@@ -136,6 +136,91 @@ reading 1,093 tokens/s at 512 to 855 at 22K.
 - The cluster runs seven servers on one 4-core host with `--memory 6g`. One server on a computer of its own can use
   the default budgets.
 
+## GeForce RTX 4000, 8 GB (Turing, sm_75)
+
+| item | value |
+|---|---|
+| model | Ternary-Bonsai-2-27B (the 9B, 4B and 2B also run) |
+| variables | `KINDI_PACK=/data/pack27b`, `KINDI_CARDS=1`, `KINDI_CTX=65536`, `KINDI_HEAD=exact` or `fast`, `KINDI_REPEAT_STOP=1`, `KINDI_MAX_TOKENS=65536`, `KINDI_CHUNK_Q8=1`, `KINDI_BLOCKING_SYNC=0` |
+| tensor cores | `KINDI_TC=1`, `KINDI_FD=1`, `KINDI_ATT_TC=1`, `KINDI_TC_TMAX=4` |
+| docker | `--memory 14g` (the first load needs it) |
+| generation | not yet measured; expect Pascal-class speed or better (the tensor-core path is new) |
+
+- Turing has int8 tensor cores. Kindi has a separate Turing backend
+  ([TURING-TENSOR-CORES.md](TURING-TENSOR-CORES.md)): with `KINDI_TC=1` on an
+  `sm_75` card it uses `mma.m8n8k16` for the decode products and the prompt
+  chunks. The Ampere backend (`sm_80` and later) is unchanged.
+- The installer's `turing` profile sets `KINDI_TC=1`, split flash-decode
+  attention (`KINDI_FD=1`), tensor-core prompt attention (`KINDI_ATT_TC=1`) and,
+  for the 27B, the 2B draft model (`KINDI_SPEC=draft2b`). It also adds the 2B
+  pack.
+- The weights keep the existing `tc` layout, and every Turing MMA is an exact
+  integer sum, so greedy output should be token-identical to the 5-trit path.
+  Verification on this card is still pending; `KINDI_TC=0` returns to the
+  5-trit path.
+- The 8 GB card fits about 65,536 tokens of context with the 27B. Larger Turing
+  cards (11 GB and more) get `KINDI_CTX=131072` and `KINDI_MEM_RESERVE_MB=160`
+  (the smaller reserve that context needs, as on the RTX 3080).
+
+## Quadro P4000, 8 GB (Pascal, sm_61)
+
+| item | value |
+|---|---|
+| model | Ternary-Bonsai-2-27B |
+| variables | `KINDI_PACK=/data/pack27b`, `KINDI_CARDS=1`, `KINDI_CTX=65536`, `KINDI_HEAD=exact` or `fast`, `KINDI_REPEAT_STOP=1`, `KINDI_MAX_TOKENS=65536`, `KINDI_CHUNK_Q8=1`, `KINDI_BLOCKING_SYNC=0` |
+| generation | not yet measured; expect GTX 1080-class speed |
+
+- Single-slot Pascal card. Use the same profile as the GeForce GTX 1080.
+
+## NVIDIA P106-100, 6 GB (Pascal, sm_61)
+
+| item | value |
+|---|---|
+| models | 2B, 4B or 9B |
+| variables | `KINDI_CTX=24576`, `KINDI_CHUNK_Q8=1`, `KINDI_BLOCKING_SYNC=0` |
+| generation | not yet measured |
+
+- A mining card with no display output. It works as a headless GPU, but check its PCIe link: many P106 cards run at x1 or x4 and are slower on prompt reading.
+- The 27B does not fit in 6 GB. Two P106 cards cannot run one model together (Kindi pairs only two Maxwell cards).
+
+## Quadro M4000, 8 GB (Maxwell 2.0, sm_52)
+
+| item | value |
+|---|---|
+| models | 2B, 4B or 9B (`/data/pack`, `/data/pack4b`, `/data/pack9b`) |
+| variables | `KINDI_CTX=24576`, `KINDI_BLOCKING_SYNC=0` |
+| generation | not yet measured; expect Maxwell-class speed |
+
+- 8 GB of memory. The 27B can be tried manually with `KINDI_PACK=/data/pack27b`; the engine fits the context to the free memory. It is not offered by default.
+
+## GeForce 940M, 2 GB (Maxwell 1.0, sm_50)
+
+| item | value |
+|---|---|
+| model | Ternary-Bonsai-2-2B |
+| variables | `KINDI_CTX=24576`, `KINDI_BLOCKING_SYNC=0` |
+| generation | not yet measured |
+
+- Laptop card, often behind Optimus. On most laptops the CPU engine is faster and simpler to use.
+
+## GeForce GT 1030, 2 GB (Pascal, sm_61)
+
+| item | value |
+|---|---|
+| models | 2B or 4B |
+| variables | `KINDI_CTX=24576`, `KINDI_CHUNK_Q8=1`, `KINDI_BLOCKING_SYNC=0` |
+| generation | not yet measured |
+
+- Low-memory Pascal card. Keep the context at 24,576 tokens or less.
+
+## Unsupported NVIDIA cards
+
+| card | reason |
+|---|---|
+| GeForce GT 430 and other Fermi / pre-Kepler cards (below sm_30) | Kindi needs Kepler (sm_30) or later; the CUDA 10.2 image does not support these cards |
+
+- Use the CPU engine (`KINDI_DEVICE=cpu`) on these machines, or remove the card.
+
 ## CPU (x86-64 with AVX2)
 
 | item | value |
