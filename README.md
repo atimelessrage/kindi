@@ -107,7 +107,7 @@ connections only from the same computer (see [Run the server](#run-the-server)).
 
 | | |
 |---|---|
-| GPU | NVIDIA, compute capability 3.0 (Kepler) or later. Tested: Quadro K420 (1 GB and 2 GB), Quadro K1200 (one card, or two in tensor parallel), Quadro K6000, Tesla P100 16 GB, GeForce GTX 1080, GeForce RTX 3080. Supported, and `kindi verify` passes: the GeForce RTX 20, 30, 40 and 50 series (speed numbers are only for the cards in the tables below). AMD: Radeon 780M (RDNA3, gfx1103) with 32 GB of computer memory or more; see [docs/AMD.md](docs/AMD.md). With no GPU, the CPU engine runs on x86-64 with AVX2. |
+| GPU | NVIDIA, compute capability 3.0 (Kepler) or later. Tested: Quadro K420 (1 GB and 2 GB), Quadro K1200 (one card, or two in tensor parallel), Quadro K6000, Tesla P100 16 GB, GeForce GTX 1080, GeForce RTX 3080. Supported, and `kindi verify` passes: the GeForce RTX 20, 30, 40 and 50 series (speed numbers are only for the cards in the tables below). This includes the Turing, Pascal and Maxwell cards in this repository's installer profiles (RTX 4000, Quadro P4000, P106-100, Quadro M4000, GeForce 940M, GT 1030). Fermi and older cards (for example GT 430) are not supported. On Turing (sm_75) cards such as the RTX 4000, `KINDI_TC=1` selects a separate Turing tensor-core backend ([docs/TURING-TENSOR-CORES.md](docs/TURING-TENSOR-CORES.md)). AMD: Radeon 780M (RDNA3, gfx1103) with 32 GB of computer memory or more; see [docs/AMD.md](docs/AMD.md). With no GPU, the CPU engine runs on x86-64 with AVX2. |
 | Driver | Kepler: the NVIDIA **470** series (the last driver branch with Kepler support). Later cards: a current driver. The image has CUDA 10.2; the host needs only the driver. AMD: the `amdgpu` driver of Linux and the kernel option `amdgpu.cwsr_enable=0`; ROCm 6.3 is in the `kindi-rocm` image. |
 | OS | Linux x86-64 (developed on Ubuntu 24.04 with Docker; the image itself is Ubuntu 18.04) |
 | RAM / disk | 2B: 4 GB RAM, ~1.5 GB disk. 27B: ~14 GB of free RAM for its first start (two K1200 cards: ~5 GB) and ~19 GB of disk. The Docker image takes ~4 GB more. |
@@ -343,7 +343,7 @@ llama.cpp on the same card, with the same model file and the same context: on th
 tokens/s and reads prompts at 1.2 tokens/s (512 tokens). The tables for each card, with their method, are in
 [docs/BENCHMARKS.md](docs/BENCHMARKS.md).
 How Kindi works: [docs/HOW-IT-WORKS.md](docs/HOW-IT-WORKS.md).
-The settings for each tested card (K420, K1200, K6000, Tesla P100, GTX 1080, RTX 3080, RTX 20/30/40/50, Radeon 780M, CPU): [docs/CARDS.md](docs/CARDS.md).
+The settings for each tested card (K420, K1200, K6000, Tesla P100, GTX 1080, RTX 3080, RTX 4000, RTX 20/30/40/50, Radeon 780M, CPU): [docs/CARDS.md](docs/CARDS.md).
 
 ## Agent benchmark
 

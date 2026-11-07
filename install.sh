@@ -201,11 +201,15 @@ if command -v nvidia-smi >/dev/null && nvidia-smi >/dev/null 2>&1; then
         *K6000*|*K5200*|*K40[!0-9]*|*K40|*K20[!0-9]*|*K20|*"GTX TITAN"*|*"GTX 780"*) c=3.5 ;;   # GK110
         *K80*) c=3.7 ;;                                                                # GK210
         *K420*|*K600*|*K2000*|*K4000*|*K4200*|*K5000*|*K520*|*K10[!0-9]*|*K10|*"GTX 6"*|*"GTX 7"[0-4]*|*"GT 7"*) c=3.0 ;;   # GK104, GK106, GK107
-        *K620*|*K1200*|*K2200*|*"GTX 75"*|*"GTX 9"*|*M[0-9]*) c=5.0 ;;
+        *"M4000"*|*"M2000"*|*"M2200"*) c=5.2 ;;                                            # GM204/GM206 Maxwell 2.0
+        *K620*|*K1200*|*K2200*|*"GTX 75"*|*"GTX 9"*|*"940M"*|*"930M"*|*M[0-9]*) c=5.0 ;;
         *"GTX 10"*|*"Quadro P"*|*"TITAN X"*|*Tesla\ P*) c=6.1 ;;
+        *"GT 1030"*|*"GT 10"*|*"P106"*) c=6.1 ;;
+        *"RTX 4000"*|*"Quadro RTX 4000"*) c=7.5 ;;            # Turing (sm_75): the turing profile, with tensor cores
         *"RTX 20"*|*"GTX 16"*|*"Quadro RTX"*|*T4*) c=7.5 ;;
         *"RTX 30"*|*A[0-9]*) c=8.6 ;;
         *"RTX 40"*|*L4*) c=8.9 ;;
+        *"GT 430"*|*"GT 420"*|*"GT 520"*|*"GT 210"*|*"GT 220"*|*"GT 240"*|*"GT 330"*) c=2.1 ;;   # Fermi / pre-Kepler
         *) c=6.1 ;;
       esac
     fi
@@ -400,9 +404,11 @@ pick_card() {     # the NVIDIA GPU with the most memory (first on a tie)
   echo $best
 }
 card_k() { local k; for k in $(seq 0 $((NG - 1))); do [ "${GIDX[$k]}" = "$1" ] && { echo "$k"; return 0; }; done; return 1; }
-card_class() {    # NVIDIA card position -> tc | pascal8 | p100 | maxwell | kepler
+card_class() {    # NVIDIA card position -> tc | turing | pascal8 | p100 | maxwell | kepler | unsupported
   local V=${GMEM[$1]} c=${GCC[$1]/./}
-  if [ "$c" -ge 80 ] && [ "$V" -ge 9500 ]; then echo tc
+  if [ "$c" -lt 30 ]; then echo unsupported
+  elif [ "$c" -ge 80 ] && [ "$V" -ge 9500 ]; then echo tc
+  elif [ "$c" -eq 75 ] && [ "$V" -ge 7500 ]; then echo turing
   elif [ "$c" -ge 61 ] && [ "$V" -ge 7500 ]; then echo pascal8
   elif [ "$c" -eq 60 ] && [ "$V" -ge 12000 ]; then echo p100     # Tesla P100 (sm_60, no dp4a): docs/CARDS.md
   elif [ "$c" -lt 50 ]; then echo kepler
@@ -424,7 +430,8 @@ nb_cards() {      # NVIDIA card positions (candidates) -> the fewest of them, la
 card_models() {   # NVIDIA card position -> the models that run on it, the best first
   local V=${GMEM[$1]}
   case "$(card_class "$1")" in
-    tc|pascal8) echo "27b nemotron 9b 4b 2b" ;;
+    unsupported) echo "" ;;
+    tc|turing|pascal8) echo "27b nemotron 9b 4b 2b" ;;
     p100) echo "27b 9b 4b 2b" ;;
     kepler) if [ "$V" -ge 11000 ]; then echo "27b 9b 4b 2b"; elif [ "$V" -ge 3800 ]; then echo "9b 4b 2b"   # no Nemotron on Kepler
             elif [ "$V" -ge 1900 ]; then echo "4b 2b"; else echo "2b"; fi ;;
@@ -432,6 +439,11 @@ card_models() {   # NVIDIA card position -> the models that run on it, the best 
        elif [ "$V" -ge 1900 ]; then echo "4b 2b"; else echo "2b"; fi ;;
   esac
 }
+for k in $(seq 0 $((NG - 1))); do
+  if [ "$(card_class "$k")" = unsupported ]; then
+    warn "GPU ${GIDX[$k]} (${GNAME[$k]}, sm_${GCC[$k]/./}) is below Kepler (sm_30): Kindi will not use it; use the CPU engine or remove the card"
+  fi
+done
 pair_ok() {       # two NVIDIA card positions -> 0 if they run a model split over both (tensor parallel)
   local a=$1 b=$2
   [ "${GCC[$a]/./}" -ge 50 ] && [ "${GCC[$a]/./}" -lt 61 ] && [ "${GCC[$b]/./}" -ge 50 ] && [ "${GCC[$b]/./}" -lt 61 ] \
@@ -621,6 +633,17 @@ profile_of() {
               ENV+=(-e KINDI_TC=1 -e KINDI_TP=1 -e KINDI_FD=1 -e KINDI_ATT_TC=1 -e KINDI_TC_TMAX=4
                     -e KINDI_SPEC=auto -e "KINDI_MTP_HEAD=/data/mtp/$MTPF")
             fi ;;
+        turing) C=${CTX/auto/65536}; MEM=14g
+                # Turing tensor cores (tc_turing.cu): the RTX 3080 feature set, on the Turing kernels, for every model
+                ENV+=(-e KINDI_CARDS=1 -e KINDI_REPEAT_STOP=1 -e KINDI_CHECKPOINT_BUDGET_MB=1280 -e KINDI_PARK_MAX=1
+                      -e KINDI_DENSE_SPACING=2048 -e KINDI_PREFIX_MAX=2 -e KINDI_MAX_TOKENS=65536
+                      -e KINDI_TC=1 -e KINDI_FD=1 -e KINDI_ATT_TC=1 -e KINDI_TC_TMAX=4 -e KINDI_CKPT_VRAM=1)
+                # 11 GB and more: the 131072-token context of the RTX 3080 (the reserve that fits it there)
+                [ "$V" -ge 11000 ] && { C=${CTX/auto/131072}; ENV+=(-e KINDI_MEM_RESERVE_MB=160); }
+                if [ "$M" = 27b ]; then   # the 2B draft model and its pack, as on the RTX 3080
+                  ENV+=(-e KINDI_SPEC=draft2b -e KINDI_SPEC_K=3 -e KINDI_SPEC_PACK=/data/pack-2b -e KINDI_SPEC_WINDOW=8192)
+                  XPACKS+=(2b)
+                fi ;;
         pascal8) C=${CTX/auto/65536}; MEM=14g; ENV+=(-e KINDI_CARDS=1 -e KINDI_REPEAT_STOP=1 -e KINDI_MAX_TOKENS=65536) ;;
         # Tesla P100 (sm_60, no dp4a): the plain engines, no speculation (on sm_60 a verify pass costs about one
         # step per token, so drafting is slower: docs/CARDS.md)

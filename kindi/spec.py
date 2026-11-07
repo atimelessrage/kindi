@@ -1,5 +1,5 @@
-"""Tensor-core decode and speculative decoding for the one-card plan engine (sm_80+, KINDI_TC=1; on Pascal sm_61
-the same plans run the dp4a kernels of tcp.cu, bit-identical products).
+"""Tensor-core decode and speculative decoding for the one-card plan engine (sm_80+ with tc.cu, sm_75 with
+tc_turing.cu, KINDI_TC=1; on Pascal sm_61 the same plans run the dp4a kernels of tcp.cu, bit-identical products).
 
 One plan per token count T = 1 .. 8: T tokens at positions pos .. pos + T - 1 in one pass, every matrix product an
 int8 tensor-core product of all T tokens (tc.cu: each token's result is bit-identical to a pass of that token
@@ -36,6 +36,7 @@ import cupy as cp
 from . import tp as _tp
 from . import chunk as _chunk
 from . import tc as _tc
+from . import tc_turing as _tc_turing
 from . import sampling
 from . import mtp as _mtp
 
@@ -108,17 +109,21 @@ _TCF_HIP = (
 
 
 class SpecKernels(object):
-    def __init__(self):
+    def __init__(self, backend=None):
+        if backend is None:
+            backend = _tc
+        self.backend = backend
         base = open(os.path.join(HERE, "kindi.cu"), encoding="utf-8").read()
         # (the device copies are made from the kernel text; _wrappers reads the parameters from the first "(", so the
         # copies are taken from a text without the launch bounds)
         wr, _ = _chunk._wrappers(re.sub(r"__launch_bounds__\(\d+\) (k_\w+)\(", r"\1(", base), WRAP)
         own = open(os.path.join(HERE, "spec.cu"), encoding="utf-8").read()
         hip = cp.cuda.runtime.is_hip
-        tcs = open(os.path.join(HERE, "tc_hip.cu" if hip else "tc.cu"), encoding="utf-8").read()
+        tc_name = "tc_hip.cu" if hip else ("tc_turing.cu" if backend is _tc_turing else "tc.cu")
+        tcs = open(os.path.join(HERE, tc_name), encoding="utf-8").read()
         tcf = open(os.path.join(HERE, "tcf.cu"), encoding="utf-8").read()
         pas = not hip and _tc.pascal()
-        names = _tc.NAMES_PASCAL if pas else _tc.NAMES
+        names = _tc.NAMES_PASCAL if pas else backend.NAMES
         if pas:
             # Pascal (sm_61): tcp.cu, the same products with dp4a on the pl layout; tca.cu (k_att_tc_T) is mma.sync
             # only. Compiled for the card itself (no PTX patch).
@@ -136,10 +141,15 @@ class SpecKernels(object):
                 tcf = tcf.replace(old, new)
             mod = cp.RawModule(code=base + "\n" + tcs + "\n" + wr + "\n" + own + "\n" + tcf)
         else:
-            tcf += chr(10) + open(os.path.join(HERE, "tca.cu"), encoding="utf-8").read()
-            p = cp.cuda.runtime.getDeviceProperties(cp.cuda.Device().id)
-            mod = _tc._patched_module(base + "\n" + wr + "\n" + own + "\n" + tcs + "\n" + tcf,
-                                      "sm_%d%d" % (p["major"], p["minor"]))
+            tca_name = "tca_turing.cu" if backend is _tc_turing else "tca.cu"
+            tcf += chr(10) + open(os.path.join(HERE, tca_name), encoding="utf-8").read()
+            if backend is _tc_turing:
+                # Turing: compute_75 PTX as NVRTC produces it (no header patching; Turing has no cp.async)
+                mod = _tc_turing.load_module(base + "\n" + wr + "\n" + own + "\n" + tcs + "\n" + tcf)
+            else:
+                p = cp.cuda.runtime.getDeviceProperties(cp.cuda.Device().id)
+                mod = _tc._patched_module(base + "\n" + wr + "\n" + own + "\n" + tcs + "\n" + tcf,
+                                          "sm_%d%d" % (p["major"], p["minor"]))
         self.mod = mod
         for k in ([w + "_T" for w in WRAP] + ["k_sgdn_pre_T", "k_sgdn_deltan_T", "k_sgdn_deltan_C", "k_sconv_C", "k_xsum_T"] +
                   list(names) + (["k_g5t4"] + ["k_g5t2_%d" % n for n in (2, 3, 4)] + ["k_g5t1_%d" % n for n in (5, 6, 7, 8)]
@@ -1445,6 +1455,15 @@ def load_stream(self):
     return True
 
 
+def _tc_backend(card):
+    """Return the tensor-core backend module for this card, or None."""
+    if _tc.supported(card):
+        return _tc
+    if _tc_turing.supported(card):
+        return _tc_turing
+    return None
+
+
 # ====================================================================================== install
 _installed = [False]
 _drafter = [None]
@@ -1485,10 +1504,13 @@ def install(log=print):
     _tp.Shard._slices, _tp.Shard.build_plans = _slices, _bplans
 
     def _load(self):
-        if not (self.tp.W in (1, 2) and self.g5l and _tc.supported(self.card) and load_stream(self)):
+        backend = _tc_backend(self.card)
+        # two cards are tensor parallel on the Ampere and Pascal kernels; the Turing backend is one card
+        w_ok = self.tp.W == 1 if backend is _tc_turing else self.tp.W in (1, 2)
+        if not (w_ok and self.g5l and backend is not None and load_stream(self)):
             o_load(self)
-        if self.tp.W in (1, 2) and self.g5l and _tc.supported(self.card):
-            self.sk = SpecKernels()
+        if w_ok and self.g5l and backend is not None:
+            self.sk = SpecKernels(backend=backend)
             repack(self, self.log)
 
     def _reserve(eng):
