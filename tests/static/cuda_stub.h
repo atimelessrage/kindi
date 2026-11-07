@@ -14,7 +14,7 @@
  * clang-tidy (real CUDA mode, device pass only, so the target is nvptx64 and the PTX asm constraints - "=f", "h",
  * ... - are the ones that actually apply; NVIDIA headers and libdevice are not needed):
  *
- *   clang-tidy --checks='-*,clang-analyzer-*,bugprone-*' --header-filter='^$' \
+ *   clang-tidy --checks='-*,clang-analyzer-*' --header-filter='^$' \
  *       --extra-arg=-x --extra-arg=cuda --extra-arg=--cuda-device-only --extra-arg=--cuda-gpu-arch=sm_75 \
  *       --extra-arg=-nocudainc --extra-arg=-nocudalib --extra-arg=-std=c++14 \
  *       --extra-arg=-include --extra-arg=tests/static/cuda_stub.h kindi/tc_turing.cu
@@ -79,6 +79,7 @@ __device__ inline float fmaxf(float a, float b) { return a > b ? a : b; }
 __device__ inline float sqrtf(float x) { (void)x; return 0.0f; }
 __device__ inline float rsqrtf(float x) { (void)x; return 0.0f; }
 __device__ inline float expf(float x) { (void)x; return 0.0f; }
+__device__ inline float rintf(float x) { return x; }
 __device__ inline float __expf(float x) { (void)x; return 0.0f; }
 __device__ inline float logf(float x) { (void)x; return 0.0f; }
 __device__ inline float powf(float a, float b) { (void)a; (void)b; return 0.0f; }

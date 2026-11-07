@@ -203,10 +203,11 @@ if command -v nvidia-smi >/dev/null && nvidia-smi >/dev/null 2>&1; then
         *K420*|*K600*|*K2000*|*K4000*|*K4200*|*K5000*|*K520*|*K10[!0-9]*|*K10|*"GTX 6"*|*"GTX 7"[0-4]*|*"GT 7"*) c=3.0 ;;   # GK104, GK106, GK107
         *"M4000"*|*"M2000"*|*"M2200"*) c=5.2 ;;                                            # GM204/GM206 Maxwell 2.0
         *K620*|*K1200*|*K2200*|*"GTX 75"*|*"GTX 9"*|*"940M"*|*"930M"*|*M[0-9]*) c=5.0 ;;
-        *"GTX 10"*|*"Quadro P"*|*"TITAN X"*|*Tesla\ P*) c=6.1 ;;
-        *"GT 1030"*|*"GT 10"*|*"P106"*) c=6.1 ;;
+        *Tesla\ P100*|*GP100*) c=6.0 ;;                        # GP100, HBM2: sm_60 (no dp4a), the p100 class
+        *"GTX 10"*|*"Quadro P"*|*"TITAN X"*|*Tesla\ P*) c=6.1 ;;   # GP10x: GTX 10, P106/P104/P102, Quadro P, P40/P4
+        *"GT 1030"*|*"GT 10"*|*"P106"*) c=6.1 ;;               # GT 1030 (GP108), GT 1010, P106-100
         *"RTX 4000"*|*"Quadro RTX 4000"*) c=7.5 ;;            # Turing (sm_75): the turing profile, with tensor cores
-        *"RTX 20"*|*"GTX 16"*|*"Quadro RTX"*|*T4*) c=7.5 ;;
+        *"RTX 20"*|*"Quadro RTX"*|*"TITAN RTX"*|*"Quadro T"*|*"GTX 16"*|*CMP\ 30HX*|*CMP\ 40HX*|*T4*) c=7.5 ;;
         *"RTX 30"*|*A[0-9]*) c=8.6 ;;
         *"RTX 40"*|*L4*) c=8.9 ;;
         *"GT 430"*|*"GT 420"*|*"GT 520"*|*"GT 210"*|*"GT 220"*|*"GT 240"*|*"GT 330"*) c=2.1 ;;   # Fermi / pre-Kepler
@@ -404,11 +405,19 @@ pick_card() {     # the NVIDIA GPU with the most memory (first on a tie)
   echo $best
 }
 card_k() { local k; for k in $(seq 0 $((NG - 1))); do [ "${GIDX[$k]}" = "$1" ] && { echo "$k"; return 0; }; done; return 1; }
+card_tc() {       # NVIDIA card position -> 0 when the Turing card has tensor cores (TU102/TU104/TU106)
+  local n; n=$(echo "${GNAME[$1]}" | tr '[:lower:]' '[:upper:]')
+  case "$n" in
+    # sm_75 without tensor cores: TU116/TU117 (GTX 16, Quadro T400/T600/T1000/T2000, MX4xx/MX5xx, CMP 30HX)
+    *"GTX 16"*|*"QUADRO T4"*|*"QUADRO T6"*|*"QUADRO T10"*|*"QUADRO T20"*|*"CMP 30HX"*|*MX*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
 card_class() {    # NVIDIA card position -> tc | turing | pascal8 | p100 | maxwell | kepler | unsupported
   local V=${GMEM[$1]} c=${GCC[$1]/./}
   if [ "$c" -lt 30 ]; then echo unsupported
   elif [ "$c" -ge 80 ] && [ "$V" -ge 9500 ]; then echo tc
-  elif [ "$c" -eq 75 ] && [ "$V" -ge 7500 ]; then echo turing
+  elif [ "$c" -eq 75 ] && [ "$V" -ge 7500 ] && card_tc "$1"; then echo turing
   elif [ "$c" -ge 61 ] && [ "$V" -ge 7500 ]; then echo pascal8
   elif [ "$c" -eq 60 ] && [ "$V" -ge 12000 ]; then echo p100     # Tesla P100 (sm_60, no dp4a): docs/CARDS.md
   elif [ "$c" -lt 50 ]; then echo kepler

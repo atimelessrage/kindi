@@ -294,6 +294,46 @@ option `amdgpu.cwsr_enable=0`. [AMD.md](AMD.md) gives the settings.
 
 - Low-memory Pascal card. Keep the context at 24,576 tokens or less.
 
+## Pascal and Turing card families
+
+These two generations contain the cards that the installer profiles above cover. The class column is what
+`card_class` in `install.sh` returns; the profile is the variables it sets. All the cards below run with `KINDI_TC=0`
+(the 5-trit path). `KINDI_TC=1` adds tensor cores only where the card has them.
+
+### Pascal (GP10x, `sm_61`; GP100 is `sm_60`)
+
+| line | cards | compute | tensor cores | class / profile |
+|---|---|---|---|---|
+| consumer | Titan X (Pascal), Titan Xp, GTX 1080 Ti, 1080, 1070 Ti, 1070, 1060 6 GB and 3 GB, 1050 Ti, 1050, GT 1030 | sm_61 | no | `pascal8` at 8 GB and more; `maxwell` below (the GT 1030 section above) |
+| workstation | Quadro P6000, P5000, P4000, P2200, P2000, P1000, P620, P600, P400 | sm_61 | no | `pascal8` at 8 GB and more, `maxwell` below (the P4000 section above) |
+| mining | P106-100, P106-090, P104-100, P102-100 | sm_61 | no | `pascal8` at 8 GB and more, `maxwell` below (the P106-100 section above) |
+| datacenter | Tesla P40, Tesla P4 | sm_61 | no | `pascal8` / `maxwell` |
+| datacenter / workstation | Tesla P100 (12/16 GB HBM2), Quadro GP100 | **sm_60** | no | `p100`: the `tcp.cu`/`tcl.cu` lane kernels (GP100 has no dp4a) |
+
+Pascal has no int8 tensor cores. With `KINDI_TC=1` the plans run the dp4a kernels of `tcp.cu` (`sm_61`) or the
+`tcl.cu` lane-table kernels (`sm_60`); the products are the same integers as on the tensor-core path, so the output
+is unchanged. A Pascal card needs the NVIDIA 470 driver branch (or newer for later cards).
+
+### Turing (TU10x / TU11x, `sm_75`)
+
+| line | cards | tensor cores | class / profile |
+|---|---|---|---|
+| consumer, RTX | Titan RTX, RTX 2080 Ti, 2080 Super, 2080, 2070 Super, 2070, 2060 Super, 2060 (6 GB and 12 GB) | yes (TU102/TU104/TU106) | `turing` (8 GB and more) |
+| workstation, RTX | Quadro RTX 8000, 6000, 5000, 4000 (and RTX 3000 mobile) | yes | `turing` (8 GB and more) |
+| datacenter | Tesla T4 (16 GB) | yes (TU104) | `turing` |
+| mining | CMP 40HX (8 GB) | yes (TU106) | `turing` |
+| consumer, GTX | GTX 1660 Ti, 1660 Super, 1660, 1650 Super, 1650, 1630 | **no** (TU116/TU117) | `maxwell` (plain engine, under 7.5 GB) |
+| workstation, entry | Quadro T400, T600, T1000, T2000 | **no** (TU117) | `maxwell` (plain engine, under 7.5 GB) |
+| mobile | GeForce MX450, MX550 (TU117) | **no** | `maxwell` |
+| mining | CMP 30HX (6 GB) | **no** (TU116) | `maxwell` (under 7.5 GB) |
+
+Only the TU102/TU104/TU106 parts have tensor cores, and only those of 7.5 GB and more take the `turing` profile and
+the `tc_turing.cu` backend (a 6 GB RTX 2060 keeps the plain profile in this release; its tensor cores can be enabled
+by hand with the variables from the RTX 4000 section). TU116/TU117 has the same compute capability 7.5 but no tensor
+cores; an `mma` instruction there traps, so `tc_turing.supported()` also checks the device name and leaves those
+cards on the plain engine (see [TURING-TENSOR-CORES.md](TURING-TENSOR-CORES.md)). Turning on `KINDI_TC=1` by hand on
+a GTX 16-series card is a no-op: the backend is not selected.
+
 ## Unsupported NVIDIA cards
 
 | card | reason |

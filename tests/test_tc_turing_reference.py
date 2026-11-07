@@ -337,6 +337,23 @@ def test_reference_layout():
     assert np.array_equal(ref_scales(S, 8, 32), d)
 
 
+def test_turing_names():
+    """tc_turing.supported() picks only the sm_75 parts that have tensor cores
+
+    TU116/TU117 has the same compute capability as TU102/TU104/TU106 but no tensor cores, and an mma instruction
+    there traps, so the device name must keep it off the Turing backend (docs/CARDS.md, the Turing families)."""
+    from kindi import tc_turing
+    yes = ("NVIDIA GeForce RTX 2060", "NVIDIA GeForce RTX 2080 Ti", "NVIDIA TITAN RTX",
+           "Quadro RTX 4000", "NVIDIA Tesla T4", "NVIDIA T4", "NVIDIA CMP 40HX")
+    no = ("NVIDIA GeForce GTX 1660 Ti", "NVIDIA GeForce GTX 1650", "NVIDIA GeForce GTX 1630",
+          "Quadro T400", "Quadro T600", "Quadro T1000", "Quadro T2000", "NVIDIA GeForce MX450",
+          "NVIDIA GeForce MX550", "NVIDIA CMP 30HX")
+    for name in yes:
+        assert tc_turing.tensor_cores(name), name
+    for name in no:
+        assert not tc_turing.tensor_cores(name), name
+
+
 def test_activations():
     """k_tc_q8: XQ, XS and XA equal the model, for round-half-even ties, a zero group and a zero input"""
     NG, ntok = 8, 7
@@ -513,7 +530,7 @@ def main():
     print("device: %s (sm_%d%d; the Turing module is compute_75 PTX, JIT-compiled)"
           % (p["name"], p["major"], p["minor"]))
     fails = 0
-    for fn in (test_reference_layout, test_activations, test_pack_layout, test_products, test_token_counts,
+    for fn in (test_turing_names, test_reference_layout, test_activations, test_pack_layout, test_products, test_token_counts,
                test_shapes_and_merges, test_sum, test_whole_chain):
         try:
             fn()

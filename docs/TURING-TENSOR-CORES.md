@@ -49,10 +49,16 @@ def _tc_backend(card):
     return None
 ```
 
-`tc_turing.supported()` requires `major == 7 and minor == 5`. Volta (7.0) is
-excluded because the int8 `m8n8k16` MMA needs `sm_75`; Ada/Hopper/Blackwell keep
-the Ampere `m16n8k32` path. If neither applies, the existing 5-trit path runs,
-so `KINDI_TC=1` on an older card is harmless.
+`tc_turing.supported()` requires `major == 7 and minor == 5` **and** a
+tensor-core Turing device name (TU102/TU104/TU106: RTX 20, Titan RTX, Quadro
+RTX, Tesla T4, CMP 40HX). Volta (7.0) is excluded because the int8
+`m8n8k16` MMA needs `sm_75`; Ada/Hopper/Blackwell keep the Ampere `m16n8k32`
+path. The other `sm_75` parts - TU116/TU117 (GTX 16 series, Quadro
+T400/T600/T1000/T2000, MX4xx/MX5xx, CMP 30HX) - have no tensor cores, and an
+`mma` instruction on them traps. Compute capability cannot tell the chips
+apart, so the name decides; an unknown `sm_75` name stays on the plain engine.
+If no backend applies, the existing 5-trit path runs, so `KINDI_TC=1` on an
+older or tensor-core-less card is harmless.
 
 The backend is used only when the model is the one-card 5-trit (`g5l`) path; the
 same condition already guards the Ampere backend.
@@ -229,12 +235,19 @@ instructions itself. The driver JIT then assembles it.
 `install.sh` adds a `turing` card class:
 
 ```sh
-elif [ "$c" -eq 75 ] && [ "$V" -ge 7500 ]; then echo turing
+card_tc() {       # 0 for TU102/TU104/TU106; 1 for TU116/TU117 and the like
+  case "$name" in *"GTX 16"*|*"QUADRO T4"*|*"QUADRO T6"*|*"QUADRO T10"*|*"QUADRO T20"*|*"CMP 30HX"*|*MX*) return 1 ;; esac
+  return 0
+}
+...
+elif [ "$c" -eq 75 ] && [ "$V" -ge 7500 ] && card_tc "$k"; then echo turing
 ```
 
-It is checked after `tc` and before `pascal8`, so Turing cards of 7.5 GB or more
-(such as the 8 GB RTX 4000) take the Turing profile instead of the Pascal 8 GB
-profile. The profile (`profile_of`) sets:
+It is checked after `tc` and before `pascal8`, so tensor-core Turing cards of
+7.5 GB or more (such as the 8 GB RTX 4000) take the Turing profile instead of
+the Pascal 8 GB profile. The name check keeps the tensor-core-less `sm_75` parts
+(GTX 16 series and the like) on the plain profile, where `KINDI_TC=1` is never
+set. The profile (`profile_of`) sets:
 
 ```text
 KINDI_CARDS=1, KINDI_CTX=65536 (131072 on 11 GB and more), KINDI_MAX_TOKENS=65536
@@ -271,11 +284,13 @@ to the existing path; no source change is required.
 
 ## Verification
 
-The int8 products are exact integer sums, so the Turing kernels can be checked
-without a Turing card: the same packed weights, quantized activations, scales and
-integer sums were fed to `tc.cu` (built for `compute_89`) and to `tc_turing.cu`
-(built for `compute_75` and JIT-compiled by the same driver) and the outputs were
-compared byte for byte.
+The full record, the exact commands and the pending sm_75 checks are in
+[VERIFICATION.md](VERIFICATION.md). In short: the int8 products are exact integer
+sums, so the Turing kernels can be checked without a Turing card. An independent
+NumPy model of the layout and arithmetic was compared with `SpecKernels(
+backend=tc_turing)` (built for `compute_75` and JIT-compiled by the sm_89 driver),
+and the same packed weights, quantized activations, scales and integer sums were
+fed to `tc.cu` and to `tc_turing.cu` and compared byte for byte.
 
 Done locally (RTX 4060 Ti, driver 13.4, no Turing GPU):
 
@@ -294,7 +309,13 @@ Done locally (RTX 4060 Ti, driver 13.4, no Turing GPU):
 - `.version 6.5` (CUDA 10.2's PTX) with `.target sm_75` assembles, so the image's
   NVRTC output needs no patching;
 - `tc_turing.py` and `spec.py` pass `py_compile`;
-- `install.sh` passes `bash -n`.
+- `install.sh` passes `bash -n`;
+- the CPU-reference suite ([tests/test_tc_turing_reference.py](../tests/test_tc_turing_reference.py),
+  9 tests) passes: 180/180 vector products, 80/80 token counts, 27/27
+  shapes and merges, and the whole chain is bit-identical to the fused model
+  768/768 for split 1 and split 4;
+- cppcheck and clang-tidy (CUDA device mode, `sm_75`) report no defect in
+  `tc_turing.cu` or `tca_turing.cu`; see [VERIFICATION.md](VERIFICATION.md).
 
 Pending on `sm_75` hardware (RTX 4000 or Quadro RTX 4000):
 
@@ -315,8 +336,10 @@ Until then, treat the Turing numbers as unmeasured.
   parts.
 - No `cp.async` means the staging is synchronous; the double buffer hides the
   latency only partially.
-- Only the RTX 4000 class (8 GB and more) is routed to the Turing profile; a
-  6 GB Turing card still takes the older profile and runs without tensor cores.
+- The backend selects on the device name as well as compute capability, because
+  TU116/TU117 has no tensor cores. An sm_75 card whose driver reports an
+  unexpected name stays on the plain engine (safe, but no tensor cores) until
+  the name is added to `tc_turing._TENSOR`.
 - The prompt attention value product uses `m16n8k8` where Ampere uses
   `m16n8k16`. Both are fp16 products with fp32 accumulation, but the association
   of the 32-term sum differs in principle. The local comparison came out
