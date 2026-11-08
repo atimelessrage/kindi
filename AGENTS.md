@@ -58,6 +58,7 @@ Read it before editing a shared file.
 | Plan-engine exactness guard | this worktree | `freebuff/project-review-audit-report` | `kindi/spec.py`, `AGENTS.md`, `bench-logs/diag_exact_plan.py`, `bench-logs/diag_verify8.py`, `bench-logs/diag_spec_long.py` | 2B sp=1 (no k_tc_sum) + 9B HB guard; long spec 160/160 exact; **main worktree has uncommitted `kindi/spec.py`; merge by hand** |
 | Long-term card support (single/dual) | this worktree | `freebuff/project-review-audit-report` | `docs/CARD-SUPPORT.md`, `AGENTS.md` | roadmap and acceptance contract written; no engine/installer code changed; the 4060 Ti 8 GB classification and all non-Maxwell pairings are blocked by the main worktree's dirty `install.sh` |
 | Long-term CPU support (i5-2500K, W-2133, i9-13900K, i7-8086K) | this worktree | `freebuff/project-review-audit-report` | `docs/CPU-SUPPORT.md`, `AGENTS.md` | roadmap and acceptance contract written; no CPU/installer code changed; `kindi/cpu.py`, `kindi/kcpu.c` and `install.sh` are main-owned/dirty; the i5-2500K needs an AVX-only/scalar fallback |
+| CI + plan-engine regression test | this worktree | `freebuff/project-review-audit-report` | `.github/workflows/ci.yml`, `tests/test_plan_engine.py`, `AGENTS.md` | done; CI installs `tests/requirements-test.txt` (FastAPI/httpx were missing, so collection failed) and ShellChecks the committed LF blob; 20 new CPU-only plan tests; 78 full tests pass. The main worktree's own `.github/workflows/ci.yml` is still dirty: reconcile by hand, do not overwrite it |
 | `install.sh` / `.github` collision | both | both | `install.sh`, `.github/**` | modified or present in both worktrees; do not merge or overwrite until the two changes are reconciled by hand (the main copy was empty on 2026-11-08) |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
@@ -90,8 +91,14 @@ is not a lock.
 
 - Branch `freebuff/project-review-audit-report`; audit follow-up commits `5061af2`, `2b84658`,
   `4b90ca9` and this roadmap commit.
-- Verified: `python -m pytest tests/ -q` -> 58 passed; focused server/config/installer run -> 20
-  passed; `bash -n install.sh` -> OK; `python -m compileall -q kindi/server.py` -> OK. No GPU run.
+- Verified: `python -m pytest tests/ -q` -> 78 passed (58 before the CI/plan-engine task, plus 20
+  in `tests/test_plan_engine.py`); focused server/config/installer run -> 20 passed; `bash -n
+  install.sh` -> OK; `python -m compileall -q kindi` -> OK; ShellCheck on the committed LF blob ->
+  exit 0. No GPU run, so no plan was built or launched.
+- CI is now runnable from this worktree (`.github/workflows/ci.yml`): the CPU job installs
+  `tests/requirements-test.txt` and compiles every module; the shell job parses `install.sh` and
+  ShellChecks `git show HEAD:install.sh`, which is LF even on a CRLF checkout. The main worktree
+  has its own dirty copy of this file: reconcile by hand, do not overwrite it.
 - Release docs are prepared on this branch: `docs/INSTALL.md` pins the fixed release artifact
   `38fb3417...` (the LF Git blob is `9b25e78...`; do not mix them), and `docs/RELEASE-CHECKLIST.md`
   records the release steps. The guard itself is committed in `2b84658`. No tag, push or upload was made.
@@ -114,7 +121,7 @@ is not a lock.
 | `kindi/*.cu` | CUDA kernels, compiled at runtime; `kcpu.c` is the AVX2 CPU engine |
 | `install.sh` | the installer: machine check, Docker, models, `kindi verify`, services |
 | `docs/` | user docs; `docs/CONFIGURATION.md` is the key reference |
-| `tests/` | CPU-only unit tests (config, chat, tools, tokenizer, sampling, cache) and the installer GRUB fixture test |
+| `tests/` | CPU-only unit tests (config, chat, tools, tokenizer, sampling, cache), the installer GRUB fixture test and the plan-engine contract test (`test_plan_engine.py`, stand-in `cupy`) |
 | `docker/` | `Dockerfile` (CUDA 10.2) and `Dockerfile.rocm` |
 
 ## Setup
@@ -273,6 +280,15 @@ Next, in order:
    `compileall -q kindi` OK; `sha256sum -c` -> `install.sh: OK`; no control bytes. No tag, push or
    upload was made. The main worktree's empty `install.sh` and dirty `docs/INSTALL.md` remain a
    publication blocker; the release checklist says so.
+9. [x] CI made runnable and the plan engine got a CPU-only regression test: `.github/workflows/ci.yml`
+   installs `tests/requirements-test.txt` (the old `numpy pytest` install left `test_server.py`
+   uncollectable) and ShellChecks the committed LF blob (a Windows CRLF checkout fails SC1017).
+   `tests/test_plan_engine.py` imports `kindi/spec.py` and `kindi/tp.py` with a stand-in `cupy` and
+   pins TMAX = 8 and the `k -> TMAX - 1` draft clamp (T = 8 verify), the 2B HB-512 one-split rule,
+   and both HB-4096 (9B) guards. Evidence: `pytest tests/test_plan_engine.py -q` -> 20 passed;
+   `pytest tests/ -q` -> 78 passed; `bash -n install.sh`, `compileall -q kindi` and ShellCheck on
+   `git show HEAD:install.sh` -> exit 0; five mutations of the guarded lines each fail their test.
+   No GPU run: the plans themselves were not built or executed.
 
 Decisions not to undo without new measurements:
 
