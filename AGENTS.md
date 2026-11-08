@@ -16,7 +16,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `0fc024f` | main checkout; another agent is active here |
-| `C:/Users/ICH/.freebuff/worktrees/f0e51299/kindi` | `freebuff/project-review-audit-report` | `8861502` | this session |
+| `C:/Users/ICH/.freebuff/worktrees/f0e51299/kindi` | `freebuff/project-review-audit-report` | `4b90ca9` | this session |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
@@ -56,6 +56,7 @@ Read it before editing a shared file.
 | Phase-0 CB spike | this worktree | `freebuff/project-review-audit-report` | `bench-logs/spike_batch_gemm.py`, `bench-logs/phase0-spike/**`, `docs/CONTINUOUS-BATCHING.md` | implemented; B=4 gate FAIL (0.69x vs single decode); no production code changed |
 | Plan-engine exactness guard | this worktree | `freebuff/project-review-audit-report` | `kindi/spec.py`, `AGENTS.md`, `bench-logs/diag_exact_plan.py`, `bench-logs/diag_verify8.py`, `bench-logs/diag_spec_long.py` | 2B sp=1 (no k_tc_sum) + 9B HB guard; long spec 160/160 exact; **main worktree has uncommitted `kindi/spec.py`; merge by hand** |
 | Long-term card support (single/dual) | this worktree | `freebuff/project-review-audit-report` | `docs/CARD-SUPPORT.md`, `AGENTS.md` | roadmap and acceptance contract written; no engine/installer code changed; the 4060 Ti 8 GB classification and all non-Maxwell pairings are blocked by the main worktree's dirty `install.sh` |
+| Long-term CPU support (i5-2500K, W-2133, i9-13900K, i7-8086K) | this worktree | `freebuff/project-review-audit-report` | `docs/CPU-SUPPORT.md`, `AGENTS.md` | roadmap and acceptance contract written; no CPU/installer code changed; `kindi/cpu.py`, `kindi/kcpu.c` and `install.sh` are main-owned/dirty; the i5-2500K needs an AVX-only/scalar fallback |
 | `install.sh` / `.github` collision | both | both | `install.sh`, `.github/**` | modified or present in both worktrees; do not merge or overwrite until the two changes are reconciled by hand (the main copy was empty on 2026-11-08) |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
@@ -86,8 +87,8 @@ is not a lock.
 
 ## Handoff (2026-11-09)
 
-- Branch `freebuff/project-review-audit-report`; audit follow-up commits `5061af2` and `2b84658`,
-  plus this handoff commit.
+- Branch `freebuff/project-review-audit-report`; audit follow-up commits `5061af2`, `2b84658`,
+  `4b90ca9` and this roadmap commit.
 - Verified: `python -m pytest tests/ -q` -> 58 passed; focused server/config/installer run -> 20
   passed; `bash -n install.sh` -> OK; `python -m compileall -q kindi/server.py` -> OK. No GPU run.
 - Still blocked: the 0.4.0 installer checksum in `docs/INSTALL.md`; the central docs/CI, packaging
@@ -97,6 +98,10 @@ is not a lock.
   the 8 GB RTX 4060 Ti as `pascal8` because `tc` also requires at least 9,500 MiB, and `pair_ok()`
   rejects every pair above sm_60. Both fixes and the `tc2` profile are main-worktree work; the card
   target is not a support claim until a GPU verify is recorded.
+- Long-term CPU target is in `docs/CPU-SUPPORT.md`. The CPU engine requires AVX2, FMA and F16C but
+  checks none of them; the i5-2500K (AVX only) therefore cannot build the current `kcpu.c`. The Xeon
+  W-2133, i9-13900K and i7-8086K have the required instructions but have no measured CPU run here.
+  `kindi/cpu.py`, `kindi/kcpu.c` and `install.sh` remain main-owned; no CPU code changed.
 
 ## Layout
 
@@ -254,6 +259,10 @@ Next, in order:
    the 8 GB RTX 4060 Ti is classified `pascal8` because `tc` also demands 9,500 MiB, and `pair_ok()` rejects
    every pair above sm_60. No installer/engine code changed here; the implementation is main-worktree work
    and no card is a support claim until a GPU verify is recorded.
+7. [x] Long-term CPU target written to `docs/CPU-SUPPORT.md`: the four requested CPUs, the AVX2/FMA/F16C
+   requirement, per-CPU single-socket targets, the i5-2500K fallback work, hybrid i9 thread tuning, and
+   the CPU acceptance matrix. No CPU/installer code changed here; no CPU is a support claim until a
+   native build and `kindi verify` are recorded.
 
 Decisions not to undo without new measurements:
 
