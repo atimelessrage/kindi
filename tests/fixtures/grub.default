@@ -1,0 +1,9 @@
+# A sample /etc/default/grub for tests/test_installer_grub.py.
+# The installer rewrites only the GRUB_CMDLINE_LINUX_DEFAULT line; every other line here must
+# come out of the edit unchanged, and the parameters already on that line must survive.
+GRUB_DEFAULT=0
+GRUB_TIMEOUT_STYLE=hidden
+GRUB_TIMEOUT=10
+GRUB_DISTRIBUTOR=`lsb_release -i -s 2> /dev/null || echo Debian`
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash resume=/dev/nvme0n1p2"
+GRUB_CMDLINE_LINUX=""

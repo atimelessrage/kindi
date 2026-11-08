@@ -50,7 +50,7 @@ Read it before editing a shared file.
 | Documentation drift (P1-3, P1-4, P1-5, P1-6) | this worktree | `freebuff/project-review-audit-report` | `WHY.md`, `docs/CONFIGURATION.md`, `docs/INSTALL.md`, `docs/BENCHMARKS.md`, `docs/CARDS.md`, `docs/MTP.md`, `kindi.conf.example`, `kindi/spec.py` | partial: `WHY.md` and `kindi.conf.example` updated; `docs/CONFIGURATION.md`, `docs/INSTALL.md`, `docs/CARDS.md`, `docs/BENCHMARKS.md` and `docs/MTP.md` remain blocked by the main worktree's dirty copies |
 | Continuous-batching investigation | this worktree | `freebuff/project-review-audit-report` | `docs/CONTINUOUS-BATCHING.md`, `AGENTS.md` | archived NO-GO; Phase-0 gate failed (0.69x); top banner and section 8 updated; no production code changed |
 | Server request validation + boundary hardening (P1-1/P2-1) | this worktree | `freebuff/project-review-audit-report` | `kindi/server.py`, `tests/test_server.py`, `tests/test_config_example.py` | done; 10 server tests (validation, auth, 413 body cap) + 1 example-config test + 9 installer fixture tests = 20 passed; invalid requests and 413 keep the cache |
-| GRUB edit guard (plan 1) | this worktree | `freebuff/project-review-audit-report` | `install.sh`, `tests/test_installer_grub.py` | done; 9 fixture tests pass, guard verified non-vacuous. **Release blocker: docs/INSTALL.md still pins the buggy 592a... hash; main owns docs/INSTALL.md. `T:/kindi/install.sh` also remains dirty; reconcile by hand before release** |
+| GRUB edit guard (plan 1) | this worktree | `freebuff/project-review-audit-report` | `install.sh`, `tests/test_installer_grub.py` | done; 9 fixture tests pass, guard verified non-vacuous. **Release blocker: docs/INSTALL.md still pins the buggy 592a... hash; the fixed copy hashes 38fb3417...; main owns docs/INSTALL.md. `T:/kindi/install.sh` also remains dirty; reconcile by hand before release** |
 | Per-slot plain-engine plan (Phase 1) | this worktree | `freebuff/project-review-audit-report` | `docs/PER-SLOT-REFACTOR.md`, `docs/CONTINUOUS-BATCHING.md` | archived NO-GO with `docs/CONTINUOUS-BATCHING.md`; no engine code changed |
 | 2B CB-vs-spec measurement | this worktree | `freebuff/project-review-audit-report` | `bench-logs/compare-2b-cb-spec/**`, `AGENTS.md` | measured; no code changed; results in `bench-logs/compare-2b-cb-spec/RESULTS.md` |
 | Phase-0 CB spike | this worktree | `freebuff/project-review-audit-report` | `bench-logs/spike_batch_gemm.py`, `bench-logs/phase0-spike/**`, `docs/CONTINUOUS-BATCHING.md` | implemented; B=4 gate FAIL (0.69x vs single decode); no production code changed |
@@ -203,7 +203,7 @@ Done:
   with a clear error; the 9B plain engine passes 4/4 at 87.8 tok/s. No 27B pack was present,
   so its unchanged HB=1024 path was not re-run. Evidence:
   `bench-logs/verify-2b-plan-tc1-tmax4-fixed.log`, `...tmax8-fixed.log`, `diag-verify8.log`,
-  `diag-spec-long.log`, `verify-9b-plan-tc1-guard.log`, `verify-9b-plain-fixed.log`; `pytest tests/ -q` 55 passed.
+  `diag-spec-long.log`, `verify-9b-plan-tc1-guard.log`, `verify-9b-plain-fixed.log`; `pytest tests/ -q` 58 passed.
 
 Next, in order:
 
@@ -219,7 +219,8 @@ Next, in order:
    a configured API key is compared with `hmac.compare_digest`; bodies over 16 MiB
    (`KINDI_MAX_BODY_MB`) return 413 without touching the prompt cache. Evidence: `python -m pytest
    tests/test_server.py tests/test_config_example.py tests/test_installer_grub.py -q` -> 20 passed;
-   with `_validate_request` stubbed to a no-op the earlier validation tests fail, so they are not vacuous.
+   `python -m pytest tests/ -q` -> 58 passed; with `_validate_request` stubbed to a no-op the earlier
+   validation tests fail, so they are not vacuous.
 3. [~] Documentation sync. `WHY.md` now names 0.4.0 and no longer says "one CUDA file";
    `kindi.conf.example` now lists every key in `config.DEFAULTS` (including the five that were
    missing). **Still blocked:** `T:/kindi` has uncommitted changes in `docs/CONFIGURATION.md`,

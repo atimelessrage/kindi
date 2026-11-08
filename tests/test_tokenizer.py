@@ -1,0 +1,49 @@
+"""Tokenizer ids on a synthetic Qwen3.5 vocabulary, without a model pack."""
+from kindi.tokenizer import Tok, _B2U, bpe, gpt2_bytes
+
+BASE = 256          # the 256 byte-level tokens
+AB = BASE           # "ab"
+ABC = BASE + 1      # "abc"
+ADDED = 248044      # the first added-token slot Tok reads
+
+
+def make_tok(tmp_path):
+    """A 248k-entry vocabulary: the GPT-2 byte alphabet, two merges, two added tokens."""
+    vocab = ([_B2U[b] for b in range(BASE)] + ["ab", "abc"]
+             + [""] * (ADDED - (BASE + 2)) + ["<|im_start|>", "<|im_end|>"])
+    assert len(vocab) == ADDED + 2
+    merges = tmp_path / "merges.txt"
+    merges.write_text("a b\nab c\n", encoding="utf-8")
+    return Tok(vocab, str(merges))
+
+
+def test_gpt2_bytes_maps_ascii_to_itself():
+    assert gpt2_bytes("abc") == "abc"
+    assert gpt2_bytes(" ") == _B2U[32]
+
+
+def test_golden_ids(tmp_path):
+    tok = make_tok(tmp_path)
+    assert tok.encode("ab") == [AB]
+    assert tok.encode("abc") == [ABC]
+    assert tok.encode("Hi") == [72, 105]
+    assert tok.encode("<|im_start|>") == [ADDED]
+
+
+def test_decode_round_trip(tmp_path):
+    tok = make_tok(tmp_path)
+    assert tok.decode([AB]) == "ab"
+    assert tok.decode(tok.encode("abc")) == "abc"
+
+
+def test_added_token_is_split_out_of_text(tmp_path):
+    tok = make_tok(tmp_path)
+    ids = tok.encode("Hi<|im_start|>there")
+    assert ids[:2] == [72, 105]
+    assert ids[2] == ADDED
+    assert tok.decode(ids) == "Hi<|im_start|>there"
+
+
+def test_lowest_rank_pair_merges_first():
+    ranks = {("a", "b"): 1, ("b", "c"): 0}
+    assert bpe("abc", ranks) == ["a", "bc"]

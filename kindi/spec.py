@@ -316,6 +316,15 @@ def tune(s, R, C, rowpar=None):
     cache = s.__dict__.setdefault("tccfg", {})
     if (R, C) in cache:
         return cache[(R, C)]
+    if s.HB == 512:
+        # The 512-point packs (the 2B) are verified against llama.cpp's fp16 K/V reference. A column
+        # split's k_tc_sum order differs from the unsplit dot product; the 1-ulp difference flips an
+        # argmax at long prompts (seen at T=1, T=4 and T=8). One split keeps the plan token-exact;
+        # the 27B (HB 1024, q8_0 reference) keeps its measured splits.
+        NU = C // 1024
+        cfg = ((8 if NU > 8 else 4) if rowpar else 2, 1)
+        cache[(R, C)] = cfg
+        return cfg
     if os.environ.get("KINDI_TC_TUNE", "0") != "1":
         # a fixed rule (the timed bests on the 3080), so a restart never changes a split and its rounding
         NU = C // 1024
@@ -1468,7 +1477,10 @@ def install(log=print):
         return tern, flt
 
     def _bplans(self):
-        if getattr(self, "tc_layout", False):          # the tensor-core plans replace them (any Hadamard block)
+        if self.HB not in (512, 1024):
+            raise SystemExit("kindi: the tensor-core plan engine supports Hadamard blocks of 512 and 1024 "
+                             "(this pack has %d); use the plain engine (KINDI_TP=0)" % self.HB)
+        if getattr(self, "tc_layout", False):          # the tensor-core plans replace them
             drv = _tp._drv()
             cp.cuda.Device(self.card).synchronize()
             if cp.cuda.runtime.is_hip:             # HIP: the device index (tp.py hipSetDevice(s.ctxh))

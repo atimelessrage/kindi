@@ -40,7 +40,7 @@ URL[nanbeige]="${NB_CARD_URL}/resolve/main/${GGUF[nanbeige]}"
 # MTP head for the 2B (docs/MTP.md, tensor-core cards only).
 # The files are on Hugging Face (https://huggingface.co/ahtx/kindi-mtp-heads); KINDI_MTP_URL overrides the location.
 MTP_URL="${KINDI_MTP_URL:-https://huggingface.co/ahtx/kindi-mtp-heads/resolve/main}"
-MTPF="kindi-mtp-2b-v1.npz"; MTPSHA="1b5c0c790a594af368c3646370c527c319cdb3bb0592dd3e523e752f721a5520"; MTPSIZE=60960552
+MTPF="kindi-mtp-2b-v1.npz"; MTPSHA="1b5c0c790a594af368c3646370c527c319cdb3bb0592dd3e523e752f721a5520"
 mtp_ready() { [ -f "$DIR/mtp/$MTPF" ] && [ -f "$DIR/mtp/$MTPF.sha256-ok" ]; }
 
 DIR="${KINDI_HOME:-$HOME/.kindi}"
@@ -169,8 +169,7 @@ if [ "$MODE" = uninstall ]; then
 fi
 
 echo "${B}Kindi ${KINDI_VERSION} installer${N}$([ "$DRY" = 1 ] && echo " (dry run: nothing changes)")"
-PREV=""
-[ -f "$STATE" ] && PREV=$(cat "$STATE") && info "found an earlier install (${STATE}): this run upgrades or repairs it"
+[ -f "$STATE" ] && info "found an earlier install (${STATE}): this run upgrades or repairs it"
 
 # ------------------------------------------------------------------------------------------------ 1. machine
 step "Check the machine" "Kindi runs on 64-bit Linux: on an NVIDIA GPU from the Quadro K420 (Kepler) up, on an AMD RDNA3 GPU, or on the CPU."
@@ -369,6 +368,43 @@ if [ "$NA" -gt 0 ] && [ "$GPU" != cpu ]; then
   fi
 fi
 
+# The kernel command line that GRUB_CMDLINE_LINUX_DEFAULT="..." holds (empty when the file has no such line).
+grub_cmdline_value() {
+  local line; line=$(grep -m1 '^GRUB_CMDLINE_LINUX_DEFAULT=' "$1" || true)
+  line=${line#*=\"}
+  printf '%s' "${line%\"*}"
+}
+
+# $1: the line before the edit, $2: after. The option is there, and no parameter of the old line is gone.
+cwsr_line_ok() {
+  local p
+  case " $2 " in *" amdgpu.cwsr_enable=0 "*) ;; *) return 1 ;; esac
+  for p in $1; do
+    case " $2 " in *" $p "*) ;; *) return 1 ;; esac
+  done
+  return 0
+}
+
+# $1: the grub file. Back it up, rewrite it, then read it back before update-grub runs: a sed that fails, adds
+# nothing, or drops a parameter of the old line restores the backup and stops (0.4.0's literal 0x01 replaced
+# every parameter on the line, and the installer still reported success).
+cwsr_edit_grub() {
+  local file="$1" old new backup
+  [ "$DRY" = 1 ] && return 0
+  old=$(grub_cmdline_value "$file")
+  backup="$file.kindi-$(date +%Y%m%d%H%M%S)"
+  run $SUDO cp "$file" "$backup" || die "could not back up $file to $backup"
+  if ! run $SUDO sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="\1 amdgpu.cwsr_enable=0"/' "$file"; then
+    run $SUDO cp "$backup" "$file" || die "the edit of $file failed, and the backup $backup could not be restored"
+    die "the edit of $file failed; the original file is back (backup: $backup)"
+  fi
+  new=$(grub_cmdline_value "$file")
+  if ! cwsr_line_ok "$old" "$new"; then
+    run $SUDO cp "$backup" "$file" || die "the edit of $file lost a kernel parameter, and the backup $backup could not be restored"
+    die "the edit of $file lost a kernel parameter or added nothing; the original file is back (backup: $backup)"
+  fi
+}
+
 # The Radeon 780M (gfx1103) resets under long GPU work when the driver preempts a running kernel (CWSR). The kernel
 # option amdgpu.cwsr_enable=0 turns that preemption off; with it, the long-prompt tests that reset the GPU passed.
 check_cwsr() {
@@ -386,8 +422,7 @@ check_cwsr() {
   [ "$a" = y ] || [ "$a" = Y ] || [ "$a" = yes ] || { info "not changed"; return 0; }
   need_sudo
   if grep -q 'amdgpu.cwsr_enable=' /etc/default/grub; then ok "the option is already in /etc/default/grub (reboot to use it)"; return 0; fi
-  run $SUDO cp /etc/default/grub "/etc/default/grub.kindi-$(date +%Y%m%d%H%M%S)"
-  run $SUDO sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT=" amdgpu.cwsr_enable=0"/' /etc/default/grub
+  cwsr_edit_grub /etc/default/grub
   run $SUDO update-grub
   ok "set; reboot to use it (Kindi works before the reboot, but long prompts can reset the GPU)"
 }
@@ -397,7 +432,7 @@ step "Choose the setup" "Every setup that Kindi supports on this machine, the re
 pick_card() {     # the NVIDIA GPU with the most memory (first on a tie)
   local best=0
   for k in $(seq 0 $((NG - 1))); do [ "${GMEM[$k]}" -gt "${GMEM[$best]}" ] && best=$k; done
-  echo $best
+  echo "$best"
 }
 card_k() { local k; for k in $(seq 0 $((NG - 1))); do [ "${GIDX[$k]}" = "$1" ] && { echo "$k"; return 0; }; done; return 1; }
 card_class() {    # NVIDIA card position -> tc | pascal8 | p100 | maxwell | kepler
@@ -889,18 +924,18 @@ echo "  Kindi      ${GOT_VER}${GOT_SHA:+ (commit ${GOT_SHA})}"
 for i in $(seq 0 $((NS - 1))); do
   echo "  ${SV_NAME[$i]}  http://127.0.0.1:${SV_PORT[$i]}/v1  $(model_name "${SV_M[$i]}") on $([ "${SV_B[$i]}" = cpu ] && echo "the CPU" || echo "$([ "${SV_B[$i]}" = rocm ] && echo "AMD ")GPU ${SV_C[$i]}"), ${GOT_CTX[$i]:-?} tokens, ${SPEED[$i]:-?} tokens/s in the check"
 done
-URL="http://127.0.0.1:${SV_PORT[0]}/v1"; MODEL_NAME=$(model_name "${SV_M[0]}")
+BASE_URL="http://127.0.0.1:${SV_PORT[0]}/v1"
 cat <<EOF
 
   Each server is an OpenAI-compatible endpoint; status: /health on its port. Logs: ${DOCKER} logs -f ${SV_NAME[0]}
   The containers restart unless stopped.
 
 Try it:
-  curl ${URL}/chat/completions -H 'Content-Type: application/json' \\
+  curl ${BASE_URL}/chat/completions -H 'Content-Type: application/json' \\
     -d '{"messages": [{"role": "user", "content": "Hello!"}]}'
 
 OpenAI clients:
-  export OPENAI_BASE_URL=${URL}  OPENAI_API_KEY=none
+  export OPENAI_BASE_URL=${BASE_URL}  OPENAI_API_KEY=none
 
 pi (~/.pi/agent/models.json; one provider for each server):
   {"providers": {
