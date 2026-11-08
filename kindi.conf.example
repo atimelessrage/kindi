@@ -1,6 +1,7 @@
 # Kindi configuration - copy to ~/.kindi/kindi.conf (or ./kindi.conf, or point KINDI_CONFIG / --config at it).
 # Every key is optional; these are the defaults. Environment variables KINDI_<KEY> and command-line flags win over
-# this file. See docs/CONFIGURATION.md.
+# this file. See docs/CONFIGURATION.md, and docs/CONFIGURATION-REFERENCE.md for the generated list of
+# every key and every KINDI_* environment variable.
 
 [kindi]
 # --- where things live

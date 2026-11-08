@@ -59,6 +59,7 @@ Read it before editing a shared file.
 | Long-term card support (single/dual) | this worktree | `freebuff/project-review-audit-report` | `docs/CARD-SUPPORT.md`, `AGENTS.md` | roadmap and acceptance contract written; no engine/installer code changed; the 4060 Ti 8 GB classification and all non-Maxwell pairings are blocked by the main worktree's dirty `install.sh` |
 | Long-term CPU support (i5-2500K, W-2133, i9-13900K, i7-8086K) | this worktree | `freebuff/project-review-audit-report` | `docs/CPU-SUPPORT.md`, `AGENTS.md` | roadmap and acceptance contract written; no CPU/installer code changed; `kindi/cpu.py`, `kindi/kcpu.c` and `install.sh` are main-owned/dirty; the i5-2500K needs an AVX-only/scalar fallback |
 | CI + plan-engine regression test | this worktree | `freebuff/project-review-audit-report` | `.github/workflows/ci.yml`, `tests/test_plan_engine.py`, `AGENTS.md` | done; CI installs `tests/requirements-test.txt` (FastAPI/httpx were missing, so collection failed) and ShellChecks the committed LF blob; 20 new CPU-only plan tests; 78 full tests pass. The main worktree's own `.github/workflows/ci.yml` is still dirty: reconcile by hand, do not overwrite it |
+| Generated configuration reference | this worktree | `freebuff/project-review-audit-report` | `kindi/config_reference.py`, `tests/test_config_reference.py`, `docs/CONFIGURATION-REFERENCE.md`, `kindi.conf.example`, `AGENTS.md` | done; `python -m kindi.config_reference` renders 25 config keys and 104 environment rows from the code, and `--check` plus 6 tests fail on drift. `docs/CONFIGURATION.md` stays main-owned/dirty; the generated file is new, so merging it is additive |
 | `install.sh` / `.github` collision | both | both | `install.sh`, `.github/**` | modified or present in both worktrees; do not merge or overwrite until the two changes are reconciled by hand (the main copy was empty on 2026-11-08) |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
@@ -91,14 +92,19 @@ is not a lock.
 
 - Branch `freebuff/project-review-audit-report`; audit follow-up commits `5061af2`, `2b84658`,
   `4b90ca9` and this roadmap commit.
-- Verified: `python -m pytest tests/ -q` -> 78 passed (58 before the CI/plan-engine task, plus 20
-  in `tests/test_plan_engine.py`); focused server/config/installer run -> 20 passed; `bash -n
-  install.sh` -> OK; `python -m compileall -q kindi` -> OK; ShellCheck on the committed LF blob ->
-  exit 0. No GPU run, so no plan was built or launched.
+- Verified: `python -m pytest tests/ -q` -> 84 passed (58 before the CI/plan-engine task, plus 20
+  in `tests/test_plan_engine.py` and 6 in `tests/test_config_reference.py`); focused
+  server/config/installer run -> 20 passed; `bash -n install.sh` -> OK; `python -m compileall -q
+  kindi` -> OK; ShellCheck on the committed LF blob -> exit 0. No GPU run, so no plan was built or
+  launched.
 - CI is now runnable from this worktree (`.github/workflows/ci.yml`): the CPU job installs
   `tests/requirements-test.txt` and compiles every module; the shell job parses `install.sh` and
   ShellChecks `git show HEAD:install.sh`, which is LF even on a CRLF checkout. The main worktree
   has its own dirty copy of this file: reconcile by hand, do not overwrite it.
+- The configuration reference is generated from the code (`python -m kindi.config_reference`):
+  `docs/CONFIGURATION-REFERENCE.md` lists every `config.DEFAULTS` key and every `KINDI_*` read in
+  `kindi/`, and `tests/test_config_reference.py` fails on drift. `docs/CONFIGURATION.md` is still
+  main-owned and dirty, so its hand-written tables and the generated file must be reconciled by hand.
 - Release docs are prepared on this branch: `docs/INSTALL.md` pins the fixed release artifact
   `38fb3417...` (the LF Git blob is `9b25e78...`; do not mix them), and `docs/RELEASE-CHECKLIST.md`
   records the release steps. The guard itself is committed in `2b84658`. No tag, push or upload was made.
@@ -289,6 +295,14 @@ Next, in order:
    `pytest tests/ -q` -> 78 passed; `bash -n install.sh`, `compileall -q kindi` and ShellCheck on
    `git show HEAD:install.sh` -> exit 0; five mutations of the guarded lines each fail their test.
    No GPU run: the plans themselves were not built or executed.
+10. [x] Configuration reference generated from the code: `kindi/config_reference.py` reads
+    `config.DEFAULTS` (key, type, default and the inline comment) plus every `os.environ` read of a
+    `KINDI_*` name under `kindi/`, and writes `docs/CONFIGURATION-REFERENCE.md`.
+    `python -m kindi.config_reference --check` and `tests/test_config_reference.py` fail when a key
+    or switch is added without regenerating. Evidence: `--check` exit 0; 6 new tests and 84 full
+    tests pass; adding `KINDI_BRAND_NEW` or a new DEFAULTS key to a copy makes `--check` exit 1 and
+    the list tests fail. `docs/CONFIGURATION.md` itself is not touched: it is main-owned and dirty,
+    so its hand-written tables and the generated file must be reconciled by hand.
 
 Decisions not to undo without new measurements:
 
