@@ -20,17 +20,18 @@ Download the script, compare its sha256 with the value below, read it, and then 
 
 ```bash
 curl -fsSLO https://amirhusain.com/kindi/install.sh
-echo "592a07e0f56f164023a9e633a6e619fff5fdea1d1b3bf30345701c6658a13c7d  install.sh" | sha256sum -c -
+echo "38fb341797825160f620045dd37ece2034e70e7b2a3deab76d5d2edea701fe4e  install.sh" | sha256sum -c -
 bash install.sh --dry-run
 bash install.sh
 ```
 
 | File | sha256 |
 |---|---|
-| `install.sh` (Kindi 0.4.0) | `592a07e0f56f164023a9e633a6e619fff5fdea1d1b3bf30345701c6658a13c7d` |
+| `install.sh` (Kindi 0.4.0) | `38fb341797825160f620045dd37ece2034e70e7b2a3deab76d5d2edea701fe4e` |
 
 If `sha256sum -c` does not print `install.sh: OK`, do not run the script. The same script is in the repository root
-and in the 0.4.0 release.
+and in the 0.4.0 release. The checksum is for the exact published artifact: a copy that was re-saved with different
+line endings hashes differently. Maintainers should follow [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md).
 
 ## What it does
 

@@ -16,7 +16,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `0fc024f` | main checkout; another agent is active here |
-| `C:/Users/ICH/.freebuff/worktrees/f0e51299/kindi` | `freebuff/project-review-audit-report` | `4b90ca9` | this session |
+| `C:/Users/ICH/.freebuff/worktrees/f0e51299/kindi` | `freebuff/project-review-audit-report` | `7f7196c` | this session |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
@@ -47,10 +47,11 @@ Read it before editing a shared file.
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
 | Main-worktree task (other agent) | `T:/kindi` | `main` | `README.md`, `docs/CARDS.md`, `docs/CONFIGURATION.md`, `docs/INSTALL.md`, `docs/TURING-TENSOR-CORES.md`, `docs/VERIFICATION.md`, `docs/PAIR-SETUPS.md`, `docs/CPU_GPU_TANDEM_DESIGN.md`, `docs/GPU_PROFILE_ANALYSIS.md`, `docs/dev/**`, `install.sh`, `kindi/spec.py`, `.github/workflows/ci.yml` | dirty in the main worktree; owner: other agent; do not edit |
-| Documentation drift (P1-3, P1-4, P1-5, P1-6) | this worktree | `freebuff/project-review-audit-report` | `WHY.md`, `docs/CONFIGURATION.md`, `docs/INSTALL.md`, `docs/BENCHMARKS.md`, `docs/CARDS.md`, `docs/MTP.md`, `kindi.conf.example`, `kindi/spec.py` | partial: `WHY.md` and `kindi.conf.example` updated; `docs/CONFIGURATION.md`, `docs/INSTALL.md`, `docs/CARDS.md`, `docs/BENCHMARKS.md` and `docs/MTP.md` remain blocked by the main worktree's dirty copies |
+| Documentation drift (P1-3, P1-4, P1-5, P1-6) | this worktree | `freebuff/project-review-audit-report` | `WHY.md`, `docs/CONFIGURATION.md`, `docs/INSTALL.md`, `docs/BENCHMARKS.md`, `docs/CARDS.md`, `docs/MTP.md`, `kindi.conf.example`, `kindi/spec.py` | partial: `WHY.md` and `kindi.conf.example` updated; `docs/INSTALL.md` checksum updated by the release task; `docs/CONFIGURATION.md`, `docs/CARDS.md`, `docs/BENCHMARKS.md` and `docs/MTP.md` remain blocked by the main worktree's dirty copies |
 | Continuous-batching investigation | this worktree | `freebuff/project-review-audit-report` | `docs/CONTINUOUS-BATCHING.md`, `AGENTS.md` | archived NO-GO; Phase-0 gate failed (0.69x); top banner and section 8 updated; no production code changed |
 | Server request validation + boundary hardening (P1-1/P2-1) | this worktree | `freebuff/project-review-audit-report` | `kindi/server.py`, `tests/test_server.py`, `tests/test_config_example.py` | done; 10 server tests (validation, auth, 413 body cap) + 1 example-config test + 9 installer fixture tests = 20 passed; invalid requests and 413 keep the cache |
-| GRUB edit guard (plan 1) | this worktree | `freebuff/project-review-audit-report` | `install.sh`, `tests/test_installer_grub.py` | done; 9 fixture tests pass, guard verified non-vacuous. **Release blocker: docs/INSTALL.md still pins the buggy 592a... hash; the fixed copy hashes 38fb3417...; main owns docs/INSTALL.md. `T:/kindi/install.sh` also remains dirty; reconcile by hand before release** |
+| GRUB edit guard (plan 1) | this worktree | `freebuff/project-review-audit-report` | `install.sh`, `tests/test_installer_grub.py` | done; guard committed in `2b84658`; 9 fixture tests pass and the non-vacuous check is recorded. Release commit updates `docs/INSTALL.md` to the fixed artifact hash `38fb3417...`; the main worktree still has an empty `install.sh` and dirty `docs/INSTALL.md`, so do not publish from main until reconciled |
+| Installer safety release (GRUB guard) | this worktree | `freebuff/project-review-audit-report` | `docs/INSTALL.md` (checksum only), `docs/RELEASE-CHECKLIST.md`, `AGENTS.md` | release docs committed; guard already in `2b84658`; no tag, push or upload. Verified: `bash -n` OK, 9 guard tests, 58 full tests, `compileall` OK, artifact hash `38fb3417...` check OK, no control bytes. Release artifact is the CRLF worktree file; the LF Git blob is `9b25e78...`; docs must name the exact published file |
 | Per-slot plain-engine plan (Phase 1) | this worktree | `freebuff/project-review-audit-report` | `docs/PER-SLOT-REFACTOR.md`, `docs/CONTINUOUS-BATCHING.md` | archived NO-GO with `docs/CONTINUOUS-BATCHING.md`; no engine code changed |
 | 2B CB-vs-spec measurement | this worktree | `freebuff/project-review-audit-report` | `bench-logs/compare-2b-cb-spec/**`, `AGENTS.md` | measured; no code changed; results in `bench-logs/compare-2b-cb-spec/RESULTS.md` |
 | Phase-0 CB spike | this worktree | `freebuff/project-review-audit-report` | `bench-logs/spike_batch_gemm.py`, `bench-logs/phase0-spike/**`, `docs/CONTINUOUS-BATCHING.md` | implemented; B=4 gate FAIL (0.69x vs single decode); no production code changed |
@@ -91,9 +92,11 @@ is not a lock.
   `4b90ca9` and this roadmap commit.
 - Verified: `python -m pytest tests/ -q` -> 58 passed; focused server/config/installer run -> 20
   passed; `bash -n install.sh` -> OK; `python -m compileall -q kindi/server.py` -> OK. No GPU run.
-- Still blocked: the 0.4.0 installer checksum in `docs/INSTALL.md`; the central docs/CI, packaging
-  (`setup.py`) and engine/tp/cpu edits are owned by the dirty main worktree. Do not release until
-  those are reconciled and the checksum is updated to the fixed `install.sh` hash.
+- Release docs are prepared on this branch: `docs/INSTALL.md` pins the fixed release artifact
+  `38fb3417...` (the LF Git blob is `9b25e78...`; do not mix them), and `docs/RELEASE-CHECKLIST.md`
+  records the release steps. The guard itself is committed in `2b84658`. No tag, push or upload was made.
+  **Still blocked for publication:** the main worktree has an empty `install.sh` and dirty
+  `docs/INSTALL.md`; reconcile or merge by hand before publishing.
 - Long-term single/dual card target is in `docs/CARD-SUPPORT.md`. The current installer misclassifies
   the 8 GB RTX 4060 Ti as `pascal8` because `tc` also requires at least 9,500 MiB, and `pair_ok()`
   rejects every pair above sm_60. Both fixes and the `tc2` profile are main-worktree work; the card
@@ -263,6 +266,13 @@ Next, in order:
    requirement, per-CPU single-socket targets, the i5-2500K fallback work, hybrid i9 thread tuning, and
    the CPU acceptance matrix. No CPU/installer code changed here; no CPU is a support claim until a
    native build and `kindi verify` are recorded.
+8. [x] Installer safety release prepared: the GRUB guard is committed in `2b84658`, `docs/INSTALL.md`
+   pins the fixed artifact hash `38fb3417...`, and `docs/RELEASE-CHECKLIST.md` records reconciliation,
+   tests, exact-artifact hashing and publication checks. Evidence: `bash -n install.sh` OK;
+   `pytest tests/test_installer_grub.py -q` -> 9 passed; `pytest tests/ -q` -> 58 passed;
+   `compileall -q kindi` OK; `sha256sum -c` -> `install.sh: OK`; no control bytes. No tag, push or
+   upload was made. The main worktree's empty `install.sh` and dirty `docs/INSTALL.md` remain a
+   publication blocker; the release checklist says so.
 
 Decisions not to undo without new measurements:
 
