@@ -16,7 +16,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `0fc024f` | main checkout; another agent is active here |
-| `C:/Users/ICH/.freebuff/worktrees/f0e51299/kindi` | `freebuff/project-review-audit-report` | `2b84658` | this session |
+| `C:/Users/ICH/.freebuff/worktrees/f0e51299/kindi` | `freebuff/project-review-audit-report` | `8861502` | this session |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
@@ -55,6 +55,7 @@ Read it before editing a shared file.
 | 2B CB-vs-spec measurement | this worktree | `freebuff/project-review-audit-report` | `bench-logs/compare-2b-cb-spec/**`, `AGENTS.md` | measured; no code changed; results in `bench-logs/compare-2b-cb-spec/RESULTS.md` |
 | Phase-0 CB spike | this worktree | `freebuff/project-review-audit-report` | `bench-logs/spike_batch_gemm.py`, `bench-logs/phase0-spike/**`, `docs/CONTINUOUS-BATCHING.md` | implemented; B=4 gate FAIL (0.69x vs single decode); no production code changed |
 | Plan-engine exactness guard | this worktree | `freebuff/project-review-audit-report` | `kindi/spec.py`, `AGENTS.md`, `bench-logs/diag_exact_plan.py`, `bench-logs/diag_verify8.py`, `bench-logs/diag_spec_long.py` | 2B sp=1 (no k_tc_sum) + 9B HB guard; long spec 160/160 exact; **main worktree has uncommitted `kindi/spec.py`; merge by hand** |
+| Long-term card support (single/dual) | this worktree | `freebuff/project-review-audit-report` | `docs/CARD-SUPPORT.md`, `AGENTS.md` | roadmap and acceptance contract written; no engine/installer code changed; the 4060 Ti 8 GB classification and all non-Maxwell pairings are blocked by the main worktree's dirty `install.sh` |
 | `install.sh` / `.github` collision | both | both | `install.sh`, `.github/**` | modified or present in both worktrees; do not merge or overwrite until the two changes are reconciled by hand (the main copy was empty on 2026-11-08) |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
@@ -92,6 +93,10 @@ is not a lock.
 - Still blocked: the 0.4.0 installer checksum in `docs/INSTALL.md`; the central docs/CI, packaging
   (`setup.py`) and engine/tp/cpu edits are owned by the dirty main worktree. Do not release until
   those are reconciled and the checksum is updated to the fixed `install.sh` hash.
+- Long-term single/dual card target is in `docs/CARD-SUPPORT.md`. The current installer misclassifies
+  the 8 GB RTX 4060 Ti as `pascal8` because `tc` also requires at least 9,500 MiB, and `pair_ok()`
+  rejects every pair above sm_60. Both fixes and the `tc2` profile are main-worktree work; the card
+  target is not a support claim until a GPU verify is recorded.
 
 ## Layout
 
@@ -244,6 +249,11 @@ Next, in order:
    `tests/requirements-test.txt` (pytest, fastapi, pydantic, httpx, numpy) as the dependency list.
 5. [ ] Feature work is tracked separately: `GOALS.md` / `IMPLEMENTATION_PLAN.md` when present
    (Turing/CPU SIMD/tandem). Do not fork that roadmap here; update those files.
+6. [x] Long-term single/dual card target written to `docs/CARD-SUPPORT.md`: seven requested cards, current
+   installer/engine gates, one- and two-card acceptance matrix, and P0-P3 work. It records two blockers:
+   the 8 GB RTX 4060 Ti is classified `pascal8` because `tc` also demands 9,500 MiB, and `pair_ok()` rejects
+   every pair above sm_60. No installer/engine code changed here; the implementation is main-worktree work
+   and no card is a support claim until a GPU verify is recorded.
 
 Decisions not to undo without new measurements:
 
