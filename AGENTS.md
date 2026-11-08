@@ -16,7 +16,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `0fc024f` | main checkout; another agent is active here |
-| `C:/Users/ICH/.freebuff/worktrees/f0e51299/kindi` | `freebuff/project-review-audit-report` | `c27773f` | this session |
+| `C:/Users/ICH/.freebuff/worktrees/f0e51299/kindi` | `freebuff/project-review-audit-report` | `2b84658` | this session |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
@@ -70,19 +70,28 @@ is not a lock.
 
 - Version 0.4.0 (`kindi/__init__.py`), model id `bonsai2-2b`, AGPL-3.0-only plus a commercial
   option. New files carry the SPDX header of their neighbours.
-- Uncommitted in this worktree: `install.sh` (the GRUB `\1` fix and the post-sed guard), `AGENTS.md`,
-  `docs/CONTINUOUS-BATCHING.md`, `docs/PER-SLOT-REFACTOR.md`, the audit, `bench-logs/`, `tests/`,
-  `.github/`, `kindi/server.py` (request validation, constant-time API key and 16 MiB body cap) and
-  `kindi/spec.py` (the plan-engine exactness
-  guard: HB=512 `sp=1`, HB not in (512, 1024) refused). The main worktree's uncommitted
-  `kindi/spec.py`/`tp.py`/`engine.py` changes are untouched; reconcile by hand before merging. The documentation drift task is paused
-  before its first edit; the main worktree already owns the shared docs.
+- Audited and committed in this worktree: `5061af2` (server boundary hardening, WHY/config example,
+  No-Go docs, CPU tests) and `2b84658` (installer + plan-engine fixes, full CPU suite). Left untracked:
+  `.github/`, `bench-logs/`, the two audit reports. The main worktree's central docs, CI, `setup.py`,
+  `install.sh` and `kindi/spec.py`/`engine.py`/`tp.py`/`cpu.py` remain dirty and are untouched here;
+  reconcile by hand before merging. The documentation drift task is complete for `WHY.md` and
+  `kindi.conf.example`; its remaining files are blocked by the main worktree.
 - Kernels are not compiled at build time: CuPy compiles the `*.cu` sources with NVRTC on first
   use, and the driver caches them under `state_dir`, so the first start is slow.
 - The server serves one request at a time. Greedy output is token-for-token identical to
   llama.cpp for the same file (`kindi verify`). Do not change that casually.
 - Configuration precedence: built-in defaults < config file (`kindi.conf`, `~/.kindi/kindi.conf`)
   < environment (`KINDI_<KEY>`) < command-line flags.
+
+## Handoff (2026-11-09)
+
+- Branch `freebuff/project-review-audit-report`; audit follow-up commits `5061af2` and `2b84658`,
+  plus this handoff commit.
+- Verified: `python -m pytest tests/ -q` -> 58 passed; focused server/config/installer run -> 20
+  passed; `bash -n install.sh` -> OK; `python -m compileall -q kindi/server.py` -> OK. No GPU run.
+- Still blocked: the 0.4.0 installer checksum in `docs/INSTALL.md`; the central docs/CI, packaging
+  (`setup.py`) and engine/tp/cpu edits are owned by the dirty main worktree. Do not release until
+  those are reconciled and the checksum is updated to the fixed `install.sh` hash.
 
 ## Layout
 
