@@ -17,14 +17,30 @@ model_name = auto
 ctx = 24576
 head = exact
 fast_clusters = 256
+# 1: stop a reply caught in a repeating loop (close it while thinking)
+repeat_stop = 0
+
 # --- prompt cache
 checkpoint_every = 256
 prefix_max = 8
 prefix_min = 512
 park_max = 3
+# host RAM for checkpoints and parked conversations (0: 20% of the RAM)
+checkpoint_budget_mb = 0
+
+# --- Nanbeige drafting
+# prompt-lookup drafting, up to this many tokens per check (0: off)
+lookup = 5
+# a second draft source; empty: none
+mtp_head =
+# 27B template: xhigh, medium or low (empty: the template default, xhigh)
+reasoning_effort =
 
 # --- generation defaults (a request's own values win)
 max_tokens = 1024
 temperature = 0.7
 top_p = 0.8
 top_k = 20
+min_p = 0
+repeat_penalty = 1.0
+repeat_last_n = 64

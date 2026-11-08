@@ -1,5 +1,7 @@
 # Why Kindi
 
+*Current release: Kindi 0.4.0 (2026-11-04). The K420 table and chart below are the 0.2.0 measurements that established the card; [docs/BENCHMARKS.md](docs/BENCHMARKS.md) has the release tables.*
+
 **A modern 2-billion-parameter language model that runs at 22.9 tokens per second on a ten-year-old, 1 GB,
 entry-level graphics card.**
 
@@ -16,15 +18,15 @@ exactly this chip.
 
 <p align="center"><img src="assets/kindi-speed.svg" alt="Write speed in tokens per second, Kindi 0.2.0 and llama.cpp on the same card with the same model file and context: Quadro K420 1 GB, 2B, 20.8 and 1.65; Quadro K1200, 2B, 81.0 and 20.8; 4B, 39.2 and 8.7; 9B, 23.4 and 5.9; two Quadro K1200 cards, 27B, 12.6 and 1.69; GeForce GTX 1080, 27B, 27.9 and 19.4 at 512 tokens, and 15.4 at 64,000 tokens, where llama.cpp runs out of memory; GeForce RTX 3080 at 190 W, 27B, 63.2 and 52.2 at 1K and 44.0 and 23.5 at 90K." width="100%"></p>
 
-Kindi is about **13x faster than llama.cpp when it generates text and 28x faster when it reads a prompt**. Both
+In that 0.2.0 measurement, Kindi is about **13x faster than llama.cpp when it generates text and 28x faster when it reads a prompt**. Both
 engines use the same card, the same model file and the same context. At 8,192 tokens, llama.cpp stopped with a Vulkan
 error; Kindi runs to 24,576 tokens on this card. The fast head gives 22.9 tokens/s at 2,000 tokens of context. Kindi's default output is
 also **token-for-token identical to llama.cpp's** (`kindi verify` checks it). We searched and found no published result that shows any modern language model on a K420
 at anything close to this speed (see [docs/BENCHMARKS.md](docs/BENCHMARKS.md)).
 
-Version 0.2.0 also runs the 4B, 9B and 27B models on newer cards: the Quadro K1200 (one or two), the GeForce GTX
-1080 and the GeForce RTX 3080, and the 2B to 9B on the CPU. [docs/CARDS.md](docs/CARDS.md) has the settings, and
-[docs/BENCHMARKS.md](docs/BENCHMARKS.md) has the comparisons for each card.
+Kindi 0.4.0 runs the 2B, 4B, 9B and 27B models on the cards listed in [docs/CARDS.md](docs/CARDS.md), plus the 2B
+to 9B on the CPU. The 0.2.0 release introduced those model sizes for newer cards. [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
+has the comparisons for each card.
 
 ## What you get
 
@@ -37,7 +39,8 @@ Version 0.2.0 also runs the 4B, 9B and 27B models on newer cards: the Quadro K12
   restarts.
 - **Exact by default, faster on request.** One command switches to the shortlist output head (~15 % faster,
   99.4 % identical greedy tokens) and back, without a restart.
-- **Small and self-contained.** One Python package, one CUDA file, three commands: `convert`, `verify`, `serve`.
+- **Small and self-contained.** The core is a small Python package with CUDA and CPU kernels. The everyday commands
+  are `convert`, `verify` and `serve`.
 
 ## How
 

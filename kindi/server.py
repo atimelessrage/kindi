@@ -1,8 +1,10 @@
-"""Kindi OpenAI-compatible server.\n\n  GET  /health                 status, live progress of the request being served, GPU memory\n  GET  /v1/models              the model\n  POST /v1/chat/completions    messages (+ tools) -> answer; stream=true for SSE; tool calls as OpenAI tool_calls\n\nOne request at a time (one engine on one GPU); concurrent requests queue. Thinking is off unless the request sets\nchat_template_kwargs.enable_thinking (or top-level enable_thinking); a stream then carries the thinking as\ndelta.reasoning_content. thinking_budget_tokens (or thinking_budget) caps it: at the budget the server closes the\nthinking itself and the model goes on to answer. temperature 0 = greedy (token-exact with llama.cpp in the exact head\nmode)."""
+"""Kindi OpenAI-compatible server.\n\n  GET  /health                 status, live progress of the request being served, GPU memory\n  GET  /v1/models              the model\n  POST /v1/chat/completions    messages (+ tools) -> answer; stream=true for SSE; tool calls as OpenAI tool_calls\n\nOne request at a time (one engine on one GPU); concurrent requests queue. Thinking is off unless the request sets\nchat_template_kwargs.enable_thinking (or top-level enable_thinking); a stream then carries the thinking as\ndelta.reasoning_content. thinking_budget_tokens (or thinking_budget) caps it: at the budget the server closes the\nthinking itself and the model goes on to answer. temperature 0 = greedy (token-exact with llama.cpp in the exact head\nmode). Request bodies are capped at 16 MiB (KINDI_MAX_BODY_MB); when api_key is set, it is compared in constant time."""
 import asyncio
 import codecs
 import concurrent.futures
+import hmac
 import json
+import math
 import os
 import threading
 import time
@@ -17,6 +19,177 @@ from .sampling import Sampler
 
 
 THINK_CLOSE = "\n\nI have thought enough; time to act.\n</think>\n\n"
+
+
+class RequestError(ValueError):
+    """A malformed client request. It is a 400 and must never touch the prompt cache."""
+
+
+def _request_error(msg):
+    raise RequestError(msg)
+
+
+def _finite_number(value):
+    """JSON numbers only; bool is an int in Python, and NaN/Infinity are not valid JSON numbers."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except (OverflowError, TypeError):
+        return False
+
+
+MAX_BODY_BYTES = int(os.environ.get("KINDI_MAX_BODY_MB", "16")) * 1024 * 1024
+
+
+class RequestTooLarge(ValueError):
+    """The request body exceeds MAX_BODY_BYTES: an HTTP 413, not an engine error."""
+
+
+async def _read_json_body(request):
+    """Read and parse a JSON body with a hard size cap.
+
+    `await request.json()` reads an unbounded body into memory. This server can be bound to 0.0.0.0, so a
+    LAN client must not be able to make the process allocate an arbitrarily large string before the API key
+    or the request shape is checked. The declared Content-Length is checked first; `stream()` then enforces
+    the same cap even when the header is missing or lies.
+    """
+    limit = MAX_BODY_BYTES
+    declared = request.headers.get("content-length")
+    if declared is not None:
+        try:
+            too_large = int(declared) > limit
+        except ValueError:
+            too_large = False
+        if too_large:
+            raise RequestTooLarge("the request body is larger than %d bytes" % limit)
+    body = bytearray()
+    async for piece in request.stream():
+        body.extend(piece)
+        if len(body) > limit:
+            raise RequestTooLarge("the request body is larger than %d bytes" % limit)
+    try:
+        return json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        raise RequestError("the body is not JSON")
+
+
+def _validate_request(req):
+    """Check the OpenAI request shape before it reaches the engine or the prompt cache.
+
+    The server takes a raw Request, so this is the boundary that turns a typo or a wrong JSON type into a
+    400 RequestError instead of a KeyError/TypeError from chat.render() that would be reported as an engine
+    failure (and, before this check, would clear the prompt cache).
+    """
+    if not isinstance(req, dict):
+        _request_error("the body must be a JSON object")
+
+    messages = req.get("messages")
+    if not isinstance(messages, list) or not messages:
+        _request_error("messages must be a non-empty list")
+    for i, m in enumerate(messages):
+        if not isinstance(m, dict):
+            _request_error("messages[%d] must be an object" % i)
+        role = m.get("role")
+        if not isinstance(role, str) or role not in ("system", "user", "assistant", "tool"):
+            _request_error("messages[%d].role must be system, user, assistant or tool" % i)
+        content = m.get("content")
+        if content is not None and not isinstance(content, (str, list)):
+            _request_error("messages[%d].content must be a string or a list" % i)
+        if isinstance(content, list):
+            for j, part in enumerate(content):
+                if not isinstance(part, dict):
+                    _request_error("messages[%d].content[%d] must be an object" % (i, j))
+                if "text" in part and not isinstance(part["text"], str):
+                    _request_error("messages[%d].content[%d].text must be a string" % (i, j))
+        if role == "assistant":
+            calls = m.get("tool_calls")
+            if calls is not None:
+                if not isinstance(calls, list):
+                    _request_error("messages[%d].tool_calls must be a list" % i)
+                for j, call in enumerate(calls):
+                    fn = call.get("function", call) if isinstance(call, dict) else None
+                    if not isinstance(fn, dict) or not isinstance(fn.get("name"), str):
+                        _request_error("messages[%d].tool_calls[%d] needs a function name" % (i, j))
+                    args = fn.get("arguments")
+                    if args is not None and not isinstance(args, (str, dict)):
+                        _request_error("messages[%d].tool_calls[%d].arguments must be a string or object" % (i, j))
+
+    tools = req.get("tools")
+    if tools is not None:
+        if not isinstance(tools, list):
+            _request_error("tools must be a list")
+        for i, tool in enumerate(tools):
+            fn = tool.get("function", tool) if isinstance(tool, dict) else None
+            if not isinstance(fn, dict) or not isinstance(fn.get("name"), str):
+                _request_error("tools[%d] needs a function name" % i)
+            if fn.get("parameters") is not None and not isinstance(fn["parameters"], dict):
+                _request_error("tools[%d].function.parameters must be an object" % i)
+
+    if "tool_choice" in req and req["tool_choice"] is not None and not isinstance(req["tool_choice"], (str, dict)):
+        _request_error("tool_choice must be a string or an object")
+    if req.get("stream") is not None and not isinstance(req["stream"], bool):
+        _request_error("stream must be true or false")
+    if req.get("logprobs") is not None and not isinstance(req["logprobs"], bool):
+        _request_error("logprobs must be true or false")
+    if req.get("parallel_tool_calls") is not None and not isinstance(req["parallel_tool_calls"], bool):
+        _request_error("parallel_tool_calls must be true or false")
+    if req.get("enable_thinking") is not None and not isinstance(req["enable_thinking"], bool):
+        _request_error("enable_thinking must be true or false")
+
+    stop = req.get("stop")
+    if stop is not None and not isinstance(stop, str):
+        if not isinstance(stop, list) or any(not isinstance(s, str) for s in stop):
+            _request_error("stop must be a string or a list of strings")
+
+    so = req.get("stream_options")
+    if so is not None:
+        if not isinstance(so, dict):
+            _request_error("stream_options must be an object")
+        if so.get("include_usage") is not None and not isinstance(so["include_usage"], bool):
+            _request_error("stream_options.include_usage must be true or false")
+    kw = req.get("chat_template_kwargs")
+    if kw is not None:
+        if not isinstance(kw, dict):
+            _request_error("chat_template_kwargs must be an object")
+        if kw.get("enable_thinking") is not None and not isinstance(kw["enable_thinking"], bool):
+            _request_error("chat_template_kwargs.enable_thinking must be true or false")
+        if kw.get("preserve_thinking") is not None and not isinstance(kw["preserve_thinking"], bool):
+            _request_error("chat_template_kwargs.preserve_thinking must be true or false")
+        if kw.get("reasoning_effort") is not None and not isinstance(kw["reasoning_effort"], str):
+            _request_error("chat_template_kwargs.reasoning_effort must be a string")
+    if req.get("reasoning_effort") is not None and not isinstance(req["reasoning_effort"], str):
+        _request_error("reasoning_effort must be a string")
+
+    for key, lo in (("max_tokens", 1), ("max_completion_tokens", 1), ("top_k", 0),
+                    ("top_logprobs", 0), ("repeat_last_n", -1), ("thinking_budget_tokens", 0),
+                    ("thinking_budget", 0), ("seed", None)):
+        value = req.get(key)
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, int):
+            _request_error("%s must be an integer" % key)
+        if lo is not None and value < lo:
+            _request_error("%s must be at least %d" % (key, lo))
+
+    for key, lo, hi in (("temperature", 0.0, None), ("top_p", 0.0, 1.0), ("min_p", 0.0, 1.0),
+                        ("repeat_penalty", 0.0, None)):
+        value = req.get(key)
+        if value is None:
+            continue
+        if not _finite_number(value):
+            _request_error("%s must be a finite number" % key)
+        if lo is not None and value < lo:
+            _request_error("%s must be at least %s" % (key, lo))
+        if hi is not None and value > hi:
+            _request_error("%s must be at most %s" % (key, hi))
+    if req.get("top_p") == 0:
+        _request_error("top_p must be greater than 0")
+    if req.get("repeat_penalty") == 0:
+        _request_error("repeat_penalty must be greater than 0")
+    if req.get("top_logprobs") is not None and req["top_logprobs"] > 20:
+        _request_error("top_logprobs must be at most 20")
+    return req
 
 
 def _looping(gen, min_span=240):
@@ -509,7 +682,10 @@ def create_app(cfg, log=print):
 
     def _auth(request):
         key = cfg["api_key"]
-        return not key or request.headers.get("authorization", "") == "Bearer " + key
+        if not key:
+            return True
+        supplied = request.headers.get("authorization", "")
+        return hmac.compare_digest(supplied.encode("utf-8"), ("Bearer " + key).encode("utf-8"))
 
     @app.get("/health")
     def health():
@@ -538,9 +714,15 @@ def create_app(cfg, log=print):
         if not _auth(request):
             return _err(401, "invalid API key", "authentication_error")
         try:
-            req = await request.json()
-        except Exception:  # noqa: BLE001
-            return _err(400, "the body is not JSON")
+            req = await _read_json_body(request)
+        except RequestTooLarge as e:
+            return _err(413, str(e), "request_too_large")
+        except RequestError as e:
+            return _err(400, str(e))
+        try:
+            _validate_request(req)
+        except RequestError as e:
+            return _err(400, str(e))
         cid, created = "chatcmpl-" + uuid.uuid4().hex[:24], int(time.time())
 
         def chunk(delta, finish=None, usage=None):

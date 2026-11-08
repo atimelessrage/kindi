@@ -1,0 +1,7 @@
+# CPU-only test dependencies. The server tests exercise FastAPI's TestClient, which needs httpx.
+# GPU/model-pack runs are separate and are not installed here.
+pytest>=7
+fastapi>=0.79
+pydantic>=1.9
+httpx>=0.23
+numpy>=1.19
