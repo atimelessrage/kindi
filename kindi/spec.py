@@ -49,8 +49,8 @@ FUSED = ("k_rmsfold_qT", "k_smfold_qT", "k_fold_fwht_qT", "k_softmax_m", "k_attn
          "k_rmsfold2_1024", "k_rmsfold2_512", "k_att_tc_T")
 FD_CH = 512                              # positions per block of the split flash-decode attention (tcf.cu)
 QB = 4                                   # queries per verify attention launch (k_attn_sq8m)
-# KINDI_SPEC=auto thresholds (positions), measured on an RTX 3080 at 190 W and an RTX 3060 (docs/MTP.md,
-# docs/dev/bench-0.4.0/mtp.md): the 2B's own head k=2 up to 8K, off above; the 27B with the 2B drafter k=2 below
+# KINDI_SPEC=auto thresholds (positions), measured on an RTX 3080 at 190 W and an RTX 3060 (docs/MTP.md):
+# the 2B's own head k=2 up to 8K, off above; the 27B with the 2B drafter k=2 below
 # 1K and k=3 from 1K. B2 (the 2B's head extends the 2B draft) was slower than B0 on both cards: off by default
 AUTO_MTP_K2_MAX = int(os.environ.get("KINDI_SPEC_MTP_K2_MAX", "8192"))
 AUTO_B0_K2_MAX = int(os.environ.get("KINDI_SPEC_B0_K2_MAX", "1024"))

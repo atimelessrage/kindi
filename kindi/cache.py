@@ -88,10 +88,16 @@ def _lcp(a, b):
     return L
 
 
-# the files whose code decides the arithmetic of the state (a change of any of them changes the saved states)
-_ARITH = ("kindi.cu", "chunk.cu", "chunk1.cu", "tc.cu", "tc_turing.cu", "tcp.cu", "tcf.cu", "tca.cu", "tca_turing.cu",
-          "spec.cu", "kcpu.c", "engine.py", "tp.py", "chunk.py", "chunk1.py", "tc.py", "tc_turing.py", "spec.py",
-          "cpu.py", "layout.py")
+# Python files whose code decides the arithmetic of the state. Every *.cu/*.c in this package is added
+# automatically by _arith_files(), so a new kernel cannot be left out of the fingerprint by accident.
+_ARITH_PY = ("engine.py", "tp.py", "chunk.py", "chunk1.py", "tc.py", "tc_turing.py", "spec.py",
+             "cpu.py", "layout.py")
+
+
+def _arith_files(here):
+    """Every compiled kernel in the package plus the explicit Python arithmetic files."""
+    kernels = sorted(name for name in os.listdir(here) if name.endswith((".cu", ".c")))
+    return tuple(kernels) + _ARITH_PY
 
 
 def engine_fingerprint(eng, cfg):
@@ -124,7 +130,7 @@ def engine_fingerprint(eng, cfg):
         "head": cfg.get("head", "exact"),
         "code": {},
     }
-    for name in _ARITH:
+    for name in _arith_files(here):
         p = os.path.join(here, name)
         if os.path.exists(p):
             d["code"][name] = hashlib.sha256(open(p, "rb").read()).hexdigest()[:12]

@@ -39,7 +39,7 @@ draft cannot save time. These are the measurements for T = 2, 3 and 4 tokens per
 ## Measured speed
 
 These measurements used greedy decoding, 128 tokens (2B: 512 tokens, the median of 3 runs), and the same text on
-each card. The cells give tok/s and (speed-up). The full tables are in `docs/dev/bench-0.4.0/mtp.md`.
+each card. The cells give tok/s and (speed-up). The full tables are internal measurement notes and are not part of this release.
 
 | Card | Model and mode | 512 tokens of context | 8K | 24K |
 |---|---|---|---|---|

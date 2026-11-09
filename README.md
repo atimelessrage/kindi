@@ -302,6 +302,8 @@ of 295 agent turns were the same). The details are in [docs/PROMPT-CACHE.md](doc
 | `kindi serve [--host H] [--port P] [--api-key K] [--head exact\|fast]` | the OpenAI-compatible server |
 | `kindi chat [--system TEXT]` | terminal chat |
 | `kindi head exact\|fast` | set the output head while the server runs |
+| `kindi models` | list the models and what fits this machine |
+| `kindi use MODEL [--gguf FILE]` | download a model, build its pack and select it |
 | `kindi info` | configuration, pack and GPU |
 
 Global options: `--config FILE`, `--pack DIR`, `--state-dir DIR`, `--ctx N`.

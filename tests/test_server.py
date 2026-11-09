@@ -67,10 +67,13 @@ class _FakeKindi(object):
 
 
 @pytest.fixture
-def app_client(monkeypatch):
+def app_client(monkeypatch, tmp_path):
+    pack = tmp_path / "text-pack"
+    pack.mkdir()
+    (pack / "kindi_pack.json").write_text('{"model": "bonsai2-2b"}', encoding="utf-8")
     K = _FakeKindi()
     monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
-    app = server.create_app({"model_name": "bonsai2-2b", "api_key": ""}, log=lambda *a: None)
+    app = server.create_app({"model_name": "bonsai2-2b", "api_key": "", "pack": str(pack)}, log=lambda *a: None)
     with TestClient(app) as client:
         yield client, K
 
@@ -244,6 +247,46 @@ def test_ollama_malformed_messages_is_400_before_the_engine(app_client):
     r = client.post("/api/chat", json={"messages": "nope"})
     assert r.status_code == 400, r.text
     assert K.last_req is None
+
+
+@pytest.mark.parametrize("stream", (False, True))
+def test_image_part_is_400_without_vision_weights(app_client, stream):
+    client, K = app_client
+    payload = {
+        "messages": [{"role": "user", "content": [
+            {"type": "text", "text": "Describe this image."},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}},
+        ]}],
+    }
+    if stream:
+        payload["stream"] = True
+    bad = client.post("/v1/chat/completions", json=payload)
+    assert bad.status_code == 400, bad.text
+    assert "no vision weights" in bad.json()["error"]["message"]
+    assert K.last_req is None
+    assert K.runner.eng.resets == 0
+    assert K.runner.tokens == [1, 2, 3]
+
+    good = client.post("/v1/chat/completions",
+                       json={"messages": [{"role": "user", "content": "hello"}]})
+    assert good.status_code == 200, good.text
+    assert good.json()["usage"]["prompt_tokens_details"]["cached_tokens"] == 3
+
+
+def test_ollama_images_are_400_without_vision_weights(app_client):
+    client, K = app_client
+    cases = (
+        ("/api/chat", {"messages": [{"role": "user", "content": "describe",
+                                      "images": ["AAAA"]}], "stream": True}),
+        ("/api/generate", {"prompt": "describe", "images": ["AAAA"], "stream": False}),
+    )
+    for path, payload in cases:
+        r = client.post(path, json=payload)
+        assert r.status_code == 400, (path, r.text)
+        assert "no vision weights" in r.json()["error"]["message"]
+        assert K.last_req is None
+        assert K.runner.eng.resets == 0
+        assert K.runner.tokens == [1, 2, 3]
 
 
 def test_oversized_body_is_413_and_keeps_the_prompt_cache(app_client, monkeypatch):

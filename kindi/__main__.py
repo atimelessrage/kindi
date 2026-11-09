@@ -76,7 +76,29 @@ def cmd_bench(cfg, a):
     return run(cfg, log=log)
 
 
+def _require_pack(cfg):
+    """Fail before CUDA starts when the configured pack directory or manifest is missing."""
+    pack = cfg["pack"]
+    manifest = os.path.join(pack, "kindi_pack.json")
+    source = cfg.get("source") or "the config file"
+    if source.startswith("("):
+        source = "the config file"
+    if not os.path.isdir(pack):
+        raise SystemExit(
+            "kindi: the configured pack directory does not exist:\n"
+            "  %s\n"
+            "Set 'pack' in %s or KINDI_PACK, or run `kindi use <model>`." % (pack, source))
+    if not os.path.isfile(manifest):
+        raise SystemExit(
+            "kindi: the configured pack is incomplete:\n"
+            "  %s\n"
+            "kindi_pack.json is missing. Run `kindi use <model>` or "
+            "`kindi convert MODEL.gguf --out %s`." % (pack, pack))
+    return pack
+
+
 def cmd_serve(cfg, a):
+    _require_pack(cfg)
     _setup_gpu_env(cfg)
     from .server import serve
     serve(cfg, log=log)
@@ -84,6 +106,7 @@ def cmd_serve(cfg, a):
 
 
 def cmd_chat(cfg, a):
+    _require_pack(cfg)
     _setup_gpu_env(cfg)
     from .server import Kindi
     K = Kindi(cfg, log=log)

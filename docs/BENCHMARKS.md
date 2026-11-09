@@ -31,8 +31,8 @@ The separate 2B plan engine at the same 24K context measured 302.4 tok/s against
 
 Two rented machines gave the numbers. Do not mix them. Box A: 2x Tesla P100-SXM2-16GB (NVLink, 300 W), driver 535.230.02,
 Kindi pascal-p100 b8c6e3f and p100-fp16-prompt 56d896d. Box B: 2x Tesla P100 16 GB (PCIe, 200 W). llama.cpp: Prism fork
-c96baf4, CUDA 12.8, `-ngl 99 -fa 1`, 3 runs. The 27B uses q8_0 K/V in both engines. Details and raw rows:
-`docs/dev/bench-0.4.0/p100.md`.
+c96baf4, CUDA 12.8, `-ngl 99 -fa 1`, 3 runs. The 27B uses q8_0 K/V in both engines. The per-row setup notes are
+internal measurement notes and are not part of this release.
 
 27B, box A. Read: a prompt of N tokens from position 0. Write: generation at depth N.
 

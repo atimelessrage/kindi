@@ -129,7 +129,28 @@ async def _read_json_body(request):
         raise RequestError("the body is not JSON")
 
 
-def _validate_request(req):
+_IMAGE_UNSUPPORTED = "this pack has no vision weights; image input is not supported"
+
+
+def _pack_has_vision(pack):
+    """True only when the selected pack names vision weights in its manifest."""
+    if not pack:
+        return False
+    try:
+        with open(os.path.join(pack, "kindi_pack.json"), encoding="utf-8") as f:
+            man = json.load(f)
+    except (OSError, ValueError):
+        return False
+    return bool(man.get("vision") or man.get("mmproj"))
+
+
+def _is_image_part(part):
+    """An OpenAI-compatible content part that carries an image."""
+    return (part.get("type") in ("image_url", "image", "input_image")
+            or "image_url" in part or "image" in part)
+
+
+def _validate_request(req, has_vision=False):
     """Check the OpenAI request shape before it reaches the engine or the prompt cache.
 
     The server takes a raw Request, so this is the boundary that turns a typo or a wrong JSON type into a
@@ -151,10 +172,14 @@ def _validate_request(req):
         content = m.get("content")
         if content is not None and not isinstance(content, (str, list)):
             _request_error("messages[%d].content must be a string or a list" % i)
+        if not has_vision and m.get("images"):
+            _request_error("%s (messages[%d].images)" % (_IMAGE_UNSUPPORTED, i))
         if isinstance(content, list):
             for j, part in enumerate(content):
                 if not isinstance(part, dict):
                     _request_error("messages[%d].content[%d] must be an object" % (i, j))
+                if not has_vision and _is_image_part(part):
+                    _request_error("%s (messages[%d].content[%d])" % (_IMAGE_UNSUPPORTED, i, j))
                 if "text" in part and not isinstance(part["text"], str):
                     _request_error("messages[%d].content[%d].text must be a string" % (i, j))
         if role == "assistant":
@@ -742,6 +767,7 @@ def create_app(cfg, log=print):
 
     K = GPU_THREAD.submit(_make_engine, cfg, log).result()
     model_id = cfg["model_name"]
+    has_vision = _pack_has_vision(cfg.get("pack"))
     app = FastAPI(title="Kindi", version=__version__)
     gate = K.gate = Gate(MAX_QUEUE)
 
@@ -763,7 +789,7 @@ def create_app(cfg, log=print):
                       ("repeat_penalty", "repeat_penalty"), ("repeat_last_n", "repeat_last_n"),
                       ("seed", "seed"), ("num_predict", "max_tokens"), ("stop", "stop"))
 
-    def _ollama_req(body, prompt_mode):
+    def _ollama_req(body, prompt_mode, has_vision):
         """Map an Ollama request to the internal one; validate it before it reaches the engine or the cache."""
         if not isinstance(body, dict):
             raise RequestError("the body must be a JSON object")
@@ -773,6 +799,8 @@ def create_app(cfg, log=print):
         opts = body.get("options") or {}
         if not isinstance(opts, dict):
             raise RequestError("options must be an object")
+        if not has_vision and body.get("images"):
+            raise RequestError(_IMAGE_UNSUPPORTED)
         if prompt_mode:
             prompt = body.get("prompt")
             if not isinstance(prompt, str) or not prompt:
@@ -793,7 +821,7 @@ def create_app(cfg, log=print):
             req.pop("max_tokens")                # Ollama's -1 means "until the context is full"
         if body.get("tools") is not None:
             req["tools"] = body["tools"]
-        _validate_request(req)
+        _validate_request(req, has_vision)
         return req, stream
 
     def _ollama_line(info, created, prompt_mode, final=False):
@@ -849,7 +877,7 @@ def create_app(cfg, log=print):
         except RequestError as e:
             return _err(400, str(e))
         try:
-            req, stream = _ollama_req(body, prompt_mode)
+            req, stream = _ollama_req(body, prompt_mode, has_vision)
         except RequestError as e:
             return _err(400, str(e))
         try:
@@ -1015,7 +1043,7 @@ def create_app(cfg, log=print):
         except RequestError as e:
             return _err(400, str(e))
         try:
-            _validate_request(req)
+            _validate_request(req, has_vision)
         except RequestError as e:
             return _err(400, str(e))
         cid, created = "chatcmpl-" + uuid.uuid4().hex[:24], int(time.time())

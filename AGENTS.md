@@ -15,8 +15,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | fast-forwarded to this branch | main checkout; clean after the 2026-11-09 reconciliation |
-| `C:/Users/ICH/.freebuff/worktrees/f0e51299/kindi` | `freebuff/project-review-audit-report` | merge `d21e566` + handoff commit | this session; includes main's Turing work |
+| `T:/kindi` | `main` | `46b63f8` | main checkout; clean apart from the untracked `optimizing-mixed-gpu-rig.json` |
+| `C:/Users/ICH/.freebuff/worktrees/f0e51299/kindi` | `freebuff/tandem-cpu-recovery` | `50d1d56` + uncommitted audit fixes | this session; includes main's Turing work |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
@@ -56,7 +56,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
-| Main-worktree task (other agent) | `T:/kindi` | `main` | `README.md`, `docs/CARDS.md`, `docs/CONFIGURATION.md`, `docs/INSTALL.md`, `docs/TURING-TENSOR-CORES.md`, `docs/VERIFICATION.md`, `docs/PAIR-SETUPS.md`, `docs/CPU_GPU_TANDEM_DESIGN.md`, `docs/GPU_PROFILE_ANALYSIS.md`, `docs/dev/**`, `install.sh`, `kindi/spec.py`, `.github/workflows/ci.yml` | clean after the 2026-11-09 snapshot; `main` fast-forwarded to this branch; interrupted WIP preserved on `wip/main-interrupted-snapshot-20261109-045352` |
+| Main-worktree task (other agent) | `T:/kindi` | `main` | `README.md`, `docs/CARDS.md`, `docs/CONFIGURATION.md`, `docs/INSTALL.md`, `docs/TURING-TENSOR-CORES.md`, `docs/VERIFICATION.md`, `docs/CPU_GPU_TANDEM_DESIGN.md`, `install.sh`, `kindi/spec.py`, `.github/workflows/ci.yml` | clean; no active shared-file edit; only untracked `optimizing-mixed-gpu-rig.json`; interrupted WIP preserved on `wip/main-interrupted-snapshot-20261109-045352` |
 | Documentation drift (P1-3, P1-4, P1-5, P1-6) | this worktree | `freebuff/project-review-audit-report` | `WHY.md`, `docs/CONFIGURATION.md`, `docs/INSTALL.md`, `docs/BENCHMARKS.md`, `docs/CARDS.md`, `docs/MTP.md`, `kindi.conf.example`, `kindi/spec.py` | partial: `WHY.md` and `kindi.conf.example` updated; `docs/INSTALL.md` checksum updated by the release task; `docs/CONFIGURATION.md`, `docs/CARDS.md`, `docs/BENCHMARKS.md` and `docs/MTP.md` remain blocked by the main worktree's dirty copies |
 | Continuous-batching investigation | this worktree | `freebuff/project-review-audit-report` | `docs/CONTINUOUS-BATCHING.md`, `AGENTS.md` | archived NO-GO; Phase-0 gate failed (0.69x); top banner and section 8 updated; no production code changed |
 | Server request validation + boundary hardening (P1-1/P2-1) | this worktree | `freebuff/project-review-audit-report` | `kindi/server.py`, `tests/test_server.py`, `tests/test_config_example.py` | done; 10 server tests (validation, auth, 413 body cap) + 1 example-config test + 9 installer fixture tests = 20 passed; invalid requests and 413 keep the cache |
@@ -306,10 +306,9 @@ Next, in order:
    validation tests fail, so they are not vacuous.
 3. [~] Documentation sync. `WHY.md` now names 0.4.0 and no longer says "one CUDA file";
    `kindi.conf.example` now lists every key in `config.DEFAULTS` (including the five that were
-   missing). **Still blocked:** `T:/kindi` has uncommitted changes in `docs/CONFIGURATION.md`,
-   `docs/INSTALL.md`, `docs/CARDS.md`, `docs/BENCHMARKS.md`, `docs/MTP.md` and `docs/dev/`, so
-   the central config reference, installer/checksum, support matrix and dead links cannot be
-   changed here until that work is committed or handed off.
+   missing). **Unblocked on 2026-11-09:** `T:/kindi` is clean, so the central config reference,
+   installer/checksum, support matrix and dead links can be reconciled here; run the worktree
+   status check immediately before a shared edit.
    Done when: every key in `config.DEFAULTS` appears in `docs/CONFIGURATION.md` and no doc link 404s.
 4. [ ] Packaging. **Blocked/owned by the main worktree:** it has `setup.py` staged and is editing
    the packaging/docs surface. Do not add a competing `pyproject.toml` here; reconcile with the

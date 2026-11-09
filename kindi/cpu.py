@@ -9,6 +9,7 @@ Threads: OMP_NUM_THREADS (with OMP_PROC_BIND=close; on a two-socket host, the co
 import ctypes
 import json
 import os
+import subprocess
 import time
 
 import numpy as np
@@ -50,14 +51,25 @@ class Model(ctypes.Structure):
                 + [(n, PF) for n in _SCR] + [("red", ctypes.POINTER(ctypes.c_double))])
 
 
+def _build(src, so):
+    """Compile kcpu.c without a shell, so paths from KINDI_CPU_CACHE stay literal."""
+    cmd = ["gcc", "-O3", "-march=native", "-fopenmp", "-fno-math-errno", "-shared", "-fPIC",
+           "-o", so, src, "-lm"]
+    try:
+        result = subprocess.run(cmd)
+    except OSError as e:
+        raise SystemExit("kindi: could not run gcc (%s); it needs gcc with OpenMP" % e)
+    if result.returncode:
+        raise SystemExit("kindi: could not build the CPU engine (%s); it needs gcc with OpenMP" % so)
+
+
 def _lib():
     src = os.path.join(HERE, "kcpu.c")
     cache = os.environ.get("KINDI_CPU_CACHE") or os.path.join(os.path.expanduser("~"), ".cache", "kindi")
     os.makedirs(cache, exist_ok=True)
     so = os.path.join(cache, "libkcpu.so")
     if not os.path.exists(so) or os.path.getmtime(so) < os.path.getmtime(src):
-        if os.system("gcc -O3 -march=native -fopenmp -fno-math-errno -shared -fPIC -o %s %s -lm" % (so, src)):
-            raise SystemExit("kindi: could not build the CPU engine (%s); it needs gcc with OpenMP" % so)
+        _build(src, so)
     lib = ctypes.CDLL(so)
     lib.kc_init()
     lib.kc_step.argtypes = [ctypes.POINTER(Model), ctypes.c_int, ctypes.c_int, ctypes.c_int]

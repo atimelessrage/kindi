@@ -1,6 +1,6 @@
 # Kindi on AMD graphics
 
-Kindi 0.3.0 runs on AMD RDNA3 graphics through ROCm. We tested it on the **Radeon 780M**, the graphics unit inside
+Kindi 0.4.0 runs on AMD RDNA3 graphics through ROCm. We tested it on the **Radeon 780M**, the graphics unit inside
 the AMD Ryzen 7 7840HS, Ryzen 9 7940HS and similar chips. Our test computer is a Minisforum UM790 Pro mini PC with a
 Ryzen 9 7940HS and 64 GB of DDR5-5600.
 

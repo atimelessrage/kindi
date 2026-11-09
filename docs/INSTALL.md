@@ -132,6 +132,7 @@ The script pins these files. It does not use a file with a different sha256.
 | 9B | `Ternary-Bonsai-2-9B-PTQ1_0.gguf` | 1,997,486,976 | `3561df7ac7d26a71ffa991ac2db740b10841c3a350aa2676ccd3ff5d428b4e8b` |
 | 27B | `Ternary-Bonsai-2-27B-PTQ1_0.gguf` | 5,946,648,928 | `53107f530aa52eb00912263ab1ee29bd199261c87cd7b4ad4ca1318c1fe33ee3` |
 | Nemotron | `NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q3_K_XL.gguf` (unsloth) | 4,219,133,120 | `3f8032b9d2c18536c4ac51b97959a563cc27434de99823640c98147edc62ce9b` |
+| Nanbeige 33B | `AH-Nanbeige4.3-33B-IQ3_XXS.gguf` | 13,108,685,952 | `9d4f18e8a22573c94b18a455147e807a8b9d2cd4b30302f2a4639c2db0a6c239` |
 
 ## Options
 
@@ -141,7 +142,7 @@ The script pins these files. It does not use a file with a different sha256.
 | `--yes`, `-y` | Answers yes to each question (for scripts) and takes the recommended setup. Kernel changes are never answered. |
 | `--auto` | Takes the recommended setup and continues with no questions. Kernel changes are only described. |
 | `--config N` | Setup N of the list; `N,M` for several servers; `NxK` for setup N on K cards. |
-| `--model M` | Lists only the setups with this model: `2b`, `4b`, `9b`, `27b` or `nemotron`. |
+| `--model M` | Lists only the setups with this model: `2b`, `4b`, `9b`, `27b`, `nemotron` or `nanbeige`. |
 | `--ctx N` | The context length in tokens. |
 | `--gpu G` | `N` (one NVIDIA card), `N,M` (two cards), `amd` or `amdN`, `all`, or `cpu`. |
 | `--port P` | The port of the first server on 127.0.0.1 (default 8093). Later servers take the next free ports. |

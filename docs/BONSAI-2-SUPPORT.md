@@ -22,9 +22,9 @@ Sources:
    2B/4B/9B use the `qwen35` chat template while the 27B has its own template. The family is not a
    from-scratch port.
 2. The largest missing capability is **image input**. Bonsai 2 is vision-language, but Kindi has no
-   mmproj loader, no vision tower, and no image-token insertion. Worse, an OpenAI request containing
-   an `image_url` part is currently accepted and the image is silently ignored by `chat.content_of()`;
-   the model answers as if no image was sent.
+   mmproj loader, no vision tower, and no image-token insertion. The request boundary now rejects an
+   OpenAI `image_url` part or Ollama `images` with HTTP 400 when the selected pack has no vision
+   weights, instead of silently dropping the image; text-only requests are unchanged.
 3. The highest-value work is not a new ternary kernel. It is a **2B vision MVP**: mmproj loader,
    Q8_0/BF16 vision encoder, image preprocessing, image tokens, an OpenAI/Ollama image contract, and
    an explicit 400 when the selected pack has no vision weights.
@@ -92,7 +92,7 @@ Verified in the code and docs on this branch:
 | Text, PTQ1_0 | Yes | Yes | Yes | Yes | Four profiles in `kindi/convert.py`; references and verifies exist |
 | Text, PQ2_0/Q2_0 | No | No | No | No | `convert.py` accepts only types 143, 0, 30 |
 | Image input | No | No | No | No | No mmproj loader; `chat.content_of()` takes only `text` parts |
-| Image part rejected | No | No | No | No | The server validates the list shape but does not reject unknown part types; the image is dropped |
+| Image part rejected without vision weights | Yes (400) | Yes (400) | Yes (400) | Yes (400) | `kindi/server.py` checks `image_url`/`image`/`input_image` parts and Ollama `images`; a pack with `vision` or `mmproj` in `kindi_pack.json` is allowed through |
 | 262,144 context | Untested | Untested | Untested | Yes, 2x P100 | `docs/BENCHMARKS.md` full-context 27B run; `docs/CARDS.md` shows 110,592 tokens on a 10 GB RTX 3080 |
 | Tools / thinking | Yes | Yes | Yes | Yes | `kindi/chat.py`; 27B has reasoning-effort template |
 | Publisher sampling | Partial | Partial | Partial | Partial | Temperature/top-p/top-k exist; no presence penalty; thinking off by default |
@@ -114,15 +114,11 @@ Two distinctions matter:
 
 ### 4.1 Vision input is the main missing capability
 
-The current request boundary is permissive: `_validate_request()` accepts a content list containing
-objects, and `chat.content_of()` concatenates only parts with a `text` key. An OpenAI request with
-
-```json
-{"type": "image_url", "image_url": {"url": "data:image/png;base64,..."}}
-```
-
-is therefore accepted and the image is discarded. The model answers from the text alone. That is
-worse than a clear refusal because it looks like vision worked.
+The current request boundary now rejects image input when the selected pack has no vision weights:
+`_validate_request()` returns 400 for an `image_url`/`image`/`input_image` content part and for
+Ollama `images` when `kindi_pack.json` has neither `vision` nor `mmproj`. `chat.content_of()` still
+concatenates only parts with a `text` key, so a future vision pack must add the actual image path;
+the text-only behavior is unchanged.
 
 Minimum work:
 
@@ -139,8 +135,9 @@ Minimum work:
    image part, then run the normal decoder. The language model still produces text only.
 6. Add `image_url` support to `/v1/chat/completions` and `images` to Ollama `/api/chat`. Accept data
    URLs first; make remote HTTP fetching opt-in and guarded against SSRF. Cap bytes and pixels.
-7. Return **400** with "this pack has no vision weights" when an image is supplied without an mmproj.
-   Do this even before the vision path exists, so the current silent drop stops.
+7. **[Done for the boundary]** Return **400** with "this pack has no vision weights" when an image is
+   supplied without an mmproj. The server now checks OpenAI image parts and Ollama `images` before
+   the engine; the actual vision path remains open.
 
 Performance notes:
 
@@ -301,8 +298,8 @@ Performance:
 
 ## 8. Recommended next actions
 
-1. **This week:** add the 400 for image parts without a vision pack, and verify the four text packs.
-   This closes the silent-failure hole without waiting for the vision tower.
+1. **This week:** verify the four text packs with the new image-400 boundary (OpenAI image parts and
+   Ollama `images`). This closes the silent-failure hole without waiting for the vision tower.
 2. **Next:** add the publisher non-thinking/thinking profiles and `presence_penalty`. This is a
    small change with a direct quality effect.
 3. **Then:** build the 2B vision MVP. Do not start with 4B/9B or Bonsai Image.

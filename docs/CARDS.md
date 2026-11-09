@@ -15,7 +15,7 @@ is at `/data/<pack>`. The examples serve on `127.0.0.1:8093`.
 ```
 docker run -d --name kindi --restart unless-stopped --gpus all -u $(id -u):$(id -g) \
   -p 127.0.0.1:8093:8093 -v $HOME/.kindi:/data -e HOME=/tmp \
-  -e KINDI_PACK=/data/pack -e KINDI_STATE_DIR=/data/state ... kindi:0.1.0
+  -e KINDI_PACK=/data/pack -e KINDI_STATE_DIR=/data/state ... kindi:0.4.0
 ```
 
 Replace `...` with the variables in the section for your card. To use one card of two, set `--gpus device=N`.
@@ -164,8 +164,8 @@ bandwidth of 732 GB/s. Photo: GP100 chip of a Tesla P100, by Fritzchens Fritz, W
 - Speculative decoding is off on the P100. On this card, a verify pass over several tokens costs about as much as the
   same number of single steps, so a draft cannot save time.
 - `kindi verify` passes on one P100 for the 2B, 4B and 27B (token-exact), and on two P100 cards for the 33B.
-- The numbers come from two rented machines (SXM2 with NVLink, and PCIe). `docs/dev/bench-0.4.0/p100.md` has the
-  conditions of each row.
+- The numbers come from two rented machines (SXM2 with NVLink, and PCIe). The per-row setup notes are internal
+  and are not part of this release.
 
 ## GeForce RTX 20, 30, 40 and 50 series
 

@@ -1,7 +1,27 @@
 # Contributing to Kindi
 
 Bug reports, questions, test results and ideas are welcome. You do not need to sign a contributor agreement to
-open an issue or use Kindi.
+open an issue or use Kindi. For security reports, use the private process in [SECURITY.md](SECURITY.md).
+
+## Before you open a pull request
+
+Run the CPU-only gate from the repository root; it needs no GPU, model pack or Docker:
+
+```sh
+python -m compileall -q kindi
+python -m pytest tests/ -q
+bash -n install.sh
+```
+
+For installer changes, also run the GRUB fixture test and ShellCheck:
+
+```sh
+python -m pytest tests/test_installer_grub.py -q
+shellcheck --severity=warning install.sh
+```
+
+`tests/README.md` describes the optional Turing/CUDA reference suite and static analysis. Report which checks
+you ran, and say explicitly when a hardware-dependent path was not tested.
 
 ## Code and other submitted material
 

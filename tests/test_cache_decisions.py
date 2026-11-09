@@ -1,4 +1,8 @@
 """Prompt-cache decisions that need no engine: prefix matching, spacing, parking, eviction."""
+import os
+from types import SimpleNamespace
+
+from kindi import cache
 from kindi.cache import Runner, _lcp
 
 
@@ -58,3 +62,21 @@ def test_enforce_never_drops_an_opening_checkpoint():
     r._enforce()
     assert 100 in r.ckpt
     assert len(r.ckpt) == 3            # the 3 newest are kept when nothing else can go
+
+
+def test_arithmetic_fingerprint_includes_new_compiled_kernels(tmp_path):
+    (tmp_path / "new_kernel.cu").write_text("// kernel\n", encoding="utf-8")
+    (tmp_path / "new_kernel.c").write_text("/* kernel */\n", encoding="utf-8")
+    (tmp_path / "notes.txt").write_text("not arithmetic\n", encoding="utf-8")
+    files = cache._arith_files(str(tmp_path))
+    assert "new_kernel.cu" in files and "new_kernel.c" in files
+    assert "notes.txt" not in files
+    assert "engine.py" in files and "spec.py" in files
+
+
+def test_engine_fingerprint_hashes_every_compiled_kernel():
+    here = os.path.dirname(os.path.abspath(cache.__file__))
+    _, description = cache.engine_fingerprint(SimpleNamespace(), {"head": "exact"})
+    compiled = {name for name in os.listdir(here) if name.endswith((".cu", ".c"))}
+    assert compiled <= set(description["code"])
+    assert "engine.py" in description["code"]

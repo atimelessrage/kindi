@@ -36,3 +36,19 @@ the `docker run` command. Rootless Docker runs the container's root as your user
 
 **`kindi verify` fails.** The pack is from a different model file, or the GPU stack differs from the tested one.
 Re-run `kindi convert --force` from the official file and check the driver.
+
+**The server answers `429` and `Retry-After: 1`.** Up to eight requests may wait behind the active one
+(`KINDI_QUEUE_MAX`). Wait a second and retry once; do not open more parallel connections or retry in a loop.
+Watch `queue.waiting`, `queue.max` and `queue.rejected` in `/health`.
+
+**The server exits after a CUDA error, or keeps restarting.** Kindi exits instead of serving from a broken CUDA
+context. Check `nvidia-smi`, `dmesg` and the container log; restart the container only after the GPU is healthy.
+The installer uses `--restart unless-stopped`, so a persistent error becomes a restart loop rather than wrong output.
+
+**`400 this pack has no vision weights; image input is not supported`.** The selected Bonsai pack is text-only.
+Remove the image part or use a text-only prompt. A pack is vision-capable only when its `kindi_pack.json` names
+`vision` or `mmproj` weights; this release does not load them.
+
+**The CPU engine cannot build.** The first CPU start needs `gcc` with OpenMP. Check `gcc --version`; the build uses
+`-march=native`, so a binary copied from another CPU may not run. Set `KINDI_CPU_CACHE` to a writable directory if
+the default cache is not usable.

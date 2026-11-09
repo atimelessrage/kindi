@@ -20,7 +20,10 @@ Besides `/v1`, Kindi serves what an agent host needs to observe and to connect a
   without an OpenAI shim. `stream` defaults to true and the body is NDJSON; `options.num_predict` maps to
   `max_tokens`; `options.keep_alive`, `num_ctx`, `num_thread` and `format` are ignored. The API key applies here
   too.
-- `GET /health` also reports the queue: `queue.waiting`, `queue.max` and `queue.rejected`.
+- `GET /health` also reports the queue: `queue.waiting`, `queue.max` and `queue.rejected`. It is
+  unauthenticated and includes model, context and GPU details; keep it on loopback or protect it at a proxy.
+- Image input is rejected with HTTP 400 when the selected pack has no vision weights. The current packs are
+  text-only; remove `image_url`/`input_image` parts and Ollama `images`, or use a text-only prompt.
 
 ## What to set in any client
 

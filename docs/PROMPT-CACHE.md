@@ -85,6 +85,22 @@ The Bonsai models use the same three kinds of saved state. Their checkpoints als
 Gated-DeltaNet layers, and they can save the start of a conversation to disk, so that it is available after a
 restart. See [HOW-IT-WORKS.md](HOW-IT-WORKS.md).
 
+## Invariants
+
+These rules are why a resumed request is safe; break one and the cache can return wrong output.
+
+- A saved opening is reused only when its engine fingerprint matches. The fingerprint covers the model path,
+  K/V type, chunk/attention/tensor-core/speculation settings, head mode and the code of every compiled kernel
+  (all `*.cu`/`*.c` files in `kindi/`) plus the explicit Python arithmetic files.
+- A checkpoint is a copy of the complete recurrent and attention state at a token boundary. Resume starts at
+  the last checkpoint at or before the first differing token; the position-indexed K/V suffix is then valid.
+- Parked conversations are moved whole (tokens, checkpoints, end state and K/V). They are not mixed with another
+  conversation, and `park_max`/`checkpoint_budget_mb` may evict them but never truncate a live state.
+- A damaged or foreign opening is ignored, not repaired in place. The cache must never resume a state made by a
+  different engine configuration.
+- Eviction drops the least-recently-used opening or the oldest checkpoint that is not needed by a live request.
+  The final state after a request is never removed while that request is active.
+
 ## Settings
 
 | Setting | Default | What it does |
