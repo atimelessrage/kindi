@@ -1,4 +1,19 @@
-"""Kindi OpenAI-compatible server.\n\n  GET  /health                 status, live progress of the request being served, GPU memory\n  GET  /v1/models              the model\n  POST /v1/chat/completions    messages (+ tools) -> answer; stream=true for SSE; tool calls as OpenAI tool_calls\n\nOne request at a time (one engine on one GPU); concurrent requests queue. Thinking is off unless the request sets\nchat_template_kwargs.enable_thinking (or top-level enable_thinking); a stream then carries the thinking as\ndelta.reasoning_content. thinking_budget_tokens (or thinking_budget) caps it: at the budget the server closes the\nthinking itself and the model goes on to answer. temperature 0 = greedy (token-exact with llama.cpp in the exact head\nmode). Request bodies are capped at 16 MiB (KINDI_MAX_BODY_MB); when api_key is set, it is compared in constant time."""
+"""Kindi OpenAI-compatible server.
+
+  GET  /health                 status, live progress of the request being served, GPU memory, queue depth
+  GET  /v1/models              the model
+  POST /v1/chat/completions    messages (+ tools) -> answer; stream=true for SSE; tool calls as OpenAI tool_calls
+  POST /api/chat               the same, in Ollama's NDJSON form (stream defaults to true)
+  POST /api/generate           a raw prompt, Ollama style
+  GET  /api/tags               the served model, Ollama style
+  GET  /metrics                Prometheus text: requests, tokens, speculative stats, queue, uptime
+
+One request at a time (one engine on one GPU); up to KINDI_QUEUE_MAX requests wait behind it, and the next one gets
+HTTP 429 with Retry-After instead of waiting without a bound. Thinking is off unless the request sets
+chat_template_kwargs.enable_thinking (or top-level enable_thinking); a stream then carries the thinking as
+delta.reasoning_content. thinking_budget_tokens (or thinking_budget) caps it: at the budget the server closes the
+thinking itself and the model goes on to answer. temperature 0 = greedy (token-exact with llama.cpp in the exact head
+mode). Request bodies are capped at 16 MiB (KINDI_MAX_BODY_MB); when api_key is set, it is compared in constant time."""
 import asyncio
 import codecs
 import concurrent.futures
@@ -40,6 +55,46 @@ def _finite_number(value):
 
 
 MAX_BODY_BYTES = int(os.environ.get("KINDI_MAX_BODY_MB", "16")) * 1024 * 1024
+
+# One engine runs one request; this bounds how many clients may wait behind it (KINDI_QUEUE_MAX=0: no waiting).
+MAX_QUEUE = int(os.environ.get("KINDI_QUEUE_MAX", "8"))
+
+
+class QueueFull(Exception):
+    """The bounded wait behind the active request is full: an HTTP 429 with Retry-After."""
+
+
+class Gate(object):
+    """Admission for the single engine.
+
+    K.lock serialises generation, but nothing bounded the number of clients waiting for it: the executor queue
+    is unbounded, so on a loaded server every extra request waited (for minutes) instead of being told to retry.
+    The count is the number admitted (one running + up to max_queue waiting); rejections are counted for /metrics.
+    """
+
+    def __init__(self, max_queue):
+        self.max_queue = max(0, int(max_queue))
+        self._lock = threading.Lock()
+        self.admitted = 0
+        self.rejected = 0
+
+    def enter(self):
+        with self._lock:
+            if self.admitted >= self.max_queue + 1:
+                self.rejected += 1
+                raise QueueFull("the server is busy: %d request(s) queued (KINDI_QUEUE_MAX=%d)"
+                                % (self.admitted - 1, self.max_queue))
+            self.admitted += 1
+
+    def release(self):
+        with self._lock:
+            if self.admitted:
+                self.admitted -= 1
+
+    @property
+    def waiting(self):
+        with self._lock:
+            return max(0, self.admitted - 1)
 
 
 class RequestTooLarge(ValueError):
@@ -272,7 +327,9 @@ class Kindi(object):
             self.runner = Runner(self.eng, cfg, self.pack_id, log, progress=self.busy)
             self.sample = Sampler(self.eng)
         self.lock = threading.Lock()
-        self.stats = {"requests": 0, "prompt_tokens": 0, "cached_tokens": 0, "completion_tokens": 0}
+        self.stats = {"requests": 0, "prompt_tokens": 0, "cached_tokens": 0, "completion_tokens": 0,
+                      "spec_passes": 0, "spec_drafted": 0, "spec_accepted": 0,
+                      "errors": 0, "gen_seconds": 0.0, "last_tok_s": 0.0}
         self.t0 = time.time()
 
     def head_mode(self):
@@ -437,6 +494,8 @@ class Kindi(object):
             self.busy["active"]=False
             raise
         elapsed=max(0.001,time.time()-prompt_done)
+        self.stats["gen_seconds"]+=elapsed
+        self.stats["last_tok_s"]=round(len(generated)/elapsed,2)
         self.stats["prompt_tokens"]+=len(ids)
         self.stats["cached_tokens"]+=self.busy.get("cached",0)
         self.stats["completion_tokens"]+=len(generated)
@@ -612,10 +671,15 @@ class Kindi(object):
         if sp and sp["passes"]:
             self.log("speculative: %d tokens in %d passes, %d of %d drafted tokens accepted" % (
                 len(gen), sp["passes"], sp["accepted"], sp["drafted"]))
+            self.stats["spec_passes"] += sp["passes"]
+            self.stats["spec_drafted"] += sp["drafted"]
+            self.stats["spec_accepted"] += sp["accepted"]
         if st["think"] and len(text) > st["sent"]:
             yield "reasoning", text[st["sent"]:]
         t2 = time.time()
         self.log("done: %d tokens in %.1fs (%s)" % (len(gen), t2 - t1, finish))
+        self.stats["gen_seconds"] += t2 - t1
+        self.stats["last_tok_s"] = round(len(gen) / (t2 - t1), 2) if t2 > t1 else 0.0
         for k, v in (("requests", 1), ("prompt_tokens", len(T)), ("cached_tokens", cached),
                      ("completion_tokens", len(gen))):
             self.stats[k] += v
@@ -646,6 +710,9 @@ def _after_engine_error(K, e):
     """An engine error other than a bad request. Drop the cache state (it may be half updated), and if the GPU
     context is broken (an illegal memory access is sticky in CUDA: every later call fails too), exit so that the
     container's restart policy brings the server back, in place of answering every request with an error."""
+    stats = getattr(K, "stats", None)
+    if isinstance(stats, dict):
+        stats["errors"] = stats.get("errors", 0) + 1
     r = getattr(K, "runner", None)
     if r is not None:
         try:
@@ -671,14 +738,19 @@ def _make_engine(cfg, log):
 
 def create_app(cfg, log=print):
     from fastapi import FastAPI, Request
-    from fastapi.responses import JSONResponse, StreamingResponse
+    from fastapi.responses import JSONResponse, Response, StreamingResponse
 
     K = GPU_THREAD.submit(_make_engine, cfg, log).result()
     model_id = cfg["model_name"]
     app = FastAPI(title="Kindi", version=__version__)
+    gate = K.gate = Gate(MAX_QUEUE)
 
-    def _err(code, msg, typ="invalid_request_error"):
-        return JSONResponse({"error": {"message": msg, "type": typ, "code": typ}}, status_code=code)
+    def _err(code, msg, typ="invalid_request_error", headers=None):
+        return JSONResponse({"error": {"message": msg, "type": typ, "code": typ}},
+                            status_code=code, headers=headers)
+
+    def _busy(e):
+        return _err(429, str(e), "server_busy", {"Retry-After": "1"})
 
     def _auth(request):
         key = cfg["api_key"]
@@ -686,6 +758,160 @@ def create_app(cfg, log=print):
             return True
         supplied = request.headers.get("authorization", "")
         return hmac.compare_digest(supplied.encode("utf-8"), ("Bearer " + key).encode("utf-8"))
+
+    OLLAMA_OPTIONS = (("temperature", "temperature"), ("top_p", "top_p"), ("top_k", "top_k"),
+                      ("repeat_penalty", "repeat_penalty"), ("repeat_last_n", "repeat_last_n"),
+                      ("seed", "seed"), ("num_predict", "max_tokens"), ("stop", "stop"))
+
+    def _ollama_req(body, prompt_mode):
+        """Map an Ollama request to the internal one; validate it before it reaches the engine or the cache."""
+        if not isinstance(body, dict):
+            raise RequestError("the body must be a JSON object")
+        stream = body.get("stream", True)
+        if not isinstance(stream, bool):
+            raise RequestError("stream must be true or false")
+        opts = body.get("options") or {}
+        if not isinstance(opts, dict):
+            raise RequestError("options must be an object")
+        if prompt_mode:
+            prompt = body.get("prompt")
+            if not isinstance(prompt, str) or not prompt:
+                raise RequestError("prompt must be a non-empty string")
+            messages = []
+            if body.get("system") is not None:
+                if not isinstance(body["system"], str):
+                    raise RequestError("system must be a string")
+                messages.append({"role": "system", "content": body["system"]})
+            messages.append({"role": "user", "content": prompt})
+        else:
+            messages = body.get("messages")
+        req = {"messages": messages}
+        for src, dst in OLLAMA_OPTIONS:
+            if opts.get(src) is not None:
+                req[dst] = opts[src]
+        if req.get("max_tokens") in (-1, 0):
+            req.pop("max_tokens")                # Ollama's -1 means "until the context is full"
+        if body.get("tools") is not None:
+            req["tools"] = body["tools"]
+        _validate_request(req)
+        return req, stream
+
+    def _ollama_line(info, created, prompt_mode, final=False):
+        """The final Ollama object of a request (done=true), from the internal done info."""
+        t, u = info["timing"], info["usage"]
+        line = {"model": model_id, "created_at": created, "done": True,
+                "done_reason": info["finish"], "load_duration": 0,
+                "prompt_eval_count": u["prompt_tokens"], "prompt_eval_duration": int(t["prompt_s"] * 1e9),
+                "eval_count": u["completion_tokens"], "eval_duration": int(t["gen_s"] * 1e9),
+                "total_duration": int((t["prompt_s"] + t["gen_s"]) * 1e9)}
+        if prompt_mode:
+            line["response"] = "" if final else info["content"]
+        else:
+            msg = {"role": "assistant", "content": "" if final else info["content"]}
+            if info.get("reasoning"):
+                msg["thinking"] = info["reasoning"]
+            if info.get("tool_calls"):
+                msg["tool_calls"] = info["tool_calls"]
+            line["message"] = msg
+        return line
+
+    async def _relay_ndjson(gen, cancel):
+        """Run a blocking generator on the GPU thread and relay its lines, so the event loop stays free."""
+        loop = asyncio.get_event_loop()
+        q = asyncio.Queue()
+        END = object()
+
+        def pump():
+            try:
+                for item in gen:
+                    loop.call_soon_threadsafe(q.put_nowait, item)
+            finally:
+                loop.call_soon_threadsafe(q.put_nowait, END)
+
+        fut = loop.run_in_executor(GPU_THREAD, pump)
+        try:
+            while True:
+                item = await q.get()
+                if item is END:
+                    break
+                yield item
+        finally:
+            cancel.set()
+            await asyncio.wait([fut], timeout=30)
+
+    async def _ollama(request, prompt_mode):
+        if not _auth(request):
+            return _err(401, "invalid API key", "authentication_error")
+        try:
+            body = await _read_json_body(request)
+        except RequestTooLarge as e:
+            return _err(413, str(e), "request_too_large")
+        except RequestError as e:
+            return _err(400, str(e))
+        try:
+            req, stream = _ollama_req(body, prompt_mode)
+        except RequestError as e:
+            return _err(400, str(e))
+        try:
+            gate.enter()
+        except QueueFull as e:
+            return _busy(e)
+        created = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        cancel = threading.Event()
+        if stream:
+            def events():
+                try:
+                    with K.lock:
+                        for kind, val in K.generate(req, cancel):
+                            if kind == "text":
+                                line = {"model": model_id, "created_at": created, "done": False}
+                                if prompt_mode:
+                                    line["response"] = val
+                                else:
+                                    line["message"] = {"role": "assistant", "content": val}
+                                yield json.dumps(line, ensure_ascii=False) + "\n"
+                            elif kind == "reasoning" and not prompt_mode:
+                                yield json.dumps({"model": model_id, "created_at": created, "done": False,
+                                                  "message": {"role": "assistant", "content": "",
+                                                              "thinking": val}}, ensure_ascii=False) + "\n"
+                            else:
+                                yield json.dumps(_ollama_line(val, created, prompt_mode, final=True),
+                                                 ensure_ascii=False) + "\n"
+                except (OverflowError, ValueError) as e:
+                    yield json.dumps({"error": str(e)}, ensure_ascii=False) + "\n"
+                except Exception as e:  # noqa: BLE001 - report it on the stream, as the SSE path does
+                    yield json.dumps({"error": "kindi: %s" % e}, ensure_ascii=False) + "\n"
+                    _after_engine_error(K, e)
+                finally:
+                    gate.release()
+            return StreamingResponse(_relay_ndjson(events(), cancel), media_type="application/x-ndjson")
+
+        def run():
+            with K.lock:
+                info = None
+                for kind, val in K.generate(req, cancel):
+                    if kind == "done":
+                        info = val
+                return info
+        try:
+            fut = asyncio.get_event_loop().run_in_executor(GPU_THREAD, run)
+            while not fut.done():
+                done, _ = await asyncio.wait([fut], timeout=1.0)
+                if not done and await request.is_disconnected():
+                    cancel.set()
+            info = fut.result()
+            if info is None:
+                return _err(499, "request cancelled", "cancelled")
+            return _ollama_line(info, created, prompt_mode)
+        except OverflowError as e:
+            return _err(400, str(e), "context_length_exceeded")
+        except ValueError as e:
+            return _err(400, str(e))
+        except Exception as e:  # noqa: BLE001 - an engine failure, not a bad request
+            _after_engine_error(K, e)
+            return _err(500, "kindi: %s" % e, "server_error")
+        finally:
+            gate.release()
 
     @app.get("/health")
     def health():
@@ -700,6 +926,7 @@ def create_app(cfg, log=print):
                     "prompt_read": "%d/%d" % (b["read"], b["prompt_tokens"] - b["cached"]), "generated": b["generated"]}
         return {"ok": True, "kindi": __version__, "commit": COMMIT, "model": model_id, "ctx": K.eng.ctx, "head": K.head_active(),
                 "uptime_s": round(time.time() - K.t0), "busy": busy, "stats": K.stats,
+                "queue": {"waiting": gate.waiting, "max": gate.max_queue, "rejected": gate.rejected},
                 "gpu_free_mib": round(free / 1048576.0), "gpu_total_mib": round(total / 1048576.0)}
 
     @app.get("/v1/models")
@@ -708,6 +935,74 @@ def create_app(cfg, log=print):
             return _err(401, "invalid API key", "authentication_error")
         return {"object": "list", "data": [{"id": model_id, "object": "model", "created": int(K.t0),
                                             "owned_by": "kindi", "context_length": K.eng.ctx}]}
+
+    @app.get("/metrics")
+    def metrics(request: Request):
+        if not _auth(request):
+            return _err(401, "invalid API key", "authentication_error")
+        s = K.stats
+
+        def g(k):
+            return s.get(k, 0)
+
+        def label(v):
+            return str(v).replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+        lines = []
+
+        def metric(name, typ, help_text, *samples):
+            lines.extend(("# HELP %s %s" % (name, help_text), "# TYPE %s %s" % (name, typ)))
+            lines.extend(samples)
+
+        metric("kindi_up", "gauge", "1 while the server is up", "kindi_up 1")
+        metric("kindi_uptime_seconds", "gauge", "seconds since the engine started",
+               "kindi_uptime_seconds %.3f" % (time.time() - K.t0))
+        metric("kindi_model_info", "gauge", "the served model",
+               'kindi_model_info{model="%s",ctx="%d",head="%s"} 1'
+               % (label(model_id), K.eng.ctx, label(K.head_active())))
+        metric("kindi_queue_depth", "gauge", "requests admitted and waiting for the engine",
+               "kindi_queue_depth %d" % gate.waiting)
+        metric("kindi_queue_max", "gauge", "KINDI_QUEUE_MAX: requests that may wait behind the active one",
+               "kindi_queue_max %d" % gate.max_queue)
+        metric("kindi_requests_total", "counter", "generation requests completed",
+               "kindi_requests_total %d" % g("requests"))
+        metric("kindi_requests_rejected_total", "counter", "requests rejected because the queue was full",
+               "kindi_requests_rejected_total %d" % gate.rejected)
+        metric("kindi_request_errors_total", "counter", "requests that failed after admission",
+               "kindi_request_errors_total %d" % g("errors"))
+        metric("kindi_prompt_tokens_total", "counter", "prompt tokens processed",
+               "kindi_prompt_tokens_total %d" % g("prompt_tokens"))
+        metric("kindi_cached_prompt_tokens_total", "counter", "prompt tokens served from the cache",
+               "kindi_cached_prompt_tokens_total %d" % g("cached_tokens"))
+        metric("kindi_completion_tokens_total", "counter", "completion tokens generated",
+               "kindi_completion_tokens_total %d" % g("completion_tokens"))
+        metric("kindi_spec_drafted_tokens_total", "counter", "tokens proposed by speculative drafting",
+               "kindi_spec_drafted_tokens_total %d" % g("spec_drafted"))
+        metric("kindi_spec_accepted_tokens_total", "counter", "drafted tokens accepted by the verify pass",
+               "kindi_spec_accepted_tokens_total %d" % g("spec_accepted"))
+        metric("kindi_generation_seconds_total", "counter", "seconds spent generating",
+               "kindi_generation_seconds_total %.3f" % g("gen_seconds"))
+        metric("kindi_last_generation_tokens_per_second", "gauge", "tokens/s of the last generation",
+               "kindi_last_generation_tokens_per_second %.2f" % g("last_tok_s"))
+        return Response("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
+
+    @app.get("/api/tags")
+    def ollama_tags(request: Request):
+        if not _auth(request):
+            return _err(401, "invalid API key", "authentication_error")
+        return {"models": [{"name": model_id, "model": model_id,
+                            "modified_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(K.t0)),
+                            "size": 0, "digest": getattr(K, "pack_id", ""),
+                            "details": {"format": "kindi", "family": "kindi", "families": ["kindi"],
+                                        "parameter_size": "", "quantization_level": "ternary"}}]}
+
+    @app.post("/api/chat")
+    async def ollama_chat(request: Request):
+        return await _ollama(request, False)
+
+    @app.post("/api/generate")
+    async def ollama_generate(request: Request):
+        return await _ollama(request, True)
 
     @app.post("/v1/chat/completions")
     async def completions(request: Request):
@@ -745,7 +1040,12 @@ def create_app(cfg, log=print):
             except Exception:  # noqa: BLE001 - anything else: the stream reports it
                 pass
 
-            def sse():
+            try:
+                gate.enter()
+            except QueueFull as e:
+                return _busy(e)
+
+            def _sse_locked():
                 with K.lock:
                     yield chunk({"role": "assistant", "content": ""})
                     held, in_call = "", False
@@ -788,6 +1088,14 @@ def create_app(cfg, log=print):
                         yield "data: " + json.dumps({"error": {"message": "kindi: %s" % e, "type": "server_error"}}) + "\n\n"
                         _after_engine_error(K, e)
                     yield "data: [DONE]\n\n"
+
+            def sse():
+                try:
+                    for item in _sse_locked():
+                        yield item
+                finally:
+                    gate.release()
+
             async def relay():
                 # the generator runs in a worker thread; if the client disconnects, Starlette cancels this
                 # coroutine, the finally sets `cancel`, and the engine stops at its next token
@@ -819,6 +1127,11 @@ def create_app(cfg, log=print):
                     await asyncio.wait([fut], timeout=30)
             return StreamingResponse(relay(), media_type="text/event-stream")
 
+        try:
+            gate.enter()
+        except QueueFull as e:
+            return _busy(e)
+
         def run():
             with K.lock:
                 info = None
@@ -842,6 +1155,8 @@ def create_app(cfg, log=print):
         except Exception as e:
             _after_engine_error(K, e)
             return _err(500, "kindi: %s" % e, "server_error")
+        finally:
+            gate.release()
         msg = {"role": "assistant", "content": info["content"] if (info["content"] or not info["tool_calls"]) else None}
         if info["tool_calls"]:
             msg["tool_calls"] = info["tool_calls"]

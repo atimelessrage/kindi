@@ -8,6 +8,20 @@ Kindi is an OpenAI-compatible endpoint. Use these values:
 
 For tool calls, Kindi uses the standard `tools` / `tool_calls` fields.
 
+## Native endpoints
+
+Besides `/v1`, Kindi serves what an agent host needs to observe and to connect a non-OpenAI client:
+
+- `GET /metrics` - Prometheus text. `kindi_requests_total`, `kindi_prompt_tokens_total`,
+  `kindi_cached_prompt_tokens_total`, `kindi_completion_tokens_total`, `kindi_spec_drafted_tokens_total`,
+  `kindi_spec_accepted_tokens_total`, `kindi_queue_depth`, `kindi_queue_max`, `kindi_uptime_seconds` and
+  `kindi_model_info{model,ctx,head}`. It is protected by the API key when one is set.
+- `GET /api/tags`, `POST /api/chat`, `POST /api/generate` - Ollama's API, so Ollama clients and chat UIs work
+  without an OpenAI shim. `stream` defaults to true and the body is NDJSON; `options.num_predict` maps to
+  `max_tokens`; `options.keep_alive`, `num_ctx`, `num_thread` and `format` are ignored. The API key applies here
+  too.
+- `GET /health` also reports the queue: `queue.waiting`, `queue.max` and `queue.rejected`.
+
 ## What to set in any client
 
 1. **Context window: 24,576 tokens** (or your `ctx`). Clients that summarise old turns ("compaction") should do it
@@ -17,7 +31,9 @@ For tool calls, Kindi uses the standard `tools` / `tool_calls` fields.
    that text takes about 3 minutes. The cache then saves it (see the README), so later turns and later sessions are
    fast. Some clients stop after 60-120 s and send the request again. This makes the problem worse: the retry waits
    behind the request that Kindi still reads.
-3. **One retry at most**, and no parallel requests: Kindi serves one request at a time.
+3. **One retry at most**, and no parallel requests: Kindi serves one request at a time. Up to 8 requests may
+   wait behind the active one; beyond that the server answers **HTTP 429** with `Retry-After: 1`. Wait a second
+   and retry once instead of opening more connections.
 4. **A short system prompt and few tools.** Every tool schema is prompt text. Keep the tool list fixed between calls.
    A different set of tools per call changes the start of the prompt, and then the cache cannot help.
 5. **Temperature 0.1-0.7.** Greedy (`0`) is reproducible; the model publisher recommends 0.7 / top_p 0.8 / top_k 20.

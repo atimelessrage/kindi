@@ -4,6 +4,7 @@ These tests use a stub Kindi, so they need no GPU, model pack or tokenizer. The 
 TypeError for a malformed message list, which is what the old generic exception path turned into a 500 after
 clearing the real Runner. The validator must stop the request before that path is reached.
 """
+import json
 import threading
 
 import pytest
@@ -34,6 +35,8 @@ class _FakeKindi(object):
 
     def __init__(self):
         self.cfg = {"model_name": "bonsai2-2b", "api_key": ""}
+        self.pack_id = "fake"
+        self.last_req = None
         self.eng = _FakeEngine()
         self.runner = _FakeRunner()
         self.lock = threading.Lock()
@@ -53,6 +56,8 @@ class _FakeKindi(object):
             if not isinstance(m, dict) or "role" not in m:
                 raise TypeError("missing role")
         cached = len(self.runner.tokens)
+        self.last_req = req
+        yield "text", "ok"
         yield "done", {
             "content": "ok", "tool_calls": [], "reasoning": "", "finish": "stop", "logprobs": None,
             "usage": {"prompt_tokens": cached, "completion_tokens": 1, "total_tokens": cached + 1,
@@ -134,6 +139,111 @@ def test_api_key_is_required_and_matches_exactly(auth_client):
     assert client.get("/v1/models").status_code == 401
     assert client.get("/v1/models", headers={"Authorization": "Bearer wrong"}).status_code == 401
     assert client.get("/v1/models", headers={"Authorization": "Bearer secret-token"}).status_code == 200
+
+
+def test_queue_gate_bounds_the_wait():
+    gate = server.Gate(1)
+    gate.enter()
+    gate.enter()
+    assert gate.waiting == 1
+    with pytest.raises(server.QueueFull):
+        gate.enter()
+    assert gate.rejected == 1
+    gate.release()
+    gate.enter()                       # a freed slot is reusable
+    assert gate.admitted == 2
+    gate.release()
+    gate.release()
+    assert gate.admitted == 0          # release never underflows
+
+
+def test_full_queue_is_429_with_retry_after(monkeypatch):
+    class _FullGate(object):
+        max_queue = 8
+        rejected = 0
+        waiting = 0
+
+        def enter(self):
+            raise server.QueueFull("the server is busy: 8 request(s) queued (KINDI_QUEUE_MAX=8)")
+
+        def release(self):
+            pass
+
+    monkeypatch.setattr(server, "Gate", lambda n: _FullGate())
+    K = _FakeKindi()
+    monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
+    app = server.create_app({"model_name": "bonsai2-2b", "api_key": ""}, log=lambda *a: None)
+    with TestClient(app) as client:
+        for path, payload in (("/v1/chat/completions", {"messages": [{"role": "user", "content": "hi"}]}),
+                              ("/v1/chat/completions", {"messages": [{"role": "user", "content": "hi"}],
+                                                       "stream": True}),
+                              ("/api/generate", {"prompt": "hi"})):
+            r = client.post(path, json=payload)
+            assert r.status_code == 429, r.text
+            assert r.headers["retry-after"] == "1"
+            assert r.json()["error"]["type"] == "server_busy"
+    assert K.last_req is None               # rejected before the engine ran
+
+
+def test_metrics_endpoint_reports_the_model_and_queue(app_client):
+    client, _ = app_client
+    r = client.get("/metrics")
+    assert r.status_code == 200, r.text
+    assert r.headers["content-type"].startswith("text/plain")
+    body = r.text
+    assert "kindi_up 1" in body
+    assert 'kindi_model_info{model="bonsai2-2b",ctx="4096",head="exact"} 1' in body
+    assert "kindi_queue_max %d" % server.MAX_QUEUE in body
+    assert "kindi_queue_depth 0" in body
+    assert "kindi_requests_rejected_total 0" in body
+
+
+def test_metrics_and_ollama_endpoints_need_the_api_key(auth_client):
+    client, _ = auth_client
+    for path in ("/metrics", "/api/tags"):
+        assert client.get(path).status_code == 401
+        assert client.get(path, headers={"Authorization": "Bearer secret-token"}).status_code == 200
+
+
+def test_ollama_tags_lists_the_model(app_client):
+    client, _ = app_client
+    r = client.get("/api/tags")
+    assert r.status_code == 200, r.text
+    model = r.json()["models"][0]
+    assert model["name"] == "bonsai2-2b" and model["model"] == "bonsai2-2b"
+    assert model["details"]["format"] == "kindi"
+
+
+def test_ollama_chat_streams_ndjson(app_client):
+    client, _ = app_client
+    r = client.post("/api/chat", json={"model": "bonsai2-2b",
+                                       "messages": [{"role": "user", "content": "hi"}],
+                                       "stream": True})
+    assert r.status_code == 200, r.text
+    events = [json.loads(line) for line in r.text.splitlines() if line.strip()]
+    assert events[0] == {"model": "bonsai2-2b", "created_at": events[0]["created_at"], "done": False,
+                         "message": {"role": "assistant", "content": "ok"}}
+    assert events[-1]["done"] is True and events[-1]["eval_count"] == 1
+    assert events[-1]["message"]["content"] == ""
+
+
+def test_ollama_generate_maps_prompt_and_options(app_client):
+    client, K = app_client
+    r = client.post("/api/generate", json={"prompt": "hello", "stream": False,
+                                           "options": {"temperature": 0, "num_predict": 7}})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["response"] == "ok" and body["done"] is True
+    assert body["prompt_eval_count"] == 3 and body["eval_count"] == 1
+    assert K.last_req["messages"] == [{"role": "user", "content": "hello"}]
+    assert K.last_req["temperature"] == 0 and K.last_req["max_tokens"] == 7
+
+
+def test_ollama_malformed_messages_is_400_before_the_engine(app_client):
+    client, K = app_client
+    r = client.post("/api/chat", json={"messages": "nope"})
+    assert r.status_code == 400, r.text
+    assert K.last_req is None
 
 
 def test_oversized_body_is_413_and_keeps_the_prompt_cache(app_client, monkeypatch):

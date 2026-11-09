@@ -61,6 +61,7 @@ Read it before editing a shared file.
 | CI + plan-engine regression test | this worktree | `freebuff/project-review-audit-report` | `.github/workflows/ci.yml`, `tests/test_plan_engine.py`, `AGENTS.md` | done; CI installs `tests/requirements-test.txt` (FastAPI/httpx were missing, so collection failed) and ShellChecks the committed LF blob; 20 new CPU-only plan tests; 78 full tests pass. The main worktree's own `.github/workflows/ci.yml` is still dirty: reconcile by hand, do not overwrite it |
 | Generated configuration reference | this worktree | `freebuff/project-review-audit-report` | `kindi/config_reference.py`, `tests/test_config_reference.py`, `docs/CONFIGURATION-REFERENCE.md`, `kindi.conf.example`, `AGENTS.md` | done; `python -m kindi.config_reference` renders 25 config keys and 104 environment rows from the code, and `--check` plus 6 tests fail on drift. `docs/CONFIGURATION.md` stays main-owned/dirty; the generated file is new, so merging it is additive |
 | 2B spec acceptance on non-repetitive prompts | this worktree | `freebuff/project-review-audit-report` | `bench-logs/measure_2b_spec_norepeat.py`, `bench-logs/measure-2b-spec-norepeat/**`, `AGENTS.md` | measured; no code changed; n-gram acceptance is 8-18% on fresh prose vs. 86% on the copy control, throughput 364.9 vs. 328.9 tok/s (plan) and 168.1 (plain); results in `bench-logs/measure-2b-spec-norepeat/RESULTS.md` |
+| Agent serving layer (task_0013 slice) | this worktree | `freebuff/project-review-audit-report` | `kindi/server.py`, `tests/test_server.py`, `docs/AGENTS.md`, `docs/CONFIGURATION-REFERENCE.md`, `AGENTS.md` | done; bounded queue with 429 + Retry-After, `/metrics`, and Ollama `/api/tags`, `/api/chat`, `/api/generate`; 18 server tests and 92 full tests pass; no engine code changed; multi-GPU replicas remain (needs `tp.py`, main-owned) |
 | `install.sh` / `.github` collision | both | both | `install.sh`, `.github/**` | modified or present in both worktrees; do not merge or overwrite until the two changes are reconciled by hand (the main copy was empty on 2026-11-08) |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
@@ -106,6 +107,10 @@ is not a lock.
   `docs/CONFIGURATION-REFERENCE.md` lists every `config.DEFAULTS` key and every `KINDI_*` read in
   `kindi/`, and `tests/test_config_reference.py` fails on drift. `docs/CONFIGURATION.md` is still
   main-owned and dirty, so its hand-written tables and the generated file must be reconciled by hand.
+- The agent serving layer has a bounded queue (`KINDI_QUEUE_MAX`, default 8 waiting) that answers 429 with
+  `Retry-After`, a Prometheus `/metrics` endpoint, and Ollama-compatible `/api/tags`, `/api/chat` and
+  `/api/generate`. The API key protects all of them. `docs/AGENTS.md` describes the contract. No engine code
+  changed; multi-GPU replicas are still open (they need the main-owned `kindi/tp.py`).
 - Spec on non-repetitive prompts was measured on the 4060 Ti: acceptance falls from 86.1%
   (copy-task control) to 8.4% (k=3) / 17.9% (k=1) on three fresh prose prompts, and throughput is
   364.9 tok/s vs. 328.9 plan-only and 168.1 plain. `generate_spec` still equals `generate` on the
@@ -317,6 +322,15 @@ Next, in order:
     known numerical divergence, not a spec error. Evidence:
     `bench-logs/measure-2b-spec-norepeat/RESULTS.md`, `bench-logs/measure-2b-spec-norepeat.log`,
     `bench-logs/measure-2b-spec-norepeat.json`. No code changed; `bench-logs/` stays untracked.
+12. [x] Agent serving layer (`task_0013`) advanced without touching leased files: `kindi/server.py` now
+    admits at most `KINDI_QUEUE_MAX` (default 8) waiting requests and answers the next with **429** and
+    `Retry-After: 1` instead of queueing without a bound; `GET /metrics` exports Prometheus counters for
+    requests, prompt/cached/completion tokens, speculative drafted/accepted tokens, generation seconds and
+    the queue; `GET /api/tags`, `POST /api/chat` and `POST /api/generate` speak Ollama's NDJSON API (streaming
+    and not), so Ollama clients work without an OpenAI shim. `docs/AGENTS.md` documents the endpoints and the
+    429 contract. Evidence: `python -m pytest tests/test_server.py -q` -> 18 passed; `pytest tests/ -q` -> 92
+    passed; `python -m kindi.config_reference --check` -> 0; `compileall -q kindi` -> 0. Remaining in task_0013:
+    multi-GPU replicas (needs `tp.py`, main-owned) and a deployment note in the main-owned README.
 
 Decisions not to undo without new measurements:
 
