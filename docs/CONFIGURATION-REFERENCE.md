@@ -122,31 +122,31 @@ is where it is read, which is where the full description lives.
 | `KINDI_G5_PIN` | `1` | `kindi/tp.py:78` |
 | `KINDI_G5_TUNE` | `1` | `kindi/tp.py:82` |
 | `KINDI_GEMV_BLOCKS` | (unset) | `kindi/engine.py:113` |
-| `KINDI_HIP_LIB` | `libamdhip64.so` | `kindi/gpudrv.py:27` |
+| `KINDI_HIP_LIB` | `libamdhip64.so` | `kindi/gpudrv.py:28` |
 | `KINDI_HOST_RAM_CHECK` | `1` | `kindi/hostram.py:23` |
 | `KINDI_MAX_BODY_MB` | `16` | `kindi/server.py:57` |
 | `KINDI_MEM_RESERVE_MB` | `96` or `32` | `kindi/engine.py:168` (+2 more) |
-| `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:628` |
+| `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:629` |
 | `KINDI_NB_CPUF` | `0.55` | `kindi/nanbeige.py:33` |
-| `KINDI_NB_EMBD_HOST` | `"1" if kepler(cp, devices[0]) else "0"` | `kindi/nanbeige.py:260` |
-| `KINDI_NB_FA` | `1` | `kindi/nanbeige.py:891` |
+| `KINDI_NB_EMBD_HOST` | `"1" if kepler(cp, devices[0]) else "0"` | `kindi/nanbeige.py:261` |
+| `KINDI_NB_FA` | `1` | `kindi/nanbeige.py:892` |
 | `KINDI_NB_FASTMATH` | `1` | `kindi/nanbeige.py:54` |
 | `KINDI_NB_FUSED_QKV` | `1` | `kindi/nanbeige.py:16` |
-| `KINDI_NB_HOST` | `1` | `kindi/nanbeige.py:353` |
+| `KINDI_NB_HOST` | `1` | `kindi/nanbeige.py:354` |
 | `KINDI_NB_KBLAS` | `1` | `kindi/nanbeige.py:29` |
 | `KINDI_NB_KDQ_MB` | `128` | `kindi/nanbeige.py:30` |
 | `KINDI_NB_KFAST` | `1` | `kindi/nanbeige.py:201` |
 | `KINDI_NB_KINT` | (unset) | `kindi/nanbeige.py:202` |
-| `KINDI_NB_KROWS` | `0` | `kindi/nanbeige.py:916` |
-| `KINDI_NB_KWARPS` | `2560` | `kindi/nanbeige.py:619` |
+| `KINDI_NB_KROWS` | `0` | `kindi/nanbeige.py:917` |
+| `KINDI_NB_KWARPS` | `2560` | `kindi/nanbeige.py:620` |
 | `KINDI_NB_LOGREQ` | (unset) | `kindi/nanbeige_gen.py:209` (+1 more) |
-| `KINDI_NB_PCHUNK` | `"256" if len(ids) <= 4096 and not self.k35 else "512"` | `kindi/nanbeige.py:922` |
-| `KINDI_NB_RESERVE_MB` | `300` | `kindi/nanbeige.py:251` |
+| `KINDI_NB_PCHUNK` | `"256" if len(ids) <= 4096 and not self.k35 else "512"` | `kindi/nanbeige.py:923` |
+| `KINDI_NB_RESERVE_MB` | `300` | `kindi/nanbeige.py:252` |
 | `KINDI_NB_SELFCHECK` | `1` | `kindi/nanbeige_gen.py:127` |
 | `KINDI_NB_SLOTS` | `2` | `kindi/nanbeige.py:34` |
-| `KINDI_NB_TC` | `1` | `kindi/nanbeige.py:268` |
-| `KINDI_NB_TSPLIT` | `0` | `kindi/nanbeige.py:1014` |
-| `KINDI_NB_TWARPS` | `24` | `kindi/nanbeige.py:1013` |
+| `KINDI_NB_TC` | `1` | `kindi/nanbeige.py:269` |
+| `KINDI_NB_TSPLIT` | `0` | `kindi/nanbeige.py:1015` |
+| `KINDI_NB_TWARPS` | `24` | `kindi/nanbeige.py:1014` |
 | `KINDI_P100_FP16_PROMPT` | (empty) | `kindi/chunk.py:89` |
 | `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:550` (+1 more) |
 | `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:551` |

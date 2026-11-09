@@ -71,7 +71,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | CI + plan-engine regression test | this worktree | `freebuff/project-review-audit-report` | `.github/workflows/ci.yml`, `tests/test_plan_engine.py`, `AGENTS.md` | done; CI installs `tests/requirements-test.txt` (FastAPI/httpx were missing, so collection failed) and ShellChecks the committed LF blob; 20 new CPU-only plan tests; 78 full tests pass. The main worktree's own `.github/workflows/ci.yml` is still dirty: reconcile by hand, do not overwrite it |
 | Generated configuration reference | this worktree | `freebuff/project-review-audit-report` | `kindi/config_reference.py`, `tests/test_config_reference.py`, `docs/CONFIGURATION-REFERENCE.md`, `kindi.conf.example`, `AGENTS.md` | done; `python -m kindi.config_reference` renders 25 config keys and 104 environment rows from the code, and `--check` plus 6 tests fail on drift. `docs/CONFIGURATION.md` stays main-owned/dirty; the generated file is new, so merging it is additive |
 | 2B spec acceptance on non-repetitive prompts | this worktree | `freebuff/project-review-audit-report` | `bench-logs/measure_2b_spec_norepeat.py`, `bench-logs/measure-2b-spec-norepeat/**`, `AGENTS.md` | measured; no code changed; n-gram acceptance is 8-18% on fresh prose vs. 86% on the copy control, throughput 364.9 vs. 328.9 tok/s (plan) and 168.1 (plain); results in `bench-logs/measure-2b-spec-norepeat/RESULTS.md` |
-| Agent serving layer (task_0013 slice) | this worktree | `freebuff/project-review-audit-report` | `kindi/server.py`, `tests/test_server.py`, `docs/AGENTS.md`, `docs/CONFIGURATION-REFERENCE.md`, `AGENTS.md` | done; bounded queue with 429 + Retry-After, `/metrics`, and Ollama `/api/tags`, `/api/chat`, `/api/generate`; 18 server tests and 101 full tests pass after the Turing merge; no engine code changed; multi-GPU replicas remain (needs `tp.py`, main-owned) |
+| Agent serving layer (task_0013 slice) | this worktree | `freebuff/project-review-audit-report` | `kindi/server.py`, `tests/test_server.py`, `docs/AGENTS.md`, `docs/CONFIGURATION-REFERENCE.md`, `AGENTS.md` | done; bounded queue with 429 + Retry-After, `/metrics`, and Ollama `/api/tags`, `/api/chat`, `/api/generate`; 18 server tests and 104 full tests pass after the Turing merge and the native-Windows driver loader; no engine code changed; multi-GPU replicas remain (needs `tp.py`, main-owned) |
 | `install.sh` / `.github` collision | both | both | `install.sh`, `.github/**` | reconciled on 2026-11-09: the merged `install.sh` has the GRUB guard and the Turing profile; the WIP's empty `install.sh` was discarded, and main's Turing commits were merged |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
@@ -102,6 +102,10 @@ is not a lock.
 
 ## Handoff (2026-11-09)
 
+- Native Windows runs without an external shim: `gpudrv.driver_name()` selects `nvcuda.dll` on
+  Windows and `libcuda.so.1` on Linux, and `sched.py`, `chunk1.py` and `nanbeige.py` now use
+  `gpudrv.driver()` instead of a hardcoded library. Verified natively through `python -m kindi`:
+  9B 4/4 token-exact and 2B plan 4/4, with 104 CPU tests passing.
 - 2026-11-09 reconciliation: main's three Turing commits were merged into this branch
   (`d21e566`); the interrupted main worktree was snapshotted to
   `wip/main-interrupted-snapshot-20261109-045352` and
