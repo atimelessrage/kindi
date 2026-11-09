@@ -60,6 +60,7 @@ Read it before editing a shared file.
 | Long-term CPU support (i5-2500K, W-2133, i9-13900K, i7-8086K) | this worktree | `freebuff/project-review-audit-report` | `docs/CPU-SUPPORT.md`, `AGENTS.md` | roadmap and acceptance contract written; no CPU/installer code changed; `kindi/cpu.py`, `kindi/kcpu.c` and `install.sh` are main-owned/dirty; the i5-2500K needs an AVX-only/scalar fallback |
 | CI + plan-engine regression test | this worktree | `freebuff/project-review-audit-report` | `.github/workflows/ci.yml`, `tests/test_plan_engine.py`, `AGENTS.md` | done; CI installs `tests/requirements-test.txt` (FastAPI/httpx were missing, so collection failed) and ShellChecks the committed LF blob; 20 new CPU-only plan tests; 78 full tests pass. The main worktree's own `.github/workflows/ci.yml` is still dirty: reconcile by hand, do not overwrite it |
 | Generated configuration reference | this worktree | `freebuff/project-review-audit-report` | `kindi/config_reference.py`, `tests/test_config_reference.py`, `docs/CONFIGURATION-REFERENCE.md`, `kindi.conf.example`, `AGENTS.md` | done; `python -m kindi.config_reference` renders 25 config keys and 104 environment rows from the code, and `--check` plus 6 tests fail on drift. `docs/CONFIGURATION.md` stays main-owned/dirty; the generated file is new, so merging it is additive |
+| 2B spec acceptance on non-repetitive prompts | this worktree | `freebuff/project-review-audit-report` | `bench-logs/measure_2b_spec_norepeat.py`, `bench-logs/measure-2b-spec-norepeat/**`, `AGENTS.md` | measured; no code changed; n-gram acceptance is 8-18% on fresh prose vs. 86% on the copy control, throughput 364.9 vs. 328.9 tok/s (plan) and 168.1 (plain); results in `bench-logs/measure-2b-spec-norepeat/RESULTS.md` |
 | `install.sh` / `.github` collision | both | both | `install.sh`, `.github/**` | modified or present in both worktrees; do not merge or overwrite until the two changes are reconciled by hand (the main copy was empty on 2026-11-08) |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
@@ -105,6 +106,11 @@ is not a lock.
   `docs/CONFIGURATION-REFERENCE.md` lists every `config.DEFAULTS` key and every `KINDI_*` read in
   `kindi/`, and `tests/test_config_reference.py` fails on drift. `docs/CONFIGURATION.md` is still
   main-owned and dirty, so its hand-written tables and the generated file must be reconciled by hand.
+- Spec on non-repetitive prompts was measured on the 4060 Ti: acceptance falls from 86.1%
+  (copy-task control) to 8.4% (k=3) / 17.9% (k=1) on three fresh prose prompts, and throughput is
+  364.9 tok/s vs. 328.9 plan-only and 168.1 plain. `generate_spec` still equals `generate` on the
+  plan engine; the plan engine itself diverges from plain on two of the three prompts. Evidence:
+  `bench-logs/measure-2b-spec-norepeat/RESULTS.md`. No code changed.
 - Release docs are prepared on this branch: `docs/INSTALL.md` pins the fixed release artifact
   `38fb3417...` (the LF Git blob is `9b25e78...`; do not mix them), and `docs/RELEASE-CHECKLIST.md`
   records the release steps. The guard itself is committed in `2b84658`. No tag, push or upload was made.
@@ -303,6 +309,14 @@ Next, in order:
     tests pass; adding `KINDI_BRAND_NEW` or a new DEFAULTS key to a copy makes `--check` exit 1 and
     the list tests fail. `docs/CONFIGURATION.md` itself is not touched: it is main-owned and dirty,
     so its hand-written tables and the generated file must be reconciled by hand.
+11. [x] 2B spec acceptance and throughput on non-repetitive prompts measured (RTX 4060 Ti,
+    greedy, ctx 1024, N=192, best of 3): n-gram drafting accepts 17.9% at k=1 and 8.4% at k=3,
+    with 1.06-1.08 tokens per pass; 364.9 tok/s at k=3 vs. 328.9 plan-only and 168.1 plain
+    (2.17x plain, +11% over plan). The copy-task control reads 86.1% with the same counters, and
+    spec == plan on every prompt. `plan != plain` from token 30/140 on two prompts (q8_0 K/V), a
+    known numerical divergence, not a spec error. Evidence:
+    `bench-logs/measure-2b-spec-norepeat/RESULTS.md`, `bench-logs/measure-2b-spec-norepeat.log`,
+    `bench-logs/measure-2b-spec-norepeat.json`. No code changed; `bench-logs/` stays untracked.
 
 Decisions not to undo without new measurements:
 
