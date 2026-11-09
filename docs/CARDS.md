@@ -169,8 +169,10 @@ bandwidth of 732 GB/s. Photo: GP100 chip of a Tesla P100, by Fritzchens Fritz, W
 
 ## GeForce RTX 20, 30, 40 and 50 series
 
-Kindi 0.4.0 supports all four series. The tensor-core path and speculative decoding use cards of compute capability
-8.0 and later (RTX 30, 40 and 50). The RTX 20 series (Turing, sm_75) uses the default engine.
+Kindi 0.4.0 supports all four series. The Ampere tensor-core path and speculative decoding use cards of compute
+capability 8.0 and later (RTX 30, 40 and 50). The RTX 20 series (Turing, sm_75) has its own tensor-core backend
+([TURING-TENSOR-CORES.md](TURING-TENSOR-CORES.md)), selected with `KINDI_TC=1`; see the RTX 4000 section below. Its
+runtime verification on sm_75 hardware is still pending.
 
 | card | what we measured |
 |---|---|
@@ -214,6 +216,131 @@ option `amdgpu.cwsr_enable=0`. [AMD.md](AMD.md) gives the settings.
 | model | Ternary-Bonsai-2-27B, Nemotron or the 2B |
 | generation | 10.6 tokens/s at 512 tokens (27B) |
 | prompt reading | 103.7 tokens/s at 512 tokens (27B) |
+
+## GeForce RTX 4000, 8 GB (Turing, sm_75)
+
+| item | value |
+|---|---|
+| model | Ternary-Bonsai-2-27B (the 9B, 4B and 2B also run) |
+| variables | `KINDI_PACK=/data/pack27b`, `KINDI_CARDS=1`, `KINDI_CTX=65536`, `KINDI_HEAD=exact` or `fast`, `KINDI_REPEAT_STOP=1`, `KINDI_MAX_TOKENS=65536`, `KINDI_CHUNK_Q8=1`, `KINDI_BLOCKING_SYNC=0` |
+| tensor cores | `KINDI_TC=1`, `KINDI_FD=1`, `KINDI_ATT_TC=1`, `KINDI_TC_TMAX=4` |
+| docker | `--memory 14g` (the first load needs it) |
+| generation | not yet measured; expect Pascal-class speed or better (the tensor-core path is new) |
+
+- Turing has int8 tensor cores. Kindi has a separate Turing backend
+  ([TURING-TENSOR-CORES.md](TURING-TENSOR-CORES.md)): with `KINDI_TC=1` on an
+  `sm_75` card it uses `mma.m8n8k16` for the decode products and the prompt
+  chunks. The Ampere backend (`sm_80` and later) is unchanged.
+- The installer's `turing` profile sets `KINDI_TC=1`, split flash-decode
+  attention (`KINDI_FD=1`), tensor-core prompt attention (`KINDI_ATT_TC=1`) and,
+  for the 27B, the 2B draft model (`KINDI_SPEC=draft2b`). It also adds the 2B
+  pack.
+- The weights keep the existing `tc` layout, and every Turing MMA is an exact
+  integer sum, so greedy output should be token-identical to the 5-trit path.
+  Verification on this card is still pending; `KINDI_TC=0` returns to the
+  5-trit path.
+- The 8 GB card fits about 65,536 tokens of context with the 27B. Larger Turing
+  cards (11 GB and more) get `KINDI_CTX=131072` and `KINDI_MEM_RESERVE_MB=160`
+  (the smaller reserve that context needs, as on the RTX 3080).
+
+## Quadro P4000, 8 GB (Pascal, sm_61)
+
+| item | value |
+|---|---|
+| model | Ternary-Bonsai-2-27B |
+| variables | `KINDI_PACK=/data/pack27b`, `KINDI_CARDS=1`, `KINDI_CTX=65536`, `KINDI_HEAD=exact` or `fast`, `KINDI_REPEAT_STOP=1`, `KINDI_MAX_TOKENS=65536`, `KINDI_CHUNK_Q8=1`, `KINDI_BLOCKING_SYNC=0` |
+| generation | not yet measured; expect GTX 1080-class speed |
+
+- Single-slot Pascal card. Use the same profile as the GeForce GTX 1080.
+
+## NVIDIA P106-100, 6 GB (Pascal, sm_61)
+
+| item | value |
+|---|---|
+| models | 2B, 4B or 9B |
+| variables | `KINDI_CTX=24576`, `KINDI_CHUNK_Q8=1`, `KINDI_BLOCKING_SYNC=0` |
+| generation | not yet measured |
+
+- A mining card with no display output. It works as a headless GPU, but check its PCIe link: many P106 cards run at x1 or x4 and are slower on prompt reading.
+- The 27B does not fit in 6 GB. Two P106 cards cannot run one model together (Kindi pairs only two Maxwell cards).
+
+## Quadro M4000, 8 GB (Maxwell 2.0, sm_52)
+
+| item | value |
+|---|---|
+| models | 2B, 4B or 9B (`/data/pack`, `/data/pack4b`, `/data/pack9b`) |
+| variables | `KINDI_CTX=24576`, `KINDI_BLOCKING_SYNC=0` |
+| generation | not yet measured; expect Maxwell-class speed |
+
+- 8 GB of memory. The 27B can be tried manually with `KINDI_PACK=/data/pack27b`; the engine fits the context to the free memory. It is not offered by default.
+
+## GeForce 940M, 2 GB (Maxwell 1.0, sm_50)
+
+| item | value |
+|---|---|
+| model | Ternary-Bonsai-2-2B |
+| variables | `KINDI_CTX=24576`, `KINDI_BLOCKING_SYNC=0` |
+| generation | not yet measured |
+
+- Laptop card, often behind Optimus. On most laptops the CPU engine is faster and simpler to use.
+
+## GeForce GT 1030, 2 GB (Pascal, sm_61)
+
+| item | value |
+|---|---|
+| models | 2B or 4B |
+| variables | `KINDI_CTX=24576`, `KINDI_CHUNK_Q8=1`, `KINDI_BLOCKING_SYNC=0` |
+| generation | not yet measured |
+
+- Low-memory Pascal card. Keep the context at 24,576 tokens or less.
+
+## Pascal and Turing card families
+
+These two generations contain the cards that the installer profiles above cover. The class column is what
+`card_class` in `install.sh` returns; the profile is the variables it sets. All the cards below run with `KINDI_TC=0`
+(the 5-trit path). `KINDI_TC=1` adds tensor cores only where the card has them.
+
+### Pascal (GP10x, `sm_61`; GP100 is `sm_60`)
+
+| line | cards | compute | tensor cores | class / profile |
+|---|---|---|---|---|
+| consumer | Titan X (Pascal), Titan Xp, GTX 1080 Ti, 1080, 1070 Ti, 1070, 1060 6 GB and 3 GB, 1050 Ti, 1050, GT 1030 | sm_61 | no | `pascal8` at 8 GB and more; `maxwell` below (the GT 1030 section above) |
+| workstation | Quadro P6000, P5000, P4000, P2200, P2000, P1000, P620, P600, P400 | sm_61 | no | `pascal8` at 8 GB and more, `maxwell` below (the P4000 section above) |
+| mining | P106-100, P106-090, P104-100, P102-100 | sm_61 | no | `pascal8` at 8 GB and more, `maxwell` below (the P106-100 section above) |
+| datacenter | Tesla P40, Tesla P4 | sm_61 | no | `pascal8` / `maxwell` |
+| datacenter / workstation | Tesla P100 (12/16 GB HBM2), Quadro GP100 | **sm_60** | no | `p100`: the `tcp.cu`/`tcl.cu` lane kernels (GP100 has no dp4a) |
+
+Pascal has no int8 tensor cores. With `KINDI_TC=1` the plans run the dp4a kernels of `tcp.cu` (`sm_61`) or the
+`tcl.cu` lane-table kernels (`sm_60`); the products are the same integers as on the tensor-core path, so the output
+is unchanged. A Pascal card needs the NVIDIA 470 driver branch (or newer for later cards).
+
+### Turing (TU10x / TU11x, `sm_75`)
+
+| line | cards | tensor cores | class / profile |
+|---|---|---|---|
+| consumer, RTX | Titan RTX, RTX 2080 Ti, 2080 Super, 2080, 2070 Super, 2070, 2060 Super, 2060 (6 GB and 12 GB) | yes (TU102/TU104/TU106) | `turing` (8 GB and more) |
+| workstation, RTX | Quadro RTX 8000, 6000, 5000, 4000 (and RTX 3000 mobile) | yes | `turing` (8 GB and more) |
+| datacenter | Tesla T4 (16 GB) | yes (TU104) | `turing` |
+| mining | CMP 40HX (8 GB) | yes (TU106) | `turing` |
+| consumer, GTX | GTX 1660 Ti, 1660 Super, 1660, 1650 Super, 1650, 1630 | **no** (TU116/TU117) | `maxwell` (plain engine, under 7.5 GB) |
+| workstation, entry | Quadro T400, T600, T1000, T2000 | **no** (TU117) | `maxwell` (plain engine, under 7.5 GB) |
+| mobile | GeForce MX450, MX550 (TU117) | **no** | `maxwell` |
+| mining | CMP 30HX (6 GB) | **no** (TU116) | `maxwell` (under 7.5 GB) |
+
+Only the TU102/TU104/TU106 parts have tensor cores, and only those of 7.5 GB and more take the `turing` profile and
+the `tc_turing.cu` backend (a 6 GB RTX 2060 keeps the plain profile in this release; its tensor cores can be enabled
+by hand with the variables from the RTX 4000 section). TU116/TU117 has the same compute capability 7.5 but no tensor
+cores; an `mma` instruction there traps, so `tc_turing.supported()` also checks the device name and leaves those
+cards on the plain engine (see [TURING-TENSOR-CORES.md](TURING-TENSOR-CORES.md)). Turning on `KINDI_TC=1` by hand on
+a GTX 16-series card is a no-op: the backend is not selected.
+
+## Unsupported NVIDIA cards
+
+| card | reason |
+|---|---|
+| GeForce GT 430 and other Fermi / pre-Kepler cards (below sm_30) | Kindi needs Kepler (sm_30) or later; the CUDA 10.2 image does not support these cards |
+
+- Use the CPU engine (`KINDI_DEVICE=cpu`) on these machines, or remove the card.
 
 ## CPU (x86-64 with AVX2)
 
