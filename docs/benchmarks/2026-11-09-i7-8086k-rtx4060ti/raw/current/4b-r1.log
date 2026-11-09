@@ -1,0 +1,16 @@
+run=1 model=4b
+gpu_before: 39, 2820 MHz, 43.63 W
+C:\Users\ICH\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+[kindi 13:09:23] blocking sync: card 0 primary context flags 0x4 (set: 0)
+[kindi 13:09:23] GPU: NVIDIA GeForce RTX 4060 Ti, sm_89, 34 SMs, 8187 MiB
+[kindi 13:09:27] engine ready: ctx 24576, head plain (3.6s)
+[kindi 13:09:27] GPU memory: 5077 MiB free of 8187 with a 24576-token context
+[kindi 13:09:27] prompt reading:       129.0 tokens/s
+[kindi 13:09:27] generation (exact head) at position   100: 108.4 tokens/s
+[kindi 13:09:27] generation (exact head) at position  2000: 101.9 tokens/s
+[kindi 13:09:27] generation (exact head) at position  8000:  89.0 tokens/s
+[kindi 13:09:27] generation (exact head) at position 16000:  88.4 tokens/s
+[kindi 13:09:28] generation (exact head) at position 24000:  78.0 tokens/s
+gpu_after: 42, 2805 MHz, 54.04 W
+exit=0

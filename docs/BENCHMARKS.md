@@ -13,6 +13,18 @@ generated. Project page: [amirhusain.com/kindi](https://amirhusain.com/kindi/).
 
 In the initial test (the 65 tasks of kbench and 50 LiveCodeBench problems, one run each), the 33B solved 98 and the 27B solved 96.
 
+## 2026-11-09: GeForce RTX 4060 Ti 8 GB · 2B, 4B, 9B
+
+Windows 10, i7-8086K, RTX 4060 Ti 8 GB (sm_89), 24,576-token context, exact head, three fresh runs per model. Median tokens/s; read is the synthetic 1,000-token prompt read, 24K is generation at position 24,000.
+
+| Model | Current read | v0.4.0 + Windows loader read | Current 24K | v0.4.0 + Windows loader 24K |
+|---|---:|---:|---:|---:|
+| 2B | 190.0 | 161.5 | 160.6 | 165.5 |
+| 4B | 129.0 | 132.9 | 79.8 | 82.1 |
+| 9B | 90.3 | 90.8 | 62.3 | 62.7 |
+
+The current branch and `v0.4.0` have byte-identical `kindi/bench.py` and `kindi/engine.py`; only the native-Windows driver selection differs on this path. The 24K differences are -3.0%, -2.8% and -0.6%, and are not a code-level speedup or regression. Full method, variance, per-run CSV/JSON and raw logs: [benchmarks/2026-11-09-i7-8086k-rtx4060ti/README.md](benchmarks/2026-11-09-i7-8086k-rtx4060ti/README.md).
+
 ## Kindi 0.4.0: Tesla P100 (sm_60)
 
 Two rented machines gave the numbers. Do not mix them. Box A: 2x Tesla P100-SXM2-16GB (NVLink, 300 W), driver 535.230.02,

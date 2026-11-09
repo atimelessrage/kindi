@@ -144,6 +144,13 @@ is not a lock.
   364.9 tok/s vs. 328.9 plan-only and 168.1 plain. `generate_spec` still equals `generate` on the
   plan engine; the plan engine itself diverges from plain on two of the three prompts. Evidence:
   `bench-logs/measure-2b-spec-norepeat/RESULTS.md`. No code changed.
+- 2B/4B/9B benchmark at 24,576 tokens on the i7-8086K + RTX 4060 Ti is stored in
+  `docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/` (README, `runs.csv`, `stats.csv`,
+  `summary.json`, 18 raw logs). Current vs `v0.4.0` + native loader only: 24K generation
+  160.6/79.8/62.3 vs 165.5/82.1/62.7 tok/s (-3.0/-2.8/-0.6%). `kindi/bench.py` and
+  `kindi/engine.py` are byte-identical to the tag, so this is not a benchmark-path speedup or
+  regression. 4B `kindi verify` 4/4; no plan/spec/Turing/server/CPU measurement. Evidence:
+  `docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json`; all 18 runs exited 0.
 - Release docs are prepared on this branch: `docs/INSTALL.md` pins the fixed release artifact
   `c05d0190...` (the LF Git blob is `2ae8f960...`; do not mix them), and
   `docs/RELEASE-CHECKLIST.md` records the release steps. The guard is in `2b84658`; the Turing
