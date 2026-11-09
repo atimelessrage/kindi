@@ -114,7 +114,7 @@ def engine_fingerprint(eng, cfg):
         "engine": type(eng).__module__ + "." + type(eng).__name__,
         "cards": len(cards) if cards else 1,
         "weights": "5-trit lane" if getattr(c0, "g5l", False) else ("5-trit" if getattr(c0, "g5", False) else "2-bit"),
-        "kv": "q8_0" if cards else "f16",
+        "kv": getattr(eng, "kv", None) or ("q8_0" if cards else "f16"),
         "chunk": int(getattr(eng, "chunk_ok", False)) and int(chunk.get("T", 0)),
         "chunk_q8": bool(chunk.get("q8")),
         "chunk_tc": bool(chunk.get("tc")),

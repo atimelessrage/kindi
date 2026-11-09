@@ -12,6 +12,9 @@ give a partial sum of all D outputs. k_xrms swaps the two partials through mappe
 stream is bit-identical on the two cards. The embedding row is read from host memory by both cards.
 K/V cache: q8_0 (llama.cpp's -ctk q8_0 -ctv q8_0: blocks of 32 int8 with an fp16 scale); attention scores use
 llama.cpp's flash-attention arithmetic for that cache (the query in q8_0, integer block dot products).
+KINDI_KV=k8v4 keeps K at q8_0 and stores V as symmetric 4-bit blocks (16 packed bytes and an fp16 scale per 32
+values); the V4 value kernel is used for decode and batched prompts. The chunked prompt path is q8-only, so it is
+disabled for k8v4 and prompts use the per-token plan.
 
 A launch plan records one token's kernels once (function, grid, block, ctypes arguments) and replays them through
 cuLaunchKernel; only the token id and the position change between tokens (Dyn arguments). The exchange epochs are
@@ -30,6 +33,16 @@ from .engine import Kernels, DEFAULT_DIMS, VOCAB
 
 rt = cp.cuda.runtime
 i32, f32t = np.int32, np.float32
+
+
+def kv_mode():
+    """The K/V cache format selected by KINDI_KV. q8_0 is the default and preserves the old cache."""
+    value = os.environ.get("KINDI_KV", "q8_0").strip().lower()
+    if value in ("q8", "q8_0"):
+        return "q8_0"
+    if value in ("k8v4", "k8_v4"):
+        return "k8v4"
+    raise SystemExit("kindi: KINDI_KV must be q8_0 or k8v4 (got %r)" % value)
 
 
 POW5 = np.array([1, 3, 9, 27, 81], dtype=np.uint16)
@@ -456,7 +469,11 @@ class Shard(object):
         self.conv = [z(3 * self.CONV_CH) for _ in range(self.NL)]
 
     def per_pos_bytes(self):
-        kv = self.NATT * 2 * self.NHKV * (self.HD + self.HD // 32 * 2)      # q8_0 K and V
+        if getattr(self.tp, "kv", "q8_0") == "k8v4":
+            # K q8_0 plus V4: 32 four-bit values packed in 16 bytes with one fp16 scale
+            kv = self.NATT * self.NHKV * (self.HD + self.HD // 32 * 2 + self.HD // 2 + self.HD // 32 * 2)
+        else:
+            kv = self.NATT * 2 * self.NHKV * (self.HD + self.HD // 32 * 2)      # q8_0 K and V
         return kv + self.NH * 4 + (self.NH * self.HD * 4) // 256 + self.dims["rope_dim"] * 4 + 64
 
     def free_bytes(self):
@@ -477,7 +494,10 @@ class Shard(object):
             def kv(dt, last):
                 a = cp.zeros((self.NATT, ctx, self.NHKV, last), dtype=dt)
                 return [a[i] for i in range(self.NATT)]
-            self.Kq, self.Vq = kv(cp.int8, self.HD), kv(cp.int8, self.HD)
+            if getattr(self.tp, "kv", "q8_0") == "k8v4":
+                self.Kq, self.Vq = kv(cp.int8, self.HD), kv(cp.uint8, self.HD // 2)
+            else:
+                self.Kq, self.Vq = kv(cp.int8, self.HD), kv(cp.int8, self.HD)
             self.Kd, self.Vd = kv(cp.float16, self.HD // 32), kv(cp.float16, self.HD // 32)
             cp.get_default_pinned_memory_pool().free_all_blocks()
 
@@ -494,6 +514,8 @@ class Shard(object):
         if HB != 1024:
             raise SystemExit("kindi: the tensor parallel engine needs Hadamard blocks of 1024")
         st = {"h": s.hA, "h2": s.hB, "pending": 0}
+        store_kv = K.k_store_k8v4 if tp.kv == "k8v4" else K.k_store_q8
+        attn_v = K.k_attn_vq4w if tp.kv == "k8v4" else K.k_attn_vq8w
 
         def mixin(P, wname):
             """RMS norm + fold of the residual stream; with a pending row-parallel partial, the exchange and the
@@ -599,10 +621,10 @@ class Shard(object):
                 P.add(K.k_rope2, (NHKV,), (256,), (s.kn, s.kn, Dyn("pos", s.cos_t.data.ptr, rd0, ptr=True),
                                                    Dyn("pos", s.sin_t.data.ptr, rd0, ptr=True), s.kro, s.kro, i32(0), i32(HD)))
                 nb0 = NHKV * HD // 32
-                P.add(K.k_store_q8, ((64 * nb0 + 1023) // 1024,), (min(1024, 64 * nb0),), (s.kro, s.qkvbuf,
+                P.add(store_kv, ((64 * nb0 + 1023) // 1024,), (min(1024, 64 * nb0),), (s.kro, s.qkvbuf,
                                                         Dyn("pos", s.Kq[kvi].data.ptr, NHKV * HD, ptr=True),
                                                         Dyn("pos", s.Kd[kvi].data.ptr, nb0 * 2, ptr=True),
-                                                        Dyn("pos", s.Vq[kvi].data.ptr, NHKV * HD, ptr=True),
+                                                        Dyn("pos", s.Vq[kvi].data.ptr, NHKV * (HD // 2 if tp.kv == "k8v4" else HD), ptr=True),
                                                         Dyn("pos", s.Vd[kvi].data.ptr, nb0 * 2, ptr=True), i32(nb0)))
                 st["pending"] = 0
                 return
@@ -613,17 +635,17 @@ class Shard(object):
             P.add(K.k_rope2, (NH + NHKV,), (256,), (s.fo, s.kn, Dyn("pos", s.cos_t.data.ptr, rd, ptr=True),
                                                     Dyn("pos", s.sin_t.data.ptr, rd, ptr=True), s.qr, s.kro, i32(NH), i32(HD)))
             nblk = NHKV * HD // 32
-            P.add(K.k_store_q8, ((64 * nblk + 1023) // 1024,), (min(1024, 64 * nblk),), (s.kro, s.qkvbuf,
+            P.add(store_kv, ((64 * nblk + 1023) // 1024,), (min(1024, 64 * nblk),), (s.kro, s.qkvbuf,
                                                      Dyn("pos", s.Kq[kvi].data.ptr, NHKV * HD, ptr=True),
                                                      Dyn("pos", s.Kd[kvi].data.ptr, nblk * 2, ptr=True),
-                                                     Dyn("pos", s.Vq[kvi].data.ptr, NHKV * HD, ptr=True),
+                                                     Dyn("pos", s.Vq[kvi].data.ptr, NHKV * (HD // 2 if tp.kv == "k8v4" else HD), ptr=True),
                                                      Dyn("pos", s.Vd[kvi].data.ptr, nblk * 2, ptr=True), i32(nblk)))
             P.add(K.k_q8row, ((NH * HD + 1023) // 1024,), (1024,), (s.qr, s.qq, s.qd, i32(NH * HD // 32)))
             n = lambda: Dyn("pos", 1, 1)  # noqa: E731
             P.add(K.k_attn_sq8d if s.dp4a else K.k_attn_sq8t, (NHKV, (s.ctx + 255) // 256), (256,), (s.Kq[kvi], s.Kd[kvi], s.qq, s.qd, s.sbuf, n(), i32(NHKV), i32(s.G)))
             P.add(K.k_softmax_rows, (NH,), (256,), (s.sbuf, n()))
-            P.add(K.k_attn_vq8w, (NHKV, 1, (s.ctx + 255) // 256), (128,), (s.sbuf, s.Vq[kvi], s.Vd[kvi], s.apart, n(),
-                                                                         i32(NH), i32(NHKV), i32(s.G)))
+            P.add(attn_v, (NHKV, 1, (s.ctx + 255) // 256), (128,), (s.sbuf, s.Vq[kvi], s.Vd[kvi], s.apart, n(),
+                                                                     i32(NH), i32(NHKV), i32(s.G)))
             P.add(K.k_attn_combn, (NH,), (256,), (s.apart, s.qn, s.att, n(), i32(NH)))
             P.add(K.k_fold_fwht, (NH * HD // HB,), (512,), (s.att, s.sA, s.xp, i32(HB)))
             st["pending"] = gemv(P, [p + "attn_output.weight"], s.xp, [s.y])
@@ -682,6 +704,11 @@ class TPEngine(object):
         blocking_sync(log)
         t0 = time.time()
         self.log = log
+        self.kv = kv_mode()
+        if self.kv != "q8_0" and os.environ.get("KINDI_SPEC", "0") == "1":
+            raise SystemExit("kindi: speculative decoding does not support KINDI_KV=%s" % self.kv)
+        if self.kv != "q8_0" and os.environ.get("KINDI_TC", "0") == "1":
+            raise SystemExit("kindi: the tensor-core plan does not support KINDI_KV=%s; unset KINDI_TC" % self.kv)
         self.W = int(os.environ.get("KINDI_CARDS") or min(2, rt.getDeviceCount()))
         if self.W not in (1, 2) or rt.getDeviceCount() < self.W:
             raise SystemExit("kindi: the plan engine runs on 1 or 2 cards (%d found)" % rt.getDeviceCount())
@@ -727,7 +754,10 @@ class TPEngine(object):
         self.cards = [Shard(self, c, log) for c in range(self.W)]
         # the context: what the card with less free memory can hold
         from . import chunk as _chunk
-        _chunk.reserve(self)                       # the chunked prompt path's buffers, before the context fit
+        if self.kv == "q8_0":
+            _chunk.reserve(self)                   # the chunked prompt path's buffers, before the context fit
+        else:
+            self.chunk_ok = False                  # the chunk path is q8-only
         reserve = int(os.environ.get("KINDI_MEM_RESERVE_MB", "32")) * 2 ** 20
         fit = min((s.free_bytes() - reserve) // s.per_pos_bytes() for s in self.cards) // 256 * 256
         self.ctx = int(min(int(ctx), fit))
@@ -746,10 +776,11 @@ class TPEngine(object):
                 with cp.cuda.Device(s.card):        # kernel handles belong to the device that is current
                     s.plan_batch = build_batch_plan(s, self.NB)
             self.batch_ok = True
-        _chunk.build(self)
+        if self.kv == "q8_0":
+            _chunk.build(self)
         self.ylog_n, self.ylog_map = VOCAB, None
         self._state_views()
-        log("plan engine ready: %d card%s, ctx %d, K/V q8_0, weights %s (%.1fs)" % (self.W, "s" if self.W > 1 else "", self.ctx, ("5-trit lane" if self.cards[0].g5l else "5-trit") if self.cards[0].g5 else "2-bit", time.time() - t0))
+        log("plan engine ready: %d card%s, ctx %d, K/V %s, weights %s (%.1fs)" % (self.W, "s" if self.W > 1 else "", self.ctx, self.kv, ("5-trit lane" if self.cards[0].g5l else "5-trit") if self.cards[0].g5 else "2-bit", time.time() - t0))
 
     def _host_buffers(self):
         flags = rt.hostAllocMapped | rt.hostAllocPortable
@@ -974,6 +1005,9 @@ def build_batch_plan(s, NB):
     NK, NV, NH, NHKV, NFF = s.NK, s.NV, s.NH, s.NHKV, s.NFF
     z = lambda n, t=cp.float32: cp.zeros(n, dtype=t)  # noqa: E731
     work = max(D, NFF, NV * HK)
+    store_kv = K.k_store_k8v4 if tp.kv == "k8v4" else K.k_store_q8
+    attn_v = K.k_attn_vq4w if tp.kv == "k8v4" else K.k_attn_vq8w
+    vstride = NHKV * (HD // 2 if tp.kv == "k8v4" else HD)
     with cp.cuda.Device(s.card):
         HA, HBUF, XN = z(NB * D), z(NB * D), z(NB * D)
         XP, PART, Y = z(NB * work), z(NB * s.nsm * work), z(NB * D)
@@ -1104,10 +1138,10 @@ def build_batch_plan(s, NB):
                 P.add(K.k_rope2, (NHKV,), (256,), (s.kn, s.kn, Dyn("pos", s.cos_t.data.ptr + k * rd, rd, ptr=True),
                                                    Dyn("pos", s.sin_t.data.ptr + k * rd, rd, ptr=True), s.kro, s.kro,
                                                    i32(0), i32(HD)))
-            P.add(K.k_store_q8, ((64 * nb0 + 1023) // 1024,), (min(1024, 64 * nb0),), (s.kro, v(VB, k, NHKV * HD),
+            P.add(store_kv, ((64 * nb0 + 1023) // 1024,), (min(1024, 64 * nb0),), (s.kro, v(VB, k, NHKV * HD),
                                                     Dyn("pos", s.Kq[kvi].data.ptr + k * NHKV * HD, NHKV * HD, ptr=True),
                                                     Dyn("pos", s.Kd[kvi].data.ptr + k * nb0 * 2, nb0 * 2, ptr=True),
-                                                    Dyn("pos", s.Vq[kvi].data.ptr + k * NHKV * HD, NHKV * HD, ptr=True),
+                                                    Dyn("pos", s.Vq[kvi].data.ptr + k * vstride, vstride, ptr=True),
                                                     Dyn("pos", s.Vd[kvi].data.ptr + k * nb0 * 2, nb0 * 2, ptr=True), i32(nb0)))
             if last:
                 continue
@@ -1116,8 +1150,8 @@ def build_batch_plan(s, NB):
             P.add(K.k_attn_sq8d if s.dp4a else K.k_attn_sq8t, (NHKV, (s.ctx + 255) // 256), (256,), (s.Kq[kvi], s.Kd[kvi], s.qq, s.qd, s.sbuf, n(),
                                                                        i32(NHKV), i32(s.G)))
             P.add(K.k_softmax_rows, (NH,), (256,), (s.sbuf, n()))
-            P.add(K.k_attn_vq8w, (NHKV, 1, (s.ctx + 255) // 256), (128,), (s.sbuf, s.Vq[kvi], s.Vd[kvi], s.apart, n(),
-                                                                          i32(NH), i32(NHKV), i32(s.G)))
+            P.add(attn_v, (NHKV, 1, (s.ctx + 255) // 256), (128,), (s.sbuf, s.Vq[kvi], s.Vd[kvi], s.apart, n(),
+                                                                  i32(NH), i32(NHKV), i32(s.G)))
             P.add(K.k_attn_combn, (NH,), (256,), (s.apart, v(QN, k, NH * 2 * HD), s.att, n(), i32(NH)))
             P.add(K.k_fold_fwht, (NH * HD // HB,), (512,), (s.att, s.sA, v(XP, k, work), i32(HB)))
             pt, yt = out(k)

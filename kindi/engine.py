@@ -55,9 +55,9 @@ KERNELS = ("k_g4", "k_g4l", "k_fold_fwht", "k_rmsfold", "k_smfold", "k_l2w", "k_
            "k_attn_sg", "k_attn_vg", "k_xchg",
            "k_xchg2", "k_attn_vgn", "k_attn_combn", "k_store_h", "k_cpq", "k_xchg3",
            "k_xrms", "k_gdn_pre", "k_gdn_deltan", "k_rmsw_s", "k_rope2", "k_store_q8", "k_q8row",
-           "k_attn_sq8", "k_attn_vq8",
+           "k_attn_sq8", "k_attn_vq8", "k_store_k8v4",
            "k_attn_sq8f", "k_attn_vq8f", "k_deq_emb4",
-           "k_attn_sq8t", "k_attn_vq8u", "k_attn_vq8g", "k_xrmsN", "k_attn_vq8w", "k_g5r4", "k_g5r8", "k_attn_sq8d", "k_g5r1", "k_g5r2", "k_g5n4")
+           "k_attn_sq8t", "k_attn_vq8u", "k_attn_vq8g", "k_xrmsN", "k_attn_vq8w", "k_attn_vq4w", "k_g5r4", "k_g5r8", "k_attn_sq8d", "k_g5r1", "k_g5r2", "k_g5n4")
 
 
 

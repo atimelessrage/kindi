@@ -179,6 +179,39 @@ def test_tensor_parallel_plans_accept_hadamard_1024(spec_tp):
         tp.Shard.build_plans(_probe(1024))
 
 
+def test_kv_mode_defaults_to_q8_0(spec_tp, monkeypatch):
+    _, tp = spec_tp
+    monkeypatch.delenv("KINDI_KV", raising=False)
+    assert tp.kv_mode() == "q8_0"
+
+
+@pytest.mark.parametrize("value, want", [("q8", "q8_0"), ("Q8_0", "q8_0"), ("k8v4", "k8v4"),
+                                         ("K8_V4", "k8v4")])
+def test_kv_mode_accepts_the_cache_names(spec_tp, monkeypatch, value, want):
+    _, tp = spec_tp
+    monkeypatch.setenv("KINDI_KV", value)
+    assert tp.kv_mode() == want
+
+
+def test_kv_mode_rejects_an_unknown_cache(spec_tp, monkeypatch):
+    _, tp = spec_tp
+    monkeypatch.setenv("KINDI_KV", "q4_0")
+    with pytest.raises(SystemExit, match="KINDI_KV must be q8_0 or k8v4"):
+        tp.kv_mode()
+
+
+def test_k8v4_saves_eight_kib_per_position(spec_tp):
+    """27B geometry: q8_0 K+V is 34,816 bytes/token; q8_0 K + 4-bit V is 26,624."""
+    _, tp = spec_tp
+    shard = types.SimpleNamespace(NATT=16, NHKV=4, HD=256, NH=24, dims={"rope_dim": 64},
+                                  tp=types.SimpleNamespace(kv="q8_0"))
+    q8 = tp.Shard.per_pos_bytes(shard)
+    shard.tp.kv = "k8v4"
+    v4 = tp.Shard.per_pos_bytes(shard)
+    assert q8 - v4 == 16 * 4 * (256 - 128)       # 8,192 bytes per token
+    assert q8 == 16 * 2 * 4 * (256 + 16) + 24 * 4 + (24 * 256 * 4) // 256 + 64 * 4 + 64
+
+
 def test_plan_engine_refuses_the_9b_before_building_plans(spec_tp, monkeypatch):
     """KINDI_TC=1 installs a build_plans wrapper; the 9B (HB 4096) must stop there, not in a kernel."""
     spec, tp = spec_tp
