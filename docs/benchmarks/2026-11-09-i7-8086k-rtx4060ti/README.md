@@ -1,14 +1,18 @@
 # Kindi 2B / 4B / 9B on the i7-8086K + RTX 4060 Ti
 
-Measured 2026-11-09. This is the plain exact-head benchmark, not the plan or
-speculative path. It compares the current branch with tag `v0.4.0`.
+Measured 2026-11-09. The main 2B/4B/9B comparison is the plain exact-head
+path; a separate 2B plan comparison is included below. It compares the current
+branch with tag `v0.4.0`.
 
 The short version: the plain benchmark path did not change. `kindi/bench.py` and
 `kindi/engine.py` are byte-identical between `v0.4.0` and current main. The only
 changes on this path are the native-Windows driver selection in `kindi/gpudrv.py`,
 `kindi/sched.py` and `kindi/chunk1.py`. The current branch adds a Turing
 tensor-core backend, plan-engine guards, server features, installer safety and
-tests, but none of those run in this benchmark.
+tests; the plain rows below do not exercise them.
+
+The separate 2B plan engine reaches 302.4 tok/s at 24K versus 170.6 plain
+(1.77x); that comparison is below.
 
 ## Headline
 
@@ -132,6 +136,43 @@ runs, not an interleaved A/B, so it is not evidence of a code regression.
 
 Read: current 90.3 ± 9.3, baseline 90.8 ± 2.3 (-0.6%).
 
+## 2B plan engine vs plain at 24K
+
+Same rig, same 24,576-token context, exact head. Three fresh processes per
+engine, alternating order: r1 plain then plan, r2 plan then plain, r3 plain then
+plan.
+
+| Engine | Read | 100 | 2K | 8K | 16K | 24K |
+|---|---:|---:|---:|---:|---:|---:|
+| Plain | 225.3 ± 12.2 | 184.2 ± 8.6 | 156.1 ± 23.9 | 185.7 ± 0.5 | 183.5 ± 0.8 | 170.6 ± 17.3 |
+| Plan | 470.5 ± 0.6 | 350.2 ± 1.7 | 335.6 ± 2.2 | 329.2 ± 7.7 | 322.2 ± 5.9 | 302.4 ± 1.7 |
+| Speedup | 2.09x | 1.90x | 2.15x | 1.77x | 1.76x | 1.77x |
+
+At 24K the plan engine is **302.4 tok/s against 170.6 tok/s plain: 1.77x, or
++77.3% (+131.8 tok/s)**. The plain 24K runs were 172.9, 170.6 and 141.8; the plan
+runs were 302.4, 303.5 and 300.1. The plan side is stable; the plain side has one
+low run, which is why the median speedup is lower than the ratio of the best
+runs.
+
+Configurations (no speculative drafting in either):
+
+```sh
+# plain single-card engine
+KINDI_TP=0 KINDI_SPEC=0 python -m kindi --pack ~/.kindi/packs/bonsai-2b --ctx 24576 bench
+
+# 2B tensor-core plan engine; T=4 is the exact plan
+KINDI_TP=1 KINDI_CARDS=1 KINDI_TC=1 KINDI_TC_TMAX=4 KINDI_ATT_TC=1 KINDI_FD=1 KINDI_SPEC=0 \
+  python -m kindi --pack ~/.kindi/packs/bonsai-2b --ctx 24576 bench
+```
+
+The plan engine uses TMAX=4 because the T=4 2B plan is the token-exact
+configuration; the T=8 default is not exact for this model. The benchmark does
+not compare token outputs. The T=4 plan was previously verified 4/4 token-exact;
+this run measures speed only. Per-run data is in
+[2b-plan-vs-plain-24k.csv](2b-plan-vs-plain-24k.csv), the machine-readable form
+in [2b-plan-vs-plain-24k.json](2b-plan-vs-plain-24k.json), and the six logs in
+[raw/plan-vs-plain/](raw/plan-vs-plain/).
+
 ## Files
 
 | File | Contents |
@@ -139,23 +180,28 @@ Read: current 90.3 ± 9.3, baseline 90.8 ± 2.3 (-0.6%).
 | [runs.csv](runs.csv) | 18 rows: source, model, repetition, read rate and every generation position |
 | [stats.csv](stats.csv) | n, median, variance, sample standard deviation, minimum, maximum and the three raw values per cell |
 | [summary.json](summary.json) | machine-readable rig, method, source commits, per-run data, statistics and deltas |
+| [2b-plan-vs-plain-24k.csv](2b-plan-vs-plain-24k.csv) | six rows: plan and plain, three repetitions, read and all five generation positions |
+| [2b-plan-vs-plain-24k.json](2b-plan-vs-plain-24k.json) | machine-readable plan-vs-plain configs, runs, statistics and speedups |
+| [raw/plan-vs-plain/](raw/plan-vs-plain/) | the six plan-vs-plain logs |
 | [raw/current/](raw/current/) | the nine current-run logs |
 | [raw/v0.4.0+native-loader/](raw/v0.4.0+native-loader/) | the nine baseline logs |
 | [baseline-loader.md](baseline-loader.md) | the exact three edits that made v0.4.0 run natively on Windows |
 
-All 18 runs exited 0 and contain the expected read and five generation rows.
+All 24 runs (18 plain/current-vs-v0.4.0 plus six plan-vs-plain) exited 0 and
+contain the expected read and five generation rows.
 
 ## What changed with our modifications and additions
 
 The important distinction is between the plain inference path and the rest of
-the branch. `kindi/bench.py` and `kindi/engine.py` are unchanged, so this
-benchmark cannot show a speedup from the other work.
+the branch. `kindi/bench.py` and `kindi/engine.py` are unchanged, so the
+current-vs-v0.4.0 table cannot show a speedup from the other work. The separate
+2B plan section does exercise the tensor-core plan path.
 
 | Area | Added or changed since v0.4.0 | Exercised by this benchmark? | What that means |
 |---|---|---|---|
 | Native Windows loader | `kindi/gpudrv.py` selects `nvcuda.dll` on Windows and `libcuda.so.1` elsewhere; `sched.py` and `chunk1.py` use `gpudrv.driver()` | Yes, needed to run | Loader only; there is no kernel or arithmetic change. This is why v0.4.0 needed the small baseline patch. |
 | Turing tensor cores | `kindi/tc_turing.py`, `kindi/tc_turing.cu`, `kindi/tca_turing.cu`, `docs/TURING-TENSOR-CORES.md` | No | Targets sm_75. The 4060 Ti is sm_89, so it uses the plain path. No Turing gain is measured here. |
-| Plan / speculative engine | `kindi/spec.py`: draft clamp, 2B one-split rule, 9B guard | No | `bench` runs the plain exact path. These changes need their own plan/spec measurements. |
+| Plan / speculative engine | `kindi/spec.py`: draft clamp, 2B one-split rule, 9B guard | Yes, the 2B plan at 24K; no speculative drafting | The plan section measures 302.4 vs 170.6 tok/s (1.77x). Drafting remains unmeasured. |
 | Agent serving layer | `kindi/server.py`: bounded queue with 429, `/metrics`, Ollama-compatible `/api/tags`, `/api/chat`, `/api/generate` | No | Offline `bench` does not start the server. No HTTP throughput or queue result is claimed. |
 | Installer safety | `install.sh` GRUB edit guard, card/Turing profiles | No | No runtime effect on this benchmark. |
 | Configuration, CI and tests | generated config reference, CPU-only tests, plan-engine tests, installer fixture tests | No | They protect behavior; they do not change the measured kernels. |
@@ -176,8 +222,8 @@ performance is essentially unchanged.
 - No llama.cpp comparison was run here. The earlier P100 and K1200 tables in
   [../../BENCHMARKS.md](../../BENCHMARKS.md) are different cards and are not
   comparable rows for this rig.
-- No plan-engine, speculative, Turing, server, CPU or tandem measurement is
-  included.
+- The 2B plan comparison is included; no speculative drafting, Turing, server,
+  CPU or tandem measurement is included.
 - The 24,576-token context is the tested limit. The packs advertise a 262,144
   token native context, but this run did not test beyond 24K.
 - The benchmark is not a correctness test. The current 4B pack passed

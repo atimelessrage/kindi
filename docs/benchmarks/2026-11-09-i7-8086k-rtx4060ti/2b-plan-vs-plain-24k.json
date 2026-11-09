@@ -1,0 +1,304 @@
+{
+  "schema": 1,
+  "title": "Kindi 2B plan engine vs plain engine, 24,576-token context",
+  "date": "2026-11-09",
+  "rig": "i7-8086K + RTX 4060 Ti 8 GB (sm_89), Windows 10, driver 617.42; see README.md",
+  "model": "Ternary-Bonsai-2-2B, pack ~/.kindi/packs/bonsai-2b",
+  "method": {
+    "command": "python -m kindi --pack ~/.kindi/packs/bonsai-2b --ctx 24576 bench",
+    "context": 24576,
+    "head": "exact",
+    "speculation": "off",
+    "runs_per_variant": 3,
+    "order": "alternating: r1 plain→plan, r2 plan→plain, r3 plain→plan; each run a fresh process",
+    "statistic": "median; sample SD over three runs"
+  },
+  "configs": {
+    "plain": {
+      "label": "plain single-card engine",
+      "env": {
+        "KINDI_TP": "0",
+        "KINDI_SPEC": "0"
+      }
+    },
+    "plan": {
+      "label": "2B tensor-core plan engine",
+      "env": {
+        "KINDI_TP": "1",
+        "KINDI_CARDS": "1",
+        "KINDI_TC": "1",
+        "KINDI_TC_TMAX": "4",
+        "KINDI_ATT_TC": "1",
+        "KINDI_FD": "1",
+        "KINDI_SPEC": "0"
+      }
+    }
+  },
+  "runs": [
+    {
+      "variant": "plain",
+      "run": 1,
+      "prompt": 226.9,
+      "gen_100": 184.2,
+      "gen_2000": 139.5,
+      "gen_8000": 185.8,
+      "gen_16000": 183.5,
+      "gen_24000": 172.9
+    },
+    {
+      "variant": "plain",
+      "run": 2,
+      "prompt": 225.3,
+      "gen_100": 188.4,
+      "gen_2000": 186.6,
+      "gen_8000": 184.9,
+      "gen_16000": 183.5,
+      "gen_24000": 170.6
+    },
+    {
+      "variant": "plain",
+      "run": 3,
+      "prompt": 205.0,
+      "gen_100": 171.9,
+      "gen_2000": 156.1,
+      "gen_8000": 185.7,
+      "gen_16000": 182.1,
+      "gen_24000": 141.8
+    },
+    {
+      "variant": "plan",
+      "run": 1,
+      "prompt": 471.2,
+      "gen_100": 350.2,
+      "gen_2000": 335.6,
+      "gen_8000": 329.2,
+      "gen_16000": 322.2,
+      "gen_24000": 302.4
+    },
+    {
+      "variant": "plan",
+      "run": 2,
+      "prompt": 470.0,
+      "gen_100": 352.7,
+      "gen_2000": 336.8,
+      "gen_8000": 342.6,
+      "gen_16000": 322.7,
+      "gen_24000": 303.5
+    },
+    {
+      "variant": "plan",
+      "run": 3,
+      "prompt": 470.5,
+      "gen_100": 349.5,
+      "gen_2000": 332.5,
+      "gen_8000": 329.2,
+      "gen_16000": 312.2,
+      "gen_24000": 300.1
+    }
+  ],
+  "stats": {
+    "plain": {
+      "prompt": {
+        "n": 3,
+        "median": 225.3,
+        "variance": 149.04333333333344,
+        "stdev": 12.208330489191937,
+        "min": 205.0,
+        "max": 226.9,
+        "values": [
+          226.9,
+          225.3,
+          205.0
+        ]
+      },
+      "gen": {
+        "100": {
+          "n": 3,
+          "median": 184.2,
+          "variance": 73.52999999999996,
+          "stdev": 8.574963556773868,
+          "min": 171.9,
+          "max": 188.4,
+          "values": [
+            184.2,
+            188.4,
+            171.9
+          ]
+        },
+        "2000": {
+          "n": 3,
+          "median": 156.1,
+          "variance": 570.7033333333333,
+          "stdev": 23.889397927393087,
+          "min": 139.5,
+          "max": 186.6,
+          "values": [
+            139.5,
+            186.6,
+            156.1
+          ]
+        },
+        "8000": {
+          "n": 3,
+          "median": 185.7,
+          "variance": 0.24333333333333124,
+          "stdev": 0.49328828623162263,
+          "min": 184.9,
+          "max": 185.8,
+          "values": [
+            185.8,
+            184.9,
+            185.7
+          ]
+        },
+        "16000": {
+          "n": 3,
+          "median": 183.5,
+          "variance": 0.6533333333333387,
+          "stdev": 0.8082903768654793,
+          "min": 182.1,
+          "max": 183.5,
+          "values": [
+            183.5,
+            183.5,
+            182.1
+          ]
+        },
+        "24000": {
+          "n": 3,
+          "median": 170.6,
+          "variance": 300.3233333333331,
+          "stdev": 17.329839391446566,
+          "min": 141.8,
+          "max": 172.9,
+          "values": [
+            172.9,
+            170.6,
+            141.8
+          ]
+        }
+      }
+    },
+    "plan": {
+      "prompt": {
+        "n": 3,
+        "median": 470.5,
+        "variance": 0.3633333333333261,
+        "stdev": 0.6027713773341649,
+        "min": 470.0,
+        "max": 471.2,
+        "values": [
+          471.2,
+          470.0,
+          470.5
+        ]
+      },
+      "gen": {
+        "100": {
+          "n": 3,
+          "median": 350.2,
+          "variance": 2.8299999999999854,
+          "stdev": 1.6822603841260677,
+          "min": 349.5,
+          "max": 352.7,
+          "values": [
+            350.2,
+            352.7,
+            349.5
+          ]
+        },
+        "2000": {
+          "n": 3,
+          "median": 335.6,
+          "variance": 4.923333333333368,
+          "stdev": 2.218858565419024,
+          "min": 332.5,
+          "max": 336.8,
+          "values": [
+            335.6,
+            336.8,
+            332.5
+          ]
+        },
+        "8000": {
+          "n": 3,
+          "median": 329.2,
+          "variance": 59.85333333333364,
+          "stdev": 7.736493607141005,
+          "min": 329.2,
+          "max": 342.6,
+          "values": [
+            329.2,
+            342.6,
+            329.2
+          ]
+        },
+        "16000": {
+          "n": 3,
+          "median": 322.2,
+          "variance": 35.083333333333336,
+          "stdev": 5.923118547972287,
+          "min": 312.2,
+          "max": 322.7,
+          "values": [
+            322.2,
+            322.7,
+            312.2
+          ]
+        },
+        "24000": {
+          "n": 3,
+          "median": 302.4,
+          "variance": 3.009999999999948,
+          "stdev": 1.7349351572897322,
+          "min": 300.1,
+          "max": 303.5,
+          "values": [
+            302.4,
+            303.5,
+            300.1
+          ]
+        }
+      }
+    }
+  },
+  "speedup": {
+    "prompt": {
+      "plain_median": 225.3,
+      "plan_median": 470.5,
+      "ratio": 2.0883266755437195,
+      "percent": 108.83266755437195
+    },
+    "100": {
+      "plain_median": 184.2,
+      "plan_median": 350.2,
+      "ratio": 1.9011943539630836,
+      "percent": 90.11943539630836
+    },
+    "2000": {
+      "plain_median": 156.1,
+      "plan_median": 335.6,
+      "ratio": 2.1499039077514417,
+      "percent": 114.99039077514416
+    },
+    "8000": {
+      "plain_median": 185.7,
+      "plan_median": 329.2,
+      "ratio": 1.7727517501346257,
+      "percent": 77.27517501346257
+    },
+    "16000": {
+      "plain_median": 183.5,
+      "plan_median": 322.2,
+      "ratio": 1.755858310626703,
+      "percent": 75.5858310626703
+    },
+    "24000": {
+      "plain_median": 170.6,
+      "plan_median": 302.4,
+      "ratio": 1.772567409144197,
+      "percent": 77.2567409144197
+    }
+  },
+  "note": "The plan engine is the canonical exact 2B T=4 tensor-core plan; no speculative drafting. The benchmark does not compare token outputs. Prior plan verification is 4/4 token-exact."
+}

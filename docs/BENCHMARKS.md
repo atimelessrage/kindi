@@ -25,6 +25,8 @@ Windows 10, i7-8086K, RTX 4060 Ti 8 GB (sm_89), 24,576-token context, exact head
 
 The current branch and `v0.4.0` have byte-identical `kindi/bench.py` and `kindi/engine.py`; only the native-Windows driver selection differs on this path. The 24K differences are -3.0%, -2.8% and -0.6%, and are not a code-level speedup or regression. Full method, variance, per-run CSV/JSON and raw logs: [benchmarks/2026-11-09-i7-8086k-rtx4060ti/README.md](benchmarks/2026-11-09-i7-8086k-rtx4060ti/README.md).
 
+The separate 2B plan engine at the same 24K context measured 302.4 tok/s against 170.6 plain, 1.77x, with `KINDI_TP=1 KINDI_TC=1 KINDI_TC_TMAX=4` and no speculative drafting. That result is in the same report.
+
 ## Kindi 0.4.0: Tesla P100 (sm_60)
 
 Two rented machines gave the numbers. Do not mix them. Box A: 2x Tesla P100-SXM2-16GB (NVLink, 300 W), driver 535.230.02,

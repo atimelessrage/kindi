@@ -149,8 +149,11 @@ is not a lock.
   `summary.json`, 18 raw logs). Current vs `v0.4.0` + native loader only: 24K generation
   160.6/79.8/62.3 vs 165.5/82.1/62.7 tok/s (-3.0/-2.8/-0.6%). `kindi/bench.py` and
   `kindi/engine.py` are byte-identical to the tag, so this is not a benchmark-path speedup or
-  regression. 4B `kindi verify` 4/4; no plan/spec/Turing/server/CPU measurement. Evidence:
-  `docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json`; all 18 runs exited 0.
+  regression. 4B `kindi verify` 4/4. A separate 2B plan-vs-plain run at 24K is 302.4 vs
+  170.6 tok/s (1.77x; T=4 exact plan, no drafting), stored as `2b-plan-vs-plain-24k.csv` and
+  `.json`. No speculative/Turing/server/CPU measurement. Evidence:
+  `docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json` and
+  `.../2b-plan-vs-plain-24k.json`; all 24 runs exited 0.
 - Release docs are prepared on this branch: `docs/INSTALL.md` pins the fixed release artifact
   `c05d0190...` (the LF Git blob is `2ae8f960...`; do not mix them), and
   `docs/RELEASE-CHECKLIST.md` records the release steps. The guard is in `2b84658`; the Turing
