@@ -56,19 +56,19 @@ The published file is the **release artifact**, not necessarily the Git blob. Tw
 
 | source | sha256 |
 |---|---|
-| the current worktree release file (CRLF, `38fb…`) | `38fb341797825160f620045dd37ece2034e70e7b2a3deab76d5d2edea701fe4e` |
-| the committed Git blob (LF, `9b25…`) | `9b25e78ba293ffdf0da9cfccdb5ea23ee787dce4ad7c8c6157507a2744a0da23` |
+| the current worktree release file (CRLF, `c05d…`) | `c05d019002c7db1dc6b4e0b73718d5a9087676ea68c1e247ada9a463e6d6551e` |
+| the committed Git blob (LF, `2ae8…`) | `2ae8f9605218f1fd3b1668068e748cbd21f29289aec863c48da5130b0d523a6a` |
 
 The published 0.4.0 file was an artifact hash (`592a…`), not the Git blob. This release records the
-worktree artifact hash `38fb…` in `docs/INSTALL.md`; publish that exact file, not a re-saved copy.
+worktree artifact hash `c05d…` in `docs/INSTALL.md`; publish that exact file, not a re-saved copy.
 
 ```sh
 sha256sum install.sh
-# must print 38fb341797825160f620045dd37ece2034e70e7b2a3deab76d5d2edea701fe4e
+# must print c05d019002c7db1dc6b4e0b73718d5a9087676ea68c1e247ada9a463e6d6551e
 ```
 
 If the release pipeline normalizes line endings, or you build the artifact from the Git blob instead,
-the hash becomes `9b25e78…`. Stop, choose the exact artifact, and update **both** checksum lines in
+the hash becomes `2ae8f960…`. Stop, choose the exact artifact, and update **both** checksum lines in
 `docs/INSTALL.md` plus this table before publishing. Never publish a file whose hash differs from the
 documented value.
 
@@ -85,7 +85,7 @@ grep -nP '\x01' install.sh && echo 'STOP: control byte in installer'
 match the release artifact.
 
 ```sh
-grep -n '38fb341797825160f620045dd37ece2034e70e7b2a3deab76d5d2edea701fe4e' docs/INSTALL.md
+grep -n 'c05d019002c7db1dc6b4e0b73718d5a9087676ea68c1e247ada9a463e6d6551e' docs/INSTALL.md
 # two lines expected
 ```
 
@@ -93,7 +93,7 @@ Download the candidate artifact and check it exactly as a user would:
 
 ```sh
 curl -fsSLO https://amirhusain.com/kindi/install.sh
-echo "38fb341797825160f620045dd37ece2034e70e7b2a3deab76d5d2edea701fe4e  install.sh" | sha256sum -c -
+echo "c05d019002c7db1dc6b4e0b73718d5a9087676ea68c1e247ada9a463e6d6551e  install.sh" | sha256sum -c -
 bash -n install.sh
 ```
 

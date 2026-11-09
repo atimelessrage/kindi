@@ -15,8 +15,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `0fc024f` | main checkout; another agent is active here |
-| `C:/Users/ICH/.freebuff/worktrees/f0e51299/kindi` | `freebuff/project-review-audit-report` | `7f7196c` | this session |
+| `T:/kindi` | `main` | fast-forwarded to this branch | main checkout; clean after the 2026-11-09 reconciliation |
+| `C:/Users/ICH/.freebuff/worktrees/f0e51299/kindi` | `freebuff/project-review-audit-report` | merge `d21e566` + handoff commit | this session; includes main's Turing work |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
@@ -42,27 +42,37 @@ Read it before editing a shared file.
 6. At handoff: commit the task, record its branch, HEAD and remaining files here, and leave the
    worktree clean or explicitly listed. Do not delete another worktree's files.
 
+### Reconciliation (2026-11-09)
+
+The main worktree was interrupted mid-edit: `install.sh` was empty, `kindi/tandem.py` did not parse,
+and `tandem_new.py`/`hostram.py` were placeholders. Its full tracked and untracked state is preserved
+in `bench-logs/main-backup-20261109-045352/` and on the branches
+`wip/main-interrupted-snapshot-20261109-045352` and `wip/main-interrupted-backup-20261109-045352`.
+The main worktree is clean now; `main` was fast-forwarded to this branch after its three Turing
+commits were merged. The corrupt tandem WIP was not merged into `main`; restart it from
+`docs/CPU_GPU_TANDEM_DESIGN.md` and the WIP branch if it is resumed.
+
 ### Current leases (checked 2026-11-08)
 
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
-| Main-worktree task (other agent) | `T:/kindi` | `main` | `README.md`, `docs/CARDS.md`, `docs/CONFIGURATION.md`, `docs/INSTALL.md`, `docs/TURING-TENSOR-CORES.md`, `docs/VERIFICATION.md`, `docs/PAIR-SETUPS.md`, `docs/CPU_GPU_TANDEM_DESIGN.md`, `docs/GPU_PROFILE_ANALYSIS.md`, `docs/dev/**`, `install.sh`, `kindi/spec.py`, `.github/workflows/ci.yml` | dirty in the main worktree; owner: other agent; do not edit |
+| Main-worktree task (other agent) | `T:/kindi` | `main` | `README.md`, `docs/CARDS.md`, `docs/CONFIGURATION.md`, `docs/INSTALL.md`, `docs/TURING-TENSOR-CORES.md`, `docs/VERIFICATION.md`, `docs/PAIR-SETUPS.md`, `docs/CPU_GPU_TANDEM_DESIGN.md`, `docs/GPU_PROFILE_ANALYSIS.md`, `docs/dev/**`, `install.sh`, `kindi/spec.py`, `.github/workflows/ci.yml` | clean after the 2026-11-09 snapshot; `main` fast-forwarded to this branch; interrupted WIP preserved on `wip/main-interrupted-snapshot-20261109-045352` |
 | Documentation drift (P1-3, P1-4, P1-5, P1-6) | this worktree | `freebuff/project-review-audit-report` | `WHY.md`, `docs/CONFIGURATION.md`, `docs/INSTALL.md`, `docs/BENCHMARKS.md`, `docs/CARDS.md`, `docs/MTP.md`, `kindi.conf.example`, `kindi/spec.py` | partial: `WHY.md` and `kindi.conf.example` updated; `docs/INSTALL.md` checksum updated by the release task; `docs/CONFIGURATION.md`, `docs/CARDS.md`, `docs/BENCHMARKS.md` and `docs/MTP.md` remain blocked by the main worktree's dirty copies |
 | Continuous-batching investigation | this worktree | `freebuff/project-review-audit-report` | `docs/CONTINUOUS-BATCHING.md`, `AGENTS.md` | archived NO-GO; Phase-0 gate failed (0.69x); top banner and section 8 updated; no production code changed |
 | Server request validation + boundary hardening (P1-1/P2-1) | this worktree | `freebuff/project-review-audit-report` | `kindi/server.py`, `tests/test_server.py`, `tests/test_config_example.py` | done; 10 server tests (validation, auth, 413 body cap) + 1 example-config test + 9 installer fixture tests = 20 passed; invalid requests and 413 keep the cache |
-| GRUB edit guard (plan 1) | this worktree | `freebuff/project-review-audit-report` | `install.sh`, `tests/test_installer_grub.py` | done; guard committed in `2b84658`; 9 fixture tests pass and the non-vacuous check is recorded. Release commit updates `docs/INSTALL.md` to the fixed artifact hash `38fb3417...`; the main worktree still has an empty `install.sh` and dirty `docs/INSTALL.md`, so do not publish from main until reconciled |
-| Installer safety release (GRUB guard) | this worktree | `freebuff/project-review-audit-report` | `docs/INSTALL.md` (checksum only), `docs/RELEASE-CHECKLIST.md`, `AGENTS.md` | release docs committed; guard already in `2b84658`; no tag, push or upload. Verified: `bash -n` OK, 9 guard tests, 58 full tests, `compileall` OK, artifact hash `38fb3417...` check OK, no control bytes. Release artifact is the CRLF worktree file; the LF Git blob is `9b25e78...`; docs must name the exact published file |
+| GRUB edit guard (plan 1) | this worktree | `freebuff/project-review-audit-report` | `install.sh`, `tests/test_installer_grub.py` | done; guard committed in `2b84658`; 9 fixture tests pass and the non-vacuous check is recorded. Release commit updates `docs/INSTALL.md` to the fixed artifact hash `c05d0190...`; the merged `install.sh` now carries both the Turing profile and the GRUB guard; the pinned hashes were refreshed after the merge |
+| Installer safety release (GRUB guard) | this worktree | `freebuff/project-review-audit-report` | `docs/INSTALL.md` (checksum only), `docs/RELEASE-CHECKLIST.md`, `AGENTS.md` | release docs committed; guard already in `2b84658`; no tag, push or upload. Verified: `bash -n` OK, 9 guard tests, 58 full tests, `compileall` OK, artifact hash `c05d0190...` check OK, no control bytes. Release artifact is the CRLF worktree file; the LF Git blob is `2ae8f960...`; docs must name the exact published file |
 | Per-slot plain-engine plan (Phase 1) | this worktree | `freebuff/project-review-audit-report` | `docs/PER-SLOT-REFACTOR.md`, `docs/CONTINUOUS-BATCHING.md` | archived NO-GO with `docs/CONTINUOUS-BATCHING.md`; no engine code changed |
 | 2B CB-vs-spec measurement | this worktree | `freebuff/project-review-audit-report` | `bench-logs/compare-2b-cb-spec/**`, `AGENTS.md` | measured; no code changed; results in `bench-logs/compare-2b-cb-spec/RESULTS.md` |
 | Phase-0 CB spike | this worktree | `freebuff/project-review-audit-report` | `bench-logs/spike_batch_gemm.py`, `bench-logs/phase0-spike/**`, `docs/CONTINUOUS-BATCHING.md` | implemented; B=4 gate FAIL (0.69x vs single decode); no production code changed |
-| Plan-engine exactness guard | this worktree | `freebuff/project-review-audit-report` | `kindi/spec.py`, `AGENTS.md`, `bench-logs/diag_exact_plan.py`, `bench-logs/diag_verify8.py`, `bench-logs/diag_spec_long.py` | 2B sp=1 (no k_tc_sum) + 9B HB guard; long spec 160/160 exact; **main worktree has uncommitted `kindi/spec.py`; merge by hand** |
+| Plan-engine exactness guard | this worktree | `freebuff/project-review-audit-report` | `kindi/spec.py`, `AGENTS.md`, `bench-logs/diag_exact_plan.py`, `bench-logs/diag_verify8.py`, `bench-logs/diag_spec_long.py` | 2B sp=1 (no k_tc_sum) + 9B HB guard; long spec 160/160 exact; merged with main's Turing changes; the plan-engine tests pass |
 | Long-term card support (single/dual) | this worktree | `freebuff/project-review-audit-report` | `docs/CARD-SUPPORT.md`, `AGENTS.md` | roadmap and acceptance contract written; no engine/installer code changed; the 4060 Ti 8 GB classification and all non-Maxwell pairings are blocked by the main worktree's dirty `install.sh` |
 | Long-term CPU support (i5-2500K, W-2133, i9-13900K, i7-8086K) | this worktree | `freebuff/project-review-audit-report` | `docs/CPU-SUPPORT.md`, `AGENTS.md` | roadmap and acceptance contract written; no CPU/installer code changed; `kindi/cpu.py`, `kindi/kcpu.c` and `install.sh` are main-owned/dirty; the i5-2500K needs an AVX-only/scalar fallback |
 | CI + plan-engine regression test | this worktree | `freebuff/project-review-audit-report` | `.github/workflows/ci.yml`, `tests/test_plan_engine.py`, `AGENTS.md` | done; CI installs `tests/requirements-test.txt` (FastAPI/httpx were missing, so collection failed) and ShellChecks the committed LF blob; 20 new CPU-only plan tests; 78 full tests pass. The main worktree's own `.github/workflows/ci.yml` is still dirty: reconcile by hand, do not overwrite it |
 | Generated configuration reference | this worktree | `freebuff/project-review-audit-report` | `kindi/config_reference.py`, `tests/test_config_reference.py`, `docs/CONFIGURATION-REFERENCE.md`, `kindi.conf.example`, `AGENTS.md` | done; `python -m kindi.config_reference` renders 25 config keys and 104 environment rows from the code, and `--check` plus 6 tests fail on drift. `docs/CONFIGURATION.md` stays main-owned/dirty; the generated file is new, so merging it is additive |
 | 2B spec acceptance on non-repetitive prompts | this worktree | `freebuff/project-review-audit-report` | `bench-logs/measure_2b_spec_norepeat.py`, `bench-logs/measure-2b-spec-norepeat/**`, `AGENTS.md` | measured; no code changed; n-gram acceptance is 8-18% on fresh prose vs. 86% on the copy control, throughput 364.9 vs. 328.9 tok/s (plan) and 168.1 (plain); results in `bench-logs/measure-2b-spec-norepeat/RESULTS.md` |
-| Agent serving layer (task_0013 slice) | this worktree | `freebuff/project-review-audit-report` | `kindi/server.py`, `tests/test_server.py`, `docs/AGENTS.md`, `docs/CONFIGURATION-REFERENCE.md`, `AGENTS.md` | done; bounded queue with 429 + Retry-After, `/metrics`, and Ollama `/api/tags`, `/api/chat`, `/api/generate`; 18 server tests and 92 full tests pass; no engine code changed; multi-GPU replicas remain (needs `tp.py`, main-owned) |
-| `install.sh` / `.github` collision | both | both | `install.sh`, `.github/**` | modified or present in both worktrees; do not merge or overwrite until the two changes are reconciled by hand (the main copy was empty on 2026-11-08) |
+| Agent serving layer (task_0013 slice) | this worktree | `freebuff/project-review-audit-report` | `kindi/server.py`, `tests/test_server.py`, `docs/AGENTS.md`, `docs/CONFIGURATION-REFERENCE.md`, `AGENTS.md` | done; bounded queue with 429 + Retry-After, `/metrics`, and Ollama `/api/tags`, `/api/chat`, `/api/generate`; 18 server tests and 101 full tests pass after the Turing merge; no engine code changed; multi-GPU replicas remain (needs `tp.py`, main-owned) |
+| `install.sh` / `.github` collision | both | both | `install.sh`, `.github/**` | reconciled on 2026-11-09: the merged `install.sh` has the GRUB guard and the Turing profile; the WIP's empty `install.sh` was discarded, and main's Turing commits were merged |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -92,6 +102,13 @@ is not a lock.
 
 ## Handoff (2026-11-09)
 
+- 2026-11-09 reconciliation: main's three Turing commits were merged into this branch
+  (`d21e566`); the interrupted main worktree was snapshotted to
+  `wip/main-interrupted-snapshot-20261109-045352` and
+  `bench-logs/main-backup-20261109-045352/`, then cleaned. The corrupt tandem WIP was not
+  merged. Post-merge verification: 101 CPU tests, `compileall`, `bash -n install.sh`, generated
+  reference check, 9B verify (4/4, 87.6 tok/s) and 2B plan verify (4/4, 377.1 tok/s) on the
+  4060 Ti.
 - Branch `freebuff/project-review-audit-report`; audit follow-up commits `5061af2`, `2b84658`,
   `4b90ca9` and this roadmap commit.
 - Verified: `python -m pytest tests/ -q` -> 84 passed (58 before the CI/plan-engine task, plus 20
@@ -117,10 +134,9 @@ is not a lock.
   plan engine; the plan engine itself diverges from plain on two of the three prompts. Evidence:
   `bench-logs/measure-2b-spec-norepeat/RESULTS.md`. No code changed.
 - Release docs are prepared on this branch: `docs/INSTALL.md` pins the fixed release artifact
-  `38fb3417...` (the LF Git blob is `9b25e78...`; do not mix them), and `docs/RELEASE-CHECKLIST.md`
-  records the release steps. The guard itself is committed in `2b84658`. No tag, push or upload was made.
-  **Still blocked for publication:** the main worktree has an empty `install.sh` and dirty
-  `docs/INSTALL.md`; reconcile or merge by hand before publishing.
+  `c05d0190...` (the LF Git blob is `2ae8f960...`; do not mix them), and
+  `docs/RELEASE-CHECKLIST.md` records the release steps. The guard is in `2b84658`; the Turing
+  commits were merged and the hashes refreshed on 2026-11-09. No tag, push or upload was made.
 - Long-term single/dual card target is in `docs/CARD-SUPPORT.md`. The current installer misclassifies
   the 8 GB RTX 4060 Ti as `pascal8` because `tc` also requires at least 9,500 MiB, and `pair_ok()`
   rejects every pair above sm_60. Both fixes and the `tc2` profile are main-worktree work; the card
@@ -291,7 +307,7 @@ Next, in order:
    the CPU acceptance matrix. No CPU/installer code changed here; no CPU is a support claim until a
    native build and `kindi verify` are recorded.
 8. [x] Installer safety release prepared: the GRUB guard is committed in `2b84658`, `docs/INSTALL.md`
-   pins the fixed artifact hash `38fb3417...`, and `docs/RELEASE-CHECKLIST.md` records reconciliation,
+   pins the fixed artifact hash `c05d0190...`, and `docs/RELEASE-CHECKLIST.md` records reconciliation,
    tests, exact-artifact hashing and publication checks. Evidence: `bash -n install.sh` OK;
    `pytest tests/test_installer_grub.py -q` -> 9 passed; `pytest tests/ -q` -> 58 passed;
    `compileall -q kindi` OK; `sha256sum -c` -> `install.sh: OK`; no control bytes. No tag, push or
