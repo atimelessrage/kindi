@@ -73,6 +73,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | 2B spec acceptance on non-repetitive prompts | this worktree | `freebuff/project-review-audit-report` | `bench-logs/measure_2b_spec_norepeat.py`, `bench-logs/measure-2b-spec-norepeat/**`, `AGENTS.md` | measured; no code changed; n-gram acceptance is 8-18% on fresh prose vs. 86% on the copy control, throughput 364.9 vs. 328.9 tok/s (plan) and 168.1 (plain); results in `bench-logs/measure-2b-spec-norepeat/RESULTS.md` |
 | Agent serving layer (task_0013 slice) | this worktree | `freebuff/project-review-audit-report` | `kindi/server.py`, `tests/test_server.py`, `docs/AGENTS.md`, `docs/CONFIGURATION-REFERENCE.md`, `AGENTS.md` | done; bounded queue with 429 + Retry-After, `/metrics`, and Ollama `/api/tags`, `/api/chat`, `/api/generate`; 18 server tests and 104 full tests pass after the Turing merge and the native-Windows driver loader; no engine code changed; multi-GPU replicas remain (needs `tp.py`, main-owned) |
 | `install.sh` / `.github` collision | both | both | `install.sh`, `.github/**` | reconciled on 2026-11-09: the merged `install.sh` has the GRUB guard and the Turing profile; the WIP's empty `install.sh` was discarded, and main's Turing commits were merged |
+| Tandem/CPU recovery audit | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CPU_GPU_TANDEM_DESIGN.md`, `docs/TANDEM-STATUS.md`, `AGENTS.md` | design restored; no tandem runtime merged; WIP `tandem.py` is unparsable, CPU changes are uncompiled and the WIP branches are preserved; see `docs/TANDEM-STATUS.md` for the cleanup gate |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -113,6 +114,12 @@ is not a lock.
   merged. Post-merge verification: 101 CPU tests, `compileall`, `bash -n install.sh`, generated
   reference check, 9B verify (4/4, 87.6 tok/s) and 2B plan verify (4/4, 377.1 tok/s) on the
   4060 Ti.
+- Tandem/CPU recovery audit: `main` has only the host-RAM preflight, the baseline CPU engine and
+  `layout.repack`; it has no tandem runtime. The WIP `kindi/tandem.py` is unparsable and the only
+  historical blob is the corrupt one, so a branch merge would lose the audit/server work and still
+  not provide a working engine. The intact design was restored at
+  `docs/CPU_GPU_TANDEM_DESIGN.md`; the evidence and cleanup gate are in
+  `docs/TANDEM-STATUS.md`. The WIP branches remain preserved.
 - Branch `freebuff/project-review-audit-report`; audit follow-up commits `5061af2`, `2b84658`,
   `4b90ca9` and this roadmap commit.
 - Verified: `python -m pytest tests/ -q` -> 84 passed (58 before the CI/plan-engine task, plus 20

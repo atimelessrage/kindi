@@ -1,9 +1,10 @@
 # Long-term CPU support
 
-Status: **roadmap and acceptance contract, 2026-11-09. Not a support claim yet.** The CPU engine files
-(`kindi/cpu.py`, `kindi/kcpu.c`) and `install.sh` are dirty in the main worktree. This page records the
-target and the exact build/runtime requirements so the work can be implemented and measured without
-re-discovering them.
+Status: **roadmap and acceptance contract, 2026-11-09. Not a support claim yet.** The baseline CPU
+engine (`kindi/cpu.py`, `kindi/kcpu.c`) is in `main`; the WIP ISA/AVX-only changes are uncompiled and
+not merged. This page records the target and the exact build/runtime requirements so the work can be
+implemented and measured without re-discovering them. The tandem recovery gate is in
+[TANDEM-STATUS.md](TANDEM-STATUS.md).
 
 ## What “supported” means here
 
