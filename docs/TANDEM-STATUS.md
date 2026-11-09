@@ -31,7 +31,7 @@ server and test work. Any salvage must be selective.
 
 | Item | WIP state | Recovery verdict |
 |---|---|---|
-| `docs/CPU_GPU_TANDEM_DESIGN.md` | 647 lines, intact; SHA-256 `8d1cb927ad3543a4895c427699e697be68f3107310943cde6c8d9a211cdd9f92` | **Restored in this branch.** It is a design, not an implementation. |
+| `docs/CPU_GPU_TANDEM_DESIGN.md` | 647 lines, intact; committed Git-blob SHA-256 `8d1cb927ad3543a4895c427699e697be68f3107310943cde6c8d9a211cdd9f92` (working copy may be CRLF) | **Restored in this branch.** It is a design, not an implementation. |
 | `kindi/tandem.py` | 280 lines; only historical blob `ccb8841748`; parse fails at line 131 | **Corrupt; rewrite from the design.** It contains duplicated classes, diff markers, broken indentation and placeholder methods. |
 | `kindi/tandem_new.py` | 4 bytes: `test` | **Delete from any salvage; no value.** |
 | `kindi/hostram.py` WIP additions | 334 added lines, parses; pinned allocator, mmap loader, double buffer, LRU cache | **Candidate foundation**, but unintegrated and untested. Main keeps only the preflight for now. |
