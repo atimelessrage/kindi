@@ -1,6 +1,6 @@
 # Kindi on AMD graphics
 
-Kindi 0.4.0 runs on AMD RDNA3 graphics through ROCm. We tested it on the **Radeon 780M**, the graphics unit inside
+Kindi 0.5.0 runs on AMD RDNA3 graphics through ROCm. We tested it on the **Radeon 780M**, the graphics unit inside
 the AMD Ryzen 7 7840HS, Ryzen 9 7940HS and similar chips. Our test computer is a Minisforum UM790 Pro mini PC with a
 Ryzen 9 7940HS and 64 GB of DDR5-5600.
 
@@ -17,7 +17,10 @@ context and other programs at the same time.
 
 The speeds, against llama.cpp on the same computer with the same model files, are in [BENCHMARKS.md](BENCHMARKS.md).
 
-Other RDNA3 graphics (gfx1100, gfx1101, gfx1102) use the same code. We did not measure them.
+Kindi 0.5.0 adds RDNA 3.5 graphics. The Radeon 840M (gfx1152, in the Ryzen AI 5 340) and the Radeon 8060S (Strix
+Halo, gfx1151, in the Ryzen AI MAX+ 395) run the 2B, 4B, 9B and 27B, without `HSA_OVERRIDE_GFX_VERSION`. `kindi
+verify` passes on both. The installer builds the `kindi-rocm7` image for them (ROCm 7, HIP 7.16). Other RDNA3 graphics
+(gfx1100, gfx1101, gfx1102) and Strix Point (gfx1150) use the same code. We did not measure them.
 
 ## Install
 
@@ -27,7 +30,8 @@ The installer finds the 780M and lists the 27B first:
 curl -fsSL https://amirhusain.com/kindi/install.sh | bash
 ```
 
-It builds the `kindi-rocm` image, which holds ROCm 6.3.3 and CuPy 14.2.0, so the computer needs only:
+It builds the `kindi-rocm` image (ROCm 6.3.3 and CuPy 14.2.0) for RDNA3 graphics, and the `kindi-rocm7` image (ROCm 7
+with HIP 7.16 and CuPy 14.2.0) for RDNA 3.5 graphics. The computer needs only:
 
 - Linux with the `amdgpu` driver (kernel 6.2 or newer, and the `linux-firmware` package): `/dev/kfd` and
   `/dev/dri/renderD*` must exist;
