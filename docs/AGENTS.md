@@ -41,6 +41,16 @@ Besides `/v1`, Kindi serves what an agent host needs to observe and to connect a
    A different set of tools per call changes the start of the prompt, and then the cache cannot help.
 5. **Temperature 0.1-0.7.** Greedy (`0`) is reproducible; the model publisher recommends 0.7 / top_p 0.8 / top_k 20 with `presence_penalty` 1.5. Set `sampling_profile = publisher` in `kindi.conf` for the whole publisher profile, including the thinking profile (1.0 / 0.95 / 20, presence 1.0, up to 8K output). A request's own `presence_penalty` (-2..2) overrides the config value.
 
+## Queue load check (2026-11-10)
+
+A native CPU run of `bonsai2-9b` (6 threads, 1024-token context, `KINDI_QUEUE_MAX=8`) with 12
+simultaneous non-streaming clients produced **9 HTTP 200** and **3 HTTP 429**. The nine 200s were
+the active request plus the eight waiters; the queue never exceeded eight waiters. Every 429 carried
+`Retry-After: 1` and returned in 8-10 ms. `/health` reported at most eight waiting requests, and the
+final metrics were `kindi_requests_rejected_total 3` with 0 errors. The eight queued requests ran
+serially behind the active request. This confirms the queue bounds waiting clients instead of
+letting them accumulate.
+
 Watch a long first read with `curl -s localhost:8093/health` - the `busy` field shows `prompt_read` progress.
 
 ## Examples
