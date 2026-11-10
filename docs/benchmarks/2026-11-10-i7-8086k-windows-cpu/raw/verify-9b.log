@@ -1,0 +1,8 @@
+C:\Users\ICH\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+[kindi 11:54:17] kindi-cpu ready: Ternary-Bonsai-2-9B, 6 threads, ctx 1024 (112.3s)
+[kindi 11:54:23] prompt 1 'The sky is blue because'                                    PASS  40/40 tokens match  (5.2s)
+[kindi 11:54:28] prompt 2 'The capital of France is'                                   PASS  40/40 tokens match  (4.9s)
+[kindi 11:54:30] prompt 3 'Water boils at a lower temperature on mountains because'    PASS  13/13 tokens match  (2.3s)
+[kindi 11:54:35] prompt 4 'def add_two_numbers('                                       PASS  40/40 tokens match  (4.9s)
+[kindi 11:54:35] ALL PASS: token-exact with llama.cpp - 9.1 tokens/s over the run
