@@ -1,8 +1,9 @@
 # Kindi CPU engine on the Intel Core i7-8086K
 
 Measured 2026-11-09. This is the first native run of the `kindi/cpu.py` + `kindi/kcpu.c`
-engine on this machine. The engine was built and executed inside WSL2 Ubuntu 24.04;
-there is still no Windows-native compiler path for `kcpu.c`.
+engine on this machine. The engine was built and executed inside WSL2 Ubuntu 24.04. The
+native Windows build followed on 2026-11-10: see the
+[newer benchmark](../2026-11-10-i7-8086k-windows-cpu/README.md).
 
 The short version: **the CPU engine works on the i7-8086K**. All three converted packs
 (2B, 4B, 9B) pass `kindi verify` token-exact with llama.cpp, the full CPU-only test suite
@@ -161,8 +162,9 @@ Proved on this machine:
 
 Not proved or not done:
 
-- **Windows-native CPU engine.** No `gcc`, `clang`, MSVC or MinGW was available on the
-  Windows side; WSL2 was used. The native CPU engine on bare Windows remains unbuilt.
+- **Windows-native CPU engine (since done).** No compiler was available on the Windows side at the
+  time, so WSL2 was used. The native build followed on 2026-11-10 with clang 18.1.8 and libomp:
+  [2026-11-10-i7-8086k-windows-cpu](../2026-11-10-i7-8086k-windows-cpu/README.md).
 - **12-thread usability.** It is measured and is much slower; it is not a recommended
   configuration, and no profiler-based explanation was established.
 - **Repeated-run stability and thermals.** One run per configuration; no clock, power or

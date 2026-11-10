@@ -165,9 +165,27 @@ comparison was made here.
 `Tokens/s` in the Verify column is the verify rate. Twelve threads is 6-20x slower and is not a
 usable configuration: a 2B probe reads 1.3 tokens/s with 12 threads under `close`, `spread` or no
 binding, and 12.5 with the active spin-wait off, so libgomp spins the hyperthread pairs into each
-other at the kernel's per-row-block barriers. `kindi/cpu.py` now defaults to the physical-core count. Native Windows CPU is not built; this is a WSL2 result. Full method, raw logs
+other at the kernel's per-row-block barriers. `kindi/cpu.py` now defaults to the physical-core count. The native Windows build is measured in the next section. Full method, raw logs
 and limitations: [benchmarks/2026-11-09-i7-8086k-cpu/README.md](benchmarks/2026-11-09-i7-8086k-cpu/README.md).
 The support status is tracked in [CPU-SUPPORT.md](CPU-SUPPORT.md).
+
+## 2026-11-10: CPU engine on native Windows · Intel Core i7-8086K
+
+Windows 10 (10.0.19045), i7-8086K @ 4.00 GHz, clang 18.1.8 with MSVC 14.51, Python 3.13.6,
+1,024-token verify context, six threads (one per physical core, resolved through the Windows
+topology API). One run per model. This is a Kindi-only correctness run; no llama.cpp speed
+comparison was made.
+
+| Model | Verify | Tokens/s | Engine ready |
+|---|---:|---:|---:|
+| 2B | 4/4 | 33.7 | 22.8 s |
+| 4B | 4/4 | 16.7 | 50.7 s |
+| 9B | 4/4 (13/13 on prompt 3) | 9.1 | 112.3 s |
+
+The same verifies read 28.1, 13.0 and 5.6 tokens/s under WSL2, so the native build is faster on
+this CPU. A second native run measured 33.5/14.3/7.3; these are single runs and vary by up to a
+quarter. Full method, build command and raw logs:
+[benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md](benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md).
 
 ## Kindi 0.4.0: Tesla P100 (sm_60)
 

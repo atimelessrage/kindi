@@ -401,8 +401,11 @@ image for it.
 | models | 2B, 4B or 9B |
 | variables | `KINDI_DEVICE=cpu`; optional `OMP_NUM_THREADS=<cores of one socket>`, `OMP_PROC_BIND=close`, `OMP_PLACES=cores` (the default is one thread per physical core, bound to those cores) |
 
-- The CPU engine needs gcc with OpenMP. It builds `libkcpu.so` at the first start (`KINDI_CPU_CACHE`).
-- The output is token-exact with llama.cpp.
+- The CPU engine builds at the first start into `KINDI_CPU_CACHE`: `libkcpu.so` with gcc and OpenMP on
+  Linux, `libkcpu.dll` with clang and libomp on Windows (`KINDI_CC`, `KINDI_LLVM`).
+- The output is token-exact with llama.cpp. Verified on the i7-8086K: 2B/4B/9B 4/4 at 33.7/16.7/9.1
+  tokens/s natively on Windows and 28.1/13.0/5.6 under WSL2
+  ([benchmark](benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md), [CPU-SUPPORT.md](CPU-SUPPORT.md)).
 - The engine defaults to one thread per physical core of the CPUs it may run on. On the i7-8086K the 2B
   runs 39.2 tokens/s with 6 threads and 1.3 with 12: a token is one OpenMP parallel region with a
   barrier between row blocks, and the two hyperthread siblings of a core spin into each other at every

@@ -40,7 +40,7 @@ they are not part of this CPU goal.
 | Intel Core i5-2500K | Sandy Bridge | 4 / 4 | AVX; **no AVX2, FMA or F16C** | **Blocked**: the current source cannot compile for this CPU | 2B and 4B after an AVX/scalar fallback; 9B only if measured and useful; 27B no |
 | Intel Xeon W-2133 | Skylake-W | 6 / 12 | AVX-512, AVX2, FMA, F16C | Expected to build and run, but **unverified** | 2B, 4B and 9B |
 | Intel Core i9-13900K | Raptor Lake (8 P + 16 E) | 24 / 32 | AVX2, FMA, F16C; no AVX-512 | Expected to build and run, but **unverified** | 2B, 4B and 9B; tune P/E thread count |
-| Intel Core i7-8086K | Coffee Lake | 6 / 12 | AVX2, FMA, F16C | **Engine verified** on WSL2 (2B/4B/9B 4/4, 6-thread 24K bench) and natively on Windows (2B/4B/9B 4/4 at 33.5/14.3/7.3 tok/s, 6 threads auto-detected); server path pending | 2B, 4B and 9B; use 6 threads |
+| Intel Core i7-8086K | Coffee Lake | 6 / 12 | AVX2, FMA, F16C | **Engine verified** on WSL2 (2B/4B/9B 4/4, 6-thread 24K bench) and natively on Windows (2B/4B/9B 4/4 at 33.7/16.7/9.1 tok/s, 6 threads auto-detected); server path pending | 2B, 4B and 9B; use 6 threads |
 
 Notes:
 
@@ -113,12 +113,14 @@ python -m kindi verify
 
 | Model | Prompts | Tokens/s | Result |
 |---|---:|---:|---|
-| 2B | 4/4 | 33.5 | token-exact |
-| 4B | 4/4 | 14.3 | token-exact |
-| 9B | 4/4 (13/13 on prompt 3) | 7.3 | token-exact |
+| 2B | 4/4 | 33.7 | token-exact |
+| 4B | 4/4 | 16.7 | token-exact |
+| 9B | 4/4 (13/13 on prompt 3) | 9.1 | token-exact |
 
 The same verifies on WSL2 read 28.1, 13.0 and 5.6 tokens/s, so the native build is the faster path on
-this CPU. Pack load is the slow part on Windows (26 s, 56 s and 129 s for 2B/4B/9B).
+this CPU. Pack load is the slow part on Windows (22.8 s, 50.7 s and 112.3 s for 2B/4B/9B). A second
+native run measured 33.5/14.3/7.3, so these single runs vary by up to a quarter. Evidence:
+[benchmark](benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md).
 
 The engine resolves 6 threads, not 12, through `GetLogicalProcessorInformationEx`, so the Windows
 default avoids the hyperthread collapse below without `OMP_NUM_THREADS`. `libomp.dll` is loaded from
