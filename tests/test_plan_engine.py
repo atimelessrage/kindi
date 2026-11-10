@@ -190,6 +190,7 @@ def test_kv_mode_defaults_to_q8_0(spec_tp, monkeypatch):
 def test_kv_mode_accepts_the_cache_names(spec_tp, monkeypatch, value, want):
     _, tp = spec_tp
     monkeypatch.setenv("KINDI_KV", value)
+    monkeypatch.setenv("KINDI_KV_EXPERIMENTAL", "1")      # k8v4 is quarantined; its gate has its own suite
     assert tp.kv_mode() == want
 
 

@@ -97,7 +97,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_D1` | `0` | `kindi/spec.py:713` |
 | `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:428` |
 | `KINDI_DEVICE` | `gpu` | `kindi/bench.py:8` (+3 more) |
-| `KINDI_DP4A` | `"1" if rt.is_hip else "0"` | `kindi/tp.py:376` |
+| `KINDI_DP4A` | `"1" if rt.is_hip else "0"` | `kindi/tp.py:385` |
 | `KINDI_FD` | `0` | `kindi/spec.py:581` (+1 more) |
 | `KINDI_FD_CH` | (empty) | `kindi/spec.py:132` |
 | `KINDI_FF` | (empty) or `1` | `kindi/spec.py:172` (+1 more) |
@@ -119,20 +119,21 @@ is where it is read, which is where the full description lives.
 | `KINDI_G4_TC` | `1` | `kindi/gemma4.py:61` (+3 more) |
 | `KINDI_G4_TP` | `auto` | `kindi/server.py:292` |
 | `KINDI_G4_WARPS` | `2560` | `kindi/gemma4.py:93` |
-| `KINDI_G5` | (empty) | `kindi/tp.py:372` |
-| `KINDI_G5L` | `"0" if rt.is_hip and os.environ.get("KINDI_TC", "0") != "1" else "1"` | `kindi/tp.py:375` |
-| `KINDI_G5_AB` | `1` | `kindi/tp.py:205` |
-| `KINDI_G5_DUAL` | `"1" if rt.is_hip else "0"` | `kindi/tp.py:459` |
-| `KINDI_G5_FUSED` | `1` | `kindi/tp.py:183` |
-| `KINDI_G5_PIN` | `1` | `kindi/tp.py:132` |
-| `KINDI_G5_PINS` | (empty) | `kindi/tp.py:124` |
-| `KINDI_G5_TUNE` | `1` | `kindi/tp.py:138` |
-| `KINDI_G5_TUNELOG` | (unset) | `kindi/tp.py:245` |
+| `KINDI_G5` | (empty) | `kindi/tp.py:381` |
+| `KINDI_G5L` | `"0" if rt.is_hip and os.environ.get("KINDI_TC", "0") != "1" else "1"` | `kindi/tp.py:384` |
+| `KINDI_G5_AB` | `1` | `kindi/tp.py:214` |
+| `KINDI_G5_DUAL` | `"1" if rt.is_hip else "0"` | `kindi/tp.py:468` |
+| `KINDI_G5_FUSED` | `1` | `kindi/tp.py:192` |
+| `KINDI_G5_PIN` | `1` | `kindi/tp.py:141` |
+| `KINDI_G5_PINS` | (empty) | `kindi/tp.py:133` |
+| `KINDI_G5_TUNE` | `1` | `kindi/tp.py:147` |
+| `KINDI_G5_TUNELOG` | (unset) | `kindi/tp.py:254` |
 | `KINDI_GEMV_BLOCKS` | (unset) | `kindi/engine.py:142` |
 | `KINDI_HIP_LIB` | `libamdhip64.so` | `kindi/gpudrv.py:28` |
 | `KINDI_HOST_RAM_CHECK` | `1` | `kindi/hostram.py:23` |
 | `KINDI_KEXPF` | (empty) | `kindi/spec.py:153` |
-| `KINDI_KV` | `q8_0` | `kindi/tp.py:42` |
+| `KINDI_KV` | `q8_0` | `kindi/tp.py:46` |
+| `KINDI_KV_EXPERIMENTAL` | `0` | `kindi/tp.py:50` |
 | `KINDI_MAX_BODY_MB` | `16` | `kindi/server.py:57` |
 | `KINDI_MEM_RESERVE_MB` | `96` or `32` | `kindi/engine.py:212` (+2 more) |
 | `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:634` |

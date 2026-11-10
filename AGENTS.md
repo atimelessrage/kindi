@@ -75,7 +75,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | `install.sh` / `.github` collision | both | both | `install.sh`, `.github/**` | reconciled on 2026-11-09: the merged `install.sh` has the GRUB guard and the Turing profile; the WIP's empty `install.sh` was discarded, and main's Turing commits were merged |
 | Tandem/CPU recovery audit | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CPU_GPU_TANDEM_DESIGN.md`, `docs/TANDEM-STATUS.md`, `AGENTS.md`, `kindi/cpu.py`, `tests/test_cpu_threads.py`, `docs/CPU-SUPPORT.md`, `docs/CARDS.md`, `docs/BENCHMARKS.md` | design restored; no tandem runtime merged; WIP `tandem.py` is unparsable, CPU changes are uncompiled and the WIP branches are preserved; see `docs/TANDEM-STATUS.md` for the cleanup gate. CPU thread default added 2026-11-09 (see Handoff) |
 | K8/V4 chunk + tensor-core plan | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/chunk.py`, `kindi/chunk.cu`, `kindi/spec.py`, `kindi/tcf.cu`, `kindi/tp.py`, `tests/test_plan_engine.py`, `bench-logs/check_k8v4_chunk.py`, `bench-logs/27b-matrix/REPORT.md`, `AGENTS.md` | done; V4 store/one-pass/exact chunk kernels and V4 decode/verify plan kernels selected from `tp.kv`; `KINDI_TC=1` no longer refused for k8v4; ATT_TC/FD fall back with a log; 140 CPU tests, both modules compile on the 4060 Ti, direct GPU check passes (store vs NumPy, chunk V4 == decode V4 bit for bit); 27B 8K/24K retrieval matches q8_0 (5/5 codes + follow-up); the 49K read was aborted at >3x slower, see `bench-logs/27b-longctx/RESULTS.md` |
-| K8/V4 two-card + cache verification | this worktree | `freebuff/tandem-cpu-recovery` | `AGENTS.md`, `bench-logs/k8v4-cache/**`, `bench-logs/test_k8v4_cache.py`, `bench-logs/test_k8v4_dist_cache.py`, `manual_help_needed.txt` | one-card cache save/restart/restore PASS (867-token opening reloaded after a restart, reply bit-exact, 867/888 cached); two-card run blocked (one GPU, `TPEngine` needs two); 2B k8v4 verify 2/4 vs the fp16 reference, 4B 4/4; 9B k8v4 unavailable (plan engine refuses HB 4096, plain engine ignores `KINDI_KV`) |
+| K8/V4 two-card + cache verification and quarantine | this worktree | `freebuff/tandem-cpu-recovery` | `AGENTS.md`, `kindi/tp.py`, `tests/test_k8v4.py`, `tests/test_plan_engine.py`, `docs/CONFIGURATION-REFERENCE.md`, `bench-logs/k8v4-cache/**`, `bench-logs/test_k8v4_cache.py`, `bench-logs/test_k8v4_dist_cache.py`, `manual_help_needed.txt` | one-card cache save/restart/restore PASS (867-token opening reloaded after a restart, reply bit-exact, 867/888 cached); two-card run blocked (one GPU, `TPEngine` needs two); 2B k8v4 verify 2/4 vs the fp16 reference, 4B 4/4; 9B k8v4 unavailable (plan engine refuses HB 4096, plain engine ignores `KINDI_KV`) |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -233,7 +233,10 @@ is not a lock.
   (`KINDI_CHUNK=0`) the chunk path gives the same tokens. The 9B cannot run k8v4: the plan engine
   refuses its Hadamard block 4096 and the plain engine ignores `KINDI_KV`. No 27B pack is installed.
   Gate: 140 tests, `compileall -q kindi`, `config_reference --check`. Evidence:
-  `bench-logs/k8v4-cache/RESULTS.md`.
+  `bench-logs/k8v4-cache/RESULTS.md`. k8v4 cannot be made token-exact (4-bit V), so it is quarantined:
+  `tp.kv_mode()` refuses it unless `KINDI_KV_EXPERIMENTAL=1` and the message names the measured loss;
+  `tests/test_k8v4.py` pins the gate, the exact opt-in, the V4 kernel selection, the cache-fingerprint
+  isolation and the generated-reference row, and `docs/CONFIGURATION-REFERENCE.md` is regenerated.
 
 ## Layout
 

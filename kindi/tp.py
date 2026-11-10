@@ -12,8 +12,8 @@ give a partial sum of all D outputs. k_xrms swaps the two partials through mappe
 stream is bit-identical on the two cards. The embedding row is read from host memory by both cards.
 K/V cache: q8_0 (llama.cpp's -ctk q8_0 -ctv q8_0: blocks of 32 int8 with an fp16 scale); attention scores use
 llama.cpp's flash-attention arithmetic for that cache (the query in q8_0, integer block dot products).
-KINDI_KV=k8v4 keeps K at q8_0 and stores V as symmetric 4-bit blocks (16 packed bytes and an fp16 scale per 32
-values). The V4 value kernels serve the per-token plan, the batched plan, the chunked prompt attention
+KINDI_KV=k8v4 (experimental, needs KINDI_KV_EXPERIMENTAL=1) keeps K at q8_0 and stores V as symmetric 4-bit
+blocks (16 packed bytes and an fp16 scale per 32 values). The V4 value kernels serve the per-token plan, the batched plan, the chunked prompt attention
 (k_att_flash4_T and k_att_pv4_T) and the tensor-core plans (k_attn_vq4w / k_attn_vq4w_m), so the cache format never
 changes which prompt path runs. The value kernels cover a head size of 256; the engine refuses k8v4 on any other
 geometry. q8_0 is the default, and its kernels, buffers and arithmetic are unchanged.
@@ -38,11 +38,20 @@ i32, f32t = np.int32, np.float32
 
 
 def kv_mode():
-    """The K/V cache format selected by KINDI_KV. q8_0 is the default and preserves the old cache."""
+    """The K/V cache format selected by KINDI_KV. q8_0 is the default and preserves the old cache.
+
+    k8v4 is experimental and lossy: its 4-bit V does not reproduce the fp16 K/V reference (2B `kindi verify`:
+    2 of 4 prompts, first difference at tokens 35-36), so it is refused unless KINDI_KV_EXPERIMENTAL=1.
+    The gate lives here because this is the only place the format is selected, before any pack is read."""
     value = os.environ.get("KINDI_KV", "q8_0").strip().lower()
     if value in ("q8", "q8_0"):
         return "q8_0"
     if value in ("k8v4", "k8_v4"):
+        if os.environ.get("KINDI_KV_EXPERIMENTAL", "0") != "1":
+            raise SystemExit(
+                "kindi: KINDI_KV=k8v4 is an experimental, lossy cache (4-bit V): it is not token-exact with "
+                "the fp16 K/V reference (2B `kindi verify`: 2 of 4 prompts, first difference at tokens 35-36). "
+                "Set KINDI_KV_EXPERIMENTAL=1 to use it; q8_0 is the supported default.")
         return "k8v4"
     raise SystemExit("kindi: KINDI_KV must be q8_0 or k8v4 (got %r)" % value)
 
