@@ -208,6 +208,16 @@ is not a lock.
   `bash -n install.sh`. `origin` (`ahtx/kindi`) rejected the push with 403 for `atimelessrage`;
   `main`, `freebuff/tandem-cpu-recovery` and the annotated tag `v0.4.0-k8v4` (-> `858eac5`) are on
   `myfork` (`atimelessrage/kindi`). The merge commit is `78a66d3`; this handoff commit follows it.
+- v0.5.0 merge verified on the i7-8086K + RTX 4060 Ti (2026-11-10): `kindi verify`
+  passed 4/4 prompts token-exact for 2B, 4B and 9B plain and for the 2B T=4 plan
+  (`KINDI_TC=1 KINDI_TP=1 KINDI_CARDS=1 KINDI_TC_TMAX=4 KINDI_ATT_TC=1 KINDI_FD=1
+  KINDI_SPEC=0`), 40/40 each except the 9B prompt 3 stop (13/13). Three 24K
+  `kindi bench` runs per config: medians 2B 172.8, 4B 86.4, 9B 66.4 and 2B plan
+  301.3 tok/s at position 24,000, against the pre-merge 160.6 / 79.8 / 62.3 /
+  302.4; reads 224.1 / 128.6 / 92.5 / 474.3. No 27B pack is installed, so the
+  K8/V4 long-context path was not rerun after the merge. The pre-merge checkpoint
+  is tagged `v0.4.0-cpu-threads` (`fc23913`); the merged, verified state is
+  tagged `v0.5.0-k8v4` at this handoff commit.
 
 ## Layout
 
