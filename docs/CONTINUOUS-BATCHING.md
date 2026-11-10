@@ -2,7 +2,7 @@
 
 Status: **NO-GO (2026-11-08).** Der Phase-0-Spike erreichte B=4 mit 131,8 tok/s = 0,69x Single-Decode; das
 1,5x-Gate ist FAIL. Kein Produktivcode geändert. Dieses Dokument ist ein Mess- und Designprotokoll, kein
-freigegebenes MVP.
+freigegebenes MVP. Archiviert in [ROADMAP.md](ROADMAP.md).
 
 ## 0. Kurzfassung
 

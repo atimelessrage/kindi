@@ -3,6 +3,7 @@
 Status: **NO-GO/archiviert (2026-11-08).** **Kein Produktivcode geändert.** Das ist der Phase-1-Code-Plan aus
 `docs/CONTINUOUS-BATCHING.md` (Abschnitt 5); der Phase-0-Spike hat das 1,5x-Gate mit 0,69x verfehlt. Der Plan ist
 nicht autorisiert und bleibt nur als Referenz liegen, bis ein neuer Spike das Gate besteht.
+Archiviert in [ROADMAP.md](ROADMAP.md).
 
 ## 0. Kurzfassung
 

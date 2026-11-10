@@ -2,7 +2,7 @@
 
 Status: **recovery audit, 2026-11-09. No tandem runtime is present and no tandem support is claimed.**
 This page records what `main` actually contains, why the interrupted WIP cannot be merged as-is, and
-the gate for deleting it.
+the gate for deleting it. Archived with the other no-go work in [ROADMAP.md](ROADMAP.md).
 
 ## Answer
 
