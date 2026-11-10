@@ -24,9 +24,9 @@ from . import tp as _tp
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 i32 = np.int32
-WRAP = ("k_rmsfold", "k_smfold", "k_rmsw", "k_rmsw_s", "k_rope2", "k_store_q8", "k_q8row", "k_fold_fwht")
+WRAP = ("k_rmsfold", "k_smfold", "k_rmsw", "k_rmsw_s", "k_rope2", "k_store_q8", "k_q8row", "k_fold_fwht", "k_store_k8v4")
 OWN = ("k_gdn_pre_T", "k_gdn_deltan_T", "k_sumsplits", "k_mm_g5n", "k_att_qk_T", "k_att_softmax_T", "k_att_pv_T",
-       "k_att_comb_T", "k_att_flash_T", "k_att_merge_T", "k_q8x_T", "k_q8x_T2", "k_mm_g5q", "k_mm_g4", "k_mm_g4s", "k_mm_g4k", "k_add2")
+       "k_att_comb_T", "k_att_flash_T", "k_att_merge_T", "k_att_flash4_T", "k_att_pv4_T", "k_q8x_T", "k_q8x_T2", "k_mm_g5q", "k_mm_g4", "k_mm_g4s", "k_mm_g4k", "k_add2")
 
 
 def _kernel_text(src, name):
@@ -135,6 +135,17 @@ class ChunkKernels(object):
             setattr(self, k + "_T", mod.get_function(k + "_T"))
         for k in OWN:
             setattr(self, k, mod.get_function(k))
+
+
+def kv_plan(tp):
+    """(store kernel, one-pass attention, exact-path value kernel, V row stride divisor) for the engine's cache.
+
+    q8_0 is the long-standing path; k8v4 keeps K at q8_0 and halves the V row. The choice follows the engine's kv
+    mode only, so a pack of any size uses either format as long as its head size is what the value kernels cover
+    (tp.py refuses k8v4 otherwise). The q8 kernels and buffers are the same objects they always were."""
+    if getattr(tp, "kv", "q8_0") == "k8v4":
+        return "k_store_k8v4_T", "k_att_flash4_T", "k_att_pv4_T", 2
+    return "k_store_q8_T", "k_att_flash_T", "k_att_pv_T", 1
 
 
 def enabled(eng):
@@ -339,6 +350,7 @@ def _build(s):
         p = "blk.%d." % il
         mixin(p + "attn_norm.weight")
         L = NHKV * HD
+        st_name, _, _, vdiv = kv_plan(tp)
         QN = U1
         KRO, VB, KN, FO, QR = U2, U2[T * L:], U2[2 * T * L:], U2[3 * T * L:], U2[3 * T * L + T * NH * HD:]
         if not last:
@@ -357,10 +369,10 @@ def _build(s):
         else:
             tadd(CK.k_rope2_T, NHKV, (256,), (KN, KN, cs_, sn_, KRO, KRO, i32(0), i32(HD)), (L, L, rd, rd, L, L))
         nb0 = L // 32
-        tadd(CK.k_store_q8_T, (64 * nb0 + 1023) // 1024, (min(1024, 64 * nb0),),
+        tadd(getattr(CK, st_name), (64 * nb0 + 1023) // 1024, (min(1024, 64 * nb0),),
              (KRO, VB, _tp.Dyn("pos", s.Kq[kvi].data.ptr, L, ptr=True), _tp.Dyn("pos", s.Kd[kvi].data.ptr, nb0 * 2, ptr=True),
-              _tp.Dyn("pos", s.Vq[kvi].data.ptr, L, ptr=True), _tp.Dyn("pos", s.Vd[kvi].data.ptr, nb0 * 2, ptr=True), i32(nb0)),
-             (L, L, L, nb0, L, nb0))
+              _tp.Dyn("pos", s.Vq[kvi].data.ptr, L // vdiv, ptr=True), _tp.Dyn("pos", s.Vd[kvi].data.ptr, nb0 * 2, ptr=True), i32(nb0)),
+             (L, L, L, nb0, L // vdiv, nb0))
         if last:
             st["pending"] = 0
             return
@@ -402,11 +414,12 @@ def run_core(s, kvi, pos, T):
     """attention of the chunk's T tokens (positions pos ..) in groups of TS tokens: scores in U2, chunk parts in XP"""
     c, CK = s.chunk, s.ck
     NH, NHKV, G, QL = s.NH, s.NHKV, s.G, s.NH * s.HD
+    _, fl_name, pv_name, vdiv = kv_plan(getattr(s, "tp", None))
     if os.environ.get("KINDI_CHUNK_ATT", "flash") != "exact":
         # positions split over Z blocks when there are enough of them (each block then has >= 16 tiles of 64)
         Z = max(1, min(int(os.environ.get("KINDI_CHUNK_SPLIT", "4")), (pos + T) // 1024, c["XP"].size // (NHKV * T * G * 260)))
-        fl = CK.k_att_flash_T
-        if getattr(s, "tc_layout", False) and os.environ.get("KINDI_ATT_TC", "0") == "1":
+        fl = getattr(CK, fl_name)
+        if vdiv == 1 and getattr(s, "tc_layout", False) and os.environ.get("KINDI_ATT_TC", "0") == "1":
             fl = s.sk.k_att_tc_T                 # tensor cores (tca.cu): int8 scores, fp16 P V; same interface
         fl(((T * G + 63) // 64, NHKV, Z), (256,), (s.Kq[kvi], s.Kd[kvi], s.Vq[kvi], s.Vd[kvi], c["QQ"], c["QD"],
                                                                   c["U1"], i32(2 * QL), c["OUT"], i32(QL), i32(pos), i32(T),
@@ -426,7 +439,7 @@ def run_core(s, kvi, pos, T):
         CK.k_att_qk_T(((nmax + 127) // 128, (ts * G + 63) // 64, NHKV), (256,),
                       (s.Kq[kvi], s.Kd[kvi], c["QQ"], c["QD"], Sb, i32(ld)) + a + (i32(ts), i32(NHKV), i32(G), i32(NH)))
         CK.k_att_softmax_T((NH, ts), (256,), (Sb, i32(ld)) + a + (i32(NH),))
-        CK.k_att_pv_T(((nmax + 255) // 256, (ts * G + 63) // 64, NHKV * 4), (256,),
+        getattr(CK, pv_name)(((nmax + 255) // 256, (ts * G + 63) // 64, NHKV * 4), (256,),
                       (Sb, i32(ld), s.Vq[kvi], s.Vd[kvi], AP) + a + (i32(ts), i32(NHKV), i32(G), i32(NH)))
         CK.k_att_comb_T((NH, ts), (256,), (AP, c["U1"], i32(2 * QL), c["OUT"], i32(QL)) + a + (i32(ts), i32(NH)))
 

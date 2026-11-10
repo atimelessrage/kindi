@@ -212,6 +212,48 @@ def test_k8v4_saves_eight_kib_per_position(spec_tp):
     assert q8 == 16 * 2 * 4 * (256 + 16) + 24 * 4 + (24 * 256 * 4) // 256 + 64 * 4 + 64
 
 
+# ------------------------------------------- the K/V cache formats: q8_0 unchanged, k8v4 halves V
+def test_kv_plan_defaults_to_the_q8_kernels(spec_tp):
+    """q8_0 (the default) keeps the store and value kernels it has always run."""
+    spec, _ = spec_tp
+    chunk = importlib.import_module("kindi.chunk")
+    q8 = types.SimpleNamespace(kv="q8_0")
+    assert spec.kv_plan(q8) == ("k_store_q8_T", "k_attn_vq8w", "k_attn_vq8w_m", 1)
+    assert chunk.kv_plan(q8) == ("k_store_q8_T", "k_att_flash_T", "k_att_pv_T", 1)
+
+
+def test_kv_plan_selects_the_v4_kernels(spec_tp):
+    """k8v4 must take the V4 store and value kernels on the chunk path and in the tensor-core
+    plans; a q8 value kernel against V4 storage reads the wrong bytes."""
+    spec, _ = spec_tp
+    chunk = importlib.import_module("kindi.chunk")
+    v4 = types.SimpleNamespace(kv="k8v4")
+    assert spec.kv_plan(v4) == ("k_store_k8v4_T", "k_attn_vq4w", "k_attn_vq4w_m", 2)
+    assert chunk.kv_plan(v4) == ("k_store_k8v4_T", "k_att_flash4_T", "k_att_pv4_T", 2)
+
+
+def test_kv_plan_follows_the_engine_not_a_model(spec_tp):
+    """The choice is the engine's kv mode, so a new pack of any geometry selects the same kernels
+    (tp.py refuses k8v4 when its head size is not what the value kernels cover)."""
+    spec, _ = spec_tp
+    chunk = importlib.import_module("kindi.chunk")
+    for shard in (types.SimpleNamespace(kv="k8v4", HD=256, NATT=16),
+                  types.SimpleNamespace(kv="k8v4", HD=256, NATT=32)):
+        assert spec.kv_plan(shard)[1] == "k_attn_vq4w"
+        assert chunk.kv_plan(shard)[1] == "k_att_flash4_T"
+
+
+def test_the_v4_kernels_are_compiled_and_wrapped(spec_tp):
+    """A selection is only as good as its registration: a name missing from WRAP / OWN / FUSED
+    fails at get_function on a card, so pin the lists here (no GPU needed)."""
+    spec, _ = spec_tp
+    chunk = importlib.import_module("kindi.chunk")
+    assert "k_store_k8v4" in chunk.WRAP             # -> k_store_k8v4_T, used by the chunk and tc plans
+    assert {"k_att_flash4_T", "k_att_pv4_T"} <= set(chunk.OWN)
+    assert "k_attn_vq4w" in spec.WRAP               # -> d_k_attn_vq4w for the _m wrapper
+    assert "k_attn_vq4w_m" in spec.FUSED
+
+
 def test_plan_engine_refuses_the_9b_before_building_plans(spec_tp, monkeypatch):
     """KINDI_TC=1 installs a build_plans wrapper; the 9B (HB 4096) must stop there, not in a kernel."""
     spec, tp = spec_tp

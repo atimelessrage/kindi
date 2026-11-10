@@ -88,6 +88,15 @@ extern "C" __global__ void __launch_bounds__(128) k_attn_vq8w_m(const float* __r
   d_k_attn_vq8w(s + blockIdx.y * ss, Vq8, Vd, part + blockIdx.y * ps, n0 + (int)blockIdx.y, nheads, n_kv, G);
 }
 
+extern "C" __global__ void __launch_bounds__(128) k_attn_vq4w_m(const float* __restrict__ s, long long ss,
+    const unsigned char* __restrict__ Vq4, const unsigned short* __restrict__ Vd, float* __restrict__ part, long long ps,
+    int n0, int QN, int nheads, int n_kv, int G){
+  /* k_attn_vq8w_m for the K8/V4 cache: one launch for up to QN queries, each with the decode V4 value kernel's own
+     arithmetic (k_attn_vq4w), so a verify pass matches one token at a time on V4 storage too. */
+  if((int)blockIdx.y >= QN) return;
+  d_k_attn_vq4w(s + blockIdx.y * ss, Vq4, Vd, part + blockIdx.y * ps, n0 + (int)blockIdx.y, nheads, n_kv, G);
+}
+
 extern "C" __global__ void k_attn_combn_m(const float* __restrict__ part, long long ps, const float* __restrict__ gatev,
     int gs, float* __restrict__ att, int as, int n0, int QN, int nheads){
   if((int)blockIdx.y >= QN) return;

@@ -43,8 +43,8 @@ from . import mtp as _mtp
 HERE = os.path.dirname(os.path.abspath(__file__))
 i32, f32t = np.int32, np.float32
 TMAX = max(2, min(8, int(os.environ.get("KINDI_TC_TMAX", "8"))))   # the largest T-token pass (verify needs k + 1)
-WRAP = _chunk.WRAP + ("k_argmax", "k_softmax_rows", "k_attn_vq8w", "k_attn_combn", "k_deq_emb4")
-FUSED = ("k_rmsfold_qT", "k_smfold_qT", "k_fold_fwht_qT", "k_softmax_m", "k_attn_vq8w_m", "k_attn_combn_m", "k_attn_sq8m",
+WRAP = _chunk.WRAP + ("k_argmax", "k_softmax_rows", "k_attn_vq8w", "k_attn_vq4w", "k_attn_combn", "k_deq_emb4")
+FUSED = ("k_rmsfold_qT", "k_smfold_qT", "k_fold_fwht_qT", "k_softmax_m", "k_attn_vq8w_m", "k_attn_vq4w_m", "k_attn_combn_m", "k_attn_sq8m",
          "k_deq_emb4_p", "k_copyf", "k_fd_q8_4", "k_fd_q8_6", "k_fd_q8_8", "k_fd_comb",
          "k_rmsfold2_1024", "k_rmsfold2_512", "k_att_tc_T")
 FD_CH = 512                              # positions per block of the split flash-decode attention (tcf.cu)
@@ -499,6 +499,18 @@ def _reserve_card(eng, s):
             tune3(s, [int(s.w[n][2]) for n in names], int(s.w[names[0]][3]))
 
 
+def kv_plan(tp):
+    """(store kernel, decode value kernel, verify value kernel, V row stride divisor) for the engine's K/V cache.
+
+    q8_0 is the default and its kernels, buffers and arithmetic are unchanged. k8v4 keeps K at q8_0 and halves the V
+    row; both the decode and the verify passes need their V4 value kernel, and the store must write V4. The choice
+    follows the engine's kv mode only (no model name), so any pack whose head size the value kernels cover can use
+    either format; tp.py refuses k8v4 on other head sizes instead of reading the wrong bytes."""
+    if getattr(tp, "kv", "q8_0") == "k8v4":
+        return "k_store_k8v4_T", "k_attn_vq4w", "k_attn_vq4w_m", 2
+    return "k_store_q8_T", "k_attn_vq8w", "k_attn_vq8w_m", 1
+
+
 def build_plan(s, T, head, wb, aout=None, tokp=None):
     """aout: where the argmaxes go (default the AOUT buffer); tokp: T = 1 only, the token id is read from this device
     int (a draft step chained to the step before) instead of a plan argument"""
@@ -606,6 +618,8 @@ def build_plan(s, T, head, wb, aout=None, tokp=None):
         p = "blk.%d." % il
         mixin(p + "attn_norm.weight")
         L, QL = NHKV * HD, NH * HD
+        st_name, vdec, vver, vdiv = kv_plan(tp)
+        fd = "FDP" in b and vdiv == 1
         QN, KRO, VB, KN, FO, QR, QQ, QD = b["QN"], b["KRO"], b["VB"], b["KN"], b["FO"], b["QR"], b["QQ"], b["QD"]
         gemm3([p + "attn_q.weight", p + "attn_k.weight", p + "attn_v.weight"], [QN, KRO, VB])
         tadd(SK.k_rmsw_T, (NHKV + 7) // 8, (256,), (KRO, s.f(p + "attn_k_norm.weight"), KN, i32(HD), i32(NHKV)), (L, 0, L))
@@ -616,13 +630,13 @@ def build_plan(s, T, head, wb, aout=None, tokp=None):
         sn_ = _tp.Dyn("pos", s.sin_t.data.ptr, rd * 4, ptr=True)
         tadd(SK.k_rope2_T, NH + NHKV, (256,), (FO, KN, cs_, sn_, QR, KRO, i32(NH), i32(HD)), (QL, L, rd, rd, QL, L))
         nb0 = L // 32
-        tadd(SK.k_store_q8_T, (64 * nb0 + 1023) // 1024, (min(1024, 64 * nb0),),
+        tadd(getattr(SK, st_name), (64 * nb0 + 1023) // 1024, (min(1024, 64 * nb0),),
              (KRO, VB, _tp.Dyn("pos", s.Kq[kvi].data.ptr, L, ptr=True), _tp.Dyn("pos", s.Kd[kvi].data.ptr, nb0 * 2, ptr=True),
-              _tp.Dyn("pos", s.Vq[kvi].data.ptr, L, ptr=True), _tp.Dyn("pos", s.Vd[kvi].data.ptr, nb0 * 2, ptr=True), i32(nb0)),
-             (L, L, L, nb0, L, nb0))
+              _tp.Dyn("pos", s.Vq[kvi].data.ptr, L // vdiv, ptr=True), _tp.Dyn("pos", s.Vd[kvi].data.ptr, nb0 * 2, ptr=True), i32(nb0)),
+             (L, L, L, nb0, L // vdiv, nb0))
         tadd(SK.k_q8row_T, (QL + 1023) // 1024, (1024,), (QR, QQ, QD, i32(QL // 32)), (QL, QL, QL // 32))
         nch = (s.ctx + 255) // 256
-        if "FDP" in b:
+        if fd:
             # split flash-decode: K and V read once per query, chunks of FD_CH positions merged by k_fd_comb (the
             # same kernels for decode and verify, so a token's result does not depend on the pass it is in)
             nfd = (s.ctx + FD_CH - 1) // FD_CH
@@ -639,10 +653,10 @@ def build_plan(s, T, head, wb, aout=None, tokp=None):
             n = lambda: _tp.Dyn("pos", 1, 1)  # noqa: E731
             P.add(K.k_attn_sq8t, (NHKV, nch), (256,), (s.Kq[kvi], s.Kd[kvi], QQ, QD, s.sbuf, n(), i32(NHKV), i32(s.G)))
             P.add(K.k_softmax_rows, (NH,), (256,), (s.sbuf, n()))
-            P.add(K.k_attn_vq8w, (NHKV, 1, nch), (128,), (s.sbuf, s.Vq[kvi], s.Vd[kvi], s.apart, n(), i32(NH), i32(NHKV),
+            P.add(getattr(K, vdec), (NHKV, 1, nch), (128,), (s.sbuf, s.Vq[kvi], s.Vd[kvi], s.apart, n(), i32(NH), i32(NHKV),
                                                           i32(s.G)))
             P.add(K.k_attn_combn, (NH,), (256,), (s.apart, QN, OUT, n(), i32(NH)))
-        for k0 in (range(0, T, QB) if T > 1 and "FDP" not in b else ()):
+        for k0 in (range(0, T, QB) if T > 1 and not fd else ()):
             # verify: up to QB queries per launch, query k sees the positions up to its own (pos + k + 1), each with
             # the decode kernels' arithmetic (k_attn_sq8m reads each K row once for all of them)
             qn = min(QB, T - k0)
@@ -651,7 +665,7 @@ def build_plan(s, T, head, wb, aout=None, tokp=None):
             P.add(SK.k_attn_sq8m, (NHKV, nch), (256,), (s.Kq[kvi], s.Kd[kvi], QQ[k0 * QL:], QD[k0 * QL // 32:], i32(QL),
                                                         b["SB"], ss, n0(), i32(qn), i32(NHKV), i32(s.G)))
             P.add(SK.k_softmax_m, (NH, qn), (256,), (b["SB"], ss, n0(), i32(qn)))
-            P.add(SK.k_attn_vq8w_m, (NHKV, qn, nch), (128,), (b["SB"], ss, s.Vq[kvi], s.Vd[kvi], b["AP"], ps, n0(), i32(qn),
+            P.add(getattr(SK, vver), (NHKV, qn, nch), (128,), (b["SB"], ss, s.Vq[kvi], s.Vd[kvi], b["AP"], ps, n0(), i32(qn),
                                                               i32(NH), i32(NHKV), i32(s.G)))
             P.add(SK.k_attn_combn_m, (NH, qn), (256,), (b["AP"], ps, QN[k0 * 2 * QL:], i32(2 * QL), OUT[k0 * QL:], i32(QL),
                                                         n0(), i32(qn), i32(NH)))

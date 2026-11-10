@@ -13,8 +13,10 @@ stream is bit-identical on the two cards. The embedding row is read from host me
 K/V cache: q8_0 (llama.cpp's -ctk q8_0 -ctv q8_0: blocks of 32 int8 with an fp16 scale); attention scores use
 llama.cpp's flash-attention arithmetic for that cache (the query in q8_0, integer block dot products).
 KINDI_KV=k8v4 keeps K at q8_0 and stores V as symmetric 4-bit blocks (16 packed bytes and an fp16 scale per 32
-values); the V4 value kernel is used for decode and batched prompts. The chunked prompt path is q8-only, so it is
-disabled for k8v4 and prompts use the per-token plan.
+values). The V4 value kernels serve the per-token plan, the batched plan, the chunked prompt attention
+(k_att_flash4_T and k_att_pv4_T) and the tensor-core plans (k_attn_vq4w / k_attn_vq4w_m), so the cache format never
+changes which prompt path runs. The value kernels cover a head size of 256; the engine refuses k8v4 on any other
+geometry. q8_0 is the default, and its kernels, buffers and arithmetic are unchanged.
 
 A launch plan records one token's kernels once (function, grid, block, ctypes arguments) and replays them through
 cuLaunchKernel; only the token id and the position change between tokens (Dyn arguments). The exchange epochs are
@@ -707,8 +709,6 @@ class TPEngine(object):
         self.kv = kv_mode()
         if self.kv != "q8_0" and os.environ.get("KINDI_SPEC", "0") == "1":
             raise SystemExit("kindi: speculative decoding does not support KINDI_KV=%s" % self.kv)
-        if self.kv != "q8_0" and os.environ.get("KINDI_TC", "0") == "1":
-            raise SystemExit("kindi: the tensor-core plan does not support KINDI_KV=%s; unset KINDI_TC" % self.kv)
         self.W = int(os.environ.get("KINDI_CARDS") or min(2, rt.getDeviceCount()))
         if self.W not in (1, 2) or rt.getDeviceCount() < self.W:
             raise SystemExit("kindi: the plan engine runs on 1 or 2 cards (%d found)" % rt.getDeviceCount())
@@ -718,6 +718,14 @@ class TPEngine(object):
         self.HB = int(man.get("hadamard_block", 512))
         self.D, self.NL = self.dims["width"], self.dims["layers"]
         self.NHg, self.NHKVg, self.HD = self.dims["heads"], self.dims["kv_heads"], self.dims["head_dim"]
+        if self.kv == "k8v4" and self.HD != 256:
+            raise SystemExit("kindi: KINDI_KV=k8v4 needs a head size of 256 (this pack has %d); the V4 value "
+                             "kernels cover 8 blocks of 32 features" % self.HD)
+        if self.kv == "k8v4":
+            if os.environ.get("KINDI_ATT_TC", "0") == "1":
+                log("kindi: KINDI_KV=k8v4 keeps the V4 flash chunk attention (the tensor-core prompt attention is q8-only)")
+            if os.environ.get("KINDI_FD", "0") == "1":
+                log("kindi: KINDI_KV=k8v4 keeps the per-query verify attention (the split flash-decode path is q8-only)")
         self.NKg, self.HK = self.dims["groups"], self.dims["state_size"]
         self.NVg = self.dims["gdn_inner"] // self.HK
         self.NFFg = self.dims["ffn"]
@@ -754,10 +762,7 @@ class TPEngine(object):
         self.cards = [Shard(self, c, log) for c in range(self.W)]
         # the context: what the card with less free memory can hold
         from . import chunk as _chunk
-        if self.kv == "q8_0":
-            _chunk.reserve(self)                   # the chunked prompt path's buffers, before the context fit
-        else:
-            self.chunk_ok = False                  # the chunk path is q8-only
+        _chunk.reserve(self)                       # the chunked prompt path's buffers, before the context fit
         reserve = int(os.environ.get("KINDI_MEM_RESERVE_MB", "32")) * 2 ** 20
         fit = min((s.free_bytes() - reserve) // s.per_pos_bytes() for s in self.cards) // 256 * 256
         self.ctx = int(min(int(ctx), fit))
@@ -776,8 +781,7 @@ class TPEngine(object):
                 with cp.cuda.Device(s.card):        # kernel handles belong to the device that is current
                     s.plan_batch = build_batch_plan(s, self.NB)
             self.batch_ok = True
-        if self.kv == "q8_0":
-            _chunk.build(self)
+        _chunk.build(self)
         self.ylog_n, self.ylog_map = VOCAB, None
         self._state_views()
         log("plan engine ready: %d card%s, ctx %d, K/V %s, weights %s (%.1fs)" % (self.W, "s" if self.W > 1 else "", self.ctx, self.kv, ("5-trit lane" if self.cards[0].g5l else "5-trit") if self.cards[0].g5 else "2-bit", time.time() - t0))

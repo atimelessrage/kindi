@@ -73,7 +73,8 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | 2B spec acceptance on non-repetitive prompts | this worktree | `freebuff/project-review-audit-report` | `bench-logs/measure_2b_spec_norepeat.py`, `bench-logs/measure-2b-spec-norepeat/**`, `AGENTS.md` | measured; no code changed; n-gram acceptance is 8-18% on fresh prose vs. 86% on the copy control, throughput 364.9 vs. 328.9 tok/s (plan) and 168.1 (plain); results in `bench-logs/measure-2b-spec-norepeat/RESULTS.md` |
 | Agent serving layer (task_0013 slice) | this worktree | `freebuff/project-review-audit-report` | `kindi/server.py`, `tests/test_server.py`, `docs/AGENTS.md`, `docs/CONFIGURATION-REFERENCE.md`, `AGENTS.md` | done; bounded queue with 429 + Retry-After, `/metrics`, and Ollama `/api/tags`, `/api/chat`, `/api/generate`; 18 server tests and 104 full tests pass after the Turing merge and the native-Windows driver loader; no engine code changed; multi-GPU replicas remain (needs `tp.py`, main-owned) |
 | `install.sh` / `.github` collision | both | both | `install.sh`, `.github/**` | reconciled on 2026-11-09: the merged `install.sh` has the GRUB guard and the Turing profile; the WIP's empty `install.sh` was discarded, and main's Turing commits were merged |
-| Tandem/CPU recovery audit | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CPU_GPU_TANDEM_DESIGN.md`, `docs/TANDEM-STATUS.md`, `AGENTS.md` | design restored; no tandem runtime merged; WIP `tandem.py` is unparsable, CPU changes are uncompiled and the WIP branches are preserved; see `docs/TANDEM-STATUS.md` for the cleanup gate |
+| Tandem/CPU recovery audit | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CPU_GPU_TANDEM_DESIGN.md`, `docs/TANDEM-STATUS.md`, `AGENTS.md`, `kindi/cpu.py`, `tests/test_cpu_threads.py`, `docs/CPU-SUPPORT.md`, `docs/CARDS.md`, `docs/BENCHMARKS.md` | design restored; no tandem runtime merged; WIP `tandem.py` is unparsable, CPU changes are uncompiled and the WIP branches are preserved; see `docs/TANDEM-STATUS.md` for the cleanup gate. CPU thread default added 2026-11-09 (see Handoff) |
+| K8/V4 chunk + tensor-core plan | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/chunk.py`, `kindi/chunk.cu`, `kindi/spec.py`, `kindi/tcf.cu`, `kindi/tp.py`, `tests/test_plan_engine.py`, `bench-logs/check_k8v4_chunk.py`, `bench-logs/27b-matrix/REPORT.md`, `AGENTS.md` | done; V4 store/one-pass/exact chunk kernels and V4 decode/verify plan kernels selected from `tp.kv`; `KINDI_TC=1` no longer refused for k8v4; ATT_TC/FD fall back with a log; 140 CPU tests, both modules compile on the 4060 Ti, direct GPU check passes (store vs NumPy, chunk V4 == decode V4 bit for bit); 27B 8K/24K retrieval matches q8_0 (5/5 codes + follow-up); the 49K read was aborted at >3x slower, see `bench-logs/27b-longctx/RESULTS.md` |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -163,9 +164,40 @@ is not a lock.
   rejects every pair above sm_60. Both fixes and the `tc2` profile are main-worktree work; the card
   target is not a support claim until a GPU verify is recorded.
 - Long-term CPU target is in `docs/CPU-SUPPORT.md`. The CPU engine requires AVX2, FMA and F16C but
-  checks none of them; the i5-2500K (AVX only) therefore cannot build the current `kcpu.c`. The Xeon
-  W-2133, i9-13900K and i7-8086K have the required instructions but have no measured CPU run here.
-  `kindi/cpu.py`, `kindi/kcpu.c` and `install.sh` remain main-owned; no CPU code changed.
+  checks none of them; the i5-2500K (AVX only) therefore cannot build the current `kcpu.c`. The i7-8086K
+  is verified in WSL2 (2B/4B/9B 4/4 token-exact; 6-thread 24K benchmark; 12 threads not viable); the
+  Xeon W-2133 and i9-13900K remain unverified, and the native Windows CPU build is still unbuilt.
+  Evidence: `docs/benchmarks/2026-11-09-i7-8086k-cpu/README.md`. `kindi/kcpu.c` and `install.sh`
+  remain main-owned; the only CPU code changed here is the thread default below.
+- CPU thread default (2026-11-09): `kindi/cpu.py` no longer lets OpenMP fall back to every logical CPU.
+  `_configure_threads()` takes an explicit `threads=`, then `OMP_NUM_THREADS` already in the
+  environment, then the physical-core count of the CPUs the process may run on (sysfs
+  `thread_siblings_list`, `/proc/cpuinfo` fallback, logical count as the last resort), and sets
+  `OMP_PROC_BIND=close` / `OMP_PLACES=cores` only in that default case. Cause of the 12-thread
+  collapse, measured on the 2B at ctx 512: binding is irrelevant (12 threads read 1.3-1.4 tok/s with
+  `close`, `spread` and no binding) while `OMP_WAIT_POLICY=passive` or `GOMP_SPINCOUNT=0` recover 12.5
+  — libgomp spins both hyperthread siblings of a core at the per-row-block barriers of `kcpu.c`.
+  Same probe: 6 threads `close`/`cores` 39.2 read / 28.9 generation (39.2-40.0 over four runs),
+  8 threads 47.9 / 37.3 repeated at 46.4-49.1 / 36.0-36.1 (faster, not the default), 12 threads 1.3. Verified with no `OMP_NUM_THREADS`: engine reports 6 threads,
+  39.8 read / 29.7 generation.  `tests/test_cpu_threads.py` pins the CPU-list parser, sibling counting,
+  the cpuinfo fallback, explicit-env preservation and the physical-core default.
+- K8/V4 chunk + tensor-core support (2026-11-10): with `KINDI_KV=k8v4`, prompts no longer fall back to
+  the per-token plan. `chunk.kv_plan` / `spec.kv_plan` select the store and value kernels from the
+  engine's kv mode: `k_store_k8v4_T` plus `k_att_flash4_T` / `k_att_pv4_T` for the chunked path (V row
+  stride halved), and `k_attn_vq4w` / `k_attn_vq4w_m` for tensor-core decode and verify. `tp.py` no
+  longer refuses `KINDI_TC=1` with k8v4 (it still refuses `KINDI_SPEC`) and refuses k8v4 on any head
+  size other than 256. `KINDI_ATT_TC=1` and `KINDI_FD=1` remain q8-only: with k8v4 they log a fallback
+  to the V4 flash chunk / the standard verify path instead of being refused. q8_0 kernels, buffers and
+  arithmetic are untouched. Evidence: `python -m pytest tests/ -q` -> 140 passed;
+  `python -m kindi.config_reference --check` -> 0; `python -m compileall -q kindi` -> 0; `ChunkKernels()`
+  and `SpecKernels()` compile on the 4060 Ti; `bench-logs/check_k8v4_chunk.py` -> store matches NumPy,
+  the K bytes are identical to `k_store_q8`, chunk V4 values equal decode `k_attn_vq4w` + `k_attn_combn`
+  bit for bit (0.0), flash V4 vs the exact path 1.49e-07 abs. End-to-end on the 27B pack (RTX 4060 Ti,
+  8 GB): retrieval at 7,496 and 23,319 prompt tokens matches q8_0, 5/5 codes and the single follow-up
+  in both formats; a 44,625-token run was aborted after 36 min at ~21 tok/s against 151 tok/s at 24K
+  (>3x rule), so 49K quality is unmeasured and the long-context path needs root-causing. q8_0 fits
+  only 35,328-35,840 tokens on the card. Evidence: `bench-logs/27b-longctx/RESULTS.md`. The cache
+  remains lossy (2/4 prompts exact, see `bench-logs/27b-matrix/REPORT.md`).
 
 ## Layout
 
@@ -324,8 +356,8 @@ Next, in order:
    and no card is a support claim until a GPU verify is recorded.
 7. [x] Long-term CPU target written to `docs/CPU-SUPPORT.md`: the four requested CPUs, the AVX2/FMA/F16C
    requirement, per-CPU single-socket targets, the i5-2500K fallback work, hybrid i9 thread tuning, and
-   the CPU acceptance matrix. No CPU/installer code changed here; no CPU is a support claim until a
-   native build and `kindi verify` are recorded.
+   the CPU acceptance matrix. The i7-8086K engine is now verified in WSL2 (2B/4B/9B 4/4; 6-thread
+   24K benchmark); the Xeon/i9 and full server/native-Windows claims remain open.
 8. [x] Installer safety release prepared: the GRUB guard is committed in `2b84658`, `docs/INSTALL.md`
    pins the fixed artifact hash `c05d0190...`, and `docs/RELEASE-CHECKLIST.md` records reconciliation,
    tests, exact-artifact hashing and publication checks. Evidence: `bash -n install.sh` OK;
