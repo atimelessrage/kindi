@@ -80,6 +80,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | Native Windows CPU build | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/cpu.py`, `kindi/kcpu.c`, `tests/test_cpu_build.py`, `tests/test_cpu_threads.py`, `docs/CPU-SUPPORT.md`, `AGENTS.md` | done; clang 18.1.8 + MSVC 14.51 build `libkcpu.dll` without a vcvars shell; 2B/4B/9B verify 4/4 token-exact at 33.7/16.7/9.1 tok/s with 6 auto-detected threads |
 | Generated support matrix + roadmap | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/support_matrix.py`, `tests/test_support_matrix.py`, `docs/SUPPORT-MATRIX.md`, `docs/ROADMAP.md`, `docs/CONTINUOUS-BATCHING.md`, `docs/PER-SLOT-REFACTOR.md`, `docs/TANDEM-STATUS.md`, `AGENTS.md` | done; `python -m kindi.support_matrix` renders models/formats/K-V modes/CPU ISA from the code and `--check` fails on drift; `docs/ROADMAP.md` is the single index of the archived no-go work (batching, per-slot, tandem, k8v4) |
 | Sampling profiles + presence penalty | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/config.py`, `kindi/profiles.py`, `kindi/sampling.py`, `kindi/server.py`, `kindi.conf.example`, `tests/test_config.py`, `tests/test_profiles.py`, `tests/test_sampling.py`, `tests/test_server.py`, `docs/AGENTS.md`, `docs/CONFIGURATION.md`, `docs/BONSAI-2-SUPPORT.md`, `docs/CONFIGURATION-REFERENCE.md`, `AGENTS.md` | done; publisher thinking/non-thinking profiles behind `sampling_profile = publisher`, `presence_penalty` in the API/config; 189 tests, both generated-file checks and `compileall` pass; no GPU run. `docs/CONFIGURATION.md` was edited with `T:/kindi` clean (checked) |
+| Installer card classification + dual pairing | this worktree | `freebuff/tandem-cpu-recovery` | `install.sh`, `tests/test_installer_cards.py`, `docs/CARD-SUPPORT.md`, `docs/CARDS.md`, `AGENTS.md` | done; every sm_80+ card is `tc` regardless of memory (the 8 GB RTX 4060 Ti was `pascal8`), same-class pairs with at least 3,800 MiB pair, `tc2` for two sm_80 cards; 12 fake-nvidia-smi tests pass and 7 fail on the old installer; 201 tests, `bash -n`, generated checks and `compileall` pass; no GPU run. `install.sh` was edited with `T:/kindi` clean (checked) |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -164,10 +165,10 @@ is not a lock.
   `c05d0190...` (the LF Git blob is `2ae8f960...`; do not mix them), and
   `docs/RELEASE-CHECKLIST.md` records the release steps. The guard is in `2b84658`; the Turing
   commits were merged and the hashes refreshed on 2026-11-09. No tag, push or upload was made.
-- Long-term single/dual card target is in `docs/CARD-SUPPORT.md`. The current installer misclassifies
-  the 8 GB RTX 4060 Ti as `pascal8` because `tc` also requires at least 9,500 MiB, and `pair_ok()`
-  rejects every pair above sm_60. Both fixes and the `tc2` profile are main-worktree work; the card
-  target is not a support claim until a GPU verify is recorded.
+- Long-term single/dual card target is in `docs/CARD-SUPPORT.md`. The 2026-11-10 installer fix
+  classifies every sm_80 card as `tc` (the 8 GB RTX 4060 Ti was `pascal8`), pairs same-class cards with
+  at least 3,800 MiB each, and adds the `tc2` profile; `tests/test_installer_cards.py` covers it. The
+  card target is still not a support claim until a GPU verify is recorded.
 - Long-term CPU target is in `docs/CPU-SUPPORT.md`. The CPU engine requires AVX2, FMA and F16C but
   checks none of them; the i5-2500K (AVX only) therefore cannot build the current `kcpu.c`. The i7-8086K
   is verified in WSL2 (2B/4B/9B 4/4 token-exact; 6-thread 24K benchmark; 12 threads not viable); the
@@ -285,6 +286,17 @@ is not a lock.
   greedy presence, explicit-key tracking, HTTP range validation and Ollama mapping), `config_reference
   --check`, `support_matrix --check`, `compileall -q kindi` all pass. No GPU run: sampled output and the
   profile values are unmeasured; the default profile leaves token-exactness unchanged.
+- Installer card classification + dual pairing (2026-11-10): `card_class()` now classifies every sm_80+
+  card as `tc` from compute capability alone (the 8 GB RTX 4060 Ti was `pascal8`), and `profile_of()`
+  gives an 8 GB tc card a 24,576-token context. `pair_ok()` accepts two cards of the same class with at
+  least 3,800 MiB each (maxwell, pascal8, turing, tc, p100), so dual P106, P4000, RTX 4000, 4060 Ti and
+  5060 Ti setups are offered; 2 GB cards and mixed classes stay out. Two sm_80+ cards get the new `tc2`
+  profile (KINDI_CARDS=2, KINDI_TC/FD/ATT_TC, TMAX=4, 512 MiB reserve, context from the smaller card,
+  spec off until the two-card verify). The 27B 8 GB tc single-card profile leaves the 2B drafter off.
+  Evidence: `tests/test_installer_cards.py` runs the installer's own functions against a fake nvidia-smi
+  (12 pass; 7 fail with `KINDI_INSTALLER` on the old copy), 201 tests pass, `bash -n install.sh`,
+  `config_reference --check`, `support_matrix --check` and `compileall` pass. No GPU verify and no Linux
+  installer run, so this is not a support claim yet.
 
 ## Layout
 

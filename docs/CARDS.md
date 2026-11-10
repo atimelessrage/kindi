@@ -195,6 +195,11 @@ capability 8.0 and later (RTX 30, 40 and 50). The RTX 20 series (Turing, sm_75) 
 ([TURING-TENSOR-CORES.md](TURING-TENSOR-CORES.md)), selected with `KINDI_TC=1`; see the RTX 4000 section below. Its
 runtime verification on sm_75 hardware is still pending.
 
+The installer classifies a card by compute capability, not by memory: every sm_80 card gets the `tc` profile,
+including the 8 GB RTX 4060 Ti, whose default context is 24,576 tokens. Two cards of the same class with at least
+4 GB each can run one model together; two sm_80 cards get the `tc2` profile (tensor cores on, speculative decoding
+off until the two-card verify is recorded).
+
 | card | what we measured |
 |---|---|
 | RTX 3080 (190 W) | 27B: 62.3 tokens/s at 512 tokens. With the 2B draft model: 91.1 (1.46 times) at 512 tokens, 103.2 (1.68 times) at 8K with k=2, and 111.5 (1.82 times) at 8K with k=3. The same output as without the draft model. Against llama.cpp: see [BENCHMARKS.md](BENCHMARKS.md) |
@@ -278,12 +283,12 @@ option `amdgpu.cwsr_enable=0`. [AMD.md](AMD.md) gives the settings.
 
 | item | value |
 |---|---|
-| models | 2B, 4B or 9B |
+| models | 2B, 4B or 9B; 27B on two cards (12 GB total) |
 | variables | `KINDI_CTX=24576`, `KINDI_CHUNK_Q8=1`, `KINDI_BLOCKING_SYNC=0` |
 | generation | not yet measured |
 
 - A mining card with no display output. It works as a headless GPU, but check its PCIe link: many P106 cards run at x1 or x4 and are slower on prompt reading.
-- The 27B does not fit in 6 GB. Two P106 cards cannot run one model together (Kindi pairs only two Maxwell cards).
+- The 27B does not fit in 6 GB. Two P106 cards can run it together: the installer pairs two cards of the same class with at least 3,800 MiB each.
 
 ## Quadro M4000, 8 GB (Maxwell 2.0, sm_52)
 

@@ -456,7 +456,7 @@ card_tc() {       # NVIDIA card position -> 0 when the Turing card has tensor co
 card_class() {    # NVIDIA card position -> tc | turing | pascal8 | p100 | maxwell | kepler | unsupported
   local V=${GMEM[$1]} c=${GCC[$1]/./}
   if [ "$c" -lt 30 ]; then echo unsupported
-  elif [ "$c" -ge 80 ] && [ "$V" -ge 9500 ]; then echo tc
+  elif [ "$c" -ge 80 ]; then echo tc                 # tensor cores: the memory class is chosen in profile_of
   elif [ "$c" -eq 75 ] && [ "$V" -ge 7500 ] && card_tc "$1"; then echo turing
   elif [ "$c" -ge 61 ] && [ "$V" -ge 7500 ]; then echo pascal8
   elif [ "$c" -eq 60 ] && [ "$V" -ge 12000 ]; then echo p100     # Tesla P100 (sm_60, no dp4a): docs/CARDS.md
@@ -494,9 +494,15 @@ for k in $(seq 0 $((NG - 1))); do
   fi
 done
 pair_ok() {       # two NVIDIA card positions -> 0 if they run a model split over both (tensor parallel)
-  local a=$1 b=$2
-  [ "${GCC[$a]/./}" -ge 50 ] && [ "${GCC[$a]/./}" -lt 61 ] && [ "${GCC[$b]/./}" -ge 50 ] && [ "${GCC[$b]/./}" -lt 61 ] \
-    && [ "${GMEM[$a]}" -ge 3800 ] && [ "${GMEM[$b]}" -ge 3800 ]
+  local a=$1 b=$2 ca cb
+  [ "${GMEM[$a]}" -ge 3800 ] && [ "${GMEM[$b]}" -ge 3800 ] || return 1
+  ca=$(card_class "$a"); cb=$(card_class "$b")
+  case "$ca" in
+    # the same architecture class: Maxwell/Pascal, Turing, Ada/Blackwell, or the P100 exception.
+    # 2 GB cards (GT 1030) stay out: the plan engine needs a K/V slice and the exchange on each card.
+    tc|turing|pascal8|p100|maxwell) [ "$cb" = "$ca" ] ;;
+    *) return 1 ;;
+  esac
 }
 amd_models() {    # AMD GPU position -> the models that run on it, the best first
   local V=${AMEM[$1]} m=""
@@ -538,7 +544,7 @@ if [ "$GPU" != cpu ]; then
       PAIR="${GIDX[$pa]},${GIDX[$pb]}"
       want 27b && add_cfg "cuda|27b|$PAIR" "$(model_label 27b) on GPUs ${PAIR}, split over both cards"
       want nemotron && add_cfg "cuda|nemotron|$PAIR" "$(model_label nemotron) on GPUs ${PAIR}, split over both cards"
-    elif [[ "$GPU" == *,* ]] && ! { want nanbeige && nb_cards "$pa" "$pb" >/dev/null; }; then die "GPUs ${GPU} cannot run one model together (two Maxwell cards of 4 GB, such as two K1200s, can; Nanbeige 33B needs sm_80 cards or Tesla P100s with 16.2 GB in total, plus 0.7 GB for each more card)"
+    elif [[ "$GPU" == *,* ]] && ! { want nanbeige && nb_cards "$pa" "$pb" >/dev/null; }; then die "GPUs ${GPU} cannot run one model together (two cards of the same class with at least 4 GB each, such as two K1200s or two P106s, can; Nanbeige 33B needs sm_80 cards or Tesla P100s with 16.2 GB in total, plus 0.7 GB for each more card)"
     fi
     if [[ "$GPU" != *,* ]] && [[ "$GPU" != amd* ]]; then
       # one card: the card with the most memory first, then each other kind of card. A setup on a kind of card
@@ -651,7 +657,7 @@ NS=${#SV_B[@]}
 
 # the engine settings of server i -> PROFILE, C (context), MEM, CPUS, ENV (the -e settings), XPACKS (extra packs)
 profile_of() {
-  local i=$1 B=${SV_B[$1]} M=${SV_M[$1]} CARDS=${SV_C[$1]} k V
+  local i=$1 B=${SV_B[$1]} M=${SV_M[$1]} CARDS=${SV_C[$1]} k V k2 V2
   ENV=(); XPACKS=(); MEM=""; CPUS=""
   if [ "$B" = cpu ]; then
     PROFILE=cpu
@@ -670,21 +676,36 @@ profile_of() {
       PROFILE=nanbeige; C=${CTX/auto/16384}; MEM=10g
       ENV+=(-e KINDI_REPEAT_STOP=1 -e KINDI_MAX_TOKENS=16384)
     elif [[ "$CARDS" == *,* ]]; then
-      PROFILE=k1200x2; C=${CTX/auto/24576}; MEM=12g
-      ENV+=(-e KINDI_CARDS=2 -e KINDI_REPEAT_STOP=1 -e KINDI_CHECKPOINT_BUDGET_MB=4096)
+      k2=$(card_k "${CARDS##*,}"); V2=${GMEM[$k2]}
+      if [ "${GCC[$k]/./}" -ge 80 ] && [ "${GCC[$k2]/./}" -ge 80 ]; then
+        # two Ada/Blackwell cards: the tensor-core plan engine, the context fitted to the smaller card.
+        # Speculative decoding stays off until the two-card verify is recorded (docs/CARD-SUPPORT.md).
+        PROFILE=tc2; [ "$V2" -lt "$V" ] && V=$V2
+        if [ "$V" -lt 9500 ]; then C=${CTX/auto/24576}; else C=${CTX/auto/65536}; fi
+        MEM=12g
+        ENV+=(-e KINDI_CARDS=2 -e KINDI_TC=1 -e KINDI_FD=1 -e KINDI_ATT_TC=1 -e KINDI_TC_TMAX=4
+              -e KINDI_CKPT_VRAM=1 -e KINDI_MEM_RESERVE_MB=512 -e KINDI_SPEC=0
+              -e KINDI_REPEAT_STOP=1 -e KINDI_CHECKPOINT_BUDGET_MB=4096)
+      else
+        PROFILE=k1200x2; C=${CTX/auto/24576}; MEM=12g
+        ENV+=(-e KINDI_CARDS=2 -e KINDI_REPEAT_STOP=1 -e KINDI_CHECKPOINT_BUDGET_MB=4096)
+      fi
     else
       PROFILE=$(card_class "$k")
       case "$PROFILE" in
-        tc) C=${CTX/auto/131072}; MEM=14g; [ "$M" = 2b ] && NEED_MTP=1
+        tc) if [ "$V" -lt 9500 ]; then C=${CTX/auto/24576}; else C=${CTX/auto/131072}; fi
+            MEM=14g; [ "$M" = 2b ] && NEED_MTP=1
             ENV+=(-e KINDI_CARDS=1 -e KINDI_REPEAT_STOP=1 -e KINDI_CHECKPOINT_BUDGET_MB=1280 -e KINDI_PARK_MAX=1
                   -e KINDI_DENSE_SPACING=2048 -e KINDI_PREFIX_MAX=2 -e KINDI_MAX_TOKENS=65536)
             if [ "$M" = 27b ]; then   # the profile of the RTX 3080 cluster servers (docs/CARDS.md)
-              ENV+=(-e KINDI_TC=1 -e KINDI_FD=1 -e KINDI_ATT_TC=1 -e KINDI_CKPT_VRAM=1
-                    -e KINDI_SPEC_K=3 -e KINDI_SPEC_PACK=/data/pack-2b -e KINDI_SPEC_WINDOW=8192
-                    -e KINDI_TC_TMAX=4 -e KINDI_MEM_RESERVE_MB=160)
-              # auto (docs/MTP.md): the 2B drafter, k=2 below 1K tokens of context and k=3 from 1K
-              ENV+=(-e KINDI_SPEC=auto)
-              XPACKS+=(2b)
+              ENV+=(-e KINDI_TC=1 -e KINDI_FD=1 -e KINDI_ATT_TC=1 -e KINDI_CKPT_VRAM=1 -e KINDI_TC_TMAX=4)
+              if [ "$V" -ge 9500 ]; then   # the 2B drafter needs the memory of a 10 GB card and more
+                ENV+=(-e KINDI_SPEC_K=3 -e KINDI_SPEC_PACK=/data/pack-2b -e KINDI_SPEC_WINDOW=8192
+                      -e KINDI_MEM_RESERVE_MB=160)
+                # auto (docs/MTP.md): the 2B drafter, k=2 below 1K tokens of context and k=3 from 1K
+                ENV+=(-e KINDI_SPEC=auto)
+                XPACKS+=(2b)
+              fi
             elif [ "$M" = 2b ] && mtp_ready; then   # the 2B with its own MTP head: the plan engine on the tensor cores
               ENV+=(-e KINDI_TC=1 -e KINDI_TP=1 -e KINDI_FD=1 -e KINDI_ATT_TC=1 -e KINDI_TC_TMAX=4
                     -e KINDI_SPEC=auto -e "KINDI_MTP_HEAD=/data/mtp/$MTPF")

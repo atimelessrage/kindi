@@ -95,10 +95,11 @@ To select without questions, add `--auto`: the installer takes the recommended s
 |---|---|---|
 | cpu | no GPU, or `--gpu cpu` | 24,576 |
 | kepler | sm_30-sm_37 | 24,576; 65,536 at 1.5 GB or more; 23,808 for the 4B on a 2 GB card |
-| maxwell | other cards below sm_61 or below 7.5 GB | 24,576 |
-| k1200x2 | two cards of 3.8 GB or more, sm_50-sm_60 | 24,576 |
-| pascal8 | sm_61 or newer, 7.5 GB or more | 65,536 |
-| tc | sm_80 or newer, 9.5 GB or more | 131,072 |
+| maxwell | below sm_61, or sm_61-sm_79 below 7.5 GB | 24,576 |
+| k1200x2 | two same-class cards of 3.8 GB or more below sm_80 | 24,576 |
+| pascal8 | sm_61-sm_79, 7.5 GB or more | 65,536 |
+| tc | sm_80 or newer | 131,072; 24,576 on an 8 GB card |
+| tc2 | two sm_80 or newer cards | 24,576 (8 GB pair) or 65,536 |
 | rocm-gfx1103 | AMD Radeon 780M | 24,576 |
 | rocm-gfx1151, rocm-gfx1152 | AMD Radeon 8060S, Radeon 840M (RDNA 3.5) | 24,576 |
 

@@ -1,9 +1,10 @@
 # Long-term card support: single and dual GPUs
 
-Status: **roadmap and acceptance contract, 2026-11-09. Not a support claim yet.** The installer and engine
-changes below are not in this worktree: `install.sh`, `kindi/engine.py`, `kindi/tp.py` and `docs/CARDS.md`
-are owned by the active main worktree. This page records the target and the exact gaps so the work can be
-implemented and tested without re-discovering them.
+Status: **P0 implemented 2026-11-10; not a support claim yet.** `install.sh` now classifies every sm_80 card
+as `tc` from its compute capability, pairs two cards of the same class with at least 3,800 MiB each, and gives
+two sm_80 cards the `tc2` profile. `tests/test_installer_cards.py` runs the installer's own card functions
+against a fake nvidia-smi table. The GPU verify and the measured rows below are still open; P1-P3 are
+unimplemented.
 
 ## What “supported” means here
 
@@ -27,10 +28,10 @@ generic GPU table are hardware capabilities, not Kindi formats; they do not impl
 
 | gate | current behaviour | consequence for this goal |
 |---|---|---|
-| install.sh `card_class()` | `tc` only when compute capability is at least 8.0 **and** VRAM is at least 9,500 MiB; 61–79 with 7,500 MiB becomes `pascal8`; below 50 is `kepler`; everything else is `maxwell` | **RTX 4060 Ti 8 GB is classified as `pascal8`**, so the tensor-core/spec profile is not offered. The 4060 Ti 16 GB variant would be `tc`. |
-| install.sh `pair_ok()` | accepts only compute capability 5.0–6.0 with at least 3,800 MiB per card | **All dual RTX 4000, P4000, P106, 4060 Ti and 5060 Ti setups are rejected**, even though the plan engine can use two cards. |
-| install.sh `profile_of()` dual branch | sets `KINDI_CARDS=2`, context 24,576, but calls the profile `k1200x2` and sets no `KINDI_TC`/spec variables | A dual Ada/Blackwell setup would run the plain plan path with no tensor cores and no spec, instead of the intended fast path. |
-| install.sh `card_models()` | `pascal8` offers 27B; `maxwell` offers 9B/Nemotron/4B/2B; `tc` offers 27B/Nemotron/9B/4B/2B | A 6 GB P106 is offered only up to 9B; a dual P106 is not offered at all. A 2 GB GT 1030 is offered 4B/2B. |
+| install.sh `card_class()` | `tc` for every compute capability 8.0 and later; `turing` for sm_75 with tensor cores; `pascal8` for 61–79 at 7,500 MiB or more; `p100` for sm_60 at 12,000 MiB or more; below 50 is `kepler`; everything else is `maxwell` | **The RTX 4060 Ti 8 GB is now `tc`**, so the tensor-core profile is offered; `profile_of()` picks a 24,576-token context for an 8 GB tc card instead of the 131,072-token 10 GB+ default. |
+| install.sh `pair_ok()` | two cards of the same class (maxwell, pascal8, turing, tc or p100) with at least 3,800 MiB each; 2 GB cards and mixed classes stay out | **Dual P106, P4000, RTX 4000, 4060 Ti and 5060 Ti setups are now offered.** The 2 GB GT 1030 pair and a 4060 Ti + RTX 4000 mix are rejected. |
+| install.sh `profile_of()` dual branch | two sm_80+ cards get `tc2`: `KINDI_CARDS=2`, `KINDI_TC=1`, `KINDI_FD=1`, `KINDI_ATT_TC=1`, `KINDI_TC_TMAX=4`, a 512 MiB exchange reserve, and a context from the smaller card (24,576 below 9.5 GB, 65,536 above); speculative decoding is off | Two Ada/Blackwell cards now use the tensor-core plan path. Spec remains off until the P1 two-card verify passes. Legacy pairs keep `k1200x2`. |
+| install.sh `card_models()` | `pascal8` offers 27B; `maxwell` offers 9B/Nemotron/4B/2B; `tc` offers 27B/Nemotron/9B/4B/2B | A 6 GB P106 is offered up to 9B alone and 27B as a pair. A 2 GB GT 1030 is offered 4B/2B and does not pair. |
 | `kindi/tc.py` | compiles for compute_75 PTX, raises the PTX header to 7.1/sm_8x, lets the driver JIT; `supported()` accepts major >= 8 or major == 6 | Ada and Blackwell depend on this PTX patch; it is exactly the fragile path that needs a real test on the 4060 Ti and 5060 Ti. |
 | `kindi/engine.py` | `_cupy_arch_fix()` caps CuPy 9.6’s NVRTC target to the toolkit maximum | Necessary for Blackwell with the CUDA 10.2 image, but it means the image is not a native sm_89/sm_120 toolchain. |
 | `kindi/tp.py` | two-card plan engine; 27B path requires Hadamard blocks of 1024 | The 27B dual target is viable; the 2B/4B plan paths have their own Hadamard/spec constraints. |
@@ -44,11 +45,11 @@ targets pending verification, not current claims.
 | Card | Arch / CC | Current installer class | Single target | Dual target | Required path |
 |---|---|---|---|---|---|
 | GT 1030 2 GB | Pascal 6.1 | `maxwell` | 2B; 4B only if the fitted context is acceptable | not useful | plain engine; 2 GB context/memory test |
-| P106-100 6 GB | Pascal 6.1 | `maxwell` | 9B/4B/2B | 27B (12 GB total) after pairing fix | plain plan engine, no TC; P106 has no display outputs |
+| P106-100 6 GB | Pascal 6.1 | `maxwell` | 9B/4B/2B | 27B (12 GB total) now offered | plain plan engine, no TC; P106 has no display outputs |
 | Quadro M4000 8 GB | Maxwell 5.2 | `maxwell` | 9B/4B/2B; 27B only if the 8 GB fit is verified | 27B | plain plan engine, no TC; already in `pair_ok` |
-| Quadro P4000 8 GB | Pascal 6.1 | `pascal8` | 27B/9B/4B/2B | 27B after pairing fix | plain plan engine, no TC; the dp4a kernels exist but `pascal8` does not enable `KINDI_TC=1` |
-| Quadro RTX 4000 8 GB | Turing 7.5 | `pascal8` | 27B/9B/4B/2B | 27B after pairing fix | default/plain engine, no `KINDI_TC`; CUDA 10.2 supports sm_75 |
-| RTX 4060 Ti 8 GB | Ada 8.9 | **`pascal8` (wrong)** | 27B/9B/4B/2B with TC/spec | 27B with `tc2`; 33B is not viable on 2×8 GB | classify as `tc`; PTX patch or modern image; 8 GB memory profile |
+| Quadro P4000 8 GB | Pascal 6.1 | `pascal8` | 27B/9B/4B/2B | 27B now offered | plain plan engine, no TC; the dp4a kernels exist but `pascal8` does not enable `KINDI_TC=1` |
+| Quadro RTX 4000 8 GB | Turing 7.5 | `turing` | 27B/9B/4B/2B | 27B now offered | Turing tensor-core backend (`KINDI_TC=1`); CUDA 10.2 supports sm_75 |
+| RTX 4060 Ti 8 GB | Ada 8.9 | `tc` | 27B/9B/4B/2B with TC (2B MTP spec; 27B without the drafter on 8 GB) | 27B with `tc2`; 33B is not viable on 2×8 GB | `tc` profile, 24,576-token default; PTX patch or modern image |
 | RTX 5060 Ti 16 GB | Blackwell (confirm the driver’s exact CC; table says 10.0/12.8) | `tc` | 27B; 33B if the 16 GB fit is verified | 27B and 33B | `tc2`; Blackwell-capable toolkit or verified PTX JIT; 16 GB memory profile |
 
 Notes:
@@ -69,9 +70,15 @@ Notes:
 
 ### P0 — make the installer classify and pair correctly
 
+**Status 2026-11-10:** items 1-5 are implemented and covered by `tests/test_installer_cards.py` (12 cases:
+4060 Ti 8 GB and 5060 Ti 16 GB are `tc`; 2×P106, 2×RTX 4000 and 2×4060 Ti pair; 2×GT 1030 and mixed classes do
+not; `tc2` and the legacy dual profile are checked). No GPU verify is recorded, so this stays a roadmap, not a
+support claim. Item 4 is satisfied by the existing model lists: the tc branch keeps `27b nemotron 9b 4b 2b`, and
+the 2×8 GB pair offers 27B, not 33B.
+
 1. In `card_class()`, separate **compute capability** from **memory profile**:
    - `tc`: CC >= 8.0 (4060 Ti 8 GB included), with a memory sub-profile for 8 GB and 16 GB.
-   - `pascal8`: CC 6.1–7.9.
+   - `pascal8`: CC 6.1–7.9 at 7,500 MiB or more (smaller cards stay `maxwell`).
    - `p100`: the existing sm_60 exception.
    - `maxwell`: CC 5.0–6.0.
    - `kepler`: below 5.0.
