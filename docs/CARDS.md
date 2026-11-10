@@ -204,7 +204,20 @@ off until the two-card verify is recorded).
 |---|---|
 | RTX 3080 (190 W) | 27B: 62.3 tokens/s at 512 tokens. With the 2B draft model: 91.1 (1.46 times) at 512 tokens, 103.2 (1.68 times) at 8K with k=2, and 111.5 (1.82 times) at 8K with k=3. The same output as without the draft model. Against llama.cpp: see [BENCHMARKS.md](BENCHMARKS.md) |
 | RTX 3060 12 GB | 27B: 41.1 tokens/s at 512 tokens; with the 2B draft model 60.6 (1.48 times), 73.5 (1.82 times) at 8K, 66.7 (1.81 times) at 24K |
-| other RTX 20, 40 and 50 cards | supported; `kindi verify` passes. We give no speed numbers |
+| RTX 4060 Ti 8 GB | tc plan: 2B 4/4 token-exact; 4B 2/4; 9B refused (Hadamard 4096). Plain 4B/9B 4/4. Details below |
+| other RTX 20, 40 and 50 cards | supported on the plain engine; `kindi verify` passes. We give no speed numbers |
+
+### RTX 4060 Ti 8 GB (Ada, sm_89)
+
+| item | value |
+|---|---|
+| models | 2B, 4B, 9B |
+| tc plan | `KINDI_TC=1`, `KINDI_TP=1`, `KINDI_FD=1`, `KINDI_ATT_TC=1`, `KINDI_TC_TMAX=4`, `KINDI_SPEC=0`, `KINDI_HEAD=exact`; verify uses its fixed 1,024-token context |
+| verify, tc plan (2026-11-10) | 2B **4/4 token-exact**, 354.5 tokens/s; 4B **2/4**: prompt 2 6/40 (first difference at token 6, llama.cpp top-2 gap 0.0447), prompt 3 37/40 (first difference at token 37); 9B **refused before graph build**: the tensor-core plan supports Hadamard blocks 512 and 1024, and this pack has 4096 |
+| verify, plain engine | 4B **4/4 token-exact**, 114.9 tokens/s; 9B **4/4 token-exact** (13/13 on prompt 3), 72.5 tokens/s |
+| result | The tc plan is verified for the 2B only. The 4B divergence and the 9B Hadamard block are open; [CARD-SUPPORT.md](CARD-SUPPORT.md) tracks them |
+
+- The 8 GB `tc` installer profile only adds tensor-core settings to the 27B (and the 2B when its MTP head is installed); the 2B/4B/9B settings above are the documented tc plan. The plain 4B/9B paths remain the safe default.
 
 ## AH-Nanbeige4.3-33B IQ3_XXS
 

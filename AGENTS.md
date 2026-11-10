@@ -84,6 +84,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | Cross-mode benchmarks (CPU / GPU / tandem) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/benchmarks/build_cross_mode.py`, `docs/benchmarks/CROSS-MODE.md`, `docs/benchmarks/CROSS-MODE.csv`, `tests/test_cross_mode_benchmarks.py`, `docs/BENCHMARKS.md`, `docs/TANDEM-STATUS.md`, `AGENTS.md` | done; CPU-only and GPU-only 2B/4B/9B at positions 100-24,000 from the measured i7-8086K runs; tandem rows are `n/a` because there is no runtime; generated `--check`, 203 tests and the usual gates pass; no new timing run |
 | i7-8086K CPU support row + server chat | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CARDS.md`, `docs/CPU-SUPPORT.md`, `docs/ROADMAP.md`, `docs/SUPPORT-MATRIX.md`, `docs/BENCHMARKS.md`, `docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md`, `docs/benchmarks/2026-11-09-i7-8086k-cpu/README.md`, `kindi/support_matrix.py`, `AGENTS.md` | done; i7-8086K row added to `docs/CARDS.md`; native 2B CPU server answered `/v1/chat/completions` non-stream and stream at 32.9 tok/s, 6 threads, 0 errors; support matrix regenerated; 203 tests and generated checks pass |
 | CI CPU build-and-smoke job | this worktree | `freebuff/tandem-cpu-recovery` | `.github/workflows/ci.yml`, `tests/test_cpu_smoke.py`, `docs/CPU-SUPPORT.md`, `AGENTS.md` | done; `cpu-engine-smoke` compiles `kcpu.c` with gcc for AVX2/FMA/F16C and loads it through `kindi.cpu._lib()`; 203 tests pass and the gated smoke test passes with a compiled library; no GPU or pack |
+| RTX 4060 Ti tc verify | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CARDS.md`, `docs/CARD-SUPPORT.md`, `AGENTS.md` | done; 2B tc 4/4 at 354.5 tok/s, 4B tc 2/4 (prompts 2/3), 9B tc refused (Hadamard 4096), plain 4B/9B 4/4 at 114.9/72.5 tok/s; no code changed |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -323,6 +324,12 @@ is not a lock.
   library, so the default suite needs no C toolchain. No model pack, GPU or full token is used.
   Gate: 203 passed + 2 skipped, the three CPU test files pass with `KINDI_CPU_SMOKE=1`, `compileall`,
   `bash -n`, config/support checks and `git diff --check`.
+- RTX 4060 Ti tc verify (2026-11-10): `kindi verify` with `KINDI_TC=1 KINDI_TP=1 KINDI_FD=1 KINDI_ATT_TC=1
+  KINDI_TC_TMAX=4 KINDI_SPEC=0 KINDI_HEAD=exact` on the 4060 Ti (sm_89, 8 GB, Windows) gives 2B **4/4 token-exact** at
+  354.5 tok/s, 4B **2/4** (prompts 2 and 3; first differences at tokens 6 and 37), and 9B **refused before
+  graph build** (Hadamard block 4096). The plain `KINDI_TP=0` 4B/9B paths pass 4/4 at 114.9/72.5 tok/s.
+  `docs/CARDS.md` and `docs/CARD-SUPPORT.md` record this as a partial result, not a tc support claim. Raw
+  logs (untracked): `bench-logs/verify-4060ti-tc/`. No code changed.
 
 ## Layout
 

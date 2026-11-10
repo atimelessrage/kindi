@@ -3,8 +3,9 @@
 Status: **P0 implemented 2026-11-10; not a support claim yet.** `install.sh` now classifies every sm_80 card
 as `tc` from its compute capability, pairs two cards of the same class with at least 3,800 MiB each, and gives
 two sm_80 cards the `tc2` profile. `tests/test_installer_cards.py` runs the installer's own card functions
-against a fake nvidia-smi table. The GPU verify and the measured rows below are still open; P1-P3 are
-unimplemented.
+against a fake nvidia-smi table. The first GPU verify is recorded on the RTX 4060 Ti: the 2B tc plan is 4/4
+token-exact, the 4B tc plan is 2/4, the 9B tc plan is refused (Hadamard 4096), and the plain 4B/9B paths are
+4/4. The dual, 27B/33B and 5060 Ti rows remain open; P1-P3 are unimplemented.
 
 ## What “supported” means here
 
@@ -34,7 +35,7 @@ generic GPU table are hardware capabilities, not Kindi formats; they do not impl
 | install.sh `card_models()` | `pascal8` offers 27B; `maxwell` offers 9B/Nemotron/4B/2B; `tc` offers 27B/Nemotron/9B/4B/2B | A 6 GB P106 is offered up to 9B alone and 27B as a pair. A 2 GB GT 1030 is offered 4B/2B and does not pair. |
 | `kindi/tc.py` | compiles for compute_75 PTX, raises the PTX header to 7.1/sm_8x, lets the driver JIT; `supported()` accepts major >= 8 or major == 6 | Ada and Blackwell depend on this PTX patch; it is exactly the fragile path that needs a real test on the 4060 Ti and 5060 Ti. |
 | `kindi/engine.py` | `_cupy_arch_fix()` caps CuPy 9.6’s NVRTC target to the toolkit maximum | Necessary for Blackwell with the CUDA 10.2 image, but it means the image is not a native sm_89/sm_120 toolchain. |
-| `kindi/tp.py` | two-card plan engine; 27B path requires Hadamard blocks of 1024 | The 27B dual target is viable; the 2B/4B plan paths have their own Hadamard/spec constraints. |
+| `kindi/tp.py` | two-card plan engine; 27B path requires Hadamard blocks of 1024 | The 27B dual target is viable; the 2B tc plan is exact, the 4B tc plan is 2/4, and the 9B is refused (Hadamard 4096). |
 | docs/CARDS.md | “All the cards use the same Docker image (CUDA 10.2, CuPy 9.6)” | A 4060 Ti/5060 Ti support claim needs a modern-toolkit image and a documented exception, or a verified PTX-JIT path. |
 
 ## Target matrix
@@ -49,11 +50,15 @@ targets pending verification, not current claims.
 | Quadro M4000 8 GB | Maxwell 5.2 | `maxwell` | 9B/4B/2B; 27B only if the 8 GB fit is verified | 27B | plain plan engine, no TC; already in `pair_ok` |
 | Quadro P4000 8 GB | Pascal 6.1 | `pascal8` | 27B/9B/4B/2B | 27B now offered | plain plan engine, no TC; the dp4a kernels exist but `pascal8` does not enable `KINDI_TC=1` |
 | Quadro RTX 4000 8 GB | Turing 7.5 | `turing` | 27B/9B/4B/2B | 27B now offered | Turing tensor-core backend (`KINDI_TC=1`); CUDA 10.2 supports sm_75 |
-| RTX 4060 Ti 8 GB | Ada 8.9 | `tc` | 27B/9B/4B/2B with TC (2B MTP spec; 27B without the drafter on 8 GB) | 27B with `tc2`; 33B is not viable on 2×8 GB | `tc` profile, 24,576-token default; PTX patch or modern image |
+| RTX 4060 Ti 8 GB | Ada 8.9 | `tc` | 27B/9B/4B/2B; tc plan verify: 2B 4/4, 4B 2/4, 9B refused (plain 4/4) | 27B with `tc2`; 33B is not viable on 2×8 GB | `tc` profile, 24,576-token default; PTX patch; fix the 4B tc divergence and 9B HB=4096 before a tc support claim |
 | RTX 5060 Ti 16 GB | Blackwell (confirm the driver’s exact CC; table says 10.0/12.8) | `tc` | 27B; 33B if the 16 GB fit is verified | 27B and 33B | `tc2`; Blackwell-capable toolkit or verified PTX JIT; 16 GB memory profile |
 
 Notes:
 
+- **RTX 4060 Ti tc verify (2026-11-10):** with `KINDI_TC=1 KINDI_TP=1 KINDI_FD=1 KINDI_ATT_TC=1
+  KINDI_TC_TMAX=4 KINDI_SPEC=0`, the 2B is 4/4 token-exact at 354.5 tokens/s; the 4B is 2/4
+  (prompts 2 and 3); the 9B is refused before graph build (Hadamard 4096). The plain 4B/9B paths are
+  4/4 at 114.9/72.5 tokens/s. The tc plan is not a 4B/9B support claim yet.
 - **33B needs about 15.5 GB of weights plus K/V and per-card overhead.** Two 8 GB cards (16 GB total)
   are not enough for the current Nanbeige estimator; a single 16 GB card is marginal and must be measured;
   two 16 GB cards are the safe dual target.
@@ -99,9 +104,10 @@ the 2×8 GB pair offers 27B, not 33B.
 6. Add a CUDA 12.x / current-CuPy image for sm_80+ cards, while keeping the CUDA 10.2/CuPy 9.6 image for
    Kepler and other legacy cards. The 10.2 PTX patch in `tc.py` can stay as the compatibility path, but it
    must not be the only path for a new 5060 Ti.
-7. Test native sm_89 and sm_120 compilation against the same verify prompts. Confirm whether the current
+7. [~] Test native sm_89 and sm_120 compilation against the same verify prompts. Confirm whether the current
    `tc.py` `ptx_target()` (sm_80 for everything after sm_86) works on Blackwell, or whether a native
-   toolkit target is required.
+   toolkit target is required. The 4060 Ti (sm_89) tc plan is 4/4 on the 2B but 2/4 on the 4B, and the
+   9B is refused (Hadamard 4096); sm_120 remains untested.
 8. Add the two-card `tc2` verify: 27B on 2×8 GB Ada, 27B/33B on 2×16 GB Blackwell, exact output and no
    exchange race. Only then turn on two-card spec.
 
@@ -133,7 +139,8 @@ the 2×8 GB pair offers 27B, not 33B.
 | 5060 Ti 16 GB | single | single | single | single or 2× | single if fit, 2× preferred |
 
 A checked cell requires an installer option, a passing verify and a measured row in the docs. Empty cells
-are not promises.
+are not promises. The RTX 4060 Ti's tc results above are 2B 4/4, 4B 2/4 and 9B refused; the plain 4B/9B
+paths are 4/4, so its 4B/9B cells are not tc-checked.
 
 ## Open decisions
 
