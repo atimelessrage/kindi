@@ -4,6 +4,10 @@ Status: **recovery audit, 2026-11-09. No tandem runtime is present and no tandem
 This page records what `main` actually contains, why the interrupted WIP cannot be merged as-is, and
 the gate for deleting it. Archived with the other no-go work in [ROADMAP.md](ROADMAP.md).
 
+Benchmark coverage: [benchmarks/CROSS-MODE.md](benchmarks/CROSS-MODE.md) records the measured CPU-only and
+GPU-only 2B/4B/9B cells at positions 100-24,000 on the i7-8086K + RTX 4060 Ti. Its GPU+CPU tandem rows are
+`n/a` until gates 3 and 4 below pass; no tandem number is claimed.
+
 ## Answer
 
 At `main` = `2abf9ad`, the repository has:

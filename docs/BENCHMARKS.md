@@ -149,6 +149,23 @@ The current branch and `v0.4.0` have byte-identical `kindi/bench.py` and `kindi/
 
 The separate 2B plan engine at the same 24K context measured 302.4 tok/s against 170.6 plain, 1.77x, with `KINDI_TP=1 KINDI_TC=1 KINDI_TC_TMAX=4` and no speculative drafting. That result is in the same report.
 
+## Cross-mode: CPU-only, GPU-only and GPU+CPU tandem (one machine)
+
+The same i7-8086K + RTX 4060 Ti rig, 24,576-token context, exact head. The full matrix for the 2B, 4B and 9B at
+positions 100 to 24,000, with read speeds and sources, is generated at
+[benchmarks/CROSS-MODE.md](benchmarks/CROSS-MODE.md) (`python docs/benchmarks/build_cross_mode.py`).
+
+| Model | CPU-only 24K | GPU-only 24K | GPU / CPU | Tandem 24K |
+|---|---:|---:|---:|---:|
+| 2B | 4.6 | 160.6 | 34.9x | n/a |
+| 4B | 1.6 | 79.8 | 49.9x | n/a |
+| 9B | 1.4 | 62.3 | 44.5x | n/a |
+
+CPU-only is the 6-thread WSL2 run; GPU-only is the median of three Windows runs. **GPU+CPU tandem has no runtime
+in this tree** ([TANDEM-STATUS.md](TANDEM-STATUS.md)), so its column is `n/a`: the matrix does not invent a tandem
+number. A tandem cell is added only after the token-exact gate and a measured decode rate with the CPU/GPU split
+stated.
+
 ## 2026-11-09: CPU engine · Intel Core i7-8086K
 
 WSL2 Ubuntu 24.04, GCC 13.3, i7-8086K (6 cores / 12 threads), 15 GiB visible to WSL2, 24,576-token

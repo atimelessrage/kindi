@@ -81,6 +81,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | Generated support matrix + roadmap | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/support_matrix.py`, `tests/test_support_matrix.py`, `docs/SUPPORT-MATRIX.md`, `docs/ROADMAP.md`, `docs/CONTINUOUS-BATCHING.md`, `docs/PER-SLOT-REFACTOR.md`, `docs/TANDEM-STATUS.md`, `AGENTS.md` | done; `python -m kindi.support_matrix` renders models/formats/K-V modes/CPU ISA from the code and `--check` fails on drift; `docs/ROADMAP.md` is the single index of the archived no-go work (batching, per-slot, tandem, k8v4) |
 | Sampling profiles + presence penalty | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/config.py`, `kindi/profiles.py`, `kindi/sampling.py`, `kindi/server.py`, `kindi.conf.example`, `tests/test_config.py`, `tests/test_profiles.py`, `tests/test_sampling.py`, `tests/test_server.py`, `docs/AGENTS.md`, `docs/CONFIGURATION.md`, `docs/BONSAI-2-SUPPORT.md`, `docs/CONFIGURATION-REFERENCE.md`, `AGENTS.md` | done; publisher thinking/non-thinking profiles behind `sampling_profile = publisher`, `presence_penalty` in the API/config; 189 tests, both generated-file checks and `compileall` pass; no GPU run. `docs/CONFIGURATION.md` was edited with `T:/kindi` clean (checked) |
 | Installer card classification + dual pairing | this worktree | `freebuff/tandem-cpu-recovery` | `install.sh`, `tests/test_installer_cards.py`, `docs/CARD-SUPPORT.md`, `docs/CARDS.md`, `AGENTS.md` | done; every sm_80+ card is `tc` regardless of memory (the 8 GB RTX 4060 Ti was `pascal8`), same-class pairs with at least 3,800 MiB pair, `tc2` for two sm_80 cards; 12 fake-nvidia-smi tests pass and 7 fail on the old installer; 201 tests, `bash -n`, generated checks and `compileall` pass; no GPU run. `install.sh` was edited with `T:/kindi` clean (checked) |
+| Cross-mode benchmarks (CPU / GPU / tandem) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/benchmarks/build_cross_mode.py`, `docs/benchmarks/CROSS-MODE.md`, `docs/benchmarks/CROSS-MODE.csv`, `tests/test_cross_mode_benchmarks.py`, `docs/BENCHMARKS.md`, `docs/TANDEM-STATUS.md`, `AGENTS.md` | done; CPU-only and GPU-only 2B/4B/9B at positions 100-24,000 from the measured i7-8086K runs; tandem rows are `n/a` because there is no runtime; generated `--check`, 203 tests and the usual gates pass; no new timing run |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -297,6 +298,13 @@ is not a lock.
   (12 pass; 7 fail with `KINDI_INSTALLER` on the old copy), 201 tests pass, `bash -n install.sh`,
   `config_reference --check`, `support_matrix --check` and `compileall` pass. No GPU verify and no Linux
   installer run, so this is not a support claim yet.
+- Cross-mode benchmark matrix (2026-11-10): `docs/benchmarks/build_cross_mode.py` reads the measured CPU-only
+  (`2026-11-09-i7-8086k-cpu`, 6 threads, one run) and GPU-only (`2026-11-09-i7-8086k-rtx4060ti`, median of 3)
+  runs and writes `CROSS-MODE.md`/`.csv` for the 2B, 4B and 9B at positions 100-24,000 plus the 1,000-token read.
+  GPU-only/CPU-only at 24K is 34.9x/49.9x/44.5x. The GPU+CPU tandem rows are present and `n/a`: there is no
+  `TandemEngine`, so no tandem number is claimed; the page names the TANDEM-STATUS gates that must pass first.
+  Gate: `python docs/benchmarks/build_cross_mode.py --check`, 203 tests, `compileall`, config/support checks; no
+  new timing run and no GPU run.
 
 ## Layout
 
