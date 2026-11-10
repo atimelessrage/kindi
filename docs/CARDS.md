@@ -437,9 +437,11 @@ image for it.
 | variables | `KINDI_DEVICE=cpu`; six threads (the engine's physical-core default); on Windows set `KINDI_CC` and `KINDI_LLVM` to clang 18 and the LLVM install |
 | build | `libkcpu.dll` with clang 18.1.8 and libomp on Windows, `libkcpu.so` with gcc and OpenMP on Linux |
 | verify | 2B 4/4 at 33.7 tokens/s, 4B 4/4 at 16.7, 9B 4/4 at 9.1 (native Windows, 1,024-token context) |
-| generation (24,576-token context, six threads, WSL2) | 2B 28.2 at 100 tokens, 21.3 at 2K, 12.2 at 8K, 6.7 at 16K, 4.6 at 24K; 4B 11.8 / 9.1 / 3.9 / 2.3 / 1.6; 9B 6.8 / 5.8 / 3.2 / 2.0 / 1.4 |
-| prompt reading | 35.2 (2B), 14.2 (4B), 7.6 (9B) tokens/s (WSL2, 1,000-token prompt) |
+| generation (24,576-token context, six threads, native Windows) | 2B 35.9 at 100 tokens, 29.3 at 2K, 19.4 at 8K, 11.9 at 16K, 8.2 at 24K; 4B 15.2 / 13.4 / 6.8 / 4.3 / 3.1; 9B 8.7 / 7.7 / 4.9 / 3.5 / 2.6 |
+| prompt reading | 45.1 (2B), 19.2 (4B), 9.9 (9B) tokens/s (native Windows, 1,000-token prompt) |
 | server | `kindi serve` with `KINDI_DEVICE=cpu` answered `POST /v1/chat/completions` non-stream and stream on the 2B: 19 prompt / 9 completion tokens at 32.9 tokens/s generation, 0 errors, 0 MiB GPU memory (native Windows, 1,024-token context, 2026-11-10) |
 
 - The 12-thread setting is 6-20x slower; use 6 threads. Eight threads were faster on this chip in the
   probe (47.9 read, 37.3 generation), but they are not the general default.
+- The 24K and prompt-reading rows are the native Windows 2026-11-10 run; the WSL2 numbers are archived
+  in the benchmark page.

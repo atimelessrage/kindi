@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-CPU_RUNS = HERE / "2026-11-09-i7-8086k-cpu" / "runs.csv"
+CPU_RUNS = HERE / "2026-11-10-i7-8086k-windows-cpu" / "runs.csv"
 GPU_RUNS = HERE / "2026-11-09-i7-8086k-rtx4060ti" / "runs.csv"
 MD = HERE / "CROSS-MODE.md"
 CSV = HERE / "CROSS-MODE.csv"
@@ -30,7 +30,7 @@ def _read_csv(path):
 
 
 def cpu_rows():
-    """The 6-thread, one-per-physical-core CPU run; the 12-thread collapse is not a benchmark mode."""
+    """The native Windows, 6-thread, one-per-physical-core CPU run; 12 threads is not a mode."""
     out = {}
     for row in _read_csv(CPU_RUNS):
         if row["model"] in MODELS and row["threads"] == "6" and row["binding"] == "close/cores":
@@ -66,7 +66,7 @@ def matrix():
     rows = []
     for model in MODELS:
         rows.append(dict(mode="cpu", available=1, model=model, runs=1,
-                         source="2026-11-09-i7-8086k-cpu (6 threads, one run)", **cpu[model]))
+                         source="2026-11-10-i7-8086k-windows-cpu (6 threads, one run)", **cpu[model]))
         rows.append(dict(mode="gpu", available=1, model=model, runs=gpu[model]["runs"],
                          source="2026-11-09-i7-8086k-rtx4060ti (median of 3)",
                          **{k: gpu[model][k] for k in METRICS}))
@@ -100,8 +100,8 @@ def render_md(rows):
         "NVIDIA GeForce RTX 4060 Ti 8 GB, at a 24,576-token context, exact head, greedy, no speculative",
         "drafting.",
         "",
-        "- **CPU only:** `KINDI_DEVICE=cpu`, 6 threads, WSL2 Ubuntu 24.04. The native Windows build has",
-        "  only the 1,024-token verify; no native 24K CPU benchmark has been run.",
+        "- **CPU only:** `KINDI_DEVICE=cpu` on native Windows 10, 6 threads (one per physical core),",
+        "  24,576-token context. One fresh-process run per model; no WSL.",
         "- **GPU only:** the card runs every layer; the CPU only drives the process (Windows 10, CuPy",
         "  14.2.0). Three fresh-process runs per model; the table uses their median.",
         "- **GPU+CPU tandem:** **not available in this tree.** There is no `TandemEngine`; only the",
@@ -120,10 +120,10 @@ def render_md(rows):
                                                " | ".join(cell(r[k]) for k in METRICS)))
     lines += [
         "",
-        "Sources: [2026-11-09-i7-8086k-cpu](2026-11-09-i7-8086k-cpu/README.md) (6 threads) and",
-        "[2026-11-09-i7-8086k-rtx4060ti](2026-11-09-i7-8086k-rtx4060ti/README.md). The CPU run is one",
-        "run per cell; the GPU run is the median of three. The two blocks were not interleaved and the CPU",
-        "block ran under WSL2, so the ratio below is a same-machine indication, not a controlled A/B.",
+        "Sources: [2026-11-10-i7-8086k-windows-cpu](2026-11-10-i7-8086k-windows-cpu/README.md) (6 threads,",
+        "native Windows) and [2026-11-09-i7-8086k-rtx4060ti](2026-11-09-i7-8086k-rtx4060ti/README.md). The",
+        "CPU run is one run per cell; the GPU run is the median of three. The two blocks were not interleaved",
+        "and the CPU block is native Windows, so the ratio is a same-machine indication, not a controlled A/B.",
         "",
         "## GPU-only speedup over CPU-only",
         "",
@@ -156,9 +156,8 @@ def render_md(rows):
         "",
         "- **No 27B, Nemotron or Nanbeige CPU row.** The CPU engine covers the 2B, 4B and 9B only; the",
         "  larger models are GPU targets.",
-        "- **CPU is WSL2, not native Windows.** The native build is faster in `verify` (2B/4B/9B",
-        "  33.7/16.7/9.1 tok/s against 28.1/13.0/5.6), so the CPU cells here are conservative; a native",
-        "  24,576-token run is still missing.",
+        "- **CPU is native Windows, not WSL2.** The 2026-11-09 WSL2 page is kept as history; its CPU cells",
+        "  are no longer the cross-mode source.",
         "- **One CPU run per cell.** There is no variance or thermal control; the GPU cells have three",
         "  runs and a spread of a few percent.",
         "- **24K is the deepest measured position.** The packs advertise 262,144 tokens, but no 32K/64K",

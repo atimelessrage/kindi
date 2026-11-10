@@ -1,0 +1,10 @@
+C:\Users\ICH\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+[kindi 12:53:50] kindi-cpu ready: Ternary-Bonsai-2-9B, 6 threads, ctx 24576 (111.7s)
+[kindi 12:53:50] CPU engine: 6 threads, 24576-token context
+[kindi 12:53:53] prompt reading:         9.9 tokens/s
+[kindi 12:53:54] generation (exact head) at position   100:   8.7 tokens/s
+[kindi 12:53:55] generation (exact head) at position  2000:   7.7 tokens/s
+[kindi 12:53:58] generation (exact head) at position  8000:   4.9 tokens/s
+[kindi 12:54:01] generation (exact head) at position 16000:   3.5 tokens/s
+[kindi 12:54:05] generation (exact head) at position 24000:   2.6 tokens/s

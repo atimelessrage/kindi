@@ -157,11 +157,12 @@ positions 100 to 24,000, with read speeds and sources, is generated at
 
 | Model | CPU-only 24K | GPU-only 24K | GPU / CPU | Tandem 24K |
 |---|---:|---:|---:|---:|
-| 2B | 4.6 | 160.6 | 34.9x | n/a |
-| 4B | 1.6 | 79.8 | 49.9x | n/a |
-| 9B | 1.4 | 62.3 | 44.5x | n/a |
+| 2B | 8.2 | 160.6 | 19.6x | n/a |
+| 4B | 3.1 | 79.8 | 25.7x | n/a |
+| 9B | 2.6 | 62.3 | 24.0x | n/a |
 
-CPU-only is the 6-thread WSL2 run; GPU-only is the median of three Windows runs. **GPU+CPU tandem has no runtime
+CPU-only is the 6-thread native Windows run (2026-11-10); GPU-only is the median of three Windows runs. The old
+WSL2 CPU cells are archived in the 2026-11-09 benchmark page. **GPU+CPU tandem has no runtime
 in this tree** ([TANDEM-STATUS.md](TANDEM-STATUS.md)), so its column is `n/a`: the matrix does not invent a tandem
 number. A tandem cell is added only after the token-exact gate and a measured decode rate with the CPU/GPU split
 stated.
@@ -189,9 +190,9 @@ The support status is tracked in [CPU-SUPPORT.md](CPU-SUPPORT.md).
 ## 2026-11-10: CPU engine on native Windows · Intel Core i7-8086K
 
 Windows 10 (10.0.19045), i7-8086K @ 4.00 GHz, clang 18.1.8 with MSVC 14.51, Python 3.13.6,
-1,024-token verify context, six threads (one per physical core, resolved through the Windows
-topology API). One run per model. This is a Kindi-only correctness run; no llama.cpp speed
-comparison was made.
+six threads (one per physical core, resolved through the Windows topology API). One run per model.
+The verify uses a 1,024-token context; the benchmark uses 24,576. This is a Kindi-only correctness
+and speed run; no llama.cpp speed comparison was made.
 
 | Model | Verify | Tokens/s | Engine ready |
 |---|---:|---:|---:|
@@ -202,7 +203,19 @@ comparison was made.
 The same verifies read 28.1, 13.0 and 5.6 tokens/s under WSL2, so the native build is faster on
 this CPU. A second native run measured 33.5/14.3/7.3; these are single runs and vary by up to a
 quarter. The native CPU server also answered a 2B chat request, non-stream and stream, at 32.9
-tokens/s generation with 0 errors and no GPU memory. Full method, build command and raw logs:
+tokens/s generation with 0 errors and no GPU memory.
+
+At 24,576 tokens, six threads, exact head, one run per model:
+
+| Model | Read | 100 | 2,000 | 8,000 | 16,000 | 24,000 |
+|---|---:|---:|---:|---:|---:|---:|
+| 2B | 45.1 | 35.9 | 29.3 | 19.4 | 11.9 | 8.2 |
+| 4B | 19.2 | 15.2 | 13.4 | 6.8 | 4.3 | 3.1 |
+| 9B | 9.9 | 8.7 | 7.7 | 4.9 | 3.5 | 2.6 |
+
+The 24K generation rates are 8.2/3.1/2.6 tokens/s, up from the WSL2 4.6/1.6/1.4. The native CPU
+cells now feed the cross-mode table above; the GPU cells are still the 2026-11-09 median of three
+and the two blocks were not interleaved. Full method, build command and raw logs:
 [benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md](benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md).
 
 ## Kindi 0.4.0: Tesla P100 (sm_60)

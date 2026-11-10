@@ -6,7 +6,8 @@ Windows run of `kindi/cpu.py` + `kindi/kcpu.c`; the earlier i7-8086K result
 
 The short version: **`libkcpu.dll` builds with clang 18.1.8 and libomp, the engine resolves six
 threads on its own, and the 2B, 4B and 9B are token-exact with llama.cpp.** The native verify is
-faster than the WSL2 one on every model.
+faster than the WSL2 one on every model, and the native 24,576-token benchmark now supplies the
+CPU-only cells in the cross-mode matrix.
 
 ## Rig and toolchain
 
@@ -19,7 +20,7 @@ faster than the WSL2 one on every model.
 | Headers / linker | MSVC 14.51.36231 (Visual Studio 18 Community), Windows SDK — clang's driver finds both through `vswhere`; no `vcvars` shell is used |
 | OpenMP | libomp from the same LLVM install (`lib/libomp.lib`, `bin/libomp.dll`) |
 | Python | 3.13.6 |
-| Kindi HEAD | `fd3fba5` on `freebuff/tandem-cpu-recovery` |
+| Kindi HEAD | `fd3fba5` for the verify/server runs; `4934974` for the 24K benchmark (`kindi/cpu.py` and `kindi/kcpu.c` are unchanged) |
 | GPU | not used (`KINDI_DEVICE=cpu`) |
 
 `kindi/cpu.py` compiles the engine on first use with:
@@ -60,7 +61,25 @@ prompt 3 stops at 13 tokens, exactly as in the WSL2 reference run.
 
 For comparison, the WSL2 verify read 28.1, 13.0 and 5.6 tokens/s on the same machine
 ([2026-11-09 benchmark](../2026-11-09-i7-8086k-cpu/README.md)). The native build is faster on all
-three models; no 24,576-token native benchmark was run.
+three models; the 24,576-token benchmark is below.
+
+## 24,576-token benchmark
+
+`kindi bench` with the full 24,576-token context, exact head, six threads, one fresh process per
+model. "Read" is the 1,000-token prompt-reading probe; the other columns are generation at that
+position. Tokens/s:
+
+| Model | Read | 100 | 2,000 | 8,000 | 16,000 | 24,000 |
+|---|---:|---:|---:|---:|---:|---:|
+| 2B | 45.1 | 35.9 | 29.3 | 19.4 | 11.9 | 8.2 |
+| 4B | 19.2 | 15.2 | 13.4 | 6.8 | 4.3 | 3.1 |
+| 9B | 9.9 | 8.7 | 7.7 | 4.9 | 3.5 | 2.6 |
+
+The 24K generation rates are 8.2, 3.1 and 2.6 tokens/s; the WSL2 run measured 4.6, 1.6 and 1.4.
+The native read is also faster: 45.1/19.2/9.9 against 35.2/14.2/7.6. The engine loaded the 2B,
+4B and 9B in 22.5, 50.3 and 111.7 s. One run per model, no thermal or power clamp, so this is a
+single sample. The CPU-only cells in [CROSS-MODE.md](../../CROSS-MODE.md) now use these numbers;
+the GPU cells are the earlier median of three and the two blocks were not interleaved.
 
 ## Method
 
@@ -71,8 +90,9 @@ set KINDI_DEVICE=cpu
 python -m kindi --pack %USERPROFILE%\.kindi\packs\bonsai-2b --ctx 1024 verify
 ```
 
-The same command was used with `bonsai-4b` and `bonsai-9b`. Each run writes its own raw log; the
-engine builds once and reuses `~/.cache/kindi/libkcpu.dll` afterwards.
+The same command was used with `bonsai-4b` and `bonsai-9b`. For the 24K benchmark, replace
+`--ctx 1024 verify` with `--ctx 24576 bench`. Each run writes its own raw log; the engine builds
+once and reuses `~/.cache/kindi/libkcpu.dll` afterwards.
 
 ## CPU server chat
 
@@ -97,6 +117,8 @@ python -m kindi serve --host 127.0.0.1 --port 8199
 | File | Contents |
 |---|---|
 | [raw/system-info.log](raw/system-info.log) | OS, Python, clang version, git HEAD, logical CPU count, CPU model |
+| [runs.csv](runs.csv) | the three native 24K rows in the cross-mode schema |
+| [raw/bench-24k-2b.log](raw/bench-24k-2b.log), [raw/bench-24k-4b.log](raw/bench-24k-4b.log), [raw/bench-24k-9b.log](raw/bench-24k-9b.log) | the three 24K benchmark logs quoted above |
 | [raw/verify-2b.log](raw/verify-2b.log), [raw/verify-4b.log](raw/verify-4b.log), [raw/verify-9b.log](raw/verify-9b.log) | the three token-exact verification logs quoted above |
 | [raw/server-chat.log](raw/server-chat.log), [raw/server-chat.json](raw/server-chat.json), [raw/server-chat-stream.txt](raw/server-chat-stream.txt) | the native CPU server start, the OpenAI chat response and the streaming chunks |
 
@@ -107,18 +129,19 @@ Proved on this machine:
 - `kcpu.c` compiles to a DLL with clang 18.1.8 + libomp against the MSVC 14.51 headers, with no
   `vcvars` shell and no POSIX flags.
 - The 2B, 4B and 9B run in the native Windows engine and are token-exact with llama.cpp.
+- The 24K benchmark completes natively at 24,576 tokens for the 2B, 4B and 9B.
 - The engine's Windows thread default resolves to 6 physical cores.
 - The CPU server answered a 2B chat request, non-stream and stream, at 1,024 context: HTTP 200,
   32.9 tokens/s generation, 0 errors and 0 MiB GPU memory.
 
 Not proved or not done:
 
-- **24K context on Windows.** Only the 1,024-token verify was run here; the 24,576-token CPU
-  benchmark remains the WSL2 number.
-- **Repeated-run stability and thermals.** One run per model, no clock/power logging; the two runs
-  differ by up to a quarter.
+- **Cross-block comparison.** The CPU run is native Windows and the GPU cells are from 2026-11-09;
+  the two blocks were not interleaved.
+- **Repeated-run stability and thermals.** One run per model, no clock/power logging; the two verify
+  runs differ by up to a quarter.
 - **4B/9B server chat.** The server path was exercised with the 2B only; the 4B and 9B
   `kindi verify` runs passed, but no separate server chat request was sent for them.
 - **Other CPUs.** Only the i7-8086K was measured; the i5-2500K, Xeon W-2133 and i9-13900K rows are
   unchanged.
-- **A llama.cpp speed comparison.** This is a Kindi-only correctness run.
+- **A llama.cpp speed comparison.** This is a Kindi-only correctness and speed run.

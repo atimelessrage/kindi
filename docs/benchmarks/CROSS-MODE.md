@@ -5,8 +5,8 @@ All measured cells are from one machine: an Intel Core i7-8086K (6 physical core
 NVIDIA GeForce RTX 4060 Ti 8 GB, at a 24,576-token context, exact head, greedy, no speculative
 drafting.
 
-- **CPU only:** `KINDI_DEVICE=cpu`, 6 threads, WSL2 Ubuntu 24.04. The native Windows build has
-  only the 1,024-token verify; no native 24K CPU benchmark has been run.
+- **CPU only:** `KINDI_DEVICE=cpu` on native Windows 10, 6 threads (one per physical core),
+  24,576-token context. One fresh-process run per model; no WSL.
 - **GPU only:** the card runs every layer; the CPU only drives the process (Windows 10, CuPy
   14.2.0). Three fresh-process runs per model; the table uses their median.
 - **GPU+CPU tandem:** **not available in this tree.** There is no `TandemEngine`; only the
@@ -19,27 +19,27 @@ generation at that token position in the allocated 24,576-token context. Tokens/
 | Model | Mode | Read | 100 | 2K | 8K | 16K | 24K |
 |---|---|---:|---:|---:|---:|---:|---:|
 | 2B | GPU only | 190.0 | 169.0 | 163.3 | 175.4 | 171.7 | 160.6 |
-| 2B | CPU only | 35.2 | 28.2 | 21.3 | 12.2 | 6.7 | 4.6 |
+| 2B | CPU only | 45.1 | 35.9 | 29.3 | 19.4 | 11.9 | 8.2 |
 | 2B | GPU+CPU tandem | n/a | n/a | n/a | n/a | n/a | n/a |
 | 4B | GPU only | 129.0 | 106.2 | 101.9 | 90.8 | 89.3 | 79.8 |
-| 4B | CPU only | 14.2 | 11.8 | 9.1 | 3.9 | 2.3 | 1.6 |
+| 4B | CPU only | 19.2 | 15.2 | 13.4 | 6.8 | 4.3 | 3.1 |
 | 4B | GPU+CPU tandem | n/a | n/a | n/a | n/a | n/a | n/a |
 | 9B | GPU only | 90.3 | 77.8 | 76.8 | 71.6 | 67.4 | 62.3 |
-| 9B | CPU only | 7.6 | 6.8 | 5.8 | 3.2 | 2.0 | 1.4 |
+| 9B | CPU only | 9.9 | 8.7 | 7.7 | 4.9 | 3.5 | 2.6 |
 | 9B | GPU+CPU tandem | n/a | n/a | n/a | n/a | n/a | n/a |
 
-Sources: [2026-11-09-i7-8086k-cpu](2026-11-09-i7-8086k-cpu/README.md) (6 threads) and
-[2026-11-09-i7-8086k-rtx4060ti](2026-11-09-i7-8086k-rtx4060ti/README.md). The CPU run is one
-run per cell; the GPU run is the median of three. The two blocks were not interleaved and the CPU
-block ran under WSL2, so the ratio below is a same-machine indication, not a controlled A/B.
+Sources: [2026-11-10-i7-8086k-windows-cpu](2026-11-10-i7-8086k-windows-cpu/README.md) (6 threads,
+native Windows) and [2026-11-09-i7-8086k-rtx4060ti](2026-11-09-i7-8086k-rtx4060ti/README.md). The
+CPU run is one run per cell; the GPU run is the median of three. The two blocks were not interleaved
+and the CPU block is native Windows, so the ratio is a same-machine indication, not a controlled A/B.
 
 ## GPU-only speedup over CPU-only
 
 | Model | 100 | 2K | 8K | 16K | 24K |
 |---|---:|---:|---:|---:|---:|
-| 2B | 6.0x | 7.7x | 14.4x | 25.6x | 34.9x |
-| 4B | 9.0x | 11.2x | 23.3x | 38.8x | 49.9x |
-| 9B | 11.4x | 13.2x | 22.4x | 33.7x | 44.5x |
+| 2B | 4.7x | 5.6x | 9.0x | 14.4x | 19.6x |
+| 4B | 7.0x | 7.6x | 13.4x | 20.8x | 25.7x |
+| 9B | 8.9x | 10.0x | 14.6x | 19.3x | 24.0x |
 
 The ratio grows with depth because the CPU attention path slows down faster than the GPU path.
 
@@ -62,9 +62,8 @@ rate at each of the same positions and the peak VRAM. Until then the third mode 
 
 - **No 27B, Nemotron or Nanbeige CPU row.** The CPU engine covers the 2B, 4B and 9B only; the
   larger models are GPU targets.
-- **CPU is WSL2, not native Windows.** The native build is faster in `verify` (2B/4B/9B
-  33.7/16.7/9.1 tok/s against 28.1/13.0/5.6), so the CPU cells here are conservative; a native
-  24,576-token run is still missing.
+- **CPU is native Windows, not WSL2.** The 2026-11-09 WSL2 page is kept as history; its CPU cells
+  are no longer the cross-mode source.
 - **One CPU run per cell.** There is no variance or thermal control; the GPU cells have three
   runs and a spread of a few percent.
 - **24K is the deepest measured position.** The packs advertise 262,144 tokens, but no 32K/64K

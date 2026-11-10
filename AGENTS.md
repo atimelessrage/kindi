@@ -85,6 +85,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | i7-8086K CPU support row + server chat | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CARDS.md`, `docs/CPU-SUPPORT.md`, `docs/ROADMAP.md`, `docs/SUPPORT-MATRIX.md`, `docs/BENCHMARKS.md`, `docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md`, `docs/benchmarks/2026-11-09-i7-8086k-cpu/README.md`, `kindi/support_matrix.py`, `AGENTS.md` | done; i7-8086K row added to `docs/CARDS.md`; native 2B CPU server answered `/v1/chat/completions` non-stream and stream at 32.9 tok/s, 6 threads, 0 errors; support matrix regenerated; 203 tests and generated checks pass |
 | CI CPU build-and-smoke job | this worktree | `freebuff/tandem-cpu-recovery` | `.github/workflows/ci.yml`, `tests/test_cpu_smoke.py`, `docs/CPU-SUPPORT.md`, `AGENTS.md` | done; `cpu-engine-smoke` compiles `kcpu.c` with gcc for AVX2/FMA/F16C and loads it through `kindi.cpu._lib()`; 203 tests pass and the gated smoke test passes with a compiled library; no GPU or pack |
 | RTX 4060 Ti tc verify | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CARDS.md`, `docs/CARD-SUPPORT.md`, `AGENTS.md` | done; 2B tc 4/4 at 354.5 tok/s, 4B tc 2/4 (prompts 2/3), 9B tc refused (Hadamard 4096), plain 4B/9B 4/4 at 114.9/72.5 tok/s; no code changed |
+| Native Windows 24K CPU benchmark + cross-mode matrix | this worktree | `freebuff/tandem-cpu-recovery` | `docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/{README.md,runs.csv,raw/bench-24k-*.log}`, `docs/benchmarks/build_cross_mode.py`, `docs/benchmarks/CROSS-MODE.md`, `docs/benchmarks/CROSS-MODE.csv`, `docs/BENCHMARKS.md`, `docs/CARDS.md`, `docs/CPU-SUPPORT.md`, `AGENTS.md` | done; native 2B/4B/9B 24K generation 8.2/3.1/2.6 tok/s, read 45.1/19.2/9.9; replaced the WSL2 CPU cells; GPU/tandem rows unchanged |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -301,15 +302,16 @@ is not a lock.
   (12 pass; 7 fail with `KINDI_INSTALLER` on the old copy), 201 tests pass, `bash -n install.sh`,
   `config_reference --check`, `support_matrix --check` and `compileall` pass. No GPU verify and no Linux
   installer run, so this is not a support claim yet.
-- Cross-mode benchmark matrix (2026-11-10): `docs/benchmarks/build_cross_mode.py` reads the measured CPU-only
-  (`2026-11-09-i7-8086k-cpu`, 6 threads, one run) and GPU-only (`2026-11-09-i7-8086k-rtx4060ti`, median of 3)
-  runs and writes `CROSS-MODE.md`/`.csv` for the 2B, 4B and 9B at positions 100-24,000 plus the 1,000-token read.
-  GPU-only/CPU-only at 24K is 34.9x/49.9x/44.5x. The GPU+CPU tandem rows are present and `n/a`: there is no
-  `TandemEngine`, so no tandem number is claimed; the page names the TANDEM-STATUS gates that must pass first.
-  Gate: `python docs/benchmarks/build_cross_mode.py --check`, 203 tests, `compileall`, config/support checks; no
-  new timing run and no GPU run.
+- Cross-mode benchmark matrix (2026-11-10): `docs/benchmarks/build_cross_mode.py` reads the measured native
+  Windows CPU-only (`2026-11-10-i7-8086k-windows-cpu`, 6 threads, one run) and GPU-only
+  (`2026-11-09-i7-8086k-rtx4060ti`, median of 3) runs and writes `CROSS-MODE.md`/`.csv` for the 2B, 4B and 9B
+  at positions 100-24,000 plus the 1,000-token read. CPU-only at 24K is 8.2/3.1/2.6 tok/s; GPU-only/CPU-only
+  is 19.6x/25.7x/24.0x. The WSL2 CPU cells are archived. The GPU+CPU tandem rows are present and `n/a`: there
+  is no `TandemEngine`, so no tandem number is claimed; the page names the TANDEM-STATUS gates that must pass
+  first. Gate: `python docs/benchmarks/build_cross_mode.py --check`, 203 tests, `compileall`, config/support
+  checks; no new GPU run.
 - i7-8086K CPU support row and CPU server chat (2026-11-10): `docs/CARDS.md` now lists the i7-8086K
-  (6 threads, 2B/4B/9B, native Windows 33.7/16.7/9.1 tok/s verify, WSL2 24K table). The missing support
+  (6 threads, 2B/4B/9B, native Windows 33.7/16.7/9.1 tok/s verify, native 24K table). The missing support
   gate is verified on the native build: `KINDI_DEVICE=cpu` served the 2B on 127.0.0.1:8199 at a 1,024
   context, answering `POST /v1/chat/completions` non-stream (19 prompt / 9 completion, 32.9 tok/s) and
   stream (17 / 7, 32.7 tok/s) with 0 errors, 0 MiB GPU memory and `kindi.cpu.Engine` at 6 threads. The
@@ -330,6 +332,15 @@ is not a lock.
   graph build** (Hadamard block 4096). The plain `KINDI_TP=0` 4B/9B paths pass 4/4 at 114.9/72.5 tok/s.
   `docs/CARDS.md` and `docs/CARD-SUPPORT.md` record this as a partial result, not a tc support claim. Raw
   logs (untracked): `bench-logs/verify-4060ti-tc/`. No code changed.
+- Native Windows 24K CPU benchmark (2026-11-10): `python -m kindi --pack ... --ctx 24576 bench` on the
+  native Windows engine (6 threads auto-detected, exact head, one fresh process per model) measured 2B
+  45.1 read / 35.9 / 29.3 / 19.4 / 11.9 / 8.2; 4B 19.2 / 15.2 / 13.4 / 6.8 / 4.3 / 3.1; 9B 9.9 / 8.7 /
+  7.7 / 4.9 / 3.5 / 2.6 tokens/s. All three `bench` processes exited 0. The rows are in
+  `docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv`; the generator now reads them and
+  `CROSS-MODE.md`/`.csv` use 8.2/3.1/2.6 at 24K (GPU/CPU 19.6x/25.7x/24.0x). The GPU and tandem rows are
+  unchanged. Raw logs: `docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/raw/bench-24k-*.log`. Gate: 203 tests,
+  `python docs/benchmarks/build_cross_mode.py --check`, config/support checks, `compileall`, `bash -n`,
+  `git diff --check`.
 
 ## Layout
 

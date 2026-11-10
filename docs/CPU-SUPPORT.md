@@ -40,7 +40,7 @@ they are not part of this CPU goal.
 | Intel Core i5-2500K | Sandy Bridge | 4 / 4 | AVX; **no AVX2, FMA or F16C** | **Blocked**: the current source cannot compile for this CPU | 2B and 4B after an AVX/scalar fallback; 9B only if measured and useful; 27B no |
 | Intel Xeon W-2133 | Skylake-W | 6 / 12 | AVX-512, AVX2, FMA, F16C | Expected to build and run, but **unverified** | 2B, 4B and 9B |
 | Intel Core i9-13900K | Raptor Lake (8 P + 16 E) | 24 / 32 | AVX2, FMA, F16C; no AVX-512 | Expected to build and run, but **unverified** | 2B, 4B and 9B; tune P/E thread count |
-| Intel Core i7-8086K | Coffee Lake | 6 / 12 | AVX2, FMA, F16C | **Engine and server verified**: WSL2 (2B/4B/9B 4/4, 6-thread 24K bench), native Windows (2B/4B/9B 4/4 at 33.7/16.7/9.1 tok/s, 6 threads auto-detected), and a native CPU server chat request on the 2B (32.9 tok/s, 1,024 context, 0 errors) | 2B, 4B and 9B; use 6 threads |
+| Intel Core i7-8086K | Coffee Lake | 6 / 12 | AVX2, FMA, F16C | **Engine and server verified**: native Windows (2B/4B/9B 4/4 at 33.7/16.7/9.1 tok/s, 6 threads auto-detected; 24K generation 8.2/3.1/2.6 tok/s, read 45.1/19.2/9.9), WSL2 history, and a native CPU server chat request on the 2B (32.9 tok/s, 1,024 context, 0 errors) | 2B, 4B and 9B; use 6 threads |
 
 Notes:
 
@@ -53,11 +53,12 @@ Notes:
 - The i9-13900K is hybrid. The current installer counts 24 physical cores and OpenMP places threads on
   “cores”, so E-cores will be used. Test `--threads 8`, `16`, `24` and `32`, then choose a default from
   the measurement rather than from the core count.
-- The i7-8086K is now measured: 2B 35.2 read / 28.2 write at depth 100, 4B 14.2 / 11.8 and 9B 7.6 /
-  6.8 tokens/s, with 2B at 4.6 tokens/s at 24K. The 12-thread configuration is 6-20x slower; use 6
-  threads (one per physical core, now the engine's default — see below). See the
-  [benchmark](benchmarks/2026-11-09-i7-8086k-cpu/README.md). The i7-8700 row remains a separate
-  6-core reference point.
+- The i7-8086K is now measured natively: 2B 45.1 read / 35.9 write at depth 100, 4B 19.2 / 15.2 and
+  9B 9.9 / 8.7 tokens/s, with 2B/4B/9B at 8.2/3.1/2.6 tokens/s at 24K. The WSL2 run (35.2/28.2,
+  14.2/11.8, 7.6/6.8; 4.6/1.6/1.4 at 24K) is kept as history. The 12-thread configuration is 6-20x
+  slower; use 6 threads (one per physical core, now the engine's default — see below). See the
+  [native benchmark](benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md). The i7-8700 row remains a
+  separate 6-core reference point.
 - These are single-socket desktop/workstation CPUs. Multi-socket CPU inference is out of scope.
 
 ## Verified i7-8086K result (2026-11-09)
@@ -87,6 +88,7 @@ Benchmark at 24,576 tokens with 6 threads (`OMP_NUM_THREADS=6`, `OMP_PROC_BIND=c
 The same benchmark with 12 threads is 6-20x slower (2B read 1.8, 4B 1.2, 9B 1.1 tokens/s); it is
 not a recommended configuration. The follow-up probe below identifies libgomp's active spin-wait on
 the hyperthread pairs as the cause, so `kindi/cpu.py` now defaults to one thread per physical core.
+The native 24K numbers in the next section replace these cells in the cross-mode matrix.
 
 The full CPU test suite passes (`127 passed, 1 warning`), but it does not build `kcpu.c`; the native
 runs above are what exercise the C engine. This is one run per model/thread configuration, with no
@@ -119,8 +121,18 @@ python -m kindi verify
 
 The same verifies on WSL2 read 28.1, 13.0 and 5.6 tokens/s, so the native build is the faster path on
 this CPU. Pack load is the slow part on Windows (22.8 s, 50.7 s and 112.3 s for 2B/4B/9B). A second
-native run measured 33.5/14.3/7.3, so these single runs vary by up to a quarter. Evidence:
-[benchmark](benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md).
+native run measured 33.5/14.3/7.3, so these single runs vary by up to a quarter.
+
+At 24,576 tokens, six threads, exact head, one run per model:
+
+| Model | Read | 100 | 2,000 | 8,000 | 16,000 | 24,000 |
+|---|---:|---:|---:|---:|---:|---:|
+| 2B | 45.1 | 35.9 | 29.3 | 19.4 | 11.9 | 8.2 |
+| 4B | 19.2 | 15.2 | 13.4 | 6.8 | 4.3 | 3.1 |
+| 9B | 9.9 | 8.7 | 7.7 | 4.9 | 3.5 | 2.6 |
+
+The native 24K rates are 8.2/3.1/2.6 tokens/s; the old WSL2 run generated 4.6/1.6/1.4. These rows are the
+CPU cells in `CROSS-MODE.md`; raw logs are in the [benchmark](benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md).
 
 The engine resolves 6 threads, not 12, through `GetLogicalProcessorInformationEx`, so the Windows
 default avoids the hyperthread collapse below without `OMP_NUM_THREADS`. `libomp.dll` is loaded from
