@@ -198,6 +198,16 @@ is not a lock.
   (>3x rule), so 49K quality is unmeasured and the long-context path needs root-causing. q8_0 fits
   only 35,328-35,840 tokens on the card. Evidence: `bench-logs/27b-longctx/RESULTS.md`. The cache
   remains lossy (2/4 prompts exact, see `bench-logs/27b-matrix/REPORT.md`).
+- origin/main v0.5.0 merged (2026-11-10): merge commit `78a66d3` brings `origin/main` (`d9fce60`,
+  v0.5.0) into this branch on top of `858eac5` and `fc23913`. Resolutions keep the
+  Turing/Pascal/Maxwell card sections with the AMD 840M/8060S sections, the 0.5.0 `fd_ch`/`kexpf`
+  fingerprint keys plus `att_tc`, and the vq4w and B2 kernel names. The v0.5.0 one-card HB 512/4096
+  guard is null-safe for the plan-engine probe; the B2 maps are built only for `tc.cu` because
+  `tc_turing.cu` has no B2 kernels; `docs/AMD.md` now says 0.5.0. `docs/CONFIGURATION-REFERENCE.md`
+  regenerated (25 keys, 122 env reads). Gate: 140 tests, `config_reference --check`, `compileall`,
+  `bash -n install.sh`. `origin` (`ahtx/kindi`) rejected the push with 403 for `atimelessrage`;
+  `main`, `freebuff/tandem-cpu-recovery` and the annotated tag `v0.4.0-k8v4` (-> `858eac5`) are on
+  `myfork` (`atimelessrage/kindi`). The merge commit is `78a66d3`; this handoff commit follows it.
 
 ## Layout
 
