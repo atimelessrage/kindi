@@ -4,12 +4,15 @@ The whole forward pass of a token runs in C (kcpu.c, one OpenMP parallel region 
 kindi.engine.Engine: reset(), feed(tok, pos), step(tok, pos) -> greedy token, generate(ids, n), logits in
 self.ylog[:self.ylog_n]. Loads a Kindi pack (kindi convert) and repacks the ternary weights into pair codes
 ("perm8": per 8-row block and 128-column group, 64 words of 32 bits; one vpermps gives 8 rows x 2 columns).
-kcpu.c is built on first use with gcc (-O3 -march=native -fopenmp) into KINDI_CPU_CACHE (default ~/.cache/kindi).
+kcpu.c is built on first use (-O3 -march=native -fopenmp) into KINDI_CPU_CACHE (default ~/.cache/kindi): gcc on
+Linux, and on Windows clang with the MSVC headers and libomp that its driver finds (KINDI_CC, KINDI_LLVM override).
 Threads: OMP_NUM_THREADS, or one per physical core of this process's CPUs by default (OMP_PROC_BIND=close,
 OMP_PLACES=cores); see _configure_threads for why the hyperthread siblings are left out."""
 import ctypes
 import json
 import os
+import shutil
+import struct
 import subprocess
 import time
 
@@ -52,25 +55,63 @@ class Model(ctypes.Structure):
                 + [(n, PF) for n in _SCR] + [("red", ctypes.POINTER(ctypes.c_double))])
 
 
+def _llvm_root(cc):
+    """The clang install whose lib/ holds libomp.lib and bin/ libomp.dll, or None (KINDI_LLVM wins)."""
+    root = os.environ.get("KINDI_LLVM")
+    if root:
+        return root
+    exe = shutil.which(cc)
+    if not exe:
+        return None
+    root = os.path.dirname(os.path.dirname(os.path.abspath(exe)))
+    return root if os.path.isdir(os.path.join(root, "lib")) else None
+
+
+def _build_cmd(src, so, win=None):
+    """The compiler command line: gcc on Linux; clang and libomp on Windows.
+
+    clang's driver finds the MSVC headers and Windows SDK through vswhere, so no vcvars shell is needed;
+    the build stays an argument vector (paths from KINDI_CPU_CACHE are literal). -ffp-contract=off keeps
+    Windows output on the same side of the FMA rounding as the gcc build that the references were made with.
+    """
+    if win is None:
+        win = os.name == "nt"
+    if not win:
+        return ["gcc", "-O3", "-march=native", "-fopenmp", "-fno-math-errno", "-shared", "-fPIC",
+                "-o", so, src, "-lm"]
+    cc = os.environ.get("KINDI_CC", "clang")
+    cmd = [cc, "-O3", "-march=native", "-fopenmp", "-fno-math-errno", "-ffp-contract=off",
+           "-shared", "-o", so, src]
+    root = _llvm_root(cc)
+    if root:
+        cmd += ["-L", os.path.join(root, "lib"), "-llibomp"]
+    return cmd
+
+
 def _build(src, so):
     """Compile kcpu.c without a shell, so paths from KINDI_CPU_CACHE stay literal."""
-    cmd = ["gcc", "-O3", "-march=native", "-fopenmp", "-fno-math-errno", "-shared", "-fPIC",
-           "-o", so, src, "-lm"]
+    cmd = _build_cmd(src, so)
     try:
         result = subprocess.run(cmd)
     except OSError as e:
-        raise SystemExit("kindi: could not run gcc (%s); it needs gcc with OpenMP" % e)
+        raise SystemExit("kindi: could not run %s (%s); it needs gcc with OpenMP, or clang and libomp on Windows"
+                         % (cmd[0], e))
     if result.returncode:
-        raise SystemExit("kindi: could not build the CPU engine (%s); it needs gcc with OpenMP" % so)
+        raise SystemExit("kindi: could not build the CPU engine (%s); it needs gcc with OpenMP, or clang and "
+                         "libomp on Windows" % so)
 
 
 def _lib():
     src = os.path.join(HERE, "kcpu.c")
     cache = os.environ.get("KINDI_CPU_CACHE") or os.path.join(os.path.expanduser("~"), ".cache", "kindi")
     os.makedirs(cache, exist_ok=True)
-    so = os.path.join(cache, "libkcpu.so")
+    so = os.path.join(cache, "libkcpu.dll" if os.name == "nt" else "libkcpu.so")
     if not os.path.exists(so) or os.path.getmtime(so) < os.path.getmtime(src):
         _build(src, so)
+    if os.name == "nt":
+        root = _llvm_root(os.environ.get("KINDI_CC", "clang"))
+        if root and os.path.isdir(os.path.join(root, "bin")):
+            os.add_dll_directory(os.path.join(root, "bin"))      # libomp.dll the built DLL links against
     lib = ctypes.CDLL(so)
     lib.kc_init()
     lib.kc_step.argtypes = [ctypes.POINTER(Model), ctypes.c_int, ctypes.c_int, ctypes.c_int]
@@ -139,8 +180,39 @@ def _cpuinfo_cores(cpus):
     return len(seen) or None
 
 
+def _count_core_records(buf):
+    """Count RelationProcessorCore (0) records in GetLogicalProcessorInformationEx output."""
+    n, off = 0, 0
+    while off + 8 <= len(buf):
+        rel, size = struct.unpack_from("<II", buf, off)
+        if size < 8:
+            break
+        if rel == 0:
+            n += 1
+        off += size
+    return n or None
+
+
+def _windows_cores():
+    """Physical cores of the machine from the Windows topology API, or None."""
+    try:
+        k32 = ctypes.windll.kernel32
+        need = ctypes.c_ulong(0)
+        k32.GetLogicalProcessorInformationEx(0, None, ctypes.byref(need))
+        buf = ctypes.create_string_buffer(need.value)
+        if not k32.GetLogicalProcessorInformationEx(0, buf, ctypes.byref(need)):
+            return None
+        return _count_core_records(buf.raw[:need.value])
+    except (AttributeError, OSError):
+        return None
+
+
 def _physical_cores():
     """How many physical cores this process may run on; the logical CPU count when the topology is unknown."""
+    if os.name == "nt":
+        n = _windows_cores()
+        if n:
+            return n
     cpus = _affinity()
     if not cpus:
         cpus = list(range(os.cpu_count() or 1))

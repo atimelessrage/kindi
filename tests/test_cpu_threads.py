@@ -9,6 +9,12 @@ import pytest
 from kindi import cpu
 
 
+@pytest.fixture(autouse=True)
+def linux_topology(monkeypatch):
+    """These tests describe the Linux topology path; the Windows API has its own test below."""
+    monkeypatch.setattr(cpu, "_windows_cores", lambda: None)
+
+
 @pytest.fixture
 def no_omp(monkeypatch):
     for k in ("OMP_NUM_THREADS", "OMP_PROC_BIND", "OMP_PLACES"):
@@ -20,6 +26,17 @@ def test_cpu_list_parses_ranges_and_singles():
     assert cpu._cpu_list("0-3,8,10-11\n") == [0, 1, 2, 3, 8, 10, 11]
     assert cpu._cpu_list("5") == [5]
     assert cpu._cpu_list("") == []
+
+
+def test_windows_topology_counts_only_processor_cores():
+    import struct
+
+    def rec(rel, size):
+        return struct.pack("<II", rel, size) + b"\x00" * (size - 8)
+
+    # RelationProcessorCore is 0; RelationCache (2) records must not add cores.
+    assert cpu._count_core_records(rec(0, 48) + rec(2, 32) + rec(0, 48)) == 2
+    assert cpu._count_core_records(b"") is None
 
 
 def test_physical_cores_counts_sibling_groups(no_omp, monkeypatch):

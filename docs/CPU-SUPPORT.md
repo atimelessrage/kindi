@@ -1,7 +1,7 @@
 # Long-term CPU support
 
-Status: **roadmap and acceptance contract, 2026-11-09. The i7-8086K engine result is verified;
-the full support contract and the other CPUs remain open.** The baseline CPU engine (`kindi/cpu.py`,
+Status: **roadmap and acceptance contract, updated 2026-11-10. The i7-8086K engine result is
+verified on WSL2 and natively on Windows; the full support contract and the other CPUs remain open.** The baseline CPU engine (`kindi/cpu.py`,
 `kindi/kcpu.c`) is in `main`; the WIP ISA/AVX-only changes are uncompiled and not merged. This page
 records the target, the verified result, and the exact build/runtime requirements so the work can be
 implemented and measured without re-discovering them. The tandem recovery gate is in
@@ -24,7 +24,7 @@ they are not part of this CPU goal.
 
 | gate | current behaviour | consequence |
 |---|---|---|
-| `kindi/cpu.py` build | `gcc -O3 -march=native -fopenmp -fno-math-errno -shared -fPIC` | The binary is built for the host CPU. There is no prebuilt portable CPU library. |
+| `kindi/cpu.py` build | Linux: `gcc -O3 -march=native -fopenmp -fno-math-errno -shared -fPIC`; Windows: `clang -O3 -march=native -fopenmp -fno-math-errno -ffp-contract=off -shared` plus `libomp` (`KINDI_CC`, `KINDI_LLVM`) | The binary is built for the host CPU. There is no prebuilt portable CPU library. |
 | `kindi/kcpu.c` ISA | Uses AVX2 (`_mm256_srlv_epi32`, `_mm256_permutevar8x32_ps`), FMA (`_mm256_fmadd_ps`) and F16C (`_cvtsh_ss` / `_cvtss_sh`) unconditionally; no `#ifdef` or runtime dispatch | A CPU without all three cannot build or run the current library. |
 | documented requirement | `docs/CARDS.md` and the README say “x86-64 with AVX2” | This is accurate but incomplete: FMA and F16C are also required by the source. |
 | `install.sh` preflight | Checks Linux and `x86_64`; does not check AVX2/FMA/F16C | An unsupported CPU fails later inside the container build, with a compiler error rather than an actionable message. |
@@ -40,7 +40,7 @@ they are not part of this CPU goal.
 | Intel Core i5-2500K | Sandy Bridge | 4 / 4 | AVX; **no AVX2, FMA or F16C** | **Blocked**: the current source cannot compile for this CPU | 2B and 4B after an AVX/scalar fallback; 9B only if measured and useful; 27B no |
 | Intel Xeon W-2133 | Skylake-W | 6 / 12 | AVX-512, AVX2, FMA, F16C | Expected to build and run, but **unverified** | 2B, 4B and 9B |
 | Intel Core i9-13900K | Raptor Lake (8 P + 16 E) | 24 / 32 | AVX2, FMA, F16C; no AVX-512 | Expected to build and run, but **unverified** | 2B, 4B and 9B; tune P/E thread count |
-| Intel Core i7-8086K | Coffee Lake | 6 / 12 | AVX2, FMA, F16C | **Engine verified** on WSL2: 2B/4B/9B 4/4 token-exact; 6-thread 24K bench; server path pending | 2B, 4B and 9B; use 6 threads |
+| Intel Core i7-8086K | Coffee Lake | 6 / 12 | AVX2, FMA, F16C | **Engine verified** on WSL2 (2B/4B/9B 4/4, 6-thread 24K bench) and natively on Windows (2B/4B/9B 4/4 at 33.5/14.3/7.3 tok/s, 6 threads auto-detected); server path pending | 2B, 4B and 9B; use 6 threads |
 
 Notes:
 
@@ -65,7 +65,7 @@ Notes:
 Environment: WSL2 Ubuntu 24.04, kernel 6.18.54.1-microsoft-standard-WSL2, GCC 13.3.0, Intel Core
 i7-8086K (6 cores / 12 threads), 15 GiB visible to WSL2 of 32 GB installed, HEAD `0ce4350`, and a
 24,576-token benchmark context. The CPU library was built with `gcc -O3 -march=native -fopenmp`.
-Native Windows CPU is still unbuilt; this is a WSL2 result.
+The native Windows result is recorded in the next section.
 
 Verify used a 1,024-token context:
 
@@ -96,6 +96,35 @@ engine result, not the full support claim defined above.
 Evidence: [README](benchmarks/2026-11-09-i7-8086k-cpu/README.md),
 [summary.json](benchmarks/2026-11-09-i7-8086k-cpu/summary.json),
 [runs.csv](benchmarks/2026-11-09-i7-8086k-cpu/runs.csv), and the raw verify/bench logs indexed there.
+
+## Verified native Windows result (2026-11-10)
+
+Environment: Windows, Intel Core i7-8086K, Python 3.13, clang 18.1.8
+(`clang+llvm-18.1.8-x86_64-pc-windows-msvc`) with the MSVC 14.51 toolset and Windows SDK that clang's
+driver finds through `vswhere`; no `vcvars` shell is needed. `kindi` builds `libkcpu.dll` on first use
+into `KINDI_CPU_CACHE`.
+
+```bat
+set KINDI_CC=C:\Program Files\clang+llvm-18.1.8-x86_64-pc-windows-msvc\bin\clang.exe
+set KINDI_LLVM=C:\Program Files\clang+llvm-18.1.8-x86_64-pc-windows-msvc
+set KINDI_DEVICE=cpu
+python -m kindi verify
+```
+
+| Model | Prompts | Tokens/s | Result |
+|---|---:|---:|---|
+| 2B | 4/4 | 33.5 | token-exact |
+| 4B | 4/4 | 14.3 | token-exact |
+| 9B | 4/4 (13/13 on prompt 3) | 7.3 | token-exact |
+
+The same verifies on WSL2 read 28.1, 13.0 and 5.6 tokens/s, so the native build is the faster path on
+this CPU. Pack load is the slow part on Windows (26 s, 56 s and 129 s for 2B/4B/9B).
+
+The engine resolves 6 threads, not 12, through `GetLogicalProcessorInformationEx`, so the Windows
+default avoids the hyperthread collapse below without `OMP_NUM_THREADS`. `libomp.dll` is loaded from
+the clang `bin` directory, and `kindi/kcpu.c` marks its four entry points `__declspec(dllexport)` so
+the ctypes loader can bind them. The build command and the Linux/Windows split are pinned by
+`tests/test_cpu_build.py`, and the topology parser by `tests/test_cpu_threads.py`.
 
 ### Why 12 threads collapse
 
@@ -187,12 +216,12 @@ the setting that holds on any machine, and the 8-thread gain is a per-machine tu
 | i5-2500K | fallback target | fallback target | measure only | 2B/4B if RAM allows | fallback build, verify, bench |
 | Xeon W-2133 | target | target | target | yes | verify, bench, thread/AVX-512 result |
 | i9-13900K | target | target | target | yes | verify, bench, P/E thread default |
-| i7-8086K | engine verified | engine verified | engine verified | yes | CPU server path, repeat run, native Windows build |
+| i7-8086K | engine verified | engine verified | engine verified | yes | CPU server path, repeat run |
 
 A checked cell needs a recorded `kindi verify` pass and a benchmark row. “Builds” alone is not support.
-`engine verified` for the i7-8086K means the WSL2 CPU library built, `kindi verify` passed and the
-6-thread 24K benchmark completed. The full support contract still needs the CPU server path and a
-native Windows build.
+`engine verified` for the i7-8086K means the CPU library built on WSL2 and natively on Windows,
+`kindi verify` passed and the 6-thread 24K benchmark completed. The full support contract still needs
+the CPU server path.
 
 ## Commands for the validation machine
 
@@ -209,7 +238,9 @@ KINDI_DEVICE=cpu KINDI_CPU_CACHE=/tmp/kindi-cpu python3 -m kindi bench
 
 `kindi verify` needs the converted pack and the matching reference file. The installer's `--threads N`
 sets `OMP_NUM_THREADS` for the CPU container; the direct commands above use the OpenMP default unless
-`OMP_NUM_THREADS` is set.
+`OMP_NUM_THREADS` is set. On Windows set `KINDI_CC` to `clang.exe` and `KINDI_LLVM` to the LLVM
+install root (the directory holding `lib/libomp.lib`); `cpu.py` appends `-L <root>/lib -llibomp` and
+puts `<root>/bin` on the DLL search path.
 
 ## Open decisions
 

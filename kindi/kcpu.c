@@ -9,6 +9,12 @@
 #include <omp.h>
 #include <immintrin.h>
 
+#ifdef _WIN32
+#define KC_API __declspec(dllexport)      /* the ctypes loader needs the names in the DLL export table */
+#else
+#define KC_API
+#endif
+
 typedef struct { const uint8_t* W; const float* S; int R, C; } Mat;   /* W [R/8][C/128][64] u32 pair codes, S [R/8][C/128][8] */
 
 typedef struct {
@@ -75,7 +81,7 @@ static void fold(const Model* m, const float* v, const float* sg, float* out, in
    Per call, a table of the 8 nonzero pair sums for every column pair (m->T, C/2 x 8 floats); then one vpermps per
    8 rows x 2 columns. Per-group sums are scaled (the 8 rows' scales are contiguous) into a vector accumulator, so a
    row's result needs no horizontal sum. Every pair sum is formed once in fp32; no activation quantisation. */
-void kc_init(void){}
+KC_API void kc_init(void){}
 static void pair_tables(const float* x, float* T, int p0, int p1){
   for(int p = p0; p < p1; ++p){
     const float x0 = x[2 * p], x1 = x[2 * p + 1];
@@ -333,7 +339,7 @@ static void embed(Model* m, int tok){
 }
 
 /* one token; head != 0: also the output head (logits in m->logits); returns the greedy token or -1 */
-int kc_step(Model* m, int tok, int pos, int head){
+KC_API int kc_step(Model* m, int tok, int pos, int head){
   int best = -1;
   t_last = omp_get_wtime(); t_cur = 0;
   #pragma omp parallel
@@ -363,5 +369,5 @@ int kc_step(Model* m, int tok, int pos, int head){
   return best;
 }
 
-int kc_sizeof_model(void){ return (int)sizeof(Model); }
-int kc_sizeof_layer(void){ return (int)sizeof(Layer); }
+KC_API int kc_sizeof_model(void){ return (int)sizeof(Model); }
+KC_API int kc_sizeof_layer(void){ return (int)sizeof(Layer); }
