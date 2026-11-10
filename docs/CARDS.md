@@ -441,7 +441,8 @@ image for it.
 | prompt reading | 45.1 (2B), 19.2 (4B), 9.9 (9B) tokens/s (native Windows, 1,000-token prompt) |
 | server | `kindi serve` with `KINDI_DEVICE=cpu` answered `POST /v1/chat/completions` non-stream and stream on the 2B: 19 prompt / 9 completion tokens at 32.9 tokens/s generation, 0 errors, 0 MiB GPU memory (native Windows, 1,024-token context, 2026-11-10) |
 
-- The 12-thread setting is 6-20x slower; use 6 threads. Eight threads were faster on this chip in the
-  probe (47.9 read, 37.3 generation), but they are not the general default.
+- The default six threads is the portable choice. The 12-thread setting is 6-20x slower and 10 is
+  slower too; eight threads are a WSL2/libgomp tuning only (2B/9B gain, 4B read regresses, native
+  Windows 8 loses). See [CPU-SUPPORT.md](CPU-SUPPORT.md#thread-count-sweep-6-8-10-and-12-2026-11-10).
 - The 24K and prompt-reading rows are the native Windows 2026-11-10 run; the WSL2 numbers are archived
   in the benchmark page.

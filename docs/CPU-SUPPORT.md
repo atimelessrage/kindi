@@ -56,7 +56,8 @@ Notes:
 - The i7-8086K is now measured natively: 2B 45.1 read / 35.9 write at depth 100, 4B 19.2 / 15.2 and
   9B 9.9 / 8.7 tokens/s, with 2B/4B/9B at 8.2/3.1/2.6 tokens/s at 24K. The WSL2 run (35.2/28.2,
   14.2/11.8, 7.6/6.8; 4.6/1.6/1.4 at 24K) is kept as history. The 12-thread configuration is 6-20x
-  slower; use 6 threads (one per physical core, now the engine's default — see below). See the
+  slower and 10 is slower too; 8 is only a WSL2/libgomp tuning (see the thread sweep below). Use 6
+  threads (one per physical core, now the engine's default — see below). See the
   [native benchmark](benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md). The i7-8700 row remains a
   separate 6-core reference point.
 - These are single-socket desktop/workstation CPUs. Multi-socket CPU inference is out of scope.
@@ -169,23 +170,93 @@ A 2B probe at a 512-token context, one run per row, read rate and generation at 
 | 12 threads, `OMP_PROC_BIND=spread` | 1.3 | 1.4 |
 | 6 threads, default binding | 38.6 | 28.8 |
 
+The 6- and 8-thread rows in this first probe are one-run values; the follow-up medians below
+supersede them and add 10 threads.
+
 Binding is not the variable: 12 threads collapse under `close`, `spread` and no binding at all.
 Turning the active spin-wait off is: passive waiting or `GOMP_SPINCOUNT=0` recovers 10x. The cause
 is libgomp spinning both hyperthread siblings of a core. `kcpu.c` runs a token as one parallel
 region with a barrier between row blocks, so a spinning sibling takes the pipeline from the partner
 it is waiting for at every barrier, and the convoy grows with each one. The passive recovery still
 only reaches 12.5 tokens/s against 39.2 for 6 threads: waking 12 threads at every barrier is
-expensive on its own, and the two siblings of a core share its execution units. Leaving the
-siblings out is the fix, so `_configure_threads()` in `kindi/cpu.py` resolves the default to the
-physical-core count and pins it with `OMP_PROC_BIND=close` and `OMP_PLACES=cores`.
+expensive on its own, and the two siblings of a core share its execution units. For the default,
+leaving the siblings out is the stable fix, so `_configure_threads()` in `kindi/cpu.py` resolves the
+default to the physical-core count and pins it with `OMP_PROC_BIND=close` and `OMP_PLACES=cores`.
 
-One anomaly is recorded as measured and not explained: 8 threads (two cores doubled up) are
-consistently faster than 6 — 47.9 read in the probe and 46.4 / 49.1 in two repeats, against
-39.2-40.0 for 6 threads over four runs, with generation at 36.0 / 36.1 against 28.9-29.9. The two
-extra runnable threads seem to hide some of the barrier and memory latency, but no profiler run was
-made, so this is a hypothesis. The default stays at the physical-core count rather than 8: that is
-the setting that holds on any machine, and the 8-thread gain is a per-machine tuning result
-(`OMP_NUM_THREADS=8`) that has only been measured on this i7-8086K.
+### Thread-count sweep: 6, 8, 10 and 12 (2026-11-10)
+
+The 8-thread row in the table above is not eight physical cores. With `OMP_PLACES=cores`, each place
+is a physical core (both SMT siblings), so 6 threads take six places. Eight threads put the two extra
+threads on two of those places (two SMT pairs); 10 threads use four pairs; 12 threads double all six.
+A thread-affinity probe on both WSL2 and native Windows confirmed this placement.
+
+A follow-up measured six in-process read blocks (20 tokens each) and six generation blocks (10 tokens
+each) per process; the medians below use the same 512-token protocol as `kindi bench`. WSL2 (GCC
+13.3, libgomp), 2B, read and generation at position 100:
+
+| threads | read | generation |
+|---|---:|---:|
+| 6 | 38.2 | 28.6 |
+| 8 | 44.3 | 31.2 |
+| 10 | 25.5 | 24.1 |
+| 12 | 1.7 | 1.6 |
+
+At 24,576 tokens on WSL2 (one run each):
+
+| threads | read | 100 | 2,000 | 8,000 | 16,000 | 24,000 |
+|---|---:|---:|---:|---:|---:|---:|
+| 6 | 38.3 | 28.1 | 22.4 | 11.7 | 7.0 | 4.5 |
+| 8 | 40.0 | 31.9 | 26.8 | 15.3 | 7.6 | 6.2 |
+
+At 512 tokens, one run each:
+
+| model | 6 threads (read / gen) | 8 threads (read / gen) |
+|---|---:|---:|
+| 4B | 14.8 / 12.7 | 10.2 / 13.1 |
+| 9B | 7.3 / 6.4 | 7.5 / 7.3 |
+
+Native Windows (clang 18.1.8, libomp), 2B, 512 tokens; median of the available process runs (6/8:
+three, 10: two):
+
+| threads | read | generation |
+|---|---:|---:|
+| 6 | 43.2 | 31.7 |
+| 8 | 28.4 | 21.6 |
+| 10 | 13.5 | 9.8 |
+
+Stage timers from thread 0 (`kc_times`), medians of six blocks; seconds per 20 read tokens / 10
+generation tokens. The native rows use a debug DLL with a read-only accessor; production code is
+unchanged.
+
+| runtime | threads | read total | read GEMV | gen total | gen GEMV |
+|---|---:|---:|---:|---:|---:|
+| WSL2 | 6 | 0.531 | 0.480 | 0.356 | 0.323 |
+| WSL2 | 8 | 0.458 | 0.404 | 0.309 | 0.275 |
+| WSL2 | 10 | 0.737 | 0.520 | 0.499 | 0.359 |
+| native | 6 | 0.465 | 0.406 | 0.312 | 0.278 |
+| native | 8 | 0.619 | 0.506 | 0.709 | 0.452 |
+| native | 10 | 1.722 | 0.827 | 1.242 | 0.532 |
+
+The stage split answers the "why": GEMV is about 90% of both paths. On WSL2, 8 threads lowers GEMV
+by 16-19%; GDN, attention and norm stages barely change or get worse. `rows8` is a latency-heavy
+loop (permute, table loads, FMA), and the two SMT workers fill issue and memory gaps. This is not
+barrier load balance: the barrier-heavy GDN/attention stages do not improve. On native Windows the
+same two SMT pairs make GEMV 25-63% slower and add overhead in the small stages, so 6 wins. The
+exact libgomp/libomp and GCC/clang difference is not reduced to a cycle-level model, but the effect
+is localized to the GEMV kernel and SMT contention.
+
+At 10 threads four cores are doubled. Both runtimes lose: WSL2 reads 25.5 / generates 24.1 against
+44.3 / 31.2 at 8, and native reads 13.5 / generates 9.8 against 43.2 / 31.7 at 6. Twelve doubles all
+six and collapses (1.7 tokens/s); passive waiting recovered 12 threads to 12.6 / 11.5 in the earlier
+probe, still far below 6. Native passive waiting improved 10 to 20.0 / 14.7, but not enough to beat 6.
+
+**Decision: keep the physical-core default (6 on this CPU).** Do not change it to 8 or 10. Eight
+threads is an explicit WSL2/libgomp tuning for the 2B and 9B; 4B read regresses, native Windows 8 is
+slower, and the result is compiler/runtime-specific. A startup auto-tune is not warranted now:
+read and generation disagree for 4B, the choice is model-dependent, and calibration would add
+startup cost and another source of variance; 10/12 must remain bounded. A user with a measured WSL2
+workload can set `OMP_NUM_THREADS=8`. Raw probe logs are in `bench-logs/thread-sweep-20261110/`
+(untracked).
 
 ## Work packages
 

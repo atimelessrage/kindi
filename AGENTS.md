@@ -86,6 +86,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | CI CPU build-and-smoke job | this worktree | `freebuff/tandem-cpu-recovery` | `.github/workflows/ci.yml`, `tests/test_cpu_smoke.py`, `docs/CPU-SUPPORT.md`, `AGENTS.md` | done; `cpu-engine-smoke` compiles `kcpu.c` with gcc for AVX2/FMA/F16C and loads it through `kindi.cpu._lib()`; 203 tests pass and the gated smoke test passes with a compiled library; no GPU or pack |
 | RTX 4060 Ti tc verify | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CARDS.md`, `docs/CARD-SUPPORT.md`, `AGENTS.md` | done; 2B tc 4/4 at 354.5 tok/s, 4B tc 2/4 (prompts 2/3), 9B tc refused (Hadamard 4096), plain 4B/9B 4/4 at 114.9/72.5 tok/s; no code changed |
 | Native Windows 24K CPU benchmark + cross-mode matrix | this worktree | `freebuff/tandem-cpu-recovery` | `docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/{README.md,runs.csv,raw/bench-24k-*.log}`, `docs/benchmarks/build_cross_mode.py`, `docs/benchmarks/CROSS-MODE.md`, `docs/benchmarks/CROSS-MODE.csv`, `docs/BENCHMARKS.md`, `docs/CARDS.md`, `docs/CPU-SUPPORT.md`, `AGENTS.md` | done; native 2B/4B/9B 24K generation 8.2/3.1/2.6 tok/s, read 45.1/19.2/9.9; replaced the WSL2 CPU cells; GPU/tandem rows unchanged |
+| CPU thread-count sweep (6/8/10/12) | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/cpu.py`, `tests/test_cpu_threads.py`, `docs/CPU-SUPPORT.md`, `docs/CARDS.md`, `docs/CONFIGURATION-REFERENCE.md`, `docs/benchmarks/2026-11-09-i7-8086k-cpu/README.md`, `AGENTS.md` | done; WSL2 2B 6/8/10 read 38.2/44.3/25.5 and gen 28.6/31.2/24.1; native 2B 6/8/10 read 43.2/28.4/13.5 and gen 31.7/21.6/9.8; 8 is a WSL2/libgomp tuning, 10/12 are slower, default stays 6; no auto-tune |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -341,6 +342,21 @@ is not a lock.
   unchanged. Raw logs: `docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/raw/bench-24k-*.log`. Gate: 203 tests,
   `python docs/benchmarks/build_cross_mode.py --check`, config/support checks, `compileall`, `bash -n`,
   `git diff --check`.
+- CPU thread-count sweep (2026-11-10): 6, 8, 10 and 12 threads were measured on the i7-8086K. The
+  affinity probe shows 8 uses six cores with two SMT pairs, 10 uses four pairs and 12 doubles all six.
+  WSL2/libgomp 2B at 512 tokens: 6/8/10 read 38.2/44.3/25.5 and generation 28.6/31.2/24.1 tok/s; 12
+  collapses to 1.7. WSL2 2B at 24K: 6/8 generation at 24,000 is 4.5/6.2 and read is 38.3/40.0. Native
+  Windows/clang 2B: 6/8/10 read 43.2/28.4/13.5 and generation 31.7/21.6/9.8; native passive waiting
+  lifts 10 to 20.0/14.7 but not past 6. Stage timers (`kc_times`) localize the WSL2 gain to GEMV
+  (read 0.480 to 0.404 s, generation 0.323 to 0.275 s); on native the same GEMV worsens (0.406 to
+  0.506 and 0.278 to 0.452). The barrier-heavy GDN/attention stages do not improve, so the effect is
+  SMT latency hiding in `rows8`, not barrier load balance. 4B read regresses under WSL2 8
+  (14.8 to 10.2) while generation is +3%; 9B is 7.3/6.4 at 6 and 7.5/7.3 at 8. Decision: keep the
+  physical-core default; 8 is an explicit WSL2/libgomp tuning, 10/12 are not viable, and auto-tuning
+  is not justified by these mixed model/read-vs-generation results. Evidence (untracked):
+  `bench-logs/thread-sweep-20261110/`; docs updated in `docs/CPU-SUPPORT.md`, `docs/CARDS.md`,
+  `docs/CONFIGURATION-REFERENCE.md`, `docs/benchmarks/2026-11-09-i7-8086k-cpu/README.md` and
+  `kindi/cpu.py`. Gate: 203 tests, `compileall`, `bash -n`, config/support checks, `git diff --check`.
 
 ## Layout
 

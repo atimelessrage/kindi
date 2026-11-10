@@ -7,7 +7,9 @@ self.ylog[:self.ylog_n]. Loads a Kindi pack (kindi convert) and repacks the tern
 kcpu.c is built on first use (-O3 -march=native -fopenmp) into KINDI_CPU_CACHE (default ~/.cache/kindi): gcc on
 Linux, and on Windows clang with the MSVC headers and libomp that its driver finds (KINDI_CC, KINDI_LLVM override).
 Threads: OMP_NUM_THREADS, or one per physical core of this process's CPUs by default (OMP_PROC_BIND=close,
-OMP_PLACES=cores); see _configure_threads for why the hyperthread siblings are left out."""
+OMP_PLACES=cores). The physical-core default is the portable choice; 8 threads (two SMT pairs) can be
+faster under WSL2/libgomp on the 2B/9B, but 10/12 and native Windows 8 are slower. See
+docs/CPU-SUPPORT.md for the sweep and _configure_threads for the default."""
 import ctypes
 import json
 import os
@@ -232,10 +234,10 @@ def _configure_threads(threads=None):
     """Resolve the OpenMP thread count and binding before the C library loads (OpenMP reads them once).
 
     An explicit `threads` wins, then OMP_NUM_THREADS already in the environment, then one thread per
-    physical core of this process's CPUs, bound to those cores.  The hyperthread siblings must stay
-    out: a token is one OpenMP parallel region with a barrier per matrix row block, and the siblings
-    spin through those barriers stealing the pipeline from their partners.  On the i7-8086K (6 cores /
-    12 threads) 12 threads run the 2B at 1.3 tokens/s against 39.2 for 6."""
+    physical core of this process's CPUs, bound to those cores.  The physical-core default is the
+    portable choice.  Eight threads (two SMT pairs) can be faster in WSL2/libgomp on the 2B/9B, but
+    4B read regresses, 10/12 are slower, and native Windows/clang is slower at 8; explicit values
+    remain available for a measured workload."""
     if threads:
         n = int(threads)
         os.environ["OMP_NUM_THREADS"] = str(n)

@@ -1,8 +1,9 @@
-"""The CPU engine's thread default: physical cores, never the hyperthread siblings.
+"""The CPU engine's thread default: physical cores, not all hyperthreads.
 
 The i7-8086K runs the 2B at 39.2 tokens/s with 6 threads and 1.3 with 12 (OpenMP active
-spinning on 6 pairs), so the default must resolve to one thread per physical core, while an
-explicit `threads=` or `OMP_NUM_THREADS` stays untouched.
+spinning on 6 pairs), so the default must resolve to one thread per physical core.  Eight
+threads uses two SMT pairs and is a WSL2-specific tuning, not the default; an explicit
+`threads=` or `OMP_NUM_THREADS` stays untouched.
 """
 import pytest
 

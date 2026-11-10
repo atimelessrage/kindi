@@ -166,7 +166,8 @@ Not proved or not done:
   time, so WSL2 was used. The native build followed on 2026-11-10 with clang 18.1.8 and libomp:
   [2026-11-10-i7-8086k-windows-cpu](../2026-11-10-i7-8086k-windows-cpu/README.md).
 - **12-thread usability.** It is measured and is much slower; it is not a recommended
-  configuration, and no profiler-based explanation was established.
+  configuration. The 2026-11-10 thread sweep and `kc_times` stage timers in
+  [CPU-SUPPORT.md](../../CPU-SUPPORT.md) explain the 8/10 results and keep 6 as the default.
 - **Repeated-run stability and thermals.** One run per configuration; no clock, power or
   temperature logging; no median/variance.
 - **Multi-user serving or 27B CPU.** The 2B CPU server chat path was tested later (native Windows,
