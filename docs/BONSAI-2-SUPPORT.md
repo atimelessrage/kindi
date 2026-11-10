@@ -96,7 +96,7 @@ Verified in the code and docs on this branch:
 | 262,144 context | Untested | Untested | Untested | Yes, 2x P100 | `docs/BENCHMARKS.md` full-context 27B run; `docs/CARDS.md` shows 110,592 tokens on a 10 GB RTX 3080 |
 | Tools / thinking | Yes | Yes | Yes | Yes | `kindi/chat.py`; 27B has reasoning-effort template |
 | Publisher sampling | Partial | Partial | Partial | Partial | Temperature/top-p/top-k exist; no presence penalty; thinking off by default |
-| CPU text | Yes | Yes | Yes | No | `docs/CPU-SUPPORT.md`; CPU targets are not all measured |
+| CPU text | Yes | Yes | Yes | No | `docs/CPU-SUPPORT.md`; i7-8086K engine verified 2026-11-09 (2B/4B/9B 4/4); W-2133/i9 unmeasured |
 | Multi-GPU text | No | No | No | Yes (2 cards) | 27B 2x P100 full-context result; no vision TP |
 | Publisher MTP | No | No | No | No | Prism 4B/9B MTP is not loadable |
 | Kindi MTP / draft | 2B head | No | No | 2B drafter | `docs/MTP.md`; 2B head is neutral at 24K |

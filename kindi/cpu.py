@@ -5,7 +5,8 @@ kindi.engine.Engine: reset(), feed(tok, pos), step(tok, pos) -> greedy token, ge
 self.ylog[:self.ylog_n]. Loads a Kindi pack (kindi convert) and repacks the ternary weights into pair codes
 ("perm8": per 8-row block and 128-column group, 64 words of 32 bits; one vpermps gives 8 rows x 2 columns).
 kcpu.c is built on first use with gcc (-O3 -march=native -fopenmp) into KINDI_CPU_CACHE (default ~/.cache/kindi).
-Threads: OMP_NUM_THREADS (with OMP_PROC_BIND=close; on a two-socket host, the cores of one socket)."""
+Threads: OMP_NUM_THREADS, or one per physical core of this process's CPUs by default (OMP_PROC_BIND=close,
+OMP_PLACES=cores); see _configure_threads for why the hyperthread siblings are left out."""
 import ctypes
 import json
 import os
@@ -78,6 +79,108 @@ def _lib():
     return lib
 
 
+def _cpu_list(s):
+    """Parse a Linux CPU list ("0-3,8,10-11") into [0, 1, 2, 3, 8, 10, 11]."""
+    out = []
+    for part in s.strip().split(","):
+        part = part.strip()
+        if not part:
+            continue
+        lo, _, hi = part.partition("-")
+        out.extend(range(int(lo), int(hi) + 1 if hi else int(lo) + 1))
+    return out
+
+
+def _affinity():
+    """The CPUs this process may run on, or None where the OS does not say (Linux sched_getaffinity)."""
+    try:
+        return sorted(os.sched_getaffinity(0))
+    except (AttributeError, OSError):
+        return None
+
+
+def _read(path):
+    """The text of a system file, or None when it is not there."""
+    try:
+        with open(path) as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def _siblings(cpu):
+    """The hyperthread siblings of a CPU from sysfs, or None when the topology is not exposed."""
+    sib = _read("/sys/devices/system/cpu/cpu%d/topology/thread_siblings_list" % cpu)
+    return None if sib is None else _cpu_list(sib)
+
+
+def _cpuinfo_cores(cpus):
+    """Fallback: count the (physical id, core id) pairs of `cpus` in /proc/cpuinfo."""
+    text = _read("/proc/cpuinfo")
+    if text is None:
+        return None
+    seen, cur = set(), {}
+
+    def flush():
+        if cur.get("processor") in cpus:
+            seen.add((cur.get("physical id", 0), cur.get("core id", cur["processor"])))
+        cur.clear()
+    for line in text.splitlines():
+        if not line.strip():
+            flush()
+            continue
+        key, _, val = line.partition(":")
+        if key.strip() in ("processor", "physical id", "core id"):
+            try:
+                cur[key.strip()] = int(val)
+            except ValueError:
+                pass
+    flush()
+    return len(seen) or None
+
+
+def _physical_cores():
+    """How many physical cores this process may run on; the logical CPU count when the topology is unknown."""
+    cpus = _affinity()
+    if not cpus:
+        cpus = list(range(os.cpu_count() or 1))
+    cores = set()
+    for c in cpus:
+        sib = _siblings(c)
+        if sib is None:
+            break
+        cores.add(min([s for s in sib if s in cpus] or sib))
+    else:
+        if cores:
+            return len(cores)
+    return _cpuinfo_cores(set(cpus)) or len(cpus)
+
+
+def _configure_threads(threads=None):
+    """Resolve the OpenMP thread count and binding before the C library loads (OpenMP reads them once).
+
+    An explicit `threads` wins, then OMP_NUM_THREADS already in the environment, then one thread per
+    physical core of this process's CPUs, bound to those cores.  The hyperthread siblings must stay
+    out: a token is one OpenMP parallel region with a barrier per matrix row block, and the siblings
+    spin through those barriers stealing the pipeline from their partners.  On the i7-8086K (6 cores /
+    12 threads) 12 threads run the 2B at 1.3 tokens/s against 39.2 for 6."""
+    if threads:
+        n = int(threads)
+        os.environ["OMP_NUM_THREADS"] = str(n)
+        return n
+    env = os.environ.get("OMP_NUM_THREADS")
+    if env:
+        try:
+            return int(env)
+        except ValueError:
+            return env
+    n = _physical_cores()
+    os.environ["OMP_NUM_THREADS"] = str(n)
+    os.environ.setdefault("OMP_PROC_BIND", "close")
+    os.environ.setdefault("OMP_PLACES", "cores")
+    return n
+
+
 _CODE = np.array([0, 1, 2, 3, 8, 4, 5, 6, 7], dtype=np.uint32)     # t0 + 3 t1 -> pair code (4 = both zero -> 8)
 
 
@@ -107,8 +210,7 @@ def _p(a, t=PF):
 class Engine(object):
     def __init__(self, pack, ctx=4096, clusters=None, log=print, threads=None):
         t0 = time.time()
-        if threads:
-            os.environ["OMP_NUM_THREADS"] = str(threads)
+        self.threads = _configure_threads(threads)
         self.lib = _lib()
         self.ctx = int(ctx)
         man = json.load(open(os.path.join(pack, "kindi_pack.json")))
@@ -202,7 +304,7 @@ class Engine(object):
         self.shortlist = 0
         self.vocab = json.load(open(os.path.join(pack, "vocab.json")))
         (log or (lambda *a: None))("kindi-cpu ready: %s, %s threads, ctx %d (%.1fs)" % (
-            man.get("model"), os.environ.get("OMP_NUM_THREADS", os.cpu_count()), self.ctx, time.time() - t0))
+            man.get("model"), self.threads, self.ctx, time.time() - t0))
 
     def reset(self):
         for a in self.M + self.conv + self.Kc + self.Vc:

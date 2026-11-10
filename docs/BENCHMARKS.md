@@ -27,6 +27,26 @@ The current branch and `v0.4.0` have byte-identical `kindi/bench.py` and `kindi/
 
 The separate 2B plan engine at the same 24K context measured 302.4 tok/s against 170.6 plain, 1.77x, with `KINDI_TP=1 KINDI_TC=1 KINDI_TC_TMAX=4` and no speculative drafting. That result is in the same report.
 
+## 2026-11-09: CPU engine · Intel Core i7-8086K
+
+WSL2 Ubuntu 24.04, GCC 13.3, i7-8086K (6 cores / 12 threads), 15 GiB visible to WSL2, 24,576-token
+context, exact head, one run per configuration. Verify uses a 1,024-token context. Six threads (one
+per physical core) is the recommended configuration. This is a Kindi-only run; no llama.cpp
+comparison was made here.
+
+| Model | Verify | Tokens/s | Read | 100 | 2,000 | 8,000 | 16,000 | 24,000 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2B | 4/4 | 28.1 | 35.2 | 28.2 | 21.3 | 12.2 | 6.7 | 4.6 |
+| 4B | 4/4 | 13.0 | 14.2 | 11.8 | 9.1 | 3.9 | 2.3 | 1.6 |
+| 9B | 4/4 | 5.6 | 7.6 | 6.8 | 5.8 | 3.2 | 2.0 | 1.4 |
+
+`Tokens/s` in the Verify column is the verify rate. Twelve threads is 6-20x slower and is not a
+usable configuration: a 2B probe reads 1.3 tokens/s with 12 threads under `close`, `spread` or no
+binding, and 12.5 with the active spin-wait off, so libgomp spins the hyperthread pairs into each
+other at the kernel's per-row-block barriers. `kindi/cpu.py` now defaults to the physical-core count. Native Windows CPU is not built; this is a WSL2 result. Full method, raw logs
+and limitations: [benchmarks/2026-11-09-i7-8086k-cpu/README.md](benchmarks/2026-11-09-i7-8086k-cpu/README.md).
+The support status is tracked in [CPU-SUPPORT.md](CPU-SUPPORT.md).
+
 ## Kindi 0.4.0: Tesla P100 (sm_60)
 
 Two rented machines gave the numbers. Do not mix them. Box A: 2x Tesla P100-SXM2-16GB (NVLink, 300 W), driver 535.230.02,

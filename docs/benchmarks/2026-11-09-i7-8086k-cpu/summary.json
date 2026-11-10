@@ -1,0 +1,148 @@
+{
+  "schema": 1,
+  "title": "Kindi CPU engine on Intel Core i7-8086K",
+  "date": "2026-11-09",
+  "rig": {
+    "cpu": "Intel Core i7-8086K @ 4.00 GHz",
+    "cores": 6,
+    "threads": 12,
+    "memory_gib": 15,
+    "os": "Microsoft Windows 10 Pro 10.0.19045; WSL2 Ubuntu 24.04",
+    "kernel": "6.18.54.1-microsoft-standard-WSL2",
+    "gcc": "13.3.0",
+    "python": "3.12.3",
+    "numpy": "2.5.4",
+    "engine": "kindi/cpu.py + kindi/kcpu.c, built with gcc -O3 -march=native -fopenmp -shared -fPIC"
+  },
+  "method": {
+    "command": "KINDI_DEVICE=cpu python3 -m kindi --pack <PACK> --ctx 24576 bench",
+    "context": 24576,
+    "head": "exact",
+    "speculation": "off",
+    "runs_per_config": 1,
+    "threads": [
+      6,
+      12
+    ],
+    "binding": {
+      "6": "OMP_NUM_THREADS=6 OMP_PROC_BIND=close OMP_PLACES=cores",
+      "12": "OMP_NUM_THREADS=12; no explicit OMP_PROC_BIND/OMP_PLACES"
+    },
+    "note": "One run per configuration; bench warms each timed operation and uses a fresh process. 24,576-token context."
+  },
+  "verification": {
+    "2b": {
+      "result": "PASS",
+      "prompts": 4,
+      "tokens_per_s": 28.1
+    },
+    "4b": {
+      "result": "PASS",
+      "prompts": 4,
+      "tokens_per_s": 13.0
+    },
+    "9b": {
+      "result": "PASS",
+      "prompts": 4,
+      "tokens_per_s": 5.6
+    }
+  },
+  "runs": [
+    {
+      "model": "2b",
+      "threads": 6,
+      "binding": "close/cores",
+      "run": 1,
+      "prompt": 35.2,
+      "gen_100": 28.2,
+      "gen_2000": 21.3,
+      "gen_8000": 12.2,
+      "gen_16000": 6.7,
+      "gen_24000": 4.6
+    },
+    {
+      "model": "2b",
+      "threads": 12,
+      "binding": "default",
+      "run": 1,
+      "prompt": 1.8,
+      "gen_100": 1.7,
+      "gen_2000": 1.7,
+      "gen_8000": 1.7,
+      "gen_16000": 1.5,
+      "gen_24000": 1.4
+    },
+    {
+      "model": "4b",
+      "threads": 6,
+      "binding": "close/cores",
+      "run": 1,
+      "prompt": 14.2,
+      "gen_100": 11.8,
+      "gen_2000": 9.1,
+      "gen_8000": 3.9,
+      "gen_16000": 2.3,
+      "gen_24000": 1.6
+    },
+    {
+      "model": "4b",
+      "threads": 12,
+      "binding": "default",
+      "run": 1,
+      "prompt": 1.2,
+      "gen_100": 1.3,
+      "gen_2000": 1.2,
+      "gen_8000": 1.0,
+      "gen_16000": 0.9,
+      "gen_24000": 0.8
+    },
+    {
+      "model": "9b",
+      "threads": 6,
+      "binding": "close/cores",
+      "run": 1,
+      "prompt": 7.6,
+      "gen_100": 6.8,
+      "gen_2000": 5.8,
+      "gen_8000": 3.2,
+      "gen_16000": 2.0,
+      "gen_24000": 1.4
+    },
+    {
+      "model": "9b",
+      "threads": 12,
+      "binding": "default",
+      "run": 1,
+      "prompt": 1.1,
+      "gen_100": 1.1,
+      "gen_2000": 1.1,
+      "gen_8000": 1.0,
+      "gen_16000": 0.9,
+      "gen_24000": 0.7
+    }
+  ],
+  "pinned_12_thread_observation": {
+    "2b": {
+      "prompt": 1.8,
+      "gen": {
+        "100": 1.8,
+        "2000": 1.8,
+        "8000": 1.6,
+        "16000": 1.5,
+        "24000": 1.4
+      },
+      "log": "raw/bench-2b-12t-pinned.log",
+      "note": "OMP_PROC_BIND=close OMP_PLACES=cores with 12 threads on 6 cores. Not used as the headline result."
+    },
+    "4b": {
+      "log": "raw/bench-4b-12t-pinned-incomplete.log",
+      "note": "Interrupted at position 8000; not a complete benchmark."
+    }
+  },
+  "full_cpu_suite": {
+    "command": "KINDI_DEVICE=cpu python -m pytest tests/ -q",
+    "result": "127 passed, 1 warning in 5.98s",
+    "python": "3.13.6 on Windows",
+    "log": "raw/pytest.log"
+  }
+}

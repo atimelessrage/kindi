@@ -1,8 +1,9 @@
 # Long-term CPU support
 
-Status: **roadmap and acceptance contract, 2026-11-09. Not a support claim yet.** The baseline CPU
-engine (`kindi/cpu.py`, `kindi/kcpu.c`) is in `main`; the WIP ISA/AVX-only changes are uncompiled and
-not merged. This page records the target and the exact build/runtime requirements so the work can be
+Status: **roadmap and acceptance contract, 2026-11-09. The i7-8086K engine result is verified;
+the full support contract and the other CPUs remain open.** The baseline CPU engine (`kindi/cpu.py`,
+`kindi/kcpu.c`) is in `main`; the WIP ISA/AVX-only changes are uncompiled and not merged. This page
+records the target, the verified result, and the exact build/runtime requirements so the work can be
 implemented and measured without re-discovering them. The tandem recovery gate is in
 [TANDEM-STATUS.md](TANDEM-STATUS.md).
 
@@ -27,7 +28,8 @@ they are not part of this CPU goal.
 | `kindi/kcpu.c` ISA | Uses AVX2 (`_mm256_srlv_epi32`, `_mm256_permutevar8x32_ps`), FMA (`_mm256_fmadd_ps`) and F16C (`_cvtsh_ss` / `_cvtss_sh`) unconditionally; no `#ifdef` or runtime dispatch | A CPU without all three cannot build or run the current library. |
 | documented requirement | `docs/CARDS.md` and the README say “x86-64 with AVX2” | This is accurate but incomplete: FMA and F16C are also required by the source. |
 | `install.sh` preflight | Checks Linux and `x86_64`; does not check AVX2/FMA/F16C | An unsupported CPU fails later inside the container build, with a compiler error rather than an actionable message. |
-| CPU thread default | Counts the physical cores of socket 0 (`lscpu -p=CORE,SOCKET`), then sets `OMP_NUM_THREADS`, `OMP_PROC_BIND=close`, `OMP_PLACES=cores`; `--threads N` overrides it | On a hybrid i9 this counts 24 cores, including E-cores. The best P/E split has not been measured. |
+| CPU engine thread default | `kindi/cpu.py` counts the physical cores this process may run on (sysfs `thread_siblings_list`, `/proc/cpuinfo` fallback) and sets `OMP_NUM_THREADS`, `OMP_PROC_BIND=close`, `OMP_PLACES=cores` before the library loads; `threads=` or an `OMP_NUM_THREADS` already in the environment wins | On a hybrid i9 this counts 24 cores, E-cores included. The best P/E split has not been measured. |
+| `install.sh` CPU default | Counts the physical cores of socket 0 (`lscpu -p=CORE,SOCKET`) and exports the same three variables for the CPU container; `--threads N` overrides it | Two sockets are not measured; the engine's own default counts every CPU it may use, not socket 0. |
 | build container | `docker/Dockerfile` is Ubuntu 18.04 with the distribution gcc and `libgomp1` | The old gcc may not know Raptor Lake as a `-march=native` target. Explicit AVX2/FMA/F16C flags are safer for the supported tier. |
 | test coverage | `tests/` has server/config/cache tests but no CPU-engine build or runtime test | A regression in the CPU ISA path is not caught by the current CPU-only suite. |
 
@@ -38,7 +40,7 @@ they are not part of this CPU goal.
 | Intel Core i5-2500K | Sandy Bridge | 4 / 4 | AVX; **no AVX2, FMA or F16C** | **Blocked**: the current source cannot compile for this CPU | 2B and 4B after an AVX/scalar fallback; 9B only if measured and useful; 27B no |
 | Intel Xeon W-2133 | Skylake-W | 6 / 12 | AVX-512, AVX2, FMA, F16C | Expected to build and run, but **unverified** | 2B, 4B and 9B |
 | Intel Core i9-13900K | Raptor Lake (8 P + 16 E) | 24 / 32 | AVX2, FMA, F16C; no AVX-512 | Expected to build and run, but **unverified** | 2B, 4B and 9B; tune P/E thread count |
-| Intel Core i7-8086K | Coffee Lake | 6 / 12 | AVX2, FMA, F16C | Expected to build and run, but **unverified** | 2B, 4B and 9B |
+| Intel Core i7-8086K | Coffee Lake | 6 / 12 | AVX2, FMA, F16C | **Engine verified** on WSL2: 2B/4B/9B 4/4 token-exact; 6-thread 24K bench; server path pending | 2B, 4B and 9B; use 6 threads |
 
 Notes:
 
@@ -51,9 +53,85 @@ Notes:
 - The i9-13900K is hybrid. The current installer counts 24 physical cores and OpenMP places threads on
   “cores”, so E-cores will be used. Test `--threads 8`, `16`, `24` and `32`, then choose a default from
   the measurement rather than from the core count.
-- The i7-8086K is close to the measured 6-core i7-8700 in the benchmark table: 2B 42.50 read /
-  28.92 write tokens/s, 4B 17.02 / 12.61. That is a reference point, not a promise for the 8086K.
+- The i7-8086K is now measured: 2B 35.2 read / 28.2 write at depth 100, 4B 14.2 / 11.8 and 9B 7.6 /
+  6.8 tokens/s, with 2B at 4.6 tokens/s at 24K. The 12-thread configuration is 6-20x slower; use 6
+  threads (one per physical core, now the engine's default — see below). See the
+  [benchmark](benchmarks/2026-11-09-i7-8086k-cpu/README.md). The i7-8700 row remains a separate
+  6-core reference point.
 - These are single-socket desktop/workstation CPUs. Multi-socket CPU inference is out of scope.
+
+## Verified i7-8086K result (2026-11-09)
+
+Environment: WSL2 Ubuntu 24.04, kernel 6.18.54.1-microsoft-standard-WSL2, GCC 13.3.0, Intel Core
+i7-8086K (6 cores / 12 threads), 15 GiB visible to WSL2 of 32 GB installed, HEAD `0ce4350`, and a
+24,576-token benchmark context. The CPU library was built with `gcc -O3 -march=native -fopenmp`.
+Native Windows CPU is still unbuilt; this is a WSL2 result.
+
+Verify used a 1,024-token context:
+
+| Model | Prompts | Tokens/s | Result |
+|---|---:|---:|---|
+| 2B | 4/4 | 28.1 | token-exact |
+| 4B | 4/4 | 13.0 | token-exact |
+| 9B | 4/4 | 5.6 | token-exact |
+
+Benchmark at 24,576 tokens with 6 threads (`OMP_NUM_THREADS=6`, `OMP_PROC_BIND=close`,
+`OMP_PLACES=cores`):
+
+| Model | Read | 100 | 2,000 | 8,000 | 16,000 | 24,000 |
+|---|---:|---:|---:|---:|---:|---:|
+| 2B | 35.2 | 28.2 | 21.3 | 12.2 | 6.7 | 4.6 |
+| 4B | 14.2 | 11.8 | 9.1 | 3.9 | 2.3 | 1.6 |
+| 9B | 7.6 | 6.8 | 5.8 | 3.2 | 2.0 | 1.4 |
+
+The same benchmark with 12 threads is 6-20x slower (2B read 1.8, 4B 1.2, 9B 1.1 tokens/s); it is
+not a recommended configuration. The follow-up probe below identifies libgomp's active spin-wait on
+the hyperthread pairs as the cause, so `kindi/cpu.py` now defaults to one thread per physical core.
+
+The full CPU test suite passes (`127 passed, 1 warning`), but it does not build `kcpu.c`; the native
+runs above are what exercise the C engine. This is one run per model/thread configuration, with no
+thermal or power clamp. The server path and native Windows build were not tested, so this is an
+engine result, not the full support claim defined above.
+
+Evidence: [README](benchmarks/2026-11-09-i7-8086k-cpu/README.md),
+[summary.json](benchmarks/2026-11-09-i7-8086k-cpu/summary.json),
+[runs.csv](benchmarks/2026-11-09-i7-8086k-cpu/runs.csv), and the raw verify/bench logs indexed there.
+
+### Why 12 threads collapse
+
+A 2B probe at a 512-token context, one run per row, read rate and generation at position 100:
+
+| setting | read | generation |
+|---|---:|---:|
+| 1 thread | 11.2 | 8.3 |
+| 2 threads | 18.0 | 12.5 |
+| 4 threads | 29.2 | 22.1 |
+| 6 threads, `close`/`cores` | 39.2 | 28.9 |
+| 8 threads, `close`/`cores` | 47.9 | 37.3 |
+| 12 threads, `close`/`cores` | **1.3** | **1.3** |
+| 12 threads, `close`/`cores`, `OMP_WAIT_POLICY=passive` | 12.6 | 11.5 |
+| 12 threads, `close`/`cores`, `GOMP_SPINCOUNT=0` | 12.5 | 11.6 |
+| 12 threads, default binding | 1.4 | 1.5 |
+| 12 threads, `OMP_PROC_BIND=spread` | 1.3 | 1.4 |
+| 6 threads, default binding | 38.6 | 28.8 |
+
+Binding is not the variable: 12 threads collapse under `close`, `spread` and no binding at all.
+Turning the active spin-wait off is: passive waiting or `GOMP_SPINCOUNT=0` recovers 10x. The cause
+is libgomp spinning both hyperthread siblings of a core. `kcpu.c` runs a token as one parallel
+region with a barrier between row blocks, so a spinning sibling takes the pipeline from the partner
+it is waiting for at every barrier, and the convoy grows with each one. The passive recovery still
+only reaches 12.5 tokens/s against 39.2 for 6 threads: waking 12 threads at every barrier is
+expensive on its own, and the two siblings of a core share its execution units. Leaving the
+siblings out is the fix, so `_configure_threads()` in `kindi/cpu.py` resolves the default to the
+physical-core count and pins it with `OMP_PROC_BIND=close` and `OMP_PLACES=cores`.
+
+One anomaly is recorded as measured and not explained: 8 threads (two cores doubled up) are
+consistently faster than 6 — 47.9 read in the probe and 46.4 / 49.1 in two repeats, against
+39.2-40.0 for 6 threads over four runs, with generation at 36.0 / 36.1 against 28.9-29.9. The two
+extra runnable threads seem to hide some of the barrier and memory latency, but no profiler run was
+made, so this is a hypothesis. The default stays at the physical-core count rather than 8: that is
+the setting that holds on any machine, and the 8-thread gain is a per-machine tuning result
+(`OMP_NUM_THREADS=8`) that has only been measured on this i7-8086K.
 
 ## Work packages
 
@@ -88,16 +166,17 @@ Notes:
 8. Measure the i9-13900K with 8, 16, 24 and 32 threads. Decide whether the default should use only
    P-cores or all cores; record the choice in the installer.
 9. Measure the Xeon W-2133 with 6 and 12 threads and with AVX2-width versus AVX-512 auto-vectorization.
-10. Measure the i7-8086K with 6 and 12 threads. Compare it with the i7-8700 benchmark before setting
-    expectations.
-11. Check the 24,576-token context and the 9B memory footprint on each CPU; lower the CPU profile's
-    default context if the measured free memory requires it.
+10. [x] Measure the i7-8086K with 6 and 12 threads. Done 2026-11-09: 6 threads are usable and
+    12 threads are not; the verified result and the 24K table are above.
+11. [~] Check the 24,576-token context and the 9B memory footprint on each CPU. The i7-8086K
+    completed the 6-thread 24K benchmark; 9B used 3.8 GiB during the 1K verify, but the 24K peak was
+    not recorded. The other CPUs are still pending.
 
 ### P3 — validation and documentation
 
-12. For every cell that is advertised, record the CPU, gcc version, thread count, context, model,
-    `kindi verify` result and tokens/s. Update `docs/CARDS.md`, `README.md` and `docs/BENCHMARKS.md`
-    when the main worktree hands those files off.
+12. [~] For every cell that is advertised, record the CPU, gcc version, thread count, context, model,
+    `kindi verify` result and tokens/s. The i7-8086K row is recorded here and in `docs/BENCHMARKS.md`;
+    `docs/CARDS.md`, `README.md`, the other CPUs and the full server claim remain pending.
 13. Keep the current CPU-only tests passing and add a CPU build/smoke job that needs no GPU and no
     model pack.
 
@@ -108,9 +187,12 @@ Notes:
 | i5-2500K | fallback target | fallback target | measure only | 2B/4B if RAM allows | fallback build, verify, bench |
 | Xeon W-2133 | target | target | target | yes | verify, bench, thread/AVX-512 result |
 | i9-13900K | target | target | target | yes | verify, bench, P/E thread default |
-| i7-8086K | target | target | target | yes | verify, bench, thread result |
+| i7-8086K | engine verified | engine verified | engine verified | yes | CPU server path, repeat run, native Windows build |
 
 A checked cell needs a recorded `kindi verify` pass and a benchmark row. “Builds” alone is not support.
+`engine verified` for the i7-8086K means the WSL2 CPU library built, `kindi verify` passed and the
+6-thread 24K benchmark completed. The full support contract still needs the CPU server path and a
+native Windows build.
 
 ## Commands for the validation machine
 

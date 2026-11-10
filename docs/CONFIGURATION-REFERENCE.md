@@ -93,7 +93,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_CKPT_PINNED` | `"1" if os.path.exists("/dev/dxg") else "0"` | `kindi/cache.py:34` |
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:470` |
 | `KINDI_CONFIG` | (unset) | `kindi/config.py:66` (+1 more) |
-| `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:68` (+1 more) |
+| `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:69` (+1 more) |
 | `KINDI_D1` | `0` | `kindi/spec.py:591` |
 | `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:426` |
 | `KINDI_DEVICE` | `gpu` | `kindi/bench.py:8` (+3 more) |

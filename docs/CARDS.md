@@ -347,7 +347,11 @@ a GTX 16-series card is a no-op: the backend is not selected.
 | item | value |
 |---|---|
 | models | 2B, 4B or 9B |
-| variables | `KINDI_DEVICE=cpu`, `OMP_NUM_THREADS=<cores of one socket>`, `OMP_PROC_BIND=close`, `OMP_PLACES=cores` |
+| variables | `KINDI_DEVICE=cpu`; optional `OMP_NUM_THREADS=<cores of one socket>`, `OMP_PROC_BIND=close`, `OMP_PLACES=cores` (the default is one thread per physical core, bound to those cores) |
 
 - The CPU engine needs gcc with OpenMP. It builds `libkcpu.so` at the first start (`KINDI_CPU_CACHE`).
 - The output is token-exact with llama.cpp.
+- The engine defaults to one thread per physical core of the CPUs it may run on. On the i7-8086K the 2B
+  runs 39.2 tokens/s with 6 threads and 1.3 with 12: a token is one OpenMP parallel region with a
+  barrier between row blocks, and the two hyperthread siblings of a core spin into each other at every
+  one. See [CPU-SUPPORT.md](CPU-SUPPORT.md#why-12-threads-collapse).
