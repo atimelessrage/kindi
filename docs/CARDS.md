@@ -434,6 +434,8 @@ image for it.
 | item | value |
 |---|---|
 | models | 2B, 4B or 9B |
+| processor | Intel Core i7-8086K, Coffee Lake (14 nm), 6 physical cores / 12 logical threads (Hyper-Threading), 12 MB L3 |
+| clocks | 4.00 GHz base; up to 5.00 GHz single-core turbo; all-core turbo is typically 4.3-4.4 GHz, depending on the board, cooling and power limits; unlocked multiplier |
 | variables | `KINDI_DEVICE=cpu`; six threads (the engine's physical-core default); on Windows set `KINDI_CC` and `KINDI_LLVM` to clang 18 and the LLVM install |
 | build | `libkcpu.dll` with clang 18.1.8 and libomp on Windows, `libkcpu.so` with gcc and OpenMP on Linux |
 | verify | 2B 4/4 at 33.7 tokens/s, 4B 4/4 at 16.7, 9B 4/4 at 9.1 (native Windows, 1,024-token context) |
@@ -441,6 +443,9 @@ image for it.
 | prompt reading | 45.1 (2B), 19.2 (4B), 9.9 (9B) tokens/s (native Windows, 1,000-token prompt) |
 | server | `kindi serve` with `KINDI_DEVICE=cpu` answered `POST /v1/chat/completions` non-stream and stream on the 2B: 19 prompt / 9 completion tokens at 32.9 tokens/s generation, 0 errors, 0 MiB GPU memory (native Windows, 1,024-token context, 2026-11-10) |
 
+- The 8086K is the 2018 40th-anniversary limited edition, closely related to the i7-8700K with a
+  higher single-core turbo. These runs used no explicit overclock and no thermal or power clamp;
+  per-core clocks were not logged.
 - The default six threads is the portable choice. The 12-thread setting is 6-20x slower and 10 is
   slower too; eight threads are a WSL2/libgomp tuning only (2B/9B gain, 4B read regresses, native
   Windows 8 loses). See [CPU-SUPPORT.md](CPU-SUPPORT.md#thread-count-sweep-6-8-10-and-12-2026-11-10).

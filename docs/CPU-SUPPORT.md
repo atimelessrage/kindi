@@ -62,6 +62,24 @@ Notes:
   separate 6-core reference point.
 - These are single-socket desktop/workstation CPUs. Multi-socket CPU inference is out of scope.
 
+## i7-8086K processor details
+
+The CPU used for the measurements in this page is the Intel Core i7-8086K:
+
+| item | value |
+|---|---|
+| architecture | Coffee Lake, 14 nm |
+| cores / threads | 6 physical cores / 12 logical threads (Intel Hyper-Threading, 2 threads per core) |
+| clocks | 4.00 GHz base; up to 5.00 GHz single-core turbo; all-core turbo is typically around 4.3-4.4 GHz, depending on the board, cooling and power limits |
+| cache | 12 MB L3 |
+| multiplier | unlocked (K suffix) |
+| release / positioning | mid-2018 limited 40th-anniversary edition; closely related to the Core i7-8700K, with a higher 5.0 GHz single-core turbo |
+| benchmark clocks | no explicit overclock and no thermal or power clamp; per-core clocks were not logged, so turbo residency and the board's power limits are not verified |
+
+The all-core turbo figure is a typical operating range, not a guaranteed clock. The 6/8/10/12
+thread results below use the 12 logical CPUs: 6 threads take the six physical cores, 8 and 10 add
+SMT pairs, and 12 uses all six pairs.
+
 ## Verified i7-8086K result (2026-11-09)
 
 Environment: WSL2 Ubuntu 24.04, kernel 6.18.54.1-microsoft-standard-WSL2, GCC 13.3.0, Intel Core
