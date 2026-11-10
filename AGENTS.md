@@ -90,6 +90,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | i7-8086K processor details | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CPU-SUPPORT.md`, `docs/CARDS.md`, `AGENTS.md` | done; added Coffee Lake 14 nm, 6C/12T, 4.00 GHz base, 5.00 GHz single-core turbo, typical 4.3-4.4 GHz all-core, 12 MB L3, unlocked multiplier, 2018 40th-anniversary positioning and the stock-clock caveat; no code changed |
 | 9B CPU queue load test | this worktree | `freebuff/tandem-cpu-recovery` | `docs/AGENTS.md`, `AGENTS.md` | done; native 9B CPU, 6 threads, ctx 1024, queue max 8, 12 clients: 9x200 + 3x429 with Retry-After 1, max waiting 8, 0 errors; 429s returned in 8-10 ms; raw evidence untracked in `bench-logs/9b-queue-load/` |
 | Intel Arc A770 support goal | this worktree | `freebuff/tandem-cpu-recovery` | `docs/INTEL-ARC.md`, `docs/ROADMAP.md`, `docs/CARD-SUPPORT.md`, `AGENTS.md` | planning/audit done; no Intel backend code; no Arc hardware (RTX 4060 Ti only, no `sycl-ls`); one/two/CPU-tandem goals, gates and milestones written; not a support claim |
+| P106-100 single/dual support + CPU tandem gate | this worktree | `freebuff/tandem-cpu-recovery` | `docs/P106.md`, `docs/CARDS.md`, `docs/CARD-SUPPORT.md`, `docs/ROADMAP.md`, `tests/test_installer_cards.py`, `AGENTS.md` | installer single/dual routing tested; no P106 hardware; general Bonsai CPU tandem blocked on the missing `TandemEngine` (Nanbeige host-layer path is separate); not a support claim |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -375,6 +376,16 @@ is not a lock.
   performance gates and M0-M8 milestones. M0 is done; M1 is blocked because the test host has only
   an RTX 4060 Ti and no `sycl-ls`/Arc device. No Intel backend code exists and this is not a support
   claim. `docs/ROADMAP.md` and `docs/CARD-SUPPORT.md` link the plan.
+- P106-100 single/dual support and CPU-tandem gate (2026-11-10): `docs/P106.md` records the official
+  1,280-core/6 GB/192-bit specifications, the single-card 2B/4B/9B path, the two-card 27B path, the
+  headless/PCIe caveats and the CPU+tandem gate. The installer already classifies the 6 GB card as the
+  `maxwell` 24,576-token profile, offers no single-card 27B, pairs two P106s and gives the pair the
+  `k1200x2` profile; new fake-GPU tests pin the single profile, the no-27B rule and the dual profile.
+  No P106 hardware is attached, so no `verify`/server/cache result exists. There is no general Bonsai
+  CPU+GPU tandem runtime (`docs/TANDEM-STATUS.md`); the Nanbeige host-layer path is separate.
+  `docs/CARDS.md`, `docs/CARD-SUPPORT.md` and `docs/ROADMAP.md` link the page. Gate:
+  `pytest tests/test_installer_cards.py -q` -> 15 passed; `pytest tests/ -q` -> 206 passed, 2 skipped;
+  `compileall`, the support/config checks and `bash -n install.sh` pass. No GPU run, no P106 hardware.
 
 ## Layout
 

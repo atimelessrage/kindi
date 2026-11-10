@@ -5,7 +5,9 @@ as `tc` from its compute capability, pairs two cards of the same class with at l
 two sm_80 cards the `tc2` profile. `tests/test_installer_cards.py` runs the installer's own card functions
 against a fake nvidia-smi table. The first GPU verify is recorded on the RTX 4060 Ti: the 2B tc plan is 4/4
 token-exact, the 4B tc plan is 2/4, the 9B tc plan is refused (Hadamard 4096), and the plain 4B/9B paths are
-4/4. The dual, 27B/33B and 5060 Ti rows remain open; P1-P3 are unimplemented.
+4/4. The P106-100 single-card 2B/4B/9B offer and the two-card 27B offer are now covered by
+`tests/test_installer_cards.py`, but no P106 has been measured and there is no general Bonsai
+CPU+GPU tandem runtime (see [P106.md](P106.md); the Nanbeige host-layer back end is separate). The dual, 27B/33B and 5060 Ti rows remain open; P1-P3 are unimplemented.
 
 ## What “supported” means here
 
@@ -46,7 +48,7 @@ targets pending verification, not current claims.
 | Card | Arch / CC | Current installer class | Single target | Dual target | Required path |
 |---|---|---|---|---|---|
 | GT 1030 2 GB | Pascal 6.1 | `maxwell` | 2B; 4B only if the fitted context is acceptable | not useful | plain engine; 2 GB context/memory test |
-| P106-100 6 GB | Pascal 6.1 | `maxwell` | 9B/4B/2B | 27B (12 GB total) now offered | plain plan engine, no TC; P106 has no display outputs |
+| P106-100 6 GB | Pascal 6.1 | `maxwell` | 9B/4B/2B | 27B (12 GB total) now offered | plain plan engine, no TC; single/dual installer routing is tested, no P106 run yet; general Bonsai CPU tandem is blocked on [TANDEM-STATUS.md](TANDEM-STATUS.md); see [P106.md](P106.md) |
 | Quadro M4000 8 GB | Maxwell 5.2 | `maxwell` | 9B/4B/2B; 27B only if the 8 GB fit is verified | 27B | plain plan engine, no TC; already in `pair_ok` |
 | Quadro P4000 8 GB | Pascal 6.1 | `pascal8` | 27B/9B/4B/2B | 27B now offered | plain plan engine, no TC; the dp4a kernels exist but `pascal8` does not enable `KINDI_TC=1` |
 | Quadro RTX 4000 8 GB | Turing 7.5 | `turing` | 27B/9B/4B/2B | 27B now offered | Turing tensor-core backend (`KINDI_TC=1`); CUDA 10.2 supports sm_75 |
@@ -149,7 +151,9 @@ paths are 4/4, so its 4B/9B cells are not tc-checked.
 - Does the current CUDA 10.2 PTX patch reach sm_120 reliably, or should the 5060 Ti require the modern
   image? P1 decides; until then the 5060 Ti is not a release-supported card.
 - Is 2×P106 27B fast enough to be useful through PCIe x8/x4 with no display outputs? Measure before
-  advertising it.
+  advertising it. The offer and pairing are tested; the runtime is not ([P106.md](P106.md)).
+- Can a CPU+GPU tandem engine be built at all? No `TandemEngine` exists; do not offer a P106 tandem
+  configuration until the gates in [TANDEM-STATUS.md](TANDEM-STATUS.md) pass.
 - Is 27B on a single 8 GB Ada card stable at a useful context, or does the TC graph memory reserve leave
   too little? Measure, then set the installer context.
 - Is 2×4060 Ti 27B better as plain plan or TC plan? Start with TC on and spec off; add spec only after the

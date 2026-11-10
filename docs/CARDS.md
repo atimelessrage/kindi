@@ -296,12 +296,18 @@ option `amdgpu.cwsr_enable=0`. [AMD.md](AMD.md) gives the settings.
 
 | item | value |
 |---|---|
-| models | 2B, 4B or 9B; 27B on two cards (12 GB total) |
-| variables | `KINDI_CTX=24576`, `KINDI_CHUNK_Q8=1`, `KINDI_BLOCKING_SYNC=0` |
-| generation | not yet measured |
+| models | 2B, 4B or 9B on one card; 27B on two cards (12 GB total) |
+| single-card variables | `KINDI_CTX=24576`, `KINDI_BLOCKING_SYNC=0` (the installer sets both; `KINDI_CHUNK_Q8` defaults to 1 on sm_61) |
+| two-card variables | `KINDI_PACK=/data/pack27b`, `KINDI_CARDS=2`, `KINDI_CTX=24576`, `KINDI_CHECKPOINT_BUDGET_MB=4096`, `KINDI_REPEAT_STOP=1`, `KINDI_BLOCKING_SYNC=0` |
+| generation | not measured on a P106; the installer offer and pairing are unit-tested only |
 
-- A mining card with no display output. It works as a headless GPU, but check its PCIe link: many P106 cards run at x1 or x4 and are slower on prompt reading.
-- The 27B does not fit in 6 GB. Two P106 cards can run it together: the installer pairs two cards of the same class with at least 3,800 MiB each.
+- Official specifications: 1,280 CUDA cores, 80 TMUs, 48 ROPs, 1,506 MHz base / 1,708 MHz boost, 4.37 TFLOPS FP32, 6 GB GDDR5 on a 192-bit bus (192.2 GB/s), PCIe 3.0 x16, 120 W, one 6-pin connector and no display outputs.
+- It is a mining variant of the GTX 1060. Run it headless: use the integrated graphics or another card for the console, and leave the P106 for CUDA. `nvidia-smi` still reports it.
+- Many P106 boards link at x1 or x4 although the slot is x16. Prompt reading and the two-card exchange are sensitive to that link; check `nvidia-smi --query-gpu=pcie.link.gen.current,pcie.link.width.current`.
+- The installer classifies the 6 GB card as `maxwell`, its 24,576-token memory profile, rather than `pascal8` (which starts at 7,500 MiB). That is the context that fits 6 GB; it does not mean the card is Maxwell.
+- The 27B does not fit in 6 GB. Two P106 cards run it together: the installer pairs two cards of the same class with at least 3,800 MiB each and sets the legacy two-card profile.
+- The installer's shared 6 GB list also offers Nemotron; it is experimental and has not been measured on a P106.
+- CPU+GPU tandem (one model split across CPU and GPU layers) is not implemented for the Bonsai models and is not supported on the P106. (The Nanbeige backend has a separate host-layer path; it does not apply here.) The gate is in [P106.md](P106.md#cpu-tandem-status); do not advertise it yet.
 
 ## Quadro M4000, 8 GB (Maxwell 2.0, sm_52)
 

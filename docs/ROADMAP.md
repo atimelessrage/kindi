@@ -46,7 +46,9 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
 - **Plan engine:** 2B T=4 token-exact; 9B is refused before graph build (Hadamard block 4096).
 - **Serving:** bounded queue with 429, `/metrics`, Ollama-compatible endpoints; multi-GPU
   replicas need `kindi/tp.py` work.
-- **Cards:** single/dual card support targets are in [CARD-SUPPORT.md](CARD-SUPPORT.md).
+- **Cards:** single/dual card support targets are in [CARD-SUPPORT.md](CARD-SUPPORT.md). The P106-100
+  single-card (2B/4B/9B) and two-card (27B) offers are installer-tested but not measured on hardware;
+  general Bonsai CPU+GPU tandem is blocked on the missing runtime ([P106.md](P106.md)).
 - **Intel Arc A770:** a separate SYCL/oneAPI backend is planned for one card, two cards and CPU+Arc
   tandem; the goal, gates and milestones are in [INTEL-ARC.md](INTEL-ARC.md). M0 (architecture audit)
   is done; M1 is blocked on Arc hardware. This is not a support claim.

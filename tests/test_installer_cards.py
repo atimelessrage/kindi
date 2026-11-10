@@ -90,9 +90,9 @@ if pair_ok 0 1; then echo "pair=yes"; else echo "pair=no"; fi
 """)
 
 
-def profile(names, mems, ccs, model="27b"):
+def profile(names, mems, ccs, model="27b", cards="0,1"):
     return fields(names, mems, ccs, """
-SV_B=(cuda); SV_M=(%s); SV_C=("0,1")
+SV_B=(cuda); SV_M=(%s); SV_C=("%s")
 CTX=auto; MEMORY=""; THREADS=""; CORES=16; RAM_MB=65536
 AGFX=(); AMEM=(); MTPF=""; XPACKS=(); ENV=(); NEED_MTP=0
 mtp_ready() { return 1; }
@@ -101,7 +101,7 @@ profile_of 0
 echo "profile=$PROFILE"
 echo "ctx=$C"
 echo "env=${ENV[*]}"
-""" % model)
+""" % (model, cards))
 
 
 def test_rtx_4060_ti_8gb_is_tensor_core():
@@ -127,6 +127,38 @@ def test_two_p106_cards_pair():
         return
     assert info["class0"] == info["class1"] == "maxwell", info
     assert info["pair"] == "yes", info
+
+
+def test_single_p106_6gb_is_offered_2b_4b_9b_but_not_27b():
+    info = one_card("NVIDIA P106-100", 6077, "6.1")
+    if info is None:
+        return
+    assert info["class"] == "maxwell", info
+    models = info["models"].split()
+    assert "9b" in models and "4b" in models and "2b" in models, info
+    assert "27b" not in models, info
+
+
+def test_single_p106_6gb_uses_the_24k_plain_profile():
+    info = profile(["NVIDIA P106-100"], [6077], ["6.1"], model="9b", cards="0")
+    if info is None:
+        return
+    assert info["profile"] == "maxwell", info
+    assert info["ctx"] == "24576", info
+    assert "CUDA_VISIBLE_DEVICES=0" in info["env"], info
+    assert "KINDI_BLOCKING_SYNC=0" in info["env"], info
+    assert "KINDI_TC=1" not in info["env"], info
+
+
+def test_two_p106_cards_use_the_27b_dual_profile_without_tensor_cores():
+    info = profile(["NVIDIA P106-100"] * 2, [6077, 6077], ["6.1", "6.1"], model="27b")
+    if info is None:
+        return
+    assert info["profile"] == "k1200x2", info
+    assert info["ctx"] == "24576", info
+    for flag in ("KINDI_CARDS=2", "KINDI_REPEAT_STOP=1", "KINDI_CHECKPOINT_BUDGET_MB=4096"):
+        assert flag in info["env"], (flag, info)
+    assert "KINDI_TC=1" not in info["env"], info
 
 
 def test_two_rtx_4060_ti_cards_pair():
