@@ -1,6 +1,6 @@
 """kindi - command line.
 
-  kindi convert MODEL.gguf      build the weight pack from the PTQ1_0 GGUF (once; ~1 minute)
+  kindi convert MODEL.gguf      build the weight pack from a PTQ1_0/PQ2_0/Q2_0 GGUF (once; ~1 minute)
   kindi fast-head               build the cluster file for the fast head (optional; ~2 minutes)
   kindi verify                  check greedy output against llama.cpp's reference (token for token)
   kindi bench                   measure speed and GPU memory

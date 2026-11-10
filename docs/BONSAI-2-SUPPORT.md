@@ -71,8 +71,8 @@ Architecture points that matter to Kindi:
 | Artifact | What it is | Kindi today | Recommendation |
 |---|---|---|---|
 | `PTQ1_0` | Dense trits, ~1.75-1.83 bpw; 5 trits/byte | **Supported** by the converter and runtime | Keep as the primary format |
-| `PQ2_0` | 2-bit slots, ~2.13-2.20 bpw; cheaper prompt processing | **Rejected** by `kindi/convert.py` | P2: import/convert to Kindi's pack; no decode speed claim |
-| `Q2_0` | Upstream llama.cpp 2-bit type, ~2.28-2.33 bpw | **Rejected** | P2: import for users who already downloaded it; upstream compatibility only |
+| `PQ2_0` | 2-bit slots, ~2.13-2.20 bpw; cheaper prompt processing | **Supported** by `kindi/convert.py` (type 142) | Convert to Kindi's pack; the result is byte-identical to the PTQ1_0 pack |
+| `Q2_0` | Upstream llama.cpp 2-bit type, ~2.28-2.33 bpw | **Supported** by `kindi/convert.py` (type 42) | Import for users who already downloaded it; the result is byte-identical to the PTQ1_0 pack |
 | mmproj | Q8_0 or BF16 vision tower + projector | **No loader** | P1: required for image input |
 | MTP | Publisher MTP head/checkpoint | **No 4B/9B support**; own 2B head only | P2/P3: measure before integrating |
 | DFlash2 | Block-diffusion drafter | **No support** | P3: copy/edit workloads only |
@@ -83,6 +83,12 @@ The publisher's own guidance is that `PTQ1_0` is the smallest and the faster dec
 llama.cpp, so there is no compatibility reason to make `Q2_0` the default. The practical reason to
 add either format is a user who already has that file and does not want to download PTQ1_0 again.
 
+Since 2026-11-10 the 2B `PQ2_0` and `Q2_0` files convert to packs that are byte-identical to the
+PTQ1_0 pack for every stream (`bcodes.bin`, `dpm.bin`, `f32.bin`, both sign files, the tokenizer and
+both indexes); only `index.json`'s recorded source type and `kindi_pack.json`'s `source_format`
+differ. Because the pack is identical, the memory footprint and every benchmark number are the
+PTQ1_0 numbers: converting `PQ2_0`/`Q2_0` buys download compatibility, not speed.
+
 ## 3. Current Kindi support
 
 Verified in the code and docs on this branch:
@@ -90,7 +96,7 @@ Verified in the code and docs on this branch:
 | Capability | 2B | 4B | 9B | 27B | Evidence / caveat |
 |---|---|---|---|---|---|
 | Text, PTQ1_0 | Yes | Yes | Yes | Yes | Four profiles in `kindi/convert.py`; references and verifies exist |
-| Text, PQ2_0/Q2_0 | No | No | No | No | `convert.py` accepts only types 143, 0, 30 |
+| Text, PQ2_0/Q2_0 | Yes | Not tested | Not tested | Not tested | Types 142/42/143 in `kindi/convert.py`; the 2B pack is byte-identical to the PTQ1_0 pack and `kindi verify` passes 4/4 (`bench-logs/pq2-q2-2b/RESULTS.md`) |
 | Image input | No | No | No | No | No mmproj loader; `chat.content_of()` takes only `text` parts |
 | Image part rejected without vision weights | Yes (400) | Yes (400) | Yes (400) | Yes (400) | `kindi/server.py` checks `image_url`/`image`/`input_image` parts and Ollama `images`; a pack with `vision` or `mmproj` in `kindi_pack.json` is allowed through |
 | 262,144 context | Untested | Untested | Untested | Yes, 2x P100 | `docs/BENCHMARKS.md` full-context 27B run; `docs/CARDS.md` shows 110,592 tokens on a 10 GB RTX 3080 |
@@ -239,7 +245,7 @@ no new hardware, and access to the publisher's mmproj and reference outputs.
 | M2. 2B vision MVP | mmproj loader, ViT, projector, image preprocessing, image tokens, data-URL `image_url`, image cache | 10-15 days | Fixed image set answered with image-dependent questions; same image twice reuses cache; image request without mmproj gets 400 |
 | M3. Vision for 4B/9B/27B | Reuse the 2B path; per-size projector/token metadata; memory checks; Ollama `images`; remote URL guard | 5-10 days | Each size passes the fixed image set; 27B two-card vision run; no OOM at documented context |
 | M4. Context matrix | Per-size largest-fit tests up to 262K; f16/q8_0 KV table; request/grant reporting | 2-4 days | 27B 262K regression; 2B/4B/9B tested at the largest context that fits; docs state the limit |
-| M5. Formats and drafters | PQ2_0/Q2_0 import; 4B/9B MTP; DFlash2 evaluation | 8-14 days | Converted pack is bit-identical to PTQ1_0 reference; MTP/DFlash2 measured, not assumed |
+| M5. Formats and drafters | PQ2_0/Q2_0 import (**2B done**); 4B/9B MTP; DFlash2 evaluation | 8-14 days | Converted pack is bit-identical to PTQ1_0 reference; MTP/DFlash2 measured, not assumed |
 | M6. Plan-engine expansion | 4B/9B HB=4096 plan; two-card 27B plan; launch-path cleanup | 10-20 days | Plan output remains exact; measured speedup; no regression on the 2B |
 | M7. Bonsai Image | Separate diffusion backend: text encoder, VAE, scheduler, Gemlite/MLX-style path, CLI/server | 20-30 days | 512x512 image generation from fixed prompts; separate from the LM server; no shared-pack regression |
 

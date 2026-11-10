@@ -76,6 +76,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | Tandem/CPU recovery audit | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CPU_GPU_TANDEM_DESIGN.md`, `docs/TANDEM-STATUS.md`, `AGENTS.md`, `kindi/cpu.py`, `tests/test_cpu_threads.py`, `docs/CPU-SUPPORT.md`, `docs/CARDS.md`, `docs/BENCHMARKS.md` | design restored; no tandem runtime merged; WIP `tandem.py` is unparsable, CPU changes are uncompiled and the WIP branches are preserved; see `docs/TANDEM-STATUS.md` for the cleanup gate. CPU thread default added 2026-11-09 (see Handoff) |
 | K8/V4 chunk + tensor-core plan | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/chunk.py`, `kindi/chunk.cu`, `kindi/spec.py`, `kindi/tcf.cu`, `kindi/tp.py`, `tests/test_plan_engine.py`, `bench-logs/check_k8v4_chunk.py`, `bench-logs/27b-matrix/REPORT.md`, `AGENTS.md` | done; V4 store/one-pass/exact chunk kernels and V4 decode/verify plan kernels selected from `tp.kv`; `KINDI_TC=1` no longer refused for k8v4; ATT_TC/FD fall back with a log; 140 CPU tests, both modules compile on the 4060 Ti, direct GPU check passes (store vs NumPy, chunk V4 == decode V4 bit for bit); 27B 8K/24K retrieval matches q8_0 (5/5 codes + follow-up); the 49K read was aborted at >3x slower, see `bench-logs/27b-longctx/RESULTS.md` |
 | K8/V4 two-card + cache verification and quarantine | this worktree | `freebuff/tandem-cpu-recovery` | `AGENTS.md`, `kindi/tp.py`, `tests/test_k8v4.py`, `tests/test_plan_engine.py`, `docs/CONFIGURATION-REFERENCE.md`, `bench-logs/k8v4-cache/**`, `bench-logs/test_k8v4_cache.py`, `bench-logs/test_k8v4_dist_cache.py`, `manual_help_needed.txt` | one-card cache save/restart/restore PASS (867-token opening reloaded after a restart, reply bit-exact, 867/888 cached); two-card run blocked (one GPU, `TPEngine` needs two); 2B k8v4 verify 2/4 vs the fp16 reference, 4B 4/4; 9B k8v4 unavailable (plan engine refuses HB 4096, plain engine ignores `KINDI_KV`) |
+| PQ2_0 / Q2_0 conversion | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/convert.py`, `kindi/__main__.py`, `tests/test_convert.py`, `docs/TROUBLESHOOTING.md`, `docs/BONSAI-2-SUPPORT.md`, `bench-logs/convert_pq2_q2.py`, `bench-logs/pq2-q2-2b/**`, `AGENTS.md` | done; GGUF types 142/42 import to packs byte-identical to the PTQ1_0 pack for the 2B; `kindi verify` 4/4 for both new packs; 24,576-token bench (3 runs each) medians PTQ1_0 170.8 / PQ2_0 162.1 / Q2_0 160.8 tok/s at position 24,000, read 207.7 / 214.7 / 160.1; deltas are noise because the packs are identical. 4B/9B/27B PQ2_0/Q2_0 files not downloaded, so not verified |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -237,6 +238,23 @@ is not a lock.
   `tp.kv_mode()` refuses it unless `KINDI_KV_EXPERIMENTAL=1` and the message names the measured loss;
   `tests/test_k8v4.py` pins the gate, the exact opt-in, the V4 kernel selection, the cache-fingerprint
   isolation and the generated-reference row, and `docs/CONFIGURATION-REFERENCE.md` is regenerated.
+- PQ2_0 / Q2_0 conversion support (2026-11-10): `kindi/convert.py` accepts GGUF type 142 (PQ2_0, 128-weight
+  groups, 34-byte blocks: fp16 `d` then 32 bytes of 2-bit slots) and type 42 (Q2_0, the same slots in 64-weight
+  18-byte blocks), records `source_format` in `kindi_pack.json`, and gates on the pack's one-scale-per-128-weights
+  rule (the two 64-halves of a Q2_0 group must share the fp16 scale, else it refuses). Both 2B GGUFs were
+  downloaded and `sha256sum -c`-verified (PQ2_0 517,312,992 B, Q2_0 546,689,504 B). The conformance gate is
+  byte identity with the PTQ1_0 pack: `bench-logs/convert_pq2_q2.py` reports `ALL PASS` for both (bcodes, dpm,
+  f32, both sign files, tokenizer, `bcodes_index.json` identical; only the recorded source type and
+  `source_format` differ), and `kindi verify` is 4/4 token-exact for both new packs. Two format-only bugs were
+  fixed: `q2_groups` now handles several 128-groups per row, and the pack's `bc_off`/`dpm_off` accumulators now
+  advance by `ne0/4` bytes and `ne0/128` scales instead of the source group size (Q2_0 has twice as many
+  64-groups, which had corrupted `bcodes_index.json` and the manifest sizes even though the stream bytes were
+  right). Benchmark at the common 24,576-token context (all three packs fit, 6213 MiB free, three runs): median
+  generation at position 24,000 PTQ1_0 170.8, PQ2_0 162.1, Q2_0 160.8 tok/s; read 207.7 / 214.7 / 160.1. The
+  spread within one pack (148.8-192.1 tok/s at 16K) is wider than every between-pack difference, and the packs are
+  byte-identical, so no format speed claim is made. Evidence: `bench-logs/pq2-q2-2b/RESULTS.md`. Gate: 161 tests,
+  `compileall -q kindi`, `config_reference --check`. Only the 2B was converted; 4B/9B/27B PQ2_0/Q2_0 are untested
+  and no 27B pack is installed.
 
 ## Layout
 
