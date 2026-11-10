@@ -41,8 +41,8 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
 
 - **Formats:** `PQ2_0`/`Q2_0` import (2B done, byte-identical packs); 4B/9B/27B conversion and
   verification are open because those files were never downloaded.
-- **CPU:** native Windows engine verified on the i7-8086K; the CPU server path and the other
-  CPUs (i5-2500K AVX-only fallback, Xeon W-2133, i9-13900K) are open.
+- **CPU:** native Windows engine and a CPU server chat request verified on the i7-8086K; a repeat
+  timing run and the other CPUs (i5-2500K AVX-only fallback, Xeon W-2133, i9-13900K) are open.
 - **Plan engine:** 2B T=4 token-exact; 9B is refused before graph build (Hadamard block 4096).
 - **Serving:** bounded queue with 429, `/metrics`, Ollama-compatible endpoints; multi-GPU
   replicas need `kindi/tp.py` work.

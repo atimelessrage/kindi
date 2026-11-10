@@ -82,6 +82,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | Sampling profiles + presence penalty | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/config.py`, `kindi/profiles.py`, `kindi/sampling.py`, `kindi/server.py`, `kindi.conf.example`, `tests/test_config.py`, `tests/test_profiles.py`, `tests/test_sampling.py`, `tests/test_server.py`, `docs/AGENTS.md`, `docs/CONFIGURATION.md`, `docs/BONSAI-2-SUPPORT.md`, `docs/CONFIGURATION-REFERENCE.md`, `AGENTS.md` | done; publisher thinking/non-thinking profiles behind `sampling_profile = publisher`, `presence_penalty` in the API/config; 189 tests, both generated-file checks and `compileall` pass; no GPU run. `docs/CONFIGURATION.md` was edited with `T:/kindi` clean (checked) |
 | Installer card classification + dual pairing | this worktree | `freebuff/tandem-cpu-recovery` | `install.sh`, `tests/test_installer_cards.py`, `docs/CARD-SUPPORT.md`, `docs/CARDS.md`, `AGENTS.md` | done; every sm_80+ card is `tc` regardless of memory (the 8 GB RTX 4060 Ti was `pascal8`), same-class pairs with at least 3,800 MiB pair, `tc2` for two sm_80 cards; 12 fake-nvidia-smi tests pass and 7 fail on the old installer; 201 tests, `bash -n`, generated checks and `compileall` pass; no GPU run. `install.sh` was edited with `T:/kindi` clean (checked) |
 | Cross-mode benchmarks (CPU / GPU / tandem) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/benchmarks/build_cross_mode.py`, `docs/benchmarks/CROSS-MODE.md`, `docs/benchmarks/CROSS-MODE.csv`, `tests/test_cross_mode_benchmarks.py`, `docs/BENCHMARKS.md`, `docs/TANDEM-STATUS.md`, `AGENTS.md` | done; CPU-only and GPU-only 2B/4B/9B at positions 100-24,000 from the measured i7-8086K runs; tandem rows are `n/a` because there is no runtime; generated `--check`, 203 tests and the usual gates pass; no new timing run |
+| i7-8086K CPU support row + server chat | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CARDS.md`, `docs/CPU-SUPPORT.md`, `docs/ROADMAP.md`, `docs/SUPPORT-MATRIX.md`, `docs/BENCHMARKS.md`, `docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md`, `docs/benchmarks/2026-11-09-i7-8086k-cpu/README.md`, `kindi/support_matrix.py`, `AGENTS.md` | done; i7-8086K row added to `docs/CARDS.md`; native 2B CPU server answered `/v1/chat/completions` non-stream and stream at 32.9 tok/s, 6 threads, 0 errors; support matrix regenerated; 203 tests and generated checks pass |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -305,6 +306,14 @@ is not a lock.
   `TandemEngine`, so no tandem number is claimed; the page names the TANDEM-STATUS gates that must pass first.
   Gate: `python docs/benchmarks/build_cross_mode.py --check`, 203 tests, `compileall`, config/support checks; no
   new timing run and no GPU run.
+- i7-8086K CPU support row and CPU server chat (2026-11-10): `docs/CARDS.md` now lists the i7-8086K
+  (6 threads, 2B/4B/9B, native Windows 33.7/16.7/9.1 tok/s verify, WSL2 24K table). The missing support
+  gate is verified on the native build: `KINDI_DEVICE=cpu` served the 2B on 127.0.0.1:8199 at a 1,024
+  context, answering `POST /v1/chat/completions` non-stream (19 prompt / 9 completion, 32.9 tok/s) and
+  stream (17 / 7, 32.7 tok/s) with 0 errors, 0 MiB GPU memory and `kindi.cpu.Engine` at 6 threads. The
+  4B/9B engine verifies are recorded, but no separate chat request was sent to them. `docs/CPU-SUPPORT.md`,
+  `docs/ROADMAP.md`, both CPU benchmark pages and the generated support matrix now say so. Gate: 203 tests,
+  `support_matrix --check`, `config_reference --check`, `compileall`, `bash -n`.
 
 ## Layout
 

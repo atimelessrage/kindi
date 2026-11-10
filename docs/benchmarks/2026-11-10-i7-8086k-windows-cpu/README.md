@@ -74,12 +74,31 @@ python -m kindi --pack %USERPROFILE%\.kindi\packs\bonsai-2b --ctx 1024 verify
 The same command was used with `bonsai-4b` and `bonsai-9b`. Each run writes its own raw log; the
 engine builds once and reuses `~/.cache/kindi/libkcpu.dll` afterwards.
 
+## CPU server chat
+
+The native CPU engine served the 2B on `127.0.0.1:8199` with a 1,024-token context and six threads.
+The server built and loaded the pack in 25.5 s. `POST /v1/chat/completions` returned HTTP 200 for a
+normal request (19 prompt / 9 completion tokens, 32.9 tokens/s) and a streaming request (17 / 7,
+32.7 tokens/s), and the streaming body ended in `[DONE]`. `/health` reported 2 requests, 0 errors
+and 0 MiB GPU memory.
+
+```bat
+set KINDI_DEVICE=cpu
+set KINDI_CC=C:\Program Files\clang+llvm-18.1.8-x86_64-pc-windows-msvc\bin\clang.exe
+set KINDI_LLVM=C:\Program Files\clang+llvm-18.1.8-x86_64-pc-windows-msvc
+set KINDI_PACK=%USERPROFILE%\.kindi\packs\bonsai-2b
+set KINDI_MODEL_NAME=bonsai2-2b
+set KINDI_CTX=1024
+python -m kindi serve --host 127.0.0.1 --port 8199
+```
+
 ## Files
 
 | File | Contents |
 |---|---|
 | [raw/system-info.log](raw/system-info.log) | OS, Python, clang version, git HEAD, logical CPU count, CPU model |
 | [raw/verify-2b.log](raw/verify-2b.log), [raw/verify-4b.log](raw/verify-4b.log), [raw/verify-9b.log](raw/verify-9b.log) | the three token-exact verification logs quoted above |
+| [raw/server-chat.log](raw/server-chat.log), [raw/server-chat.json](raw/server-chat.json), [raw/server-chat-stream.txt](raw/server-chat-stream.txt) | the native CPU server start, the OpenAI chat response and the streaming chunks |
 
 ## What this proves and what it does not
 
@@ -89,6 +108,8 @@ Proved on this machine:
   `vcvars` shell and no POSIX flags.
 - The 2B, 4B and 9B run in the native Windows engine and are token-exact with llama.cpp.
 - The engine's Windows thread default resolves to 6 physical cores.
+- The CPU server answered a 2B chat request, non-stream and stream, at 1,024 context: HTTP 200,
+  32.9 tokens/s generation, 0 errors and 0 MiB GPU memory.
 
 Not proved or not done:
 
@@ -96,8 +117,8 @@ Not proved or not done:
   benchmark remains the WSL2 number.
 - **Repeated-run stability and thermals.** One run per model, no clock/power logging; the two runs
   differ by up to a quarter.
-- **CPU server path.** `kindi serve` with `KINDI_DEVICE=cpu` was not exercised, so the support
-  contract in [CPU-SUPPORT.md](../../CPU-SUPPORT.md) still lists it as open.
+- **4B/9B server chat.** The server path was exercised with the 2B only; the 4B and 9B
+  `kindi verify` runs passed, but no separate server chat request was sent for them.
 - **Other CPUs.** Only the i7-8086K was measured; the i5-2500K, Xeon W-2133 and i9-13900K rows are
   unchanged.
 - **A llama.cpp speed comparison.** This is a Kindi-only correctness run.

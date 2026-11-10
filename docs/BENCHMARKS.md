@@ -201,7 +201,8 @@ comparison was made.
 
 The same verifies read 28.1, 13.0 and 5.6 tokens/s under WSL2, so the native build is faster on
 this CPU. A second native run measured 33.5/14.3/7.3; these are single runs and vary by up to a
-quarter. Full method, build command and raw logs:
+quarter. The native CPU server also answered a 2B chat request, non-stream and stream, at 32.9
+tokens/s generation with 0 errors and no GPU memory. Full method, build command and raw logs:
 [benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md](benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md).
 
 ## Kindi 0.4.0: Tesla P100 (sm_60)

@@ -399,7 +399,7 @@ image for it.
   wait).
 - The AH-Nanbeige4.3-33B backend of Kindi needs CUDA. It does not run on AMD graphics.
 
-## CPU (x86-64 with AVX2)
+## CPU (x86-64 with AVX2, FMA and F16C)
 
 | item | value |
 |---|---|
@@ -415,3 +415,18 @@ image for it.
   runs 39.2 tokens/s with 6 threads and 1.3 with 12: a token is one OpenMP parallel region with a
   barrier between row blocks, and the two hyperthread siblings of a core spin into each other at every
   one. See [CPU-SUPPORT.md](CPU-SUPPORT.md#why-12-threads-collapse).
+
+### Intel Core i7-8086K (6 cores / 12 threads)
+
+| item | value |
+|---|---|
+| models | 2B, 4B or 9B |
+| variables | `KINDI_DEVICE=cpu`; six threads (the engine's physical-core default); on Windows set `KINDI_CC` and `KINDI_LLVM` to clang 18 and the LLVM install |
+| build | `libkcpu.dll` with clang 18.1.8 and libomp on Windows, `libkcpu.so` with gcc and OpenMP on Linux |
+| verify | 2B 4/4 at 33.7 tokens/s, 4B 4/4 at 16.7, 9B 4/4 at 9.1 (native Windows, 1,024-token context) |
+| generation (24,576-token context, six threads, WSL2) | 2B 28.2 at 100 tokens, 21.3 at 2K, 12.2 at 8K, 6.7 at 16K, 4.6 at 24K; 4B 11.8 / 9.1 / 3.9 / 2.3 / 1.6; 9B 6.8 / 5.8 / 3.2 / 2.0 / 1.4 |
+| prompt reading | 35.2 (2B), 14.2 (4B), 7.6 (9B) tokens/s (WSL2, 1,000-token prompt) |
+| server | `kindi serve` with `KINDI_DEVICE=cpu` answered `POST /v1/chat/completions` non-stream and stream on the 2B: 19 prompt / 9 completion tokens at 32.9 tokens/s generation, 0 errors, 0 MiB GPU memory (native Windows, 1,024-token context, 2026-11-10) |
+
+- The 12-thread setting is 6-20x slower; use 6 threads. Eight threads were faster on this chip in the
+  probe (47.9 read, 37.3 generation), but they are not the general default.

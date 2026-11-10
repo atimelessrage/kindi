@@ -169,11 +169,11 @@ Not proved or not done:
   configuration, and no profiler-based explanation was established.
 - **Repeated-run stability and thermals.** One run per configuration; no clock, power or
   temperature logging; no median/variance.
-- **CPU server chat, multi-user serving or 27B CPU.** This benchmark covers the 2B/4B/9B
-  bench and verify paths only.
-- **A general support claim.** The engine result is now recorded in
-  [../../CPU-SUPPORT.md](../../CPU-SUPPORT.md) and the benchmark index. The CPU server path,
-  repeated-run stability and native Windows build remain unverified.
+- **Multi-user serving or 27B CPU.** The 2B CPU server chat path was tested later (native Windows,
+  see the 2026-11-10 page); this benchmark covers the 2B/4B/9B bench and verify paths only.
+- **A general support claim.** The engine result is recorded in
+  [../../CPU-SUPPORT.md](../../CPU-SUPPORT.md) and the benchmark index, and the native CPU server
+  chat path is verified separately. Repeated-run stability remains open.
 
 ## Reproduce
 

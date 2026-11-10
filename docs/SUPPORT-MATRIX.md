@@ -81,7 +81,8 @@ feature is behind its explicit experimental switch.
 - `PQ2_0`/`Q2_0` are converted and verified for the 2B only; the 4B/9B/27B files were
   not downloaded.
 - `k8v4` is quarantined behind `KINDI_KV_EXPERIMENTAL=1` because it is lossy.
-- The CPU server path is not exercised on native Windows yet.
+- The CPU server chat path is verified for the 2B only; the 4B/9B chat paths and repeated-run
+  stability are not.
 - The 27B needs two cards and is not installed on the reference machine.
 - `nemotron-e4b` and `nanbeige-33b` have separate backends and are outside this matrix.
 - The archived no-go work and the gates that would reopen it are in [ROADMAP.md](ROADMAP.md).
