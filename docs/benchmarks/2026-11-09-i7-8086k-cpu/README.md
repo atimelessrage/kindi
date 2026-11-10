@@ -112,11 +112,13 @@ latency is model-size dominated.
 Command per benchmark case:
 
 ```sh
-KINDI_DEVICE=cpu KINDI_CPU_CACHE=/home/beefc0de/.cache/kindi-cpu-i7 \
+KINDI_DEVICE=cpu KINDI_CPU_CACHE=<home>/.cache/kindi-cpu-i7 \
   OMP_NUM_THREADS=6 OMP_PROC_BIND=close OMP_PLACES=cores \
-  python3 -m kindi --pack /mnt/c/Users/ICH/.kindi/packs/bonsai-2b \
+  python3 -m kindi --pack <home>/.kindi/packs/bonsai-2b \
     --ctx 24576 bench
 ```
+
+`<home>` is a placeholder for the benchmark machine's home directory.
 
 The same command was used with `bonsai-4b` and `bonsai-9b`. For the 12-thread rows,
 `OMP_NUM_THREADS=12` and no explicit `OMP_PROC_BIND`/`OMP_PLACES` were used.
@@ -181,15 +183,15 @@ Not proved or not done:
 From a WSL2 Ubuntu 24.04 shell with gcc/OpenMP and NumPy available:
 
 ```sh
-cd /mnt/c/Users/ICH/.freebuff/worktrees/f0e51299/kindi
+cd <home>/.freebuff/worktrees/f0e51299/kindi
 
-KINDI_DEVICE=cpu KINDI_CPU_CACHE=/home/beefc0de/.cache/kindi-cpu-i7 \
+KINDI_DEVICE=cpu KINDI_CPU_CACHE=<home>/.cache/kindi-cpu-i7 \
   OMP_NUM_THREADS=6 OMP_PROC_BIND=close OMP_PLACES=cores \
-  python3 -m kindi --pack /mnt/c/Users/ICH/.kindi/packs/bonsai-2b verify
+  python3 -m kindi --pack <home>/.kindi/packs/bonsai-2b verify
 
-KINDI_DEVICE=cpu KINDI_CPU_CACHE=/home/beefc0de/.cache/kindi-cpu-i7 \
+KINDI_DEVICE=cpu KINDI_CPU_CACHE=<home>/.cache/kindi-cpu-i7 \
   OMP_NUM_THREADS=6 OMP_PROC_BIND=close OMP_PLACES=cores \
-  python3 -m kindi --pack /mnt/c/Users/ICH/.kindi/packs/bonsai-2b --ctx 24576 bench
+  python3 -m kindi --pack <home>/.kindi/packs/bonsai-2b --ctx 24576 bench
 ```
 
 Regenerate the tables:

@@ -10,9 +10,36 @@ state/
 kindi.conf
 *.local.*
 .env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+.envrc
+.direnv/
+.npmrc
+.pypirc
+.netrc
+_netrc
 # python / tooling
 __pycache__/
 *.pyc
 *.log
 .vscode/
 .idea/
+# raw local evidence and scratch audits (may contain local paths or prompts)
+bench-logs/
+optimizing-mixed-gpu-rig.json
+Buffy_ReviewAudit_*.txt
+ConsultProposals*.txt
+manual_help_needed.txt
+# key material
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+*.jks
+*.keystore
+*.ppk
+*.kdbx
+*.ovpn

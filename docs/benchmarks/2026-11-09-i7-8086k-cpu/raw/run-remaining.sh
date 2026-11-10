@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Remaining i7-8086K CPU runs. This file is executed inside WSL, so shell
 # variables here are not expanded by the host command wrapper.
+# Paths are redacted to <home>; substitute the benchmark machine's home directory.
 set -o pipefail
 
-RAW=/mnt/c/Users/ICH/.freebuff/worktrees/f0e51299/kindi/docs/benchmarks/2026-11-09-i7-8086k-cpu/raw
-PROJ=/mnt/c/Users/ICH/.freebuff/worktrees/f0e51299/kindi
-DEPS=/home/beefc0de/kindi-cpu-deps
-CACHE=/home/beefc0de/.cache/kindi-cpu-i7
-PACKS=/mnt/c/Users/ICH/.kindi/packs
+RAW=<home>/.freebuff/worktrees/f0e51299/kindi/docs/benchmarks/2026-11-09-i7-8086k-cpu/raw
+PROJ=<home>/.freebuff/worktrees/f0e51299/kindi
+DEPS=<home>/kindi-cpu-deps
+CACHE=<home>/.cache/kindi-cpu-i7
+PACKS=<home>/.kindi/packs
 
 cd "$PROJ" || exit 1
 mkdir -p "$RAW"

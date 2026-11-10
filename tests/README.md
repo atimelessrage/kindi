@@ -16,8 +16,8 @@ bash -n install.sh
 The suite uses stub engines and stand-in CuPy where needed. It covers config precedence, the chat
 template and tool-call round trips, tokenizer behavior, sampling, cache decisions, the HTTP boundary
 (validation, auth, body caps, queue, Ollama endpoints, image rejection), startup pack checks, the
-plan-engine guards, the installer's GRUB fixture and GPU-driver selection. No CUDA device or model
-pack is required.
+plan-engine guards, the tracked-file secret/personal-data guard, the installer's GRUB fixture and
+GPU-driver selection. No CUDA device or model pack is required.
 
 `tests/requirements-test.txt` lists the test dependencies. The same commands run in the CPU job of
 `.github/workflows/ci.yml`. A separate `cpu-engine-smoke` job compiles `kindi/kcpu.c` with gcc for

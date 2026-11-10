@@ -1,4 +1,4 @@
-C:\Users\ICH\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+<home>\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
   warnings.warn(
 [kindi 11:51:15] kindi-cpu ready: Ternary-Bonsai-2-2B, 6 threads, ctx 1024 (22.8s)
 [kindi 11:51:17] prompt 1 'The sky is blue because'                                    PASS  40/40 tokens match  (1.8s)

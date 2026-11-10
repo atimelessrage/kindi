@@ -16,7 +16,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `46b63f8` | main checkout; clean apart from the untracked `optimizing-mixed-gpu-rig.json` |
-| `C:/Users/ICH/.freebuff/worktrees/f0e51299/kindi` | `freebuff/tandem-cpu-recovery` | `50d1d56` + uncommitted audit fixes | this session; includes main's Turing work |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `50d1d56` + uncommitted audit fixes | this session; includes main's Turing work |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
@@ -386,6 +386,12 @@ is not a lock.
   `docs/CARDS.md`, `docs/CARD-SUPPORT.md` and `docs/ROADMAP.md` link the page. Gate:
   `pytest tests/test_installer_cards.py -q` -> 15 passed; `pytest tests/ -q` -> 206 passed, 2 skipped;
   `compileall`, the support/config checks and `bash -n install.sh` pass. No GPU run, no P106 hardware.
+
+- Secret/personal-data guard (2026-11-10): `tests/test_no_secrets.py` scans every tracked file
+  (binary files skipped) for private keys, cloud tokens, JWTs, email addresses and local home paths;
+  `.gitignore` now covers raw evidence, audit scratch files and key material. 39 local home-path
+  occurrences in 33 tracked benchmark files were redacted to `<home>`. The scan and the full gate
+  pass; commit metadata still uses the repository's configured author identity and was not rewritten.
 
 ## Layout
 
