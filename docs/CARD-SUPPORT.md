@@ -154,3 +154,14 @@ paths are 4/4, so its 4B/9B cells are not tc-checked.
   too little? Measure, then set the installer context.
 - Is 2×4060 Ti 27B better as plain plan or TC plan? Start with TC on and spec off; add spec only after the
   two-card verify.
+
+## Intel Arc A770 (planned; separate backend)
+
+Intel Arc is not an NVIDIA `card_class` and cannot be added to `card_class()`/`profile_of()` as another
+NVIDIA profile. It needs a separate SYCL/oneAPI backend, a different container and its own device
+selection. The target is one or two Arc A770 16 GB cards, with CPU+Arc layer-split tandem as a later
+phase. The goal, code audit, acceptance matrix and milestones are in [INTEL-ARC.md](INTEL-ARC.md).
+
+Status: **M0 architecture audit done; no Intel backend code and no Arc hardware on the test host.**
+There is no installer option and no support claim. Do not add Arc to `docs/CARDS.md` or the README
+until the single-card verify, server/cache and two-card/tandem gates pass.

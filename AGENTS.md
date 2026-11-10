@@ -89,6 +89,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | CPU thread-count sweep (6/8/10/12) | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/cpu.py`, `tests/test_cpu_threads.py`, `docs/CPU-SUPPORT.md`, `docs/CARDS.md`, `docs/CONFIGURATION-REFERENCE.md`, `docs/benchmarks/2026-11-09-i7-8086k-cpu/README.md`, `AGENTS.md` | done; WSL2 2B 6/8/10 read 38.2/44.3/25.5 and gen 28.6/31.2/24.1; native 2B 6/8/10 read 43.2/28.4/13.5 and gen 31.7/21.6/9.8; 8 is a WSL2/libgomp tuning, 10/12 are slower, default stays 6; no auto-tune |
 | i7-8086K processor details | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CPU-SUPPORT.md`, `docs/CARDS.md`, `AGENTS.md` | done; added Coffee Lake 14 nm, 6C/12T, 4.00 GHz base, 5.00 GHz single-core turbo, typical 4.3-4.4 GHz all-core, 12 MB L3, unlocked multiplier, 2018 40th-anniversary positioning and the stock-clock caveat; no code changed |
 | 9B CPU queue load test | this worktree | `freebuff/tandem-cpu-recovery` | `docs/AGENTS.md`, `AGENTS.md` | done; native 9B CPU, 6 threads, ctx 1024, queue max 8, 12 clients: 9x200 + 3x429 with Retry-After 1, max waiting 8, 0 errors; 429s returned in 8-10 ms; raw evidence untracked in `bench-logs/9b-queue-load/` |
+| Intel Arc A770 support goal | this worktree | `freebuff/tandem-cpu-recovery` | `docs/INTEL-ARC.md`, `docs/ROADMAP.md`, `docs/CARD-SUPPORT.md`, `AGENTS.md` | planning/audit done; no Intel backend code; no Arc hardware (RTX 4060 Ti only, no `sycl-ls`); one/two/CPU-tandem goals, gates and milestones written; not a support claim |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -369,6 +370,11 @@ is not a lock.
   and returned in 8-10 ms. `/health` peaked at 8 waiters, metrics recorded 3 rejects and 0 errors, and
   the eight waiters drained serially. Recorded in `docs/AGENTS.md`; raw evidence is untracked in
   `bench-logs/9b-queue-load/`. No code changed.
+- Intel Arc A770 support goal (2026-11-10): `docs/INTEL-ARC.md` records the one-card, two-card and
+  CPU+Arc tandem goal, the 22-kernel/CuPy audit, the SYCL/oneAPI backend design, acceptance matrix,
+  performance gates and M0-M8 milestones. M0 is done; M1 is blocked because the test host has only
+  an RTX 4060 Ti and no `sycl-ls`/Arc device. No Intel backend code exists and this is not a support
+  claim. `docs/ROADMAP.md` and `docs/CARD-SUPPORT.md` link the plan.
 
 ## Layout
 
