@@ -39,7 +39,7 @@ Besides `/v1`, Kindi serves what an agent host needs to observe and to connect a
    and retry once instead of opening more connections.
 4. **A short system prompt and few tools.** Every tool schema is prompt text. Keep the tool list fixed between calls.
    A different set of tools per call changes the start of the prompt, and then the cache cannot help.
-5. **Temperature 0.1-0.7.** Greedy (`0`) is reproducible; the model publisher recommends 0.7 / top_p 0.8 / top_k 20.
+5. **Temperature 0.1-0.7.** Greedy (`0`) is reproducible; the model publisher recommends 0.7 / top_p 0.8 / top_k 20 with `presence_penalty` 1.5. Set `sampling_profile = publisher` in `kindi.conf` for the whole publisher profile, including the thinking profile (1.0 / 0.95 / 20, presence 1.0, up to 8K output). A request's own `presence_penalty` (-2..2) overrides the config value.
 
 Watch a long first read with `curl -s localhost:8093/health` - the `busy` field shows `prompt_read` progress.
 

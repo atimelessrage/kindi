@@ -94,6 +94,9 @@ MALFORMED = [
     {"messages": [{"role": "user", "content": "hello"}], "top_k": "20"},
     {"messages": [{"role": "user", "content": "hello"}], "max_tokens": 0},
     {"messages": [{"role": "user", "content": "hello"}], "stream": "yes"},
+    {"messages": [{"role": "user", "content": "hello"}], "presence_penalty": 2.5},
+    {"messages": [{"role": "user", "content": "hello"}], "presence_penalty": -2.5},
+    {"messages": [{"role": "user", "content": "hello"}], "presence_penalty": "1"},
 ]
 
 
@@ -240,6 +243,26 @@ def test_ollama_generate_maps_prompt_and_options(app_client):
     assert body["prompt_eval_count"] == 3 and body["eval_count"] == 1
     assert K.last_req["messages"] == [{"role": "user", "content": "hello"}]
     assert K.last_req["temperature"] == 0 and K.last_req["max_tokens"] == 7
+
+
+def test_presence_penalty_is_accepted_and_forwarded(app_client):
+    client, K = app_client
+    good = client.post("/v1/chat/completions",
+                       json={"messages": [{"role": "user", "content": "hello"}], "presence_penalty": 1.5})
+    assert good.status_code == 200, good.text
+    assert K.last_req["presence_penalty"] == 1.5
+    low = client.post("/v1/chat/completions",
+                      json={"messages": [{"role": "user", "content": "hello"}], "presence_penalty": -2})
+    assert low.status_code == 200, low.text
+    assert K.last_req["presence_penalty"] == -2
+
+
+def test_ollama_presence_penalty_maps_to_the_request(app_client):
+    client, K = app_client
+    r = client.post("/api/generate", json={"prompt": "hello", "stream": False,
+                                           "options": {"presence_penalty": 1.2}})
+    assert r.status_code == 200, r.text
+    assert K.last_req["presence_penalty"] == 1.2
 
 
 def test_ollama_malformed_messages_is_400_before_the_engine(app_client):

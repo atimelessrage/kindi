@@ -45,3 +45,8 @@ top_k = 20
 min_p = 0
 repeat_penalty = 1.0
 repeat_last_n = 64
+# OpenAI's additive presence penalty, -2..2 (0: off); the Bonsai backends apply it (Gemma 4 and Nanbeige do not)
+presence_penalty = 0
+# default: the values above; publisher: the Bonsai publisher's profile (non-thinking 0.7 / 0.8 / 20 with presence
+# 1.5; thinking 1.0 / 0.95 / 20 with presence 1.0 and up to 8K output). Values set explicitly above always win.
+sampling_profile = default

@@ -174,15 +174,14 @@ presence penalty, and the thinking profile is different. The publisher recommend
 - up to 8K output tokens for thinking; avoid greedy decoding and do not treat repetition as a
   sampler substitute
 
-Kindi has `repeat_penalty`/`repeat_last_n` but no `presence_penalty`. This is a small, testable
-server/config change and it affects answer quality immediately. Add a per-model generation profile
-instead of changing every user's defaults:
-
-- expose `presence_penalty` in the request schema and sampler;
-- add a `thinking` profile selected by the same `enable_thinking` flag;
-- keep the existing non-thinking defaults for compatibility, but document the publisher profile and
-  make it selectable;
-- allow a larger default output budget for thinking requests without making 8K the global default.
+**Implemented (2026-11-10).** `presence_penalty` is a request field (OpenAI semantics, -2..2) and a
+config key; `kindi/profiles.py` carries the publisher profile above, and `sampling_profile = publisher`
+makes it active. A request's own values win, and so does a value the user set in the config file, the
+environment or a command line: the profile only fills built-in defaults. The thinking profile also
+raises the default output to 8192 tokens for that request only. The default `sampling_profile =
+default` keeps the old values, so existing users see no change. The Bonsai backends (2B/4B/9B/27B)
+apply the presence penalty; Gemma 4 and Nanbeige still do not. Tests: `tests/test_profiles.py`,
+`tests/test_sampling.py`, `tests/test_server.py`.
 
 ### 4.3 Long context is mostly a documentation and memory-profile job
 

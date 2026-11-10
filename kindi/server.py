@@ -253,7 +253,7 @@ def _validate_request(req, has_vision=False):
             _request_error("%s must be at least %d" % (key, lo))
 
     for key, lo, hi in (("temperature", 0.0, None), ("top_p", 0.0, 1.0), ("min_p", 0.0, 1.0),
-                        ("repeat_penalty", 0.0, None)):
+                        ("repeat_penalty", 0.0, None), ("presence_penalty", -2.0, 2.0)):
         value = req.get(key)
         if value is None:
             continue
@@ -374,13 +374,13 @@ class Kindi(object):
             return "exact"
         return m
 
-    def _pick(self, nxt, temperature, top_p, top_k, rng, min_p=0.0, penalty=None):
+    def _pick(self, nxt, temperature, top_p, top_k, rng, min_p=0.0, penalty=None, presence=None):
         """the next token: already drawn by speculative sampling, or sampled now"""
         ps = getattr(self.eng, "spec_presampled", None)
         if ps is not None:
             self.eng.spec_presampled = None
             return ps
-        return self.sample(nxt, temperature, top_p, top_k, rng, min_p, penalty)
+        return self.sample(nxt, temperature, top_p, top_k, rng, min_p, penalty, presence)
 
     def _g4_text(self,token):
         return self.tok.decode_bytes(token).decode("utf-8","replace")
@@ -563,14 +563,22 @@ class Kindi(object):
         think = bool((req.get("chat_template_kwargs") or {}).get("enable_thinking", req.get("enable_thinking", False)))
         budget = req.get("thinking_budget_tokens") or req.get("thinking_budget") or cfg.get("thinking_budget") or 0
         budget = int(budget) if think else 0
+        from .profiles import sampling_defaults
+        sd = sampling_defaults(cfg, think)          # the publisher profile and the explicit config values
         g = lambda k, d: d if req.get(k) is None else req.get(k)  # noqa: E731
-        temperature = float(g("temperature", cfg["temperature"]))
-        top_p = float(g("top_p", cfg["top_p"]))
-        top_k = int(g("top_k", cfg["top_k"]))
-        min_p = float(g("min_p", cfg.get("min_p", 0)))
-        rp = float(g("repeat_penalty", cfg.get("repeat_penalty", 1.0)))
-        rlast = int(g("repeat_last_n", cfg.get("repeat_last_n", 64)))
-        max_new = int(req.get("max_tokens") or req.get("max_completion_tokens") or cfg["max_tokens"])
+
+        def dflt(k, fallback):
+            v = sd.get(k)
+            return fallback if v is None else v
+        temperature = float(g("temperature", dflt("temperature", cfg["temperature"])))
+        top_p = float(g("top_p", dflt("top_p", cfg["top_p"])))
+        top_k = int(g("top_k", dflt("top_k", cfg["top_k"])))
+        min_p = float(g("min_p", dflt("min_p", 0.0)))
+        rp = float(g("repeat_penalty", dflt("repeat_penalty", 1.0)))
+        rlast = int(g("repeat_last_n", dflt("repeat_last_n", 64)))
+        pp = float(g("presence_penalty", dflt("presence_penalty", 0.0)))
+        max_new = int(req.get("max_tokens") or req.get("max_completion_tokens")
+                      or dflt("max_tokens", cfg["max_tokens"]))
         repeat_stop = bool(cfg.get("repeat_stop"))
         stops = req.get("stop") or []
         if isinstance(stops, str):
@@ -613,7 +621,7 @@ class Kindi(object):
         self.busy["phase"] = "generating"
         pen = rp != 1.0 and rlast != 0
         if hasattr(self.eng, "spec_begin"):
-            if pen or (min_p > 0 and temperature > 0):        # the speculative paths do not apply these: no drafts
+            if pen or pp or (min_p > 0 and temperature > 0):  # the speculative paths do not apply these: no drafts
                 self.eng.spec_begin(False)
             else:
                 self.eng.spec_begin(temperature <= 0, temperature, top_p, top_k, rng)   # speculative decoding (KINDI_SPEC)
@@ -646,7 +654,16 @@ class Kindi(object):
 
         # repeat_penalty: over the last repeat_last_n tokens of the prompt and the reply (-1: all of them)
         recent = lambda: (rp, set((T + gen)[-rlast:] if rlast > 0 else T + gen)) if pen else None  # noqa: E731
-        tok = self.sample(nxt, temperature, top_p, top_k, rng, min_p, recent())
+
+        def presence():
+            """presence_penalty: once for every token already in the prompt or the reply (OpenAI's additive penalty)"""
+            if not pp:
+                return None
+            mask = np.zeros(len(self.eng.vocab), dtype=bool)
+            mask[np.asarray(T + gen, dtype=np.int64)] = True
+            return pp, mask
+
+        tok = self.sample(nxt, temperature, top_p, top_k, rng, min_p, recent(), presence())
         try:
             while True:
                 if cancel is not None and cancel.is_set():
@@ -687,7 +704,7 @@ class Kindi(object):
                         for item in route(piece):
                             yield item
                         nxt = self.runner.step(ft)
-                tok = self._pick(nxt, temperature, top_p, top_k, rng, min_p, recent())
+                tok = self._pick(nxt, temperature, top_p, top_k, rng, min_p, recent(), presence())
         finally:
             sp = self.eng.spec_end() if hasattr(self.eng, "spec_end") else None
             self.busy["active"] = False
@@ -787,6 +804,7 @@ def create_app(cfg, log=print):
 
     OLLAMA_OPTIONS = (("temperature", "temperature"), ("top_p", "top_p"), ("top_k", "top_k"),
                       ("repeat_penalty", "repeat_penalty"), ("repeat_last_n", "repeat_last_n"),
+                      ("presence_penalty", "presence_penalty"),
                       ("seed", "seed"), ("num_predict", "max_tokens"), ("stop", "stop"))
 
     def _ollama_req(body, prompt_mode, has_vision):

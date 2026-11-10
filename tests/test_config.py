@@ -34,6 +34,9 @@ def test_built_in_defaults():
     assert cfg["head"] == "exact"
     assert cfg["source"] == "(built-in defaults)"
     assert isinstance(cfg["ctx"], int) and isinstance(cfg["temperature"], float)
+    assert cfg["presence_penalty"] == 0.0 and isinstance(cfg["presence_penalty"], float)
+    assert cfg["sampling_profile"] == "default"
+    assert cfg["explicit"] == frozenset()
 
 
 def test_file_beats_defaults(clean_env):
@@ -80,3 +83,16 @@ def test_unknown_key_is_rejected(clean_env):
 def test_missing_explicit_file_is_rejected(clean_env):
     with pytest.raises(SystemExit, match="config file not found"):
         config.load(explicit=str(clean_env / "does-not-exist.conf"))
+
+
+def test_explicit_keys_are_tracked(clean_env, monkeypatch):
+    path = write_conf(clean_env, "temperature = 0.25\n")
+    monkeypatch.setenv("KINDI_TOP_P", "0.5")
+    cfg = config.load(explicit=path, overrides={"ctx": 1024})
+    assert cfg["explicit"] == frozenset({"temperature", "top_p", "ctx"})
+
+
+def test_invalid_sampling_profile_is_rejected(clean_env):
+    path = write_conf(clean_env, "sampling_profile = fast\n")
+    with pytest.raises(SystemExit, match="sampling_profile must be default or publisher"):
+        config.load(explicit=path)

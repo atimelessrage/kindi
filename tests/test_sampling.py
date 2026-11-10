@@ -4,7 +4,7 @@ import math
 import numpy as np
 
 from kindi import sampling
-from kindi.sampling import Sampler, penalize
+from kindi.sampling import Sampler, apply_presence, penalize
 
 
 class RecordingRng(object):
@@ -55,6 +55,37 @@ def test_repeat_penalty_only_moves_recent_tokens():
     cand = np.array([1, 2, 3])
     z = np.array([2.0, -2.0, 1.0])
     assert penalize(cand, z, 2.0, [1, 2]).tolist() == [1.0, -4.0, 1.0]
+
+
+def test_presence_penalty_is_additive_once_per_token():
+    # OpenAI semantics: a seen token loses pp once, no matter how often it appeared
+    cand = np.array([1, 2, 3])
+    z = np.array([2.0, 1.0, 0.0])
+    seen = np.zeros(8, dtype=bool)
+    seen[[1, 1, 2]] = True
+    assert apply_presence(cand, z, 1.5, seen).tolist() == [0.5, -0.5, 0.0]
+
+
+def test_negative_presence_penalty_rewards_seen_tokens():
+    cand = np.array([1, 2])
+    z = np.array([0.0, 0.0])
+    seen = np.array([False, False, True], dtype=bool)      # token 2 is in the prompt
+    assert apply_presence(cand, z, -1.0, seen).tolist() == [0.0, 1.0]
+
+
+def test_presence_penalty_zero_is_a_no_op():
+    z = np.array([1.0, 2.0])
+    assert apply_presence(np.array([1, 2]), z, 0.0, np.ones(3, dtype=bool)) is z
+
+
+def test_presence_penalty_changes_a_greedy_choice():
+    class HostEngine(object):
+        ylog = np.array([2.0, 1.0, 0.0])
+        ylog_n = 3
+        ylog_map = None
+
+    seen = np.array([True, False, False], dtype=bool)
+    assert Sampler(HostEngine())(0, 0.0, 1.0, 0, None, presence=(1.5, seen)) == 1
 
 
 def test_greedy_bypasses_sampling():

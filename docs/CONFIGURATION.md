@@ -57,6 +57,12 @@ Notes:
 Used when a request does not set them: `max_tokens` (`1024`), `temperature` (`0.7`; `0` = greedy), `top_p`
 (`0.8`), `top_k` (`20`). These are the model publisher's recommended non-thinking settings.
 
+`presence_penalty` (`0`; -2..2) is OpenAI's additive presence penalty: the logit of every token already in the
+prompt or the reply is lowered by that value once, however often it appears there. The Bonsai backends apply it;
+Gemma 4 and Nanbeige do not. `sampling_profile = publisher` fills the sampling values that the user did not set
+explicitly from the Bonsai publisher's profile: non-thinking 0.7 / 0.8 / 20 with presence 1.5; thinking 1.0 /
+0.95 / 20 with presence 1.0 and an 8192-token default output. The default (`default`) keeps the values above.
+
 Off by default: `min_p` (`0`) and `repeat_penalty` (`1.0`), with `repeat_last_n` (`64`; `-1` = the full context).
 They work as in llama.cpp. When `repeat_penalty` is not 1.0, the output is not token-exact with the greedy output,
 and Kindi does not use speculative drafts for that request. The Bonsai models use them. The Gemma 4 and Nanbeige backends

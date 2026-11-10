@@ -79,6 +79,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | PQ2_0 / Q2_0 conversion | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/convert.py`, `kindi/__main__.py`, `tests/test_convert.py`, `docs/TROUBLESHOOTING.md`, `docs/BONSAI-2-SUPPORT.md`, `bench-logs/convert_pq2_q2.py`, `bench-logs/pq2-q2-2b/**`, `AGENTS.md` | done; GGUF types 142/42 import to packs byte-identical to the PTQ1_0 pack for the 2B; `kindi verify` 4/4 for both new packs; 24,576-token bench (3 runs each) medians PTQ1_0 170.8 / PQ2_0 162.1 / Q2_0 160.8 tok/s at position 24,000, read 207.7 / 214.7 / 160.1; deltas are noise because the packs are identical. 4B/9B/27B PQ2_0/Q2_0 files not downloaded, so not verified |
 | Native Windows CPU build | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/cpu.py`, `kindi/kcpu.c`, `tests/test_cpu_build.py`, `tests/test_cpu_threads.py`, `docs/CPU-SUPPORT.md`, `AGENTS.md` | done; clang 18.1.8 + MSVC 14.51 build `libkcpu.dll` without a vcvars shell; 2B/4B/9B verify 4/4 token-exact at 33.7/16.7/9.1 tok/s with 6 auto-detected threads |
 | Generated support matrix + roadmap | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/support_matrix.py`, `tests/test_support_matrix.py`, `docs/SUPPORT-MATRIX.md`, `docs/ROADMAP.md`, `docs/CONTINUOUS-BATCHING.md`, `docs/PER-SLOT-REFACTOR.md`, `docs/TANDEM-STATUS.md`, `AGENTS.md` | done; `python -m kindi.support_matrix` renders models/formats/K-V modes/CPU ISA from the code and `--check` fails on drift; `docs/ROADMAP.md` is the single index of the archived no-go work (batching, per-slot, tandem, k8v4) |
+| Sampling profiles + presence penalty | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/config.py`, `kindi/profiles.py`, `kindi/sampling.py`, `kindi/server.py`, `kindi.conf.example`, `tests/test_config.py`, `tests/test_profiles.py`, `tests/test_sampling.py`, `tests/test_server.py`, `docs/AGENTS.md`, `docs/CONFIGURATION.md`, `docs/BONSAI-2-SUPPORT.md`, `docs/CONFIGURATION-REFERENCE.md`, `AGENTS.md` | done; publisher thinking/non-thinking profiles behind `sampling_profile = publisher`, `presence_penalty` in the API/config; 189 tests, both generated-file checks and `compileall` pass; no GPU run. `docs/CONFIGURATION.md` was edited with `T:/kindi` clean (checked) |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -272,6 +273,18 @@ is not a lock.
   now the single index of the archived no-go work (continuous batching 0.69x, per-slot refactor,
   tandem runtime, quarantined k8v4) with the gate that would reopen each, and the three archived
   documents point at it. Gate: 172 tests, `config_reference --check`, `support_matrix --check`.
+- Sampling profiles and presence penalty (2026-11-10): `presence_penalty` (OpenAI's additive form, -2..2,
+  applied once per token already in the prompt or reply) is a request field and a config key;
+  `sampling_profile = publisher` selects the Bonsai publisher's values from `kindi/profiles.py`
+  (non-thinking 0.7 / 0.8 / 20 with presence 1.5; thinking 1.0 / 0.95 / 20 with presence 1.0 and an
+  8192-token default output). Precedence: request > explicitly configured key (`config.load` records
+  `cfg["explicit"]`) > profile > built-in default; `sampling_profile = default` keeps existing behaviour.
+  Presence is applied to the full logits before top-k/top-p, like `repeat_penalty`, and disables
+  speculative drafting. The Bonsai backends (2B/4B/9B/27B) apply it; Gemma 4 and Nanbeige do not, as with
+  `repeat_penalty`. Gate: 189 tests (17 new: profile selection/precedence, additive/negative/zero presence,
+  greedy presence, explicit-key tracking, HTTP range validation and Ollama mapping), `config_reference
+  --check`, `support_matrix --check`, `compileall -q kindi` all pass. No GPU run: sampled output and the
+  profile values are unmeasured; the default profile leaves token-exactness unchanged.
 
 ## Layout
 

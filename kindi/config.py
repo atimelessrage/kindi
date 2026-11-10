@@ -40,11 +40,13 @@ DEFAULTS = {
     "min_p": "0",                       # 0: off; else drop the tokens below min_p times the best one's probability
     "repeat_penalty": "1.0",            # 1.0: off; llama.cpp's repeat penalty (the output is then not token-exact)
     "repeat_last_n": "64",              # the tokens that repeat_penalty looks at (-1: the whole context)
+    "presence_penalty": "0",            # OpenAI's additive presence penalty: -2..2, 0 = off (Bonsai backends)
+    "sampling_profile": "default",       # default | publisher: the model publisher's sampling values (Bonsai only)
 }
 
 INT_KEYS = {"repeat_stop", "lookup", "port", "ctx", "fast_clusters", "checkpoint_every", "checkpoint_budget_mb", "prefix_max", "prefix_min", "park_max",
             "max_tokens", "top_k", "repeat_last_n"}
-FLOAT_KEYS = {"temperature", "top_p", "min_p", "repeat_penalty"}
+FLOAT_KEYS = {"temperature", "top_p", "min_p", "repeat_penalty", "presence_penalty"}
 PATH_KEYS = {"pack", "state_dir"}
 
 
@@ -71,6 +73,7 @@ def _candidates(explicit):
 
 def load(explicit=None, overrides=None):
     vals = dict(DEFAULTS)
+    explicit_keys = set()          # the keys the user actually set: a sampling profile does not override them
     source = None
     for p in _candidates(explicit):
         if p and os.path.exists(p):
@@ -81,6 +84,7 @@ def load(explicit=None, overrides=None):
                     if k not in DEFAULTS:
                         raise SystemExit("kindi: unknown config key %r in %s" % (k, p))
                     vals[k] = v
+                    explicit_keys.add(k)
             source = p
             break
         if explicit:
@@ -89,9 +93,11 @@ def load(explicit=None, overrides=None):
         e = os.environ.get("KINDI_" + k.upper())
         if e is not None:
             vals[k] = e
+            explicit_keys.add(k)
     for k, v in (overrides or {}).items():
         if v is not None:
             vals[k] = str(v)
+            explicit_keys.add(k)
     cfg = Config()
     for k, v in vals.items():
         v = v.strip()
@@ -118,5 +124,9 @@ def load(explicit=None, overrides=None):
             cfg["model_name"] = "bonsai2-%sb" % (size.group(1) if size else "2")
     if cfg["head"] not in ("exact", "fast"):
         raise SystemExit("kindi: head must be exact or fast, not %r" % cfg["head"])
+    if cfg["sampling_profile"].lower() not in ("default", "publisher"):
+        raise SystemExit("kindi: sampling_profile must be default or publisher, not %r" % cfg["sampling_profile"])
+    cfg["sampling_profile"] = cfg["sampling_profile"].lower()
+    cfg["explicit"] = frozenset(explicit_keys)
     cfg["source"] = source or "(built-in defaults)"
     return cfg

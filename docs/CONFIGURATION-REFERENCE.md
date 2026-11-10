@@ -70,6 +70,8 @@ Each key can also be set from the environment as `KINDI_<KEY>` (for example `KIN
 | `min_p` | float | `0` | 0: off; else drop the tokens below min_p times the best one's probability |
 | `repeat_penalty` | float | `1.0` | 1.0: off; llama.cpp's repeat penalty (the output is then not token-exact) |
 | `repeat_last_n` | int | `64` | the tokens that repeat_penalty looks at (-1: the whole context) |
+| `presence_penalty` | float | `0` | OpenAI's additive presence penalty: -2..2, 0 = off (Bonsai backends) |
+| `sampling_profile` | string | `default` | default \| publisher: the model publisher's sampling values (Bonsai only) |
 
 ## Environment-only variables
 
@@ -93,7 +95,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_CHUNK_TS` | `64` | `kindi/chunk.py:441` |
 | `KINDI_CKPT_PINNED` | `"1" if os.path.exists("/dev/dxg") else "0"` | `kindi/cache.py:34` |
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:572` |
-| `KINDI_CONFIG` | (unset) | `kindi/config.py:66` (+1 more) |
+| `KINDI_CONFIG` | (unset) | `kindi/config.py:68` (+1 more) |
 | `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:106` (+1 more) |
 | `KINDI_D1` | `0` | `kindi/spec.py:713` |
 | `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:428` |

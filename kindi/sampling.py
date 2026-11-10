@@ -29,12 +29,14 @@ class Sampler(object):
         self.cv = cp.zeros(CAP, dtype=cp.float32)
         self.cn = cp.zeros(1, dtype=cp.int32)
 
-    def __call__(self, greedy_tok, temperature, top_p, top_k, rng, min_p=0.0, penalty=None):
-        """penalty: None, or (repeat_penalty, the recent tokens)"""
-        if penalty is not None and penalty[0] > 1.0 and temperature <= 0 and greedy_tok not in penalty[1]:
+    def __call__(self, greedy_tok, temperature, top_p, top_k, rng, min_p=0.0, penalty=None, presence=None):
+        """penalty: None, or (repeat_penalty, the recent tokens). presence: None, or (presence_penalty, a bool
+        mask over the vocabulary of the tokens already in the prompt and the reply)."""
+        pp = presence[0] if presence is not None else 0.0
+        if not pp and penalty is not None and penalty[0] > 1.0 and temperature <= 0 and greedy_tok not in penalty[1]:
             return greedy_tok                # the penalty only lowers the recent tokens: the best token stays
-        if penalty is not None:
-            return self._penalized(temperature, top_p, top_k, rng, min_p, *penalty)
+        if penalty is not None or pp:
+            return self._penalized(temperature, top_p, top_k, rng, min_p, penalty, presence)
         if temperature <= 0:
             return greedy_tok
         e = self.eng
@@ -74,9 +76,12 @@ class Sampler(object):
         ok = cand >= 0
         return cand[ok], z[ok]
 
-    def _penalized(self, temperature, top_p, top_k, rng, min_p, rp, recent):
+    def _penalized(self, temperature, top_p, top_k, rng, min_p, penalty=None, presence=None):
         cand, z = self._logits()
-        z = penalize(cand, z, rp, recent)
+        if penalty is not None:
+            z = penalize(cand, z, penalty[0], penalty[1])
+        if presence is not None and presence[0]:
+            z = apply_presence(cand, z, presence[0], presence[1])
         if temperature <= 0:
             return int(cand[int(np.argmax(z))])
         band = z >= z.max() - BAND_T * temperature        # as k_band: the rest has probability < e^-30
@@ -113,4 +118,15 @@ def penalize(cand, z, rp, recent):
     hit = np.isin(cand, np.asarray(list(recent), dtype=np.int64))
     z = z.copy()
     z[hit] = np.where(z[hit] > 0, z[hit] / rp, z[hit] * rp)
+    return z
+
+
+def apply_presence(cand, z, pp, seen):
+    """OpenAI's presence penalty: subtract pp once from the logit of every token that is already in the prompt or
+    the reply, however often it appears there. `seen` is a bool mask over the vocabulary. Negative values reward
+    those tokens."""
+    if not pp or seen is None:
+        return z
+    z = z.copy()
+    z[seen[cand]] -= pp
     return z
