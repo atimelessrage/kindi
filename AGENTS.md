@@ -83,6 +83,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | Installer card classification + dual pairing | this worktree | `freebuff/tandem-cpu-recovery` | `install.sh`, `tests/test_installer_cards.py`, `docs/CARD-SUPPORT.md`, `docs/CARDS.md`, `AGENTS.md` | done; every sm_80+ card is `tc` regardless of memory (the 8 GB RTX 4060 Ti was `pascal8`), same-class pairs with at least 3,800 MiB pair, `tc2` for two sm_80 cards; 12 fake-nvidia-smi tests pass and 7 fail on the old installer; 201 tests, `bash -n`, generated checks and `compileall` pass; no GPU run. `install.sh` was edited with `T:/kindi` clean (checked) |
 | Cross-mode benchmarks (CPU / GPU / tandem) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/benchmarks/build_cross_mode.py`, `docs/benchmarks/CROSS-MODE.md`, `docs/benchmarks/CROSS-MODE.csv`, `tests/test_cross_mode_benchmarks.py`, `docs/BENCHMARKS.md`, `docs/TANDEM-STATUS.md`, `AGENTS.md` | done; CPU-only and GPU-only 2B/4B/9B at positions 100-24,000 from the measured i7-8086K runs; tandem rows are `n/a` because there is no runtime; generated `--check`, 203 tests and the usual gates pass; no new timing run |
 | i7-8086K CPU support row + server chat | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CARDS.md`, `docs/CPU-SUPPORT.md`, `docs/ROADMAP.md`, `docs/SUPPORT-MATRIX.md`, `docs/BENCHMARKS.md`, `docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md`, `docs/benchmarks/2026-11-09-i7-8086k-cpu/README.md`, `kindi/support_matrix.py`, `AGENTS.md` | done; i7-8086K row added to `docs/CARDS.md`; native 2B CPU server answered `/v1/chat/completions` non-stream and stream at 32.9 tok/s, 6 threads, 0 errors; support matrix regenerated; 203 tests and generated checks pass |
+| CI CPU build-and-smoke job | this worktree | `freebuff/tandem-cpu-recovery` | `.github/workflows/ci.yml`, `tests/test_cpu_smoke.py`, `docs/CPU-SUPPORT.md`, `AGENTS.md` | done; `cpu-engine-smoke` compiles `kcpu.c` with gcc for AVX2/FMA/F16C and loads it through `kindi.cpu._lib()`; 203 tests pass and the gated smoke test passes with a compiled library; no GPU or pack |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -314,6 +315,14 @@ is not a lock.
   4B/9B engine verifies are recorded, but no separate chat request was sent to them. `docs/CPU-SUPPORT.md`,
   `docs/ROADMAP.md`, both CPU benchmark pages and the generated support matrix now say so. Gate: 203 tests,
   `support_matrix --check`, `config_reference --check`, `compileall`, `bash -n`.
+- CI CPU build-and-smoke job (2026-11-10): `.github/workflows/ci.yml` adds `cpu-engine-smoke`, which
+  compiles `kindi/kcpu.c` with gcc for the documented AVX2/FMA/F16C tier and runs the CPU build and
+  thread tests plus `tests/test_cpu_smoke.py`. The smoke test loads the library through
+  `kindi.cpu._lib()`, checks `kc_sizeof_model`/`kc_sizeof_layer` against `ctypes.sizeof(Model/Layer)`
+  and calls `kc_init`; it skips unless `KINDI_CPU_SMOKE=1` and `KINDI_CPU_CACHE` hold a prebuilt
+  library, so the default suite needs no C toolchain. No model pack, GPU or full token is used.
+  Gate: 203 passed + 2 skipped, the three CPU test files pass with `KINDI_CPU_SMOKE=1`, `compileall`,
+  `bash -n`, config/support checks and `git diff --check`.
 
 ## Layout
 

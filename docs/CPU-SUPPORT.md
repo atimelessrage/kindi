@@ -31,7 +31,7 @@ they are not part of this CPU goal.
 | CPU engine thread default | `kindi/cpu.py` counts the physical cores this process may run on (sysfs `thread_siblings_list`, `/proc/cpuinfo` fallback) and sets `OMP_NUM_THREADS`, `OMP_PROC_BIND=close`, `OMP_PLACES=cores` before the library loads; `threads=` or an `OMP_NUM_THREADS` already in the environment wins | On a hybrid i9 this counts 24 cores, E-cores included. The best P/E split has not been measured. |
 | `install.sh` CPU default | Counts the physical cores of socket 0 (`lscpu -p=CORE,SOCKET`) and exports the same three variables for the CPU container; `--threads N` overrides it | Two sockets are not measured; the engine's own default counts every CPU it may use, not socket 0. |
 | build container | `docker/Dockerfile` is Ubuntu 18.04 with the distribution gcc and `libgomp1` | The old gcc may not know Raptor Lake as a `-march=native` target. Explicit AVX2/FMA/F16C flags are safer for the supported tier. |
-| test coverage | `tests/` has server/config/cache tests but no CPU-engine build or runtime test | A regression in the CPU ISA path is not caught by the current CPU-only suite. |
+| test coverage | `tests/` has server/config/cache tests plus `test_cpu_build.py`, `test_cpu_threads.py` and the gated `test_cpu_smoke.py`; the CI `cpu-engine-smoke` job compiles `kcpu.c` with gcc and loads the library | The compile/load path is covered; a full token cannot run without a model pack. |
 
 ## Target matrix
 
@@ -219,8 +219,10 @@ the setting that holds on any machine, and the 8-thread gain is a per-machine tu
 12. [~] For every cell that is advertised, record the CPU, gcc version, thread count, context, model,
     `kindi verify` result and tokens/s. The i7-8086K row is recorded here, in `docs/BENCHMARKS.md` and
     in `docs/CARDS.md`; its native CPU server chat path is verified. `README.md` and the other CPUs remain pending.
-13. Keep the current CPU-only tests passing and add a CPU build/smoke job that needs no GPU and no
-    model pack.
+13. [x] Keep the current CPU-only tests passing and add a CPU build/smoke job that needs no GPU and
+    no model pack. Done 2026-11-10: `.github/workflows/ci.yml` adds `cpu-engine-smoke`, which
+    compiles `kcpu.c` with gcc for AVX2/FMA/F16C, loads it through `kindi.cpu._lib()` and runs
+    `tests/test_cpu_build.py`, `tests/test_cpu_threads.py` and `tests/test_cpu_smoke.py`.
 
 ## Acceptance matrix
 
