@@ -1,9 +1,30 @@
-# Release checklist: installer GRUB safety fix
+# Release checklist: installer safety fixes
 
-This checklist is for the release that contains `cwsr_edit_grub()` in `install.sh`. The guard backs up
-`/etc/default/grub`, rewrites the kernel command line, re-reads it, and restores the backup and stops when
-the edit fails, adds nothing, or drops an existing parameter. The guard is committed in `2b84658`; the
-fixture test is `tests/test_installer_grub.py`.
+This checklist is for releases that contain the installer safety fixes: the GRUB guard
+(`cwsr_edit_grub()`) and the source-archive checksum. The GRUB guard backs up `/etc/default/grub`,
+rewrites the kernel command line, re-reads it, and restores the backup and stops when the edit fails,
+adds nothing, or drops an existing parameter. The guard is committed in `2b84658`; the fixture test is
+`tests/test_installer_grub.py`.
+
+## Source archive integrity (this change)
+
+`install.sh` now downloads the release source archive to a `.part` file and checks its sha256 before
+extracting it. It no longer pipes `curl` into `tar`. The default v0.5.0 archive is pinned to
+`26424ec08caf07a06a4f57547aa50d5b62a85ec8f7e8c231dcadc5c81519b1e2`; a custom `--source` URL can be
+pinned with `KINDI_SOURCE_SHA256`. The regression test is `tests/test_installer_source.py`.
+
+This change is a candidate, not a published installer. The live artifact documented in
+`docs/INSTALL.md` remains the published `b84df4fe...` file until the release owner uploads the new one.
+Candidate hashes for this worktree:
+
+| candidate | sha256 |
+|---|---|
+| LF build | `54f76308e7461a6799dcd1c7126f5a24699ba8c40aa5019f74b01bf500fe523a` |
+| CRLF worktree | `e49e1f42b57c190ca988d1627ae4f58e0f095db249dab25cc96efe2edef2dbb5` |
+
+Choose one exact candidate, publish that file, then replace both installer checksums in `docs/INSTALL.md`
+with its hash. Do not update the documented published hash before the upload: users would then check a
+file that is not yet served.
 
 Do not publish from a worktree with an empty, stale, or locally modified `install.sh`.
 
@@ -27,6 +48,7 @@ Run from the repository root on Linux or a compatible shell:
 ```sh
 bash -n install.sh
 python -m pytest tests/test_installer_grub.py -q
+python -m pytest tests/test_installer_source.py -q
 python -m pytest tests/ -q
 python -m compileall -q kindi
 ```
@@ -35,7 +57,8 @@ Expected for this release:
 
 - `bash -n install.sh` prints nothing and exits 0.
 - `tests/test_installer_grub.py` passes all 9 tests.
-- The full CPU suite passes (58 tests at the last handoff).
+- `tests/test_installer_source.py` passes all 4 tests, including the mismatch path that must not extract.
+- The full CPU suite passes (242 passed, 3 skipped at the last handoff).
 - No test edits `/etc/default/grub`; the GRUB test uses the fixture and a temporary copy.
 
 If you change the GRUB edit, reintroduce the old literal `0x01` bug on a copy and confirm the failure-path

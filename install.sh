@@ -21,6 +21,8 @@ set -euo pipefail
 
 KINDI_VERSION="0.5.0"
 SOURCE_URL="https://github.com/ahtx/kindi/archive/refs/tags/v${KINDI_VERSION}.tar.gz"
+# sha256 of the v0.5.0 source archive (GitHub archive; checked 2026-11-11)
+SOURCE_SHA256="26424ec08caf07a06a4f57547aa50d5b62a85ec8f7e8c231dcadc5c81519b1e2"
 HF="https://huggingface.co/prism-ml"
 # model: GGUF file, sha256 (= the Hugging Face file hash), size in bytes
 declare -A GGUF SHA SIZE
@@ -826,9 +828,29 @@ for e in $IMAGES; do
     SRC="$DIR/src-${KINDI_VERSION}"
     tarball="${SOURCE:-$SOURCE_URL}"
     if [ ! -f "$SRC/$DOCKERFILE" ]; then
+      # source-archive: begin
+      # Download to a file and verify it before extraction. Never pipe a remote archive into tar:
+      # a bad or truncated download must not be unpacked. The default release archive is pinned here;
+      # a custom URL can be pinned with KINDI_SOURCE_SHA256.
       run mkdir -p "$SRC"
-      if [ -f "$tarball" ]; then run tar -xzf "$tarball" -C "$SRC" --strip-components=1
-      else run sh -c "curl -fsSL '$tarball' | tar -xz -C '$SRC' --strip-components=1"; fi
+      if [ -f "$tarball" ]; then
+        run tar -xzf "$tarball" -C "$SRC" --strip-components=1
+      else
+        part="$SRC.tar.gz.part"
+        run curl -fsSL "$tarball" -o "$part"
+        if [ "$tarball" = "$SOURCE_URL" ]; then want="$SOURCE_SHA256"
+        else want="${KINDI_SOURCE_SHA256:-}"; fi
+        if [ -n "$want" ]; then
+          [ "$DRY" = 1 ] || got=$(sha256sum "$part" | cut -d' ' -f1)
+          [ "$DRY" = 1 ] || [ "$got" = "$want" ] || {
+            run rm -f "$part"
+            die "source archive sha256 ${got} is not the expected ${want} (deleted)"
+          }
+        fi
+        run tar -xzf "$part" -C "$SRC" --strip-components=1
+        run rm -f "$part"
+      fi
+      # source-archive: end
     fi
   fi
   [ "$DRY" = 1 ] || src_id=$(cd "$SRC" && find kindi docker -type f | sort | xargs cat | sha256sum | cut -c1-12)
