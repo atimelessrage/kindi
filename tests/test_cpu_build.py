@@ -68,6 +68,16 @@ def test_windows_build_keeps_static_crt_when_fma_is_available(monkeypatch, tmp_p
     assert cmd[-3:] == ["-L", str(llvm / "lib"), "-llibomp"]
 
 
+def test_cpu_cache_path_is_keyed_by_toolchain(monkeypatch, tmp_path):
+    monkeypatch.setenv("KINDI_CC", "gcc")
+    first = cpu._so_path(str(tmp_path))
+    monkeypatch.setenv("KINDI_CC", "clang")
+    second = cpu._so_path(str(tmp_path))
+    assert first != second
+    assert os.path.basename(first).startswith("libkcpu-")
+    assert os.path.dirname(first) == str(tmp_path)
+
+
 def test_build_failure_is_a_clear_exit(monkeypatch):
     monkeypatch.setattr(cpu, "_native_has_fma", lambda: True)
     monkeypatch.setattr(cpu.subprocess, "run",

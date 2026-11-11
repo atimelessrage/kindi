@@ -13,6 +13,9 @@ host = 127.0.0.1
 port = 8093
 # api_key = choose-a-long-random-string
 model_name = auto
+# largest request body accepted (MiB) and requests allowed to wait behind the active one
+max_body_mb = 16
+queue_max = 8
 
 # --- engine
 ctx = 24576

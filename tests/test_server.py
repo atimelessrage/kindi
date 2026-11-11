@@ -183,6 +183,15 @@ def test_api_key_is_required_and_matches_exactly(auth_client):
     assert client.get("/v1/models", headers={"Authorization": "Bearer secret-token"}).status_code == 200
 
 
+def test_config_limits_are_applied(monkeypatch):
+    K = _FakeKindi()
+    monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
+    app = server.create_app({"model_name": "bonsai2-2b", "api_key": "",
+                             "max_body_mb": 1, "queue_max": 2}, log=lambda *a: None)
+    assert app.state.max_body_bytes == 1024 * 1024
+    assert K.gate.max_queue == 2
+
+
 def test_queue_gate_bounds_the_wait():
     gate = server.Gate(1)
     gate.enter()
@@ -349,9 +358,9 @@ def test_ollama_images_are_400_without_vision_weights(app_client):
         assert K.runner.tokens == [1, 2, 3]
 
 
-def test_oversized_body_is_413_and_keeps_the_prompt_cache(app_client, monkeypatch):
+def test_oversized_body_is_413_and_keeps_the_prompt_cache(app_client):
     client, K = app_client
-    monkeypatch.setattr(server, "MAX_BODY_BYTES", 512)
+    client.app.state.max_body_bytes = 512
     raw = b'{"messages":[{"role":"user","content":"' + b"x" * 1024 + b'"}]}'
     bad = client.post("/v1/chat/completions", content=raw,
                       headers={"content-type": "application/json"})

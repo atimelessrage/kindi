@@ -121,7 +121,7 @@ async def _read_json_body(request):
     or the request shape is checked. The declared Content-Length is checked first; `stream()` then enforces
     the same cap even when the header is missing or lies.
     """
-    limit = MAX_BODY_BYTES
+    limit = getattr(request.app.state, "max_body_bytes", MAX_BODY_BYTES)
     declared = request.headers.get("content-length")
     if declared is not None:
         try:
@@ -808,7 +808,10 @@ def create_app(cfg, log=print):
         log("warning: serving on %s without api_key; /health is unauthenticated - use loopback or set api_key"
             % cfg.get("host"))
     app = FastAPI(title="Kindi", version=__version__)
-    gate = K.gate = Gate(MAX_QUEUE)
+    max_body_mb = cfg.get("max_body_mb")
+    app.state.max_body_bytes = (MAX_BODY_BYTES if max_body_mb is None
+                                else _env_int("max_body_mb", max_body_mb, 1) * 1024 * 1024)
+    gate = K.gate = Gate(cfg.get("queue_max", MAX_QUEUE))
 
     def _err(code, msg, typ="invalid_request_error", headers=None):
         return JSONResponse({"error": {"message": msg, "type": typ, "code": typ}},

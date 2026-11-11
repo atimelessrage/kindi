@@ -471,8 +471,8 @@ image for it.
 | models | 2B, 4B or 9B |
 | variables | `KINDI_DEVICE=cpu`; optional `OMP_NUM_THREADS=<cores of one socket>`, `OMP_PROC_BIND=close`, `OMP_PLACES=cores` (the default is one thread per physical core, bound to those cores) |
 
-- The CPU engine builds at the first start into `KINDI_CPU_CACHE`: `libkcpu.so` with gcc and OpenMP on
-  Linux, `libkcpu.dll` with clang and libomp on Windows (`KINDI_CC`, `KINDI_LLVM`).
+- The CPU engine builds at the first start into `KINDI_CPU_CACHE`: a keyed `libkcpu-<key>.so` with gcc and
+  OpenMP on Linux, or `libkcpu-<key>.dll` with clang and libomp on Windows (`KINDI_CC`, `KINDI_LLVM`).
 - AVX is the baseline. An AVX-only build (`-mavx -mno-avx2 -mno-fma -mno-f16c`) passed 2B/4B
   `kindi verify` 4/4 at 6.4/3.0 tokens/s; native Sandy Bridge hardware was not available
   ([CPU-SUPPORT.md](CPU-SUPPORT.md)).
@@ -492,7 +492,7 @@ image for it.
 | processor | Intel Core i7-8086K, Coffee Lake (14 nm), 6 physical cores / 12 logical threads (Hyper-Threading), 12 MB L3 |
 | clocks | 4.00 GHz base; up to 5.00 GHz single-core turbo; all-core turbo is typically 4.3-4.4 GHz, depending on the board, cooling and power limits; unlocked multiplier |
 | variables | `KINDI_DEVICE=cpu`; six threads (the engine's physical-core default); on Windows set `KINDI_CC` and `KINDI_LLVM` to clang 18 and the LLVM install |
-| build | `libkcpu.dll` with clang 18.1.8 and libomp on Windows, `libkcpu.so` with gcc and OpenMP on Linux |
+| build | keyed `libkcpu-<key>.dll` with clang 18.1.8 and libomp on Windows, keyed `.so` with gcc and OpenMP on Linux |
 | verify | 2B 4/4 at 33.7 tokens/s, 4B 4/4 at 16.7, 9B 4/4 at 9.1 (native Windows, 1,024-token context) |
 | generation (24,576-token context, six threads, native Windows) | 2B 35.9 at 100 tokens, 29.3 at 2K, 19.4 at 8K, 11.9 at 16K, 8.2 at 24K; 4B 15.2 / 13.4 / 6.8 / 4.3 / 3.1; 9B 8.7 / 7.7 / 4.9 / 3.5 / 2.6 |
 | prompt reading | 45.1 (2B), 19.2 (4B), 9.9 (9B) tokens/s (native Windows, 1,000-token prompt) |

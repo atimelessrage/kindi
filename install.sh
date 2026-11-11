@@ -20,9 +20,10 @@
 set -euo pipefail
 
 KINDI_VERSION="0.5.0"
-SOURCE_URL="https://github.com/ahtx/kindi/archive/refs/tags/v${KINDI_VERSION}.tar.gz"
-# sha256 of the v0.5.0 source archive (GitHub archive; checked 2026-11-11)
-SOURCE_SHA256="26424ec08caf07a06a4f57547aa50d5b62a85ec8f7e8c231dcadc5c81519b1e2"
+SOURCE_COMMIT="fd5414889e4acfd72b46bba3138a908b8e97c5be"
+SOURCE_URL="https://github.com/atimelessrage/kindi/archive/${SOURCE_COMMIT}.tar.gz"
+# sha256 of the fork's main source archive at SOURCE_COMMIT (checked 2026-11-11)
+SOURCE_SHA256="3ca1e79d371c87bea5471841db10b0509b90d3bd557512cf59fc83854b929a94"
 HF="https://huggingface.co/prism-ml"
 # model: GGUF file, sha256 (= the Hugging Face file hash), size in bytes
 declare -A GGUF SHA SIZE

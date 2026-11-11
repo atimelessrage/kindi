@@ -1,6 +1,6 @@
 # Roadmap
 
-Status: **living document, updated 2026-11-10.** The generated capability tables are in
+Status: **living document, updated 2026-11-11.** The generated capability tables are in
 [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md); this page is the single index of what was tried and
 rejected, why it was rejected, and what evidence would reopen it. The detailed documents stay as
 appendices and are linked from their rows.
@@ -54,6 +54,24 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
 - **Intel Arc A770:** a separate SYCL/oneAPI backend is planned for one card, two cards and CPU+Arc
   tandem; the goal, gates and milestones are in [INTEL-ARC.md](INTEL-ARC.md). M0 (architecture audit)
   is done; M1 is blocked on Arc hardware. This is not a support claim.
+
+## Review follow-ups (2026-11-11)
+
+These are planned, not implemented. The review that produced them is an audit, not a support
+claim; each item needs its own numeric or acceptance gate before it becomes a feature.
+
+| item | why | first gate |
+|---|---|---|
+| Multi-ISA CPU dispatch | the current build is `-march=native` with an AVX floor; the i5-2500K still cannot use the AVX2/FMA/F16C kernels | an AVX-only and an AVX2 build selected at runtime, with token-exact verify on both |
+| Tandem CPU+GPU runtime | 27B/33B models do not fit an 8 GB card; only the per-layer CPU primitive exists | an end-to-end `TandemEngine` beats GPU-only on one tier, with no token drift |
+| Asymmetric two-card tensor parallelism | two-card support assumes equal cards and the current host has one GPU | a mixed-VRAM layout passes the 27B verify and server/cache checks on two cards |
+| Self-hosted GPU CI runner | the GPU smoke workflow exists but has not been dispatched | one green `gpu-smoke` run on a registered runner |
+| Static analysis and secret scanning | report/brief claims were ahead of `main`; the tooling is not wired into CI | a baseline with no high-severity findings and a CI job that fails on a new secret |
+| Coverage and performance regression gates | the 230+ CPU suite is broad, but coverage and tok/s have no enforced floor | a documented threshold and a PR job that reports both |
+| Windows install documentation | native CPU and GPU paths exist, but the installer is Linux-only | a tested Windows CPU/GPU quickstart with the exact commands and limits |
+| Structured request logging | the server logs free-form lines; request IDs and latency fields are not stable | an opt-in JSON log line with request id, status, queue wait and tokens/s |
+| `AGENTS.md` trim and ownership index | the handoff file is large and mixes history with current instructions | a shorter current-state section plus one owner per shared file |
+| Dependency and GitHub Actions pinning | CI uses floating action tags and unpinned test dependencies | Dependabot or Renovate plus reviewed lock updates |
 
 ## Standing rules
 

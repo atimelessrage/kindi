@@ -36,6 +36,8 @@ Each key can also be set from the environment as `KINDI_<KEY>` (for example `KIN
 | `port` | int | `8093` |  |
 | `api_key` | string | (empty) | if set, clients must send Authorization: Bearer <api_key> |
 | `model_name` | string | `auto` | infer the reported id from the selected pack |
+| `max_body_mb` | int | `16` | largest request body the HTTP server accepts |
+| `queue_max` | int | `8` | requests that may wait behind the active one |
 
 ### engine
 
@@ -85,7 +87,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_BLOCKING_SYNC` | `1` | `kindi/chunk.py:461` (+7 more) |
 | `KINDI_CACHE_TIMING` | (unset) | `kindi/cache.py:689` |
 | `KINDI_CARDS` | (unset) | `kindi/spec.py:1752` (+3 more) |
-| `KINDI_CC` | `clang` | `kindi/cpu.py:89` (+1 more) |
+| `KINDI_CC` | `clang` or `"gcc" if os.name != "nt" else "clang"` | `kindi/cpu.py:85` (+3 more) |
 | `KINDI_CHUNK` | `256` or `"512" if all(f16_prompt(s.card) for s in eng.cards) else "256"` or `"256" if major >= 5 else "128"` | `kindi/chunk.py:158` (+2 more) |
 | `KINDI_CHUNK_ATT` | `flash` | `kindi/chunk.py:425` |
 | `KINDI_CHUNK_MIN` | `32` | `kindi/chunk.py:487` (+1 more) |
@@ -95,8 +97,8 @@ is where it is read, which is where the full description lives.
 | `KINDI_CHUNK_TS` | `64` | `kindi/chunk.py:441` |
 | `KINDI_CKPT_PINNED` | `"1" if os.path.exists("/dev/dxg") else "0"` | `kindi/cache.py:34` |
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:572` |
-| `KINDI_CONFIG` | (unset) | `kindi/config.py:106` (+1 more) |
-| `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:113` (+1 more) |
+| `KINDI_CONFIG` | (unset) | `kindi/config.py:110` (+1 more) |
+| `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:155` (+2 more) |
 | `KINDI_D1` | `0` | `kindi/spec.py:713` |
 | `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:428` |
 | `KINDI_DEVICE` | `gpu` | `kindi/bench.py:8` (+3 more) |
@@ -137,8 +139,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_KEXPF` | (empty) | `kindi/spec.py:153` |
 | `KINDI_KV` | `q8_0` | `kindi/tp.py:46` |
 | `KINDI_KV_EXPERIMENTAL` | `0` | `kindi/tp.py:50` |
-| `KINDI_LLVM` | (unset) | `kindi/cpu.py:67` |
-| `KINDI_MAX_BODY_MB` | `16` | `kindi/server.py:68` |
+| `KINDI_LLVM` | (unset) | `kindi/cpu.py:68` |
 | `KINDI_MEM_RESERVE_MB` | `96` or `32` | `kindi/engine.py:212` (+2 more) |
 | `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:634` |
 | `KINDI_NB_CPUF` | `0.55` | `kindi/nanbeige.py:33` |
@@ -167,7 +168,6 @@ is where it is read, which is where the full description lives.
 | `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:561` |
 | `KINDI_PROMPT_CACHE` | `1` | `kindi/cache.py:585` |
 | `KINDI_Q8X2` | `1` | `kindi/chunk.py:265` |
-| `KINDI_QUEUE_MAX` | `8` | `kindi/server.py:72` |
 | `KINDI_SAMPLER_ORDER` | `llama` | `kindi/sampling.py:19` |
 | `KINDI_SM2` | (empty) | `kindi/spec.py:732` |
 | `KINDI_SPEC` | `0` | `kindi/spec.py:1201` (+4 more) |

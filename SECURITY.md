@@ -29,7 +29,7 @@ Please do not test against systems you do not own or have permission to test.
 - **Image input.** The current text-only packs have no vision weights. Image content is rejected with
   HTTP 400 instead of being silently ignored. Do not assume a future vision pack accepts remote URLs
   without an explicit, guarded fetch policy.
-- **Request limits.** Request bodies are capped (16 MiB by default, `KINDI_MAX_BODY_MB`) and the
+- **Request limits.** Request bodies are capped (16 MiB by default, `max_body_mb` / `KINDI_MAX_BODY_MB`) and the
   waiting queue is bounded. A full queue returns HTTP 429 with `Retry-After`; retry once rather than
   opening more connections.
 - **Installer.** `install.sh` is designed to be reviewed before running. It downloads models with

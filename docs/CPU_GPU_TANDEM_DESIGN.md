@@ -1,6 +1,7 @@
 # kindi CPU+GPU Tandem Inference Design
 
-**Status**: Design Phase
+**Status**: Design only — no `TandemEngine`, placement, state handoff or GPU fallback runtime is
+implemented. See [TANDEM-STATUS.md](TANDEM-STATUS.md) for the cleanup gate and measured blockers.
 **Author**: Systems Research
 **Date**: 2026-11-07
 **Target**: kindi v0.5.0+

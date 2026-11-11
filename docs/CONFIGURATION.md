@@ -32,6 +32,8 @@ individual value. The Docker image sets
 | `port` | `8093` | |
 | `api_key` | (empty) | if set, every `/v1` request needs `Authorization: Bearer <api_key>`; `/health` stays open |
 | `model_name` | `auto` | the model id `/v1/models` reports; `auto` takes it from the pack (the Bonsai ids are `bonsai2-2b`, `bonsai2-4b`, `bonsai2-9b` and `bonsai2-27b`; Nanbeige and Gemma packs use their own ids); clients may send any model name |
+| `max_body_mb` | `16` | maximum HTTP request body in MiB; larger requests get `413` before the engine is touched |
+| `queue_max` | `8` | requests allowed to wait behind the active one; further requests get `429` with `Retry-After: 1` |
 
 ### Engine
 
@@ -92,7 +94,7 @@ and the rest).
 | variable | default | |
 |---|---|---|
 | `KINDI_DEVICE` | `gpu` | `cpu` = the CPU engine (2B, 4B, 9B). Kindi also uses the CPU engine when CuPy is not installed |
-| `KINDI_CPU_CACHE` | `~/.cache/kindi` | the folder for the built CPU library (`libkcpu.so`) |
+| `KINDI_CPU_CACHE` | `~/.cache/kindi` | the folder for the built CPU library; the file is keyed by host CPU and compiler (`libkcpu-<key>.so`) |
 | `KINDI_TP` | (auto) | `1` = the plan engine, `0` = the single-card engine. The 27B always uses the plan engine |
 | `KINDI_CARDS` | (all, at most 2) | the number of cards for the plan engine |
 | `KINDI_CHUNK` | `256` | prompt tokens per chunk; `0` = one token at a time. The default is `128` on Kepler (sm_30) |

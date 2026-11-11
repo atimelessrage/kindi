@@ -18,8 +18,9 @@ present.
 ## Source archive integrity (this change)
 
 `install.sh` now downloads the release source archive to a `.part` file and checks its sha256 before
-extracting it. It no longer pipes `curl` into `tar`. The default v0.5.0 archive is pinned to
-`26424ec08caf07a06a4f57547aa50d5b62a85ec8f7e8c231dcadc5c81519b1e2`; a custom `--source` URL can be
+extracting it. It no longer pipes `curl` into `tar`. The default v0.5.0 archive is pinned to the fork's main source archive at commit
+`fd5414889e4acfd72b46bba3138a908b8e97c5be`, sha256
+`3ca1e79d371c87bea5471841db10b0509b90d3bd557512cf59fc83854b929a94`; a custom `--source` URL can be
 pinned with `KINDI_SOURCE_SHA256`. The regression test is `tests/test_installer_source.py`.
 
 This change is published as the fork-hosted 0.5.0 installer at

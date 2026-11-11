@@ -124,8 +124,8 @@ Evidence: [README](benchmarks/2026-11-09-i7-8086k-cpu/README.md),
 
 Environment: Windows, Intel Core i7-8086K, Python 3.13, clang 18.1.8
 (`clang+llvm-18.1.8-x86_64-pc-windows-msvc`) with the MSVC 14.51 toolset and Windows SDK that clang's
-driver finds through `vswhere`; no `vcvars` shell is needed. `kindi` builds `libkcpu.dll` on first use
-into `KINDI_CPU_CACHE`.
+driver finds through `vswhere`; no `vcvars` shell is needed. `kindi` builds a keyed `libkcpu-<key>.dll`
+on first use into `KINDI_CPU_CACHE`; the key covers the host CPU and compiler.
 
 ```bat
 set KINDI_CC=C:\Program Files\clang+llvm-18.1.8-x86_64-pc-windows-msvc\bin\clang.exe
@@ -351,6 +351,9 @@ A checked cell needs a recorded `kindi verify` pass and a benchmark row. “Buil
 now verified for the 2B, 4B and 9B; the remaining open item is a repeat timing run.
 
 ## Commands for the validation machine
+
+If you build a library manually, use `python -c 'from kindi.cpu import _so_path; print(_so_path())'`
+to get the keyed filename the production loader expects.
 
 ```sh
 # AVX2/FMA/F16C fast path

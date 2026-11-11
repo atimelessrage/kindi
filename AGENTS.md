@@ -706,3 +706,38 @@ Decisions not to undo without new measurements:
    start a task whose shared files are owned by another worktree.
 5. When done: commit the task's files on its branch, tick the action with one line of evidence,
    update the snapshot and lease table, and state what could not be verified.
+
+## Review audit follow-up (2026-11-11, local)
+
+Branch `freebuff/tandem-cpu-recovery`; merge commit `d5a0dc2` absorbs `main` at `fd54148`
+(server boundary/startup validation, `logprobs`, Windows CI and GPU-smoke workflow) while keeping
+this branch's AVX-only CPU fallback and mixed-generation installer routing.
+
+- **D1 installer source pin.** `install.sh` now downloads the fork archive at
+  `fd5414889e4acfd72b46bba3138a908b8e97c5be`
+  (`https://github.com/atimelessrage/kindi/archive/${SOURCE_COMMIT}.tar.gz`) and checks
+  `3ca1e79d371c87bea5471841db10b0509b90d3bd557512cf59fc83854b929a94` before extraction.
+  `tests/test_installer_source.py` also rejects an `ahtx/kindi/archive` URL. This is fork `main`,
+  not this branch; publish a new installer after this branch is merged and tagged.
+- **D3 CPU cache identity.** `kindi/cpu.py` now writes `libkcpu-<key>.so` / `.dll`, keyed by OS,
+  architecture, compiler choice, host CPU identity/flags and the compiler command line. A shared
+  `KINDI_CPU_CACHE` can no longer reuse a `-march=native` binary from a different machine/toolchain.
+  `tests/test_cpu_build.py` covers the key; `tests/test_cpu_smoke.py`, the AVX-fallback test and the
+  CI smoke job use `_so_path()`.
+- **D4 config-expressible server limits.** `max_body_mb` (16) and `queue_max` (8) joined
+  `config.DEFAULTS`/`INT_KEYS`, validation, `kindi.conf.example`, `docs/CONFIGURATION.md` and the
+  generated reference. `create_app` stores the body cap on `app.state` and passes `queue_max` to
+  `Gate`; explicit config values beat the module import-time env fallback.
+- **Roadmap.** The review's worthwhile feature ideas are planned, not implemented, in
+  `docs/ROADMAP.md` under “Review follow-ups (2026-11-11)”: multi-ISA dispatch, tandem runtime,
+  asymmetric TP, GPU CI runner, static/secret analysis, coverage/perf gates, Windows install docs,
+  structured logging, AGENTS ownership/index trimming, and dependency/Actions pinning. The tandem
+  design page now carries an explicit “design only” banner.
+
+Evidence: `python -m pytest tests/ -q` -> **288 passed, 7 skipped**;
+`python -m kindi.config_reference --check` -> 0; `python -m kindi.support_matrix --check` -> 0;
+`python -m compileall -q kindi` -> 0; `bash -n install.sh` -> 0; `git diff --check` -> 0. No GPU run,
+no installer artifact republished, and no push. The public
+`myfork/freebuff/tandem-cpu-recovery` remains at `437891e`; it does not contain this merge and needs an
+authorized push before a release can use it. The source archive pinned by the installer is fork `main`,
+so it also does not contain this branch's fixes until a later commit is published.

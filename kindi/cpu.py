@@ -15,6 +15,7 @@ Tandem entry point: begin(tok) embeds a token, layer(il, pos) runs exactly one b
 returns the greedy token from the residual left by the last layer. The whole-model step() remains the
 single-region path; the per-layer calls are for handing one block to or from another backend."""
 import ctypes
+import hashlib
 import json
 import os
 import platform
@@ -130,11 +131,38 @@ def _build(src, so):
                          "libomp on Windows, and a CPU with AVX (docs/CPU-SUPPORT.md)" % so)
 
 
+def _cache_key():
+    """Identify the build that a cached CPU library came from.
+
+    A shared cache must not hand one machine's `-march=native` binary to another CPU, or reuse a
+    gcc build after the compiler changed. The key covers the OS, architecture, compiler choice,
+    the host CPU identity/flags and the compiler command line.
+    """
+    parts = [os.name, platform.machine(),
+             os.environ.get("KINDI_CC", "gcc" if os.name != "nt" else "clang")]
+    if os.name == "nt":
+        parts.append(os.environ.get("PROCESSOR_IDENTIFIER", platform.processor() or ""))
+    else:
+        info = _read("/proc/cpuinfo") or ""
+        parts.extend(line.strip() for line in info.splitlines()
+                     if line.startswith(("model name", "flags", "Features")))
+    parts.append(" ".join(_build_cmd("kcpu.c", "libkcpu")))
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
+def _so_path(cache=None):
+    """The keyed cache path, so machines and toolchains cannot share a native binary."""
+    cache = cache or os.environ.get("KINDI_CPU_CACHE") or os.path.join(
+        os.path.expanduser("~"), ".cache", "kindi")
+    ext = "dll" if os.name == "nt" else "so"
+    return os.path.join(cache, "libkcpu-%s.%s" % (_cache_key(), ext))
+
+
 def _lib():
     src = os.path.join(HERE, "kcpu.c")
     cache = os.environ.get("KINDI_CPU_CACHE") or os.path.join(os.path.expanduser("~"), ".cache", "kindi")
     os.makedirs(cache, exist_ok=True)
-    so = os.path.join(cache, "libkcpu.dll" if os.name == "nt" else "libkcpu.so")
+    so = _so_path(cache)
     if not os.path.exists(so) or os.path.getmtime(so) < os.path.getmtime(src):
         check_features()
         _build(src, so)

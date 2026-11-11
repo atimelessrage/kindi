@@ -53,7 +53,7 @@ def test_no_fma_verify_is_token_exact(pack, tmp_path):
     pack = Path(pack).resolve()
     assert (pack / "kindi_pack.json").is_file(), "missing pack manifest: %s" % pack
     src = ROOT / "kindi" / "kcpu.c"
-    so = tmp_path / ("libkcpu.dll" if os.name == "nt" else "libkcpu.so")
+    so = Path(cpu._so_path(str(tmp_path)))
     _build_no_fma(src, so)
 
     env = os.environ.copy()

@@ -17,9 +17,9 @@ def library():
     if os.environ.get("KINDI_CPU_SMOKE") != "1":
         pytest.skip("set KINDI_CPU_SMOKE=1 with a prebuilt kcpu library")
     cache = os.environ.get("KINDI_CPU_CACHE")
-    name = "libkcpu.dll" if os.name == "nt" else "libkcpu.so"
-    if not cache or not os.path.isfile(os.path.join(cache, name)):
-        pytest.fail("KINDI_CPU_CACHE does not contain %s" % name)
+    name = os.path.basename(cpu._so_path(cache)) if cache else ""
+    if not cache or not name or not os.path.isfile(os.path.join(cache, name)):
+        pytest.fail("KINDI_CPU_CACHE does not contain the keyed CPU library: %s" % name)
     return cpu._lib()
 
 

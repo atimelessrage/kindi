@@ -70,12 +70,15 @@ die() {{ echo "STOP: $*" >&2; exit 1; }}
         shutil.rmtree(d, ignore_errors=True)
 
 
-def test_source_archive_has_a_pinned_sha256():
+def test_source_archive_has_a_pinned_fork_sha256():
     text = installer_text()
     match = re.search(r'^SOURCE_SHA256="([0-9a-f]{64})"$', text, re.MULTILINE)
     assert match, "install.sh has no pinned 64-hex SOURCE_SHA256"
-    assert match.group(1) == "26424ec08caf07a06a4f57547aa50d5b62a85ec8f7e8c231dcadc5c81519b1e2"
-    assert 'SOURCE_URL="https://github.com/ahtx/kindi/archive/refs/tags/v${KINDI_VERSION}.tar.gz"' in text
+    assert match.group(1) == "3ca1e79d371c87bea5471841db10b0509b90d3bd557512cf59fc83854b929a94"
+    assert 'SOURCE_COMMIT="fd5414889e4acfd72b46bba3138a908b8e97c5be"' in text
+    assert ('SOURCE_URL="https://github.com/atimelessrage/kindi/archive/'
+            '${SOURCE_COMMIT}.tar.gz"') in text
+    assert "ahtx/kindi/archive" not in text
 
 
 def test_source_block_never_pipes_curl_into_tar():

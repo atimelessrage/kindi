@@ -36,6 +36,8 @@ def test_built_in_defaults():
     assert isinstance(cfg["ctx"], int) and isinstance(cfg["temperature"], float)
     assert cfg["presence_penalty"] == 0.0 and isinstance(cfg["presence_penalty"], float)
     assert cfg["sampling_profile"] == "default"
+    assert cfg["max_body_mb"] == 16
+    assert cfg["queue_max"] == 8
     assert cfg["explicit"] == frozenset()
 
 
@@ -46,6 +48,13 @@ def test_file_beats_defaults(clean_env):
     assert cfg["temperature"] == 0.25
     assert cfg["head"] == "fast"
     assert cfg["source"] == path
+
+
+def test_server_limits_can_be_set_in_the_config_file(clean_env):
+    path = write_conf(clean_env, "max_body_mb = 4\nqueue_max = 2\n")
+    cfg = config.load(explicit=path)
+    assert cfg["max_body_mb"] == 4
+    assert cfg["queue_max"] == 2
 
 
 def test_environment_beats_file(clean_env, monkeypatch):
@@ -102,6 +111,8 @@ def test_invalid_sampling_profile_is_rejected(clean_env):
     ("port", "0", "port must be between"),
     ("port", "70000", "port must be between"),
     ("ctx", "0", "ctx must be at least"),
+    ("max_body_mb", "0", "max_body_mb must be at least"),
+    ("queue_max", "-1", "queue_max must be at least"),
     ("checkpoint_every", "0", "checkpoint_every must be at least"),
     ("fast_clusters", "0", "fast_clusters must be at least"),
     ("max_tokens", "0", "max_tokens must be at least"),
