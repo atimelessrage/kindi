@@ -115,12 +115,12 @@ is where it is read, which is where the full description lives.
 | `KINDI_G4_PAD` | `1` | `kindi/gemma4.py:520` |
 | `KINDI_G4_PARK_MAX` | `4` | `kindi/gemma4_cache.py:35` |
 | `KINDI_G4_PLE_HOST` | `auto` | `kindi/gemma4.py:407` |
-| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:446` |
+| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:458` |
 | `KINDI_G4_PROMPT_CACHE` | `1` | `kindi/gemma4_cache.py:33` |
 | `KINDI_G4_Q5_DP4A` | `1` | `kindi/gemma4.py:53` |
 | `KINDI_G4_RESERVE_MB` | `1024` | `kindi/gemma4.py:467` |
 | `KINDI_G4_TC` | `1` | `kindi/gemma4.py:61` (+3 more) |
-| `KINDI_G4_TP` | `auto` | `kindi/server.py:298` |
+| `KINDI_G4_TP` | `auto` | `kindi/server.py:310` |
 | `KINDI_G4_WARPS` | `2560` | `kindi/gemma4.py:93` |
 | `KINDI_G5` | (empty) | `kindi/tp.py:381` |
 | `KINDI_G5L` | `"0" if rt.is_hip and os.environ.get("KINDI_TC", "0") != "1" else "1"` | `kindi/tp.py:384` |
@@ -138,7 +138,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_KV` | `q8_0` | `kindi/tp.py:46` |
 | `KINDI_KV_EXPERIMENTAL` | `0` | `kindi/tp.py:50` |
 | `KINDI_LLVM` | (unset) | `kindi/cpu.py:67` |
-| `KINDI_MAX_BODY_MB` | `16` | `kindi/server.py:57` |
+| `KINDI_MAX_BODY_MB` | `16` | `kindi/server.py:68` |
 | `KINDI_MEM_RESERVE_MB` | `96` or `32` | `kindi/engine.py:212` (+2 more) |
 | `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:634` |
 | `KINDI_NB_CPUF` | `0.55` | `kindi/nanbeige.py:33` |
@@ -167,7 +167,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:561` |
 | `KINDI_PROMPT_CACHE` | `1` | `kindi/cache.py:585` |
 | `KINDI_Q8X2` | `1` | `kindi/chunk.py:265` |
-| `KINDI_QUEUE_MAX` | `8` | `kindi/server.py:60` |
+| `KINDI_QUEUE_MAX` | `8` | `kindi/server.py:72` |
 | `KINDI_SAMPLER_ORDER` | `llama` | `kindi/sampling.py:19` |
 | `KINDI_SM2` | (empty) | `kindi/spec.py:732` |
 | `KINDI_SPEC` | `0` | `kindi/spec.py:1201` (+4 more) |

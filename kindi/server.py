@@ -54,10 +54,22 @@ def _finite_number(value):
         return False
 
 
-MAX_BODY_BYTES = int(os.environ.get("KINDI_MAX_BODY_MB", "16")) * 1024 * 1024
+def _env_int(name, raw, minimum=0):
+    """Parse a server limit at import time with an actionable startup error."""
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        raise SystemExit("kindi: %s must be an integer (got %r)" % (name, raw))
+    if value < minimum:
+        raise SystemExit("kindi: %s must be at least %d (got %d)" % (name, minimum, value))
+    return value
+
+
+MAX_BODY_MB = _env_int("KINDI_MAX_BODY_MB", os.environ.get("KINDI_MAX_BODY_MB", "16"), 1)
+MAX_BODY_BYTES = MAX_BODY_MB * 1024 * 1024
 
 # One engine runs one request; this bounds how many clients may wait behind it (KINDI_QUEUE_MAX=0: no waiting).
-MAX_QUEUE = int(os.environ.get("KINDI_QUEUE_MAX", "8"))
+MAX_QUEUE = _env_int("KINDI_QUEUE_MAX", os.environ.get("KINDI_QUEUE_MAX", "8"), 0)
 
 
 class QueueFull(Exception):

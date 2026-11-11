@@ -22,7 +22,8 @@ CPU ISA preflight, and GPU-driver selection. No CUDA device or model pack is req
 `tests/requirements-test.txt` lists the test dependencies. The same commands run in the CPU job of
 `.github/workflows/ci.yml`. A separate `cpu-engine-smoke` job compiles `kindi/kcpu.c` with gcc for
 the AVX2/FMA/F16C tier and runs `test_cpu_build.py`, `test_cpu_threads.py` and `test_cpu_smoke.py`;
-the smoke test loads the library and checks the ctypes ABI without a model pack.
+the smoke test loads the library and checks the ctypes ABI without a model pack. The manual
+self-hosted GPU lane is described in [docs/CI.md](../docs/CI.md); it is not run by hosted CI.
 
 ## Turing reference suite (optional)
 

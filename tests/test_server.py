@@ -5,7 +5,11 @@ TypeError for a malformed message list, which is what the old generic exception 
 clearing the real Runner. The validator must stop the request before that path is reached.
 """
 import json
+import os
+import subprocess
+import sys
 import threading
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -156,6 +160,20 @@ def test_non_loopback_without_api_key_warns(monkeypatch):
     server.create_app({"model_name": "bonsai2-2b", "api_key": "", "host": "0.0.0.0"},
                       log=logs.append)
     assert any("without api_key" in message and "0.0.0.0" in message for message in logs)
+
+
+@pytest.mark.parametrize(("name", "value"), (
+    ("KINDI_MAX_BODY_MB", "not-a-number"),
+    ("KINDI_MAX_BODY_MB", "0"),
+    ("KINDI_QUEUE_MAX", "-1"),
+))
+def test_invalid_server_limit_environment_is_a_clear_startup_error(name, value):
+    root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ, PYTHONPATH=str(root), **{name: value})
+    proc = subprocess.run([sys.executable, "-c", "import kindi.server"], env=env,
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
+    assert proc.returncode != 0
+    assert name in proc.stderr.decode("utf-8", "replace")
 
 
 def test_api_key_is_required_and_matches_exactly(auth_client):
