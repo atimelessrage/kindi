@@ -202,7 +202,7 @@ and speed run; no llama.cpp speed comparison was made.
 
 The same verifies read 28.1, 13.0 and 5.6 tokens/s under WSL2, so the native build is faster on
 this CPU. A second native run measured 33.5/14.3/7.3; these are single runs and vary by up to a
-quarter. The native CPU server also answered a 2B chat request, non-stream and stream, at 32.9
+quarter. The native CPU server also answered 2B/4B/9B chat requests, non-stream and stream, at 32.9/19.2/11.5
 tokens/s generation with 0 errors and no GPU memory.
 
 At 24,576 tokens, six threads, exact head, one run per model:

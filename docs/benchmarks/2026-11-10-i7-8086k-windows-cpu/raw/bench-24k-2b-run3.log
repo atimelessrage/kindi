@@ -1,0 +1,13 @@
+date: 2026-11-11 05:34:10
+model: 2b; HEAD: 22ac35e; KINDI_DEVICE=cpu; ctx=24576; head=exact; threads=auto
+<home>\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+   Bibliothek "<home>\.cache\kindi\libkcpu.lib" und Objekt "<home>\.cache\kindi\libkcpu.exp" werden erstellt.
+[kindi 05:34:37] kindi-cpu ready: Ternary-Bonsai-2-2B, 6 threads, ctx 24576 (25.1s)
+[kindi 05:34:37] CPU engine: 6 threads, 24576-token context
+[kindi 05:34:38] prompt reading:        36.6 tokens/s
+[kindi 05:34:38] generation (exact head) at position   100:  30.4 tokens/s
+[kindi 05:34:38] generation (exact head) at position  2000:  26.3 tokens/s
+[kindi 05:34:39] generation (exact head) at position  8000:  16.7 tokens/s
+[kindi 05:34:40] generation (exact head) at position 16000:   9.7 tokens/s
+[kindi 05:34:42] generation (exact head) at position 24000:   7.4 tokens/s

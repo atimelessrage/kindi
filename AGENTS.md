@@ -83,14 +83,17 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | Installer card classification + dual pairing | this worktree | `freebuff/tandem-cpu-recovery` | `install.sh`, `tests/test_installer_cards.py`, `docs/CARD-SUPPORT.md`, `docs/CARDS.md`, `AGENTS.md` | done; every sm_80+ card is `tc` regardless of memory (the 8 GB RTX 4060 Ti was `pascal8`), same-class pairs with at least 3,800 MiB pair, `tc2` for two sm_80 cards; 12 fake-nvidia-smi tests pass and 7 fail on the old installer; 201 tests, `bash -n`, generated checks and `compileall` pass; no GPU run. `install.sh` was edited with `T:/kindi` clean (checked) |
 | Cross-mode benchmarks (CPU / GPU / tandem) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/benchmarks/build_cross_mode.py`, `docs/benchmarks/CROSS-MODE.md`, `docs/benchmarks/CROSS-MODE.csv`, `tests/test_cross_mode_benchmarks.py`, `docs/BENCHMARKS.md`, `docs/TANDEM-STATUS.md`, `AGENTS.md` | done; CPU-only and GPU-only 2B/4B/9B at positions 100-24,000 from the measured i7-8086K runs; tandem rows are `n/a` because there is no runtime; generated `--check`, 203 tests and the usual gates pass; no new timing run |
 | i7-8086K CPU support row + server chat | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CARDS.md`, `docs/CPU-SUPPORT.md`, `docs/ROADMAP.md`, `docs/SUPPORT-MATRIX.md`, `docs/BENCHMARKS.md`, `docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md`, `docs/benchmarks/2026-11-09-i7-8086k-cpu/README.md`, `kindi/support_matrix.py`, `AGENTS.md` | done; i7-8086K row added to `docs/CARDS.md`; native 2B CPU server answered `/v1/chat/completions` non-stream and stream at 32.9 tok/s, 6 threads, 0 errors; support matrix regenerated; 203 tests and generated checks pass |
+| CPU server chat 4B/9B | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CPU-SUPPORT.md`, `docs/CARDS.md`, `docs/BENCHMARKS.md`, `docs/ROADMAP.md`, `docs/SUPPORT-MATRIX.md`, `docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md`, `docs/benchmarks/2026-11-09-i7-8086k-cpu/README.md`, `kindi/support_matrix.py`, `AGENTS.md` | done; native CPU server chat 4B/9B non-stream + stream, 0 errors, 0 MiB; 2B/4B/9B claim documented; 214 tests and generated checks pass |
 | CI CPU build-and-smoke job | this worktree | `freebuff/tandem-cpu-recovery` | `.github/workflows/ci.yml`, `tests/test_cpu_smoke.py`, `docs/CPU-SUPPORT.md`, `AGENTS.md` | done; `cpu-engine-smoke` compiles `kcpu.c` with gcc for AVX2/FMA/F16C and loads it through `kindi.cpu._lib()`; 203 tests pass and the gated smoke test passes with a compiled library; no GPU or pack |
-| RTX 4060 Ti tc verify | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CARDS.md`, `docs/CARD-SUPPORT.md`, `AGENTS.md` | done; 2B tc 4/4 at 354.5 tok/s, 4B tc 2/4 (prompts 2/3), 9B tc refused (Hadamard 4096), plain 4B/9B 4/4 at 114.9/72.5 tok/s; no code changed |
+| RTX 4060 Ti tc verify | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CARDS.md`, `docs/CARD-SUPPORT.md`, `AGENTS.md` | done; 2B tc 4/4 at 370.2 tok/s, 4B tc 2/4 (prompts 2/3), 9B tc refused (Hadamard 4096), plain 4B/9B 4/4 at 114.9/72.5 tok/s; no inference code changed; verify_matrix.py now covers 27B |
+| 27B tc 24K + server/cache | this worktree | `freebuff/tandem-cpu-recovery` | `bench-logs/test_27b_tc_cache.py`, `bench-logs/27b-tc-24k/**`, `docs/CARDS.md`, `docs/CARD-SUPPORT.md`, `AGENTS.md` | done; 27B tc at ctx 24,576 read 40.5 and generated 37.6/37.1/36.6/34.7/33.9 tok/s at 100/2K/8K/16K/24K, 724 nodes/decode, 351 MiB free; three real servers saved/loaded an 867-token opening (cached 867/888), replies bit-exact, stream `[DONE]`; no inference code changed |
 | Native Windows 24K CPU benchmark + cross-mode matrix | this worktree | `freebuff/tandem-cpu-recovery` | `docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/{README.md,runs.csv,raw/bench-24k-*.log}`, `docs/benchmarks/build_cross_mode.py`, `docs/benchmarks/CROSS-MODE.md`, `docs/benchmarks/CROSS-MODE.csv`, `docs/BENCHMARKS.md`, `docs/CARDS.md`, `docs/CPU-SUPPORT.md`, `AGENTS.md` | done; native 2B/4B/9B 24K generation 8.2/3.1/2.6 tok/s, read 45.1/19.2/9.9; replaced the WSL2 CPU cells; GPU/tandem rows unchanged |
 | CPU thread-count sweep (6/8/10/12) | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/cpu.py`, `tests/test_cpu_threads.py`, `docs/CPU-SUPPORT.md`, `docs/CARDS.md`, `docs/CONFIGURATION-REFERENCE.md`, `docs/benchmarks/2026-11-09-i7-8086k-cpu/README.md`, `AGENTS.md` | done; WSL2 2B 6/8/10 read 38.2/44.3/25.5 and gen 28.6/31.2/24.1; native 2B 6/8/10 read 43.2/28.4/13.5 and gen 31.7/21.6/9.8; 8 is a WSL2/libgomp tuning, 10/12 are slower, default stays 6; no auto-tune |
 | i7-8086K processor details | this worktree | `freebuff/tandem-cpu-recovery` | `docs/CPU-SUPPORT.md`, `docs/CARDS.md`, `AGENTS.md` | done; added Coffee Lake 14 nm, 6C/12T, 4.00 GHz base, 5.00 GHz single-core turbo, typical 4.3-4.4 GHz all-core, 12 MB L3, unlocked multiplier, 2018 40th-anniversary positioning and the stock-clock caveat; no code changed |
 | 9B CPU queue load test | this worktree | `freebuff/tandem-cpu-recovery` | `docs/AGENTS.md`, `AGENTS.md` | done; native 9B CPU, 6 threads, ctx 1024, queue max 8, 12 clients: 9x200 + 3x429 with Retry-After 1, max waiting 8, 0 errors; 429s returned in 8-10 ms; raw evidence untracked in `bench-logs/9b-queue-load/` |
 | Intel Arc A770 support goal | this worktree | `freebuff/tandem-cpu-recovery` | `docs/INTEL-ARC.md`, `docs/ROADMAP.md`, `docs/CARD-SUPPORT.md`, `AGENTS.md` | planning/audit done; no Intel backend code; no Arc hardware (RTX 4060 Ti only, no `sycl-ls`); one/two/CPU-tandem goals, gates and milestones written; not a support claim |
 | P106-100 single/dual support + CPU tandem gate | this worktree | `freebuff/tandem-cpu-recovery` | `docs/P106.md`, `docs/CARDS.md`, `docs/CARD-SUPPORT.md`, `docs/ROADMAP.md`, `tests/test_installer_cards.py`, `AGENTS.md` | installer single/dual routing tested; no P106 hardware; general Bonsai CPU tandem blocked on the missing `TandemEngine` (Nanbeige host-layer path is separate); not a support claim |
+| P106 verification runner | this worktree | `freebuff/tandem-cpu-recovery` | `tools/verify_p106.py`, `tests/test_verify_p106.py`, `docs/P106.md`, `docs/CARDS.md`, `AGENTS.md` | `tools/verify_p106.py` records the single-card 2B/4B/9B verify, the real server/cache restart, and the two-card 27B verify in one run; it pins the P106 indices, drops inherited `KINDI_*`, and refuses a full run without exactly two P106-100s. 10 CPU-only tests and a dry-run pass on this host; no P106 hardware, so the record is not run and not a support claim |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -316,13 +319,14 @@ is not a lock.
   first. Gate: `python docs/benchmarks/build_cross_mode.py --check`, 203 tests, `compileall`, config/support
   checks; no new GPU run.
 - i7-8086K CPU support row and CPU server chat (2026-11-10): `docs/CARDS.md` now lists the i7-8086K
-  (6 threads, 2B/4B/9B, native Windows 33.7/16.7/9.1 tok/s verify, native 24K table). The missing support
-  gate is verified on the native build: `KINDI_DEVICE=cpu` served the 2B on 127.0.0.1:8199 at a 1,024
-  context, answering `POST /v1/chat/completions` non-stream (19 prompt / 9 completion, 32.9 tok/s) and
-  stream (17 / 7, 32.7 tok/s) with 0 errors, 0 MiB GPU memory and `kindi.cpu.Engine` at 6 threads. The
-  4B/9B engine verifies are recorded, but no separate chat request was sent to them. `docs/CPU-SUPPORT.md`,
-  `docs/ROADMAP.md`, both CPU benchmark pages and the generated support matrix now say so. Gate: 203 tests,
-  `support_matrix --check`, `config_reference --check`, `compileall`, `bash -n`.
+  (6 threads, 2B/4B/9B, native Windows 33.7/16.7/9.1 tok/s verify, native 24K table). The support gate
+  is verified on the native build: `KINDI_DEVICE=cpu` served the 2B/4B/9B on 127.0.0.1:8199 at a 1,024
+  context, answering `POST /v1/chat/completions` non-stream and stream with 0 errors, 0 MiB GPU memory
+  and `kindi.cpu.Engine` at 6 threads. Non-stream rates were 32.9/19.2/11.5 tok/s; the streams were
+  17/7 (2B), 17/1 (4B) and 15/9 (9B), each ending in `[DONE]`. The 4B loaded in 55.8 s, the 9B in
+  123.7 s. `docs/CPU-SUPPORT.md`, `docs/ROADMAP.md`, `docs/BENCHMARKS.md`, both CPU benchmark pages and
+  the generated support matrix now say so. Gate: 214 tests, `support_matrix --check`,
+  `config_reference --check`, `compileall`, `bash -n`, `git diff --check`.
 - CI CPU build-and-smoke job (2026-11-10): `.github/workflows/ci.yml` adds `cpu-engine-smoke`, which
   compiles `kindi/kcpu.c` with gcc for the documented AVX2/FMA/F16C tier and runs the CPU build and
   thread tests plus `tests/test_cpu_smoke.py`. The smoke test loads the library through
@@ -331,12 +335,19 @@ is not a lock.
   library, so the default suite needs no C toolchain. No model pack, GPU or full token is used.
   Gate: 203 passed + 2 skipped, the three CPU test files pass with `KINDI_CPU_SMOKE=1`, `compileall`,
   `bash -n`, config/support checks and `git diff --check`.
-- RTX 4060 Ti tc verify (2026-11-10): `kindi verify` with `KINDI_TC=1 KINDI_TP=1 KINDI_FD=1 KINDI_ATT_TC=1
+- RTX 4060 Ti tc verify (2026-11-11 one-pass matrix): `kindi verify` with `KINDI_TC=1 KINDI_TP=1 KINDI_FD=1 KINDI_ATT_TC=1
   KINDI_TC_TMAX=4 KINDI_SPEC=0 KINDI_HEAD=exact` on the 4060 Ti (sm_89, 8 GB, Windows) gives 2B **4/4 token-exact** at
-  354.5 tok/s, 4B **2/4** (prompts 2 and 3; first differences at tokens 6 and 37), and 9B **refused before
-  graph build** (Hadamard block 4096). The plain `KINDI_TP=0` 4B/9B paths pass 4/4 at 114.9/72.5 tok/s.
-  `docs/CARDS.md` and `docs/CARD-SUPPORT.md` record this as a partial result, not a tc support claim. Raw
-  logs (untracked): `bench-logs/verify-4060ti-tc/`. No code changed.
+  370.2 tok/s, 4B **2/4** (prompts 2 and 3; first differences at tokens 6 and 37), and 9B **refused before
+  graph build** (Hadamard block 4096); the 27B tc plan passes with 3 exact prompts + 1 llama.cpp tie (token 14, gap 0.0064) at 38.9 tok/s in the 2026-11-11 one-pass matrix, using 724 nodes/decode token and leaving 1,128 MiB free. The plain `KINDI_TP=0` 4B/9B paths pass 4/4 at 114.9/72.5 tok/s.
+  `docs/CARDS.md` and `docs/CARD-SUPPORT.md` record this as a partial result, not a tc support claim. Raw logs (untracked): `bench-logs/verify-matrix-tc-4060ti/` (one-pass matrix); earlier `bench-logs/verify-4060ti-tc/` and `bench-logs/27b-tc-4060ti/` logs remain. The 27B pack and GGUF are at `D:/kindi-27b` (C: had 3.8 GB free); the follow-up 24K benchmark and server/cache run are recorded in `bench-logs/27b-tc-24k/RESULTS.md`. No inference code changed.
+- 27B tc 24K + server/cache (2026-11-11): the tc profile above on the 4060 Ti at `--ctx 24576` built
+  T=1..4 (724 nodes/decode token), read 40.5 tokens/s, generated 37.6/37.1/36.6/34.7/33.9 tokens/s at
+  positions 100/2,000/8,000/16,000/24,000, and left 351 MiB free. Three real servers ran a fresh-state
+  cold/save/restart cycle: 888 prompt tokens, an 867-token opening saved in 0.2 s and loaded in 0.3 s,
+  cached 867/888 in process and after restart, bit-identical replies, and a stream ending in `[DONE]`;
+  350-398 MiB stayed free. Cold loads were 56.4/54.6 s and the restart was 6.0 s. Evidence:
+  `bench-logs/27b-tc-24k/` and `bench-logs/test_27b_tc_cache.py`; `docs/CARDS.md` and
+  `docs/CARD-SUPPORT.md` record the qualification. No inference code changed.
 - Native Windows 24K CPU benchmark (2026-11-10): `python -m kindi --pack ... --ctx 24576 bench` on the
   native Windows engine (6 threads auto-detected, exact head, one fresh process per model) measured 2B
   45.1 read / 35.9 / 29.3 / 19.4 / 11.9 / 8.2; 4B 19.2 / 15.2 / 13.4 / 6.8 / 4.3 / 3.1; 9B 9.9 / 8.7 /
@@ -386,6 +397,24 @@ is not a lock.
   `docs/CARDS.md`, `docs/CARD-SUPPORT.md` and `docs/ROADMAP.md` link the page. Gate:
   `pytest tests/test_installer_cards.py -q` -> 15 passed; `pytest tests/ -q` -> 206 passed, 2 skipped;
   `compileall`, the support/config checks and `bash -n install.sh` pass. No GPU run, no P106 hardware.
+
+- CPU per-layer tandem entry point (2026-11-11): `kindi/kcpu.c` exports `kc_embed`, `kc_layer` and
+  `kc_head`, and `kindi/cpu.py` exposes `begin`, `layer`, `head`, `feed_layers`, `step_layers`, plus
+  `hidden`/`get_hidden`/`set_hidden`. `kc_layer` takes the complete residual in `hidden` and leaves the
+  complete residual there; `step`/`feed` keep the original single-OpenMP-region path. `tests/test_cpu_layers.py`
+  has fake-library ordering/validation tests and an opt-in `KINDI_CPU_PACK` exactness check. Native
+  Windows i7-8086K (6 threads, clang 18.1.8): the five-token layerwise sequence is token- and
+  hidden-state-exact against `step` on the 2B/4B/9B packs (5 passed per pack); no pack: 4 passed,
+  1 skipped; compiled CPU smoke: 16 passed. No `TandemEngine`, layer placement or GPU handoff exists;
+  the RTX 4060 Ti is not used by this slice.
+
+- P106 verification runner (2026-11-11): `tools/verify_p106.py` writes `results.json`, `RESULTS.md`,
+  a generated `kindi.conf` and raw logs for the single-card 2B/4B/9B verify, the real server/cache
+  save/in-process-hit/restart/invalid-request cycle, and the two-card 27B verify. It requires exactly two
+  visible P106-100s for a full run (or `--single-only`), pins `CUDA_VISIBLE_DEVICES` to their nvidia-smi
+  indices, removes inherited `KINDI_*` settings, and requires `plan engine ready: 2 cards` for the dual
+  result. Evidence: `pytest tests/test_verify_p106.py -q` -> 10 passed; `python tools/verify_p106.py --dry-run`
+  -> exit 0 on the RTX 4060 Ti host (no P106). Not run on P106 hardware; not a support claim.
 
 - Secret/personal-data guard (2026-11-10): `tests/test_no_secrets.py` scans every tracked file
   (binary files skipped) for private keys, cloud tokens, JWTs, email addresses and local home paths;

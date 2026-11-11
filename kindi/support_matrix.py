@@ -26,7 +26,7 @@ STATUS = {
     "bonsai-2b": ["4/4", "4/4, 33.7 tok/s", "4/4, identical pack", "2/4, gated"],
     "bonsai-4b": ["4/4", "4/4, 16.7 tok/s", "not tested", "4/4, gated"],
     "bonsai-9b": ["4/4", "4/4, 9.1 tok/s", "not tested", "n/a"],
-    "bonsai-27b": ["pass (2xP100 record)", "not supported", "not converted", "n/a"],
+    "bonsai-27b": ["3 exact + tie, 4060 Ti tc", "not supported", "not converted", "n/a"],
     "nemotron-e4b": ["separate backend", "n/a", "n/a", "n/a"],
     "nanbeige-33b": ["separate backend", "n/a", "n/a", "n/a"],
 }
@@ -35,6 +35,7 @@ EVIDENCE = [
     ("CPU engine on the i7-8086K, native Windows", "benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md"),
     ("CPU engine on the i7-8086K, WSL2", "benchmarks/2026-11-09-i7-8086k-cpu/README.md"),
     ("GPU 2B/4B/9B at 24K on the RTX 4060 Ti", "benchmarks/2026-11-09-i7-8086k-rtx4060ti/README.md"),
+    ("RTX 4060 Ti 27B tc verify", "CARDS.md#rtx-4060-ti-8-gb-ada-sm89"),
     ("No-go experiments and their gates", "ROADMAP.md"),
 ]
 
@@ -202,9 +203,10 @@ def render(models=None, fmts=None, kv=None, isa=None):
               "- `PQ2_0`/`Q2_0` are converted and verified for the 2B only; the 4B/9B/27B files were",
               "  not downloaded.",
               "- `k8v4` is quarantined behind `KINDI_KV_EXPERIMENTAL=1` because it is lossy.",
-              "- The CPU server chat path is verified for the 2B only; the 4B/9B chat paths and repeated-run",
-              "  stability are not.",
-              "- The 27B needs two cards and is not installed on the reference machine.",
+              "- The CPU server chat path is verified for the 2B, 4B and 9B; repeated-run stability",
+              "  is not measured.",
+              "- The 27B single-card tc verify passes on the RTX 4060 Ti (3 exact + 1 llama.cpp tie at",
+              "  1,024 tokens); its long-context/server path and the two-card result remain unmeasured.",
               "- `nemotron-e4b` and `nanbeige-33b` have separate backends and are outside this matrix.",
               "- The archived no-go work and the gates that would reopen it are in [ROADMAP.md](ROADMAP.md)."]
     return "\n".join(lines) + "\n"

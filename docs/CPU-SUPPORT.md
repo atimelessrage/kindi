@@ -1,7 +1,7 @@
 # Long-term CPU support
 
 Status: **roadmap and acceptance contract, updated 2026-11-10. The i7-8086K engine and native CPU
-server chat path are verified; the other CPUs and a repeat timing run remain open.** The baseline CPU engine (`kindi/cpu.py`,
+server chat path on the 2B/4B/9B are verified; the other CPUs and a repeat timing run remain open.** The baseline CPU engine (`kindi/cpu.py`,
 `kindi/kcpu.c`) is in `main`; the WIP ISA/AVX-only changes are uncompiled and not merged. This page
 records the target, the verified result, and the exact build/runtime requirements so the work can be
 implemented and measured without re-discovering them. The tandem recovery gate is in
@@ -40,7 +40,7 @@ they are not part of this CPU goal.
 | Intel Core i5-2500K | Sandy Bridge | 4 / 4 | AVX; **no AVX2, FMA or F16C** | **Blocked**: the current source cannot compile for this CPU | 2B and 4B after an AVX/scalar fallback; 9B only if measured and useful; 27B no |
 | Intel Xeon W-2133 | Skylake-W | 6 / 12 | AVX-512, AVX2, FMA, F16C | Expected to build and run, but **unverified** | 2B, 4B and 9B |
 | Intel Core i9-13900K | Raptor Lake (8 P + 16 E) | 24 / 32 | AVX2, FMA, F16C; no AVX-512 | Expected to build and run, but **unverified** | 2B, 4B and 9B; tune P/E thread count |
-| Intel Core i7-8086K | Coffee Lake | 6 / 12 | AVX2, FMA, F16C | **Engine and server verified**: native Windows (2B/4B/9B 4/4 at 33.7/16.7/9.1 tok/s, 6 threads auto-detected; 24K generation 8.2/3.1/2.6 tok/s, read 45.1/19.2/9.9), WSL2 history, and a native CPU server chat request on the 2B (32.9 tok/s, 1,024 context, 0 errors) | 2B, 4B and 9B; use 6 threads |
+| Intel Core i7-8086K | Coffee Lake | 6 / 12 | AVX2, FMA, F16C | **Engine and server verified**: native Windows (2B/4B/9B 4/4 at 33.7/16.7/9.1 tok/s, 6 threads auto-detected; 24K generation 8.2/3.1/2.6 tok/s, read 45.1/19.2/9.9), WSL2 history, and native CPU server chat requests on the 2B/4B/9B (32.9/19.2/11.5 tok/s, 1,024 context, non-stream and stream, 0 errors) | 2B, 4B and 9B; use 6 threads |
 
 Notes:
 
@@ -161,14 +161,20 @@ the ctypes loader can bind them. The build command and the Linux/Windows split a
 
 ### CPU server chat (2026-11-10)
 
-The last open item of the support contract is exercised on the same native Windows machine.
-`KINDI_DEVICE=cpu`, `KINDI_PACK=.../bonsai-2b`, `KINDI_CTX=1024`, six threads: the server built and
-loaded the 2B in 25.5 s and served on `127.0.0.1:8199`. `POST /v1/chat/completions` returned HTTP 200
-with "Hello! How can I help you today?" (19 prompt, 9 completion tokens, 32.9 tokens/s generation); a
-streaming request returned SSE chunks ending in `[DONE]` (17 prompt, 7 completion, 32.7 tokens/s).
-`/health` reported 2 requests, 0 errors and 0 MiB of GPU memory, and the log identified the engine as
-`kindi.cpu.Engine` with 6 threads. This is the 2B chat path; the 4B and 9B engine verifies are above,
-but no separate chat request was sent for them.
+The server path is exercised on the same native Windows machine for all three CPU models.
+`KINDI_DEVICE=cpu`, `KINDI_CTX=1024`, six threads, exact head, one fresh server per pack on
+`127.0.0.1:8199`. Each model answered `POST /v1/chat/completions` non-stream and stream with HTTP 200,
+0 errors and 0 MiB of GPU memory; every stream ended in `[DONE]`.
+
+| model | engine ready | non-stream | stream |
+|---|---:|---|---|
+| 2B | 25.5 s | 19 prompt / 9 completion, 32.9 tok/s | 17 / 7, 32.7 tok/s, stop |
+| 4B | 55.8 s | 15 / 9, 19.2 tok/s | 17 / 1, stop |
+| 9B | 123.7 s | 15 / 9, 11.5 tok/s | 15 / 9, 10.7 tok/s, stop |
+
+The 2B row is from the earlier run; the 4B and 9B rows are the 2026-11-10 extension. The 9B was
+also probed with `max_tokens=12`; that stream ended with `finish_reason=length` and `[DONE]`, so a
+capped stream terminates cleanly. These are single chat requests, not throughput benchmarks.
 
 ### Why 12 threads collapse
 
@@ -319,7 +325,7 @@ workload can set `OMP_NUM_THREADS=8`. Raw probe logs are in `bench-logs/thread-s
 
 12. [~] For every cell that is advertised, record the CPU, gcc version, thread count, context, model,
     `kindi verify` result and tokens/s. The i7-8086K row is recorded here, in `docs/BENCHMARKS.md` and
-    in `docs/CARDS.md`; its native CPU server chat path is verified. `README.md` and the other CPUs remain pending.
+    in `docs/CARDS.md`; its native CPU server chat path is verified for the 2B, 4B and 9B. `README.md` and the other CPUs remain pending.
 13. [x] Keep the current CPU-only tests passing and add a CPU build/smoke job that needs no GPU and
     no model pack. Done 2026-11-10: `.github/workflows/ci.yml` adds `cpu-engine-smoke`, which
     compiles `kcpu.c` with gcc for AVX2/FMA/F16C, loads it through `kindi.cpu._lib()` and runs
@@ -332,12 +338,12 @@ workload can set `OMP_NUM_THREADS=8`. Raw probe logs are in `bench-logs/thread-s
 | i5-2500K | fallback target | fallback target | measure only | 2B/4B if RAM allows | fallback build, verify, bench |
 | Xeon W-2133 | target | target | target | yes | verify, bench, thread/AVX-512 result |
 | i9-13900K | target | target | target | yes | verify, bench, P/E thread default |
-| i7-8086K | engine + server verified | engine verified | engine verified | yes | repeat run |
+| i7-8086K | engine + server verified | engine + server verified | engine + server verified | yes | repeat run |
 
 A checked cell needs a recorded `kindi verify` pass and a benchmark row. “Builds” alone is not support.
 `engine verified` for the i7-8086K means the CPU library built on WSL2 and natively on Windows,
 `kindi verify` passed and the 6-thread 24K benchmark completed. Its native CPU server chat path is
-now verified for the 2B; the remaining open item is a repeat timing run.
+now verified for the 2B, 4B and 9B; the remaining open item is a repeat timing run.
 
 ## Commands for the validation machine
 

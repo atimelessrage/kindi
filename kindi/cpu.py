@@ -9,7 +9,11 @@ Linux, and on Windows clang with the MSVC headers and libomp that its driver fin
 Threads: OMP_NUM_THREADS, or one per physical core of this process's CPUs by default (OMP_PROC_BIND=close,
 OMP_PLACES=cores). The physical-core default is the portable choice; 8 threads (two SMT pairs) can be
 faster under WSL2/libgomp on the 2B/9B, but 10/12 and native Windows 8 are slower. See
-docs/CPU-SUPPORT.md for the sweep and _configure_threads for the default."""
+docs/CPU-SUPPORT.md for the sweep and _configure_threads for the default.
+
+Tandem entry point: begin(tok) embeds a token, layer(il, pos) runs exactly one block, and head()
+returns the greedy token from the residual left by the last layer. The whole-model step() remains the
+single-region path; the per-layer calls are for handing one block to or from another backend."""
 import ctypes
 import json
 import os
@@ -118,6 +122,11 @@ def _lib():
     lib.kc_init()
     lib.kc_step.argtypes = [ctypes.POINTER(Model), ctypes.c_int, ctypes.c_int, ctypes.c_int]
     lib.kc_step.restype = ctypes.c_int
+    lib.kc_embed.argtypes = [ctypes.POINTER(Model), ctypes.c_int]
+    lib.kc_layer.argtypes = [ctypes.POINTER(Model), ctypes.c_int, ctypes.c_int]
+    lib.kc_layer.restype = ctypes.c_int
+    lib.kc_head.argtypes = [ctypes.POINTER(Model)]
+    lib.kc_head.restype = ctypes.c_int
     assert lib.kc_sizeof_model() == ctypes.sizeof(Model) and lib.kc_sizeof_layer() == ctypes.sizeof(Layer)
     return lib
 
@@ -292,6 +301,7 @@ class Engine(object):
         self.HB = int(man.get("hadamard_block", 512))
         self.head_name = man.get("head", "token_embd.weight")
         D, NL, NFF = d["width"], d["layers"], d["ffn"]
+        self.D, self.NL = D, NL
         NH, NHKV, HD = d["heads"], d["kv_heads"], d["head_dim"]
         NK, HK = d["groups"], d["state_size"]
         NV = d["gdn_inner"] // HK
@@ -374,6 +384,7 @@ class Engine(object):
                 self.logits = a
         m.red = _p(z(256, np.float64), ctypes.POINTER(ctypes.c_double))
         self.ylog, self.ylog_n, self.ylog_map = self.logits, VOCAB, None
+        self.hidden = np.ctypeslib.as_array(m.h, shape=(D,))   # in-place residual for a tandem handoff
         self.hsl, self.shortlist = None, 0
         self.shortlist = 0
         self.vocab = json.load(open(os.path.join(pack, "vocab.json")))
@@ -384,6 +395,32 @@ class Engine(object):
         for a in self.M + self.conv + self.Kc + self.Vc:
             a.fill(0)
 
+    def begin(self, tok):
+        """Embed one token into self.hidden; the next layer() call starts layer 0."""
+        self.lib.kc_embed(ctypes.byref(self.m), int(tok))
+
+    def layer(self, il, pos):
+        """Run exactly one block on self.hidden (the complete residual entering the layer)."""
+        il, pos = int(il), int(pos)
+        if not 0 <= il < self.NL:
+            raise IndexError("layer %d is outside 0..%d" % (il, self.NL - 1))
+        if not 0 <= pos < self.ctx:
+            raise OverflowError("position %d is past the context (%d)" % (pos, self.ctx))
+        if self.lib.kc_layer(ctypes.byref(self.m), il, pos):
+            raise ValueError("kindi: the CPU layer entry point rejected layer %d" % il)
+
+    def feed_layers(self, tok, pos):
+        """The per-layer equivalent of feed(): embed then run every block."""
+        if pos >= self.ctx:
+            raise OverflowError("position %d is past the context (%d)" % (pos, self.ctx))
+        self.begin(tok)
+        for il in range(self.NL):
+            self.layer(il, pos)
+
+    def head(self):
+        """Greedy token from the residual left by the last layer (or by begin() plus layers)."""
+        return int(self.lib.kc_head(ctypes.byref(self.m)))
+
     def feed(self, tok, pos):
         if pos >= self.ctx:
             raise OverflowError("position %d is past the context (%d)" % (pos, self.ctx))
@@ -393,6 +430,22 @@ class Engine(object):
         if pos >= self.ctx:
             raise OverflowError("position %d is past the context (%d)" % (pos, self.ctx))
         return self.lib.kc_step(ctypes.byref(self.m), int(tok), int(pos), 1)
+
+    def step_layers(self, tok, pos):
+        """The per-layer equivalent of step(): embed, every block, then the exact head."""
+        self.feed_layers(tok, pos)
+        return self.head()
+
+    def set_hidden(self, values):
+        """Copy a residual from another backend into the CPU layer input."""
+        x = np.asarray(values, dtype=F32)
+        if x.shape != (self.D,):
+            raise ValueError("hidden state has shape %r, expected (%d,)" % (x.shape, self.D))
+        np.copyto(self.hidden, x)
+
+    def get_hidden(self):
+        """A copy of the residual left by the last layer/head."""
+        return self.hidden.copy()
 
     def generate(self, ids, n):
         self.reset()

@@ -27,6 +27,9 @@ def test_compiled_library_loads_with_the_python_abi(library):
     assert library.kc_sizeof_model() == ctypes.sizeof(cpu.Model)
     assert library.kc_sizeof_layer() == ctypes.sizeof(cpu.Layer)
     assert callable(library.kc_step)
+    assert callable(library.kc_embed)
+    assert callable(library.kc_layer)
+    assert callable(library.kc_head)
 
 
 def test_compiled_library_initializes(library):

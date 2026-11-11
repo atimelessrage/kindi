@@ -204,20 +204,22 @@ off until the two-card verify is recorded).
 |---|---|
 | RTX 3080 (190 W) | 27B: 62.3 tokens/s at 512 tokens. With the 2B draft model: 91.1 (1.46 times) at 512 tokens, 103.2 (1.68 times) at 8K with k=2, and 111.5 (1.82 times) at 8K with k=3. The same output as without the draft model. Against llama.cpp: see [BENCHMARKS.md](BENCHMARKS.md) |
 | RTX 3060 12 GB | 27B: 41.1 tokens/s at 512 tokens; with the 2B draft model 60.6 (1.48 times), 73.5 (1.82 times) at 8K, 66.7 (1.81 times) at 24K |
-| RTX 4060 Ti 8 GB | tc plan: 2B 4/4 token-exact; 4B 2/4; 9B refused (Hadamard 4096). Plain 4B/9B 4/4. Details below |
+| RTX 4060 Ti 8 GB | tc plan (2026-11-11 one-pass matrix): 2B 4/4 token-exact, 370.2 tokens/s; 4B 2/4; 9B refused (Hadamard 4096); 27B passes (3 exact + 1 tie, 38.9 tokens/s); 27B 24K benchmark 33.9 tokens/s at position 24,000 and server/cache pass. Plain 4B/9B 4/4. Details below |
 | other RTX 20, 40 and 50 cards | supported on the plain engine; `kindi verify` passes. We give no speed numbers |
 
 ### RTX 4060 Ti 8 GB (Ada, sm_89)
 
 | item | value |
 |---|---|
-| models | 2B, 4B, 9B |
-| tc plan | `KINDI_TC=1`, `KINDI_TP=1`, `KINDI_FD=1`, `KINDI_ATT_TC=1`, `KINDI_TC_TMAX=4`, `KINDI_SPEC=0`, `KINDI_HEAD=exact`; verify uses its fixed 1,024-token context |
-| verify, tc plan (2026-11-10) | 2B **4/4 token-exact**, 354.5 tokens/s; 4B **2/4**: prompt 2 6/40 (first difference at token 6, llama.cpp top-2 gap 0.0447), prompt 3 37/40 (first difference at token 37); 9B **refused before graph build**: the tensor-core plan supports Hadamard blocks 512 and 1024, and this pack has 4096 |
+| models | 2B, 4B, 9B, 27B |
+| tc plan | `KINDI_TC=1`, `KINDI_TP=1`, `KINDI_FD=1`, `KINDI_ATT_TC=1`, `KINDI_TC_TMAX=4`, `KINDI_SPEC=0`, `KINDI_HEAD=exact`; verify uses its fixed 1,024-token context; the 24K run below uses the same profile with `KINDI_KV=q8_0` and `--ctx 24576` |
+| benchmark, tc plan (2026-11-11) | 27B at ctx 24,576: prompt read 40.5 tokens/s; generation **37.6 / 37.1 / 36.6 / 34.7 / 33.9** tokens/s at positions 100 / 2,000 / 8,000 / 16,000 / 24,000; 724 nodes/decode token; **351 MiB free** |
+| server/cache, tc plan (2026-11-11) | three real servers at ctx 24,576: `/health` 200, non-stream and stream chat, 888-token prompt; a **867-token opening** saved and loaded after restart; **cached 867/888** in process and after restart; replies bit-identical; 350-398 MiB free |
+| verify, tc plan (2026-11-11 one-pass matrix) | 2B **4/4 token-exact**, 370.2 tokens/s; 4B **2/4**: prompt 2 6/40 (first difference at token 6, llama.cpp top-2 gap 0.0447), prompt 3 37/40 (first difference at token 37); 9B **refused before graph build**: the tensor-core plan supports Hadamard blocks 512 and 1024, and this pack has 4096; 27B **PASS: 3/4 token-exact + 1 llama.cpp tie** (tie at token 14, gap 0.0064), **38.9 tokens/s** in the one-pass matrix; the tc plan built T=1..4 with 724 nodes/decode token and left 1,128 MiB free |
 | verify, plain engine | 4B **4/4 token-exact**, 114.9 tokens/s; 9B **4/4 token-exact** (13/13 on prompt 3), 72.5 tokens/s |
-| result | The tc plan is verified for the 2B only. The 4B divergence and the 9B Hadamard block are open; [CARD-SUPPORT.md](CARD-SUPPORT.md) tracks them |
+| result | The tc plan passes on the 2B (4/4) and the 27B (3 exact + 1 accepted tie). The 4B divergence and the 9B Hadamard block are open. The 27B single-card path now has a 24K benchmark and a real server/cache restart cycle, but no long soak or concurrency; [CARD-SUPPORT.md](CARD-SUPPORT.md) tracks the remaining gaps |
 
-- The 8 GB `tc` installer profile only adds tensor-core settings to the 27B (and the 2B when its MTP head is installed); the 2B/4B/9B settings above are the documented tc plan. The plain 4B/9B paths remain the safe default.
+- The 8 GB `tc` installer profile only adds tensor-core settings to the 27B (and the 2B when its MTP head is installed); the 2B/4B/9B/27B settings above are the documented tc plan. The plain 4B/9B paths remain the safe default.
 
 ## AH-Nanbeige4.3-33B IQ3_XXS
 
@@ -308,6 +310,7 @@ option `amdgpu.cwsr_enable=0`. [AMD.md](AMD.md) gives the settings.
 - The 27B does not fit in 6 GB. Two P106 cards run it together: the installer pairs two cards of the same class with at least 3,800 MiB each and sets the legacy two-card profile.
 - The installer's shared 6 GB list also offers Nemotron; it is experimental and has not been measured on a P106.
 - CPU+GPU tandem (one model split across CPU and GPU layers) is not implemented for the Bonsai models and is not supported on the P106. (The Nanbeige backend has a separate host-layer path; it does not apply here.) The gate is in [P106.md](P106.md#cpu-tandem-status); do not advertise it yet.
+- Verification runner: `python3 tools/verify_p106.py` records the single-card 2B/4B/9B verify, the server/cache cycle and the two-card 27B verify. It has not run on P106 hardware; see [P106.md](P106.md#one-command-verification-record).
 
 ## Quadro M4000, 8 GB (Maxwell 2.0, sm_52)
 
@@ -447,7 +450,7 @@ image for it.
 | verify | 2B 4/4 at 33.7 tokens/s, 4B 4/4 at 16.7, 9B 4/4 at 9.1 (native Windows, 1,024-token context) |
 | generation (24,576-token context, six threads, native Windows) | 2B 35.9 at 100 tokens, 29.3 at 2K, 19.4 at 8K, 11.9 at 16K, 8.2 at 24K; 4B 15.2 / 13.4 / 6.8 / 4.3 / 3.1; 9B 8.7 / 7.7 / 4.9 / 3.5 / 2.6 |
 | prompt reading | 45.1 (2B), 19.2 (4B), 9.9 (9B) tokens/s (native Windows, 1,000-token prompt) |
-| server | `kindi serve` with `KINDI_DEVICE=cpu` answered `POST /v1/chat/completions` non-stream and stream on the 2B: 19 prompt / 9 completion tokens at 32.9 tokens/s generation, 0 errors, 0 MiB GPU memory (native Windows, 1,024-token context, 2026-11-10) |
+| server | `kindi serve` with `KINDI_DEVICE=cpu` answered `POST /v1/chat/completions` non-stream and stream on the 2B, 4B and 9B: 32.9/19.2/11.5 tokens/s generation, 0 errors, 0 MiB GPU memory (native Windows, 1,024-token context, 2026-11-10; [details](benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md#cpu-server-chat)) |
 
 - The 8086K is the 2018 40th-anniversary limited edition, closely related to the i7-8700K with a
   higher single-core turbo. These runs used no explicit overclock and no thermal or power clamp;

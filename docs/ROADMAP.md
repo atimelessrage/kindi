@@ -14,7 +14,7 @@ next person does not have to rediscover the wall.
 |---|---|---|---|---|
 | Continuous batching (multi-sequence decode) | **NO-GO** 2026-11-08 | Phase-0 spike: B=4 reached 131.8 tok/s = 0.69x of single decode; the gate was 1.5x | [CONTINUOUS-BATCHING.md](CONTINUOUS-BATCHING.md), phase-0 spike logs in `bench-logs/phase0-spike/` | a new batch-GEMM spike clears 1.5x aggregate at B=4 on the 2B |
 | Per-slot plain-engine refactor (Phase 1 of the batching plan) | **NO-GO/archived** 2026-11-08 | inherits the batching gate; the plan was never authorized | [PER-SLOT-REFACTOR.md](PER-SLOT-REFACTOR.md) | the batching gate passes |
-| Tandem CPU+GPU layer split | **NO RUNTIME** 2026-11-09 | the WIP `tandem.py` does not parse; `main` has only the host-RAM preflight and the design | [TANDEM-STATUS.md](TANDEM-STATUS.md), [CPU_GPU_TANDEM_DESIGN.md](CPU_GPU_TANDEM_DESIGN.md) | a clean implementation of the restored design beats the GPU-only path on one tier |
+| Tandem CPU+GPU layer split | **NO RUNTIME** 2026-11-09; per-layer CPU entry point 2026-11-11 | the WIP `tandem.py` does not parse; there is no `TandemEngine`, placement or GPU/CPU handoff | [TANDEM-STATUS.md](TANDEM-STATUS.md), [CPU_GPU_TANDEM_DESIGN.md](CPU_GPU_TANDEM_DESIGN.md) | a clean implementation of the restored design beats the GPU-only path on one tier |
 | `k8v4` 4-bit V K/V cache | **QUARANTINED** 2026-11-10 | 2B `kindi verify` is 2/4 against the fp16 reference (4B is 4/4); a 4-bit V cannot be token-exact | [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md), `bench-logs/k8v4-cache/RESULTS.md` | the project accepts lossy K/V behind a flag, or a V format that reproduces the reference exists |
 
 ## Why each one stopped
@@ -31,7 +31,8 @@ state. Nothing was implemented, so there is no code to remove.
 **Tandem CPU+GPU.** The interrupted worktree could not be merged: its `tandem.py` is unparsable,
 the only historical blob is the corrupt one, and a branch merge would revert later audit, server
 and test work. The intact design was restored, and the WIP branches are preserved (see the status
-page for the cleanup gate).
+page for the cleanup gate). On 2026-11-11 the CPU engine gained a per-layer entry point and a 2B/4B/9B
+exactness check; placement, state handoff and a `TandemEngine` are still missing.
 
 **`k8v4`.** K stays q8_0 and only V drops to 4 bits, which is enough to change two of four 2B
 prompts. It is refused unless `KINDI_KV_EXPERIMENTAL=1`, and the message names the measured loss.
@@ -41,14 +42,15 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
 
 - **Formats:** `PQ2_0`/`Q2_0` import (2B done, byte-identical packs); 4B/9B/27B conversion and
   verification are open because those files were never downloaded.
-- **CPU:** native Windows engine and a CPU server chat request verified on the i7-8086K; a repeat
-  timing run and the other CPUs (i5-2500K AVX-only fallback, Xeon W-2133, i9-13900K) are open.
+- **CPU:** native Windows engine and CPU server chat requests for the 2B/4B/9B verified on the
+  i7-8086K; a repeat timing run and the other CPUs (i5-2500K AVX-only fallback, Xeon W-2133, i9-13900K) are open.
 - **Plan engine:** 2B T=4 token-exact; 9B is refused before graph build (Hadamard block 4096).
 - **Serving:** bounded queue with 429, `/metrics`, Ollama-compatible endpoints; multi-GPU
   replicas need `kindi/tp.py` work.
 - **Cards:** single/dual card support targets are in [CARD-SUPPORT.md](CARD-SUPPORT.md). The P106-100
   single-card (2B/4B/9B) and two-card (27B) offers are installer-tested but not measured on hardware;
-  general Bonsai CPU+GPU tandem is blocked on the missing runtime ([P106.md](P106.md)).
+  general Bonsai CPU+GPU tandem still has no placement/state-handoff runtime, although the per-layer
+  CPU primitive exists ([P106.md](P106.md), [TANDEM-STATUS.md](TANDEM-STATUS.md)).
 - **Intel Arc A770:** a separate SYCL/oneAPI backend is planned for one card, two cards and CPU+Arc
   tandem; the goal, gates and milestones are in [INTEL-ARC.md](INTEL-ARC.md). M0 (architecture audit)
   is done; M1 is blocked on Arc hardware. This is not a support claim.

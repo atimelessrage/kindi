@@ -81,7 +81,7 @@ implementation.
 | prompt cache | `kindi/cache.py` uses `cp.cuda` streams, events and pinned memory | needs a backend-neutral host/device-copy layer or an Arc implementation |
 | server | `kindi/server.py` and `kindi/catalog.py` call CuPy for device counts, memory and names | health, metrics, device selection and model fit need an Intel branch |
 | installer | `install.sh` detects NVIDIA with `nvidia-smi` and AMD through `/dev/kfd`; there is no Intel path | detection and a container image are release work, not the first correctness milestone |
-| CPU engine | whole-model C engine; verified for 2B/4B/9B, not 27B; no per-layer entry point | CPU+Arc tandem needs a real per-layer CPU API, not just two servers |
+| CPU engine | whole-model C engine; verified for 2B/4B/9B, not 27B; per-layer `kc_embed`/`kc_layer`/`kc_head` entry point added 2026-11-11, but no placement or GPU handoff | CPU+Arc tandem now has the CPU primitive; it still needs layer placement, state ownership and an Arc backend |
 | CPU+GPU tandem | design only in [CPU_GPU_TANDEM_DESIGN.md](CPU_GPU_TANDEM_DESIGN.md); the WIP `tandem.py` is not usable and the roadmap records no runtime | CPU+Arc tandem is the last milestone, not an offload flag |
 
 The 22 kernel files include the core Bonsai path (`kindi.cu`), prompt/chunk GEMM

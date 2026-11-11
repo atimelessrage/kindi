@@ -172,7 +172,7 @@ Not proved or not done:
   [CPU-SUPPORT.md](../../CPU-SUPPORT.md) explain the 8/10 results and keep 6 as the default.
 - **Repeated-run stability and thermals.** One run per configuration; no clock, power or
   temperature logging; no median/variance.
-- **Multi-user serving or 27B CPU.** The 2B CPU server chat path was tested later (native Windows,
+- **Multi-user serving or 27B CPU.** The 2B/4B/9B CPU server chat path was tested later (native Windows,
   see the 2026-11-10 page); this benchmark covers the 2B/4B/9B bench and verify paths only.
 - **A general support claim.** The engine result is recorded in
   [../../CPU-SUPPORT.md](../../CPU-SUPPORT.md) and the benchmark index, and the native CPU server

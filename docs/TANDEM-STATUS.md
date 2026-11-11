@@ -1,6 +1,7 @@
 # Tandem/CPU recovery status
 
-Status: **recovery audit, 2026-11-09. No tandem runtime is present and no tandem support is claimed.**
+Status: **first CPU slice, 2026-11-11. The CPU engine now exposes per-layer entry points; no
+`TandemEngine`, layer placement or measured CPU+GPU split is present, and no tandem support is claimed.**
 This page records what `main` actually contains, why the interrupted WIP cannot be merged as-is, and
 the gate for deleting it. Archived with the other no-go work in [ROADMAP.md](ROADMAP.md).
 
@@ -10,21 +11,50 @@ GPU-only 2B/4B/9B cells at positions 100-24,000 on the i7-8086K + RTX 4060 Ti. I
 
 ## Answer
 
-At `main` = `2abf9ad`, the repository has:
+At `main` = `2abf9ad` (the recovery audit), the repository had:
 
 - the **host-RAM preflight** in `kindi/hostram.py` (37 lines, used by `kindi/tp.py`);
 - the existing **AVX2/FMA/F16C CPU engine** (`kindi/cpu.py`, `kindi/kcpu.c`);
 - the existing **GEMV weight layout** (`kindi/layout.py:repack`, `reorder_head`).
 
-It does **not** have:
+The 2026-11-11 slice adds:
+
+- `kc_embed`, `kc_layer` and `kc_head` in `kindi/kcpu.c`;
+- `Engine.begin`, `layer`, `head`, `feed_layers`, `step_layers` and an in-place `hidden` view in
+  `kindi/cpu.py`.
+
+It still does **not** have:
 
 - `kindi/tandem.py`, `kindi/tandem_kernels.cu`, or a `TandemEngine`;
 - a layer-contiguous streaming pack format or a converter that emits one;
 - CPU ISA detection, an AVX-only fallback, or the WIP's CPU dispatch;
-- any working CPU+GPU layer split.
+- any working CPU+GPU layer split, layer placement or GPU/CPU state handoff.
 
 So there is no uncorrupted tandem/CPU implementation in `main` that makes the WIP branches
 disposable. **Do not delete the WIP branches yet.**
+
+## First slice: per-layer CPU entry point (2026-11-11)
+
+`kindi/kcpu.c` now exports three calls beside the whole-model `kc_step`:
+
+- `kc_embed(Model*, tok)` puts one token's embedding in `m->h`;
+- `kc_layer(Model*, il, pos)` runs exactly one block. It treats `m->h` as the complete residual
+  entering the block and leaves the complete residual leaving it in `m->h`; `m->y` is scratch and
+  is not carried between calls;
+- `kc_head(Model*)` runs the final norm and exact head on that residual and returns the greedy id.
+
+`kindi/cpu.py` exposes `begin(tok)`, `layer(il, pos)`, `head()`, `feed_layers(tok, pos)` and
+`step_layers(tok, pos)`, plus `hidden`, `get_hidden()` and `set_hidden()` for a future backend
+handoff. `step()` and `feed()` still use the original single-OpenMP-region path and are unchanged.
+
+Verification on the native Windows i7-8086K (6 threads, clang 18.1.8): a five-token sequence
+through `step_layers` matches `step` token-for-token and leaves the same hidden state on the 2B, 4B
+and 9B packs (`pytest tests/test_cpu_layers.py -q` with `KINDI_CPU_PACK`; 5 passed for each pack).
+With no pack the wrapper tests are 4 passed, 1 skipped; the compiled CPU smoke group is 16 passed.
+
+This is a CPU-side primitive, not a tandem runtime: no GPU layer is handed off, no layer placement
+or state ownership exists, and the RTX 4060 Ti is not used by this slice. No tandem benchmark is
+claimed.
 
 ## WIP inventory
 
@@ -49,19 +79,21 @@ server and test work. Any salvage must be selective.
 The only historical `kindi/tandem.py` blob is the corrupt one; there is no earlier valid
 implementation to restore.
 
-## Why this host cannot finish the runtime
+## Why the runtime is still unfinished
 
-This Windows machine has the RTX 4060 Ti and a working native CUDA driver, but no `gcc`, `clang` or
-`cl` on `PATH`. The CPU engine cannot be rebuilt or tested here, and the tandem CPU worker depends on
-that engine. The WIP's CUDA doorbell kernel has also not been compiled or exercised. A Linux host
-with gcc/OpenMP, or CI, is required for the CPU acceptance gate.
+The native Windows build works when `KINDI_CC`/`KINDI_LLVM` select clang 18.1.8 and libomp; the CPU
+per-layer gate above was rebuilt and run on this host. The remaining work is the GPU-side handoff:
+layer placement, ownership of K/V and GDN state, hidden-state copies, and a two-backend exactness
+test. The WIP's CUDA doorbell kernel has still not been compiled or exercised. A Linux host with
+gcc/OpenMP, or CI, is still required for the AVX-only and portable CPU gates.
 
 ## Cleanup gate
 
 Do not remove either WIP branch until a replacement on `main` passes all of these:
 
 1. **CPU gate:** the supported CPU flags build; an AVX-only host fails with an actionable message or
-   uses a real fallback; `kindi verify` passes on 2B and 4B; CPU tests pass.
+   uses a real fallback; `kindi verify` passes on 2B and 4B; CPU tests pass. The per-layer entry point
+   and its 2B/4B/9B exactness check are now present; the AVX-only fallback remains open.
 2. **Streaming gate:** `convert` emits a real layer-contiguous pack (or an explicit compatible
    alternative), and existing packs still load unchanged.
 3. **Tandem gate:** a clean `TandemEngine` runs layer-by-layer with CPU/GPU placement, and greedy
@@ -76,13 +108,14 @@ sketches. Keep them.
 
 ## Next implementation slice
 
-Start from the design, not the corrupt file:
+Start from the design, not the corrupt file. The CPU entry point is done; the next steps are:
 
-1. Build `hostram` pinned/mmap primitives with CPU-only unit tests and a fake CuPy layer.
-2. Implement a real layer-contiguous pack writer plus a compatibility check for existing packs.
-3. Add a clean `TandemConfig` and layer-placement planner before touching the engine.
-4. Integrate one layer at a time behind a disabled-by-default flag; run token-exact verification
-   after each step.
+1. Add a clean `TandemConfig` and layer-placement planner, with one explicit CPU layer and the rest
+   on the GPU.
+2. Add the hidden-state handoff and keep K/V and GDN state on the backend that owns each layer.
+3. Run the per-layer gate against the full-GPU engine on 2B and 9B before any speed claim.
+4. Build `hostram` pinned/mmap primitives and a layer-contiguous pack format only after the
+   placement path is exact.
 5. Benchmark only after the exactness gate passes.
 
 The design is restored at [CPU_GPU_TANDEM_DESIGN.md](CPU_GPU_TANDEM_DESIGN.md). The current CPU
