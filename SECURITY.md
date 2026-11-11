@@ -32,6 +32,9 @@ Please do not test against systems you do not own or have permission to test.
 - **Request limits.** Request bodies are capped (16 MiB by default, `max_body_mb` / `KINDI_MAX_BODY_MB`) and the
   waiting queue is bounded. A full queue returns HTTP 429 with `Retry-After`; retry once rather than
   opening more connections.
+- **Secret scanning.** `.pre-commit-config.yaml` and the CI `secret-scan` job run detect-secrets
+  against `.secrets.baseline`. Update the baseline only after reviewing a newly flagged value; the
+  baseline stores hashes, not the secret values.
 - **Installer.** `install.sh` is designed to be reviewed before running. It downloads models with
   pinned SHA-256 hashes and asks before privileged changes. Prefer a release archive with a verified
   checksum over piping a moving URL into a shell. The AMD path changes GRUB only after confirmation

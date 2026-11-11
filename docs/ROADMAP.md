@@ -66,7 +66,7 @@ claim; each item needs its own numeric or acceptance gate before it becomes a fe
 | Tandem CPU+GPU runtime | 27B/33B models do not fit an 8 GB card; only the per-layer CPU primitive exists | an end-to-end `TandemEngine` beats GPU-only on one tier, with no token drift |
 | Asymmetric two-card tensor parallelism | two-card support assumes equal cards and the current host has one GPU | a mixed-VRAM layout passes the 27B verify and server/cache checks on two cards |
 | Self-hosted GPU CI runner | the GPU smoke workflow exists but has not been dispatched | one green `gpu-smoke` run on a registered runner |
-| Static analysis and secret scanning | report/brief claims were ahead of `main`; the tooling is not wired into CI | a baseline with no high-severity findings and a CI job that fails on a new secret |
+| Static analysis and secret scanning | secret scanning is now wired into pre-commit and CI; CUDA static analysis remains a manual tool | a baseline with no new secret, plus a CI static-analysis job for the CUDA TUs |
 | Coverage and performance regression gates | the 230+ CPU suite is broad, but coverage and tok/s have no enforced floor | a documented threshold and a PR job that reports both |
 | Windows install documentation | native CPU and GPU paths exist, but the installer is Linux-only | a tested Windows CPU/GPU quickstart with the exact commands and limits |
 | Structured request logging | the server logs free-form lines; request IDs and latency fields are not stable | an opt-in JSON log line with request id, status, queue wait and tokens/s |

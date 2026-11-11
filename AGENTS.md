@@ -741,3 +741,17 @@ no installer artifact republished, and no push. The public
 `myfork/freebuff/tandem-cpu-recovery` remains at `437891e`; it does not contain this merge and needs an
 authorized push before a release can use it. The source archive pinned by the installer is fork `main`,
 so it also does not contain this branch's fixes until a later commit is published.
+
+### Interrupted-WIP recovery (2026-11-11)
+
+Recovered only the snapshot's secret-scanning work: `.secrets.baseline` was regenerated from the
+current tracked tree, `.pre-commit-config.yaml` runs `detect-secrets` locally, and the CI
+`secret-scan` job runs `detect-secrets-hook` so the baseline is checked without rewriting it. The
+rest of `wip/main-interrupted-snapshot-20261109-045352` was rejected: its `install.sh` is empty, its
+`tandem.py`/streaming layout/CPU worker are placeholders, its asymmetric TP and Turing two-card
+paths are unverified, its CPUID binding has undefined functions and an ABI mismatch, and its
+benchmark/verification harnesses are broken (zero baselines, invalid CLI calls). The WIP planning
+docs contain stale or contradictory support claims and were not merged into the current docs.
+
+Evidence: `detect-secrets-hook --baseline .secrets.baseline` on all tracked files, `pre-commit
+validate-config .pre-commit-config.yaml`, and the usual test/config/support/compile/shell gates.
