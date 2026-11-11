@@ -17,6 +17,7 @@ single-region path; the per-layer calls are for handing one block to or from ano
 import ctypes
 import json
 import os
+import platform
 import shutil
 import struct
 import subprocess
@@ -113,6 +114,7 @@ def _lib():
     os.makedirs(cache, exist_ok=True)
     so = os.path.join(cache, "libkcpu.dll" if os.name == "nt" else "libkcpu.so")
     if not os.path.exists(so) or os.path.getmtime(so) < os.path.getmtime(src):
+        check_features()
         _build(src, so)
     if os.name == "nt":
         root = _llvm_root(os.environ.get("KINDI_CC", "clang"))
@@ -158,6 +160,61 @@ def _read(path):
             return f.read()
     except OSError:
         return None
+
+
+CPU_REQUIRED = (("avx2", "AVX2"), ("fma", "FMA3"), ("f16c", "F16C"))
+
+
+def _cpu_model(text):
+    """The model name from /proc/cpuinfo, or the platform's best fallback."""
+    if text:
+        for line in text.splitlines():
+            key, _, value = line.partition(":")
+            if key.strip() in ("model name", "Model", "Hardware"):
+                value = value.strip()
+                if value:
+                    return value
+    return platform.processor() or platform.machine() or "unknown CPU"
+
+
+def _cpu_flags(text):
+    """The /proc/cpuinfo feature set, or None when this OS does not expose it."""
+    if not text:
+        return None
+    for line in text.splitlines():
+        key, _, value = line.partition(":")
+        if key.strip().lower() in ("flags", "features"):
+            return set(value.split())
+    return None
+
+
+def feature_report():
+    """CPU model, core counts and AVX2/FMA3/F16C support.
+
+    A feature value is None when the OS does not expose CPU flags; the compile-time guard in
+    kcpu.c remains the authority in that case.  This report is for `kindi info` and the preflight
+    before the CPU library is built.
+    """
+    text = _read("/proc/cpuinfo")
+    flags = _cpu_flags(text)
+    return {"model": _cpu_model(text), "physical": _physical_cores(), "logical": os.cpu_count(),
+            "features": {name: None if flags is None else name in flags for name, _ in CPU_REQUIRED}}
+
+
+def missing_features(report=None):
+    """Labels of required ISA features that are explicitly absent, or ()."""
+    report = feature_report() if report is None else report
+    return tuple(label for name, label in CPU_REQUIRED if report["features"].get(name) is False)
+
+
+def check_features():
+    """Stop before compiling when /proc/cpuinfo says this CPU cannot run kcpu.c."""
+    report = feature_report()
+    missing = missing_features(report)
+    if missing:
+        raise SystemExit("kindi: the CPU engine needs AVX2, FMA3 and F16C; this CPU lacks %s (%s)"
+                         % (", ".join(missing), report["model"]))
+    return report
 
 
 def _siblings(cpu):

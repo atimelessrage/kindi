@@ -290,8 +290,11 @@ workload can set `OMP_NUM_THREADS=8`. Raw probe logs are in `bench-logs/thread-s
    to the installer's machine check.
 2. In `cpu.py`, check the features before invoking gcc and stop with a clear message:
    “the CPU engine needs AVX2, FMA and F16C; this CPU has …”. The i5-2500K must fail at this check,
-   not with a target-mismatch error from inside a container. The compile-time guard in `kcpu.c` now
-   enforces this at the C boundary; the Python/installer preflight remains.
+   not with a target-mismatch error from inside a container. This is now implemented in
+   `cpu.feature_report()` / `cpu.check_features()` and is shown by `kindi info`; `_lib()` runs the
+   check before the first build. Feature values are `unknown` on systems that do not expose
+   `/proc/cpuinfo`, so the compile-time guard in `kcpu.c` remains the authority there. The
+   installer preflight is still open.
 3. Prefer explicit build flags for the supported tier (`-mavx2 -mfma -mf16c`) over an unchecked
    `-march=native`, or validate that the image's gcc maps each host correctly. Keep `-march=native`
    only if a test on all four CPUs proves it works.

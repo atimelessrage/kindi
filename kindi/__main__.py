@@ -163,6 +163,14 @@ def cmd_use(cfg, a):
 
 def cmd_info(cfg, a):
     print("Kindi %s" % __version__)
+    from . import cpu as cpu_backend
+    report = cpu_backend.feature_report()
+    print("CPU: %s, %s physical / %s logical cores" %
+          (report["model"], report["physical"], report["logical"] if report["logical"] is not None else "?"))
+    print("CPU engine: %s" % ", ".join(
+        "%s=%s" % (label, "unknown" if report["features"].get(name) is None else
+                   ("yes" if report["features"][name] else "no"))
+        for name, label in cpu_backend.CPU_REQUIRED))
     print("config: %s" % cfg["source"])
     for k in sorted(C.DEFAULTS):
         v = cfg[k]
