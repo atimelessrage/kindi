@@ -13,14 +13,15 @@ extracting it. It no longer pipes `curl` into `tar`. The default v0.5.0 archive 
 `26424ec08caf07a06a4f57547aa50d5b62a85ec8f7e8c231dcadc5c81519b1e2`; a custom `--source` URL can be
 pinned with `KINDI_SOURCE_SHA256`. The regression test is `tests/test_installer_source.py`.
 
-This change is a candidate, not a published installer. The live artifact documented in
-`docs/INSTALL.md` remains the published `b84df4fe...` file until the release owner uploads the new one.
-Candidate hashes for this worktree:
+This change is published as the fork-hosted 0.5.0 installer at
+`https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh`.
+The LF artifact hash is `5f48beca4018d993f3250e8dcbc48b43f04bd678667c5e9222a35193df8590f6`; `docs/INSTALL.md` records it.
+
+Artifact hash for this worktree:
 
 | candidate | sha256 |
 |---|---|
-| LF build | `54f76308e7461a6799dcd1c7126f5a24699ba8c40aa5019f74b01bf500fe523a` |
-| CRLF worktree | `e49e1f42b57c190ca988d1627ae4f58e0f095db249dab25cc96efe2edef2dbb5` |
+| LF release artifact | `5f48beca4018d993f3250e8dcbc48b43f04bd678667c5e9222a35193df8590f6` |
 
 Choose one exact candidate, publish that file, then replace both installer checksums in `docs/INSTALL.md`
 with its hash. Do not update the documented published hash before the upload: users would then check a
@@ -79,19 +80,17 @@ The published file is the **release artifact**, not necessarily the Git blob. Tw
 
 | source | sha256 |
 |---|---|
-| the current worktree release file (CRLF, `c05d…`) | `c05d019002c7db1dc6b4e0b73718d5a9087676ea68c1e247ada9a463e6d6551e` |
-| the committed Git blob (LF, `2ae8…`) | `2ae8f9605218f1fd3b1668068e748cbd21f29289aec863c48da5130b0d523a6a` |
+| the published LF artifact | `5f48beca4018d993f3250e8dcbc48b43f04bd678667c5e9222a35193df8590f6` |
 
-The published 0.4.0 file was an artifact hash (`592a…`), not the Git blob. This release records the
-worktree artifact hash `c05d…` in `docs/INSTALL.md`; publish that exact file, not a re-saved copy.
+The published 0.5.0 installer is the LF artifact above. This release records that hash in
+`docs/INSTALL.md`; publish that exact file, not a re-saved copy.
 
 ```sh
 sha256sum install.sh
-# must print c05d019002c7db1dc6b4e0b73718d5a9087676ea68c1e247ada9a463e6d6551e
+# must print 5f48beca4018d993f3250e8dcbc48b43f04bd678667c5e9222a35193df8590f6
 ```
 
-If the release pipeline normalizes line endings, or you build the artifact from the Git blob instead,
-the hash becomes `2ae8f960…`. Stop, choose the exact artifact, and update **both** checksum lines in
+The published artifact is LF. Do not re-save it with different line endings. Update **both** checksum lines in
 `docs/INSTALL.md` plus this table before publishing. Never publish a file whose hash differs from the
 documented value.
 
@@ -108,15 +107,15 @@ grep -nP '\x01' install.sh && echo 'STOP: control byte in installer'
 match the release artifact.
 
 ```sh
-grep -n 'c05d019002c7db1dc6b4e0b73718d5a9087676ea68c1e247ada9a463e6d6551e' docs/INSTALL.md
+grep -n '5f48beca4018d993f3250e8dcbc48b43f04bd678667c5e9222a35193df8590f6' docs/INSTALL.md
 # two lines expected
 ```
 
 Download the candidate artifact and check it exactly as a user would:
 
 ```sh
-curl -fsSLO https://amirhusain.com/kindi/install.sh
-echo "c05d019002c7db1dc6b4e0b73718d5a9087676ea68c1e247ada9a463e6d6551e  install.sh" | sha256sum -c -
+curl -fsSLO https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh
+echo "5f48beca4018d993f3250e8dcbc48b43f04bd678667c5e9222a35193df8590f6  install.sh" | sha256sum -c -
 bash -n install.sh
 ```
 
@@ -127,7 +126,7 @@ documented hash to the old file.
 
 - Commit the guard (already in `2b84658`), the checksum update, and this checklist together in the release
   history. Do not amend or reuse a published tag.
-- Decide the release version before tagging. `install.sh` and `kindi/__init__.py` currently say `0.4.0`; if
+- Decide the release version before tagging. `install.sh` and `kindi/__init__.py` currently say `0.5.0`; if
   this is a new patch release, bump both and add the changelog entry in the same release commit.
 - Tag only from the release commit, and only after the artifact hash is fixed.
 - Do not force-push or move an existing release tag.

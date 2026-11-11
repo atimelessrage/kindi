@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Kindi installer: one command from a bare Linux machine to a verified, running Kindi server.
 #
-#   curl -fsSL https://amirhusain.com/kindi/install.sh | bash             # install (or upgrade / repair)
-#   curl -fsSL https://amirhusain.com/kindi/install.sh | bash -s -- --dry-run
+#   curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh | bash             # install (or upgrade / repair)
+#   curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh | bash -s -- --dry-run
 #   bash install.sh --uninstall [--purge]
 #
 # What it does, in order (every step prints what it is about to do and why):

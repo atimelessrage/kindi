@@ -27,7 +27,7 @@ verify` passes on both. The installer builds the `kindi-rocm7` image for them (R
 The installer finds the 780M and lists the 27B first:
 
 ```bash
-curl -fsSL https://amirhusain.com/kindi/install.sh | bash
+curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh | bash
 ```
 
 It builds the `kindi-rocm` image (ROCm 6.3.3 and CuPy 14.2.0) for RDNA3 graphics, and the `kindi-rocm7` image (ROCm 7

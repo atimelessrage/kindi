@@ -48,7 +48,7 @@ By [Amir Husain](https://www.amirhusain.com). Watch the [launch video](https://y
 On Linux x86-64 with an NVIDIA card (Kepler to Ampere, one card or more), with AMD Radeon 780M, 840M or 8060S graphics, or with no GPU:
 
 ```bash
-curl -fsSL https://amirhusain.com/kindi/install.sh | bash
+curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh | bash
 ```
 
 The script finds your cards, shows each setup that they support with the recommended one first, and can set up

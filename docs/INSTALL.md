@@ -5,13 +5,13 @@ computer can run, with the best one first, and then downloads and checks the mod
 output against llama.cpp and starts the servers as services.
 
 ```bash
-curl -fsSL https://amirhusain.com/kindi/install.sh | bash
+curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh | bash
 ```
 
 To see each step and each command before anything changes, do a dry run first:
 
 ```bash
-curl -fsSL https://amirhusain.com/kindi/install.sh | bash -s -- --dry-run
+curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh | bash -s -- --dry-run
 ```
 
 ## Install with a checksum check
@@ -19,17 +19,17 @@ curl -fsSL https://amirhusain.com/kindi/install.sh | bash -s -- --dry-run
 Download the script, compare its sha256 with the value below, read it, and then run it:
 
 ```bash
-curl -fsSLO https://amirhusain.com/kindi/install.sh
-echo "b84df4fe0b4ae258433d043a34c67d0f9daaeecc0f9131eea8a2e3990f87d872  install.sh" | sha256sum -c -
+curl -fsSLO https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh
+echo "5f48beca4018d993f3250e8dcbc48b43f04bd678667c5e9222a35193df8590f6  install.sh" | sha256sum -c -
 bash install.sh --dry-run
 bash install.sh
 ```
 
 | File | sha256 |
 |---|---|
-| `install.sh` (Kindi 0.5.0) | `b84df4fe0b4ae258433d043a34c67d0f9daaeecc0f9131eea8a2e3990f87d872` |
+| `install.sh` (Kindi 0.5.0, fork-hosted) | `5f48beca4018d993f3250e8dcbc48b43f04bd678667c5e9222a35193df8590f6` |
 
-If `sha256sum -c` does not print `install.sh: OK`, do not run the script. This is the 0.5.0 release artifact;
+If `sha256sum -c` does not print `install.sh: OK`, do not run the script. This is the fork-hosted 0.5.0 installer artifact;
 the checksum is for the exact published file, and a copy that was re-saved with different line endings hashes
 differently. Maintainers should follow [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md).
 
