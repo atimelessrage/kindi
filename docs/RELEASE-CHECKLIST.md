@@ -19,8 +19,8 @@ Candidate hashes for this worktree:
 
 | candidate | sha256 |
 |---|---|
-| LF build | `54f76308e7461a6799dcd1c7126f5a24699ba8c40aa5019f74b01bf500fe523a` |
-| CRLF worktree | `e49e1f42b57c190ca988d1627ae4f58e0f095db249dab25cc96efe2edef2dbb5` |
+| LF build | `c3d1cfde7d1191b79541975a9a54c62935b5f58e3759178b4528910d6404d354` |
+| CRLF worktree | `fc93fe956a881deb3932360ec579de96444991066490c9d3f6e718b2a57f55b9` |
 
 Choose one exact candidate, publish that file, then replace both installer checksums in `docs/INSTALL.md`
 with its hash. Do not update the documented published hash before the upload: users would then check a
@@ -58,7 +58,7 @@ Expected for this release:
 - `bash -n install.sh` prints nothing and exits 0.
 - `tests/test_installer_grub.py` passes all 9 tests.
 - `tests/test_installer_source.py` passes all 4 tests, including the mismatch path that must not extract.
-- The full CPU suite passes (242 passed, 3 skipped at the last handoff).
+- The full CPU suite passes (run the current suite; do not rely on a historical count).
 - No test edits `/etc/default/grub`; the GRUB test uses the fixture and a temporary copy.
 
 If you change the GRUB edit, reintroduce the old literal `0x01` bug on a copy and confirm the failure-path
@@ -75,25 +75,26 @@ model verification.
 
 ## 3. Build and hash the exact release artifact
 
-The published file is the **release artifact**, not necessarily the Git blob. Two hashes are relevant:
+The published 0.5.0 file is `b84df4fe0b4ae258433d043a34c67d0f9daaeecc0f9131eea8a2e3990f87d872`,
+as recorded in `docs/INSTALL.md`. The installer in this worktree is a candidate because it adds the
+CPU preflight and the source-archive pin. Its candidate hashes are:
 
 | source | sha256 |
 |---|---|
-| the current worktree release file (CRLF, `c05d…`) | `c05d019002c7db1dc6b4e0b73718d5a9087676ea68c1e247ada9a463e6d6551e` |
-| the committed Git blob (LF, `2ae8…`) | `2ae8f9605218f1fd3b1668068e748cbd21f29289aec863c48da5130b0d523a6a` |
-
-The published 0.4.0 file was an artifact hash (`592a…`), not the Git blob. This release records the
-worktree artifact hash `c05d…` in `docs/INSTALL.md`; publish that exact file, not a re-saved copy.
+| current worktree file (CRLF) | `fc93fe956a881deb3932360ec579de96444991066490c9d3f6e718b2a57f55b9` |
+| LF-normalized copy | `c3d1cfde7d1191b79541975a9a54c62935b5f58e3759178b4528910d6404d354` |
 
 ```sh
 sha256sum install.sh
-# must print c05d019002c7db1dc6b4e0b73718d5a9087676ea68c1e247ada9a463e6d6551e
+# compare with the CRLF candidate above
+sed 's/\r$//' install.sh | sha256sum
+# compare with the LF candidate above
 ```
 
-If the release pipeline normalizes line endings, or you build the artifact from the Git blob instead,
-the hash becomes `2ae8f960…`. Stop, choose the exact artifact, and update **both** checksum lines in
-`docs/INSTALL.md` plus this table before publishing. Never publish a file whose hash differs from the
-documented value.
+Choose one exact candidate, publish that file, then update **both** checksum lines in
+`docs/INSTALL.md` and this table. Do not update the published hash before the upload: users would
+then check a file that is not yet served. Never publish a file whose hash differs from the documented
+value.
 
 Confirm the guard is present and no control byte remains:
 
@@ -108,15 +109,15 @@ grep -nP '\x01' install.sh && echo 'STOP: control byte in installer'
 match the release artifact.
 
 ```sh
-grep -n 'c05d019002c7db1dc6b4e0b73718d5a9087676ea68c1e247ada9a463e6d6551e' docs/INSTALL.md
-# two lines expected
+grep -n 'b84df4fe0b4ae258433d043a34c67d0f9daaeecc0f9131eea8a2e3990f87d872' docs/INSTALL.md
+# two lines expected for the published file
 ```
 
 Download the candidate artifact and check it exactly as a user would:
 
 ```sh
 curl -fsSLO https://amirhusain.com/kindi/install.sh
-echo "c05d019002c7db1dc6b4e0b73718d5a9087676ea68c1e247ada9a463e6d6551e  install.sh" | sha256sum -c -
+echo "b84df4fe0b4ae258433d043a34c67d0f9daaeecc0f9131eea8a2e3990f87d872  install.sh" | sha256sum -c -
 bash -n install.sh
 ```
 
@@ -127,7 +128,7 @@ documented hash to the old file.
 
 - Commit the guard (already in `2b84658`), the checksum update, and this checklist together in the release
   history. Do not amend or reuse a published tag.
-- Decide the release version before tagging. `install.sh` and `kindi/__init__.py` currently say `0.4.0`; if
+- Decide the release version before tagging. `install.sh` and `kindi/__init__.py` currently say `0.5.0`; if
   this is a new patch release, bump both and add the changelog entry in the same release commit.
 - Tag only from the release commit, and only after the artifact hash is fixed.
 - Do not force-push or move an existing release tag.

@@ -52,7 +52,16 @@ The main worktree is clean now; `main` was fast-forwarded to this branch after i
 commits were merged. The corrupt tandem WIP was not merged into `main`; restart it from
 `docs/CPU_GPU_TANDEM_DESIGN.md` and the WIP branch if it is resumed.
 
-### Current leases (checked 2026-11-11)
+### Current state (2026-11-11)
+
+- `main` and `freebuff/tandem-cpu-recovery` are the same line in the current checkout. Use
+  `git worktree list --porcelain`, `git log -1` and `git status --short` before touching a shared
+  file; this snapshot is not a lock.
+- `T:/kindi` is the main worktree for this handoff. The project is version 0.5.0.
+- The historical lease rows below describe earlier audit tasks and are retained for traceability,
+  not as current ownership. Do not infer that a listed task is active.
+
+### Historical lease table (2026-11-11)
 
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
@@ -129,8 +138,8 @@ is not a lock.
 to `$SRC.tar.gz.part`, compares its sha256 with `SOURCE_SHA256` (`26424ec08caf07a06a4f57547aa50d5b62a85ec8f7e8c231dcadc5c81519b1e2`), and extracts only on a match;
 a custom `--source` URL is checked when `KINDI_SOURCE_SHA256` is set. `tests/test_installer_source.py`
 executes the success and mismatch paths with fake `curl`/`sha256sum`/`tar` and guards against `curl | tar`.
-Candidate installer hashes are LF `54f76308e7461a6799dcd1c7126f5a24699ba8c40aa5019f74b01bf500fe523a` and
-CRLF `e49e1f42b57c190ca988d1627ae4f58e0f095db249dab25cc96efe2edef2dbb5`; the live `docs/INSTALL.md`
+Candidate installer hashes are LF `c3d1cfde7d1191b79541975a9a54c62935b5f58e3759178b4528910d6404d354` and
+CRLF `fc93fe956a881deb3932360ec579de96444991066490c9d3f6e718b2a57f55b9`; the live `docs/INSTALL.md`
 checksum remains `b84df4fe...` because this candidate has not been published. Gate: 4 source tests, the
 installer test files, the full 242-test CPU suite (3 skipped), `bash -n`, LF ShellCheck and
 `git diff --check` pass. No artifact was published.
@@ -485,8 +494,8 @@ pip install "numpy==1.19.5" "fastrlock==0.8.3" "cupy-cuda102==9.6.0" \
 Docker, the recommended path for the old cards:
 
 ```sh
-docker build -t kindi:0.4.0 -f docker/Dockerfile .
-docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.4.0 info
+docker build -t kindi:0.5.0 -f docker/Dockerfile .
+docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.5.0 info
 ```
 
 Models and packs live in `~/.kindi` (`pack`, `state_dir`). See `docs/INSTALL.md` for the pinned

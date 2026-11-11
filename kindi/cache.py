@@ -433,6 +433,8 @@ class Runner(object):
         self.keep_pos = []                                  # opening_end checkpoints (last 2), never dropped as extras
         self.prefix_min = int(cfg["prefix_min"])
         self.progress = progress or {}
+        self.cache_errors = 0                         # observable fallbacks: a damaged opening or a failed unpark
+        self.last_cache_error = ""
         self.tokens, self.ckpt, self.parked = [], {}, []
         self.fingerprint = engine_fingerprint(eng, cfg)
         log("engine fingerprint %s: %s" % (self.fingerprint[0], json.dumps({k: v for k, v in self.fingerprint[1].items()
@@ -609,6 +611,8 @@ class Runner(object):
             except Exception as e:
                 if "OutOfMemory" not in type(e).__name__:
                     raise
+                self.cache_errors += 1
+                self.last_cache_error = "parked conversation: %s" % e
                 # the engine state is half restored: drop it and read this prompt from the start
                 print("[kindi] could not bring back a parked conversation (%s); reading the prompt from the start"
                       % e, flush=True)
@@ -638,6 +642,8 @@ class Runner(object):
             try:
                 p, Ms, Cs = self.openings.load(hit[0])
             except Exception as e:  # noqa: BLE001 - a missing or damaged opening: read the prompt instead
+                self.cache_errors += 1
+                self.last_cache_error = "saved opening: %s" % e
                 self.log("saved opening %s is not usable (%s): reading the prompt" % (hit[0], e))
                 self.openings.entries.pop(hit[0], None)
                 shutil.rmtree(os.path.join(self.openings.root, hit[0]), ignore_errors=True)

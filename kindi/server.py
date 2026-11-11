@@ -286,6 +286,12 @@ def _looping(gen, min_span=240):
 
 
 
+def _is_loopback(host):
+    """True for the default local bind addresses; a network bind needs an explicit security warning."""
+    h = str(host or "").strip().lower()
+    return h in ("127.0.0.1", "localhost", "::1") or h.startswith("127.")
+
+
 def _two_cards():
     """Gemma 4 in tensor parallel: KINDI_G4_TP=1 always, 0 never; auto (the default) when exactly two GPUs of the
     same kind are visible"""
@@ -351,6 +357,7 @@ class Kindi(object):
             self.tok = Tok(self.eng.vocab, os.path.join(pack, "merges.txt"))
             self.runner = Runner(self.eng, cfg, self.pack_id, log, progress=self.busy)
             self.sample = Sampler(self.eng)
+        self.supports_logprobs = self.variant == "gemma4"
         self.lock = threading.Lock()
         self.stats = {"requests": 0, "prompt_tokens": 0, "cached_tokens": 0, "completion_tokens": 0,
                       "spec_passes": 0, "spec_drafted": 0, "spec_accepted": 0,
@@ -785,6 +792,9 @@ def create_app(cfg, log=print):
     K = GPU_THREAD.submit(_make_engine, cfg, log).result()
     model_id = cfg["model_name"]
     has_vision = _pack_has_vision(cfg.get("pack"))
+    if not cfg.get("api_key") and not _is_loopback(cfg.get("host", "127.0.0.1")):
+        log("warning: serving on %s without api_key; /health is unauthenticated - use loopback or set api_key"
+            % cfg.get("host"))
     app = FastAPI(title="Kindi", version=__version__)
     gate = K.gate = Gate(MAX_QUEUE)
 
@@ -963,7 +973,10 @@ def create_app(cfg, log=print):
     def health():
         free = total = 0
         if K.cp is not None and os.environ.get("KINDI_DEVICE", "gpu") != "cpu":
-            free, total = K.cp.cuda.runtime.memGetInfo()
+            try:
+                free, total = K.cp.cuda.runtime.memGetInfo()
+            except Exception:  # noqa: BLE001 - health must stay available after a GPU-context failure
+                pass
         b = K.busy
         busy = None
         if b["active"] and K.lock.locked():
@@ -1016,6 +1029,9 @@ def create_app(cfg, log=print):
                "kindi_requests_rejected_total %d" % gate.rejected)
         metric("kindi_request_errors_total", "counter", "requests that failed after admission",
                "kindi_request_errors_total %d" % g("errors"))
+        cache_errors = getattr(getattr(K, "runner", None), "cache_errors", 0)
+        metric("kindi_cache_errors_total", "counter", "cache fallbacks after a damaged opening or failed unpark",
+               "kindi_cache_errors_total %d" % cache_errors)
         metric("kindi_prompt_tokens_total", "counter", "prompt tokens processed",
                "kindi_prompt_tokens_total %d" % g("prompt_tokens"))
         metric("kindi_cached_prompt_tokens_total", "counter", "prompt tokens served from the cache",
@@ -1064,6 +1080,9 @@ def create_app(cfg, log=print):
             _validate_request(req, has_vision)
         except RequestError as e:
             return _err(400, str(e))
+        if req.get("logprobs") and not getattr(K, "supports_logprobs", False):
+            return _err(400, "logprobs are not supported by this backend; remove logprobs or use a Gemma 4 pack",
+                        "invalid_request_error")
         cid, created = "chatcmpl-" + uuid.uuid4().hex[:24], int(time.time())
 
         def chunk(delta, finish=None, usage=None):

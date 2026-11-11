@@ -66,7 +66,7 @@ matrix table is in [CARDS.md](CARDS.md#verify-matrix-rtx-4060-ti).
 | `kindi/tc.py` | compiles for compute_75 PTX, raises the PTX header to 7.1/sm_8x, lets the driver JIT; `supported()` accepts major >= 8 or major == 6 | Ada and Blackwell depend on this PTX patch; it is exactly the fragile path that needs a real test on the 4060 Ti and 5060 Ti. |
 | `kindi/engine.py` | `_cupy_arch_fix()` caps CuPy 9.6’s NVRTC target to the toolkit maximum | Necessary for Blackwell with the CUDA 10.2 image, but it means the image is not a native sm_89/sm_120 toolchain. |
 | `kindi/tp.py` | two-card plan engine; 27B path requires Hadamard blocks of 1024 | The 27B dual target is viable; the 2B tc plan is exact, the 4B tc plan is 2/4, and the 9B is refused (Hadamard 4096). |
-| docs/CARDS.md | “All the cards use the same Docker image (CUDA 10.2, CuPy 9.6)” | A 4060 Ti/5060 Ti support claim needs a modern-toolkit image and a documented exception, or a verified PTX-JIT path. |
+| docs/CARDS.md | Names the pre-Ampere cards and the CPU as the CUDA 10.2 / CuPy 9.6 image and records that the Ada/Blackwell image path is unverified | A 4060 Ti/5060 Ti support claim still needs a modern-toolkit image and a documented exception, or a verified PTX-JIT path. |
 
 ## Target matrix
 

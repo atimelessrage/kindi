@@ -83,7 +83,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_ATT_TC` | `0` | `kindi/chunk.py:429` (+1 more) |
 | `KINDI_BATCH` | `4` | `kindi/spec.py:1735` (+1 more) |
 | `KINDI_BLOCKING_SYNC` | `1` | `kindi/chunk.py:461` (+7 more) |
-| `KINDI_CACHE_TIMING` | (unset) | `kindi/cache.py:683` |
+| `KINDI_CACHE_TIMING` | (unset) | `kindi/cache.py:689` |
 | `KINDI_CARDS` | (unset) | `kindi/spec.py:1752` (+3 more) |
 | `KINDI_CC` | `clang` | `kindi/cpu.py:89` (+1 more) |
 | `KINDI_CHUNK` | `256` or `"512" if all(f16_prompt(s.card) for s in eng.cards) else "256"` or `"256" if major >= 5 else "128"` | `kindi/chunk.py:158` (+2 more) |
@@ -95,7 +95,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_CHUNK_TS` | `64` | `kindi/chunk.py:441` |
 | `KINDI_CKPT_PINNED` | `"1" if os.path.exists("/dev/dxg") else "0"` | `kindi/cache.py:34` |
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:572` |
-| `KINDI_CONFIG` | (unset) | `kindi/config.py:68` (+1 more) |
+| `KINDI_CONFIG` | (unset) | `kindi/config.py:106` (+1 more) |
 | `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:113` (+1 more) |
 | `KINDI_D1` | `0` | `kindi/spec.py:713` |
 | `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:428` |
@@ -115,12 +115,12 @@ is where it is read, which is where the full description lives.
 | `KINDI_G4_PAD` | `1` | `kindi/gemma4.py:520` |
 | `KINDI_G4_PARK_MAX` | `4` | `kindi/gemma4_cache.py:35` |
 | `KINDI_G4_PLE_HOST` | `auto` | `kindi/gemma4.py:407` |
-| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:439` |
+| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:446` |
 | `KINDI_G4_PROMPT_CACHE` | `1` | `kindi/gemma4_cache.py:33` |
 | `KINDI_G4_Q5_DP4A` | `1` | `kindi/gemma4.py:53` |
 | `KINDI_G4_RESERVE_MB` | `1024` | `kindi/gemma4.py:467` |
 | `KINDI_G4_TC` | `1` | `kindi/gemma4.py:61` (+3 more) |
-| `KINDI_G4_TP` | `auto` | `kindi/server.py:292` |
+| `KINDI_G4_TP` | `auto` | `kindi/server.py:298` |
 | `KINDI_G4_WARPS` | `2560` | `kindi/gemma4.py:93` |
 | `KINDI_G5` | (empty) | `kindi/tp.py:381` |
 | `KINDI_G5L` | `"0" if rt.is_hip and os.environ.get("KINDI_TC", "0") != "1" else "1"` | `kindi/tp.py:384` |
@@ -163,9 +163,9 @@ is where it is read, which is where the full description lives.
 | `KINDI_NB_TSPLIT` | `0` | `kindi/nanbeige.py:1020` |
 | `KINDI_NB_TWARPS` | `24` | `kindi/nanbeige.py:1019` |
 | `KINDI_P100_FP16_PROMPT` | (empty) | `kindi/chunk.py:95` |
-| `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:558` (+1 more) |
-| `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:559` |
-| `KINDI_PROMPT_CACHE` | `1` | `kindi/cache.py:583` |
+| `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:560` (+1 more) |
+| `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:561` |
+| `KINDI_PROMPT_CACHE` | `1` | `kindi/cache.py:585` |
 | `KINDI_Q8X2` | `1` | `kindi/chunk.py:265` |
 | `KINDI_QUEUE_MAX` | `8` | `kindi/server.py:60` |
 | `KINDI_SAMPLER_ORDER` | `llama` | `kindi/sampling.py:19` |
@@ -181,7 +181,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_SPEC_GUARD_FROM` | `32768` | `kindi/spec.py:61` |
 | `KINDI_SPEC_GUARD_LOG` | (unset) | `kindi/spec.py:1021` |
 | `KINDI_SPEC_K` | `4` | `kindi/spec.py:1219` (+1 more) |
-| `KINDI_SPEC_KNOWN` | `1` | `kindi/cache.py:651` |
+| `KINDI_SPEC_KNOWN` | `1` | `kindi/cache.py:657` |
 | `KINDI_SPEC_MTP_K2_MAX` | `8192` | `kindi/spec.py:56` |
 | `KINDI_SPEC_PACK` | (unset) | `kindi/spec.py:1750` (+1 more) |
 | `KINDI_SPEC_SAMPLE` | `1` | `kindi/spec.py:1225` |

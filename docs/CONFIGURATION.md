@@ -11,7 +11,8 @@ Kindi reads its settings in this order - later sources win:
 For the complete list, including the engine switches that have no config key, see the generated
 [CONFIGURATION-REFERENCE.md](CONFIGURATION-REFERENCE.md).
 
-`kindi info` prints the final values and the file that each value came from. The Docker image sets
+`kindi info` prints the final values and the config source. It does not track the origin of each
+individual value. The Docker image sets
 `KINDI_PACK=/data/pack`, `KINDI_STATE_DIR=/data/state` and `KINDI_HOST=0.0.0.0`.
 
 ## Keys

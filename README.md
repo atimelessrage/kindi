@@ -25,8 +25,9 @@ more effective than llama.cpp's. In our test, Nemotron on a GTX 1080 answers thr
 document, with both caches on. Kindi answers the third question in 0.42 s, and llama.cpp in 3.10 s. The CPU
 is now a full platform: the installer offers CPU servers next to the GPU servers. On a Ryzen 9 7940HS, Kindi's CPU engine writes the 2B 2.7
 times as fast as llama.cpp (64.8 against 23.6 tokens/s). On a Core i7-8700, it writes 1.6 times as fast. Kindi has
-an **OpenAI-compatible server** for chat clients, scripts and agents that write code. Its default output is
-token-for-token identical to the output of llama.cpp for the same model file. On the K420, with the same file and
+an **OpenAI-compatible server** for chat clients, scripts and agents that write code. With the exact head and
+greedy sampling (`temperature: 0`), its output is token-for-token identical to the output of llama.cpp for the
+same model file. The server's default sampling is 0.7 / 0.8 / 20, so set `temperature` to 0 when comparing. On the K420, with the same file and
 the same context, it generates about 13x faster than llama.cpp (exact head: 20.8 against 1.65 tokens/s). The
 comparisons for each card are in [docs/BENCHMARKS.md](docs/BENCHMARKS.md). The one-page summary is [WHY.md](WHY.md).
 
@@ -45,7 +46,7 @@ By [Amir Husain](https://www.amirhusain.com). Watch the [launch video](https://y
 
 ## Quick start: one command
 
-On Linux x86-64 with an NVIDIA card (Kepler to Ampere, one card or more), with AMD Radeon 780M, 840M or 8060S graphics, or with no GPU:
+On Linux x86-64 with an NVIDIA card (Kepler to Ada; Blackwell is detected but not yet verified), with AMD Radeon 780M, 840M or 8060S graphics, or with no GPU:
 
 ```bash
 curl -fsSL https://amirhusain.com/kindi/install.sh | bash
@@ -109,7 +110,7 @@ connections only from the same computer (see [Run the server](#run-the-server)).
 
 | | |
 |---|---|
-| GPU | NVIDIA, compute capability 3.0 (Kepler) or later. Tested: Quadro K420 (1 GB and 2 GB), Quadro K1200 (one card, or two in tensor parallel), Quadro K6000, Tesla P100 16 GB, GeForce GTX 1080, GeForce RTX 3080. Supported, and `kindi verify` passes: the GeForce RTX 20, 30, 40 and 50 series (speed numbers are only for the cards in the tables below). On Turing (sm_75) cards such as the RTX 4000, `KINDI_TC=1` selects a separate Turing tensor-core backend ([docs/TURING-TENSOR-CORES.md](docs/TURING-TENSOR-CORES.md)). AMD: Radeon 780M (RDNA3, gfx1103) with 32 GB of computer memory or more; Radeon 840M and Radeon 8060S (RDNA 3.5, gfx1152 and gfx1151); see [docs/AMD.md](docs/AMD.md). With no GPU, the CPU engine runs on x86-64 with AVX2. |
+| GPU | NVIDIA, compute capability 3.0 (Kepler) or later. Tested: Quadro K420 (1 GB and 2 GB), Quadro K1200 (one card, or two in tensor parallel), Quadro K6000, Tesla P100 16 GB, GeForce GTX 1080, GeForce RTX 3080. Supported: the GeForce RTX 20, 30 and 40 series. The RTX 20 Turing tensor-core specialization is still pending a real sm_75 verify; the RTX 50 (Blackwell) path is detected but not yet verified (see [docs/CARDS.md](docs/CARDS.md)). Speed numbers are only for the cards in the tables below. On Turing (sm_75) cards such as the RTX 4000, `KINDI_TC=1` selects a separate Turing tensor-core backend ([docs/TURING-TENSOR-CORES.md](docs/TURING-TENSOR-CORES.md)). AMD: Radeon 780M (RDNA3, gfx1103) with 32 GB of computer memory or more; Radeon 840M and Radeon 8060S (RDNA 3.5, gfx1152 and gfx1151); see [docs/AMD.md](docs/AMD.md). With no GPU, the CPU engine runs on x86-64 with AVX2, FMA and F16C. |
 | Driver | Kepler: the NVIDIA **470** series (the last driver branch with Kepler support). Later cards: a current driver. The image has CUDA 10.2; the host needs only the driver. AMD: the `amdgpu` driver of Linux and the kernel option `amdgpu.cwsr_enable=0`; ROCm 6.3 is in the `kindi-rocm` image, and ROCm 7 (for RDNA 3.5) is in the `kindi-rocm7` image. |
 | OS | Linux x86-64 (developed on Ubuntu 24.04 with Docker; the image itself is Ubuntu 18.04) |
 | RAM / disk | 2B: 4 GB RAM, ~1.5 GB disk. 27B: ~14 GB of free RAM for its first start (two K1200 cards: ~5 GB) and ~19 GB of disk. The Docker image takes ~4 GB more. |

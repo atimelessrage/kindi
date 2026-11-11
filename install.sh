@@ -121,6 +121,14 @@ info() { echo "    $*"; }
 ok() { echo "    ${G}ok${N}  $*"; }
 warn() { echo "    ${Y}note${N} $*"; }
 die() { echo; echo "${R}stopped:${N} $*"; exit 1; }
+CPU_ISA_MISSING=""
+cpu_isa_missing() {   # CPU engine requirements: AVX2 + FMA + F16C, all used unconditionally by kcpu.c
+  local f missing=""
+  for f in avx2 fma f16c; do
+    grep -qw "$f" /proc/cpuinfo 2>/dev/null || missing="${missing}${f} "
+  done
+  printf '%s' "$missing"
+}
 exec 3>&1         # run() prints to the terminal also when the command's output goes to /dev/null
 run() {   # print, then run unless --dry-run
   echo "    \$ $*" >&3
@@ -177,6 +185,12 @@ echo "${B}Kindi ${KINDI_VERSION} installer${N}$([ "$DRY" = 1 ] && echo " (dry ru
 step "Check the machine" "Kindi runs on 64-bit Linux: on an NVIDIA GPU from the Quadro K420 (Kepler) up, on an AMD RDNA3 or RDNA 3.5 GPU, or on the CPU."
 [ "$(uname -s)" = Linux ] || die "Kindi needs Linux (found $(uname -s))"
 [ "$(uname -m)" = x86_64 ] || die "Kindi needs an x86-64 CPU (found $(uname -m))"
+CPU_ISA_MISSING=$(cpu_isa_missing)
+if [ -n "$CPU_ISA_MISSING" ]; then
+  warn "CPU: missing ${CPU_ISA_MISSING% }; the CPU engine will not be offered (GPU profiles are unaffected)"
+else
+  ok "CPU: AVX2, FMA and F16C available"
+fi
 OS_ID=$(. /etc/os-release 2>/dev/null && echo "${ID:-unknown}") || OS_ID=unknown
 RAM_MB=$(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo)
 AVAIL_MB=$(awk '/MemAvailable/ {print int($2 / 1024)}' /proc/meminfo)
@@ -586,7 +600,12 @@ if [ "$GPU" != cpu ]; then
     done
   fi
 fi
-if [ "$MODEL" = auto ] || [ "$MODEL" = 2b ]; then
+if [ "$NG" = 0 ] && [ "$NA" = 0 ] && [ -n "$CPU_ISA_MISSING" ]; then
+  die "the CPU engine needs AVX2, FMA and F16C; this host is missing ${CPU_ISA_MISSING% }"
+fi
+if [ -n "$CPU_ISA_MISSING" ]; then
+  info "CPU server not offered: the CPU engine needs AVX2, FMA and F16C"
+elif [ "$MODEL" = auto ] || [ "$MODEL" = 2b ]; then
   add_cfg "cpu|2b|" "$(model_label 2b) on the CPU ($CORES threads; slow, no GPU needed)"
 fi
 [ "${#CFG[@]}" -gt 0 ] || die "model '${MODEL}' does not run on the selected hardware (run without --model to see what does)"
@@ -662,6 +681,7 @@ profile_of() {
   local i=$1 B=${SV_B[$1]} M=${SV_M[$1]} CARDS=${SV_C[$1]} k V k2 V2
   ENV=(); XPACKS=(); MEM=""; CPUS=""
   if [ "$B" = cpu ]; then
+    [ -z "${CPU_ISA_MISSING:-}" ] || die "the CPU engine needs AVX2, FMA and F16C; this host is missing ${CPU_ISA_MISSING% }"
     PROFILE=cpu
     th=$(lscpu -p=CORE,SOCKET 2>/dev/null | grep -v '^#' | awk -F, '$2 == 0' | sort -u | wc -l); [ "$th" -gt 0 ] || th=$CORES
     [ -n "$THREADS" ] && th=$THREADS

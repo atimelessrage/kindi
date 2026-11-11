@@ -31,7 +31,8 @@ bash install.sh
 
 If `sha256sum -c` does not print `install.sh: OK`, do not run the script. This is the 0.5.0 release artifact;
 the checksum is for the exact published file, and a copy that was re-saved with different line endings hashes
-differently. Maintainers should follow [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md).
+differently. The installer in a source checkout can be newer than this published artifact; use this checksum
+only for the published file. Maintainers should follow [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md).
 
 ## What it does
 

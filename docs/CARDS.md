@@ -7,7 +7,7 @@ costs 2-3% of the decode speed on the GTX 1080. With one server on its own card,
 (the installer does this). The RTX 3080 profile keeps it on: there, many servers share few CPU cores.
 
 This page gives the settings for each tested card. It also gives the speeds that we measured with these settings.
-The NVIDIA and CPU cards use the CUDA 10.2 / CuPy 9.6 image; AMD cards use the ROCm images ([AMD.md](AMD.md)). The `kindi` folder of this repository is the code.
+The pre-Ampere NVIDIA cards and the CPU use the CUDA 10.2 / CuPy 9.6 image; AMD cards use the ROCm images ([AMD.md](AMD.md)). Ada/Blackwell were measured on a modern CuPy host, and the CUDA 10.2 image path for sm_89/sm_120 is not yet verified; see [CARD-SUPPORT.md](CARD-SUPPORT.md). The `kindi` folder of this repository is the code.
 
 To make a pack, use `kindi convert` (see the README). Put the pack in `$HOME/.kindi/<pack>`. In the container, it
 is at `/data/<pack>`. The examples serve on `127.0.0.1:8093`.
@@ -190,8 +190,10 @@ link. We did not test the 8 GB board. Check `nvidia-smi` before you buy one. Mea
 
 ## GeForce RTX 20, 30, 40 and 50 series
 
-Kindi 0.5.0 supports all four series. The Ampere tensor-core path and speculative decoding use cards of compute
-capability 8.0 and later (RTX 30, 40 and 50). The RTX 20 series (Turing, sm_75) has its own tensor-core backend
+Kindi 0.5.0 supports the RTX 20, 30 and 40 series. The RTX 20 tensor-core specialization still needs its sm_75
+runtime verify. The Ampere tensor-core path and speculative decoding use cards of compute capability 8.0 and later
+(RTX 30 and 40; the RTX 50/Blackwell path is detected but not yet verified).
+The RTX 20 series (Turing, sm_75) has its own tensor-core backend
 ([TURING-TENSOR-CORES.md](TURING-TENSOR-CORES.md)), selected with `KINDI_TC=1`; see the RTX 4000 section below. Its
 runtime verification on sm_75 hardware is still pending.
 
@@ -206,7 +208,7 @@ off until the two-card verify is recorded).
 | RTX 3060 12 GB | 27B: 41.1 tokens/s at 512 tokens; with the 2B draft model 60.6 (1.48 times), 73.5 (1.82 times) at 8K, 66.7 (1.81 times) at 24K |
 | RTX 4060 Ti 8 GB | tc plan (2026-11-11 one-pass matrix): 2B 4/4 token-exact, 370.2 tokens/s; 4B 2/4; 9B refused (Hadamard 4096); 27B passes (3 exact + 1 tie; 38.9 one-pass, **38.1 median of 3**); 27B 24K benchmark 33.9 tokens/s at position 24,000 and server/cache pass. Plain 4B/9B 4/4. Details below |
 | RTX 5060 Ti 16 GB | installer classifies it as `tc` (sm_80+), but there is no Kindi exactness or speed run on Blackwell yet; this is not a support claim. See [CARD-SUPPORT.md](CARD-SUPPORT.md) |
-| other RTX 20, 40 and 50 cards | supported on the plain engine; `kindi verify` passes. We give no speed numbers |
+| other RTX 20 and 40 cards | supported on the plain engine; `kindi verify` passes. We give no speed numbers. RTX 50/Blackwell is unverified (see the 5060 Ti row) |
 
 ### RTX 4060 Ti 8 GB (Ada, sm_89)
 

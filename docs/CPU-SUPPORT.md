@@ -1,7 +1,8 @@
 # Long-term CPU support
 
-Status: **roadmap and acceptance contract, updated 2026-11-10. The i7-8086K engine and native CPU
-server chat path on the 2B/4B/9B are verified; the other CPUs and a repeat timing run remain open.** The baseline CPU engine (`kindi/cpu.py`,
+Status: **roadmap and acceptance contract, updated 2026-11-11. The i7-8086K engine and native CPU
+server chat path on the 2B/4B/9B are verified; `kindi info` now reports the ISA, and `install.sh`
+preflights AVX2/FMA/F16C before offering a CPU server. The other CPUs and a repeat timing run remain open.** The baseline CPU engine (`kindi/cpu.py`,
 `kindi/kcpu.c`) is in `main`; the WIP ISA/AVX-only changes are uncompiled and not merged. This page
 records the target, the verified result, and the exact build/runtime requirements so the work can be
 implemented and measured without re-discovering them. The tandem recovery gate is in
@@ -26,8 +27,8 @@ they are not part of this CPU goal.
 |---|---|---|
 | `kindi/cpu.py` build | Linux: `gcc -O3 -march=native -fopenmp -fno-math-errno -shared -fPIC`; Windows: `clang -O3 -march=native -fopenmp -fno-math-errno -ffp-contract=off -shared` plus `libomp` (`KINDI_CC`, `KINDI_LLVM`) | The binary is built for the host CPU. There is no prebuilt portable CPU library. |
 | `kindi/kcpu.c` ISA | Uses AVX2 (`_mm256_srlv_epi32`, `_mm256_permutevar8x32_ps`), FMA (`_mm256_fmadd_ps`) and F16C (`_cvtsh_ss` / `_cvtss_sh`) unconditionally; a compile-time `#error` now names the missing ISA (2026-11-11); there is still no runtime dispatch or AVX-only fallback | A CPU without all three is rejected during compilation with an actionable message; Sandy Bridge support remains P1. |
-| documented requirement | `docs/CARDS.md` and the README say “x86-64 with AVX2” | This is accurate but incomplete: FMA and F16C are also required by the source. |
-| `install.sh` preflight | Checks Linux and `x86_64`; does not check AVX2/FMA/F16C | An unsupported CPU fails later inside the container build, with a compiler error rather than an actionable message. |
+| documented requirement | `README.md` and `docs/CARDS.md` now say x86-64 with AVX2, FMA and F16C | Matches the source; keep the installer preflight and documentation in sync. |
+| `install.sh` preflight | Checks Linux, `x86_64` and AVX2/FMA/F16C before offering a CPU server | An unsupported CPU is reported before the container build; GPU profiles remain available on the same host. |
 | CPU engine thread default | `kindi/cpu.py` counts the physical cores this process may run on (sysfs `thread_siblings_list`, `/proc/cpuinfo` fallback) and sets `OMP_NUM_THREADS`, `OMP_PROC_BIND=close`, `OMP_PLACES=cores` before the library loads; `threads=` or an `OMP_NUM_THREADS` already in the environment wins | On a hybrid i9 this counts 24 cores, E-cores included. The best P/E split has not been measured. |
 | `install.sh` CPU default | Counts the physical cores of socket 0 (`lscpu -p=CORE,SOCKET`) and exports the same three variables for the CPU container; `--threads N` overrides it | Two sockets are not measured; the engine's own default counts every CPU it may use, not socket 0. |
 | build container | `docker/Dockerfile` is Ubuntu 18.04 with the distribution gcc and `libgomp1` | The old gcc may not know Raptor Lake as a `-march=native` target. Explicit AVX2/FMA/F16C flags are safer for the supported tier. |
@@ -286,7 +287,7 @@ workload can set `OMP_NUM_THREADS=8`. Raw probe logs are in `bench-logs/thread-s
 
 ### P0 — detect the CPU before downloading or compiling
 
-1. Add a CPU feature report (model name, physical/logical cores, AVX2, FMA, F16C) to `kindi info` and
+1. [done] Add a CPU feature report (model name, physical/logical cores, AVX2, FMA, F16C) to `kindi info` and
    to the installer's machine check.
 2. In `cpu.py`, check the features before invoking gcc and stop with a clear message:
    “the CPU engine needs AVX2, FMA and F16C; this CPU has …”. The i5-2500K must fail at this check,
