@@ -30,6 +30,10 @@ def _targets(path):
         target = unquote(target.split("#", 1)[0].strip())
         if not target:
             continue
+        # Raw benchmark logs are local evidence and may be absent from a clean checkout
+        # because *.log is ignored; do not treat them as broken documentation links.
+        if "raw" in Path(target).parts and target.endswith(".log"):
+            continue
         yield target
 
 
