@@ -518,12 +518,13 @@ pair_ok() {       # two NVIDIA card positions -> 0 if they run a model split ove
   local a=$1 b=$2 ca cb
   [ "${GMEM[$a]}" -ge 3800 ] && [ "${GMEM[$b]}" -ge 3800 ] || return 1
   ca=$(card_class "$a"); cb=$(card_class "$b")
-  case "$ca" in
-    # the same architecture class: Maxwell/Pascal, Turing, Ada/Blackwell, or the P100 exception.
-    # 2 GB cards (GT 1030) stay out: the plan engine needs a K/V slice and the exchange on each card.
-    tc|turing|pascal8|p100|maxwell) [ "$cb" = "$ca" ] ;;
-    *) return 1 ;;
-  esac
+  # Any two cards from a pair-supported class can use the plain two-card engine, including cards
+  # from different generations. Two sm_80+ cards are upgraded to tc2 by profile_of; a mixed pair
+  # stays plain, and one whose cards disagree on the 5-trit path gets KINDI_G5=0 for both (see
+  # profile_of). Kepler stays single-card; 2 GB cards (GT 1030) stay out because the plan engine
+  # needs a K/V slice and the exchange on each card.
+  case "$ca" in maxwell|pascal8|turing|tc|p100) ;; *) return 1 ;; esac
+  case "$cb" in maxwell|pascal8|turing|tc|p100) ;; *) return 1 ;; esac
 }
 amd_models() {    # AMD GPU position -> the models that run on it, the best first
   local V=${AMEM[$1]} m=""
@@ -565,7 +566,7 @@ if [ "$GPU" != cpu ]; then
       PAIR="${GIDX[$pa]},${GIDX[$pb]}"
       want 27b && add_cfg "cuda|27b|$PAIR" "$(model_label 27b) on GPUs ${PAIR}, split over both cards"
       want nemotron && add_cfg "cuda|nemotron|$PAIR" "$(model_label nemotron) on GPUs ${PAIR}, split over both cards"
-    elif [[ "$GPU" == *,* ]] && ! { want nanbeige && nb_cards "$pa" "$pb" >/dev/null; }; then die "GPUs ${GPU} cannot run one model together (two cards of the same class with at least 4 GB each, such as two K1200s or two P106s, can; Nanbeige 33B needs sm_80 cards or Tesla P100s with 16.2 GB in total, plus 0.7 GB for each more card)"
+    elif [[ "$GPU" == *,* ]] && ! { want nanbeige && nb_cards "$pa" "$pb" >/dev/null; }; then die "GPUs ${GPU} cannot run one model together (two supported cards with at least 4 GB each, such as a P106 and a P4000, can; Nanbeige 33B needs sm_80 cards or Tesla P100s with 16.2 GB in total, plus 0.7 GB for each more card)"
     fi
     if [[ "$GPU" != *,* ]] && [[ "$GPU" != amd* ]]; then
       # one card: the card with the most memory first, then each other kind of card. A setup on a kind of card
@@ -678,7 +679,7 @@ NS=${#SV_B[@]}
 
 # the engine settings of server i -> PROFILE, C (context), MEM, CPUS, ENV (the -e settings), XPACKS (extra packs)
 profile_of() {
-  local i=$1 B=${SV_B[$1]} M=${SV_M[$1]} CARDS=${SV_C[$1]} k V k2 V2
+  local i=$1 B=${SV_B[$1]} M=${SV_M[$1]} CARDS=${SV_C[$1]} k V k2 V2 g5a g5b
   ENV=(); XPACKS=(); MEM=""; CPUS=""
   if [ "$B" = cpu ]; then
     PROFILE=cpu
@@ -710,6 +711,11 @@ profile_of() {
       else
         PROFILE=k1200x2; C=${CTX/auto/24576}; MEM=12g
         ENV+=(-e KINDI_CARDS=2 -e KINDI_REPEAT_STOP=1 -e KINDI_CHECKPOINT_BUDGET_MB=4096)
+        # Maxwell cards (major < 6) use the 2-bit decode; Pascal and newer use the 5-trit path.
+        # A mixed pair forces the 2-bit path on both so one plan is valid on each card.
+        g5a=0; if [ "${GCC[$k]/./}" -ge 60 ]; then g5a=1; fi
+        g5b=0; if [ "${GCC[$k2]/./}" -ge 60 ]; then g5b=1; fi
+        [ "$g5a" = "$g5b" ] || ENV+=(-e KINDI_G5=0)
       fi
     else
       PROFILE=$(card_class "$k")

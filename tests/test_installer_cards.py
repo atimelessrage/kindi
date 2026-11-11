@@ -190,21 +190,60 @@ def test_two_gt_1030_cards_do_not_pair():
     assert info["pair"] == "no", info
 
 
-def test_different_card_classes_do_not_pair():
-    info = pair("NVIDIA GeForce RTX 4060 Ti", 8188, "8.9", "Quadro RTX 4000", 8192, "7.5")
+def test_kepler_does_not_pair_even_with_a_supported_card():
+    # Kepler remains a single-card profile; the two-card plan engine has no Kepler record.
+    info = pair("Quadro K5200", 8192, "3.5", "Quadro M4000", 8192, "5.2")
     if info is None:
         return
+    assert info["class0"] == "kepler", info
     assert info["pair"] == "no", info
 
 
-def test_p106_and_p4000_do_not_pair():
-    # Both are sm_61 Pascal, but the 6 GB P106 is in the maxwell memory class and the
-    # 8 GB P4000 is pascal8; the documented policy pairs only cards of the same class.
+def test_turing_and_ada_cards_pair_on_the_plain_engine():
+    info = pair("Quadro RTX 4000", 8192, "7.5", "NVIDIA GeForce RTX 4060 Ti", 8188, "8.9")
+    if info is None:
+        return
+    assert info["class0"] == "turing" and info["class1"] == "tc", info
+    assert info["pair"] == "yes", info
+    info = profile(["Quadro RTX 4000", "NVIDIA GeForce RTX 4060 Ti"], [8192, 8188], ["7.5", "8.9"])
+    if info is None:
+        return
+    assert info["profile"] == "k1200x2", info
+    assert "KINDI_TC=1" not in info["env"], info
+
+
+def test_p106_and_p4000_pair_on_the_plain_engine():
     info = pair("NVIDIA P106-100", 6077, "6.1", "Quadro P4000", 8192, "6.1")
     if info is None:
         return
-    assert info["class0"] == "maxwell", info
-    assert info["class1"] == "pascal8", info
+    assert info["class0"] == "maxwell" and info["class1"] == "pascal8", info
+    assert info["pair"] == "yes", info
+    info = profile(["NVIDIA P106-100", "Quadro P4000"], [6077, 8192], ["6.1", "6.1"])
+    if info is None:
+        return
+    assert info["profile"] == "k1200x2", info
+    assert "KINDI_G5=0" not in info["env"], info
+    assert "KINDI_TC=1" not in info["env"], info
+
+
+def test_m4000_and_p4000_pair_with_the_two_bit_fallback():
+    info = pair("Quadro M4000", 8192, "5.2", "Quadro P4000", 8192, "6.1")
+    if info is None:
+        return
+    assert info["class0"] == "maxwell" and info["class1"] == "pascal8", info
+    assert info["pair"] == "yes", info
+    info = profile(["Quadro M4000", "Quadro P4000"], [8192, 8192], ["5.2", "6.1"])
+    if info is None:
+        return
+    assert info["profile"] == "k1200x2", info
+    assert "KINDI_G5=0" in info["env"], info
+    assert "KINDI_TC=1" not in info["env"], info
+
+
+def test_mixed_pair_still_needs_four_gb_each():
+    info = pair("NVIDIA GeForce GT 1030", 2048, "6.1", "Quadro P4000", 8192, "6.1")
+    if info is None:
+        return
     assert info["pair"] == "no", info
 
 

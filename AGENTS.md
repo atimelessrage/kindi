@@ -98,6 +98,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | P106 verification runner | this worktree | `freebuff/tandem-cpu-recovery` | `tools/verify_p106.py`, `tests/test_verify_p106.py`, `docs/P106.md`, `docs/CARDS.md`, `AGENTS.md` | `tools/verify_p106.py` records the single-card 2B/4B/9B verify, the real server/cache restart, and the two-card 27B verify in one run; it pins the P106 indices, drops inherited `KINDI_*`, and refuses a full run without exactly two P106-100s. 10 CPU-only tests and a dry-run pass on this host; no P106 hardware, so the record is not run and not a support claim |
 | Review/audit follow-up: version, config and link consistency | this worktree | `freebuff/tandem-cpu-recovery` | `README.md`, `WHY.md`, `SECURITY.md`, `docker/Dockerfile`, `docs/CARDS.md`, `docs/CONFIGURATION.md`, `docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md`, `kindi/tokenizer.py`, `tests/test_version_consistency.py`, `tests/test_config_example.py`, `tests/test_tokenizer.py`, `tests/test_docs_links.py`, `AGENTS.md` | done; current-facing 0.4.0 tags/archive names, WHY/SECURITY version statements and the stale card tag fixed; `docs/CONFIGURATION.md` now names every default key; missing BPE pieces raise instead of silently encoding as token 0; local Markdown links are checked by a new test. Evidence: 14 focused tests pass, `config_reference --check` and `support_matrix --check` exit 0, `compileall` and `git diff --check` pass. The new `Buffy_ReviewAudit_202611111200.txt` is only an executive summary (1,012 bytes, no findings); the concrete older findings were re-triaged. The installer source tarball is still not hash-pinned; changing it requires a new published installer, so it is left for the release owner |
 | AVX feature preflight + installer refresh | this worktree | `freebuff/tandem-cpu-recovery` | `install.sh`, `tests/test_installer_cpu.py`, `docs/INSTALL.md`, `docs/RELEASE-CHECKLIST.md`, `docs/CPU-SUPPORT.md`, `AGENTS.md` | done; CPU setups require AVX; `--gpu cpu` and a machine with no usable GPU fail early, while GPU installs remain available. 4 fixture tests pass; 33 installer tests and 254 full tests (7 skipped) pass with `bash -n`, LF ShellCheck, `compileall`, generated config/support checks and `git diff --check`. Published LF artifact 65,112 bytes, sha256 `43766d8bbed09fa0ccebe6c39c8076001da99cb15814ff065380f7a46c93db99`; the release `install.sh` and `install.sh.sha256` assets were refreshed and the public URLs and release notes verified. Previous pair retained as `install.sh.pre-avx-preflight-1794385057` and `install.sh.sha256.pre-avx-preflight-1794385057`; no native Linux dry run |
+| Heterogeneous two-card pairing | this worktree | `freebuff/tandem-cpu-recovery` | `install.sh`, `tests/test_installer_cards.py`, `docs/CARD-SUPPORT.md`, `docs/CARDS.md`, `docs/INSTALL.md`, `docs/P106.md`, `AGENTS.md` | done; `pair_ok()` pairs any two cards from the supported pair classes (maxwell, pascal8, turing, tc, p100), including mixed generations; mixed pairs use plain `k1200x2`, a pre-6.0 + 6.0-or-newer pair adds `KINDI_G5=0`, and Kepler stays single-card. 19 card tests and 257 full tests (7 skipped) pass; generated config/support checks, `compileall`, `bash -n` and `git diff --check` pass. ShellCheck reports 5 warnings at unchanged lines 185, 215, 221, 294 and 594; the changed pairing block is clean. No mixed-card GPU run, no P106/P4000/M4000/RTX 4000 hardware, and the installer artifact was not rebuilt or republished |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -126,6 +127,18 @@ is not a lock.
   < environment (`KINDI_<KEY>`) < command-line flags.
 
 ## Handoff (2026-11-09)
+- Heterogeneous two-card pairing (2026-11-11): `pair_ok()` now accepts any two cards from `maxwell`,
+  `pascal8`, `turing`, `tc` or `p100` with at least 3,800 MiB each; Kepler stays single-card. Mixed
+  generations use the plain `k1200x2` engine, and `profile_of()` adds `KINDI_G5=0` when one card is
+  below compute capability 6.0 and the other is 6.0 or newer, so both use the 2-bit path. Examples now routed:
+  P106+P4000 (no G5 override), M4000+P4000 (`KINDI_G5=0`), RTX 4000+4060 Ti (plain, no TC). Evidence:
+  `tests/test_installer_cards.py` 19 passed; full suite 257 passed, 7 skipped; `python -m
+  kindi.config_reference --check`, `python -m kindi.support_matrix --check`, `python -m compileall -q
+  kindi`, `bash -n install.sh` and `git diff --check` pass. ShellCheck on the worktree copy reports 5
+  warnings at unchanged lines 185, 215, 221, 294 and 594; the changed pairing block is clean. No mixed-card
+  GPU run and no P106/P4000/M4000/RTX 4000 hardware; the published installer remains the AVX refresh
+  (`43766d8b...`) and was not republished. This supersedes the same-class-only statements in the earlier
+  installer rows and the 2026-11-10 handoff.
 - AVX feature preflight and installer refresh (2026-11-11): `install.sh` checks `avx` in
   `/proc/cpuinfo` (or `KINDI_CPUINFO`) before offering CPU setups. CPU setups are hidden without AVX;
   `--gpu cpu` and a machine with no usable GPU fail with an actionable message, while GPU installs remain

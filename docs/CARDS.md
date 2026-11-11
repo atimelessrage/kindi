@@ -196,9 +196,11 @@ capability 8.0 and later (RTX 30, 40 and 50). The RTX 20 series (Turing, sm_75) 
 runtime verification on sm_75 hardware is still pending.
 
 The installer classifies a card by compute capability, not by memory: every sm_80 card gets the `tc` profile,
-including the 8 GB RTX 4060 Ti, whose default context is 24,576 tokens. Two cards of the same class with at least
-4 GB each can run one model together; two sm_80 cards get the `tc2` profile (tensor cores on, speculative decoding
-off until the two-card verify is recorded).
+including the 8 GB RTX 4060 Ti, whose default context is 24,576 tokens. Any two cards in the pair-supported
+classes (Maxwell, Pascal, Turing, tensor-core or P100) with at least 4 GB each can be paired. Two sm_80 cards
+get the `tc2` profile (tensor cores on, speculative decoding off until the two-card verify is recorded); mixed
+generations use the plain `k1200x2` split, and a pre-6.0 + 6.0-or-newer pair adds `KINDI_G5=0` so both cards
+use the 2-bit path. Kepler stays single-card. No mixed-card execution has been recorded yet.
 
 | card | what we measured |
 |---|---|
@@ -346,7 +348,7 @@ option `amdgpu.cwsr_enable=0`. [AMD.md](AMD.md) gives the settings.
 - It is a mining variant of the GTX 1060. Run it headless: use the integrated graphics or another card for the console, and leave the P106 for CUDA. `nvidia-smi` still reports it.
 - Many P106 boards link at x1 or x4 although the slot is x16. Prompt reading and the two-card exchange are sensitive to that link; check `nvidia-smi --query-gpu=pcie.link.gen.current,pcie.link.width.current`.
 - The installer classifies the 6 GB card as `maxwell`, its 24,576-token memory profile, rather than `pascal8` (which starts at 7,500 MiB). That is the context that fits 6 GB; it does not mean the card is Maxwell.
-- The 27B does not fit in 6 GB. Two P106 cards run it together: the installer pairs two cards of the same class with at least 3,800 MiB each and sets the legacy two-card profile.
+- The 27B does not fit in 6 GB. Two P106 cards run it together; the installer also offers a P106 + P4000 pair, which keeps the 5-trit path on both cards. Any pair from the supported pair classes with at least 3,800 MiB each uses the legacy two-card profile. A pre-6.0 + 6.0-or-newer pair sets `KINDI_G5=0` and runs both cards on the 2-bit path. These mixed offers are not measured yet.
 - The installer's shared 6 GB list also offers Nemotron; it is experimental and has not been measured on a P106.
 - CPU+GPU tandem (one model split across CPU and GPU layers) is not implemented for the Bonsai models and is not supported on the P106. (The Nanbeige backend has a separate host-layer path; it does not apply here.) The gate is in [P106.md](P106.md#cpu-tandem-status); do not advertise it yet.
 - Verification runner: `python3 tools/verify_p106.py` records the single-card 2B/4B/9B verify, the server/cache cycle and the two-card 27B verify. It has not run on P106 hardware; see [P106.md](P106.md#one-command-verification-record).
