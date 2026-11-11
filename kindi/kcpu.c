@@ -9,6 +9,13 @@
 #include <omp.h>
 #include <immintrin.h>
 
+/* The kernels below use AVX2, FMA and F16C unconditionally.  Fail at compile time with an
+   actionable message instead of a target-mismatch error; an AVX-only fallback is P1 in
+   docs/CPU-SUPPORT.md. */
+#if !defined(__AVX2__) || !defined(__FMA__) || !defined(__F16C__)
+#error "kindi CPU engine requires AVX2, FMA3 and F16C; build with -mavx2 -mfma -mf16c (docs/CPU-SUPPORT.md)"
+#endif
+
 #ifdef _WIN32
 #define KC_API __declspec(dllexport)      /* the ctypes loader needs the names in the DLL export table */
 #else

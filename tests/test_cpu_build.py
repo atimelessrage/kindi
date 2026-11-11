@@ -1,9 +1,13 @@
 """The CPU engine must call gcc with an argument vector, never a shell string."""
+import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 
 from kindi import cpu
+
+SRC = Path(__file__).resolve().parents[1] / "kindi" / "kcpu.c"
 
 
 def test_build_passes_paths_as_arguments(monkeypatch, tmp_path):
@@ -46,3 +50,26 @@ def test_build_failure_is_a_clear_exit(monkeypatch):
                         lambda cmd: subprocess.CompletedProcess(cmd, 1))
     with pytest.raises(SystemExit, match="could not build the CPU engine"):
         cpu._build("kcpu.c", "libkcpu.so")
+
+
+def test_source_has_the_isa_guard():
+    assert "requires AVX2, FMA3 and F16C" in SRC.read_text(encoding="utf-8")
+
+
+def test_avx_only_build_is_rejected_with_the_required_isa():
+    gcc = shutil.which("gcc")
+    if gcc is None:
+        pytest.skip("gcc is not installed")
+    proc = subprocess.run([gcc, "-fopenmp", "-mavx", "-mno-avx2", "-mno-fma", "-mno-f16c", "-E", str(SRC)],
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    assert proc.returncode != 0
+    assert "requires AVX2, FMA3 and F16C" in proc.stderr.decode("utf-8", "replace")
+
+
+def test_supported_isa_source_preprocesses():
+    gcc = shutil.which("gcc")
+    if gcc is None:
+        pytest.skip("gcc is not installed")
+    proc = subprocess.run([gcc, "-fopenmp", "-mavx2", "-mfma", "-mf16c", "-E", str(SRC)],
+                          stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    assert proc.returncode == 0, proc.stderr.decode("utf-8", "replace")

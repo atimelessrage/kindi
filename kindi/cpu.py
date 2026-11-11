@@ -104,7 +104,7 @@ def _build(src, so):
                          % (cmd[0], e))
     if result.returncode:
         raise SystemExit("kindi: could not build the CPU engine (%s); it needs gcc with OpenMP, or clang and "
-                         "libomp on Windows" % so)
+                         "libomp on Windows, and a CPU with AVX2, FMA3 and F16C (docs/CPU-SUPPORT.md)" % so)
 
 
 def _lib():

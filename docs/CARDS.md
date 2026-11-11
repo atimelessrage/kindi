@@ -205,6 +205,7 @@ off until the two-card verify is recorded).
 | RTX 3080 (190 W) | 27B: 62.3 tokens/s at 512 tokens. With the 2B draft model: 91.1 (1.46 times) at 512 tokens, 103.2 (1.68 times) at 8K with k=2, and 111.5 (1.82 times) at 8K with k=3. The same output as without the draft model. Against llama.cpp: see [BENCHMARKS.md](BENCHMARKS.md) |
 | RTX 3060 12 GB | 27B: 41.1 tokens/s at 512 tokens; with the 2B draft model 60.6 (1.48 times), 73.5 (1.82 times) at 8K, 66.7 (1.81 times) at 24K |
 | RTX 4060 Ti 8 GB | tc plan (2026-11-11 one-pass matrix): 2B 4/4 token-exact, 370.2 tokens/s; 4B 2/4; 9B refused (Hadamard 4096); 27B passes (3 exact + 1 tie; 38.9 one-pass, **38.1 median of 3**); 27B 24K benchmark 33.9 tokens/s at position 24,000 and server/cache pass. Plain 4B/9B 4/4. Details below |
+| RTX 5060 Ti 16 GB | installer classifies it as `tc` (sm_80+), but there is no Kindi exactness or speed run on Blackwell yet; this is not a support claim. See [CARD-SUPPORT.md](CARD-SUPPORT.md) |
 | other RTX 20, 40 and 50 cards | supported on the plain engine; `kindi verify` passes. We give no speed numbers |
 
 ### RTX 4060 Ti 8 GB (Ada, sm_89)
