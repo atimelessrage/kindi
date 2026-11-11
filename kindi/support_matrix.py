@@ -35,7 +35,7 @@ EVIDENCE = [
     ("CPU engine on the i7-8086K, native Windows", "benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md"),
     ("CPU engine on the i7-8086K, WSL2", "benchmarks/2026-11-09-i7-8086k-cpu/README.md"),
     ("GPU 2B/4B/9B at 24K on the RTX 4060 Ti", "benchmarks/2026-11-09-i7-8086k-rtx4060ti/README.md"),
-    ("RTX 4060 Ti 27B tc verify", "CARDS.md#rtx-4060-ti-8-gb-ada-sm89"),
+    ("RTX 4060 Ti 27B tc verify and 24K run", "CARDS.md#rtx-4060-ti-8-gb-ada-sm89"),
     ("No-go experiments and their gates", "ROADMAP.md"),
 ]
 
@@ -205,8 +205,9 @@ def render(models=None, fmts=None, kv=None, isa=None):
               "- `k8v4` is quarantined behind `KINDI_KV_EXPERIMENTAL=1` because it is lossy.",
               "- The CPU server chat path is verified for the 2B, 4B and 9B; repeated-run stability",
               "  is not measured.",
-              "- The 27B single-card tc verify passes on the RTX 4060 Ti (3 exact + 1 llama.cpp tie at",
-              "  1,024 tokens); its long-context/server path and the two-card result remain unmeasured.",
+              "- The 27B single-card tc path passes on the RTX 4060 Ti (3 exact + 1 llama.cpp tie at",
+              "  1,024 tokens), has a three-run median of 38.1 tok/s (range 36.7-38.2), and benchmarks",
+              "  and serves at 24,576 tokens; the two-card result remains unmeasured.",
               "- `nemotron-e4b` and `nanbeige-33b` have separate backends and are outside this matrix.",
               "- The archived no-go work and the gates that would reopen it are in [ROADMAP.md](ROADMAP.md)."]
     return "\n".join(lines) + "\n"

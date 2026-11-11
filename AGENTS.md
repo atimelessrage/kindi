@@ -52,7 +52,7 @@ The main worktree is clean now; `main` was fast-forwarded to this branch after i
 commits were merged. The corrupt tandem WIP was not merged into `main`; restart it from
 `docs/CPU_GPU_TANDEM_DESIGN.md` and the WIP branch if it is resumed.
 
-### Current leases (checked 2026-11-08)
+### Current leases (checked 2026-11-11)
 
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
@@ -94,6 +94,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | Intel Arc A770 support goal | this worktree | `freebuff/tandem-cpu-recovery` | `docs/INTEL-ARC.md`, `docs/ROADMAP.md`, `docs/CARD-SUPPORT.md`, `AGENTS.md` | planning/audit done; no Intel backend code; no Arc hardware (RTX 4060 Ti only, no `sycl-ls`); one/two/CPU-tandem goals, gates and milestones written; not a support claim |
 | P106-100 single/dual support + CPU tandem gate | this worktree | `freebuff/tandem-cpu-recovery` | `docs/P106.md`, `docs/CARDS.md`, `docs/CARD-SUPPORT.md`, `docs/ROADMAP.md`, `tests/test_installer_cards.py`, `AGENTS.md` | installer single/dual routing tested; no P106 hardware; general Bonsai CPU tandem blocked on the missing `TandemEngine` (Nanbeige host-layer path is separate); not a support claim |
 | P106 verification runner | this worktree | `freebuff/tandem-cpu-recovery` | `tools/verify_p106.py`, `tests/test_verify_p106.py`, `docs/P106.md`, `docs/CARDS.md`, `AGENTS.md` | `tools/verify_p106.py` records the single-card 2B/4B/9B verify, the real server/cache restart, and the two-card 27B verify in one run; it pins the P106 indices, drops inherited `KINDI_*`, and refuses a full run without exactly two P106-100s. 10 CPU-only tests and a dry-run pass on this host; no P106 hardware, so the record is not run and not a support claim |
+| Review/audit follow-up: version, config and link consistency | this worktree | `freebuff/tandem-cpu-recovery` | `README.md`, `WHY.md`, `SECURITY.md`, `docker/Dockerfile`, `docs/CARDS.md`, `docs/CONFIGURATION.md`, `docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md`, `kindi/tokenizer.py`, `tests/test_version_consistency.py`, `tests/test_config_example.py`, `tests/test_tokenizer.py`, `tests/test_docs_links.py`, `AGENTS.md` | done; current-facing 0.4.0 tags/archive names, WHY/SECURITY version statements and the stale card tag fixed; `docs/CONFIGURATION.md` now names every default key; missing BPE pieces raise instead of silently encoding as token 0; local Markdown links are checked by a new test. Evidence: 14 focused tests pass, `config_reference --check` and `support_matrix --check` exit 0, `compileall` and `git diff --check` pass. The new `Buffy_ReviewAudit_202611111200.txt` is only an executive summary (1,012 bytes, no findings); the concrete older findings were re-triaged. The installer source tarball is still not hash-pinned; changing it requires a new published installer, so it is left for the release owner |
 
 That main-worktree lease covers its **whole dirty set**, not only the docs and installer. It also
 has changes in `GOALS.md`, `IMPLEMENTATION_PLAN.md`, `setup.py`, `kindi/config.py`,
@@ -123,6 +124,19 @@ is not a lock.
 
 ## Handoff (2026-11-09)
 
+- 2026-11-11 audit follow-up: the new report at `T:/kindi/Buffy_ReviewAudit_202611111200.txt` is incomplete
+  (only the executive summary; 1,012 bytes, no findings), so the two earlier reports were checked against the
+  current tree instead. Fixed the current-facing 0.4.0 Docker tags and release archive names in `README.md`,
+  `docs/CARDS.md` and `docker/Dockerfile`, the stale `WHY.md`/`SECURITY.md` version statements, the missing
+  default keys in `docs/CONFIGURATION.md`, and the broken `../../CROSS-MODE.md` link. `kindi/tokenizer.py` now
+  raises on a missing BPE piece instead of encoding it as token 0. New guards: image tags/archive names must
+  match `kindi/__init__.py`, every `config.DEFAULTS` key must appear in `docs/CONFIGURATION.md`, and every local
+  Markdown link must resolve. Evidence: the 14 focused tests (`test_version_consistency`, `test_config_example`,
+  `test_tokenizer`, `test_docs_links`) pass; `python -m kindi.config_reference --check` and
+  `python -m kindi.support_matrix --check` exit 0; `compileall -q kindi` and `git diff --check` pass. The
+  published installer and the v0.5.0 archive both hash to `b84df4fe...`, matching `docs/INSTALL.md`; no
+  installer change was made. The source tarball still has no pinned hash in `install.sh`; it is a release-level
+  follow-up (the downloaded v0.5.0 archive hashes to `26424ec0...`).
 - Native Windows runs without an external shim: `gpudrv.driver_name()` selects `nvcuda.dll` on
   Windows and `libcuda.so.1` on Linux, and `sched.py`, `chunk1.py` and `nanbeige.py` now use
   `gpudrv.driver()` instead of a hardcoded library. Verified natively through `python -m kindi`:

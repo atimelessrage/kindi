@@ -47,3 +47,14 @@ def test_added_token_is_split_out_of_text(tmp_path):
 def test_lowest_rank_pair_merges_first():
     ranks = {("a", "b"): 1, ("b", "c"): 0}
     assert bpe("abc", ranks) == ["a", "bc"]
+
+
+def test_missing_piece_fails_loudly(tmp_path):
+    tok = make_tok(tmp_path)
+    del tok.sid["c"]                 # a corrupt pack: the byte token is absent
+    try:
+        tok.encode("c")
+    except ValueError as e:
+        assert "c" in str(e)
+    else:
+        raise AssertionError("a missing token was silently encoded as id 0")

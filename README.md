@@ -135,15 +135,15 @@ For AMD RDNA3 graphics, build `docker/Dockerfile.rocm` instead (`kindi-rocm:0.5.
 RDNA 3.5 graphics, build `docker/Dockerfile.rocm7` (`kindi-rocm7:0.5.0`, about 9 GB to download). See
 [docs/AMD.md](docs/AMD.md).
 
-You can also use the release archive. Download `kindi-0.4.0.tar.gz` from the
-[v0.4.0 release](https://github.com/ahtx/kindi/releases/tag/v0.4.0), then run
-`tar xzf kindi-0.4.0.tar.gz && cd kindi-0.4.0` and build the image with the same `docker build` command.
+You can also use the release archive. Download `kindi-0.5.0.tar.gz` from the
+[v0.5.0 release](https://github.com/ahtx/kindi/releases/tag/v0.5.0), then run
+`tar xzf kindi-0.5.0.tar.gz && cd kindi-0.5.0` and build the image with the same `docker build` command.
 
 Check that Docker sees the GPU (create `~/.kindi` first, so it belongs to you and not to root):
 
 ```sh
 mkdir -p ~/.kindi
-docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.4.0 info
+docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.5.0 info
 ```
 
 More in [docs/DOCKER.md](docs/DOCKER.md).
@@ -174,7 +174,7 @@ Convert it once into Kindi's weight pack (about a minute; exact - the same weigh
 
 ```sh
 # Docker
-docker run --rm -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.4.0 convert /data/Ternary-Bonsai-2-2B-PTQ1_0.gguf
+docker run --rm -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.5.0 convert /data/Ternary-Bonsai-2-2B-PTQ1_0.gguf
 # native
 python3 -m kindi convert ~/.kindi/Ternary-Bonsai-2-2B-PTQ1_0.gguf          # writes ~/.kindi/pack
 ```
@@ -182,7 +182,7 @@ python3 -m kindi convert ~/.kindi/Ternary-Bonsai-2-2B-PTQ1_0.gguf          # wri
 Check the engine against llama.cpp's reference output:
 
 ```sh
-docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.4.0 verify
+docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.5.0 verify
 ```
 
 ```
@@ -201,14 +201,14 @@ measures the generation speed (see [Performance](#performance)).
 Optional - build the cluster file for the fast output head (about 2 minutes):
 
 ```sh
-docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.4.0 fast-head
+docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.5.0 fast-head
 ```
 
 ## Run the server
 
 ```sh
 docker run -d --name kindi --restart unless-stopped --gpus all -u $(id -u):$(id -g) \
-    -p 127.0.0.1:8093:8093 -v ~/.kindi:/data kindi:0.4.0
+    -p 127.0.0.1:8093:8093 -v ~/.kindi:/data kindi:0.5.0
 # native:  python3 -m kindi serve
 ```
 

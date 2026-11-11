@@ -1,6 +1,6 @@
 # Why Kindi
 
-*Current release: Kindi 0.4.0 (2026-11-04). The K420 table and chart below are the 0.2.0 measurements that established the card; [docs/BENCHMARKS.md](docs/BENCHMARKS.md) has the release tables.*
+*Current release: Kindi 0.5.0. The K420 table and chart below are the 0.2.0 measurements that established the card; [docs/BENCHMARKS.md](docs/BENCHMARKS.md) has the release tables.*
 
 **A modern 2-billion-parameter language model that runs at 22.9 tokens per second on a ten-year-old, 1 GB,
 entry-level graphics card.**
@@ -24,9 +24,10 @@ error; Kindi runs to 24,576 tokens on this card. The fast head gives 22.9 tokens
 also **token-for-token identical to llama.cpp's** (`kindi verify` checks it). We searched and found no published result that shows any modern language model on a K420
 at anything close to this speed (see [docs/BENCHMARKS.md](docs/BENCHMARKS.md)).
 
-Kindi 0.4.0 runs the 2B, 4B, 9B and 27B models on the cards listed in [docs/CARDS.md](docs/CARDS.md), plus the 2B
-to 9B on the CPU. The 0.2.0 release introduced those model sizes for newer cards. [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
-has the comparisons for each card.
+Kindi 0.5.0 runs the 2B, 4B, 9B and 27B models on the cards listed in [docs/CARDS.md](docs/CARDS.md), plus the 2B
+to 9B on the CPU. It also adds the NVIDIA CMP 170HX and AMD RDNA 3.5 graphics (the Radeon 840M and 8060S). The
+0.2.0 release introduced the larger model sizes for newer cards. [docs/BENCHMARKS.md](docs/BENCHMARKS.md) has the
+comparisons for each card.
 
 ## What you get
 

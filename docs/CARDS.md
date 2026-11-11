@@ -7,7 +7,7 @@ costs 2-3% of the decode speed on the GTX 1080. With one server on its own card,
 (the installer does this). The RTX 3080 profile keeps it on: there, many servers share few CPU cores.
 
 This page gives the settings for each tested card. It also gives the speeds that we measured with these settings.
-All the cards use the same Docker image (CUDA 10.2, CuPy 9.6). The `kindi` folder of this repository is the code.
+The NVIDIA and CPU cards use the CUDA 10.2 / CuPy 9.6 image; AMD cards use the ROCm images ([AMD.md](AMD.md)). The `kindi` folder of this repository is the code.
 
 To make a pack, use `kindi convert` (see the README). Put the pack in `$HOME/.kindi/<pack>`. In the container, it
 is at `/data/<pack>`. The examples serve on `127.0.0.1:8093`.
@@ -15,7 +15,7 @@ is at `/data/<pack>`. The examples serve on `127.0.0.1:8093`.
 ```
 docker run -d --name kindi --restart unless-stopped --gpus all -u $(id -u):$(id -g) \
   -p 127.0.0.1:8093:8093 -v $HOME/.kindi:/data -e HOME=/tmp \
-  -e KINDI_PACK=/data/pack -e KINDI_STATE_DIR=/data/state ... kindi:0.4.0
+  -e KINDI_PACK=/data/pack -e KINDI_STATE_DIR=/data/state ... kindi:0.5.0
 ```
 
 Replace `...` with the variables in the section for your card. To use one card of two, set `--gpus device=N`.
@@ -142,7 +142,7 @@ reading 1,093 tokens/s at 512 to 855 at 22K.
 
 ## Tesla P100, 16 GB (Pascal, sm_60)
 
-The Tesla P100 is a supported card in Kindi 0.4.0. A used card costs $78 to $160. It has 16 GB of HBM2 memory with a
+The Tesla P100 has been supported since Kindi 0.4.0. A used card costs $78 to $160. It has 16 GB of HBM2 memory with a
 bandwidth of 732 GB/s. Photo: GP100 chip of a Tesla P100, by Fritzchens Fritz, Wikimedia Commons (CC0).
 
 | item | value |
@@ -190,7 +190,7 @@ link. We did not test the 8 GB board. Check `nvidia-smi` before you buy one. Mea
 
 ## GeForce RTX 20, 30, 40 and 50 series
 
-Kindi 0.4.0 supports all four series. The Ampere tensor-core path and speculative decoding use cards of compute
+Kindi 0.5.0 supports all four series. The Ampere tensor-core path and speculative decoding use cards of compute
 capability 8.0 and later (RTX 30, 40 and 50). The RTX 20 series (Turing, sm_75) has its own tensor-core backend
 ([TURING-TENSOR-CORES.md](TURING-TENSOR-CORES.md)), selected with `KINDI_TC=1`; see the RTX 4000 section below. Its
 runtime verification on sm_75 hardware is still pending.
@@ -204,7 +204,7 @@ off until the two-card verify is recorded).
 |---|---|
 | RTX 3080 (190 W) | 27B: 62.3 tokens/s at 512 tokens. With the 2B draft model: 91.1 (1.46 times) at 512 tokens, 103.2 (1.68 times) at 8K with k=2, and 111.5 (1.82 times) at 8K with k=3. The same output as without the draft model. Against llama.cpp: see [BENCHMARKS.md](BENCHMARKS.md) |
 | RTX 3060 12 GB | 27B: 41.1 tokens/s at 512 tokens; with the 2B draft model 60.6 (1.48 times), 73.5 (1.82 times) at 8K, 66.7 (1.81 times) at 24K |
-| RTX 4060 Ti 8 GB | tc plan (2026-11-11 one-pass matrix): 2B 4/4 token-exact, 370.2 tokens/s; 4B 2/4; 9B refused (Hadamard 4096); 27B passes (3 exact + 1 tie, 38.9 tokens/s); 27B 24K benchmark 33.9 tokens/s at position 24,000 and server/cache pass. Plain 4B/9B 4/4. Details below |
+| RTX 4060 Ti 8 GB | tc plan (2026-11-11 one-pass matrix): 2B 4/4 token-exact, 370.2 tokens/s; 4B 2/4; 9B refused (Hadamard 4096); 27B passes (3 exact + 1 tie; 38.9 one-pass, **38.1 median of 3**); 27B 24K benchmark 33.9 tokens/s at position 24,000 and server/cache pass. Plain 4B/9B 4/4. Details below |
 | other RTX 20, 40 and 50 cards | supported on the plain engine; `kindi verify` passes. We give no speed numbers |
 
 ### RTX 4060 Ti 8 GB (Ada, sm_89)
@@ -220,6 +220,44 @@ off until the two-card verify is recorded).
 | result | The tc plan passes on the 2B (4/4) and the 27B (3 exact + 1 accepted tie). The 4B divergence and the 9B Hadamard block are open. The 27B single-card path now has a 24K benchmark and a real server/cache restart cycle, but no long soak or concurrency; [CARD-SUPPORT.md](CARD-SUPPORT.md) tracks the remaining gaps |
 
 - The 8 GB `tc` installer profile only adds tensor-core settings to the 27B (and the 2B when its MTP head is installed); the 2B/4B/9B/27B settings above are the documented tc plan. The plain 4B/9B paths remain the safe default.
+
+#### Verify matrix (RTX 4060 Ti)
+
+`tools/verify_matrix.py` runs each selected model/mode cell as a fresh
+`python -m kindi --pack ... verify` process with a clean `KINDI_*` environment. It writes
+`results.csv`, `results.json` and raw logs. `--save-baseline PATH` copies a run's
+`results.json` as a reference; `--baseline PATH` loads that file on a later run and writes
+`comparison.csv`/`comparison.json` with status and exactness transitions plus signed
+throughput deltas. The process exit status still reflects the current run's pass/fail;
+the comparison itself is diagnostic.
+
+```sh
+python tools/verify_matrix.py --models 2b,4b,9b,27b --modes tc \
+  --pack-27b /path/to/bonsai-27b \
+  --out bench-logs/verify-matrix \
+  --save-baseline bench-logs/verify-matrix/baseline.json
+
+python tools/verify_matrix.py --models 2b,4b,9b,27b --modes tc \
+  --pack-27b /path/to/bonsai-27b \
+  --out bench-logs/verify-matrix \
+  --baseline bench-logs/verify-matrix/baseline.json
+```
+
+Current single-card 4060 Ti results:
+
+| cell | status | exactness | throughput |
+|---|---|---|---|
+| 2B tc | pass | 4/4 | 370.2 tokens/s |
+| 4B tc | fail | 2/4; prompts 2 and 3 diverge at tokens 6 and 37 | 178.2 tokens/s |
+| 9B tc | refused | — | — |
+| 27B tc | pass | 3 exact + 1 tie (token 14, gap 0.0064) | 38.9 one-pass; **38.1 median** over three runs |
+| 4B plain | pass | 4/4 | 114.9 tokens/s |
+| 9B plain | pass | 4/4 (13/13 on prompt 3) | 72.5 tokens/s |
+
+The 27B tc three-run repeat was **38.2 / 38.1 / 36.7 tokens/s** (median 38.1, range 1.5,
+4.1%), with the same exactness in every run. The older 2026-11-10 **40.5** rerun was not
+reproduced; 40.5 is also the separate 24K benchmark's prompt-read rate, not verify throughput.
+The full workflow and qualifications are in [CARD-SUPPORT.md](CARD-SUPPORT.md#verify-matrix).
 
 ## AH-Nanbeige4.3-33B IQ3_XXS
 

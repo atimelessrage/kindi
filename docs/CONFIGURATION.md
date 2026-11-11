@@ -8,6 +8,9 @@ Kindi reads its settings in this order - later sources win:
 3. environment variables `KINDI_<KEY>` (for example `KINDI_PORT=9000`, `KINDI_API_KEY=...`);
 4. command-line flags (`--pack`, `--state-dir`, `--ctx`, and for `serve`: `--host`, `--port`, `--api-key`, `--head`).
 
+For the complete list, including the engine switches that have no config key, see the generated
+[CONFIGURATION-REFERENCE.md](CONFIGURATION-REFERENCE.md).
+
 `kindi info` prints the final values and the file that each value came from. The Docker image sets
 `KINDI_PACK=/data/pack`, `KINDI_STATE_DIR=/data/state` and `KINDI_HOST=0.0.0.0`.
 
@@ -27,7 +30,7 @@ Kindi reads its settings in this order - later sources win:
 | `host` | `127.0.0.1` | address to listen on; `0.0.0.0` serves your network - then also set `api_key` |
 | `port` | `8093` | |
 | `api_key` | (empty) | if set, every `/v1` request needs `Authorization: Bearer <api_key>`; `/health` stays open |
-| `model_name` | `auto` | the model id `/v1/models` reports; `auto` takes it from the pack (bonsai2-2b, bonsai2-4b or bonsai2-9b); clients may send any model name |
+| `model_name` | `auto` | the model id `/v1/models` reports; `auto` takes it from the pack (the Bonsai ids are `bonsai2-2b`, `bonsai2-4b`, `bonsai2-9b` and `bonsai2-27b`; Nanbeige and Gemma packs use their own ids); clients may send any model name |
 
 ### Engine
 
@@ -51,6 +54,7 @@ Notes:
 | `prefix_max` | `8` | saved openings kept on disk (each ~12 KiB per token + 19 MB; ~80 MB for a 5,000-token opening) |
 | `prefix_min` | `512` | the shortest opening that Kindi saves |
 | `park_max` | `3` | other conversations kept in host RAM (each: its checkpoints + its K/V cache) |
+| `checkpoint_budget_mb` | `0` | host RAM for checkpoints and parked conversations; `0` = 20% of the machine's RAM |
 
 ### Generation defaults
 
@@ -68,9 +72,21 @@ They work as in llama.cpp. When `repeat_penalty` is not 1.0, the output is not t
 and Kindi does not use speculative drafts for that request. The Bonsai models use them. The Gemma 4 and Nanbeige backends
 do not use them yet.
 
+### Output controls and model-specific keys
+
+| key | default | |
+|---|---|---|
+| `repeat_stop` | `0` | `1` stops a reply caught in a repeating loop. A loop while thinking closes the thinking block early and lets the model answer |
+| `lookup` | `5` | Nanbeige prompt-lookup drafting, up to this many tokens per check; `0` turns it off |
+| `mtp_head` | (empty) | Nanbeige MTP head file, a second draft source; empty = none |
+| `reasoning_effort` | (empty) | 27B template: `xhigh`, `medium` or `low`; empty = the template default (`xhigh`) |
+| `sampling_profile` | `default` | `default` or `publisher`; the publisher profile is described above |
+
 ## Environment variables for the engine
 
-These variables have no config key. Use them to test or to compare.
+These variables have no config key. Use them to test or to compare. The generated reference also lists every
+`KINDI_*` read in the code, including the tensor-core and speculative-decoding switches (`KINDI_TC`, `KINDI_SPEC`
+and the rest).
 
 | variable | default | |
 |---|---|---|

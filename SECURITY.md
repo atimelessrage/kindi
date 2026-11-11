@@ -43,5 +43,5 @@ Please do not test against systems you do not own or have permission to test.
 
 ## Supported versions
 
-Security fixes target the current 0.4.x release. Older releases and unmodified forks may not receive
+Security fixes target the current 0.5.x release. Older releases and unmodified forks may not receive
 fixes. This policy does not promise a bounty or a response time.

@@ -82,7 +82,7 @@ generation at that position. Tokens/s.
 Run 1's 24K generation rates are 8.2, 3.1 and 2.6 tokens/s; the WSL2 run measured 4.6, 1.6 and
 1.4. The native read is also faster: 45.1/19.2/9.9 against 35.2/14.2/7.6. The engine loaded the
 2B, 4B and 9B in 22.5, 50.3 and 111.7 s. The CPU-only cells in
-[CROSS-MODE.md](../../CROSS-MODE.md) use this run; the GPU cells are the earlier median of three
+[CROSS-MODE.md](../CROSS-MODE.md) use this run; the GPU cells are the earlier median of three
 and the two blocks were not interleaved.
 
 ### Run 2: 23:14 (fresh rerun)

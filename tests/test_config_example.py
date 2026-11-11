@@ -15,3 +15,10 @@ def test_example_config_lists_every_default_key():
     for key in config.DEFAULTS:
         assert re.search(r"^\s*#?\s*%s\s*=" % re.escape(key), text, re.MULTILINE), \
             "kindi.conf.example is missing the default key %r" % key
+
+
+def test_configuration_doc_lists_every_default_key():
+    root = Path(__file__).resolve().parents[1]
+    text = (root / "docs/CONFIGURATION.md").read_text(encoding="utf-8")
+    missing = [key for key in config.DEFAULTS if "`%s`" % key not in text]
+    assert not missing, "docs/CONFIGURATION.md is missing the keys: %s" % missing

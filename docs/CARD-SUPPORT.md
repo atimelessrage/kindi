@@ -27,6 +27,34 @@ Kindi consumes its own Bonsai PTQ1_0 packs and Nanbeige GGUF. The NVFP4/FP8/AWQ/
 generic GPU table are hardware capabilities, not Kindi formats; they do not imply support here. The
 5060 Ti’s native FP4 is not used by Kindi today.
 
+## Verify matrix
+
+`tools/verify_matrix.py` is the recorded matrix runner. Each selected cell is a fresh
+`python -m kindi --pack ... verify` process with a clean `KINDI_*` environment; the runner
+writes `results.csv`, `results.json` and raw logs. Use `--save-baseline PATH` to copy a
+run's `results.json` as a reference, then `--baseline PATH` on later runs. The comparison
+is keyed by `(model, mode)` and writes `comparison.csv`/`comparison.json` with pass/fail
+status transitions, exactness transitions, and signed throughput deltas. Both flags can
+be combined to compare against the old baseline and replace it in one run. The process
+exit status remains the current run's result; the comparison itself is diagnostic.
+
+```sh
+python tools/verify_matrix.py --models 2b,4b,9b,27b --modes tc \
+  --pack-27b /path/to/bonsai-27b --out bench-logs/verify-matrix \
+  --save-baseline bench-logs/verify-matrix/baseline.json
+
+python tools/verify_matrix.py --models 2b,4b,9b,27b --modes tc \
+  --pack-27b /path/to/bonsai-27b --out bench-logs/verify-matrix \
+  --baseline bench-logs/verify-matrix/baseline.json
+```
+
+Current single-card RTX 4060 Ti result: 2B tc **4/4 at 370.2 tokens/s**; 4B tc **2/4 at
+178.2 tokens/s**; 9B tc **refused** (Hadamard 4096); 27B tc **3 exact + 1 tie at 38.9
+tokens/s** in the one-pass matrix, with a three-run median of **38.1 tokens/s**
+(38.2/38.1/36.7; range 1.5, 4.1%); plain 4B/9B **4/4 at 114.9/72.5 tokens/s**. The 24K
+benchmark/server result is in [CARDS.md](CARDS.md#rtx-4060-ti-8-gb-ada-sm89); the full
+matrix table is in [CARDS.md](CARDS.md#verify-matrix-rtx-4060-ti).
+
 ## Current code reality
 
 | gate | current behaviour | consequence for this goal |
@@ -64,6 +92,8 @@ Notes:
   724 nodes per decode token and left 1,128 MiB free after the build. The plain 4B/9B paths are
   4/4 at 114.9/72.5 tokens/s. The 4B/9B tc paths are not support claims yet. The 27B has the 24K
   benchmark and server/cache result below; its 1,024-token verify remains the token-exact reference.
+  A three-run repeat measured 38.2/38.1/36.7 tokens/s (median 38.1; range 1.5, 4.1%), all
+  with the same 3 exact + 1 tie; the older 40.5 rerun was not reproduced.
 - **33B needs about 15.5 GB of weights plus K/V and per-card overhead.** Two 8 GB cards (16 GB total)
   are not enough for the current Nanbeige estimator; a single 16 GB card is marginal and must be measured;
   two 16 GB cards are the safe dual target.

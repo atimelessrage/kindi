@@ -21,14 +21,31 @@ def test_package_and_installer_versions_match():
     assert package == installer
 
 
-def test_current_docs_and_images_do_not_use_old_kindi_tags():
-    stale = re.compile(r"kindi:(0\.[0-3]\.[0-9]+)")
+def test_current_docs_and_images_use_the_package_version():
+    version = _version(r'^VERSION = "([^"]+)"', "kindi/__init__.py")
+    tag = re.compile(r"\bkindi(?:-rocm7?)?:(\d+\.\d+\.\d+)\b")
     offenders = []
     for relative in ("README.md", "docs/CARDS.md", "docs/DOCKER.md", "docs/AMD.md",
-                     "docker/Dockerfile", "docker/Dockerfile.rocm"):
-        for match in stale.finditer(_read(relative)):
-            offenders.append("%s: %s" % (relative, match.group(0)))
+                     "docs/INSTALL.md", "docker/Dockerfile", "docker/Dockerfile.rocm",
+                     "docker/Dockerfile.rocm7"):
+        for match in tag.finditer(_read(relative)):
+            if match.group(1) != version:
+                offenders.append("%s: %s (expected %s)" % (relative, match.group(0), version))
     assert not offenders, "\n".join(offenders)
+
+
+def test_readme_release_archive_matches_the_package_version():
+    version = _version(r'^VERSION = "([^"]+)"', "kindi/__init__.py")
+    archives = re.findall(r"kindi-(\d+\.\d+\.\d+)\.tar\.gz", _read("README.md"))
+    assert archives, "README.md no longer documents a release archive"
+    assert set(archives) == {version}, "README.md archive versions: %s" % sorted(set(archives))
+
+
+def test_why_and_security_name_the_current_version():
+    version = _version(r'^VERSION = "([^"]+)"', "kindi/__init__.py")
+    assert "Current release: Kindi %s" % version in _read("WHY.md")
+    minor = ".".join(version.split(".")[:2])
+    assert "current %s.x release" % minor in _read("SECURITY.md")
 
 
 def test_amd_page_names_the_current_release():

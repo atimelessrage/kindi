@@ -1,5 +1,6 @@
 """The tc/plain matrix must construct deterministic cells and parse verify output without a GPU."""
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -115,6 +116,77 @@ def test_dry_run_does_not_create_output(tmp_path, capsys):
     assert "4b tc" in text
     assert "KINDI_TP=1" in text
     assert "verify" in text
+
+
+def _row(*, status="pass", tps=38.0, passes=3, ties=1, fails=0):
+    return {
+        "model": "27b", "mode": "tc", "status": status,
+        "prompts_pass": passes, "prompts_tie": ties, "prompts_fail": fails,
+        "tokens_per_second": tps, "exit_code": 0 if status == "pass" else 1,
+        "duration_s": 13.0, "first_diff_token": 14,
+        "first_diff_gap": 0.0064, "summary": status, "log": "logs/27b-tc.log",
+        "config": {}, "command": [],
+    }
+
+
+def test_compare_reports_status_change_and_throughput_delta():
+    mod = load()
+    baseline = {"results": [_row(status="pass", tps=40.0)]}
+    current = [_row(status="fail", tps=30.0, passes=2, ties=0, fails=2)]
+    comparisons, baseline_only = mod.compare_results(current, baseline)
+    row = comparisons[0]
+    assert baseline_only == []
+    assert row["status_change"] == "pass->fail"
+    assert row["baseline_exactness"] == "3/1/0"
+    assert row["exactness"] == "2/0/2"
+    assert row["exactness_change"] == "3/1/0->2/0/2"
+    assert row["tokens_per_second_delta"] == -10.0
+    assert row["tokens_per_second_delta_pct"] == -25.0
+    assert mod._format_delta(row["tokens_per_second_delta"], row["tokens_per_second_delta_pct"]) == "-10.0 (-25.0%)"
+
+
+def test_compare_marks_a_new_cell():
+    mod = load()
+    comparisons, baseline_only = mod.compare_results([_row()], {"results": []})
+    row = comparisons[0]
+    assert baseline_only == []
+    assert row["status_change"] == "new"
+    assert row["baseline_exactness"] is None
+    assert row["tokens_per_second_delta"] is None
+
+
+def test_save_baseline_and_compare_cli(tmp_path, capsys, monkeypatch):
+    mod = load()
+    packs = tmp_path / "packs"
+    pack = packs / "bonsai-27b"
+    pack.mkdir(parents=True)
+    (pack / "kindi_pack.json").write_text("{}", encoding="utf-8")
+    out = tmp_path / "out"
+    baseline = tmp_path / "baseline.json"
+    saved = tmp_path / "saved.json"
+    baseline.write_text(json.dumps({
+        "started_utc": "old", "git_revision": "old",
+        "results": [_row(status="pass", tps=40.5)],
+    }), encoding="utf-8")
+
+    current = _row(status="pass", tps=38.1)
+    monkeypatch.setattr(mod, "run_cell", lambda *args, **kwargs: current)
+    rc = mod.main([
+        "--models", "27b", "--modes", "tc", "--pack-dir", str(packs),
+        "--out", str(out), "--baseline", str(baseline), "--save-baseline", str(saved),
+    ])
+
+    assert rc == 0
+    comparison = json.loads((out / "comparison.json").read_text(encoding="utf-8"))
+    row = comparison["results"][0]
+    assert row["status_change"] == "same"
+    assert row["tokens_per_second_delta"] == -2.4
+    assert (out / "comparison.csv").exists()
+    assert json.loads(saved.read_text(encoding="utf-8"))["results"][0]["tokens_per_second"] == 38.1
+    output = capsys.readouterr().out
+    assert "comparison vs" in output
+    assert "-2.4" in output
+    assert "saved baseline" in output
 
 
 def test_dry_run_uses_27b_override(tmp_path, capsys):
