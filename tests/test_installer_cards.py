@@ -197,6 +197,17 @@ def test_different_card_classes_do_not_pair():
     assert info["pair"] == "no", info
 
 
+def test_p106_and_p4000_do_not_pair():
+    # Both are sm_61 Pascal, but the 6 GB P106 is in the maxwell memory class and the
+    # 8 GB P4000 is pascal8; the documented policy pairs only cards of the same class.
+    info = pair("NVIDIA P106-100", 6077, "6.1", "Quadro P4000", 8192, "6.1")
+    if info is None:
+        return
+    assert info["class0"] == "maxwell", info
+    assert info["class1"] == "pascal8", info
+    assert info["pair"] == "no", info
+
+
 def test_tc2_profile_for_two_8gb_ada_cards():
     info = profile(["NVIDIA GeForce RTX 4060 Ti"] * 2, [8188, 8188], ["8.9", "8.9"])
     if info is None:
