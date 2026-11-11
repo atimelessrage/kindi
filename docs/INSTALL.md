@@ -20,14 +20,14 @@ Download the script, compare its sha256 with the value below, read it, and then 
 
 ```bash
 curl -fsSLO https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh
-echo "5f48beca4018d993f3250e8dcbc48b43f04bd678667c5e9222a35193df8590f6  install.sh" | sha256sum -c -
+echo "43766d8bbed09fa0ccebe6c39c8076001da99cb15814ff065380f7a46c93db99  install.sh" | sha256sum -c -
 bash install.sh --dry-run
 bash install.sh
 ```
 
 | File | sha256 |
 |---|---|
-| `install.sh` (Kindi 0.5.0, fork-hosted) | `5f48beca4018d993f3250e8dcbc48b43f04bd678667c5e9222a35193df8590f6` |
+| `install.sh` (Kindi 0.5.0, fork-hosted) | `43766d8bbed09fa0ccebe6c39c8076001da99cb15814ff065380f7a46c93db99` |
 
 If `sha256sum -c` does not print `install.sh: OK`, do not run the script. This is the fork-hosted 0.5.0 installer artifact;
 the checksum is for the exact published file, and a copy that was re-saved with different line endings hashes
@@ -37,7 +37,7 @@ differently. Maintainers should follow [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.
 
 | Step | What it does | sudo |
 |---|---|---|
-| 1. Check the machine | Linux x86-64, RAM, free disk, each NVIDIA GPU with its compute capability, and each AMD RDNA3 or RDNA 3.5 GPU. No GPU: the CPU engine. | no |
+| 1. Check the machine | Linux x86-64, AVX for the CPU engine, RAM, free disk, each NVIDIA GPU with its compute capability, and each AMD RDNA3 or RDNA 3.5 GPU. Without AVX, GPU setups remain available but CPU setups are not offered. | no |
 | 2. Docker and GPU access | Finds Docker, and the NVIDIA Container Toolkit or the AMD devices `/dev/kfd` and `/dev/dri`. If something is missing, it asks before it installs it (apt). Without the toolkit, it gives the container the NVIDIA devices and the driver libraries directly. | only to install |
 | 3. Select the setup | Shows each setup for this computer, the recommended one first, and asks which one (below). | no |
 | 4. Build the image | Builds `kindi:0.5.0` (CUDA 10.2), `kindi-rocm:0.5.0` (ROCm 6.3, RDNA3) or `kindi-rocm7:0.5.0` (ROCm 7, RDNA 3.5) from the release source, and checks that the Kindi modules load. A re-run with the same source does not build again. | no |

@@ -6,7 +6,7 @@
 #   bash install.sh --uninstall [--purge]
 #
 # What it does, in order (every step prints what it is about to do and why):
-#   1. checks the machine: Linux x86-64, RAM, disk, every NVIDIA and AMD GPU (or none: the CPU engine);
+#   1. checks the machine: Linux x86-64 with AVX for the CPU engine, RAM, disk, every NVIDIA and AMD GPU;
 #   2. checks Docker and GPU access: the NVIDIA container toolkit, or the AMD compute driver (/dev/kfd); offers to
 #      install what is missing (sudo only for that). AMD GPUs need no ROCm on the host: ROCm is in the image;
 #   3. lists every setup that Kindi supports on this machine, the recommended one first, and asks which one
@@ -140,6 +140,11 @@ need_sudo() {
   SUDO="sudo"
 }
 human() { awk -v b="$1" 'BEGIN { split("B KB MB GB TB", u); i = 1; while (b >= 1024 && i < 5) { b /= 1024; i++ } printf "%.1f %s", b, u[i] }'; }
+# The CPU engine requires AVX. Check before downloading or building anything; a GPU setup is still
+# valid on a CPU without AVX, so the caller decides whether to hide or refuse CPU setups.
+cpu_has_avx() {
+  grep -qw avx "${KINDI_CPUINFO:-/proc/cpuinfo}" 2>/dev/null
+}
 
 DOCKER="docker"
 STATE="$DIR/install.json"
@@ -181,6 +186,12 @@ OS_ID=$(. /etc/os-release 2>/dev/null && echo "${ID:-unknown}") || OS_ID=unknown
 RAM_MB=$(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo)
 AVAIL_MB=$(awk '/MemAvailable/ {print int($2 / 1024)}' /proc/meminfo)
 CORES=$(nproc)
+CPU_AVX=0
+if cpu_has_avx; then
+  CPU_AVX=1
+else
+  warn "this CPU does not report AVX: the CPU engine is unavailable; GPU servers are still supported"
+fi
 [ "$DRY" = 1 ] || mkdir -p "$DIR" 2>/dev/null || die "cannot create ${DIR}"
 d="$DIR"; while [ ! -d "$d" ]; do d=$(dirname "$d"); done      # the nearest folder that exists (a dry run makes none)
 FREE_DISK=$(df -Pk "$d" | awk 'NR == 2 {print $4 * 1024}')
@@ -378,6 +389,14 @@ if [ "$NA" -gt 0 ] && [ "$GPU" != cpu ]; then
     warn "/dev/kfd or /dev/dri/renderD* is missing: the AMD GPU cannot be used (is the amdgpu driver loaded? 'lsmod | grep amdgpu')"
     NA=0
   fi
+fi
+
+if [ "$GPU" = cpu ] && [ "$CPU_AVX" != 1 ]; then
+  die "the CPU engine needs AVX; this CPU does not report it. Use --gpu N for a supported GPU, or run on an AVX CPU."
+fi
+
+if [ "$NG" -eq 0 ] && [ "$NA" -eq 0 ] && [ "$CPU_AVX" != 1 ]; then
+  die "this machine has no usable GPU and its CPU does not support AVX; Kindi's CPU engine needs AVX."
 fi
 
 # The kernel command line that GRUB_CMDLINE_LINUX_DEFAULT="..." holds (empty when the file has no such line).
@@ -586,7 +605,7 @@ if [ "$GPU" != cpu ]; then
     done
   fi
 fi
-if [ "$MODEL" = auto ] || [ "$MODEL" = 2b ]; then
+if [ "$CPU_AVX" = 1 ] && { [ "$MODEL" = auto ] || [ "$MODEL" = 2b ]; }; then
   add_cfg "cpu|2b|" "$(model_label 2b) on the CPU ($CORES threads; slow, no GPU needed)"
 fi
 [ "${#CFG[@]}" -gt 0 ] || die "model '${MODEL}' does not run on the selected hardware (run without --model to see what does)"

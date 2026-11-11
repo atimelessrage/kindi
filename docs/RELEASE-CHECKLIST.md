@@ -1,10 +1,19 @@
 # Release checklist: installer safety fixes
 
 This checklist is for releases that contain the installer safety fixes: the GRUB guard
-(`cwsr_edit_grub()`) and the source-archive checksum. The GRUB guard backs up `/etc/default/grub`,
+(`cwsr_edit_grub()`), the source-archive checksum and the AVX CPU preflight. The GRUB guard backs up `/etc/default/grub`,
 rewrites the kernel command line, re-reads it, and restores the backup and stops when the edit fails,
 adds nothing, or drops an existing parameter. The guard is committed in `2b84658`; the fixture test is
 `tests/test_installer_grub.py`.
+
+## AVX CPU preflight (this change)
+
+`install.sh` reads `/proc/cpuinfo` (or `KINDI_CPUINFO` in tests) for `avx` before it offers a CPU
+setup. A CPU without AVX hides the CPU setups; `--gpu cpu` and a machine with no usable GPU stop
+with an actionable message before downloading or building anything. GPU installs remain available
+on a CPU without AVX. The fixture test is `tests/test_installer_cpu.py`: AVX is accepted,
+AVX2/FMA/F16C without AVX is rejected, a missing CPU table is rejected, and the CPU setup guard is
+present.
 
 ## Source archive integrity (this change)
 
@@ -15,13 +24,16 @@ pinned with `KINDI_SOURCE_SHA256`. The regression test is `tests/test_installer_
 
 This change is published as the fork-hosted 0.5.0 installer at
 `https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh`.
-The LF artifact hash is `5f48beca4018d993f3250e8dcbc48b43f04bd678667c5e9222a35193df8590f6`; `docs/INSTALL.md` records it.
+The LF artifact hash is `43766d8bbed09fa0ccebe6c39c8076001da99cb15814ff065380f7a46c93db99`; `docs/INSTALL.md` records it. The matching
+`install.sh.sha256` asset is published at the same release. The previous pair is retained as
+`install.sh.pre-avx-preflight-1794385057` and
+`install.sh.sha256.pre-avx-preflight-1794385057` for rollback.
 
 Artifact hash for this worktree:
 
 | candidate | sha256 |
 |---|---|
-| LF release artifact | `5f48beca4018d993f3250e8dcbc48b43f04bd678667c5e9222a35193df8590f6` |
+| LF release artifact | `43766d8bbed09fa0ccebe6c39c8076001da99cb15814ff065380f7a46c93db99` |
 
 Choose one exact candidate, publish that file, then replace both installer checksums in `docs/INSTALL.md`
 with its hash. Do not update the documented published hash before the upload: users would then check a
@@ -50,6 +62,7 @@ Run from the repository root on Linux or a compatible shell:
 bash -n install.sh
 python -m pytest tests/test_installer_grub.py -q
 python -m pytest tests/test_installer_source.py -q
+python -m pytest tests/test_installer_cpu.py -q
 python -m pytest tests/ -q
 python -m compileall -q kindi
 ```
@@ -59,7 +72,8 @@ Expected for this release:
 - `bash -n install.sh` prints nothing and exits 0.
 - `tests/test_installer_grub.py` passes all 9 tests.
 - `tests/test_installer_source.py` passes all 4 tests, including the mismatch path that must not extract.
-- The full CPU suite passes (242 passed, 3 skipped at the last handoff).
+- `tests/test_installer_cpu.py` passes all 4 tests for the AVX preflight.
+- The full CPU suite passes (254 passed, 7 skipped at the last handoff).
 - No test edits `/etc/default/grub`; the GRUB test uses the fixture and a temporary copy.
 
 If you change the GRUB edit, reintroduce the old literal `0x01` bug on a copy and confirm the failure-path
@@ -80,14 +94,14 @@ The published file is the **release artifact**, not necessarily the Git blob. Tw
 
 | source | sha256 |
 |---|---|
-| the published LF artifact | `5f48beca4018d993f3250e8dcbc48b43f04bd678667c5e9222a35193df8590f6` |
+| the published LF artifact | `43766d8bbed09fa0ccebe6c39c8076001da99cb15814ff065380f7a46c93db99` |
 
 The published 0.5.0 installer is the LF artifact above. This release records that hash in
 `docs/INSTALL.md`; publish that exact file, not a re-saved copy.
 
 ```sh
 sha256sum install.sh
-# must print 5f48beca4018d993f3250e8dcbc48b43f04bd678667c5e9222a35193df8590f6
+# must print 43766d8bbed09fa0ccebe6c39c8076001da99cb15814ff065380f7a46c93db99
 ```
 
 The published artifact is LF. Do not re-save it with different line endings. Update **both** checksum lines in
@@ -107,20 +121,20 @@ grep -nP '\x01' install.sh && echo 'STOP: control byte in installer'
 match the release artifact.
 
 ```sh
-grep -n '5f48beca4018d993f3250e8dcbc48b43f04bd678667c5e9222a35193df8590f6' docs/INSTALL.md
-# two lines expected
+grep -n '43766d8bbed09fa0ccebe6c39c8076001da99cb15814ff065380f7a46c93db99' docs/INSTALL.md
+# two lines expected; the published install.sh.sha256 asset uses the binary-mode '*' marker
 ```
 
 Download the candidate artifact and check it exactly as a user would:
 
 ```sh
 curl -fsSLO https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh
-echo "5f48beca4018d993f3250e8dcbc48b43f04bd678667c5e9222a35193df8590f6  install.sh" | sha256sum -c -
+echo "43766d8bbed09fa0ccebe6c39c8076001da99cb15814ff065380f7a46c93db99  install.sh" | sha256sum -c -
 bash -n install.sh
 ```
 
-If the URL still serves the old `592a…` file, the release has not been published; do not change the
-documented hash to the old file.
+If the URL still serves the previous artifact (`5f48beca…`), the release has not been published; do not
+change the documented hash to the old file.
 
 ## 5. Commit and tag
 
@@ -133,8 +147,8 @@ documented hash to the old file.
 
 ## 6. Publish atomically
 
-1. Upload the exact artifact named in `docs/INSTALL.md`.
-2. Verify the public URL with `curl | sha256sum`.
+1. Upload the exact `install.sh` artifact named in `docs/INSTALL.md` and the matching `install.sh.sha256`.
+2. Verify both public URLs with `curl | sha256sum`.
 3. Re-run the user-facing `sha256sum -c` command from `docs/INSTALL.md`.
 4. Confirm `bash install.sh --dry-run` works from the downloaded release.
 5. Keep the previous installer available for rollback.

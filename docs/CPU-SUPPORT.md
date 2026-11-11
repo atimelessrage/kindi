@@ -2,7 +2,8 @@
 
 Status: **roadmap and acceptance contract, updated 2026-11-11. The i7-8086K engine and native CPU
 server chat path on the 2B/4B/9B are verified. The AVX-only fallback is implemented and passes 2B/4B
-`kindi verify` under a forced AVX build; native Sandy Bridge hardware is still untested. The other
+`kindi verify` under a forced AVX build; the installer AVX preflight is published in the
+refreshed 0.5.0 artifact. Native Sandy Bridge hardware is still untested. The other
 CPUs and a repeat timing run remain open.** The baseline CPU engine (`kindi/cpu.py`, `kindi/kcpu.c`)
 is in `main`; this page records the target, the verified result, and the exact build/runtime
 requirements so the work can be implemented and measured without re-discovering them. The tandem
@@ -28,7 +29,7 @@ they are not part of this CPU goal.
 | `kindi/cpu.py` build | Linux: `gcc -O3 -march=native -fopenmp -fno-math-errno -shared -fPIC`; Windows: `clang -O3 -march=native -fopenmp -fno-math-errno -ffp-contract=off -shared` plus `libomp` (`KINDI_CC`, `KINDI_LLVM`) | The binary is built for the host CPU. There is no prebuilt portable CPU library. |
 | `kindi/kcpu.c` ISA | Requires AVX. The AVX2 (`_mm256_srlv_epi32`, `_mm256_permutevar8x32_ps`), FMA (`_mm256_fmadd_ps`) and F16C (`_cvtsh_ss` / `_cvtss_sh`) kernels are compiled when those features are enabled; otherwise an AVX-only fallback uses an AVX table lookup, separate multiply/add and software fp16 conversion. A compile-time `#error` names a missing AVX baseline. | An AVX-only CPU such as Sandy Bridge builds the fallback. The fallback passed 2B/4B under a forced AVX build, but has not run on native Sandy Bridge hardware. |
 | documented requirement | `docs/CARDS.md` and the README say x86-64 with AVX; the AVX2/FMA/F16C path is described as optional | This matches the source: AVX is required, while the three fast-path features are selected by the compiler. |
-| `install.sh` preflight | Checks Linux and `x86_64`; does not check AVX2/FMA/F16C | An unsupported CPU fails later inside the container build, with a compiler error rather than an actionable message. |
+| `install.sh` preflight | Checks Linux, `x86_64` and AVX; CPU setups are hidden without AVX, and `--gpu cpu` stops with an actionable message. GPU setups remain available. | A CPU-only machine without AVX is rejected before the build; an AVX-only CPU such as Sandy Bridge is accepted. |
 | CPU engine thread default | `kindi/cpu.py` counts the physical cores this process may run on (sysfs `thread_siblings_list`, `/proc/cpuinfo` fallback) and sets `OMP_NUM_THREADS`, `OMP_PROC_BIND=close`, `OMP_PLACES=cores` before the library loads; `threads=` or an `OMP_NUM_THREADS` already in the environment wins | On a hybrid i9 this counts 24 cores, E-cores included. The best P/E split has not been measured. |
 | `install.sh` CPU default | Counts the physical cores of socket 0 (`lscpu -p=CORE,SOCKET`) and exports the same three variables for the CPU container; `--threads N` overrides it | Two sockets are not measured; the engine's own default counts every CPU it may use, not socket 0. |
 | build container | `docker/Dockerfile` is Ubuntu 18.04 with the distribution gcc and `libgomp1` | The old gcc may not know Raptor Lake as a `-march=native` target. An explicit AVX baseline with optional AVX2/FMA/F16C flags is the portable build. |
@@ -294,8 +295,8 @@ workload can set `OMP_NUM_THREADS=8`. Raw probe logs are in `bench-logs/thread-s
    target-mismatch error from inside a container. Implemented in `cpu.feature_report()` /
    `cpu.check_features()` and shown by `kindi info`; `_lib()` runs the check before the first build.
    Feature values are `unknown` on systems that do not expose `/proc/cpuinfo`, so the compile-time
-   guard in `kcpu.c` remains the authority there. The installer preflight is still open, but the
-   engine catches the missing baseline.
+   guard in `kcpu.c` remains the authority there. The installer now checks AVX before it offers a
+   CPU setup; `--gpu cpu` stops immediately when the check fails.
 3. Use `-march=native` for the host build: it selects the AVX2/FMA/F16C fast path when available and
    the AVX-only fallback otherwise. A portable AVX-only artifact is a separate build decision, not a
    runtime requirement.
