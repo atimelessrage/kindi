@@ -170,7 +170,7 @@ def cmd_info(cfg, a):
     print("CPU engine: %s" % ", ".join(
         "%s=%s" % (label, "unknown" if report["features"].get(name) is None else
                    ("yes" if report["features"][name] else "no"))
-        for name, label in cpu_backend.CPU_REQUIRED))
+        for name, label in cpu_backend.CPU_FEATURES))
     print("config: %s" % cfg["source"])
     for k in sorted(C.DEFAULTS):
         v = cfg[k]

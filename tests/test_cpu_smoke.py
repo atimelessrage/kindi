@@ -1,6 +1,6 @@
 """The compiled kcpu library must load through the production loader and match the Python ctypes ABI.
 
-The CI `cpu-engine-smoke` job compiles `kindi/kcpu.c` with gcc for the supported AVX2/FMA/F16C tier,
+The CI `cpu-engine-smoke` job compiles `kindi/kcpu.c` for the AVX baseline and the AVX2/FMA/F16C fast path,
 then sets `KINDI_CPU_CACHE` and `KINDI_CPU_SMOKE=1`. The default suite skips this: it needs a compiled
 library and a C toolchain, and it deliberately needs no model pack.
 """

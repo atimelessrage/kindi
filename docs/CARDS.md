@@ -460,7 +460,7 @@ image for it.
   wait).
 - The AH-Nanbeige4.3-33B backend of Kindi needs CUDA. It does not run on AMD graphics.
 
-## CPU (x86-64 with AVX2, FMA and F16C)
+## CPU (x86-64 with AVX; AVX2/FMA/F16C fast path)
 
 | item | value |
 |---|---|
@@ -469,6 +469,9 @@ image for it.
 
 - The CPU engine builds at the first start into `KINDI_CPU_CACHE`: `libkcpu.so` with gcc and OpenMP on
   Linux, `libkcpu.dll` with clang and libomp on Windows (`KINDI_CC`, `KINDI_LLVM`).
+- AVX is the baseline. An AVX-only build (`-mavx -mno-avx2 -mno-fma -mno-f16c`) passed 2B/4B
+  `kindi verify` 4/4 at 6.4/3.0 tokens/s; native Sandy Bridge hardware was not available
+  ([CPU-SUPPORT.md](CPU-SUPPORT.md)).
 - The output is token-exact with llama.cpp. Verified on the i7-8086K: 2B/4B/9B 4/4 at 33.7/16.7/9.1
   tokens/s natively on Windows and 28.1/13.0/5.6 under WSL2
   ([benchmark](benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md), [CPU-SUPPORT.md](CPU-SUPPORT.md)).

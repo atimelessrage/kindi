@@ -9,11 +9,11 @@
 #include <omp.h>
 #include <immintrin.h>
 
-/* The kernels below use AVX2, FMA and F16C unconditionally.  Fail at compile time with an
-   actionable message instead of a target-mismatch error; an AVX-only fallback is P1 in
-   docs/CPU-SUPPORT.md. */
-#if !defined(__AVX2__) || !defined(__FMA__) || !defined(__F16C__)
-#error "kindi CPU engine requires AVX2, FMA3 and F16C; build with -mavx2 -mfma -mf16c (docs/CPU-SUPPORT.md)"
+/* The engine requires AVX.  The AVX2/FMA/F16C path is used when the compiler enables it;
+   otherwise the AVX-only fallback below is used (Sandy Bridge).  Fail at compile time with an
+   actionable message instead of a target-mismatch error. */
+#if !defined(__AVX__)
+#error "kindi CPU engine requires AVX; build with -mavx (docs/CPU-SUPPORT.md)"
 #endif
 
 #ifdef _WIN32
@@ -59,8 +59,59 @@ static inline void span(long long n, int* a, int* b){
   const int nt = omp_get_num_threads(), id = omp_get_thread_num();
   *a = (int)(n * id / nt); *b = (int)(n * (id + 1) / nt);
 }
+#if defined(__F16C__)
 static inline float h2f(uint16_t h){ return _cvtsh_ss(h); }
 static inline uint16_t f2h(float f){ return _cvtss_sh(f, 0); }
+#else
+/* IEEE binary16 conversions for AVX-only hosts.  f2h is round-to-nearest-even, matching
+   _cvtss_sh(f, 0); h2f is exact for every finite, infinite and NaN input. */
+static inline float h2f(uint16_t h){
+  const uint32_t sign = (uint32_t)(h & 0x8000u) << 16;
+  uint32_t exp = (h >> 10) & 0x1fu, mant = h & 0x3ffu, bits;
+  if(exp == 0){
+    if(mant == 0) bits = sign;
+    else {
+      int e = -1;
+      do { mant <<= 1; e++; } while(!(mant & 0x400u));
+      mant &= 0x3ffu;
+      bits = sign | ((uint32_t)(127 - 15 - e) << 23) | (mant << 13);
+    }
+  } else if(exp == 31) bits = sign | 0x7f800000u | (mant << 13);
+  else bits = sign | ((exp + 112u) << 23) | (mant << 13);
+  union { uint32_t u; float f; } v; v.u = bits; return v.f;
+}
+static inline uint16_t f2h(float f){
+  union { float f; uint32_t u; } v; v.f = f;
+  const uint32_t sign = (v.u >> 16) & 0x8000u;
+  const uint32_t abs = v.u & 0x7fffffffu;
+  if(abs >= 0x7f800000u){
+    if(abs > 0x7f800000u) return (uint16_t)(sign | 0x7e00u | ((abs >> 13) & 0x3ffu));
+    return (uint16_t)(sign | 0x7c00u);
+  }
+  if(abs >= 0x477ff000u) return (uint16_t)(sign | 0x7c00u);   /* 65520 rounds to infinity */
+  int exp = (int)(abs >> 23) - 127;
+  const uint32_t mant = abs & 0x7fffffu;
+  if(exp >= -14){
+    uint32_t q = (mant | 0x800000u) >> 13;
+    const uint32_t rem = (mant | 0x800000u) & 0x1fffu;
+    if(rem > 0x1000u || (rem == 0x1000u && (q & 1u))) q++;
+    if(q == 0x800u){ q = 0x400u; exp++; }
+    const uint32_t e = (uint32_t)(exp + 15);
+    if(e >= 31u) return (uint16_t)(sign | 0x7c00u);
+    return (uint16_t)(sign | (e << 10) | (q & 0x3ffu));
+  }
+  if(exp >= -25){
+    const uint32_t sig = mant | 0x800000u;
+    const int shift = -exp - 1;
+    uint32_t q = sig >> shift;
+    const uint32_t rem = sig & ((1u << shift) - 1u);
+    const uint32_t half = 1u << (shift - 1);
+    if(rem > half || (rem == half && (q & 1u))) q++;
+    return (uint16_t)(sign | q);
+  }
+  return (uint16_t)sign;
+}
+#endif
 static inline float silu(float x){ return x / (1.0f + expf(-x)); }
 static inline float sigm(float x){ return 1.0f / (1.0f + expf(-x)); }
 
@@ -97,6 +148,7 @@ static void pair_tables(const float* x, float* T, int p0, int p1){
     t[4] = x0; t[5] = -x0 + x1; t[6] = x1; t[7] = x0 + x1;
   }
 }
+#if defined(__AVX2__) && defined(__FMA__)
 static void rows8(const Mat* A, float* y, const float* T, int b0, int b1){
   const int G = A->C / 128;
   const __m256i sh = _mm256_setr_epi32(0, 4, 8, 12, 16, 20, 24, 28);
@@ -123,6 +175,51 @@ static void rows8(const Mat* A, float* y, const float* T, int b0, int b1){
     _mm256_storeu_ps(y + rb * 8, acc);
   }
 }
+#else
+static void rows8(const Mat* A, float* y, const float* T, int b0, int b1){
+  const int G = A->C / 128;
+  const __m256 vfour = _mm256_set1_ps(4.0f), veight = _mm256_set1_ps(8.0f);
+  for(int rb = b0; rb < b1; ++rb){
+    __m256 acc = _mm256_setzero_ps();
+    for(int g = 0; g < G; ++g){
+      const uint32_t* pw = (const uint32_t*)A->W + ((size_t)rb * G + g) * 64;
+      const float* pt = T + (size_t)g * 64 * 8;
+      __m256 s0 = _mm256_setzero_ps(), s1 = _mm256_setzero_ps();
+      for(int p = 0; p < 64; p += 2){
+        const uint32_t w0 = pw[p], w1 = pw[p + 1];
+        float c0[8], c1[8];
+        int i0[8], i1[8];
+        for(int l = 0; l < 8; ++l){
+          const int a = (int)((w0 >> (4 * l)) & 15u);
+          const int b = (int)((w1 >> (4 * l)) & 15u);
+          c0[l] = (float)a; i0[l] = a & 3;
+          c1[l] = (float)b; i1[l] = b & 3;
+        }
+        const __m256 f0 = _mm256_loadu_ps(c0), f1 = _mm256_loadu_ps(c1);
+        const __m256i x0 = _mm256_loadu_si256((const __m256i*)i0);
+        const __m256i x1 = _mm256_loadu_si256((const __m256i*)i1);
+        const __m256 t0l = _mm256_broadcast_ps((const __m128*)(pt + 8 * p));
+        const __m256 t0h = _mm256_broadcast_ps((const __m128*)(pt + 8 * p + 4));
+        const __m256 t1l = _mm256_broadcast_ps((const __m128*)(pt + 8 * p + 8));
+        const __m256 t1h = _mm256_broadcast_ps((const __m128*)(pt + 8 * p + 12));
+        __m256 v0 = _mm256_blendv_ps(_mm256_permutevar_ps(t0l, x0),
+                                     _mm256_permutevar_ps(t0h, x0),
+                                     _mm256_cmp_ps(f0, vfour, _CMP_GE_OQ));
+        __m256 v1 = _mm256_blendv_ps(_mm256_permutevar_ps(t1l, x1),
+                                     _mm256_permutevar_ps(t1h, x1),
+                                     _mm256_cmp_ps(f1, vfour, _CMP_GE_OQ));
+        v0 = _mm256_andnot_ps(_mm256_cmp_ps(f0, veight, _CMP_EQ_OQ), v0);
+        v1 = _mm256_andnot_ps(_mm256_cmp_ps(f1, veight, _CMP_EQ_OQ), v1);
+        s0 = _mm256_add_ps(s0, v0);
+        s1 = _mm256_add_ps(s1, v1);
+      }
+      acc = _mm256_add_ps(acc, _mm256_mul_ps(_mm256_add_ps(s0, s1),
+                                             _mm256_loadu_ps(A->S + ((size_t)rb * G + g) * 8)));
+    }
+    _mm256_storeu_ps(y + rb * 8, acc);
+  }
+}
+#endif
 
 /* inside the parallel region: up to 3 matrices with the same input; the threads build the pair tables, then split
    the concatenated rows in 8-row blocks; ends in a barrier */

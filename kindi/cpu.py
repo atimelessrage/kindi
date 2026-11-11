@@ -74,7 +74,23 @@ def _llvm_root(cc):
     return root if os.path.isdir(os.path.join(root, "lib")) else None
 
 
-def _build_cmd(src, so, win=None):
+def _native_has_fma(cc=None):
+    """Whether the compiler's -march=native enables FMA on this host.
+
+    Only the Windows CRT link needs this: the static libcmt expf contains FMA instructions even
+    with -mno-fma, so an AVX-only build must use the dynamic UCRT.  If the probe fails, prefer the
+    safe dynamic runtime rather than assuming FMA is available.
+    """
+    cc = cc or os.environ.get("KINDI_CC", "clang")
+    try:
+        result = subprocess.run([cc, "-march=native", "-dM", "-E", "-x", "c", "-"],
+                                input=b"", stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    except OSError:
+        return False
+    return result.returncode == 0 and b"__FMA__" in result.stdout
+
+
+def _build_cmd(src, so, win=None, native_fma=True):
     """The compiler command line: gcc on Linux; clang and libomp on Windows.
 
     clang's driver finds the MSVC headers and Windows SDK through vswhere, so no vcvars shell is needed;
@@ -92,12 +108,18 @@ def _build_cmd(src, so, win=None):
     root = _llvm_root(cc)
     if root:
         cmd += ["-L", os.path.join(root, "lib"), "-llibomp"]
+    # The static libcmt expf contains FMA instructions even with -mno-fma; use the dynamic
+    # UCRT only when the host compiler does not enable FMA, so an AVX-only (Sandy Bridge) build
+    # cannot fault in the math runtime while native AVX2 builds keep the existing static CRT.
+    if not native_fma:
+        cmd += ["-Xlinker", "/nodefaultlib:libcmt", "-Xlinker", "/defaultlib:msvcrt"]
     return cmd
 
 
 def _build(src, so):
     """Compile kcpu.c without a shell, so paths from KINDI_CPU_CACHE stay literal."""
-    cmd = _build_cmd(src, so)
+    native_fma = _native_has_fma() if os.name == "nt" else True
+    cmd = _build_cmd(src, so, native_fma=native_fma)
     try:
         result = subprocess.run(cmd)
     except OSError as e:
@@ -105,7 +127,7 @@ def _build(src, so):
                          % (cmd[0], e))
     if result.returncode:
         raise SystemExit("kindi: could not build the CPU engine (%s); it needs gcc with OpenMP, or clang and "
-                         "libomp on Windows, and a CPU with AVX2, FMA3 and F16C (docs/CPU-SUPPORT.md)" % so)
+                         "libomp on Windows, and a CPU with AVX (docs/CPU-SUPPORT.md)" % so)
 
 
 def _lib():
@@ -162,7 +184,8 @@ def _read(path):
         return None
 
 
-CPU_REQUIRED = (("avx2", "AVX2"), ("fma", "FMA3"), ("f16c", "F16C"))
+CPU_FEATURES = (("avx", "AVX"), ("avx2", "AVX2"), ("fma", "FMA3"), ("f16c", "F16C"))
+CPU_REQUIRED = (("avx", "AVX"),)
 
 
 def _cpu_model(text):
@@ -189,7 +212,7 @@ def _cpu_flags(text):
 
 
 def feature_report():
-    """CPU model, core counts and AVX2/FMA3/F16C support.
+    """CPU model, core counts and AVX/AVX2/FMA3/F16C support.
 
     A feature value is None when the OS does not expose CPU flags; the compile-time guard in
     kcpu.c remains the authority in that case.  This report is for `kindi info` and the preflight
@@ -198,7 +221,7 @@ def feature_report():
     text = _read("/proc/cpuinfo")
     flags = _cpu_flags(text)
     return {"model": _cpu_model(text), "physical": _physical_cores(), "logical": os.cpu_count(),
-            "features": {name: None if flags is None else name in flags for name, _ in CPU_REQUIRED}}
+            "features": {name: None if flags is None else name in flags for name, _ in CPU_FEATURES}}
 
 
 def missing_features(report=None):
@@ -212,7 +235,7 @@ def check_features():
     report = feature_report()
     missing = missing_features(report)
     if missing:
-        raise SystemExit("kindi: the CPU engine needs AVX2, FMA3 and F16C; this CPU lacks %s (%s)"
+        raise SystemExit("kindi: the CPU engine needs AVX; this CPU lacks %s (%s)"
                          % (", ".join(missing), report["model"]))
     return report
 

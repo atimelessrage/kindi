@@ -63,5 +63,5 @@ def test_kv_modes_and_the_k8v4_gate_come_from_tp():
 
 def test_cpu_requirements_are_read_from_kcpu_c():
     isa = sm.cpu_isa()
-    assert "AVX2" in isa and "FMA" in isa and "F16C" in isa
+    assert "AVX" in isa and "AVX2" in isa and "FMA" in isa and "F16C" in isa
     assert "AVX-512" not in isa        # the source has no 512-bit intrinsics

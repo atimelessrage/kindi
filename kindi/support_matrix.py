@@ -129,10 +129,12 @@ def kv_modes():
 
 
 def cpu_isa():
-    """the instruction sets `kindi/kcpu.c` uses unconditionally"""
+    """the baseline ISA and the fast-path instruction sets in `kindi/kcpu.c`"""
     src = _read(os.path.join(HERE, "kcpu.c"))
     feats = []
     if "_mm256_" in src:
+        feats.append("AVX")
+    if "_mm256_srlv_epi32" in src:
         feats.append("AVX2")
     if "_mm256_fmadd_ps" in src:
         feats.append("FMA")
@@ -174,9 +176,10 @@ def render(models=None, fmts=None, kv=None, isa=None):
             f["format"], f["type"], f["group"], f["block"], f["bpw"]))
 
     lines += ["", "## CPU engine requirements", "",
-              "`kindi/kcpu.c` uses these instruction sets unconditionally (no runtime dispatch), so the",
-              "CPU engine needs all of them at build time: **%s**. The build is `-march=native`; on"
-              " Windows it is clang + libomp, elsewhere gcc + OpenMP." % (", ".join(isa) or "none detected"),
+              "`kindi/kcpu.c` requires **AVX** at build time. The detected fast-path instruction sets are",
+              ("**%s**; AVX2, FMA and F16C are used when the compiler enables them, and an AVX-only build"
+               " uses the fallback kernels. The build is `-march=native`; on Windows it is clang + libomp,"
+               " elsewhere gcc + OpenMP.") % (", ".join(isa) or "none detected"),
               "", "See [CPU-SUPPORT.md](CPU-SUPPORT.md) for the per-CPU matrix and gates."]
 
     lines += ["", "## K/V cache modes", "",
