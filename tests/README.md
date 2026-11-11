@@ -17,26 +17,13 @@ The suite uses stub engines and stand-in CuPy where needed. It covers config pre
 template and tool-call round trips, tokenizer behavior, sampling, cache decisions, the HTTP boundary
 (validation, auth, body caps, queue, Ollama endpoints, image rejection), startup pack checks, the
 plan-engine guards, the tracked-file secret/personal-data guard, the installer's GRUB fixture and
-GPU-driver selection. No CUDA device or model pack is required.
+CPU ISA preflight, and GPU-driver selection. No CUDA device or model pack is required.
 
 `tests/requirements-test.txt` lists the test dependencies. The same commands run in the CPU job of
 `.github/workflows/ci.yml`. A separate `cpu-engine-smoke` job compiles `kindi/kcpu.c` with gcc for
-the AVX baseline and the AVX2/FMA/F16C fast path, and runs `test_cpu_build.py`, `test_cpu_threads.py` and `test_cpu_smoke.py`;
-the smoke test loads the library and checks the ctypes ABI without a model pack.
-
-## No-FMA fallback exactness (optional)
-
-This test compiles `kindi/kcpu.c` with `-mavx -mno-avx2 -mno-fma -mno-f16c`, loads the resulting
-library, and runs `kindi verify` on real Bonsai packs. Set `KINDI_CPU_AVX_PACKS` to one or more pack
-directories separated by the platform path separator (`:` on Linux, `;` on Windows):
-
-```sh
-KINDI_CPU_AVX_PACKS="$HOME/.kindi/packs/bonsai-2b:$HOME/.kindi/packs/bonsai-4b" \
-  python -m pytest tests/test_cpu_avx_fallback.py -q
-```
-
-The normal CPU-only gate skips this test because the model packs are not part of CI. On Windows the
-build uses the dynamic UCRT when FMA is disabled, avoiding the static libcmt `expf` FMA path.
+the AVX2/FMA/F16C tier and runs `test_cpu_build.py`, `test_cpu_threads.py` and `test_cpu_smoke.py`;
+the smoke test loads the library and checks the ctypes ABI without a model pack. The manual
+self-hosted GPU lane is described in [docs/CI.md](../docs/CI.md); it is not run by hosted CI.
 
 ## Turing reference suite (optional)
 

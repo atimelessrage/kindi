@@ -2,7 +2,8 @@
 
 This page records what has been checked for the Turing (`sm_75`) tensor-core backend
 ([TURING-TENSOR-CORES.md](TURING-TENSOR-CORES.md)), with the exact commands, and what still has to run on real
-`sm_75` hardware. It was written on 2026-11-07 against Kindi 0.4.0 merged with the Turing work.
+`sm_75` hardware. It was written on 2026-11-07 against the 0.4.0 Turing merge; it is retained as a
+historical, Turing-specific record and is not the general verification contract for every backend or card.
 
 **Status:** the arithmetic is verified against an independent CPU model, and the sources pass static analysis; the
 runtime checks on a Turing card are still pending (no `sm_75` card was available).

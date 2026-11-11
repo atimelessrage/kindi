@@ -5,7 +5,11 @@ TypeError for a malformed message list, which is what the old generic exception 
 clearing the real Runner. The validator must stop the request before that path is reached.
 """
 import json
+import os
+import subprocess
+import sys
 import threading
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -32,6 +36,7 @@ class _FakeRunner(object):
 
 class _FakeKindi(object):
     cp = None
+    supports_logprobs = False
 
     def __init__(self):
         self.cfg = {"model_name": "bonsai2-2b", "api_key": ""}
@@ -140,6 +145,37 @@ def test_invalid_streaming_request_is_400_before_sse(app_client):
     assert K.runner.tokens == [1, 2, 3]
 
 
+def test_logprobs_are_rejected_on_a_backend_that_does_not_support_them(app_client):
+    client, K = app_client
+    r = client.post("/v1/chat/completions",
+                    json={"messages": [{"role": "user", "content": "hello"}], "logprobs": True})
+    assert r.status_code == 400, r.text
+    assert "logprobs are not supported" in r.json()["error"]["message"]
+    assert K.last_req is None
+
+
+def test_non_loopback_without_api_key_warns(monkeypatch):
+    logs = []
+    monkeypatch.setattr(server, "_make_engine", lambda cfg, log: _FakeKindi())
+    server.create_app({"model_name": "bonsai2-2b", "api_key": "", "host": "0.0.0.0"},
+                      log=logs.append)
+    assert any("without api_key" in message and "0.0.0.0" in message for message in logs)
+
+
+@pytest.mark.parametrize(("name", "value"), (
+    ("KINDI_MAX_BODY_MB", "not-a-number"),
+    ("KINDI_MAX_BODY_MB", "0"),
+    ("KINDI_QUEUE_MAX", "-1"),
+))
+def test_invalid_server_limit_environment_is_a_clear_startup_error(name, value):
+    root = Path(__file__).resolve().parents[1]
+    env = dict(os.environ, PYTHONPATH=str(root), **{name: value})
+    proc = subprocess.run([sys.executable, "-c", "import kindi.server"], env=env,
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
+    assert proc.returncode != 0
+    assert name in proc.stderr.decode("utf-8", "replace")
+
+
 def test_api_key_is_required_and_matches_exactly(auth_client):
     client, _ = auth_client
     assert client.get("/v1/models").status_code == 401
@@ -202,6 +238,7 @@ def test_metrics_endpoint_reports_the_model_and_queue(app_client):
     assert "kindi_queue_max %d" % server.MAX_QUEUE in body
     assert "kindi_queue_depth 0" in body
     assert "kindi_requests_rejected_total 0" in body
+    assert "kindi_cache_errors_total 0" in body
 
 
 def test_metrics_and_ollama_endpoints_need_the_api_key(auth_client):

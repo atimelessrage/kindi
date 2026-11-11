@@ -96,3 +96,24 @@ def test_invalid_sampling_profile_is_rejected(clean_env):
     path = write_conf(clean_env, "sampling_profile = fast\n")
     with pytest.raises(SystemExit, match="sampling_profile must be default or publisher"):
         config.load(explicit=path)
+
+
+@pytest.mark.parametrize(("key", "value", "message"), (
+    ("port", "0", "port must be between"),
+    ("port", "70000", "port must be between"),
+    ("ctx", "0", "ctx must be at least"),
+    ("checkpoint_every", "0", "checkpoint_every must be at least"),
+    ("fast_clusters", "0", "fast_clusters must be at least"),
+    ("max_tokens", "0", "max_tokens must be at least"),
+    ("repeat_last_n", "-2", "repeat_last_n must be at least"),
+    ("temperature", "-0.1", "temperature must be at least"),
+    ("top_p", "0", "top_p must be greater than 0"),
+    ("top_p", "1.1", "top_p must be greater than 0"),
+    ("min_p", "-0.1", "min_p must be between"),
+    ("repeat_penalty", "0", "repeat_penalty must be greater than 0"),
+    ("presence_penalty", "2.1", "presence_penalty must be between"),
+))
+def test_invalid_config_ranges_are_rejected(clean_env, key, value, message):
+    path = write_conf(clean_env, "%s = %s\n" % (key, value))
+    with pytest.raises(SystemExit, match=message):
+        config.load(explicit=path)

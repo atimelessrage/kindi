@@ -50,6 +50,44 @@ FLOAT_KEYS = {"temperature", "top_p", "min_p", "repeat_penalty", "presence_penal
 PATH_KEYS = {"pack", "state_dir"}
 
 
+def _validate(cfg):
+    """Reject impossible values before a backend or socket touches them.
+
+    Type conversion alone is not enough: a negative context, a port outside the socket range or
+    ``top_p=0`` otherwise fails deep inside an engine or the HTTP server, with a traceback instead
+    of an actionable configuration error.
+    """
+    limits = (
+        ("port", 1, 65535),
+        ("ctx", 1, None),
+        ("fast_clusters", 1, None),
+        ("checkpoint_every", 1, None),
+        ("prefix_max", 0, None),
+        ("prefix_min", 0, None),
+        ("park_max", 0, None),
+        ("checkpoint_budget_mb", 0, None),
+        ("max_tokens", 1, None),
+        ("top_k", 0, None),
+        ("repeat_last_n", -1, None),
+        ("lookup", 0, None),
+        ("temperature", 0, None),
+    )
+    for key, low, high in limits:
+        value = cfg[key]
+        if value < low or (high is not None and value > high):
+            if high is None:
+                raise SystemExit("kindi: %s must be at least %s (got %r)" % (key, low, value))
+            raise SystemExit("kindi: %s must be between %s and %s (got %r)" % (key, low, high, value))
+    if not 0 < cfg["top_p"] <= 1:
+        raise SystemExit("kindi: top_p must be greater than 0 and at most 1 (got %r)" % cfg["top_p"])
+    if not 0 <= cfg["min_p"] <= 1:
+        raise SystemExit("kindi: min_p must be between 0 and 1 (got %r)" % cfg["min_p"])
+    if cfg["repeat_penalty"] <= 0:
+        raise SystemExit("kindi: repeat_penalty must be greater than 0 (got %r)" % cfg["repeat_penalty"])
+    if not -2 <= cfg["presence_penalty"] <= 2:
+        raise SystemExit("kindi: presence_penalty must be between -2 and 2 (got %r)" % cfg["presence_penalty"])
+
+
 class Config(dict):
     def __getattr__(self, k):
         try:
@@ -109,6 +147,7 @@ def load(explicit=None, overrides=None):
             cfg[k] = os.path.abspath(os.path.expanduser(v))
         else:
             cfg[k] = v
+    _validate(cfg)
     if cfg["model_name"] == "auto":
         manifest = os.path.join(cfg["pack"], "kindi_pack.json")
         m = json.load(open(manifest)) if os.path.isfile(manifest) else {}

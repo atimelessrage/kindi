@@ -62,6 +62,31 @@ jobs:
         run: |
           python -m pytest tests/test_cpu_build.py tests/test_cpu_threads.py tests/test_cpu_smoke.py -q
 
+  windows-cpu:
+    name: Windows CPU and config boundary
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: python -m pip install -r tests/requirements-test.txt
+      - name: Compile every module
+        run: python -m compileall -q kindi
+      - name: Run the Windows-safe boundary tests
+        run: >
+          python -m pytest -q
+          tests/test_config.py
+          tests/test_config_example.py
+          tests/test_config_reference.py
+          tests/test_cpu_build.py
+          tests/test_cpu_features.py
+          tests/test_cpu_threads.py
+          tests/test_startup.py
+          tests/test_tokenizer.py
+
   installer-shell:
     name: Installer shell checks
     runs-on: ubuntu-latest

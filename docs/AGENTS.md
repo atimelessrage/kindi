@@ -5,6 +5,7 @@ Kindi is an OpenAI-compatible endpoint. Use these values:
 - Base URL: `http://<host>:8093/v1`.
 - Model: `bonsai2-2b` (or your `model_name`).
 - API key: your `api_key`. If you did not set an `api_key`, any string works.
+- Log probabilities: only the Gemma 4 backend returns them. On Bonsai and Nanbeige, `logprobs: true` is rejected with HTTP 400 rather than silently omitting the field.
 
 For tool calls, Kindi uses the standard `tools` / `tool_calls` fields.
 
