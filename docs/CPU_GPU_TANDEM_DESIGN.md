@@ -1,7 +1,9 @@
 # kindi CPU+GPU Tandem Inference Design
 
-**Status**: Design only — no `TandemEngine`, placement, state handoff or GPU fallback runtime is
-implemented. See [TANDEM-STATUS.md](TANDEM-STATUS.md) for the cleanup gate and measured blockers.
+**Status**: The dense layer split is implemented in `kindi/tandem.py` (`cpu-first` and `gpu-first`)
+and is token-exact on the real 2B in both placements. The MoE expert-cache path and the
+larger-than-VRAM gate are still design work. See [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md) for the
+runtime evidence and limits, and [TANDEM-STATUS.md](TANDEM-STATUS.md) for the recovery history.
 **Author**: Systems Research
 **Date**: 2026-11-07
 **Target**: kindi v0.5.0+
@@ -28,6 +30,13 @@ This document designs a **CPU+GPU tandem inference architecture** for kindi, ins
 - Offloading inactive layers + KV cache to CPU RAM
 - Streaming weights asynchronously (overlap compute + transfer)
 - Prefetching next layer during current layer execution
+
+**Implemented slice (2026-11-11)**: a static layer split with one hidden-state handoff per token.
+The GPU side loads only its layer range; each side owns the recurrent/KV state for its layers.
+This is intentionally simpler than the streaming/doorbell phases below: it proves the ownership
+and exactness contract first. The real 2B passes `kindi verify` 4/4 (40/40) in both placements;
+the 27B/larger-than-VRAM measurement and the MoE expert cache remain open. See
+[TANDEM-RUNTIME.md](TANDEM-RUNTIME.md).
 
 ---
 

@@ -101,7 +101,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:155` (+2 more) |
 | `KINDI_D1` | `0` | `kindi/spec.py:713` |
 | `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:428` |
-| `KINDI_DEVICE` | `gpu` | `kindi/bench.py:8` (+3 more) |
+| `KINDI_DEVICE` | `gpu` | `kindi/bench.py:8` (+4 more) |
 | `KINDI_DP4A` | `"1" if rt.is_hip else "0"` | `kindi/tp.py:385` |
 | `KINDI_FD` | `0` | `kindi/spec.py:581` (+1 more) |
 | `KINDI_FD_CH` | (empty) | `kindi/spec.py:132` |
@@ -117,7 +117,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_G4_PAD` | `1` | `kindi/gemma4.py:520` |
 | `KINDI_G4_PARK_MAX` | `4` | `kindi/gemma4_cache.py:35` |
 | `KINDI_G4_PLE_HOST` | `auto` | `kindi/gemma4.py:407` |
-| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:458` |
+| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:465` |
 | `KINDI_G4_PROMPT_CACHE` | `1` | `kindi/gemma4_cache.py:33` |
 | `KINDI_G4_Q5_DP4A` | `1` | `kindi/gemma4.py:53` |
 | `KINDI_G4_RESERVE_MB` | `1024` | `kindi/gemma4.py:467` |
@@ -133,14 +133,14 @@ is where it is read, which is where the full description lives.
 | `KINDI_G5_PINS` | (empty) | `kindi/tp.py:133` |
 | `KINDI_G5_TUNE` | `1` | `kindi/tp.py:147` |
 | `KINDI_G5_TUNELOG` | (unset) | `kindi/tp.py:254` |
-| `KINDI_GEMV_BLOCKS` | (unset) | `kindi/engine.py:142` |
+| `KINDI_GEMV_BLOCKS` | (unset) | `kindi/engine.py:170` |
 | `KINDI_HIP_LIB` | `libamdhip64.so` | `kindi/gpudrv.py:28` |
 | `KINDI_HOST_RAM_CHECK` | `1` | `kindi/hostram.py:23` |
 | `KINDI_KEXPF` | (empty) | `kindi/spec.py:153` |
 | `KINDI_KV` | `q8_0` | `kindi/tp.py:46` |
 | `KINDI_KV_EXPERIMENTAL` | `0` | `kindi/tp.py:50` |
 | `KINDI_LLVM` | (unset) | `kindi/cpu.py:68` |
-| `KINDI_MEM_RESERVE_MB` | `96` or `32` | `kindi/engine.py:212` (+2 more) |
+| `KINDI_MEM_RESERVE_MB` | `96` or `32` | `kindi/engine.py:265` (+2 more) |
 | `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:634` |
 | `KINDI_NB_CPUF` | `0.55` | `kindi/nanbeige.py:33` |
 | `KINDI_NB_EMBD_HOST` | `"1" if kepler(cp, devices[0]) else "0"` | `kindi/nanbeige.py:266` |
@@ -186,7 +186,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_SPEC_PACK` | (unset) | `kindi/spec.py:1750` (+1 more) |
 | `KINDI_SPEC_SAMPLE` | `1` | `kindi/spec.py:1225` |
 | `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1755` |
-| `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:138` |
+| `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:166` |
 | `KINDI_TC` | `0` | `kindi/spec.py:80` (+2 more) |
 | `KINDI_TC_B2` | (empty) | `kindi/tc.py:51` |
 | `KINDI_TC_DP4A` | `0` | `kindi/tc.py:74` |
@@ -202,4 +202,4 @@ is where it is read, which is where the full description lives.
 | `KINDI_TC_TUNE` | `0` | `kindi/spec.py:429` (+1 more) |
 | `KINDI_TESTED_CC` | (empty) | `kindi/tc.py:39` |
 | `KINDI_THP` | `0` | `kindi/engine.py:69` |
-| `KINDI_TP` | (empty) | `kindi/engine.py:466` |
+| `KINDI_TP` | (empty) | `kindi/engine.py:606` |
