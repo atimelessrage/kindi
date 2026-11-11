@@ -1,4 +1,5 @@
 """The CPU engine must call the configured compiler with an argument vector, never a shell string."""
+import ctypes
 import os
 import shutil
 import subprocess
@@ -95,6 +96,36 @@ def test_avx_only_build_preprocesses():
     proc = subprocess.run([cc, "-fopenmp", "-mavx", "-mno-avx2", "-mno-fma", "-mno-f16c", "-E", str(SRC)],
                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     assert proc.returncode == 0, proc.stderr.decode("utf-8", "replace")
+
+
+def test_avx_only_library_builds_and_loads(monkeypatch, tmp_path):
+    """Compile and load the fallback, not just preprocess it.
+
+    The model-free test suite otherwise cannot catch a link/runtime break in the AVX-only
+    branch.  The resulting library is placed at the keyed path the production loader uses, so
+    this also checks the loader and the Python ctypes ABI without a pack.
+    """
+    if os.name == "nt":
+        cc = shutil.which(os.environ.get("KINDI_CC") or "clang")
+        if not cc:
+            pytest.skip("clang is not installed; set KINDI_CC to build the AVX-only fallback")
+        monkeypatch.setenv("KINDI_CC", cc)
+    else:
+        if not shutil.which("gcc"):
+            pytest.skip("gcc is not installed; it is needed to build the AVX-only fallback")
+
+    monkeypatch.setenv("KINDI_CPU_CACHE", str(tmp_path))
+    so = Path(cpu._so_path(str(tmp_path)))
+    cmd = cpu._build_cmd(str(SRC), str(so), win=os.name == "nt", native_fma=False)
+    native = cmd.index("-march=native")
+    cmd[native:native + 1] = ["-mavx", "-mno-avx2", "-mno-fma", "-mno-f16c"]
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    assert proc.returncode == 0, "AVX-only build failed:\n%s\n%s" % (" ".join(cmd), proc.stdout)
+
+    library = cpu._lib()
+    assert library.kc_sizeof_model() == ctypes.sizeof(cpu.Model)
+    assert library.kc_sizeof_layer() == ctypes.sizeof(cpu.Layer)
+    library.kc_init()
 
 
 def test_non_avx_build_is_rejected_with_the_required_isa():

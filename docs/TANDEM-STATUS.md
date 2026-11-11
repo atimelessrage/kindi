@@ -105,7 +105,8 @@ Do not remove either WIP branch until a replacement on `main` passes all of thes
 
 1. **CPU gate:** the supported CPU flags build; an AVX-only host fails with an actionable message or
    uses a real fallback; `kindi verify` passes on 2B and 4B; CPU tests pass. The per-layer entry point
-   and its 2B/4B/9B exactness check are now present; the AVX-only fallback remains open.
+   and its 2B/4B/9B exactness check are now present; the AVX-only fallback is implemented, but
+   native Sandy Bridge hardware is unverified.
 2. **Streaming gate:** `convert` emits a real layer-contiguous pack (or an explicit compatible
    alternative), and existing packs still load unchanged.
 3. **Tandem gate:** a clean `TandemEngine` runs layer-by-layer with CPU/GPU placement, and greedy
