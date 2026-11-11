@@ -1,0 +1,145 @@
+# Kindi Project - Problems, Bugs & Flaws Only
+**Original date:** 2026-11-11 12:00 UTC
+**Revised:** 2026-11-11 after merging `freebuff/tandem-cpu-recovery` into `main` at `687698f`
+**Reviewer:** original AI audit; revision by Buffy/Codebuff
+**Scope:** the 68 finding numbers are retained for traceability. Status now reflects the live
+repository, not the archived interrupted-WIP backup.
+
+> **Revision note.** The original report was partly written against files that exist only in
+> `bench-logs/main-backup-20261109-045352/` and against an older installer/documentation state.
+> It mixed confirmed defects, already-fixed items, duplicate findings, missing product features
+> and architecture preferences. This revision separates those categories. A missing feature is
+> not, by itself, a bug.
+
+## Verified branch state
+
+- The verified code state is `687698f`; this report is committed afterward. The branch integration
+  was a fast-forward from `d4362cb` to `a85cee9`; the post-merge test fix is `1403fa4`, with no
+  divergent commits.
+- The CPU engine now has a feature report and preflight in `kindi info` (`687698f`).
+- The code/docs change is 25 files relative to `d4362cb`; this audit report is a separate follow-up.
+- Recent branch commits:
+  - `687698f` - CPU feature report/preflight in `kindi info`.
+  - `1403fa4` - clean-checkout docs-link test fix; raw evidence logs are intentionally untracked.
+  - `a85cee9` - CPU ISA guard, review triage and RTX 5060 Ti status row.
+  - `120b31d` - installer source-archive checksum pin.
+  - `b8d1346` - documentation drift and tokenizer hardening.
+- Full CPU gate at revision time: **250 passed, 3 skipped** with clang available for the ISA
+  preprocessor checks. Without a compiler, the two ISA preprocessor tests skip; the source guard
+  test and CI `cpu-engine-smoke` still cover the boundary.
+- `python -m compileall -q kindi` and `git diff --check` passed.
+- The development worktree is clean. This revised report is tracked as audit evidence; the older
+  audit artifacts in the development worktree are ignored local evidence.
+
+## Critical
+
+| # | Finding | Current status |
+|---|---------|----------------|
+| 1 | FMA3 fallback / Sandy Bridge crash | **Not reproducible as written.** There is no `kcpu_cpuid.c`, `kcpu_cpuid.py` or `kc_set_isa()` in this tree. The live `kindi/kcpu.c` uses AVX2/FMA/F16C unconditionally. Commit `a85cee9` adds a compile-time `#error` naming the missing requirement, so an AVX-only CPU fails clearly instead of with an opaque target error. An AVX-only fallback remains **P1**; the i5-2500K is not supported today. |
+| 2 | `rows16_avx512_vnni` incomplete | **Not a live code defect.** No such kernel or VNNI implementation exists in this tree. AVX-512/VNNI/AMX acceleration is an open feature gap, not an incomplete shipped kernel. |
+| 3 | CPU ISA dispatch broken | **Not reproducible.** `kcpu_select_isa()` does not exist. The current engine has no runtime ISA dispatch; it is built for the host with `-march=native`. This is a known design limitation, covered by the P1 plan in `docs/CPU-SUPPORT.md`. |
+| 4 | Tandem CUDA doorbell kernel missing | **Open feature, not a missing file in a working path.** There is no `kindi/tandem_kernels.cu` and no `TandemEngine`; the tandem work is design-only. See `docs/TANDEM-STATUS.md`. |
+| 5 | FP8 support missing | **Open feature.** Kindi has no FP8 model support. The RTX 5060 Ti is classified as `tc`, but its native FP4/FP8 capabilities are not used and no Blackwell speed claim is made. |
+| 6 | `kcpu_cpuid.c` referenced but missing | **False for this tree.** Live `kindi/cpu.py` does not import it. The only copies are in the archived WIP backup. |
+
+## High severity
+
+| # | Finding | Current status |
+|---|---------|----------------|
+| 7 | Installer `pair_ok()` rejects valid pairs | **Mostly fixed; one claim rejected.** P106/P106 and RTX 4000/RTX 4000 pass the fake-GPU tests. P106 + P4000 is intentionally rejected by the documented same-class policy; the report's assertion that it should pass is not accepted. Mixed-card support would need a new policy and a 27B fit test. |
+| 8 | Ada 8 GB misclassified as `maxwell` | **Fixed.** Every compute capability >= 8.0 is `tc`; the RTX 4060 Ti 8 GB test passes and gets the 24,576-token tc profile. |
+| 9 | Blackwell detection missing | **Classification fixed; runtime unverified.** sm_100/sm_120 classifies through the sm_80+ rule and the 5060 Ti fake-GPU test passes. There is no Blackwell exactness or speed run; `docs/CARDS.md` now says so explicitly. |
+| 10 | Cyclic imports | **Not reproduced.** `kindi.engine`, `kindi.tp`, `kindi.spec` and `kindi.chunk` import cleanly. |
+| 11 | Multi-ISA CPU build incomplete | **Open feature.** The tree builds one host-native `libkcpu`; it does not build separate AVX/AVX2/AVX-512/VNNI libraries. This is P1 work in `docs/CPU-SUPPORT.md`. |
+| 12 | FP8 dequantization missing in `tc.cu` | **Open feature.** No FP8 dequantization path exists; there is also no FP8 model format to feed it. |
+| 13 | INT8 shift compensation missing | **Unverified, not confirmed.** No failing numerical test or concrete path was produced. The existing tensor-core kernels use signed int8 with block scales; a targeted asymmetric-quantization test would be needed before calling this a bug. |
+| 14 | Duplicate `generate()` implementations | **Maintenance debt, not a correctness defect.** `Engine.generate()` and `TPEngine.generate()` are separate engines with similar loops. Consolidation is a refactor, not a confirmed divergence bug. |
+
+## Medium
+
+| # | Finding | Current status |
+|---|---------|----------------|
+| 15 | Monolithic `kcpu.c` | Maintainability debt; no correctness failure. |
+| 16 | Monolithic `engine.py` | Maintainability debt; no correctness failure. |
+| 17 | Monolithic `spec.py` | Maintainability debt; no correctness failure. |
+| 18 | Magic numbers in kernels | Maintainability debt; comments/tests should be added when touching the kernels. |
+| 19 | `install.sh` large and untested | **Partially addressed.** The installer has focused fixture tests for GRUB, cards and source verification; it is still a large bash program and not exhaustively tested on every distro. |
+| 20 | Missing unit tests for core modules | **Partially addressed.** The CPU suite has 250 passing tests, including CPU features/build, threads, plan-engine, server, tokenizer and installer tests; GPU kernels and full token runs still need hardware-based verification. |
+| 21 | CARDS missing RTX 4060 Ti / 5060 Ti sections | **Addressed in part.** The 4060 Ti section already existed. Commit `a85cee9` adds a 5060 Ti row marked unverified; it is not a support claim. |
+| 22 | CONFIGURATION missing CPU ISA keys | **False.** `KINDI_CPU_ISA` and `KINDI_TANDEM_*` do not exist in the code; there is nothing to document. |
+| 23 | No GPU CI/CD pipeline | **True verification gap.** CPU CI exists; GPU correctness and performance are manual. |
+
+## Design and missing features
+
+| # | Finding | Current status |
+|---|---------|----------------|
+| 24 | No model abstraction layer | Open design improvement, not a regression. |
+| 25 | Ternary-only weight format | Open feature gap; the project intentionally targets ternary Bonsai packs plus specific separate backends. |
+| 26 | Single OpenMP region per token | Design choice with a measured trade-off; not a correctness bug. |
+| 27 | No async execution model | Open performance/design work. |
+| 28 | Prompt cache not integrated with tandem | Not applicable until a tandem runtime exists. |
+| 29 | Hardcoded Hadamard block sizes | Known limitation: the tc plan supports 512/1024; the 9B pack uses 4096 and is refused. This is documented, not a silent failure. |
+| 30 | No memory-pressure handling | Open robustness work; the plan engine has host-RAM and GPU-memory guards, but not general offload. |
+| 31 | Speculative decoding not integrated with tandem | Not applicable until tandem exists. |
+| 32 | No quantization API | Open feature gap. |
+| 33 | AVX-512 ternary GEMV | Open feature. |
+| 34 | AMX support | Open feature. |
+| 35 | BF16/FP16 weight support | Open feature; separate backends cover specific models. |
+| 36 | ONNX loader | Open feature. |
+| 37 | Flash Attention kernel | Open performance feature; current attention paths are model-specific. |
+| 38 | PagedAttention / K/V paging | Open feature. |
+| 39 | Pipeline parallelism | Open feature. |
+| 40 | Asymmetric tensor parallel | Open feature; mixed-card pairing is intentionally rejected today. |
+| 41 | Intel iGPU / Arc support | Roadmap only; no Intel backend code. |
+| 42 | DirectML / Vulkan backend | Open feature. |
+| 43 | Distributed inference | Open feature. |
+| 44 | Structured output / guided decoding | Open feature. |
+| 45 | Streaming API | **Already present.** SSE streaming is implemented in the OpenAI and Ollama endpoints. |
+| 46 | Metrics / Prometheus exporter | **Already present.** `/metrics` is implemented; queue/request/token metrics exist. |
+| 47 | Model repository / auto-download | Installer downloads pinned model files; a general repository is open. |
+| 48 | Windows native installer | **Partially present for the CPU engine;** the installer itself is Linux-only. Native Windows CPU runs are documented, but there is no Windows installer. |
+
+## Technical debt
+
+| # | Item | Current status |
+|---|------|----------------|
+| 49 | Split `kcpu.c` | Open refactor. |
+| 50 | Extract `EngineBase` | Open refactor. |
+| 51 | Separate speculative/tensor-core logic | Open refactor. |
+| 52 | Convert `install.sh` to Python | Open refactor; current bash is tested in focused areas. |
+| 53 | Structured logging | Open improvement. |
+| 54 | Standardize error handling | Open improvement. |
+| 55 | Kernel auto-tuner | Open feature. |
+| 56 | Unify config system | **Partially addressed:** precedence is documented as defaults < config < env < CLI; further unification is design work. |
+| 57 | Kernel versioning / compatibility checks | Open improvement. |
+
+## Security and safety
+
+| # | Concern | Current status |
+|---|---------|----------------|
+| 58 | No bounds checking on server inputs | **False for the current server.** Request bodies are capped at 16 MiB (`KINDI_MAX_BODY_MB`), malformed JSON/shape is rejected before the engine/cache, and tests cover the 413 path. |
+| 59 | Prompt injection through chat template | Application/model-level risk, not a server memory-safety bug. The server does not execute tool calls automatically. No mitigation is claimed beyond the template/tool handling. |
+| 60 | No rate limiting | **Partial.** There is a bounded admission queue (`KINDI_QUEUE_MAX`, default 8) returning 429 with `Retry-After`; there is no per-client token-bucket rate limiter. |
+| 61 | API key in logs | **No evidence.** Authentication uses a constant-time comparison and log messages do not print the key. |
+| 62 | No sandboxing for model loading | Open trust-boundary feature; model packs are trusted local inputs. |
+
+## Verification gaps
+
+| # | Gap | Current status |
+|---|-----|----------------|
+| 63 | No automated token-exact regression tests | **Partial.** CPU/unit tests and plan-engine tests exist (250 passed at revision); full GPU token-exact runs and `kindi verify` remain manual. |
+| 64 | No performance regression benchmarks in CI | True gap. |
+| 65 | No GPU memory-leak detection | True gap. |
+| 66 | No cross-model verification in CI | Partial: `tools/verify_matrix.py` supports 2B/4B/9B/27B and baseline comparisons, but runs require hardware/model packs. |
+| 67 | No long-context verification in CI | Partial: 24K/27B runs and server/cache checks are recorded manually; no CI job. |
+| 68 | No concurrent request testing | Partial: the admission gate and 429 path have tests; there is no long soak/race suite. |
+| 69 | No Windows CI | True gap; native Windows CPU runs are manual. |
+
+## Bottom line
+
+The original list overstated the number of live correctness bugs and understated what is already
+tested. The integrated branch adds a defensive CPU-build guard, the Blackwell/5060 Ti status
+correction and a clean-checkout docs-link test fix; the core engine behavior is unchanged. Tandem, FP8, AVX-512/VNNI/AMX, multi-ISA dispatch, GPU CI,
+Windows CI, long-context CI and the AVX-only Sandy Bridge fallback remain open work. They should
+be scheduled from `docs/ROADMAP.md` and `docs/CPU-SUPPORT.md`, not treated as regressions fixed
+by this report.
