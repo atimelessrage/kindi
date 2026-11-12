@@ -6,7 +6,8 @@ Audit date: **2026-11-12**
 > Sections 8–10 record the post-audit improvements, the 2026-11-12 evening 27B
 > tandem implementation/gate and the later requirement/structural-coverage work.
 > The best-of branch is now merged into `main`: both `main` and
-> `freebuff/tandem-cpu-recovery` are at `2d56478`. The installer source pin and
+> `freebuff/tandem-cpu-recovery` are at `082c5da` (after the 4B/9B tandem
+> throughput completion and the owned-slice CPU load). The installer source pin and
 > the `0.5.0` version identity remain a release-owner publication step, not a
 > code-complete claim.
 
@@ -19,20 +20,20 @@ everything described here has been re-run on current hardware.
 
 | | Stock “normal” Kindi 0.5 | Clean local 0.5 snapshot | Current worktree |
 |---|---|---|---|
-| Ref | `v0.5.0` tag, `1c4cc3e01732f0fada4ab7030ccf4f7651e01053` | `clean/kindi-0.5`, `1b0cbf780b57d464cdb3e5e9acf75ed49256d622` | `main` and `freebuff/tandem-cpu-recovery`, `2d5647893673268739884d0497a75b919ae7c4d7` |
+| Ref | `v0.5.0` tag, `1c4cc3e01732f0fada4ab7030ccf4f7651e01053` | `clean/kindi-0.5`, `1b0cbf780b57d464cdb3e5e9acf75ed49256d622` | `main` and `freebuff/tandem-cpu-recovery`, `082c5dab3480daa6a7ab05f952e1e2fc64bc9d77` |
 | Date | 2026-11-09 | clean snapshot of local 0.5 work | 2026-11-12 (merged state) |
-| Tracked files | 102 | 216 | 299 |
+| Tracked files | 102 | 216 | 301 |
 | Test modules | **0** (`tests/` does not exist) | 25 | 47 tracked test modules |
-| Docs files | 12 | 84 | 126 tracked paths under `docs/` |
-| Git state | release tag | clean | `main` fast-forwarded to the best-of branch at `2d56478`; generated coverage artifacts are ignored; `bench-logs/` is ignored local evidence |
+| Docs files | 12 | 84 | 128 tracked paths under `docs/` |
+| Git state | release tag | clean | `main` fast-forwarded to the best-of branch at `082c5da`; generated coverage artifacts are ignored; `bench-logs/` is ignored local evidence |
 
 The primary comparison below is against the **stock `v0.5.0` tag**. `clean/kindi-0.5`
 already contains earlier local audit, CPU, server and documentation work, so it is a
-narrower comparison, not the stock release. Relative to that clean snapshot, the committed branch has **153 changed tracked paths
-with +16,744/−578 lines**.
+narrower comparison, not the stock release. Relative to that clean snapshot, the committed branch has **156 changed tracked paths
+with +16,878/−587 lines**.
 
-Relative to the stock tag, the committed branch (`v0.5.0..HEAD`) changes **243 tracked
-files with +31,125/−353 lines**. The generated `.coverage`/`coverage.json` artifacts
+Relative to the stock tag, the committed branch (`v0.5.0..HEAD`) changes **245 tracked
+files with +31,253/−356 lines**. The generated `.coverage`/`coverage.json` artifacts
 are now ignored; `bench-logs/` remains ignored local evidence.
 
 Evidence labels used below:
@@ -104,8 +105,9 @@ Recorded results:
 | 9B, 512 context | 320 extension / 256 branch / 256 saved-opening tokens, exact in both placements; CPU load 105–108 s, GPU load 5.8–6.0 s | `RESULTS-9B.md` |
 | 9B 4K/8K cache | 4,080/8,176 and 3,072/6,144 cached; exact in both placements | `context-9b-4k.json`, `context-9b-8k.json` |
 | 9B checkpoint cost | 50.25 MiB joint recurrent state; 15.9/17.4 ms median save; 10.5/11.1 ms median restore; ~3.06 GiB device peak | `checkpoint-cost-9b-512.json` |
-| 27B `cpu-first` (CPU 0..15, GPU 16..63, GPU head), 8,192 context | 4/4 exact, 40/40 tokens each; combined load 385.6 s; peak **7,005 MiB** vs 7,238 MiB full-GPU baseline | `bench-logs/tandem-27b-gate/cpu-first-8192.json` |
-| 27B `gpu-first` (GPU 0..47 + embedding, CPU 48..63, CPU head), 8,192 context | 4/4 exact, 40/40 tokens each; combined load 413.3 s; peak **7,017 MiB** vs 7,238 MiB full-GPU baseline | `bench-logs/tandem-27b-gate/gpu-first-8192.json` |
+| 27B `cpu-first` (CPU 0..15, GPU 16..63, GPU head), 8,192 context | 4/4 exact, 40/40 tokens each; combined load 385.6 s (full-model CPU load); peak **7,005 MiB** vs 7,238 MiB full-GPU baseline | `bench-logs/tandem-27b-gate/cpu-first-8192.json` |
+| 27B `gpu-first` (GPU 0..47 + embedding, CPU 48..63, CPU head), 8,192 context | 4/4 exact, 40/40 tokens each; combined load 413.3 s (full-model CPU load); peak **7,017 MiB** vs 7,238 MiB full-GPU baseline | `bench-logs/tandem-27b-gate/gpu-first-8192.json` |
+| 2B/4B/9B `cpu-first` CROSS-MODE throughput, 24,576 ctx | 2B read 80.9, gen 65.7/71.3/55.5/43.4/35.8; 4B read 62.5, gen 52.1/51.4/33.5/24.8/20.0; 9B read 39.9, gen 28.5/35.8/28.2/20.1/16.0 tok/s; free-after-load 6411/5431/4635 MiB | `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/` |
 
 The cache work also fixed a real bug: `Openings.load` assigned a NumPy K/V array into a
 CuPy view with a plain assignment, which CuPy treated as a scalar fill. It now uses the
@@ -113,12 +115,11 @@ in-place `_to_dev` copy. A GPU-free regression test reproduces the scalar-fill f
 This is a concrete correctness improvement over the pre-fix state.
 
 **Not covered:** cumulative-B (33B), MoE, long-context *saved-opening reload*
-on 9B, and a larger-than-VRAM tandem throughput
-row with a sampled peak. The 2B `cpu-first` CROSS-MODE row is recorded (read 80.9;
-generation 65.7/71.3/55.5/43.4/35.8 tok/s at 24,576 context) and does not beat
-GPU-only. The 105–108 s 9B CPU load was a full-model load; the 27B CPU engine now
-loads only its owned 16-of-64-layer slice (unmeasured new load time), so the old
-≈365 s figure no longer describes a tandem start.
+on 9B, and a larger-than-VRAM (27B) tandem throughput row with a sampled peak.
+The 2B/4B/9B CROSS-MODE rows are recorded and do not beat GPU-only. The 105–108 s
+9B CPU load was a full-model load; the CPU engine now loads only its owned
+16-of-64-layer slice (measured owned-slice loads: 17.2 s for 4B, 32.4 s for 9B),
+so the old ≈365 s 27B full-load figure no longer describes a tandem start.
 
 ### 3.2 CPU portability and CPU serving
 
@@ -281,7 +282,7 @@ Some were fixed afterward; see section 8.
    ```
 
    `fd54148` is the old stock-0.5-era `main`, while the merged best-of `main` is now
-   `2d56478`. The installer’s default source therefore still omits the dense tandem
+   `082c5da`. The installer’s default source therefore still omits the dense tandem
    runtime, AVX-only recovery, generic-GQA support and the other verified work.
    Its image and install metadata still say `0.5.0`. This is a release-publication
    blocker, documented as a release-owner step in `docs/RELEASE-CHECKLIST.md`; it
@@ -299,7 +300,7 @@ Some were fixed afterward; see section 8.
      `tools/check_long_context.py`, `tools/dory_gguf_inventory.py`
    - 10 design/support documents and two `.github` workflow files
 
-   The branch has since been committed and merged into `main` at `2d56478`, so
+   The branch has since been committed and merged into `main` at `082c5da`, so
    the verified state is no longer only a dirty worktree.
 
 4. **Version and changelog identity are stale.** `kindi/__init__.py` still says
@@ -325,10 +326,11 @@ Some were fixed afterward; see section 8.
 7. **GPU behavior was revalidated after the audit (2026-11-12 evening).** `kindi verify`
    reports ALL PASS on the 2B (4/4, 153.7 tok/s), 4B (4/4, 108.9) and 9B (4/4, 74.6), and
    the 27B tandem gate is exact 4/4 in both placements — all with the refactored
-   attention code. What remains unverified is listed in §9.
+   attention code. The 2B/4B/9B CROSS-MODE tandem throughput rows are recorded; the
+   27B throughput-plus-peak gate remains open (§9).
 
 8. **Shared-worktree merge risk is resolved for this branch.** Both worktrees are
-   at `2d56478` and `T:/kindi` is clean. Future shared-file work still needs the
+   at `082c5da` and `T:/kindi` is clean. Future shared-file work still needs the
    AGENTS.md lease protocol; blindly copying either worktree over the other will
    lose work.
 
@@ -354,7 +356,7 @@ retains the same main-merge and installer-source problems.
 ## 6. Recommended order of work
 
 1. **Finish the release decision:** the best-of branch is merged into `main` at
-   `2d56478`. Decide the version, publish the matching installer artifact, and
+   `082c5da`. Decide the version, publish the matching installer artifact, and
    point `SOURCE_COMMIT`/SHA-256 at the exact release commit. Do not ship an
    installer that fetches `fd54148` while claiming the current tree.
 2. **Fix the test entry point:** exclude `bench-logs/` from pytest collection or remove
@@ -377,19 +379,19 @@ Run in the current worktree on 2026-11-12:
 
 | Command | Result |
 |---|---|
-| `python -m pytest tests/ -q --cov=kindi --cov-branch --cov-fail-under=27` | **462 passed, 19 skipped**, total line-and-branch coverage **27.20%**, exit 0 |
+| `python -m pytest tests/ -q --cov=kindi --cov-branch --cov-fail-under=27` | **462 passed, 19 skipped**, total line-and-branch coverage **27.15%**, exit 0 |
 | `python -m pytest -q` (after fix) | **462 passed, 19 skipped**, exit 0 |
 | `python -m pytest -q` (audit-time, before fix) | **26 collection errors**, exit 2, caused by `bench-logs/scan-tree-f7de617/` shadowing |
 | `python -m kindi.config_reference --check` | exit 0 |
 | `python -m kindi.support_matrix --check` | exit 0 |
 | `git -c core.whitespace=cr-at-eol diff --check` | exit 0 |
-| `git status --short` | `main` and the feature branch identical at `2d56478`; coverage artifacts ignored; `bench-logs/` ignored |
+| `git status --short` | `main` and the feature branch identical at `082c5da`; coverage artifacts ignored; `bench-logs/` ignored |
 | `git diff --stat v0.5.0..HEAD` | 243 tracked paths, +31,125/−353 |
 | `kindi verify` 2B/4B/9B (2026-11-12 evening) | ALL PASS, 153.7 / 108.9 / 74.6 tok/s |
 | 27B tandem gate, `cpu-first` (2026-11-12) | **4/4 prompts, 40/40 each; peak 7,005 MiB; 8,192 ctx; exit 0** |
 | 27B tandem gate, `gpu-first` (2026-11-12) | **4/4 prompts, 40/40 each; peak 7,017 MiB; 8,192 ctx; exit 0** |
 
-The best-of work is merged into `main` at `2d56478`. No push was performed. The
+The best-of work is merged into `main` at `082c5da`. No push was performed. The
 benchmark numbers are quoted from the repository’s recorded logs and docs except
 where a run is stated.
 
@@ -409,7 +411,7 @@ Two low-risk weak points were fixed without changing unverified GPU code:
    made.
 3. **Coverage regression floor.** The CI CPU job now runs
    `pytest tests/ -q --cov=kindi --cov-branch --cov-report=term --cov-fail-under=27`,
-   with `pytest-cov` in the test requirements. The measured local total is 27.20%
+   with `pytest-cov` in the test requirements. The measured local total is 27.15%
    line-and-branch coverage (462 passed, 19 skipped); the floor is deliberately
    conservative and documented as an anti-regression gate, not a quality claim.
    Requirement-based tests were added in `tests/test_requirement_coverage.py`,
@@ -455,7 +457,7 @@ Updated "what is worse or no longer works" list (as of 2026-11-12 evening):
   `--tandem cpu-first|gpu-first --tandem-cpu-layers N`.
 - **Installer pin and version** — the installer `SOURCE_COMMIT` names
   `fd54148`, `kindi/__init__.py` still says `0.5.0`, while `main` is merged at
-  `2d56478`. Publishing and retargeting the installer are explicit release decisions
+  `082c5da`. Publishing and retargeting the installer are explicit release decisions
   left for the release owner.
 - **9B tc** (Hadamard 4096 refused), **4B tc** (3 exact + 1 accepted tie with FD
   fallback; forced-FD 2/4), **k8v4** (2B 2/4, 9B unavailable),
@@ -463,6 +465,9 @@ Updated "what is worse or no longer works" list (as of 2026-11-12 evening):
   Turing/Arc hardware** — all unchanged, all the same explicit non-goals as §4.1.
 - **Generated test artifacts** — `.coverage` and `coverage.json` are now ignored,
   so normal coverage runs no longer dirty the tree.
+- **Tracked bench logs** — the force-added 4B/9B tandem raw logs initially leaked the
+  local Windows home path in the CuPy warning line and failed `test_no_secrets.py`;
+  both logs are now sanitized like the 2B log, and the full suite passes again.
 - **`git diff --check` without the project's `cr-at-eol`** still flags trailing CRs in
   `kindi/gemma4_cache.py` from earlier uncommitted edits; with `-c core.whitespace=cr-at-eol`
   it exits 0.
