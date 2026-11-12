@@ -1,9 +1,11 @@
 """Prompt-cache decisions that need no engine: prefix matching, spacing, parking, eviction,
 and the saved-opening K/V restore path."""
+import json
 import os
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 from kindi import cache
 from kindi.cache import Runner, _lcp
@@ -84,6 +86,14 @@ class _CupyLikeKv(object):
         self.data = np.full(shape, fill, dtype=np.float16)
         self.set_calls = 0
 
+    @property
+    def shape(self):
+        return self.data.shape
+
+    @property
+    def dtype(self):
+        return self.data.dtype
+
     def __getitem__(self, key):
         return _CupyLikeKvSlice(self, key)
 
@@ -138,6 +148,73 @@ def test_saved_opening_restores_kv_prefix_through_the_cupy_set_path(tmp_path):
     np.testing.assert_array_equal(eng.Vc[0].data[:p], np.full((p, 2, 2), 4, dtype=np.float16))
     assert np.all(eng.Kc[0].data[p:] == -1) and np.all(eng.Vc[0].data[p:] == -1)
     assert eng.Kc[0].set_calls == 1 and eng.Vc[0].set_calls == 1
+
+
+def test_saved_opening_save_failure_is_counted(monkeypatch, tmp_path):
+    def fail_savez(*args, **kwargs):
+        raise RuntimeError("disk full")
+
+    eng = _FakeOpeningEngine()
+    openings = cache.Openings(eng, str(tmp_path / "openings"), 4, lambda *a: None)
+    monkeypatch.setattr(cache.np, "savez", fail_savez)
+    openings.save([1, 2], [np.array([7], dtype=np.float32)], [np.array([8], dtype=np.float32)])
+    assert openings.save_failures == 1
+    assert openings.entries == {}
+
+
+def _rewrite_opening_state(openings, key, mutate):
+    path = os.path.join(openings.root, key, "state.npz")
+    with np.load(path) as z:
+        arrays = {name: z[name] for name in z.files}
+    mutate(arrays)
+    np.savez(path, **arrays)
+
+
+def test_saved_opening_load_rejects_a_shape_mismatch_without_copying_state(tmp_path):
+    eng = _FakeOpeningEngine()
+    log = []
+    openings = cache.Openings(eng, str(tmp_path / "openings"), 4, log.append)
+    tokens = [11, 12, 13]
+    openings.save(tokens, [np.array([7], dtype=np.float32)], [np.array([8], dtype=np.float32)])
+    key = openings.key_of(tokens)
+    _rewrite_opening_state(openings, key,
+                           lambda a: a.update(K0=np.zeros((2, 2, 2), dtype=np.float16)))
+
+    with pytest.raises(ValueError, match="K0 shape"):
+        openings.load(key)
+
+    assert eng.M[0][0] == 1 and eng.conv[0][0] == 2
+    assert eng.Kc[0].set_calls == 0 and eng.Vc[0].set_calls == 0
+
+
+def test_saved_opening_load_rejects_missing_state_keys(tmp_path):
+    eng = _FakeOpeningEngine()
+    openings = cache.Openings(eng, str(tmp_path / "openings"), 4, lambda *a: None)
+    tokens = [11, 12, 13]
+    openings.save(tokens, [np.array([7], dtype=np.float32)], [np.array([8], dtype=np.float32)])
+    key = openings.key_of(tokens)
+    _rewrite_opening_state(openings, key, lambda a: a.pop("V0"))
+
+    with pytest.raises(ValueError, match="state keys"):
+        openings.load(key)
+    assert eng.Kc[0].set_calls == 0
+
+
+def test_saved_opening_load_rejects_a_foreign_engine_fingerprint(tmp_path):
+    eng = _FakeOpeningEngine()
+    openings = cache.Openings(eng, str(tmp_path / "openings"), 4, lambda *a: None,
+                              fingerprint=("engine-a", {"config": "a"}))
+    tokens = [11, 12, 13]
+    openings.save(tokens, [np.array([7], dtype=np.float32)], [np.array([8], dtype=np.float32)])
+    key = openings.key_of(tokens)
+    meta_path = os.path.join(openings.root, key, "meta.json")
+    meta = json.loads(open(meta_path).read())
+    meta["engine"] = "engine-b"
+    json.dump(meta, open(meta_path, "w"))
+
+    with pytest.raises(ValueError, match="another engine"):
+        openings.load(key)
+    assert eng.M[0][0] == 1
 
 
 def test_engine_fingerprint_hashes_every_compiled_kernel():

@@ -274,6 +274,19 @@ def test_health_without_a_key_keeps_the_detailed_view(app_client):
     assert "gpu_free_mib" in body and "uptime_s" in body
 
 
+def test_keyless_non_loopback_health_gets_only_liveness_fields(monkeypatch):
+    K = _FakeKindi()
+    monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
+    app = server.create_app({"model_name": "bonsai2-2b", "api_key": "", "host": "0.0.0.0"},
+                            log=lambda *a: None)
+    with TestClient(app, client=("192.0.2.1", 12345)) as client:
+        body = client.get("/health")
+    assert body.status_code == 200, body.text
+    assert body.json() == {"ok": True, "kindi": server.__version__, "commit": server.COMMIT,
+                           "model": "bonsai2-2b", "ctx": 4096}
+    assert "queue" not in body.json() and "gpu_free_mib" not in body.json()
+
+
 def test_config_limits_are_applied(monkeypatch):
     K = _FakeKindi()
     monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)

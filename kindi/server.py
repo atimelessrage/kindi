@@ -854,11 +854,17 @@ def create_app(cfg, log=print):
     from fastapi import FastAPI, Request
     from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-    K = GPU_THREAD.submit(_make_engine, cfg, log).result()
+    log("[kindi] building engine for %s ..." % cfg.get("model_name", "model"))
+    try:
+        K = GPU_THREAD.submit(_make_engine, cfg, log).result()
+    except Exception:
+        log("[kindi] engine construction failed")
+        raise
+    log("[kindi] engine ready for %s" % cfg.get("model_name", "model"))
     model_id = cfg["model_name"]
     has_vision = _pack_has_vision(cfg.get("pack"))
     if not cfg.get("api_key") and not _is_loopback(cfg.get("host", "127.0.0.1")):
-        log("warning: serving on %s without api_key; /health is unauthenticated - use loopback or set api_key"
+        log("warning: serving on %s without api_key; /health details are loopback-only - use loopback or set api_key"
             % cfg.get("host"))
     app = FastAPI(title="Kindi", version=__version__)
     max_body_mb = cfg.get("max_body_mb")
@@ -1116,11 +1122,14 @@ def create_app(cfg, log=print):
     @app.get("/health")
     def health(request: Request):
         # A probe needs only liveness, version, model and context. The detailed view (GPU memory, queue, token
-        # counters and live progress) is available without a key on loopback, but is protected when api_key is set:
-        # /health is often exposed so a container or LAN monitor can poll it, and that probe must not become an
-        # unauthenticated inventory/usage endpoint.
+        # counters and live progress) is available without a key only on a loopback bind, but is protected when
+        # api_key is set: /health is often exposed so a container or LAN monitor can poll it, and that probe must
+        # not become an unauthenticated inventory/usage endpoint for a network bind.
         body = {"ok": True, "kindi": __version__, "commit": COMMIT, "model": model_id, "ctx": K.eng.ctx}
-        if not _auth(request):
+        if cfg["api_key"]:
+            if not _auth(request):
+                return body
+        elif not _is_loopback(cfg.get("host", "127.0.0.1")):
             return body
         free = total = 0
         if K.cp is not None and os.environ.get("KINDI_DEVICE", "gpu") != "cpu":
@@ -1188,6 +1197,9 @@ def create_app(cfg, log=print):
         cache_errors = getattr(getattr(K, "runner", None), "cache_errors", 0)
         metric("kindi_cache_errors_total", "counter", "cache fallbacks after a damaged opening or failed unpark",
                "kindi_cache_errors_total %d" % cache_errors)
+        opening_save_failures = getattr(getattr(getattr(K, "runner", None), "openings", None), "save_failures", 0)
+        metric("kindi_opening_save_failures_total", "counter", "saved-opening writes that failed and were skipped",
+               "kindi_opening_save_failures_total %d" % opening_save_failures)
         g4 = getattr(K, "g4cache", None)
         if g4 is not None:
             m = g4.metrics()

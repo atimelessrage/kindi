@@ -7,6 +7,9 @@ failure/forced-eviction behavior are specified in
 [GEMMA4-26B-COPY-COMBINE.md](GEMMA4-26B-COPY-COMBINE.md). Q4_K_M is lossy and cannot be used as an
 exactness reference.**
 
+> **Not a backend:** this page describes a proposed Gemma 4 26B-A4B expert-cache profile. Kindi has no
+> 26B backend, router, pack, GPU copy path or support claim for it.
+
 This is the Gemma 4-specific companion to [MOE-TANDEM.md](MOE-TANDEM.md). It does not replace the
 generic cache state machine in `kindi/expert_cache.py`; it fixes the model constants, slot layout,
 routing order and context limits that a 26B backend would have to honour. The model-free state

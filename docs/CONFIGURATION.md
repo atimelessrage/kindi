@@ -24,13 +24,15 @@ individual value. The Docker image sets
 | `pack` | `~/.kindi/pack` | the converted model (`kindi convert` writes it) and, optionally, `head_clusters.npz` |
 | `state_dir` | `~/.kindi/state` | the kernel cache (`kernels/`), saved prompt openings (`openings/`) and the head mode set by `kindi head` |
 
+Relative path values are resolved against the server process's current working directory, not against the directory containing the config file. Start the server from the intended directory, or use absolute paths (or `~/...`) in `pack`, `state_dir` and the corresponding `KINDI_*` environment variables.
+
 ### Server
 
 | key | default | |
 |---|---|---|
 | `host` | `127.0.0.1` | address to listen on; `0.0.0.0` serves your network - then also set `api_key` |
 | `port` | `8093` | |
-| `api_key` | (empty) | if set, every `/v1` request needs `Authorization: Bearer <api_key>`; `/health` stays open for liveness but its queue, GPU, uptime and usage details need the same header |
+| `api_key` | (empty) | if set, every `/v1` request needs `Authorization: Bearer <api_key>`; `/health` stays open for liveness but its queue, GPU, uptime and usage details need the same header. With no key, those details are available only on a loopback bind (`host=127.0.0.1`, `localhost` or `::1`); a non-loopback bind gets only liveness, version, model and context |
 | `model_name` | `auto` | the model id `/v1/models` reports; `auto` takes it from the pack (the Bonsai ids are `bonsai2-2b`, `bonsai2-4b`, `bonsai2-9b` and `bonsai2-27b`; Nanbeige and Gemma packs use their own ids); clients may send any model name |
 | `max_body_mb` | `16` | maximum HTTP request body in MiB; larger requests get `413` before the engine is touched |
 | `queue_max` | `8` | requests allowed to wait behind the active one; further requests get `429` with `Retry-After: 1` |

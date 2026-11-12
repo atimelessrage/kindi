@@ -231,7 +231,7 @@ not yet meet their own gates. They should not be presented as supported.
 
 | Area | Current state | Why it matters |
 |---|---|---|
-| **27B tandem** | implemented and measured in both placements: `cpu-first` 4/4 (peak 7,005 MiB) and `gpu-first` 4/4 (peak 7,017 MiB), all 40/40 tokens each, vs the 7,238 MiB full-GPU baseline (8,192 context, 2026-11-12); CROSS-MODE tandem throughput rows are still `n/a`. | The “larger than VRAM” use case works in both placements. The plain GPU engine now accepts grouped-query ratios up to 8:1 at head size 256, reusing the existing generic-GQA kernels; the 4:1 fast paths are unchanged. |
+| **27B tandem** | implemented and measured in both placements: `cpu-first` 4/4 (peak 7,005 MiB) and `gpu-first` 4/4 (peak 7,017 MiB), all 40/40 tokens each, vs the 7,238 MiB full-GPU baseline (8,192 context, 2026-11-12); a 2B `cpu-first` CROSS-MODE tandem throughput row is recorded; 4B/9B remain `n/a`. | The “larger than VRAM” use case works in both placements. The plain GPU engine now accepts grouped-query ratios up to 8:1 at head size 256, reusing the existing generic-GQA kernels; the 4:1 fast paths are unchanged. |
 | **9B tensor-core plan** | Refused before graph build because the Hadamard block is 4096. | The 9B tc cell is not available; plain 9B is 4/4. |
 | **4B tensor-core plan** | 2/4 exact at 178.2 tok/s (prompts 2 and 3 fail); plain 4B is 4/4 at 114.9 tok/s. | The tc path is not a general replacement; it is an uneven, partial optimization. |
 | **2B/9B k8v4** | 2B k8v4 is 2/4 against q8_0; 9B k8v4 is unavailable. 4B k8v4 is 4/4. | Experimental lossy cache; do not enable by default or describe as 9B-ready. |
@@ -442,9 +442,9 @@ Updated "what is worse or no longer works" list (as of 2026-11-12 evening):
 
 - **27B `gpu-first`** — measured, and `gpu-first` now works in both placements, so the
   partial-plan owner design the report used to call for is no longer needed on either path.
-- **Tandem throughput** — still no number at the CROSS-MODE positions. `bench` does not
-  accept tandem, and the CROSS-MODE rows stay `n/a` until a real tandem `bench` run is
-  recorded.
+- **Tandem throughput** — 2B `cpu-first` has a recorded number at the CROSS-MODE positions; 4B/9B
+  remain `n/a` until the same tandem `bench` run is recorded for those models. `bench` accepts
+  `--tandem cpu-first|gpu-first --tandem-cpu-layers N`.
 - **Installer pin, main merge, version** — the installer `SOURCE_COMMIT` names
   `fd54148`, `kindi/__init__.py` still says `0.5.0`, and `main` remains at `fd54148`
   because the other worktree is dirty. The branch itself is committed through

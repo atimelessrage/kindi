@@ -63,7 +63,9 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
 - **Cards:** single/dual card support targets are in [CARD-SUPPORT.md](CARD-SUPPORT.md). The P106-100
   single-card (2B/4B/9B) and two-card (27B) offers are installer-tested but not measured on hardware.
   The dense CPU+GPU tandem runtime now exists and is 2B token-exact in both placements; the 27B split
-  is still open. The MoE path has a model-free cache prototype but no backend
+  exactness/memory gate passed on 2026-11-12 (4/4, 40/40 tokens each; peaks 7,005/7,017 MiB vs
+  7,238 MiB full-GPU), while 4B/9B throughput and a larger-than-VRAM throughput row with sampled peak
+  remain open. The MoE path has a model-free cache prototype but no backend
   ([MOE-TANDEM.md](MOE-TANDEM.md), [P106.md](P106.md)).
 - **Intel Arc A770:** a separate SYCL/oneAPI backend is planned for one card, two cards and CPU+Arc
   tandem; the goal, gates and milestones are in [INTEL-ARC.md](INTEL-ARC.md). M0 (architecture audit)

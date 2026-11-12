@@ -150,6 +150,7 @@ class Openings(object):
         self.eng, self.root, self.keep, self.log = eng, root, keep, log
         self.fp = fingerprint                     # (hash, description) of the engine; entries of another are ignored
         self.entries = {}
+        self.save_failures = 0
         try:
             os.makedirs(root, exist_ok=True)
             for key in os.listdir(root):
@@ -166,6 +167,22 @@ class Openings(object):
         except OSError as e:
             log("saved openings disabled: %s" % e)
         log("saved openings: %d in %s" % (len(self.entries), root))
+
+    @staticmethod
+    def _expected_host_shape(a):
+        """The host-copy shape for a destination: NumPy/CuPy arrays have ``shape``; a two-card ``Dist``
+        has the concatenated host representation used by ``_host`` and ``save``."""
+        shape = getattr(a, "shape", None)
+        if shape is not None:
+            return tuple(shape)
+        parts = getattr(a, "parts", None)
+        if parts:
+            if getattr(a, "rows", False):
+                rows = int(parts[0][1].shape[0]) if parts else 0
+                cols = sum(int(np.prod(x.shape[1:])) * np.dtype(x.dtype).itemsize for _, x in parts)
+                return (rows, int(cols))
+            return (int(sum(x.size for _, x in parts)),)
+        return tuple(np.shape(a))
 
     @staticmethod
     def key_of(tokens):
@@ -213,6 +230,7 @@ class Openings(object):
             self.entries[key] = {"p": p, "used": now, "tokens": toks}
             self.log("saved an opening of %d tokens (%.1fs)" % (p, time.time() - t0))
         except Exception as e:  # noqa: BLE001 - a full disk must not break serving
+            self.save_failures += 1
             self.log("could not save an opening: %s" % e)
             shutil.rmtree(d, ignore_errors=True)
             return
@@ -225,20 +243,53 @@ class Openings(object):
         t0 = time.time()
         eng = self.eng
         d = os.path.join(self.root, key)
-        z = np.load(os.path.join(d, "state.npz"))
         p = self.entries[key]["p"]
+        if not isinstance(p, int) or isinstance(p, bool) or not 0 <= p < eng.ctx:
+            raise ValueError("saved opening %s has invalid prefix length %r" % (key, p))
+        meta = json.load(open(os.path.join(d, "meta.json")))
+        if not isinstance(meta, dict):
+            raise ValueError("saved opening %s has invalid metadata" % key)
+        if self.fp is not None and meta.get("engine") != self.fp[0]:
+            raise ValueError("saved opening %s was made by another engine" % key)
+        if meta.get("p") != p:
+            raise ValueError("saved opening %s metadata prefix length does not match its entry" % key)
+        z = np.load(os.path.join(d, "state.npz"))
+        expected_keys = set(["M%d" % i for i in range(len(eng.M))]
+                            + ["C%d" % i for i in range(len(eng.conv))]
+                            + ["K%d" % i for i in range(len(eng.Kc))]
+                            + ["V%d" % i for i in range(len(eng.Vc))])
+        if set(z.files) != expected_keys:
+            raise ValueError("saved opening %s has state keys %s, expected %s"
+                             % (key, sorted(z.files), sorted(expected_keys)))
         Ms = [z["M%d" % i] for i in range(len(eng.M))]
         Cs = [z["C%d" % i] for i in range(len(eng.conv))]
+        Ks = [z["K%d" % i] for i in range(len(eng.Kc))]
+        Vs = [z["V%d" % i] for i in range(len(eng.Vc))]
+        for label, dsts, srcs in (("M", eng.M, Ms), ("C", eng.conv, Cs)):
+            for i, (a, h) in enumerate(zip(dsts, srcs)):
+                expected_shape = self._expected_host_shape(a)
+                if tuple(h.shape) != expected_shape:
+                    raise ValueError("saved opening %s %s%d shape %s does not match engine shape %s"
+                                     % (key, label, i, tuple(h.shape), expected_shape))
+                dst_dtype = getattr(a, "dtype", None)
+                if dst_dtype is not None and not hasattr(a, "parts") and h.dtype != np.dtype(dst_dtype):
+                    raise ValueError("saved opening %s %s%d dtype %s does not match engine dtype %s"
+                                     % (key, label, i, h.dtype, np.dtype(dst_dtype)))
+        for label, dsts, srcs in (("K", eng.Kc, Ks), ("V", eng.Vc, Vs)):
+            for i, (a, h) in enumerate(zip(dsts, srcs)):
+                expected_shape = (p,) + self._expected_host_shape(a)[1:]
+                if tuple(h.shape) != expected_shape:
+                    raise ValueError("saved opening %s %s%d shape %s does not match engine prefix shape %s"
+                                     % (key, label, i, tuple(h.shape), expected_shape))
         for a, h in zip(eng.M, Ms):
             _set_host(a, h)
         for a, h in zip(eng.conv, Cs):
             _set_host(a, h)
         for i in range(len(eng.Kc)):
-            _to_dev(eng.Kc[i], p, z["K%d" % i])
-            _to_dev(eng.Vc[i], p, z["V%d" % i])
+            _to_dev(eng.Kc[i], p, Ks[i])
+            _to_dev(eng.Vc[i], p, Vs[i])
         self.entries[key]["used"] = time.time()
         try:
-            meta = json.load(open(os.path.join(d, "meta.json")))
             meta["used"] = time.time()
             json.dump(meta, open(os.path.join(d, "meta.json"), "w"))
         except Exception:  # noqa: BLE001

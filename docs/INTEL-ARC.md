@@ -164,10 +164,10 @@ are split between the CPU engine and one/two Arc cards:
 - preserve exact output;
 - measure against Arc-only and CPU-only on the same model and context.
 
-The existing [CPU_GPU_TANDEM_DESIGN.md](CPU_GPU_TANDEM_DESIGN.md) and
-[TANDEM-STATUS.md](TANDEM-STATUS.md) are the starting design, but they are not a runtime. The
-current CPU engine supports 2B/4B/9B; it has no 27B per-layer path. Therefore CPU+Arc tandem starts
-with 2B/4B/9B; 27B/33B wait for CPU per-layer support, not merely an Arc port.
+The dense Bonsai CPU+GPU tandem runtime exists on the measured NVIDIA host ([TANDEM-RUNTIME.md](TANDEM-RUNTIME.md)),
+and the CPU engine has a per-layer entry point. No CPU+Arc tandem runtime exists: Intel Arc still needs
+its own backend, so CPU+Arc tandem starts with 2B/4B/9B once that backend exists and waits for the
+relevant models, not merely an Arc port.
 
 ### Configuration
 
@@ -248,8 +248,8 @@ the backend work starts:
   all versions with every benchmark.
 - **Two-card exchange.** Arc has no NVLink; host-mediated exchange can dominate token time. The
   1.3x gate exists to reject a second card that only adds synchronization.
-- **CPU tandem.** The CPU engine is whole-model C and has no 27B path; a per-layer CPU API is the
-  real prerequisite. The existing design is not a runtime.
+- **CPU tandem.** The CPU engine has a per-layer entry point and the dense NVIDIA-host tandem runtime
+  exists, but there is no Arc backend and therefore no CPU+Arc tandem runtime.
 - **ReBAR and power.** Without ReBAR, performance results are not representative. Two cards need
   two suitable slots and power; measure before advertising a dual setup.
 

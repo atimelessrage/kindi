@@ -157,15 +157,15 @@ positions 100 to 24,000, with read speeds and sources, is generated at
 
 | Model | CPU-only 24K | GPU-only 24K | GPU / CPU | Tandem 24K |
 |---|---:|---:|---:|---:|
-| 2B | 8.2 | 160.6 | 19.6x | n/a |
+| 2B | 8.2 | 160.6 | 19.6x | 35.8 |
 | 4B | 3.1 | 79.8 | 25.7x | n/a |
 | 9B | 2.6 | 62.3 | 24.0x | n/a |
 
 CPU-only is the 6-thread native Windows run (2026-11-10); GPU-only is the median of three Windows runs. The old
-WSL2 CPU cells are archived in the 2026-11-09 benchmark page. **GPU+CPU tandem has no runtime
-in this tree** ([TANDEM-STATUS.md](TANDEM-STATUS.md)), so its column is `n/a`: the matrix does not invent a tandem
-number. A tandem cell is added only after the token-exact gate and a measured decode rate with the CPU/GPU split
-stated.
+WSL2 CPU cells are archived in the 2026-11-09 benchmark page. The 2B tandem cell is the 2026-11-12
+`cpu-first` run; 4B/9B tandem cells stay `n/a` until the same single-run benchmark is recorded. The dense
+tandem runtime and its current status are in [TANDEM-STATUS.md](TANDEM-STATUS.md) and
+[TANDEM-RUNTIME.md](TANDEM-RUNTIME.md).
 
 ## 2026-11-09: CPU engine · Intel Core i7-8086K
 

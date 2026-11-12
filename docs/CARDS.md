@@ -352,7 +352,7 @@ option `amdgpu.cwsr_enable=0`. [AMD.md](AMD.md) gives the settings.
 - The installer classifies the 6 GB card as `maxwell`, its 24,576-token memory profile, rather than `pascal8` (which starts at 7,500 MiB). That is the context that fits 6 GB; it does not mean the card is Maxwell.
 - The 27B does not fit in 6 GB. Two P106 cards run it together; the installer also offers a P106 + P4000 pair, which keeps the 5-trit path on both cards. Any pair from the supported pair classes with at least 3,800 MiB each uses the legacy two-card profile. A pre-6.0 + 6.0-or-newer pair sets `KINDI_G5=0` and runs both cards on the 2-bit path. These mixed offers are not measured yet.
 - The installer's shared 6 GB list also offers Nemotron; it is experimental and has not been measured on a P106.
-- CPU+GPU tandem (one model split across CPU and GPU layers) is not implemented for the Bonsai models and is not supported on the P106. (The Nanbeige backend has a separate host-layer path; it does not apply here.) The gate is in [P106.md](P106.md#cpu-tandem-status); do not advertise it yet.
+- CPU+GPU tandem is implemented for dense Bonsai models on the measured host, but it is not supported on the P106: no P106 tandem result is recorded and P106 acceptance is missing. (The Nanbeige backend has a separate host-layer path; it does not apply here.) The gate is in [P106.md](P106.md#cpu-tandem-status); do not advertise it yet.
 - Verification runner: `python3 tools/verify_p106.py` records the single-card 2B/4B/9B verify, the server/cache cycle and the two-card 27B verify. It has not run on P106 hardware; see [P106.md](P106.md#one-command-verification-record).
 
 ## Quadro M4000, 8 GB (Maxwell 2.0, sm_52)

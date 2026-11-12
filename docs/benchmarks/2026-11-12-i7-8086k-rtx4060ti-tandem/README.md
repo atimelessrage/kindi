@@ -11,7 +11,7 @@ Command:
 
 ```sh
 PATH='/c/Program Files/clang+llvm-18.1.8-x86_64-pc-windows-msvc/bin:'$PATH \
-python -m kindi --pack 'C:/Users/ICH/.kindi/packs/bonsai-2b' bench --tandem cpu-first --tandem-cpu-layers 6
+python -m kindi --pack '~/.kindi/packs/bonsai-2b' bench --tandem cpu-first --tandem-cpu-layers 6
 ```
 
 The raw output is `bench-2b-cpu-first-24k.log`. The CPU engine built

@@ -11,6 +11,10 @@ seam is in [EXPERT-CACHE-COPY-INTERFACE.md](EXPERT-CACHE-COPY-INTERFACE.md). The
 backend, converter, pack, GPU copy path, catalog entry, installer offer or measured inference
 result in Kindi. This document is not a support claim.**
 
+> **Not a backend:** `kindi/expert_cache.py` is only the model-free slot/LRU/metrics prototype. It has
+> no router, no pack, no engine wiring, no GPU copy path and no model support; do not treat this page as
+> a Gemma, Raon or MoE support claim.
+
 This is the design for a **CPU+GPU expert-cache tandem** path, not another dense layer split. The
 dense split is already implemented in [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md). The MoE model contract
 and long-term acceptance gates are in [RAON-1-MINI.md](RAON-1-MINI.md); the older,

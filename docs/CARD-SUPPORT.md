@@ -199,8 +199,9 @@ covered by the fixed 1,024-token verify and by the 24,576-token benchmark/server
   image? P1 decides; until then the 5060 Ti is not a release-supported card.
 - Is 2×P106 27B fast enough to be useful through PCIe x8/x4 with no display outputs? Measure before
   advertising it. The offer and pairing are tested; the runtime is not ([P106.md](P106.md)).
-- Can a CPU+GPU tandem engine be built at all? No `TandemEngine` exists; do not offer a P106 tandem
-  configuration until the gates in [TANDEM-STATUS.md](TANDEM-STATUS.md) pass.
+- Can dense Bonsai tandem run on a P106? A dense `TandemEngine` exists on the measured host, but it has
+  not been accepted on a P106; do not offer a P106 tandem configuration until the gates in
+  [TANDEM-STATUS.md](TANDEM-STATUS.md) pass.
 - Is 27B on a single 8 GB Ada card stable beyond a short 24K cycle? The 4060 Ti tc profile now serves
   at 24,576 tokens, but it leaves only 350-398 MiB free and has not been soaked, run concurrently or
   tested above 24K; the 1,024-token verify remains the token-exact reference.

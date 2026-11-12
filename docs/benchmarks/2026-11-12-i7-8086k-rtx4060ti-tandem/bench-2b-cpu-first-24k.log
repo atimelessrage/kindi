@@ -1,6 +1,6 @@
-C:\Users\ICH\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+CuPy _environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
   warnings.warn(
-   Bibliothek "C:\Users\ICH\.cache\kindi\libkcpu-4de6cea0909dfdac.lib" und Objekt "C:\Users\ICH\.cache\kindi\libkcpu-4de6cea0909dfdac.exp" werden erstellt.
+   Bibliothek "%USERPROFILE%\.cache\kindi\libkcpu-4de6cea0909dfdac.lib" und Objekt "%USERPROFILE%\.cache\kindi\libkcpu-4de6cea0909dfdac.exp" werden erstellt.
 [kindi 22:38:55] kindi-cpu ready: Ternary-Bonsai-2-2B, avx2-fma-f16c, 6 threads, ctx 24576 (27.4s)
 [kindi 22:38:55] GPU: NVIDIA GeForce RTX 4060 Ti, sm_89, 34 SMs, 8187 MiB
 [kindi 22:38:56] engine ready: ctx 24576, head plain (1.6s)

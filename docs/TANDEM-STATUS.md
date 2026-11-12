@@ -12,7 +12,9 @@ This page records what this branch actually contains, why the interrupted WIP ca
 and the gate for deleting it. Archived with the other no-go work in [ROADMAP.md](ROADMAP.md).
 
 Benchmark coverage: [benchmarks/CROSS-MODE.md](benchmarks/CROSS-MODE.md) records the measured CPU-only and
-GPU-only 2B/4B/9B cells; its GPU+CPU tandem rows remain `n/a` because no throughput benchmark was run.
+GPU-only 2B/4B/9B cells and the measured 2B GPU+CPU tandem row; the 4B and 9B tandem rows remain `n/a`
+because the same single-run throughput benchmark has not been run for those models. This page is the tandem
+status source; other pages link here rather than restating tandem details.
 The dense runtime's real 2B/9B exactness and one-run timings are in
 [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md); the 9B cache evidence is in
 `bench-logs/tandem-cache/RESULTS-9B.md`.
@@ -51,8 +53,9 @@ It still does **not** have:
 
 - a MoE backend and GPU copy path; the copy-only slot manager is in `kindi/expert_cache.py` and the
   design is in [MOE-TANDEM.md](MOE-TANDEM.md), but there is no router, pack or engine integration;
-- the CROSS-MODE tandem throughput rows are still `n/a` because no `bench` timing run has
-  been recorded (both 27B placements passed at 8K on 2026-11-12; [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md));
+- the 4B and 9B CROSS-MODE tandem throughput rows remain `n/a`: the 2B `cpu-first` `bench` run is
+  recorded, but the same single-run benchmark has not been run for 4B/9B (both 27B placements passed at
+  8K on 2026-11-12; [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md));
 - a layer-contiguous streaming pack format or a converter that emits one;
 - native Sandy Bridge or no-FMA hardware validation; the five-tier CPU dispatch and AVX-only
   fallback are implemented and forced-tier tested, but only on an AVX2 host.

@@ -23,6 +23,12 @@ extracting it. It no longer pipes `curl` into `tar`. The default v0.5.0 archive 
 `3ca1e79d371c87bea5471841db10b0509b90d3bd557512cf59fc83854b929a94`; a custom `--source` URL can be
 pinned with `KINDI_SOURCE_SHA256`. The regression test is `tests/test_installer_source.py`.
 
+Current-head note: the published installer still installs commit `fd54148`, not the current best-of
+`main` tree. Refreshing `SOURCE_COMMIT`/`SOURCE_SHA256` (and `KINDI_VERSION` if bumped) requires the
+release owner to publish and verify the exact source archive for the desired release commit, then update
+`docs/INSTALL.md`, this checklist and `tests/test_installer_source.py` in the same commit. Until that
+publication happens, the installer payload is the `fd54148` release, not current HEAD.
+
 This change is published as the fork-hosted 0.5.0 installer at
 `https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh`.
 The LF artifact hash is `43766d8bbed09fa0ccebe6c39c8076001da99cb15814ff065380f7a46c93db99`; `docs/INSTALL.md` records it. The matching
