@@ -838,6 +838,15 @@ class Shard(object):
 
 # ====================================================================================== the engine
 
+def fd_supported(dims):
+    """KINDI_FD's split decode attention is verified for widths that are a multiple of 1024.
+
+    The 4B's 2560-wide products (the only padded-width Bonsai pack) diverge from llama.cpp with FD on;
+    the standard decode attention is exact apart from an accepted llama.cpp tie.
+    """
+    return int(dims.get("width", 0)) % 1024 == 0
+
+
 class TPEngine(object):
     """Same interface as Engine (reset, feed, step, generate) over two cards."""
 
@@ -858,6 +867,10 @@ class TPEngine(object):
         self.HB = int(man.get("hadamard_block", 512))
         self.D, self.NL = self.dims["width"], self.dims["layers"]
         self.NHg, self.NHKVg, self.HD = self.dims["heads"], self.dims["kv_heads"], self.dims["head_dim"]
+        if os.environ.get("KINDI_FD", "0") == "1" and not fd_supported(self.dims):
+            log("kindi: KINDI_FD=1 is disabled for the 4B's 2560-wide plan (the split decode attention diverges); "
+                "using the standard decode attention")
+            os.environ["KINDI_FD"] = "0"
         if self.kv == "k8v4" and self.HD != 256:
             raise SystemExit("kindi: KINDI_KV=k8v4 needs a head size of 256 (this pack has %d); the V4 value "
                              "kernels cover 8 blocks of 32 features" % self.HD)

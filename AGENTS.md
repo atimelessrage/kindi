@@ -8,6 +8,20 @@ CUDA/CuPy backend, a CPU backend, an OpenAI-compatible server and a one-command 
 Keep this file current: it is the handoff document. Tick a step when it is done and add one
 line of evidence (command + result). A task must be resumable from this file alone.
 
+## Project memory (permanent)
+
+Requirements, architecture, design decisions, lessons and operational knowledge live in
+`docs/development/`; start at `docs/development/README.md`. The project-local workflow is
+`.agents/skills/project-memory/SKILL.md`. Each requirement is one stable
+`docs/development/requirements/REQ-NNNN.md` file; `python tools/project_memory.py` records
+its added, last-modified and deleted commit hashes in
+`docs/development/REQUIREMENTS-HISTORY.md`.
+
+Update the internal record and the relevant user-facing docs/examples when behavior changes.
+Before handoff run `python tools/project_memory.py --check`,
+`python -m pytest tests/test_project_memory.py tests/test_docs_links.py -q`, the normal
+CPU gate, and `git diff --check`. Do not leave durable knowledge only in chat.
+
 ## Worktree and shared-file protocol (2026-11-08)
 
 This session runs in a **linked worktree**, not the main checkout. The two working trees share the
@@ -468,6 +482,16 @@ installer test files, the full 242-test CPU suite (3 skipped), `bash -n`, LF She
   `.gitignore` now covers raw evidence, audit scratch files and key material. 39 local home-path
   occurrences in 33 tracked benchmark files were redacted to `<home>`. The scan and the full gate
   pass; commit metadata still uses the repository's configured author identity and was not rewritten.
+
+- 4B tensor-core FD fallback + streamed g5 cache repair (2026-11-11): `kindi/tp.py` disables
+  `KINDI_FD` for the 4B's 2560-wide plan (the split decode attention diverges) and logs the fallback;
+  `kindi/spec.py` rejects a streamed g5 cache whose key set predates the tied-head alias, so
+  `Shard._load` rebuilds it. `tests/test_plan_engine.py` covers both. On the RTX 4060 Ti, 4B tc is
+  3 exact + 1 accepted tie (token 24, gap 0.0157) at 164.6 tok/s; 2B tc is 4/4 and 27B tc is
+  3 exact + 1 tie. Full CPU-enabled suite: 283 passed. `compileall`, `config_reference --check`,
+  `support_matrix --check`, `cross_mode --check`, `bash -n install.sh`, the GRUB test and
+  `git diff --check` pass. The 9B tc (Hadamard 4096) and 27B plain (`unsupported grouped head
+  dimensions`) refusals remain unsupported combinations, not support claims.
 
 ## Layout
 
