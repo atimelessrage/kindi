@@ -130,8 +130,9 @@ class Engine(object):
         self.NV = self.dims["gdn_inner"] // self.HK
         self.CONV_CH = 2 * self.NK * self.HK + self.NV * self.HK
         self.NATT = self.NL // self.dims["full_attention_interval"]
-        if self.NV % self.NK or self.NH != self.NHKV * 4:
+        if self.NV % self.NK:
             raise SystemExit("kindi: unsupported grouped head dimensions")
+        self.G = self._gqa_groups(self.NH, self.NHKV, self.HD)
         # A tandem split loads only the layers it runs on this backend: the other layers' tensors never reach
         # the card, so the GPU side needs less VRAM. The full-path arrays (M, conv, Kc, Vc) stay indexed by the
         # original layer number and have None entries for the layers another backend owns.
@@ -363,6 +364,17 @@ class Engine(object):
         return out
 
     @staticmethod
+    def _gqa_groups(nh, nhkv, hd):
+        """Query heads per K/V head. The fp16 decode kernels cover a whole group: 4:1 is the fast path of the
+        2B/4B/9B, and the generic kernels cover G <= 8 at head size 256 (the 27B's 6:1 attention)."""
+        if nhkv <= 0 or nh % nhkv:
+            raise SystemExit("kindi: unsupported grouped head dimensions")
+        g = nh // nhkv
+        if not 1 <= g <= 8 or (g != 4 and hd != 256):
+            raise SystemExit("kindi: unsupported grouped head dimensions")
+        return g
+
+    @staticmethod
     def _select_layers(bi, layers, embed, head, head_name):
         """The tensor records this backend needs, for a partial layer range."""
         prefixes = tuple("blk.%d." % il for il in layers)
@@ -426,18 +438,33 @@ class Engine(object):
         self.Kc[kvi][pos] = self.kro.reshape(self.NHKV, self.HD)
         self.Vc[kvi][pos] = self.qkvbuf.reshape(self.NHKV, self.HD)
         n = pos + 1
-        nch = (n + 255) // 256
-        Kall, Vall = self.Kc[kvi][:n], self.Vc[kvi][:n]
-        self.k.k_attn_s4w((self.NHKV, min(32, (n + 31) // 32)), (256,), (Kall, self.qr, self.sbuf, np.int32(n), np.int32(self.NHKV)))
-        self.k.k_softmax_rows((self.NH,), (256,), (self.sbuf, np.int32(n)))
-        self.k.k_attn_v4p((self.NHKV, 1, nch), (128,), (self.sbuf, Vall, self.apart, np.int32(n), np.int32(self.NH), np.int32(self.NHKV)))
-        self.k.k_attn_comb((self.NH,), (256,), (self.apart, self.qn, self.att, np.int32(nch), np.int32(self.NH)))
+        self._attn_core(self.Kc[kvi][:n], self.Vc[kvi][:n], n, (n + 255) // 256)
         grid, hb = self.fold_args(self.NH * self.HD)
         self.k.k_fold_fwht(grid, (512,), (self.att, self.sA, self.xp, hb))
         self.fold_hi(self.xp, self.NH * self.HD)
         npart = self.gemv([p + "attn_output.weight"], self.xp, [self.y], parts_ok=True)
         self.pending = npart
         return h
+
+    def _attn_core(self, Kall, Vall, n, nch):
+        """Scores, softmax, values and the gated output of one attention layer into self.att. The 4:1 models use the
+        fast kernels; the generic GQA kernels run one warp per position (8 positions per block)."""
+        if self.G == 4:
+            self.k.k_attn_s4w((self.NHKV, min(32, (n + 31) // 32)), (256,),
+                              (Kall, self.qr, self.sbuf, np.int32(n), np.int32(self.NHKV)))
+            self.k.k_softmax_rows((self.NH,), (256,), (self.sbuf, np.int32(n)))
+            self.k.k_attn_v4p((self.NHKV, 1, nch), (128,),
+                              (self.sbuf, Vall, self.apart, np.int32(n), np.int32(self.NH), np.int32(self.NHKV)))
+            self.k.k_attn_comb((self.NH,), (256,),
+                               (self.apart, self.qn, self.att, np.int32(nch), np.int32(self.NH)))
+            return
+        self.k.k_attn_sg((self.NHKV, min(32, (n + 7) // 8)), (256,),
+                         (Kall, self.qr, self.sbuf, np.int32(n), np.int32(self.NHKV), np.int32(self.G)))
+        self.k.k_softmax_rows((self.NH,), (256,), (self.sbuf, np.int32(n)))
+        self.k.k_attn_vgn((self.NHKV, 1, nch), (128,),
+                          (self.sbuf, Vall, self.apart, np.int32(n), np.int32(self.NH), np.int32(self.NHKV),
+                           np.int32(self.G)))
+        self.k.k_attn_combn((self.NH,), (256,), (self.apart, self.qn, self.att, np.int32(n), np.int32(self.NH)))
 
     def ffn(self, il, h):
         p = "blk.%d." % il

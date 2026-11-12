@@ -1,45 +1,64 @@
 # Tandem/CPU recovery status
 
-Status: **dense runtime implemented and token-exact on the 2B, 2026-11-11. The CPU engine's
+Status: **dense runtime implemented and token-exact on the 2B and 9B, 2026-11-12; real joint-cache
+checks pass in both placements, including saved-opening reloads. The CPU engine's
 per-layer entry point is wired to a partial GPU engine in both dense placements; the MoE
-expert-cache approach is designed but not implemented. No model larger than one GPU has been
-measured, and no tandem support beyond the 2B gate is claimed.**
-This page records what `main` actually contains, why the interrupted WIP cannot be merged as-is, and
-the gate for deleting it. Archived with the other no-go work in [ROADMAP.md](ROADMAP.md).
+expert-cache path is designed in [MOE-TANDEM.md](MOE-TANDEM.md) and has a model-free state-machine
+prototype plus a [Gemma 4 26B adaptation](GEMMA4-26B-MOE.md), but no backend or integration. The
+27B `cpu-first` and `gpu-first` splits are token-exact at 8,192 context (peaks 7,005 / 7,017 MiB
+vs the 7,238 MiB full-GPU baseline, 2026-11-12); the CROSS-MODE throughput rows are still
+open.**
+This page records what this branch actually contains, why the interrupted WIP cannot be merged as-is,
+and the gate for deleting it. Archived with the other no-go work in [ROADMAP.md](ROADMAP.md).
 
 Benchmark coverage: [benchmarks/CROSS-MODE.md](benchmarks/CROSS-MODE.md) records the measured CPU-only and
-GPU-only 2B/4B/9B cells; its GPU+CPU tandem rows remain `n/a`. The dense runtime's real 2B exactness and
-one-run timings are in [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md).
+GPU-only 2B/4B/9B cells; its GPU+CPU tandem rows remain `n/a` because no throughput benchmark was run.
+The dense runtime's real 2B/9B exactness and one-run timings are in
+[TANDEM-RUNTIME.md](TANDEM-RUNTIME.md); the 9B cache evidence is in
+`bench-logs/tandem-cache/RESULTS-9B.md`.
 
 ## Answer
 
-At `main` = `2abf9ad` (the recovery audit), the repository had:
+At the recovery audit (`2abf9ad`), the repository had:
 
 - the **host-RAM preflight** in `kindi/hostram.py` (37 lines, used by `kindi/tp.py`);
 - the existing **AVX2/FMA/F16C CPU engine** (`kindi/cpu.py`, `kindi/kcpu.c`);
 - the existing **GEMV weight layout** (`kindi/layout.py:repack`, `reorder_head`).
 
-The 2026-11-11 slices add:
+The 2026-11-11/12 slices in this branch add:
 
 - `kc_embed`, `kc_layer` and `kc_head` in `kindi/kcpu.c`;
 - `Engine.begin`, `layer`, `head`, `feed_layers`, `step_layers` and an in-place `hidden` view in
   `kindi/cpu.py`;
-- `kindi/tandem.py`: `TandemEngine` in `cpu-first` and `gpu-first` placements, plus a cache-free
-  `TandemRunner` for the server;
+- `kindi/tandem.py`: `TandemEngine` in `cpu-first` and `gpu-first` placements, plus a
+  `TandemRunner` that reuses the normal prompt cache through joint checkpoints;
+- a real 2B joint-cache check in both placements: end-state reuse (320 tokens), a 256-token
+  joint-checkpoint restore and a 256-token saved-opening reload matched `KINDI_PROMPT_CACHE=0`
+  token-for-token; an HTTP server saved and reloaded a 344-token opening after a restart, reporting
+  344 cached tokens versus 0 with the cache off; the same check passed at 4K/8K context with
+  1,024/2,048-token checkpoints (4,080/8,176 extension tokens and 3,072/6,144 branch tokens); see
+  `bench-logs/tandem-cache/RESULTS.md` and `LONG-CONTEXT-RESULTS.md`;
+- the 9B pack passed the 512-context check in both placements with 6 CPU layers: extension 320,
+  branch 256 and saved opening 256, all exact against cache-off; CPU load 105-108 s, GPU load
+  5.8-6.0 s; see `bench-logs/tandem-cache/RESULTS-9B.md`;
+- a prepare-only 2B measurement in both placements: 320/325 and 256/261 tokens reused, a 19.27 MiB
+  joint recurrent checkpoint, 8.7-8.9 ms median save and 3.3-3.5 ms median restore; see
+  `bench-logs/tandem-cache/PREFIX-RESULTS.md`;
 - `engine.Engine(layers=..., embed=..., head=...)`: a partial GPU engine that uploads only the
   owned layer tensors and keeps only their GDN/KV state.
 
 It still does **not** have:
 
-- a MoE expert cache, because there is no Bonsai MoE backend or router path to attach it to;
-- joint prompt-cache checkpoints for the two ownership domains, so the tandem server reads the
-  prompt from position 0 on each request;
-- a measured 27B-class (larger-than-VRAM) split or a peak-VRAM comparison;
+- a MoE backend and GPU copy path; the copy-only slot manager is in `kindi/expert_cache.py` and the
+  design is in [MOE-TANDEM.md](MOE-TANDEM.md), but there is no router, pack or engine integration;
+- the CROSS-MODE tandem throughput rows are still `n/a` because no `bench` timing run has
+  been recorded (both 27B placements passed at 8K on 2026-11-12; [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md));
 - a layer-contiguous streaming pack format or a converter that emits one;
-- CPU ISA detection or the WIP's CPU dispatch; the AVX-only fallback is a separate CPU task.
+- native Sandy Bridge or no-FMA hardware validation; the five-tier CPU dispatch and AVX-only
+  fallback are implemented and forced-tier tested, but only on an AVX2 host.
 
 So the dense runtime is no longer the missing piece, but **do not delete the WIP branches yet**:
-the MoE design, the joint cache and the larger-model gate remain open.
+the MoE backend (the model-free cache prototype exists) and the larger-model gate remain open.
 
 ## First slice: per-layer CPU entry point (2026-11-11)
 
@@ -94,8 +113,9 @@ implementation to restore.
 
 The native Windows build works when `KINDI_CC`/`KINDI_LLVM` select clang 18.1.8 and libomp; the dense
 runtime and its two-backend exactness check now pass on this host. The remaining work is the
-larger-model gate: a 27B-class model through both placements, peak-VRAM evidence, and a decision on
-joint cache checkpoints. The WIP's CUDA doorbell kernel has still not been compiled or exercised,
+larger-model stage: a 27B-class model through both placements and peak-VRAM evidence. The joint
+prompt-cache checkpoints are implemented for both ownership domains and covered by unit tests; the
+real 2B exactness check and a prepare-only prefix/checkpoint measurement now pass on this host. The WIP's CUDA doorbell kernel has still not been compiled or exercised,
 and it is not used by the dense implementation. A Linux host with gcc/OpenMP, or CI, is still required
 for the AVX-only and portable CPU gates.
 
@@ -111,27 +131,29 @@ Do not remove either WIP branch until a replacement on `main` passes all of thes
    alternative), and existing packs still load unchanged.
 3. **Tandem gate:** a clean `TandemEngine` runs layer-by-layer with CPU/GPU placement, and greedy
    output is token-exact against the full-GPU engine on at least 2B and 9B. **2B: passed on
-   2026-11-11 in both placements; 9B is still open.**
+   2026-11-11 in both placements; 9B: passed on 2026-11-12 in both placements at 512 context;
+   27B: both placements passed on 2026-11-12 (4/4 prompts; peaks 7,005 / 7,017 MiB).**
 4. **Benchmark gate:** decode throughput and peak VRAM are recorded for a model that does not fit
    VRAM, with the CPU/GPU split stated.
 5. **Cleanup gate:** the replacement is committed, the full CPU suite and the GPU verify pass, and
    `git status` is clean. Only then delete the WIP branches or the backup snapshot.
 
-Until then, the WIP branches are the only copy of the CPU ISA experiments and the tandem design
-sketches. Keep them.
+Keep the WIP branches as historical references: this branch now has its own five-tier CPU
+dispatch and dense tandem runtime, but the WIP still contains unmerged exploration and the original
+design sketches.
 
 ## Next implementation slice
 
 The dense placement and handoff are done. The next steps are:
 
-1. Run the 9B tandem gate against the full-GPU engine, then a 27B-class model that does not fit
-   the card; record peak VRAM for full GPU, CPU-first and GPU-first.
-2. Decide the joint cache design: checkpoint both engines' state or keep the tandem path
-   cache-free explicitly.
+1. Run a tandem throughput benchmark so the CROSS-MODE rows are numbers, not `n/a`
+   (full-GPU and both tandem 27B peaks are recorded).
+2. Saved-opening reloads, server cache metrics and checkpoint cost at longer contexts remain to be
+   measured; the in-process end-state and joint-checkpoint paths now pass in both placements.
 3. Measure and tune the CPU layer boundary (`--tandem-cpu-layers`) and prompt reading on the
    target small card.
-4. Add a MoE expert-cache policy only after a MoE backend with per-expert tensors and router logits
-   exists; it is a different algorithm, not a flag on this one.
+4. Implement the MoE expert cache from [MOE-TANDEM.md](MOE-TANDEM.md) only after a MoE backend with
+   per-expert tensors and router logits exists; it is a different algorithm, not a flag on this one.
 5. Build `hostram` pinned/mmap primitives and a layer-contiguous pack format if the measurements
    justify them.
 

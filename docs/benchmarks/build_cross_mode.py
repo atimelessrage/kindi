@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Build the cross-mode benchmark matrix: CPU-only, GPU-only and GPU+CPU tandem.
 
-The CPU and GPU cells come from the measured runs in this folder. The tandem rows are deliberately
-empty: this tree has no tandem runtime (docs/TANDEM-STATUS.md), so no tandem number may be claimed.
-`--check` exits 1 when CROSS-MODE.md or CROSS-MODE.csv is stale.
+The CPU and GPU cells come from the measured runs in this folder. The tandem rows stay empty
+because no throughput benchmark has been run; the dense runtime exists (docs/TANDEM-RUNTIME.md),
+so this is a measurement gap rather than an absent code path. `--check` exits 1 when CROSS-MODE.md
+or CROSS-MODE.csv is stale.
 """
 import argparse
 import csv
@@ -21,7 +22,7 @@ POSITIONS = (100, 2000, 8000, 16000, 24000)
 METRICS = ("read",) + tuple("gen_%d" % p for p in POSITIONS)
 MODELS = ("2b", "4b", "9b")
 LABELS = {"cpu": "CPU only", "gpu": "GPU only", "tandem": "GPU+CPU tandem"}
-TANDEM_SOURCE = "no runtime (docs/TANDEM-STATUS.md)"
+TANDEM_SOURCE = "no throughput benchmark (runtime in docs/TANDEM-RUNTIME.md)"
 
 
 def _read_csv(path):
@@ -104,8 +105,8 @@ def render_md(rows):
         "  24,576-token context. One fresh-process run per model; no WSL.",
         "- **GPU only:** the card runs every layer; the CPU only drives the process (Windows 10, CuPy",
         "  14.2.0). Three fresh-process runs per model; the table uses their median.",
-        "- **GPU+CPU tandem:** **not available in this tree.** There is no `TandemEngine`; only the",
-        "  design, the host-RAM preflight and a corrupt WIP remain (`docs/TANDEM-STATUS.md`). The rows",
+        "- **GPU+CPU tandem:** the dense `TandemEngine` exists and is token-exact on the 2B/9B",
+        "  (`docs/TANDEM-RUNTIME.md`), but no throughput benchmark was run at these positions. The rows",
         "  below say `n/a` and no tandem number is claimed.",
         "",
         "\"Read\" is the benchmark's 1,000-token prompt-reading probe. 100, 2K, 8K, 16K and 24K are",
@@ -139,12 +140,13 @@ def render_md(rows):
         "",
         "## Tandem status and the gate for a number",
         "",
-        "No tandem cell is recorded because the runtime is absent. [TANDEM-STATUS.md](../TANDEM-STATUS.md)",
+        "No tandem cell is recorded because no throughput benchmark has been run.",
+        "[TANDEM-STATUS.md](../TANDEM-STATUS.md)",
         "requires, in order:",
         "",
         "1. the CPU gate (supported ISA flags build, actionable fallback);",
         "2. a real layer-contiguous streaming pack;",
-        "3. a clean `TandemEngine` that is token-exact against full-GPU on at least 2B and 9B;",
+        "3. the `TandemEngine` exactness gate (passed on 2B/9B; 27B `cpu-first` and `gpu-first` passed 2026-11-12 at 8K);",
         "4. decode throughput and peak VRAM recorded for a model that does not fit VRAM, with the CPU/GPU",
         "   split stated;",
         "5. a committed replacement with the full CPU suite and the GPU verify passing.",

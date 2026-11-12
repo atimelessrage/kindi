@@ -9,8 +9,8 @@ drafting.
   24,576-token context. One fresh-process run per model; no WSL.
 - **GPU only:** the card runs every layer; the CPU only drives the process (Windows 10, CuPy
   14.2.0). Three fresh-process runs per model; the table uses their median.
-- **GPU+CPU tandem:** **not available in this tree.** There is no `TandemEngine`; only the
-  design, the host-RAM preflight and a corrupt WIP remain (`docs/TANDEM-STATUS.md`). The rows
+- **GPU+CPU tandem:** the dense `TandemEngine` exists and is token-exact on the 2B/9B
+  (`docs/TANDEM-RUNTIME.md`), but no throughput benchmark was run at these positions. The rows
   below say `n/a` and no tandem number is claimed.
 
 "Read" is the benchmark's 1,000-token prompt-reading probe. 100, 2K, 8K, 16K and 24K are
@@ -45,12 +45,13 @@ The ratio grows with depth because the CPU attention path slows down faster than
 
 ## Tandem status and the gate for a number
 
-No tandem cell is recorded because the runtime is absent. [TANDEM-STATUS.md](../TANDEM-STATUS.md)
+No tandem cell is recorded because no throughput benchmark has been run.
+[TANDEM-STATUS.md](../TANDEM-STATUS.md)
 requires, in order:
 
 1. the CPU gate (supported ISA flags build, actionable fallback);
 2. a real layer-contiguous streaming pack;
-3. a clean `TandemEngine` that is token-exact against full-GPU on at least 2B and 9B;
+3. the `TandemEngine` exactness gate (passed on 2B/9B; 27B `cpu-first` and `gpu-first` passed 2026-11-12 at 8K);
 4. decode throughput and peak VRAM recorded for a model that does not fit VRAM, with the CPU/GPU
    split stated;
 5. a committed replacement with the full CPU suite and the GPU verify passing.
