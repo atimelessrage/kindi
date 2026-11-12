@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Build the cross-mode benchmark matrix: CPU-only, GPU-only and GPU+CPU tandem.
 
-The CPU and GPU cells come from the measured runs in this folder. The tandem rows stay empty
-because no throughput benchmark has been run; the dense runtime exists (docs/TANDEM-RUNTIME.md),
-so this is a measurement gap rather than an absent code path. `--check` exits 1 when CROSS-MODE.md
-or CROSS-MODE.csv is stale.
+The CPU and GPU cells come from the measured runs in this folder. Measured tandem runs are
+read from the 2026-11-12 tandem folder when they are complete; models without complete tandem
+data stay `n/a`. The dense runtime exists (docs/TANDEM-RUNTIME.md), so an absent tandem cell is
+a measurement gap rather than an absent code path. `--check` exits 1 when CROSS-MODE.md or
+CROSS-MODE.csv is stale.
 """
 import argparse
 import csv
@@ -16,6 +17,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 CPU_RUNS = HERE / "2026-11-10-i7-8086k-windows-cpu" / "runs.csv"
 GPU_RUNS = HERE / "2026-11-09-i7-8086k-rtx4060ti" / "runs.csv"
+TANDEM_RUNS = HERE / "2026-11-12-i7-8086k-rtx4060ti-tandem" / "runs.csv"
 MD = HERE / "CROSS-MODE.md"
 CSV = HERE / "CROSS-MODE.csv"
 POSITIONS = (100, 2000, 8000, 16000, 24000)
@@ -61,9 +63,50 @@ def gpu_rows():
     return out
 
 
+def tandem_rows():
+    """Measured GPU+CPU tandem runs; incomplete or absent data leaves the model unavailable."""
+    if not TANDEM_RUNS.is_file():
+        return {}
+    vals = {m: {k: [] for k in METRICS} for m in MODELS}
+    placements = {m: [] for m in MODELS}
+    cpu_layers = {m: [] for m in MODELS}
+    free = {m: [] for m in MODELS}
+    for row in _read_csv(TANDEM_RUNS):
+        model = row.get("model")
+        if model not in MODELS:
+            continue
+        try:
+            got = {"read": float(row["prompt"])}
+            got.update({k: float(row["gen_%d" % p]) for k, p in zip(METRICS[1:], POSITIONS)})
+        except (KeyError, TypeError, ValueError):
+            continue
+        for k, v in got.items():
+            vals[model][k].append(v)
+        if row.get("placement"):
+            placements[model].append(row["placement"])
+        if row.get("cpu_layers"):
+            cpu_layers[model].append(row["cpu_layers"])
+        if row.get("free_mib"):
+            try:
+                free[model].append(float(row["free_mib"]))
+            except ValueError:
+                pass
+    out = {}
+    for model, cells in vals.items():
+        if not cells["read"] or any(len(cells[k]) != len(cells["read"]) for k in METRICS):
+            continue
+        out[model] = {k: statistics.median(v) for k, v in cells.items()}
+        out[model]["runs"] = len(cells["read"])
+        layer_vals = sorted(set(cpu_layers[model]))
+        out[model]["placement"] = "+".join(sorted(set(placements[model]))) if placements[model] else "tandem"
+        out[model]["cpu_layers"] = layer_vals[0] if len(layer_vals) == 1 else ("mixed" if layer_vals else "quarter")
+        out[model]["free_mib"] = statistics.median(free[model]) if free[model] else None
+    return out
+
+
 def matrix():
-    """One row per mode and model; tandem rows are present but unavailable."""
-    cpu, gpu = cpu_rows(), gpu_rows()
+    """One row per mode and model; incomplete tandem data stays explicitly unavailable."""
+    cpu, gpu, tandem = cpu_rows(), gpu_rows(), tandem_rows()
     rows = []
     for model in MODELS:
         rows.append(dict(mode="cpu", available=1, model=model, runs=1,
@@ -71,8 +114,16 @@ def matrix():
         rows.append(dict(mode="gpu", available=1, model=model, runs=gpu[model]["runs"],
                          source="2026-11-09-i7-8086k-rtx4060ti (median of 3)",
                          **{k: gpu[model][k] for k in METRICS}))
-        rows.append(dict(mode="tandem", available=0, model=model, runs="", source=TANDEM_SOURCE,
-                         **{k: None for k in METRICS}))
+        if model in tandem:
+            t = tandem[model]
+            rows.append(dict(
+                mode="tandem", available=1, model=model, runs=t["runs"],
+                source="2026-11-12-i7-8086k-rtx4060ti-tandem (%s, %s CPU layer(s), %d run(s))"
+                       % (t["placement"], t["cpu_layers"], t["runs"]),
+                **{k: t[k] for k in METRICS}))
+        else:
+            rows.append(dict(mode="tandem", available=0, model=model, runs="", source=TANDEM_SOURCE,
+                             **{k: None for k in METRICS}))
     return rows
 
 
@@ -90,6 +141,17 @@ def render_csv(rows):
 def render_md(rows):
     by = {(r["mode"], r["model"]): r for r in rows}
 
+    measured_tandem = [m for m in MODELS if by[("tandem", m)]["available"] == 1]
+    missing_tandem = [m for m in MODELS if m not in measured_tandem]
+    if measured_tandem == MODELS:
+        tandem_intro = "All tandem rows below are measured on 2026-11-12."
+    elif measured_tandem:
+        tandem_intro = ("Measured tandem rows in the table below come from 2026-11-12 (models: %s); "
+                        "the other tandem rows say `n/a` because they have not been measured."
+                        % ", ".join(m.upper() for m in measured_tandem))
+    else:
+        tandem_intro = "No throughput benchmark has been run at these positions; the rows below say `n/a` and no tandem number is claimed."
+
     def cell(v):
         return "n/a" if v is None else "%.1f" % v
 
@@ -105,9 +167,7 @@ def render_md(rows):
         "  24,576-token context. One fresh-process run per model; no WSL.",
         "- **GPU only:** the card runs every layer; the CPU only drives the process (Windows 10, CuPy",
         "  14.2.0). Three fresh-process runs per model; the table uses their median.",
-        "- **GPU+CPU tandem:** the dense `TandemEngine` exists and is token-exact on the 2B/9B",
-        "  (`docs/TANDEM-RUNTIME.md`), but no throughput benchmark was run at these positions. The rows",
-        "  below say `n/a` and no tandem number is claimed.",
+        "- **GPU+CPU tandem:** the dense `TandemEngine` exists and is token-exact on the 2B/9B (`docs/TANDEM-RUNTIME.md`). %s" % tandem_intro,
         "",
         "\"Read\" is the benchmark's 1,000-token prompt-reading probe. 100, 2K, 8K, 16K and 24K are",
         "generation at that token position in the allocated 24,576-token context. Tokens/s.",
@@ -125,6 +185,10 @@ def render_md(rows):
         "native Windows) and [2026-11-09-i7-8086k-rtx4060ti](2026-11-09-i7-8086k-rtx4060ti/README.md). The",
         "CPU run is one run per cell; the GPU run is the median of three. The two blocks were not interleaved",
         "and the CPU block is native Windows, so the ratio is a same-machine indication, not a controlled A/B.",
+        ""]
+    if measured_tandem:
+        lines.append("Tandem source: [2026-11-12-i7-8086k-rtx4060ti-tandem](2026-11-12-i7-8086k-rtx4060ti-tandem/README.md).")
+    lines += [
         "",
         "## GPU-only speedup over CPU-only",
         "",
@@ -134,25 +198,35 @@ def render_md(rows):
         c, g = by[("cpu", model)], by[("gpu", model)]
         lines.append("| %s | %s |" % (model.upper(), " | ".join(
             "%.1fx" % (g[k] / c[k]) for k in METRICS[1:])))
+    if measured_tandem == MODELS:
+        tandem_status = "All tandem cells are recorded from 2026-11-12."
+    elif measured_tandem:
+        tandem_status = ("The %s tandem cell(s) are recorded from 2026-11-12; the %s cell(s) are not "
+                         "recorded because the same single-run throughput benchmark has not been run "
+                         "for those models." % (", ".join(m.upper() for m in measured_tandem),
+                                                ", ".join(m.upper() for m in missing_tandem)))
+    else:
+        tandem_status = "No tandem cell is recorded because no throughput benchmark has been run."
     lines += [
         "",
         "The ratio grows with depth because the CPU attention path slows down faster than the GPU path.",
         "",
         "## Tandem status and the gate for a number",
         "",
-        "No tandem cell is recorded because no throughput benchmark has been run.",
+        tandem_status,
         "[TANDEM-STATUS.md](../TANDEM-STATUS.md)",
         "requires, in order:",
         "",
         "1. the CPU gate (supported ISA flags build, actionable fallback);",
         "2. a real layer-contiguous streaming pack;",
         "3. the `TandemEngine` exactness gate (passed on 2B/9B; 27B `cpu-first` and `gpu-first` passed 2026-11-12 at 8K);",
-        "4. decode throughput and peak VRAM recorded for a model that does not fit VRAM, with the CPU/GPU",
-        "   split stated;",
+        "4. decode throughput and peak VRAM recorded for a larger-than-VRAM model, with the CPU/GPU",
+        "   split stated; a tandem cell in this table is only a throughput rate, so the larger-than-VRAM",
+        "   gate still needs a measured tandem rate plus a sampled peak for a model that does not fit VRAM;",
         "5. a committed replacement with the full CPU suite and the GPU verify passing.",
         "",
         "A tandem row is added to this matrix only after gates 3 and 4: exactness first, then a measured",
-        "rate at each of the same positions and the peak VRAM. Until then the third mode stays `n/a`.",
+        "rate at each of the same positions and the peak VRAM. Until then every unmeasured tandem row stays `n/a`.",
         "",
         "## Limits",
         "",

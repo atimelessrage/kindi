@@ -1,0 +1,2 @@
+model,placement,cpu_layers,ctx,prompt,gen_100,gen_2000,gen_8000,gen_16000,gen_24000,free_mib
+2b,cpu-first,6,24576,80.9,65.7,71.3,55.5,43.4,35.8,6411

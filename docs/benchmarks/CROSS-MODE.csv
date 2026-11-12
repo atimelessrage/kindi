@@ -1,7 +1,7 @@
 mode,available,model,read,gen_100,gen_2000,gen_8000,gen_16000,gen_24000,runs,source
 cpu,1,2b,45.1,35.9,29.3,19.4,11.9,8.2,1,"2026-11-10-i7-8086k-windows-cpu (6 threads, one run)"
 gpu,1,2b,190.0,169.0,163.3,175.4,171.7,160.6,3,2026-11-09-i7-8086k-rtx4060ti (median of 3)
-tandem,0,2b,,,,,,,,no throughput benchmark (runtime in docs/TANDEM-RUNTIME.md)
+tandem,1,2b,80.9,65.7,71.3,55.5,43.4,35.8,1,"2026-11-12-i7-8086k-rtx4060ti-tandem (cpu-first, 6 CPU layer(s), 1 run(s))"
 cpu,1,4b,19.2,15.2,13.4,6.8,4.3,3.1,1,"2026-11-10-i7-8086k-windows-cpu (6 threads, one run)"
 gpu,1,4b,129.0,106.2,101.9,90.8,89.3,79.8,3,2026-11-09-i7-8086k-rtx4060ti (median of 3)
 tandem,0,4b,,,,,,,,no throughput benchmark (runtime in docs/TANDEM-RUNTIME.md)

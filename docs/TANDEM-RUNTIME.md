@@ -155,10 +155,13 @@ commands, timings and IDs: `bench-logs/tandem-cache/RESULTS-9B.md`.
   token per backend call.
 - **One GPU.** The split composes with the CPU engine only; the two-card `TPEngine` is not a tandem
   owner.
-- **27B: both placements measured; throughput still `n/a`.** The 2026-11-12 gate records
-  `cpu-first` and `gpu-first` (below). Tandem throughput rows in
-  [CROSS-MODE.md](benchmarks/CROSS-MODE.md) remain `n/a`: no `bench` throughput run has been
-  recorded for either placement.
+- **27B: both placements exact; 2B throughput recorded.** The 2026-11-12 gate records
+  `cpu-first` and `gpu-first` (below) with sampled peaks. The 2B `cpu-first` cell in
+  [CROSS-MODE.md](benchmarks/CROSS-MODE.md) now has a real `bench` throughput run (read 80.9,
+  generation 65.7/71.3/55.5/43.4/35.8 tok/s at a 24,576-token context; free-after-load
+  6411 MiB in the tandem benchmark README, not a sampled peak). The 4B and 9B tandem
+  cells remain `n/a` until the same benchmark is run for them, and the larger-than-VRAM
+  gate still needs a measured tandem throughput row with sampled peak.
 
 ## 27B gate (2026-11-12)
 
@@ -209,7 +212,7 @@ dense MLP and layer-scoped plans. This runtime remains dense-only.
 
 1. **Larger-than-VRAM exactness:** both 27B placements are exact at 8K (2026-11-12).
 2. **Peak VRAM:** full-GPU 27B baseline 7,238 MiB at 8K; tandem `cpu-first` 7,005 MiB and
-   `gpu-first` 7,017 MiB at 8K. A throughput benchmark (the CROSS-MODE `n/a` rows) is still open.
+   `gpu-first` 7,017 MiB at 8K. The 2B `cpu-first` throughput rate is recorded in CROSS-MODE; 4B/9B throughput and a larger-than-VRAM throughput row with sampled peak remain open.
 3. **Joint cache:** end-state reuse, joint-checkpoint restore and saved-opening reloads through the
    HTTP server are measured on both placements at 512 tokens, and in-process equality now passes at
    4K/8K; saved-opening reloads at 4K/8K and checkpoint cost at longer contexts remain open.

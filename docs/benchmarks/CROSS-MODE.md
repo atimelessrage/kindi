@@ -9,9 +9,7 @@ drafting.
   24,576-token context. One fresh-process run per model; no WSL.
 - **GPU only:** the card runs every layer; the CPU only drives the process (Windows 10, CuPy
   14.2.0). Three fresh-process runs per model; the table uses their median.
-- **GPU+CPU tandem:** the dense `TandemEngine` exists and is token-exact on the 2B/9B
-  (`docs/TANDEM-RUNTIME.md`), but no throughput benchmark was run at these positions. The rows
-  below say `n/a` and no tandem number is claimed.
+- **GPU+CPU tandem:** the dense `TandemEngine` exists and is token-exact on the 2B/9B (`docs/TANDEM-RUNTIME.md`). Measured tandem rows in the table below come from 2026-11-12 (models: 2B); the other tandem rows say `n/a` because they have not been measured.
 
 "Read" is the benchmark's 1,000-token prompt-reading probe. 100, 2K, 8K, 16K and 24K are
 generation at that token position in the allocated 24,576-token context. Tokens/s.
@@ -20,7 +18,7 @@ generation at that token position in the allocated 24,576-token context. Tokens/
 |---|---|---:|---:|---:|---:|---:|---:|
 | 2B | GPU only | 190.0 | 169.0 | 163.3 | 175.4 | 171.7 | 160.6 |
 | 2B | CPU only | 45.1 | 35.9 | 29.3 | 19.4 | 11.9 | 8.2 |
-| 2B | GPU+CPU tandem | n/a | n/a | n/a | n/a | n/a | n/a |
+| 2B | GPU+CPU tandem | 80.9 | 65.7 | 71.3 | 55.5 | 43.4 | 35.8 |
 | 4B | GPU only | 129.0 | 106.2 | 101.9 | 90.8 | 89.3 | 79.8 |
 | 4B | CPU only | 19.2 | 15.2 | 13.4 | 6.8 | 4.3 | 3.1 |
 | 4B | GPU+CPU tandem | n/a | n/a | n/a | n/a | n/a | n/a |
@@ -32,6 +30,8 @@ Sources: [2026-11-10-i7-8086k-windows-cpu](2026-11-10-i7-8086k-windows-cpu/READM
 native Windows) and [2026-11-09-i7-8086k-rtx4060ti](2026-11-09-i7-8086k-rtx4060ti/README.md). The
 CPU run is one run per cell; the GPU run is the median of three. The two blocks were not interleaved
 and the CPU block is native Windows, so the ratio is a same-machine indication, not a controlled A/B.
+
+Tandem source: [2026-11-12-i7-8086k-rtx4060ti-tandem](2026-11-12-i7-8086k-rtx4060ti-tandem/README.md).
 
 ## GPU-only speedup over CPU-only
 
@@ -45,19 +45,20 @@ The ratio grows with depth because the CPU attention path slows down faster than
 
 ## Tandem status and the gate for a number
 
-No tandem cell is recorded because no throughput benchmark has been run.
+The 2B tandem cell(s) are recorded from 2026-11-12; the 4B, 9B cell(s) are not recorded because the same single-run throughput benchmark has not been run for those models.
 [TANDEM-STATUS.md](../TANDEM-STATUS.md)
 requires, in order:
 
 1. the CPU gate (supported ISA flags build, actionable fallback);
 2. a real layer-contiguous streaming pack;
 3. the `TandemEngine` exactness gate (passed on 2B/9B; 27B `cpu-first` and `gpu-first` passed 2026-11-12 at 8K);
-4. decode throughput and peak VRAM recorded for a model that does not fit VRAM, with the CPU/GPU
-   split stated;
+4. decode throughput and peak VRAM recorded for a larger-than-VRAM model, with the CPU/GPU
+   split stated; a tandem cell in this table is only a throughput rate, so the larger-than-VRAM
+   gate still needs a measured tandem rate plus a sampled peak for a model that does not fit VRAM;
 5. a committed replacement with the full CPU suite and the GPU verify passing.
 
 A tandem row is added to this matrix only after gates 3 and 4: exactness first, then a measured
-rate at each of the same positions and the peak VRAM. Until then the third mode stays `n/a`.
+rate at each of the same positions and the peak VRAM. Until then every unmeasured tandem row stays `n/a`.
 
 ## Limits
 
