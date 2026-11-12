@@ -219,6 +219,27 @@ def test_joint_prefix_reuse_resumes_at_a_checkpoint(fake_pack, fake_backends, tm
     assert runner.tokens == second
 
 
+def test_tandem_runner_recomputes_the_pick_after_its_checkpoint_cache_is_deleted(
+        fake_pack, fake_backends, tmp_path):
+    """If the prompt checkpoint cache is deleted, the runner must read the prompt again
+    and compute a fresh next-token pick instead of relying on stale reuse state."""
+    eng = tandem.TandemEngine(fake_pack, ctx=512, cpu_layers=2, mode="gpu-first", log=lambda *a: None)
+    runner = tandem.TandemRunner(eng, cache_cfg(tmp_path), "test", log=lambda *a: None)
+    first = list(range(300))
+    nxt, cached = runner.prepare(first, len(first), len(first))
+    assert nxt == 88 and cached == 0
+    assert runner.ckpt
+
+    calls_before = len(eng.cpu.calls) + len(eng.gpu.calls)
+    runner.ckpt.clear()
+    runner.parked.clear()
+
+    nxt, cached = runner.prepare(first, len(first), len(first))
+    assert nxt == 88 and cached == 0
+    assert runner.tokens == first
+    assert len(eng.cpu.calls) + len(eng.gpu.calls) > calls_before
+
+
 def test_joint_fingerprint_separates_the_two_placements(fake_pack, fake_backends, tmp_path):
     cpu_first = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first", log=lambda *a: None)
     gpu_first = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="gpu-first", log=lambda *a: None)
