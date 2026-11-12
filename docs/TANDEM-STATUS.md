@@ -12,8 +12,7 @@ This page records what this branch actually contains, why the interrupted WIP ca
 and the gate for deleting it. Archived with the other no-go work in [ROADMAP.md](ROADMAP.md).
 
 Benchmark coverage: [benchmarks/CROSS-MODE.md](benchmarks/CROSS-MODE.md) records the measured CPU-only and
-GPU-only 2B/4B/9B cells and the measured 2B GPU+CPU tandem row; the 4B and 9B tandem rows remain `n/a`
-because the same single-run throughput benchmark has not been run for those models. This page is the tandem
+GPU-only 2B/4B/9B cells and the measured 2B/4B/9B GPU+CPU tandem rows. This page is the tandem
 status source; other pages link here rather than restating tandem details.
 The dense runtime's real 2B/9B exactness and one-run timings are in
 [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md); the 9B cache evidence is in
@@ -57,9 +56,9 @@ It still does **not** have:
 
 - a MoE backend and GPU copy path; the copy-only slot manager is in `kindi/expert_cache.py` and the
   design is in [MOE-TANDEM.md](MOE-TANDEM.md), but there is no router, pack or engine integration;
-- the 4B and 9B CROSS-MODE tandem throughput rows remain `n/a`: the 2B `cpu-first` `bench` run is
-  recorded, but the same single-run benchmark has not been run for 4B/9B (both 27B placements passed at
-  8K on 2026-11-12; [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md));
+- a larger-than-VRAM tandem throughput row with a sampled peak (the 2B/4B/9B CROSS-MODE
+  `cpu-first` rows are recorded; both 27B placements passed at 8K on 2026-11-12;
+  [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md));
 - a layer-contiguous streaming pack format or a converter that emits one (the CPU backend
   now skips unowned layers at load, but the pack on disk is unchanged);
 - native Sandy Bridge or no-FMA hardware validation; the five-tier CPU dispatch and AVX-only
@@ -154,8 +153,9 @@ design sketches.
 
 The dense placement and handoff are done. The next steps are:
 
-1. Run a tandem throughput benchmark so the CROSS-MODE rows are numbers, not `n/a`
-   (full-GPU and both tandem 27B peaks are recorded).
+1. Run a larger-than-VRAM (27B) tandem throughput benchmark at the CROSS-MODE positions
+   so the capacity use case has a rate plus a sampled peak (the 2B/4B/9B CROSS-MODE rows
+   are recorded; full-GPU and both tandem 27B peaks are recorded at 8K).
 2. Saved-opening reloads, server cache metrics and checkpoint cost at longer contexts remain to be
    measured; the in-process end-state and joint-checkpoint paths now pass in both placements.
 3. Measure and tune the CPU layer boundary (`--tandem-cpu-layers`) and prompt reading on the

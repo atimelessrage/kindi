@@ -69,8 +69,8 @@ replacement release.
 
 - **27B tandem** is implemented and measured in both placements (`cpu-first` peak 7,005 MiB,
   `gpu-first` 7,017 MiB, vs the 7,238 MiB full-GPU baseline, at 8,192 context, 2026-11-12).
-  The 2B `cpu-first` CROSS-MODE tandem throughput row is recorded; 4B/9B remain `n/a`, and
-  tandem still does not beat GPU-only throughput.
+  The 2B/4B/9B `cpu-first` CROSS-MODE tandem throughput rows are recorded; tandem
+  still does not beat GPU-only throughput.
 - **9B tensor-core plan** is refused (Hadamard block 4096); **4B tc** is 3 exact + 1 accepted
   tie with the FD fallback (forced FD was 2/4); **k8v4** is absent for 9B and only 2/4 on 2B.
 - **Blackwell FP8/BF16 and real FP8 models** are not validated; the local Blackwell gate
@@ -113,7 +113,7 @@ in-place `_to_dev` copy. A GPU-free regression test reproduces the scalar-fill f
 This is a concrete correctness improvement over the pre-fix state.
 
 **Not covered:** cumulative-B (33B), MoE, long-context *saved-opening reload*
-on 9B, 4B/9B CROSS-MODE tandem throughput, and a larger-than-VRAM tandem throughput
+on 9B, and a larger-than-VRAM tandem throughput
 row with a sampled peak. The 2B `cpu-first` CROSS-MODE row is recorded (read 80.9;
 generation 65.7/71.3/55.5/43.4/35.8 tok/s at 24,576 context) and does not beat
 GPU-only. The 105–108 s 9B CPU load was a full-model load; the 27B CPU engine now
@@ -239,7 +239,7 @@ not yet meet their own gates. They should not be presented as supported.
 
 | Area | Current state | Why it matters |
 |---|---|---|
-| **27B tandem** | implemented and measured in both placements: `cpu-first` 4/4 (peak 7,005 MiB) and `gpu-first` 4/4 (peak 7,017 MiB), all 40/40 tokens each, vs the 7,238 MiB full-GPU baseline (8,192 context, 2026-11-12); a 2B `cpu-first` CROSS-MODE tandem throughput row is recorded; 4B/9B remain `n/a`. | The “larger than VRAM” use case works in both placements. The plain GPU engine now accepts grouped-query ratios up to 8:1 at head size 256, reusing the existing generic-GQA kernels; the 4:1 fast paths are unchanged. |
+| **27B tandem** | implemented and measured in both placements: `cpu-first` 4/4 (peak 7,005 MiB) and `gpu-first` 4/4 (peak 7,017 MiB), all 40/40 tokens each, vs the 7,238 MiB full-GPU baseline (8,192 context, 2026-11-12); 2B/4B/9B `cpu-first` CROSS-MODE tandem throughput rows are recorded. | The “larger than VRAM” use case works in both placements. The plain GPU engine now accepts grouped-query ratios up to 8:1 at head size 256, reusing the existing generic-GQA kernels; the 4:1 fast paths are unchanged. |
 | **9B tensor-core plan** | Refused before graph build because the Hadamard block is 4096. | The 9B tc cell is not available; plain 9B is 4/4. |
 | **4B tensor-core plan** | 3 exact + 1 accepted llama.cpp tie with the FD fallback at 164.6 tok/s (the forced-FD run was 2/4); plain 4B is 4/4 at 114.9 tok/s. | The tc path is a conditional pass, not a general replacement; forced-FD exactness remains open. |
 | **2B/9B k8v4** | 2B k8v4 is 2/4 against q8_0; 9B k8v4 is unavailable. 4B k8v4 is 4/4. | Experimental lossy cache; do not enable by default or describe as 9B-ready. |
@@ -249,7 +249,7 @@ not yet meet their own gates. They should not be presented as supported.
 | **Mixed cards, P106, RTX 5060 Ti, Turing hardware** | Installer offers mixed pairs and P106 single/dual profiles; docs mark them unverified. No mixed-card execution record. | Installer acceptance is not hardware validation. A user can be offered a pair that has never produced a token. |
 | **Intel Arc A770** | Separate SYCL/oneAPI backend; M0 audit only, M1 blocked on hardware. | Design-only; not part of the current support surface. |
 | **Continuous batching** | Archived as a no-go. The server serves one active request and queues the rest; the queue does not increase throughput. | The server scales operationally, not computationally. Multi-GPU replicas still need `tp.py` work. |
-| **Long-context tandem evidence** | 9B saved-opening reload at 4K/8K and a larger-than-VRAM tandem throughput row with sampled peak were not measured. The 4B/9B CROSS-MODE tandem rows remain `n/a`; the 2B row is recorded. | Do not generalize the 512-context 9B results to long-context serving or memory. |
+| **Long-context tandem evidence** | 9B saved-opening reload at 4K/8K and a larger-than-VRAM tandem throughput row with sampled peak were not measured. The 2B/4B/9B CROSS-MODE 24K tandem rows are recorded. | Do not generalize the 512-context 9B results to long-context serving or memory. |
 
 ### 4.2 Current-state breakage and release blockers
 
@@ -450,8 +450,8 @@ Updated "what is worse or no longer works" list (as of 2026-11-12 evening):
 
 - **27B `gpu-first`** — measured, and `gpu-first` now works in both placements, so the
   partial-plan owner design the report used to call for is no longer needed on either path.
-- **Tandem throughput** — 2B `cpu-first` has a recorded number at the CROSS-MODE positions; 4B/9B
-  remain `n/a` until the same tandem `bench` run is recorded for those models. `bench` accepts
+- **Tandem throughput** — 2B/4B/9B `cpu-first` have recorded numbers at the CROSS-MODE
+  positions; a larger-than-VRAM (27B) throughput row with sampled peak remains open. `bench` accepts
   `--tandem cpu-first|gpu-first --tandem-cpu-layers N`.
 - **Installer pin and version** — the installer `SOURCE_COMMIT` names
   `fd54148`, `kindi/__init__.py` still says `0.5.0`, while `main` is merged at

@@ -155,13 +155,13 @@ commands, timings and IDs: `bench-logs/tandem-cache/RESULTS-9B.md`.
   token per backend call.
 - **One GPU.** The split composes with the CPU engine only; the two-card `TPEngine` is not a tandem
   owner.
-- **27B: both placements exact; 2B throughput recorded.** The 2026-11-12 gate records
-  `cpu-first` and `gpu-first` (below) with sampled peaks. The 2B `cpu-first` cell in
-  [CROSS-MODE.md](benchmarks/CROSS-MODE.md) now has a real `bench` throughput run (read 80.9,
-  generation 65.7/71.3/55.5/43.4/35.8 tok/s at a 24,576-token context; free-after-load
-  6411 MiB in the tandem benchmark README, not a sampled peak). The 4B and 9B tandem
-  cells remain `n/a` until the same benchmark is run for them, and the larger-than-VRAM
-  gate still needs a measured tandem throughput row with sampled peak.
+- **27B: both placements exact; 2B/4B/9B throughput recorded.** The 2026-11-12 gate records
+  `cpu-first` and `gpu-first` (below) with sampled peaks. The `cpu-first` cells in
+  [CROSS-MODE.md](benchmarks/CROSS-MODE.md) now have real `bench` throughput runs at a
+  24,576-token context (2B read 80.9, generation 65.7/71.3/55.5/43.4/35.8; 4B read 62.5,
+  generation 52.1/51.4/33.5/24.8/20.0; 9B read 39.9, generation 28.5/35.8/28.2/20.1/16.0
+  tok/s; free-after-load in the tandem benchmark README, not a sampled peak). The
+  larger-than-VRAM gate still needs a measured tandem throughput row with sampled peak.
 
 ## 27B gate (2026-11-12)
 

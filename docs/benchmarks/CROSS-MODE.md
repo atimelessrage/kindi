@@ -9,7 +9,7 @@ drafting.
   24,576-token context. One fresh-process run per model; no WSL.
 - **GPU only:** the card runs every layer; the CPU only drives the process (Windows 10, CuPy
   14.2.0). Three fresh-process runs per model; the table uses their median.
-- **GPU+CPU tandem:** the dense `TandemEngine` exists and is token-exact on the 2B/9B (`docs/TANDEM-RUNTIME.md`). Measured tandem rows in the table below come from 2026-11-12 (models: 2B); the other tandem rows say `n/a` because they have not been measured.
+- **GPU+CPU tandem:** the dense `TandemEngine` exists and is token-exact on the 2B/9B (`docs/TANDEM-RUNTIME.md`). Measured tandem rows in the table below come from 2026-11-12 (models: 2B, 4B, 9B); the other tandem rows say `n/a` because they have not been measured.
 
 "Read" is the benchmark's 1,000-token prompt-reading probe. 100, 2K, 8K, 16K and 24K are
 generation at that token position in the allocated 24,576-token context. Tokens/s.
@@ -21,10 +21,10 @@ generation at that token position in the allocated 24,576-token context. Tokens/
 | 2B | GPU+CPU tandem | 80.9 | 65.7 | 71.3 | 55.5 | 43.4 | 35.8 |
 | 4B | GPU only | 129.0 | 106.2 | 101.9 | 90.8 | 89.3 | 79.8 |
 | 4B | CPU only | 19.2 | 15.2 | 13.4 | 6.8 | 4.3 | 3.1 |
-| 4B | GPU+CPU tandem | n/a | n/a | n/a | n/a | n/a | n/a |
+| 4B | GPU+CPU tandem | 62.5 | 52.1 | 51.4 | 33.5 | 24.8 | 20.0 |
 | 9B | GPU only | 90.3 | 77.8 | 76.8 | 71.6 | 67.4 | 62.3 |
 | 9B | CPU only | 9.9 | 8.7 | 7.7 | 4.9 | 3.5 | 2.6 |
-| 9B | GPU+CPU tandem | n/a | n/a | n/a | n/a | n/a | n/a |
+| 9B | GPU+CPU tandem | 39.9 | 28.5 | 35.8 | 28.2 | 20.1 | 16.0 |
 
 Sources: [2026-11-10-i7-8086k-windows-cpu](2026-11-10-i7-8086k-windows-cpu/README.md) (6 threads,
 native Windows) and [2026-11-09-i7-8086k-rtx4060ti](2026-11-09-i7-8086k-rtx4060ti/README.md). The
@@ -45,7 +45,7 @@ The ratio grows with depth because the CPU attention path slows down faster than
 
 ## Tandem status and the gate for a number
 
-The 2B tandem cell(s) are recorded from 2026-11-12; the 4B, 9B cell(s) are not recorded because the same single-run throughput benchmark has not been run for those models.
+The 2B, 4B, 9B tandem cell(s) are recorded from 2026-11-12; the  cell(s) are not recorded because the same single-run throughput benchmark has not been run for those models.
 [TANDEM-STATUS.md](../TANDEM-STATUS.md)
 requires, in order:
 
