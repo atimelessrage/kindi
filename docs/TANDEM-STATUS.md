@@ -47,7 +47,11 @@ The 2026-11-11/12 slices in this branch add:
   joint recurrent checkpoint, 8.7-8.9 ms median save and 3.3-3.5 ms median restore; see
   `bench-logs/tandem-cache/PREFIX-RESULTS.md`;
 - `engine.Engine(layers=..., embed=..., head=...)`: a partial GPU engine that uploads only the
-  owned layer tensors and keeps only their GDN/KV state.
+  owned layer tensors and keeps only their GDN/KV state;
+- `cpu.Engine(layers=..., embed=..., head=...)`: the CPU engine now does the same, so a
+  tandem start converts only the CPU-owned layers (16 of 64 on the 27B splits) plus the
+  embedding/head it owns, instead of the whole pack. The old ~365 s CPU load was a
+  full-model load; the new owned-slice load time is unmeasured.
 
 It still does **not** have:
 
@@ -56,7 +60,8 @@ It still does **not** have:
 - the 4B and 9B CROSS-MODE tandem throughput rows remain `n/a`: the 2B `cpu-first` `bench` run is
   recorded, but the same single-run benchmark has not been run for 4B/9B (both 27B placements passed at
   8K on 2026-11-12; [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md));
-- a layer-contiguous streaming pack format or a converter that emits one;
+- a layer-contiguous streaming pack format or a converter that emits one (the CPU backend
+  now skips unowned layers at load, but the pack on disk is unchanged);
 - native Sandy Bridge or no-FMA hardware validation; the five-tier CPU dispatch and AVX-only
   fallback are implemented and forced-tier tested, but only on an AVX2 host.
 

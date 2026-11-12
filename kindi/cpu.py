@@ -529,7 +529,7 @@ def _p(a, t=PF):
 
 
 class Engine(object):
-    def __init__(self, pack, ctx=4096, clusters=None, log=print, threads=None):
+    def __init__(self, pack, ctx=4096, clusters=None, log=print, threads=None, layers=None, embed=True, head=True):
         t0 = time.time()
         self.threads = _configure_threads(threads)
         self.lib = _lib()
@@ -541,6 +541,18 @@ class Engine(object):
         self.head_name = man.get("head", "token_embd.weight")
         D, NL, NFF = d["width"], d["layers"], d["ffn"]
         self.D, self.NL = D, NL
+        # Tandem splits load only the slice this backend owns (see TandemEngine):
+        # converting every layer of a 27B pack on the CPU took ~365 s even when
+        # the CPU owned 16 of 64 layers.  layers=None keeps the full-model load.
+        self.layers = None if layers is None else tuple(int(x) for x in layers)
+        self.layers_set = None if self.layers is None else set(self.layers)
+        if self.layers is not None:
+            if not self.layers:
+                raise SystemExit("kindi: CPU engine needs at least one layer")
+            bad = [il for il in self.layers if not 0 <= il < NL]
+            if bad:
+                raise SystemExit("kindi: CPU layer %d is outside 0..%d" % (bad[0], NL - 1))
+        self.need_embed, self.need_head = bool(embed), bool(head)
         NH, NHKV, HD = d["heads"], d["kv_heads"], d["head_dim"]
         NK, HK = d["groups"], d["state_size"]
         NV = d["gdn_inner"] // HK
@@ -555,8 +567,24 @@ class Engine(object):
         def keep(a):
             self.keep.append(a)
             return a
+        def _wanted(name):
+            if self.layers is None:
+                return True
+            if name == "token_embd.weight":
+                return self.need_embed or (self.need_head and name == self.head_name)
+            if name == self.head_name:
+                return self.need_head
+            if name.startswith("blk."):
+                try:
+                    return int(name.split(".")[1]) in self.layers_set
+                except (IndexError, ValueError):
+                    return False
+            return False
+
         mats = {}
         for name, rec in bi.items():
+            if not _wanted(name):
+                continue
             R, C = rec["rows"], rec["ne0"]
             ns, G = C // 4, C // 128
             o, q = rec["bc_off"], rec["dpm_off"] // 2
@@ -574,6 +602,8 @@ class Engine(object):
         Ls = (Layer * NL)()
         self.M, self.conv, self.Kc, self.Vc = [], [], [], []
         for il in range(NL):
+            if self.layers is not None and il not in self.layers_set:
+                continue                    # unowned layer: zero Layer, never called on this backend
             p = "blk.%d." % il
             L = Ls[il]
             L.is_attn = int((il + 1) % interval == 0)
@@ -604,7 +634,9 @@ class Engine(object):
                      ("ctx", self.ctx), ("vocab", VOCAB)):
             setattr(m, k, v)
         m.L = ctypes.cast(Ls, ctypes.POINTER(Layer))
-        m.emb, m.head = mats["token_embd.weight"], mats[self.head_name]
+        _zero = Mat()
+        m.emb = mats["token_embd.weight"] if self.need_embed and "token_embd.weight" in mats else _zero
+        m.head = mats[self.head_name] if self.need_head and self.head_name in mats else _zero
         m.out_norm = f("output_norm.weight")
         m.sD, m.sV, m.sA, m.sF = (_p(sg(D)), _p(sg(NV * HK)), _p(sg(NH * HD)), _p(sg(NFF)))
         rh = d["rope_dim"] // 2
@@ -615,7 +647,8 @@ class Engine(object):
         sizes = {"h": D, "xn": D, "xp": W, "y": D, "qkv": CC, "zv": NV * HK, "cs": CC, "qk": 2 * NK * HK,
                  "gout": NV * HK, "outn": NV * HK, "m": W, "qn": NH * 2 * HD, "kr": NHKV * HD, "vv": NHKV * HD,
                  "qr": NH * HD, "kro": NHKV * HD, "sc": NH * self.ctx, "att": NH * HD, "ffg": NFF, "ffu": NFF,
-                 "T": W // 2 * 8, "logits": max(VOCAB, mats[self.head_name].R), "gb": NV, "gg": NV}
+                 "T": W // 2 * 8, "logits": max(VOCAB, mats[self.head_name].R if self.need_head and self.head_name in mats else VOCAB),
+                 "gb": NV, "gg": NV}
         for k in _SCR:
             a = z(sizes[k])
             setattr(m, k, _p(a))

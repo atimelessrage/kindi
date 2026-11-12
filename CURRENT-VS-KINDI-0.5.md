@@ -116,8 +116,9 @@ This is a concrete correctness improvement over the pre-fix state.
 on 9B, 4B/9B CROSS-MODE tandem throughput, and a larger-than-VRAM tandem throughput
 row with a sampled peak. The 2B `cpu-first` CROSS-MODE row is recorded (read 80.9;
 generation 65.7/71.3/55.5/43.4/35.8 tok/s at 24,576 context) and does not beat
-GPU-only. The 105–108 s 9B CPU load — and the ≈365 s 27B CPU load — are also
-practical costs, not a speed claim.
+GPU-only. The 105–108 s 9B CPU load was a full-model load; the 27B CPU engine now
+loads only its owned 16-of-64-layer slice (unmeasured new load time), so the old
+≈365 s figure no longer describes a tandem start.
 
 ### 3.2 CPU portability and CPU serving
 

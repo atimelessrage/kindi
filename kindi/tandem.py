@@ -65,7 +65,8 @@ class _TandemCacheView(object):
                     raise RuntimeError("kindi: layer %d has no tandem K/V state" % il)
                 self.Kc.append(k)
                 self.Vc.append(v)
-                cpu_att += 1
+                if il in cpu_layers:
+                    cpu_att += 1
             else:
                 if il in cpu_layers:
                     m, c = eng.cpu.M[cpu_m], eng.cpu.conv[cpu_m]
@@ -77,7 +78,8 @@ class _TandemCacheView(object):
                     raise RuntimeError("kindi: layer %d has no tandem recurrent state" % il)
                 self.M.append(m)
                 self.conv.append(c)
-                cpu_m += 1
+                if il in cpu_layers:
+                    cpu_m += 1
         # cache.engine_fingerprint() reads these; a tandem split has no chunk path or VRAM slot.
         self.g5 = bool(getattr(eng.gpu, "g5", False))
         self.g5l = bool(getattr(eng.gpu, "g5l", False))
@@ -134,7 +136,10 @@ class TandemEngine(object):
         self._gpu_head = self.NL - 1 in self.gpu_range
         self.ctx = int(ctx)
 
-        self.cpu = CPUEngine(pack, ctx=ctx, log=log)
+        # Load only the CPU-owned slice: converting a whole 27B pack on the CPU
+        # cost ~365 s even when the CPU owned 16 of 64 layers.
+        self.cpu = CPUEngine(pack, ctx=ctx, log=log, layers=self.cpu_range,
+                             embed=0 in self.cpu_range, head=self.NL - 1 in self.cpu_range)
         self.gpu = GPUEngine(pack, ctx=ctx, log=log, layers=self.gpu_range,
                              embed=0 in self.gpu_range, head=self._gpu_head)
         self.ctx = min(int(self.cpu.ctx), int(self.gpu.ctx))

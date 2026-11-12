@@ -106,15 +106,36 @@ def fake_pack(tmp_path):
     return str(pack)
 
 
+class FakeCPUEngine(FakeEngine):
+    """The CPU backend keeps compact per-owner state lists (it only loads its layers)."""
+
+    def __init__(self, pack, ctx=4096, log=None, layers=None, embed=True, head=True):
+        super().__init__(pack, ctx=ctx, log=log, layers=layers, embed=embed, head=head)
+        if self.layers is not None:
+            self.M, self.conv, self.Kc, self.Vc = [], [], [], []
+            for il in self.layers:
+                if il in self._kvi:
+                    self.Kc.append(np.zeros((self.ctx, 1, 1), dtype=np.float16))
+                    self.Vc.append(np.zeros((self.ctx, 1, 1), dtype=np.float16))
+                else:
+                    self.M.append(np.zeros(1, dtype=np.float32))
+                    self.conv.append(np.zeros(1, dtype=np.float32))
+
+
+class FakeGPUEngine(FakeEngine):
+    """The GPU backend keeps global layer-indexed state (it loads a slice by layer id)."""
+
+
 @pytest.fixture
 def fake_backends(monkeypatch):
-    monkeypatch.setattr(tandem, "CPUEngine", FakeEngine)
-    monkeypatch.setattr(tandem, "GPUEngine", FakeEngine)
+    monkeypatch.setattr(tandem, "CPUEngine", FakeCPUEngine)
+    monkeypatch.setattr(tandem, "GPUEngine", FakeGPUEngine)
 
 
 def test_cpu_first_owns_the_prefix_and_the_gpu_head(fake_pack, fake_backends):
     eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first", log=lambda *a: None)
-    assert eng.cpu.layers is None
+    assert eng.cpu.layers == (0, 1)          # the CPU engine loads only its owned slice
+    assert eng.cpu.embed_owned is True and eng.cpu.head_owned is False
     assert eng.gpu.layers == (2, 3)
     assert eng.gpu.embed_owned is False
     assert eng.gpu.head_owned is True
@@ -130,6 +151,8 @@ def test_cpu_first_owns_the_prefix_and_the_gpu_head(fake_pack, fake_backends):
 
 def test_gpu_first_owns_the_prefix_and_the_cpu_head(fake_pack, fake_backends):
     eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="gpu-first", log=lambda *a: None)
+    assert eng.cpu.layers == (2, 3)          # the CPU engine loads only its owned slice
+    assert eng.cpu.embed_owned is False and eng.cpu.head_owned is True
     assert eng.gpu.layers == (0, 1)
     assert eng.gpu.embed_owned is True
     assert eng.gpu.head_owned is False

@@ -179,7 +179,8 @@ on this card), and no new kernels were written. `tests/test_gqa_heads.py` pins t
 kernel selection.
 
 With that, the `cpu-first` split passed **4/4 prompts, 40/40 tokens each**: the CPU owns layers
-0..15, the GPU owns 16..63 and the head. Combined load was 385.6 s (CPU 364.8 s + GPU 20.3 s) and
+0..15, the GPU owns 16..63 and the head. Combined load was 385.6 s (CPU 364.8 s + GPU 20.3 s;
+that run loaded the whole pack on the CPU) and
 the sampled peak was **7,005 MiB total** (5,827 MiB over idle; 1,183 MiB left) — **233 MiB (3.2%)
 below the full-GPU baseline**. The context stayed at 8,192 (`reduced: false`). The dump is
 `bench-logs/tandem-27b-gate/cpu-first-8192.json`; the full record is `RESULTS.md` there.
@@ -190,6 +191,12 @@ MiB over idle, 1,171 MiB left) — 221 MiB below the full-GPU baseline; the cont
 reduced. The 2026-11-11 attempt (CPU ready in 435.4 s, then the GPU owner rejected the pack) is
 kept as history in `RESULTS.md`. The fixed `--probe-gpu-owner` preflight constructs both 27B GPU
 ranges at 8,192 context.
+
+Those load times are the old full-model CPU loads. The CPU engine now accepts
+`layers=...`/`embed=...`/`head=...` and `TandemEngine` passes its owned CPU range, so a tandem
+start converts only the CPU-owned layers plus the embedding/head it owns (16 of 64 layers on
+the 27B splits) instead of the whole pack. The new load time is unmeasured here; do not quote
+the old 365 s as the current cost.
 
 ## The MoE approach is different
 
