@@ -33,7 +33,7 @@ jobs:
       - name: Run the CPU-only suite with coverage floor
         run: >
           python -m pytest tests/ -q
-          --cov=kindi --cov-report=term --cov-fail-under=27
+          --cov=kindi --cov-branch --cov-report=term --cov-fail-under=27
 
   cpu-engine-smoke:
     name: CPU engine build and smoke

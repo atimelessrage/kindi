@@ -3,7 +3,7 @@
 The normal GitHub-hosted workflow is
 [.github/workflows/ci.yml](../.github/workflows/ci.yml):
 
-- `CPU tests`: the CPU-only pytest suite on Ubuntu, with line coverage for `kindi` and a
+- `CPU tests`: the CPU-only pytest suite on Ubuntu, with line and branch coverage for `kindi` and a
   27% regression floor;
 - `CPU engine build and smoke`: compiles `kindi/kcpu.c` with AVX2/FMA/F16C and loads it;
 - `Windows CPU and config boundary`: the Windows-safe config, CPU, startup and tokenizer tests;
@@ -15,9 +15,12 @@ These jobs do **not** run CUDA kernels, a model pack or `kindi verify` on a real
 
 ## Coverage floor
 
-The CPU job runs `pytest` with `--cov=kindi --cov-report=term --cov-fail-under=27`. The current
-local baseline is **28%** line coverage on the CPU-only suite (2026-11-12); the floor is deliberately
-one point lower so platform and dependency differences do not make the job noisy. This is an
+The CPU job runs `pytest` with `--cov=kindi --cov-branch --cov-report=term --cov-fail-under=27`.
+The current local baseline is **27.17%** line-and-branch coverage on the CPU-only suite
+(2026-11-12); the floor is deliberately at that measured level so platform and dependency
+differences do not make the job noisy. New tests in `tests/test_requirement_coverage.py` are
+written against requirement and user-visible contracts, not implementation internals. Coverage
+is an outcome of those tests, not a reason to test private code paths. This is an
 anti-regression floor, not a quality claim: most CUDA, CuPy, model-loading and vendor paths are
 uncovered because hosted CI has no GPU or model pack. Raise the floor only with measured coverage,
 and do not exclude hardware modules merely to make the number look better.
