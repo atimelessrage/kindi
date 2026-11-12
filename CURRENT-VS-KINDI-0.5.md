@@ -2,12 +2,13 @@
 
 Audit date: **2026-11-12**
 
-> This file records the pre-improvement audit. Sections 8–9 record the fixes and
-> the 2026-11-12 evening 27B tandem implementation/gate that followed. At the
-> end of that session, the verified worktree state was committed in `4c6ad4f` and
-> `360b479`; the merge into `main` remains blocked by the other worktree’s
-> uncommitted shared files, but `main` is an ancestor of this branch, so the
-> eventual update is a fast-forward.
+> This file records the pre-improvement audit and the fixes that followed.
+> Sections 8–10 record the post-audit improvements, the 2026-11-12 evening 27B
+> tandem implementation/gate and the later requirement/structural-coverage work.
+> The best-of branch is now merged into `main`: both `main` and
+> `freebuff/tandem-cpu-recovery` are at `2d56478`. The installer source pin and
+> the `0.5.0` version identity remain a release-owner publication step, not a
+> code-complete claim.
 
 This report compares the current `freebuff/tandem-cpu-recovery` worktree with the
 stock Kindi **0.5.0** release. It separates verified behavior from recorded benchmark
@@ -18,21 +19,21 @@ everything described here has been re-run on current hardware.
 
 | | Stock “normal” Kindi 0.5 | Clean local 0.5 snapshot | Current worktree |
 |---|---|---|---|
-| Ref | `v0.5.0` tag, `1c4cc3e01732f0fada4ab7030ccf4f7651e01053` | `clean/kindi-0.5`, `1b0cbf780b57d464cdb3e5e9acf75ed49256d622` | `freebuff/tandem-cpu-recovery`, `360b479168c640fabae2978ef955ab17c1267d12` |
-| Date | 2026-11-09 | clean snapshot of local 0.5 work | 2026-11-12 |
-| Tracked files | 102 | 216 | 274 |
-| Test modules | **0** (`tests/` does not exist) | 25 | 44 tracked test modules |
-| Docs files | 12 | 84 | 105 tracked docs files |
-| Git state | release tag | clean | **clean except the untracked `.coverage` generation artifact**; `bench-logs/` is ignored local evidence |
+| Ref | `v0.5.0` tag, `1c4cc3e01732f0fada4ab7030ccf4f7651e01053` | `clean/kindi-0.5`, `1b0cbf780b57d464cdb3e5e9acf75ed49256d622` | `main` and `freebuff/tandem-cpu-recovery`, `2d5647893673268739884d0497a75b919ae7c4d7` |
+| Date | 2026-11-09 | clean snapshot of local 0.5 work | 2026-11-12 (merged state) |
+| Tracked files | 102 | 216 | 299 |
+| Test modules | **0** (`tests/` does not exist) | 25 | 47 tracked test modules |
+| Docs files | 12 | 84 | 126 tracked paths under `docs/` |
+| Git state | release tag | clean | `main` fast-forwarded to the best-of branch at `2d56478`; generated coverage artifacts are ignored; `bench-logs/` is ignored local evidence |
 
 The primary comparison below is against the **stock `v0.5.0` tag**. `clean/kindi-0.5`
 already contains earlier local audit, CPU, server and documentation work, so it is a
-narrower comparison, not the stock release. Relative to that clean snapshot, the committed branch has **124 changed tracked paths
-with +14,830/−515 lines**.
+narrower comparison, not the stock release. Relative to that clean snapshot, the committed branch has **153 changed tracked paths
+with +16,744/−578 lines**.
 
-Relative to the stock tag, the committed branch (`v0.5.0..HEAD`) changes **218 tracked
-files with +29,270/−349 lines**. The only remaining untracked file is generated
-`.coverage`; `bench-logs/` is ignored local evidence.
+Relative to the stock tag, the committed branch (`v0.5.0..HEAD`) changes **243 tracked
+files with +31,125/−353 lines**. The generated `.coverage`/`coverage.json` artifacts
+are now ignored; `bench-logs/` remains ignored local evidence.
 
 Evidence labels used below:
 
@@ -58,8 +59,9 @@ replacement release.
 - A much more operationally complete server: bounded queue, 429 responses, optional
   per-source rate limiting, metrics, JSON request logs, Ollama-compatible endpoints,
   request validation and body limits.
-- A real test suite (stock 0.5 has none), generated config/support references, CI jobs,
-  secret scanning, installer guards and much more documentation.
+- A real test suite (stock 0.5 has none), generated config/support references, CI jobs
+  with a 27% line-and-branch coverage floor, secret scanning, installer guards and
+  much more documentation.
 - Native FP8 prompt-GEMM kernels, PQ2_0/Q2_0 import, and additional tensor-core/card
   plumbing — but several of these are partial or synthetic-only, not support claims.
 
@@ -67,18 +69,20 @@ replacement release.
 
 - **27B tandem** is implemented and measured in both placements (`cpu-first` peak 7,005 MiB,
   `gpu-first` 7,017 MiB, vs the 7,238 MiB full-GPU baseline, at 8,192 context, 2026-11-12).
-  There is still no tandem throughput benchmark.
-- **9B tensor-core plan** is refused (Hadamard block 4096); **4B tc** is only 2/4 exact;
-  **k8v4** is absent for 9B and only 2/4 on 2B.
+  The 2B `cpu-first` CROSS-MODE tandem throughput row is recorded; 4B/9B remain `n/a`, and
+  tandem still does not beat GPU-only throughput.
+- **9B tensor-core plan** is refused (Hadamard block 4096); **4B tc** is 3 exact + 1 accepted
+  tie with the FD fallback (forced FD was 2/4); **k8v4** is absent for 9B and only 2/4 on 2B.
 - **Blackwell FP8/BF16 and real FP8 models** are not validated; the local Blackwell gate
   correctly reports `unsupported` on the available Ada card.
 - **MoE/Gemma 4 26B** has a design and a model-free cache prototype, not a backend.
 - **Mixed-card pairs, P106, RTX 5060 Ti and Intel Arc** are installer/design targets,
   not hardware-verified support.
-- **Release packaging is not ready:** the installer still fetches the older `main`
-  commit, this branch is committed but not yet merged into `main`, and the version
-  is still 0.5.0. The bare-`pytest` collection failure was fixed; `.coverage` is a
-  generated untracked artifact, not release payload.
+- **Release packaging is not ready:** the installer still fetches the older `fd54148`
+  commit and the version is still 0.5.0. The best-of branch is merged into `main`, but
+  publishing a new installer artifact and retargeting `SOURCE_COMMIT`/`SOURCE_SHA256`
+  remain release-owner steps. The bare-`pytest` collection failure is fixed and the
+  generated coverage artifacts are ignored.
 
 ## 3. What is new or better
 
@@ -108,9 +112,12 @@ CuPy view with a plain assignment, which CuPy treated as a scalar fill. It now u
 in-place `_to_dev` copy. A GPU-free regression test reproduces the scalar-fill failure.
 This is a concrete correctness improvement over the pre-fix state.
 
-**Not covered:** cumulative-B (33B), MoE, long-context *saved-opening reload* on
-9B, and tandem throughput at the CROSS-MODE positions. The 105–108 s 9B CPU load — and the
-≈365 s 27B CPU load — are also practical costs, not a speed claim.
+**Not covered:** cumulative-B (33B), MoE, long-context *saved-opening reload*
+on 9B, 4B/9B CROSS-MODE tandem throughput, and a larger-than-VRAM tandem throughput
+row with a sampled peak. The 2B `cpu-first` CROSS-MODE row is recorded (read 80.9;
+generation 65.7/71.3/55.5/43.4/35.8 tok/s at 24,576 context) and does not beat
+GPU-only. The 105–108 s 9B CPU load — and the ≈365 s 27B CPU load — are also
+practical costs, not a speed claim.
 
 ### 3.2 CPU portability and CPU serving
 
@@ -233,7 +240,7 @@ not yet meet their own gates. They should not be presented as supported.
 |---|---|---|
 | **27B tandem** | implemented and measured in both placements: `cpu-first` 4/4 (peak 7,005 MiB) and `gpu-first` 4/4 (peak 7,017 MiB), all 40/40 tokens each, vs the 7,238 MiB full-GPU baseline (8,192 context, 2026-11-12); a 2B `cpu-first` CROSS-MODE tandem throughput row is recorded; 4B/9B remain `n/a`. | The “larger than VRAM” use case works in both placements. The plain GPU engine now accepts grouped-query ratios up to 8:1 at head size 256, reusing the existing generic-GQA kernels; the 4:1 fast paths are unchanged. |
 | **9B tensor-core plan** | Refused before graph build because the Hadamard block is 4096. | The 9B tc cell is not available; plain 9B is 4/4. |
-| **4B tensor-core plan** | 2/4 exact at 178.2 tok/s (prompts 2 and 3 fail); plain 4B is 4/4 at 114.9 tok/s. | The tc path is not a general replacement; it is an uneven, partial optimization. |
+| **4B tensor-core plan** | 3 exact + 1 accepted llama.cpp tie with the FD fallback at 164.6 tok/s (the forced-FD run was 2/4); plain 4B is 4/4 at 114.9 tok/s. | The tc path is a conditional pass, not a general replacement; forced-FD exactness remains open. |
 | **2B/9B k8v4** | 2B k8v4 is 2/4 against q8_0; 9B k8v4 is unavailable. 4B k8v4 is 4/4. | Experimental lossy cache; do not enable by default or describe as 9B-ready. |
 | **Blackwell FP8/BF16** | No Blackwell hardware result. Local sm_89 gate returns `unsupported` exit 2. | “Blackwell FP8 support” is not established; only the verification lane exists. |
 | **Real FP8/BF16 model** | No Gemma 4 E4B BF16/FP8 GGUF available. The local `gemma4:26b` is Q4_K_M and is rejected at unsupported GGUF type 7; the Gemma 4 engine is E4B-only. | Kernel tests do not prove model-level token agreement or throughput. |
@@ -241,7 +248,7 @@ not yet meet their own gates. They should not be presented as supported.
 | **Mixed cards, P106, RTX 5060 Ti, Turing hardware** | Installer offers mixed pairs and P106 single/dual profiles; docs mark them unverified. No mixed-card execution record. | Installer acceptance is not hardware validation. A user can be offered a pair that has never produced a token. |
 | **Intel Arc A770** | Separate SYCL/oneAPI backend; M0 audit only, M1 blocked on hardware. | Design-only; not part of the current support surface. |
 | **Continuous batching** | Archived as a no-go. The server serves one active request and queues the rest; the queue does not increase throughput. | The server scales operationally, not computationally. Multi-GPU replicas still need `tp.py` work. |
-| **Long-context tandem evidence** | 9B saved-opening reload at 4K/8K and 9B peak VRAM were not measured. Tandem rows in the cross-mode benchmark remain `n/a`. | Do not generalize the 512-context 9B results to long-context serving or memory. |
+| **Long-context tandem evidence** | 9B saved-opening reload at 4K/8K and a larger-than-VRAM tandem throughput row with sampled peak were not measured. The 4B/9B CROSS-MODE tandem rows remain `n/a`; the 2B row is recorded. | Do not generalize the 512-context 9B results to long-context serving or memory. |
 
 ### 4.2 Current-state breakage and release blockers
 
@@ -272,14 +279,15 @@ Some were fixed afterward; see section 8.
    SOURCE_SHA256="3ca1e79d..."
    ```
 
-   `fd54148` is `main`, while the current branch HEAD is `360b479` (11 commits ahead).
-   The installer’s default source therefore still omits this branch: the dense tandem
-   runtime, AVX-only recovery, generic-GQA support and the other verified branch
-   work. Its image and install metadata still say `0.5.0`, and the installer
-   artifact documented elsewhere was not rebuilt for this branch.
+   `fd54148` is the old stock-0.5-era `main`, while the merged best-of `main` is now
+   `2d56478`. The installer’s default source therefore still omits the dense tandem
+   runtime, AVX-only recovery, generic-GQA support and the other verified work.
+   Its image and install metadata still say `0.5.0`. This is a release-publication
+   blocker, documented as a release-owner step in `docs/RELEASE-CHECKLIST.md`; it
+   cannot be fixed by retargeting the pin without publishing the matching artifact.
 
-3. **The branch was not self-contained at audit time (now committed; `main` merge
-   still pending).** At audit start it had 57 modified and 28 untracked files
+3. **The branch was not self-contained at audit time (now committed and merged into
+   `main`).** At audit start it had 57 modified and 28 untracked files
    (plus this report). The untracked set included runtime code and tests that
    are required for the current feature set:
 
@@ -290,10 +298,8 @@ Some were fixed afterward; see section 8.
      `tools/check_long_context.py`, `tools/dory_gguf_inventory.py`
    - 10 design/support documents and two `.github` workflow files
 
-   The branch has since been committed (`4c6ad4f` and `360b479`), so the state
-   that produced the 444-test pass is no longer only a dirty worktree. It is not
-   yet in `main`, because the main worktree still has uncommitted shared files
-   that overlap this branch’s changes.
+   The branch has since been committed and merged into `main` at `2d56478`, so
+   the verified state is no longer only a dirty worktree.
 
 4. **Version and changelog identity are stale.** `kindi/__init__.py` still says
    `VERSION = "0.5.0"`; `README.md` and `CHANGELOG.md` still describe stock 0.5.0.
@@ -320,24 +326,22 @@ Some were fixed afterward; see section 8.
    the 27B tandem gate is exact 4/4 in both placements — all with the refactored
    attention code. What remains unverified is listed in §9.
 
-8. **Shared-worktree merge risk remains.** The main checkout `T:/kindi` has its own
-   uncommitted copies of shared files (`kindi/tp.py`, `kindi/spec.py`, docs and tests).
-   `main` (`fd54148`) is an ancestor of this branch (`360b479`), so the eventual
-   update is a fast-forward; it cannot be completed until the other worktree’s
-   uncommitted shared files are committed. Blindly copying either worktree over
-   the other will lose work. This is a delivery risk, not a runtime bug.
+8. **Shared-worktree merge risk is resolved for this branch.** Both worktrees are
+   at `2d56478` and `T:/kindi` is clean. Future shared-file work still needs the
+   AGENTS.md lease protocol; blindly copying either worktree over the other will
+   lose work.
 
 ## 5. What this means
 
 ### If “normal Kindi 0.5” means the stock release
 
-The current worktree is clearly ahead in engineering breadth: tests, CPU portability,
+The merged tree is clearly ahead in engineering breadth: tests, CPU portability,
 server operations, tandem 2B/9B/27B, cache correctness, installer guards and
 documentation. It is also substantially less release-ready: the installer points at
-an older commit, the branch is committed but not merged into `main`, and the version
-is unchanged. The default test command is fixed. The right description is **“feature
-branch with several verified improvements and a long list of explicit non-goals,”**
-not “Kindi 0.5 plus fixes.”
+an older commit and the version is unchanged. The best-of branch is merged into
+`main`; the default test command is fixed and coverage artifacts are ignored.
+The right description is **“best-of main with several verified improvements and a
+long list of explicit non-goals,”** not “Kindi 0.5 plus fixes.”
 
 ### If “normal Kindi 0.5” means the clean local snapshot
 
@@ -348,11 +352,10 @@ retains the same main-merge and installer-source problems.
 
 ## 6. Recommended order of work
 
-1. **Finish the branch-to-main handoff and release decision:** the branch is now
-   committed (`360b479`), but `main` remains at `fd54148` while `T:/kindi` is dirty.
-   Once that worktree is clean, fast-forward `main`, decide the version, and point
-   the installer’s `SOURCE_COMMIT`/SHA-256 at the exact release commit. Do not ship
-   an installer that fetches `fd54148` while claiming the current branch.
+1. **Finish the release decision:** the best-of branch is merged into `main` at
+   `2d56478`. Decide the version, publish the matching installer artifact, and
+   point `SOURCE_COMMIT`/SHA-256 at the exact release commit. Do not ship an
+   installer that fetches `fd54148` while claiming the current tree.
 2. **Fix the test entry point:** exclude `bench-logs/` from pytest collection or remove
    the duplicate `scan-tree-f7de617` copy, then make the documented command and CI use
    the same invocation. Keep `python -m pytest -q tests` as the canonical command until
@@ -362,10 +365,10 @@ retains the same main-merge and installer-source problems.
    The repository already has honest limitation pages; make those the support contract,
    not the target matrix.
 4. **Confirm the release commit:** the 2B/4B/9B `verify`, both 27B tandem gate
-   placements and the 444-test suite are recorded for the committed branch state;
-   a rerun on the exact release commit remains the release gate.
-5. **Resolve the `T:/kindi` shared-file conflicts by hand** before any merge or release
-   build.
+   placements and the 462-test suite are recorded for the merged state; a rerun
+   on the exact release commit remains the release gate.
+5. **Keep the AGENTS.md lease protocol for any future shared-file work** so the
+   main worktree and feature worktrees do not drift again.
 
 ## 7. Verification performed for this report
 
@@ -373,22 +376,21 @@ Run in the current worktree on 2026-11-12:
 
 | Command | Result |
 |---|---|
-| `python -m pytest -q tests` | 436 passed, 19 skipped, exit 0 (444 passed after §9) |
-| `python -m pytest -q` (after fix) | **436 passed, 19 skipped**, exit 0 |
+| `python -m pytest tests/ -q --cov=kindi --cov-branch --cov-fail-under=27` | **462 passed, 19 skipped**, total line-and-branch coverage **27.20%**, exit 0 |
+| `python -m pytest -q` (after fix) | **462 passed, 19 skipped**, exit 0 |
 | `python -m pytest -q` (audit-time, before fix) | **26 collection errors**, exit 2, caused by `bench-logs/scan-tree-f7de617/` shadowing |
 | `python -m kindi.config_reference --check` | exit 0 |
 | `python -m kindi.support_matrix --check` | exit 0 |
 | `git -c core.whitespace=cr-at-eol diff --check` | exit 0 |
-| `git status --short` | clean except the untracked `.coverage` artifact; `bench-logs/` ignored |
-| `git diff --stat v0.5.0` | 186 tracked paths, +22,353/−342 (audit-time; §9 extends it) |
+| `git status --short` | `main` and the feature branch identical at `2d56478`; coverage artifacts ignored; `bench-logs/` ignored |
+| `git diff --stat v0.5.0..HEAD` | 243 tracked paths, +31,125/−353 |
 | `kindi verify` 2B/4B/9B (2026-11-12 evening) | ALL PASS, 153.7 / 108.9 / 74.6 tok/s |
 | 27B tandem gate, `cpu-first` (2026-11-12) | **4/4 prompts, 40/40 each; peak 7,005 MiB; 8,192 ctx; exit 0** |
 | 27B tandem gate, `gpu-first` (2026-11-12) | **4/4 prompts, 40/40 each; peak 7,017 MiB; 8,192 ctx; exit 0** |
 
-The task set is committed in `4c6ad4f`, and the remaining verified session work in
-`360b479`. No push or merge into `main` was performed; the main merge remains blocked
-by the other worktree’s uncommitted shared files. The benchmark numbers are quoted
-from the repository’s recorded logs and docs except where a run is stated.
+The best-of work is merged into `main` at `2d56478`. No push was performed. The
+benchmark numbers are quoted from the repository’s recorded logs and docs except
+where a run is stated.
 
 ## 8. Improvements applied after this audit
 
@@ -405,18 +407,23 @@ Two low-risk weak points were fixed without changing unverified GPU code:
    benchmark” from “runtime absent”; the rows remain `n/a` because no new timing run was
    made.
 3. **Coverage regression floor.** The CI CPU job now runs
-   `pytest tests/ -q --cov=kindi --cov-report=term --cov-fail-under=27`, with
-   `pytest-cov` in the test requirements. The measured local total is 27.90%; the
-   floor is deliberately conservative and documented as an anti-regression gate, not a
-   quality claim. The performance half remains the existing opt-in GPU baseline gate.
+   `pytest tests/ -q --cov=kindi --cov-branch --cov-report=term --cov-fail-under=27`,
+   with `pytest-cov` in the test requirements. The measured local total is 27.20%
+   line-and-branch coverage (462 passed, 19 skipped); the floor is deliberately
+   conservative and documented as an anti-regression gate, not a quality claim.
+   Requirement-based tests were added in `tests/test_requirement_coverage.py`,
+   including cache-loss pick recomputation for the tandem runner. The performance
+   half remains the existing opt-in GPU baseline gate.
 4. **Windows quickstart.** Added `docs/WINDOWS.md`, linked from README and INSTALL: the
    verified native CPU path, clang/libomp setup, model/verify/serve commands, and explicit
    limits. Native Windows GPU/AMD execution and the Linux installer are not claimed.
 
-Still unresolved and unchanged: the installer source commit, 9B tc, k8v4,
-Blackwell/FP8 hardware validation, and tandem-throughput measurements. The 27B
+Still unresolved and unchanged: the installer source commit/version publication,
+9B tc, k8v4, Blackwell/FP8 hardware validation, MoE/Gemma-4 26B backend, mixed-card
+and P106 hardware verification, and 4B/9B tandem-throughput measurements. The 27B
 head-ratio blocker, the 27B `gpu-first` gate, and the lack of a fresh GPU/model run
-were resolved as in §9 below.
+were resolved as in §9 below. The 2B tandem throughput row is recorded; tandem
+still does not beat GPU-only.
 
 ## 9. 27B tandem grouped-query support and the gate (2026-11-12 evening)
 
@@ -445,14 +452,16 @@ Updated "what is worse or no longer works" list (as of 2026-11-12 evening):
 - **Tandem throughput** — 2B `cpu-first` has a recorded number at the CROSS-MODE positions; 4B/9B
   remain `n/a` until the same tandem `bench` run is recorded for those models. `bench` accepts
   `--tandem cpu-first|gpu-first --tandem-cpu-layers N`.
-- **Installer pin, main merge, version** — the installer `SOURCE_COMMIT` names
-  `fd54148`, `kindi/__init__.py` still says `0.5.0`, and `main` remains at `fd54148`
-  because the other worktree is dirty. The branch itself is committed through
-  `360b479`; publishing and retargeting the installer are explicit release
-  decisions left for the release owner.
-- **9B tc** (Hadamard 4096 refused), **4B tc** (2/4 exact), **k8v4** (2B 2/4, 9B unavailable),
+- **Installer pin and version** — the installer `SOURCE_COMMIT` names
+  `fd54148`, `kindi/__init__.py` still says `0.5.0`, while `main` is merged at
+  `2d56478`. Publishing and retargeting the installer are explicit release decisions
+  left for the release owner.
+- **9B tc** (Hadamard 4096 refused), **4B tc** (3 exact + 1 accepted tie with FD
+  fallback; forced-FD 2/4), **k8v4** (2B 2/4, 9B unavailable),
   **Blackwell/FP8/BF16 validation**, **MoE/Gemma-4 26B backend**, **mixed-card/P106/5060 Ti/
   Turing/Arc hardware** — all unchanged, all the same explicit non-goals as §4.1.
+- **Generated test artifacts** — `.coverage` and `coverage.json` are now ignored,
+  so normal coverage runs no longer dirty the tree.
 - **`git diff --check` without the project's `cr-at-eol`** still flags trailing CRs in
   `kindi/gemma4_cache.py` from earlier uncommitted edits; with `-c core.whitespace=cr-at-eol`
   it exits 0.

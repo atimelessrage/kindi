@@ -24,6 +24,8 @@ _netrc
 __pycache__/
 *.pyc
 *.log
+.coverage
+coverage.json
 .vscode/
 .idea/
 # raw local evidence and scratch audits (may contain local paths or prompts)
