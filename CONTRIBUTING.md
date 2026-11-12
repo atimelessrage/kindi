@@ -23,6 +23,20 @@ shellcheck --severity=warning install.sh
 `tests/README.md` describes the optional Turing/CUDA reference suite and static analysis. Report which checks
 you ran, and say explicitly when a hardware-dependent path was not tested.
 
+## Project memory
+
+Internal requirements, architecture, decisions, lessons and operational knowledge live in
+`docs/development/`. Read the relevant record before changing behavior, and update it when
+the change lands. Requirements are one `REQ-NNNN.md` file each; after committing a
+requirement change, run `python tools/project_memory.py` and commit the regenerated
+`REQUIREMENTS-HISTORY.md`. The project-local workflow is
+`.agents/skills/project-memory/SKILL.md`.
+
+User-visible changes also need the relevant `README.md`, `docs/*.md` page and examples
+updated. Run `python tools/project_memory.py --check`,
+`python -m pytest tests/test_project_memory.py tests/test_docs_links.py -q` and the normal
+gate above.
+
 ## Code and other submitted material
 
 Before we include submitted material under the contributor agreement, we ask for explicit agreement to

@@ -16,6 +16,7 @@ is absent, then exercise the decisions taken before any buffer, kernel or graph 
 No GPU, CUDA toolkit or model pack is needed, and no kernel runs here.
 """
 import importlib
+import json
 import os
 import sys
 import types
@@ -412,3 +413,26 @@ def test_engine_fingerprint_includes_the_tp_layout(spec_tp):
     assert fa != fb
     assert da["tp_split"] == a.split_layout
     assert db["tp_split"] == b.split_layout
+
+
+def test_split_flash_decode_is_disabled_for_the_padded_4b(spec_tp):
+    """KINDI_FD is not safe for the 4B's 2560-wide products; the other Bonsai widths stay on the split path."""
+    _, tp = spec_tp
+    assert tp.fd_supported({"width": 2560}) is False
+    assert tp.fd_supported({"width": 2048}) is True
+    assert tp.fd_supported({"width": 4096}) is True
+    assert tp.fd_supported({"width": 5120}) is True
+
+
+def test_streamed_g5_cache_is_rejected_when_a_tied_head_key_is_missing(spec_tp, tmp_path):
+    """A g5 cache written before the tied-head alias has output.weight, not token_embd.weight.
+    The streamed path must refuse it so Shard._load rebuilds the cache instead of building a plan
+    that reads a missing tensor."""
+    spec, _ = spec_tp
+    (tmp_path / "g5_aaaaaaaaaaaa-w1-c0.json").write_text(json.dumps({"output.weight": [0, 1, 1]}))
+    (tmp_path / "g5n_aaaaaaaaaaaa-w1-c0.bin").write_bytes(b"\0\0\0\0")
+    shard = types.SimpleNamespace(
+        card=0,
+        tp=types.SimpleNamespace(pack=str(tmp_path), man={"source_sha256": "a" * 64}, W=1, split_tag=""),
+        _slices=lambda: ({"token_embd.weight": (None, None)}, {}))
+    assert spec.load_stream(shard) is False

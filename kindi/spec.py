@@ -1592,8 +1592,10 @@ def load_stream(self):
     if not (os.path.exists(ipath) and os.path.exists(lpath)):
         return False
     t0 = time.time()
-    _, flt = self._slices()
+    tern, flt = self._slices()
     offs = {n: tuple(v) for n, v in json.load(open(ipath)).items()}
+    if not set(tern) <= set(offs):
+        return False                     # a cache from before the tied-head alias: Shard._load rebuilds it
     nw = os.path.getsize(lpath) // 4
     self.bc = cp.empty(nw, dtype=cp.uint32)
     step = 64 << 20

@@ -5,10 +5,11 @@ Status: **P0 implemented 2026-11-10; heterogeneous pairing added 2026-11-11; not
 pair-supported classes (Maxwell, Pascal, Turing, tensor-core or P100) with at least 3,800 MiB each, and gives
 two sm_80 cards the `tc2` profile; mixed-generation pairs use the plain `k1200x2` split. `tests/test_installer_cards.py` runs the installer's own card functions against a fake
 nvidia-smi table. The first GPU verify is recorded on the RTX 4060 Ti: the 2B tc plan is 4/4
-token-exact, the 4B tc plan is 2/4, the 9B tc plan is refused (Hadamard 4096), the 27B tc plan passes
+token-exact, the 4B tc plan is 3 exact + 1 tie (FD fallback), the 9B tc plan is refused (Hadamard 4096), the 27B tc plan passes
 (3 exact + 1 llama.cpp tie at token 14, 38.9 tok/s in the 2026-11-11 one-pass matrix), and the plain 4B/9B paths are 4/4. The P106-100 single-card 2B/4B/9B offer and the two-card 27B offer are now covered by
-`tests/test_installer_cards.py`, but no P106 has been measured and there is no general Bonsai
-CPU+GPU tandem runtime (see [P106.md](P106.md); the Nanbeige host-layer back end is separate). The dual and 5060 Ti rows remain open; the 27B single-card tc path now also has a 24,576-token benchmark and a real server/cache restart cycle, while the 4B/9B tc gaps and a longer soak remain. P1-P3 are unimplemented.
+`tests/test_installer_cards.py`, but no P106 has been measured. The dense Bonsai
+CPU+GPU tandem runtime is implemented (see [TANDEM-STATUS.md](TANDEM-STATUS.md); the Nanbeige
+host-layer back end is separate). The dual and 5060 Ti rows remain open; the 27B single-card tc path now also has a 24,576-token benchmark and a real server/cache restart cycle, while the 9B tc gap, the 4B's forced-FD limitation and a longer soak remain. P1-P3 are unimplemented.
 
 ## What “supported” means here
 
@@ -51,8 +52,8 @@ python tools/verify_matrix.py --models 2b,4b,9b,27b --modes tc \
   --baseline bench-logs/verify-matrix/baseline.json
 ```
 
-Current single-card RTX 4060 Ti result: 2B tc **4/4 at 370.2 tokens/s**; 4B tc **2/4 at
-178.2 tokens/s**; 9B tc **refused** (Hadamard 4096); 27B tc **3 exact + 1 tie at 38.9
+Current single-card RTX 4060 Ti result: 2B tc **4/4 at 370.2 tokens/s**; 4B tc **3 exact + 1 tie at
+164.6 tokens/s** (FD fallback); 9B tc **refused** (Hadamard 4096); 27B tc **3 exact + 1 tie at 38.9
 tokens/s** in the one-pass matrix, with a three-run median of **38.1 tokens/s**
 (38.2/38.1/36.7; range 1.5, 4.1%); plain 4B/9B **4/4 at 114.9/72.5 tokens/s**. The 24K
 benchmark/server result is in [CARDS.md](CARDS.md#rtx-4060-ti-8-gb-ada-sm89); the full
@@ -68,7 +69,7 @@ matrix table is in [CARDS.md](CARDS.md#verify-matrix-rtx-4060-ti).
 | install.sh `card_models()` | `pascal8` offers 27B; `maxwell` offers 9B/Nemotron/4B/2B; `tc` offers 27B/Nemotron/9B/4B/2B | A 6 GB P106 is offered up to 9B alone and 27B as a pair. A 2 GB GT 1030 is offered 4B/2B and does not pair. |
 | `kindi/tc.py` | compiles for compute_75 PTX, raises the PTX header to 7.1/sm_8x, lets the driver JIT; `supported()` accepts major >= 8 or major == 6 | Ada and Blackwell depend on this PTX patch; it is exactly the fragile path that needs a real test on the 4060 Ti and 5060 Ti. |
 | `kindi/engine.py` | `_cupy_arch_fix()` caps CuPy 9.6’s NVRTC target to the toolkit maximum | Necessary for Blackwell with the CUDA 10.2 image, but it means the image is not a native sm_89/sm_120 toolchain. |
-| `kindi/tp.py` | two-card plan engine; 27B path requires Hadamard blocks of 1024 | The 27B dual target is viable; the 2B tc plan is exact, the 4B tc plan is 2/4, and the 9B is refused (Hadamard 4096). |
+| `kindi/tp.py` | two-card plan engine; 27B path requires Hadamard blocks of 1024 | The 27B dual target is viable; the 2B tc plan is exact, the 4B tc plan is 3 exact + 1 tie with FD off, and the 9B is refused (Hadamard 4096). |
 | docs/CARDS.md | Names the pre-Ampere cards and the CPU as the CUDA 10.2 / CuPy 9.6 image and records that the Ada/Blackwell image path is unverified | A 4060 Ti/5060 Ti support claim still needs a modern-toolkit image and a documented exception, or a verified PTX-JIT path. |
 
 ## Target matrix
@@ -81,21 +82,21 @@ been recorded.
 | Card | Arch / CC | Current installer class | Single target | Dual target | Required path |
 |---|---|---|---|---|---|
 | GT 1030 2 GB | Pascal 6.1 | `maxwell` | 2B; 4B only if the fitted context is acceptable | not useful | plain engine; 2 GB context/memory test |
-| P106-100 6 GB | Pascal 6.1 | `maxwell` | 9B/4B/2B | 27B with a P4000 (14 GB total) or another supported card; plain split; unverified | plain plan engine, no TC; P106+P4000 uses the 5-trit path; single/dual installer routing is tested, no P106 run yet; general Bonsai CPU tandem is blocked on [TANDEM-STATUS.md](TANDEM-STATUS.md); see [P106.md](P106.md) |
+| P106-100 6 GB | Pascal 6.1 | `maxwell` | 9B/4B/2B | 27B with a P4000 (14 GB total) or another supported card; plain split; unverified | plain plan engine, no TC; P106+P4000 uses the 5-trit path; single/dual installer routing is tested, no P106 run yet; the dense CPU+GPU tandem runtime is implemented (see [TANDEM-STATUS.md](TANDEM-STATUS.md)); see [P106.md](P106.md) |
 | Quadro M4000 8 GB | Maxwell 5.2 | `maxwell` | 9B/4B/2B; 27B only if the 8 GB fit is verified | 27B, including with a P4000; plain split, `KINDI_G5=0`; unverified | plain plan engine, no TC; the mixed pair forces 2-bit weights on both cards |
 | Quadro P4000 8 GB | Pascal 6.1 | `pascal8` | 27B/9B/4B/2B | 27B alone or with a P106/M4000; plain split; unverified | plain plan engine, no TC; the dp4a kernels exist but `pascal8` does not enable `KINDI_TC=1` |
 | Quadro RTX 4000 8 GB | Turing 7.5 | `turing` | 27B/9B/4B/2B | 27B alone or with a 4060 Ti on the plain split (no TC); unverified | Turing tensor-core backend (`KINDI_TC=1`); CUDA 10.2 supports sm_75 |
-| RTX 4060 Ti 8 GB | Ada 8.9 | `tc` | 27B/9B/4B/2B; tc plan verify: 2B 4/4, 4B 2/4, 9B refused, 27B pass (3 exact + 1 tie; 4B/9B plain 4/4) | 27B with another sm_80+ card via `tc2`; 27B with an RTX 4000 via plain split; no mixed run | `tc` profile, 24,576-token default; PTX patch; 27B also benchmarks and serves at 24,576 tokens, but note the 4B/9B tc gaps before a full support claim |
+| RTX 4060 Ti 8 GB | Ada 8.9 | `tc` | 27B/9B/4B/2B; tc plan verify: 2B 4/4, 4B 3 exact + 1 tie (FD fallback), 9B refused, 27B pass (3 exact + 1 tie; 4B/9B plain 4/4) | 27B with another sm_80+ card via `tc2`; 27B with an RTX 4000 via plain split; no mixed run | `tc` profile, 24,576-token default; PTX patch; 27B also benchmarks and serves at 24,576 tokens, but note the 9B tc gap and the 4B's FD fallback before a full support claim |
 | RTX 5060 Ti 16 GB | Blackwell (confirm the driver’s exact CC; table says 10.0/12.8) | `tc` | 27B; 33B if the 16 GB fit is verified | 27B and 33B | `tc2`; Blackwell-capable toolkit or verified PTX JIT; 16 GB memory profile |
 
 Notes:
 
 - **RTX 4060 Ti tc verify (2026-11-11 one-pass matrix):** with `KINDI_TC=1 KINDI_TP=1 KINDI_FD=1 KINDI_ATT_TC=1
-  KINDI_TC_TMAX=4 KINDI_SPEC=0`, the 2B is 4/4 token-exact at 370.2 tokens/s; the 4B is 2/4
+  KINDI_TC_TMAX=4 KINDI_SPEC=0`, the 2B is 4/4 token-exact at 370.2 tokens/s; the 4B is 3 exact + 1 tie (FD fallback)
   (prompts 2 and 3); the 9B is refused before graph build (Hadamard 4096); the 27B passes with 3 exact
   prompts and 1 llama.cpp tie at token 14 (gap 0.0064), 38.9 tokens/s in the one-pass matrix. The 27B tc plan used T=1..4,
   724 nodes per decode token and left 1,128 MiB free after the build. The plain 4B/9B paths are
-  4/4 at 114.9/72.5 tokens/s. The 4B/9B tc paths are not support claims yet. The 27B has the 24K
+  4/4 at 114.9/72.5 tokens/s. The 4B tc pass is conditional on the FD fallback; the 9B tc path is not a support claim. The 27B has the 24K
   benchmark and server/cache result below; its 1,024-token verify remains the token-exact reference.
   A three-run repeat measured 38.2/38.1/36.7 tokens/s (median 38.1; range 1.5, 4.1%), all
   with the same 3 exact + 1 tie; the older 40.5 rerun was not reproduced.
