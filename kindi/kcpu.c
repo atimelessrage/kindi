@@ -9,9 +9,12 @@
 #include <omp.h>
 #include <immintrin.h>
 
-/* The engine requires AVX.  The AVX2/FMA/F16C path is used when the compiler enables it;
-   otherwise the AVX-only fallback below is used (Sandy Bridge).  Fail at compile time with an
-   actionable message instead of a target-mismatch error. */
+/* The engine requires AVX.  Five tiers are buildable: AVX2/FMA/F16C, AVX2/F16C without FMA,
+   AVX2/FMA without F16C, AVX2, and AVX-only.  kindi/cpu.py builds the tier the host supports
+   and loads that library; kc_isa()/kc_isa_name() below report which tier was compiled, so a
+   stale cache entry cannot run instructions the CPU lacks.  FMA is optional (separate
+   multiply/add without it), and a build without F16C uses the software fp16 conversion.  Fail
+   at compile time with an actionable message instead of a target-mismatch error. */
 #if !defined(__AVX__)
 #error "kindi CPU engine requires AVX; build with -mavx (docs/CPU-SUPPORT.md)"
 #endif
@@ -148,7 +151,7 @@ static void pair_tables(const float* x, float* T, int p0, int p1){
     t[4] = x0; t[5] = -x0 + x1; t[6] = x1; t[7] = x0 + x1;
   }
 }
-#if defined(__AVX2__) && defined(__FMA__)
+#if defined(__AVX2__)
 static void rows8(const Mat* A, float* y, const float* T, int b0, int b1){
   const int G = A->C / 128;
   const __m256i sh = _mm256_setr_epi32(0, 4, 8, 12, 16, 20, 24, 28);
@@ -170,7 +173,14 @@ static void rows8(const Mat* A, float* y, const float* T, int b0, int b1){
         s0 = _mm256_add_ps(s0, _mm256_andnot_ps(z0, v0));
         s1 = _mm256_add_ps(s1, _mm256_andnot_ps(z1, v1));
       }
+#if defined(__FMA__)
       acc = _mm256_fmadd_ps(_mm256_add_ps(s0, s1), _mm256_loadu_ps(A->S + ((size_t)rb * G + g) * 8), acc);
+#else
+      /* AVX2/F16C hosts without FMA: keep the AVX2 table/permute path and round the product
+         before the add.  This is not bit-identical to FMA, but it is the documented fallback. */
+      acc = _mm256_add_ps(acc, _mm256_mul_ps(_mm256_add_ps(s0, s1),
+                                             _mm256_loadu_ps(A->S + ((size_t)rb * G + g) * 8)));
+#endif
     }
     _mm256_storeu_ps(y + rb * 8, acc);
   }
@@ -514,6 +524,36 @@ KC_API int kc_head(Model* m){
   { head_body(m, 0, &best); }
   kc_times[t_cur] += omp_get_wtime() - t_last;
   return best;
+}
+
+/* The compiled tier. The numbers and names match kindi/cpu.py:ISA_ORDER; the loader compares
+   kc_isa_name() with the tier it selected before the first model call. */
+KC_API int kc_isa(void){
+#if defined(__AVX2__) && defined(__FMA__) && defined(__F16C__)
+  return 4;
+#elif defined(__AVX2__) && defined(__F16C__)
+  return 3;
+#elif defined(__AVX2__) && defined(__FMA__)
+  return 2;
+#elif defined(__AVX2__)
+  return 1;
+#else
+  return 0;
+#endif
+}
+
+KC_API const char* kc_isa_name(void){
+#if defined(__AVX2__) && defined(__FMA__) && defined(__F16C__)
+  return "avx2-fma-f16c";
+#elif defined(__AVX2__) && defined(__F16C__)
+  return "avx2-f16c-no-fma";
+#elif defined(__AVX2__) && defined(__FMA__)
+  return "avx2-fma";
+#elif defined(__AVX2__)
+  return "avx2";
+#else
+  return "avx-only";
+#endif
 }
 
 KC_API int kc_sizeof_model(void){ return (int)sizeof(Model); }

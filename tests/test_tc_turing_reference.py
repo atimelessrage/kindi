@@ -20,7 +20,8 @@ against an independent NumPy model written from the *documented* semantics, not 
 Covered: k_tc_pack (through the trit decode and the fp16 scales, and end to end), k_tc_q8 (XQ/ XS/ XA decoded
 independently), k_tc_mv2/4/8 with and without column splits, k_tc_mv3_2/4/8 (one, two, three tensors),
 k_tc_mm2/4/8/16, k_tc_sum, odd token counts, short 16-row tiles, several units, strided output rows, all-zero and
-all-two weights, zero and huge inputs, and exact round-half-even ties.
+all-two weights, zero and huge inputs, exact round-half-even ties, and an explicit asymmetric-input check that the
+activation-sum shift is applied.
 
 The kernels are built through the production path -- kindi.spec.SpecKernels(backend=tc_turing), i.e. compute_75 PTX
 loaded by tc_turing.load_module -- so the loader is exercised too.  A CUDA device and cupy are needed; the sm_75 PTX
@@ -372,6 +373,32 @@ def test_activations():
     assert np.count_nonzero(np.abs(frac - np.floor(frac) - 0.5) < 1e-6) > 100
 
 
+def test_int8_shift_compensation_is_required():
+    """The trit A operand is 0/1/2; the kernel must subtract XA, not combine two-trit dot products directly.
+
+    All-positive activations and all-two trits make the uncorrected product exactly twice the corrected one for a
+    nonzero group.  This is a targeted regression for the review's unverified INT8 shift-compensation finding; the
+    module's reference product checks every kernel family against the same correction independently.
+    """
+    NG, R, ntok = 8, 16, 4
+    t = _trits(NG, R, "two", seed=21)
+    d = _scales(NG, R, "random", seed=22)
+    X = np.abs(_inputs(ntok, NG, "normal", seed=23)).astype(np.float32) + np.float32(0.5)
+    q, xs, xa = ref_q8(X)
+    assert np.all(xa > 0), "the targeted case must exercise a nonzero activation sum"
+
+    XQ, XS, XA = q8(X, NG)
+    assert np.array_equal(cp.asnumpy(XA).reshape(ntok, NG), xa)
+    W = pack(build_src(t, d), R, NG)
+    got = mv(2, W, R, NG, XQ, XS, XA, ntok, 1)
+    check("int8 shift compensation", got, _model(t, d, X))
+
+    isum = np.einsum("grc,tgc->trg", t.astype(np.int32), q)
+    xs_d = (xs[:, :, None] * np.asarray(d, dtype=np.float32)[None, :, :]).transpose(0, 2, 1)
+    uncorrected = (isum * xs_d).sum(axis=2)
+    assert np.max(np.abs(got - uncorrected)) > np.float32(0.05) * np.max(np.abs(got))
+
+
 def test_pack_layout():
     """k_tc_pack: every data byte decodes to a base-3 number below 243 and every scale byte pair is the fp16 scale
 
@@ -530,8 +557,8 @@ def main():
     print("device: %s (sm_%d%d; the Turing module is compute_75 PTX, JIT-compiled)"
           % (p["name"], p["major"], p["minor"]))
     fails = 0
-    for fn in (test_turing_names, test_reference_layout, test_activations, test_pack_layout, test_products, test_token_counts,
-               test_shapes_and_merges, test_sum, test_whole_chain):
+    for fn in (test_turing_names, test_reference_layout, test_activations, test_int8_shift_compensation_is_required,
+               test_pack_layout, test_products, test_token_counts, test_shapes_and_merges, test_sum, test_whole_chain):
         try:
             fn()
         except AssertionError as e:

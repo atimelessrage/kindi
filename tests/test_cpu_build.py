@@ -41,6 +41,20 @@ def test_linux_build_uses_gcc_with_the_documented_flags(tmp_path):
         "-shared", "-fPIC", "-o", so, src, "-lm"]
 
 
+@pytest.mark.parametrize("isa", cpu.ISA_ORDER)
+def test_each_isa_build_uses_explicit_flags(isa, tmp_path):
+    src, so = str(tmp_path / "kcpu.c"), str(tmp_path / "libkcpu.so")
+    cmd = cpu._build_cmd(src, so, win=False, isa=isa)
+    assert "-march=native" not in cmd
+    assert all(flag in cmd for flag in cpu.ISA_BUILDS[isa])
+
+
+def test_each_isa_has_its_own_cache_path(tmp_path):
+    paths = {isa: cpu._so_path(str(tmp_path), isa) for isa in cpu.ISA_ORDER}
+    assert len(set(paths.values())) == len(paths)
+    assert cpu._so_path(str(tmp_path)) not in paths.values()
+
+
 def test_windows_build_uses_clang_libomp_and_no_posix_flags(monkeypatch, tmp_path):
     llvm = tmp_path / "llvm"
     (llvm / "lib").mkdir(parents=True)
@@ -115,17 +129,69 @@ def test_avx_only_library_builds_and_loads(monkeypatch, tmp_path):
             pytest.skip("gcc is not installed; it is needed to build the AVX-only fallback")
 
     monkeypatch.setenv("KINDI_CPU_CACHE", str(tmp_path))
-    so = Path(cpu._so_path(str(tmp_path)))
-    cmd = cpu._build_cmd(str(SRC), str(so), win=os.name == "nt", native_fma=False)
-    native = cmd.index("-march=native")
-    cmd[native:native + 1] = ["-mavx", "-mno-avx2", "-mno-fma", "-mno-f16c"]
-    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-    assert proc.returncode == 0, "AVX-only build failed:\n%s\n%s" % (" ".join(cmd), proc.stdout)
+    monkeypatch.setenv("KINDI_CPU_ISA", "avx-only")
+    so = Path(cpu._so_path(str(tmp_path), "avx-only"))
+    cpu._build(str(SRC), str(so), isa="avx-only")
 
     library = cpu._lib()
+    assert library.kc_isa_name() == b"avx-only"
     assert library.kc_sizeof_model() == ctypes.sizeof(cpu.Model)
     assert library.kc_sizeof_layer() == ctypes.sizeof(cpu.Layer)
     library.kc_init()
+
+
+def test_avx2_f16c_without_fma_preprocesses():
+    cc = _cc()
+    proc = subprocess.run([cc, "-fopenmp", "-mavx2", "-mno-fma", "-mf16c", "-E", str(SRC)],
+                          stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    assert proc.returncode == 0, proc.stderr.decode("utf-8", "replace")
+
+
+def test_avx2_f16c_no_fma_library_builds_and_loads(monkeypatch, tmp_path):
+    """The AVX2/F16C/no-FMA branch must compile and load, not just preprocess."""
+    if os.name == "nt":
+        cc = shutil.which(os.environ.get("KINDI_CC") or "clang")
+        if not cc:
+            pytest.skip("clang is not installed; set KINDI_CC to build the no-FMA AVX2 fallback")
+        monkeypatch.setenv("KINDI_CC", cc)
+    else:
+        if not shutil.which("gcc"):
+            pytest.skip("gcc is not installed; it is needed to build the no-FMA AVX2 fallback")
+
+    monkeypatch.setenv("KINDI_CPU_CACHE", str(tmp_path))
+    monkeypatch.setenv("KINDI_CPU_ISA", "avx2-f16c-no-fma")
+    so = Path(cpu._so_path(str(tmp_path), "avx2-f16c-no-fma"))
+    cpu._build(str(SRC), str(so), isa="avx2-f16c-no-fma")
+
+    library = cpu._lib()
+    assert library.kc_isa_name() == b"avx2-f16c-no-fma"
+    assert library.kc_sizeof_model() == ctypes.sizeof(cpu.Model)
+    assert library.kc_sizeof_layer() == ctypes.sizeof(cpu.Layer)
+    library.kc_init()
+
+
+def test_full_isa_library_builds_and_loads(monkeypatch, tmp_path):
+    """The native fast path compiles, loads and reports the tier the selector chose."""
+    if cpu.cpu_tier() not in ("avx2-fma-f16c", "unknown"):
+        pytest.skip("this host does not expose AVX2/FMA/F16C")
+    if os.name == "nt":
+        cc = shutil.which(os.environ.get("KINDI_CC") or "clang")
+        if not cc:
+            pytest.skip("clang is not installed; set KINDI_CC to build the native path")
+        monkeypatch.setenv("KINDI_CC", cc)
+    elif not shutil.which("gcc"):
+        pytest.skip("gcc is not installed; it is needed to build the native path")
+
+    monkeypatch.setenv("KINDI_CPU_CACHE", str(tmp_path))
+    monkeypatch.setenv("KINDI_CPU_ISA", "avx2-fma-f16c")
+    so = Path(cpu._so_path(str(tmp_path), "avx2-fma-f16c"))
+    cpu._build(str(SRC), str(so), isa="avx2-fma-f16c")
+
+    library = cpu._lib()
+    assert library.kc_isa_name() == b"avx2-fma-f16c"
+    assert library.kc_isa() == 4
+    assert library.kc_sizeof_model() == ctypes.sizeof(cpu.Model)
+    assert library.kc_sizeof_layer() == ctypes.sizeof(cpu.Layer)
 
 
 def test_non_avx_build_is_rejected_with_the_required_isa():
@@ -139,5 +205,14 @@ def test_non_avx_build_is_rejected_with_the_required_isa():
 def test_supported_isa_source_preprocesses():
     cc = _cc()
     proc = subprocess.run([cc, "-fopenmp", "-mavx2", "-mfma", "-mf16c", "-E", str(SRC)],
+                          stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    assert proc.returncode == 0, proc.stderr.decode("utf-8", "replace")
+
+
+@pytest.mark.parametrize("flags", (["-mavx2", "-mno-fma", "-mno-f16c"],
+                                   ["-mavx2", "-mfma", "-mno-f16c"]))
+def test_other_avx2_variants_preprocess(flags):
+    cc = _cc()
+    proc = subprocess.run([cc, "-fopenmp", *flags, "-E", str(SRC)],
                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     assert proc.returncode == 0, proc.stderr.decode("utf-8", "replace")

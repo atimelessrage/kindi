@@ -1,10 +1,12 @@
 # Long-term CPU support
 
-Status: **roadmap and acceptance contract, updated 2026-11-11. The i7-8086K engine and native CPU
-server chat path on the 2B/4B/9B are verified. The AVX-only fallback is implemented; a forced AVX-only build passes the 2B `kindi verify` 4/4
-token-exact on the i7-8086K. The 4B/9B were not re-run in this checkout; the installer AVX
-preflight is published in the refreshed 0.5.0 artifact. Native Sandy Bridge hardware is still
-untested. The other CPUs and a repeat timing run remain open.** The baseline CPU engine (`kindi/cpu.py`, `kindi/kcpu.c`)
+Status: **roadmap and acceptance contract, updated 2026-11-12. The i7-8086K engine and native CPU
+server chat path on the 2B/4B/9B are verified. The AVX-only fallback and the AVX2/F16C no-FMA
+fallback are implemented; a forced AVX-only build passes the 2B `kindi verify` 4/4 token-exact on
+the i7-8086K, and a forced AVX2/F16C no-FMA build passes the 2B `kindi verify` 4/4 token-exact (31.7 tok/s). All five forced ISA tiers now pass the 4B and 9B
+4/4 token-exact; the installer AVX preflight is published in the refreshed 0.5.0 artifact. Native
+Sandy Bridge and native no-FMA hardware are still untested. The other CPUs and a repeat timing run
+remain open.** The baseline CPU engine (`kindi/cpu.py`, `kindi/kcpu.c`)
 is in `main`; this page records the target, the verified result, and the exact build/runtime
 requirements so the work can be implemented and measured without re-discovering them. The tandem
 recovery gate is in [TANDEM-STATUS.md](TANDEM-STATUS.md).
@@ -26,30 +28,99 @@ they are not part of this CPU goal.
 
 | gate | current behaviour | consequence |
 |---|---|---|
-| `kindi/cpu.py` build | Linux: `gcc -O3 -march=native -fopenmp -fno-math-errno -shared -fPIC`; Windows: `clang -O3 -march=native -fopenmp -fno-math-errno -ffp-contract=off -shared` plus `libomp` (`KINDI_CC`, `KINDI_LLVM`) | The binary is built for the host CPU. There is no prebuilt portable CPU library. |
-| `kindi/kcpu.c` ISA | Requires AVX. The AVX2 (`_mm256_srlv_epi32`, `_mm256_permutevar8x32_ps`), FMA (`_mm256_fmadd_ps`) and F16C (`_cvtsh_ss` / `_cvtss_sh`) kernels are compiled when those features are enabled; otherwise an AVX-only fallback uses an AVX table lookup, separate multiply/add and software fp16 conversion. A compile-time `#error` names a missing AVX baseline. | An AVX-only CPU such as Sandy Bridge builds the fallback. The fallback passed a forced 2B AVX-only verify on the i7-8086K, but has not run on native Sandy Bridge hardware; 4B/9B were not re-run. |
-| documented requirement | `docs/CARDS.md` and the README say x86-64 with AVX; the AVX2/FMA/F16C path is described as optional | This matches the source: AVX is required, while the three fast-path features are selected by the compiler. |
-| `install.sh` preflight | Checks Linux, `x86_64` and AVX; CPU setups are hidden without AVX, and `--gpu cpu` stops with an actionable message. GPU setups remain available. | A CPU-only machine without AVX is rejected before the build; an AVX-only CPU such as Sandy Bridge is accepted. |
+| `kindi/cpu.py` build | Linux: `gcc -O3 <tier flags> -fopenmp -fno-math-errno -shared -fPIC`; Windows: `clang -O3 <tier flags> -fopenmp -fno-math-errno -ffp-contract=off -shared` plus `libomp` (`KINDI_CC`, `KINDI_LLVM`) | One library per ISA tier, built on demand and cached by OS/architecture/compiler/tier. A shared cache can serve AVX2 and AVX-only hosts without mixing binaries. |
+| runtime dispatch | `kindi/cpu.py` selects the best tier from `/proc/cpuinfo` (Linux) or the build compiler's `-march=native` macros (Windows), builds it with explicit flags and loads it. `KINDI_CPU_ISA` pins a tier. `kcpu.c:kc_isa_name()` reports the compiled tier and the loader rejects a mismatch. | The i5-2500K path is selected at runtime, not by a special build; forcing an unsupported tier is an actionable error instead of an illegal instruction. |
+| `kindi/kcpu.c` ISA | Requires AVX. The AVX2 path (`_mm256_srlv_epi32`, `_mm256_permutevar8x32_ps`) is used whenever the compiler enables AVX2. F16C (`_cvtsh_ss` / `_cvtss_sh`) is used when available, with a software fp16 fallback. FMA (`_mm256_fmadd_ps`) is optional: without it the AVX2 kernel uses separate multiply/add. An AVX-only build uses the scalar AVX table lookup. A compile-time `#error` names a missing AVX baseline. | AVX2/FMA/F16C hosts get the full fast path; AVX2/F16C hosts without FMA keep the AVX2 table/permute path; an AVX-only CPU such as Sandy Bridge gets the scalar fallback. |
+| documented requirement | `docs/CARDS.md` and the README say x86-64 with AVX; AVX2/F16C is the fast path, FMA is optional, and AVX-only is the fallback | This matches the source: AVX is required; `kindi/cpu.py` selects the AVX2/FMA/F16C, AVX2/F16C, AVX2 or AVX-only tier at startup from the host flags, and each tier is built with explicit `-m` flags. |
+| `install.sh` preflight | Checks Linux, `x86_64` and AVX; it classifies AVX2/FMA/F16C, AVX2/F16C without FMA, and AVX-only. CPU setups are hidden without AVX, and `--gpu cpu` stops with an actionable message. GPU setups remain available. | A CPU-only machine without AVX is rejected before the build; AVX2/F16C without FMA and AVX-only CPUs are accepted, and the selected path is printed before building. |
 | CPU engine thread default | `kindi/cpu.py` counts the physical cores this process may run on (sysfs `thread_siblings_list`, `/proc/cpuinfo` fallback) and sets `OMP_NUM_THREADS`, `OMP_PROC_BIND=close`, `OMP_PLACES=cores` before the library loads; `threads=` or an `OMP_NUM_THREADS` already in the environment wins | On a hybrid i9 this counts 24 cores, E-cores included. The best P/E split has not been measured. |
 | `install.sh` CPU default | Counts the physical cores of socket 0 (`lscpu -p=CORE,SOCKET`) and exports the same three variables for the CPU container; `--threads N` overrides it | Two sockets are not measured; the engine's own default counts every CPU it may use, not socket 0. |
 | build container | `docker/Dockerfile` is Ubuntu 18.04 with the distribution gcc and `libgomp1` | The old gcc may not know Raptor Lake as a `-march=native` target. An explicit AVX baseline with optional AVX2/FMA/F16C flags is the portable build. |
-| test coverage | `tests/` has server/config/cache tests plus `test_cpu_build.py`, `test_cpu_threads.py` and the gated `test_cpu_smoke.py`; `test_cpu_build.py` checks the AVX guard, preprocesses an AVX-only build, compiles and loads it through `kindi.cpu._lib()` without a pack, and rejects a build without AVX; the CI `cpu-engine-smoke` job compiles `kcpu.c` with gcc and loads the library | The compile/load path is covered; a full token cannot run without a model pack. |
+| test coverage | `tests/` has server/config/cache tests plus `test_cpu_build.py`, `test_cpu_threads.py` and the gated `test_cpu_smoke.py`; `test_cpu_build.py` checks the AVX guard, preprocesses every AVX2 variant, compiles and loads the AVX-only, AVX2/F16C no-FMA and AVX2/FMA/F16C builds through `kindi.cpu._lib()` without a pack, and pins the explicit flags and per-tier cache paths; `test_cpu_features.py` pins `select_isa()` including forced and unsupported tiers; the CI `cpu-engine-smoke` job compiles `kcpu.c` with gcc and loads the library | The compile/load/selection path is covered; a full token cannot run without a model pack. |
+
+## Runtime ISA dispatch (2026-11-11)
+
+`kindi/cpu.py` no longer builds one `-march=native` library. It classifies the host, picks one of
+five tiers, builds that tier with explicit flags on first use, and loads it. The cached library is
+keyed by OS, architecture, compiler and tier, so one cache can serve AVX2 and AVX-only machines
+without mixing binaries. `kcpu.c` reports the compiled tier through `kc_isa_name()`, and the loader
+refuses a library whose report does not match the selection.
+
+| tier | build flags | kernels |
+|---|---|---|
+| `avx2-fma-f16c` | `-mavx2 -mfma -mf16c` | AVX2 table/permute, FMA, hardware fp16 |
+| `avx2-f16c-no-fma` | `-mavx2 -mno-fma -mf16c` | AVX2 table/permute, separate multiply/add, hardware fp16 |
+| `avx2-fma` | `-mavx2 -mfma -mno-f16c` | AVX2 table/permute, FMA, software fp16 |
+| `avx2` | `-mavx2 -mno-fma -mno-f16c` | AVX2 table/permute, separate multiply/add, software fp16 |
+| `avx-only` | `-mavx -mno-avx2 -mno-fma -mno-f16c` | scalar AVX table lookup, software fp16 |
+
+Selection is `KINDI_CPU_ISA=auto` by default: the best tier whose features `/proc/cpuinfo` (Linux)
+or the build compiler's `-march=native` macros (Windows) reports. `KINDI_CPU_ISA=<tier>` pins one
+for a benchmark or a scheduler; forcing a tier the CPU explicitly lacks is an error, not a silent
+illegal instruction. When the OS exposes no flags, the old `-march=native` path remains the
+fallback. `kindi info` prints the detected path and the build that will be loaded.
+
+Measured on the i7-8086K (native Windows, clang 18.1.8, 6 threads, 1,024-token context, 2B pack,
+one run per tier):
+
+| tier | 2B verify | tokens/s | evidence |
+|---|---|---:|---|
+| `avx2-fma-f16c` | 4/4 token-exact | 43.6 | `bench-logs/cpu-dispatch-avx2-fma-f16c.log` |
+| `avx2-f16c-no-fma` | 4/4 token-exact | 43.9 | `bench-logs/cpu-dispatch-avx2-f16c-no-fma.log` |
+| `avx2-fma` | 4/4 token-exact | 31.9 | `bench-logs/cpu-isa-2b/avx2-fma.log` |
+| `avx2` | 4/4 token-exact | 29.1 | `bench-logs/cpu-isa-2b/avx2.log` |
+| `avx-only` | 4/4 token-exact | 8.9 | `bench-logs/cpu-dispatch-avx-only.log` |
+
+All five forced tiers now have an end-to-end 2B verify pass. The two software-F16C tiers are slower
+than the hardware-F16C paths (31.9 and 29.1 tok/s against 43.6 and 43.9), as expected. These are
+forced-tier runs on an AVX2 host, not native Sandy Bridge or no-F16C measurements. The AVX-only
+build is about 5x slower on the 2B and 4.9x/5.5x slower on the 4B/9B, so it remains a compatibility
+path. No native CPU without F16C hardware was available. The 4B/9B rows below provide the same
+end-to-end coverage for those models. Evidence for the two new runs is in
+`bench-logs/cpu-isa-2b/RESULTS.md` and their full logs.
+
+### 4B/9B forced-tier runs (2026-11-12)
+
+The same forced-tier protocol was run against the 4B and 9B packs on the i7-8086K: native Windows,
+clang 18.1.8, 6 threads, 1,024-token context, one fresh process per tier/model, and a dedicated
+`KINDI_CPU_CACHE`. All ten runs exited 0 and reported `ALL PASS` with four prompt passes (the 9B
+prompt 3 stops at 13/13 tokens, as in the earlier runs). These are single runs, so the AVX2 rates
+are samples, not a tier ranking.
+
+| tier | 4B verify | 4B tok/s | 9B verify | 9B tok/s |
+|---|---:|---:|---:|---:|
+| `avx2-fma-f16c` | 4/4 | 18.1 | 4/4 | 10.7 |
+| `avx2-f16c-no-fma` | 4/4 | 15.8 | 4/4 | 10.4 |
+| `avx2-fma` | 4/4 | 17.8 | 4/4 | 10.9 |
+| `avx2` | 4/4 | 19.2 | 4/4 | 11.0 |
+| `avx-only` | 4/4 | 3.9 | 4/4 | 2.0 |
+
+Evidence: `bench-logs/cpu-isa-4b-9b/RESULTS.md`, `bench-logs/cpu-isa-4b-9b/summary.json`, and the
+ten raw logs in `bench-logs/cpu-isa-4b-9b/logs/`. The 4B manifest SHA-256 is
+`e7166ca35a0f97fc973acacaff1edb7eeb1f63098e7a343d6f76438c2fedd7dd`; the 9B manifest is
+`f5e4a8b1629e30936d5bf0ba32b99a4d460d3e937bbcc1ca76868a1391f72d07`. The AVX-only path is
+about 4.9x slower than the fastest 4B AVX2 run and 5.5x slower than the fastest 9B run. Forced-tier
+runs on this AVX2 host are compatibility evidence, not native Sandy Bridge or no-FMA support.
 
 ## Target matrix
 
 | CPU | Microarchitecture | Cores / threads | Relevant ISA | Current state | Target |
 |---|---|---|---|---|---|
-| Intel Core i5-2500K | Sandy Bridge | 4 / 4 | AVX; **no AVX2, FMA or F16C** | **AVX-only fallback implemented**: forced AVX build passes 2B 4/4 token-exact on the i7-8086K; 4B/9B not re-run; native i5-2500K hardware not available | 2B and 4B; 9B only if measured and useful; 27B no |
+| Intel Core i5-2500K | Sandy Bridge | 4 / 4 | AVX; **no AVX2, FMA or F16C** | **AVX-only tier selected at runtime**: forced `KINDI_CPU_ISA=avx-only` passes 2B 4/4 token-exact at 8.9 tok/s, 4B 4/4 at 3.9 and 9B 4/4 at 2.0 on the i7-8086K; native i5-2500K hardware not available | 2B and 4B; 9B only if measured and useful; 27B no |
 | Intel Xeon W-2133 | Skylake-W | 6 / 12 | AVX-512, AVX2, FMA, F16C | Expected to build and run, but **unverified** | 2B, 4B and 9B |
 | Intel Core i9-13900K | Raptor Lake (8 P + 16 E) | 24 / 32 | AVX2, FMA, F16C; no AVX-512 | Expected to build and run, but **unverified** | 2B, 4B and 9B; tune P/E thread count |
 | Intel Core i7-8086K | Coffee Lake | 6 / 12 | AVX2, FMA, F16C | **Engine and server verified**: native Windows (2B/4B/9B 4/4 at 33.7/16.7/9.1 tok/s, 6 threads auto-detected; 24K generation 8.2/3.1/2.6 tok/s, read 45.1/19.2/9.9), WSL2 history, and native CPU server chat requests on the 2B/4B/9B (32.9/19.2/11.5 tok/s, 1,024 context, non-stream and stream, 0 errors) | 2B, 4B and 9B; use 6 threads |
 
 Notes:
 
-- The i5-2500K is the only CPU here without AVX2/FMA/F16C. It now uses the AVX-only fallback: AVX
-  table lookup, separate multiply/add and software fp16. The 2B pass is a functional build check on
-  this host, not a native Sandy Bridge claim; the 4B/9B were not re-run, and a native run is still
-  needed for support.
+- The i5-2500K is the only CPU here without AVX2/FMA/F16C. `kindi/cpu.py` now selects the
+  `avx-only` tier on such a host: AVX table lookup, separate multiply/add and software fp16. The 2B
+  pass is a forced-tier check on an AVX2 host, not a native Sandy Bridge claim; the 4B and 9B
+  also pass the forced tier, but a native run is still needed for support.
+- An AVX2/F16C host without FMA (for example a VM with FMA masked) uses the AVX2 table/permute
+  kernel with separate multiply/add. This is not a native CPU row yet: the forced no-FMA build
+  passes 2B 4/4 at 31.7, 4B 4/4 at 15.8 and 9B 4/4 at 10.4 tok/s on the i7-8086K; native no-FMA
+  hardware is still needed for a support claim.
 - The Xeon W-2133 supports AVX-512, but `kcpu.c` is written with 256-bit AVX2 intrinsics. The compiler
   may auto-vectorize surrounding loops to AVX-512; test whether `-mprefer-vector-width=256` avoids a
   frequency drop without losing throughput.
@@ -298,23 +369,24 @@ workload can set `OMP_NUM_THREADS=8`. Raw probe logs are in `bench-logs/thread-s
    Feature values are `unknown` on systems that do not expose `/proc/cpuinfo`, so the compile-time
    guard in `kcpu.c` remains the authority there. The installer now checks AVX before it offers a
    CPU setup; `--gpu cpu` stops immediately when the check fails.
-3. Use `-march=native` for the host build: it selects the AVX2/FMA/F16C fast path when available and
-   the AVX-only fallback otherwise. A portable AVX-only artifact is a separate build decision, not a
-   runtime requirement.
-4. Keep a compile-only test for the AVX-only path and for the AVX2/FMA/F16C fast path; the feature
-   gate must accept AVX-only and reject a CPU without AVX.
+3. Use `-march=native` for the host build: it selects the AVX2/FMA/F16C fast path, the AVX2/F16C
+   no-FMA path, or the AVX-only fallback. A portable AVX-only artifact is a separate build decision,
+   not a runtime requirement.
+4. Keep a compile-and-load test for the AVX-only path, the AVX2/F16C no-FMA path and the
+   AVX2/FMA/F16C fast path; the feature gate must accept AVX-only and reject a CPU without AVX.
 
 ### P1 — the i5-2500K fallback
 
-5. AVX is the baseline. The AVX2, FMA and F16C kernels are selected with `__AVX2__`, `__FMA__` and
-   `__F16C__`; an AVX-only build uses an AVX table lookup instead of `vpermps`, separate multiply and
-   add instead of FMA, and software fp16 conversion.
+5. AVX is the baseline. The AVX2 path is selected with `__AVX2__`, F16C with `__F16C__`, and FMA
+   with `__FMA__`. An AVX2 build without FMA uses the same table/permute kernel with separate
+   multiply/add; an AVX-only build uses an AVX table lookup and software fp16 conversion.
 6. There is no runtime dispatch: `cpu.py` builds with `-march=native`, so the host compiler chooses
-   the fast path when the CPU supports it. This keeps the build and ABI simple; a separate portable
-   AVX binary is not produced.
+   the full FMA, AVX2/F16C no-FMA, or AVX-only path when the CPU supports it. This keeps the build
+   and ABI simple; a separate portable AVX binary is not produced.
 7. `kindi verify` was run on the 2B with `-mavx -mno-avx2 -mno-fma -mno-f16c`: 4/4 token-exact.
-   The 4B and 9B were not re-run in this checkout; native i5-2500K hardware is still needed for a
-   support claim.
+   A forced AVX2/F16C no-FMA build (`-mavx2 -mno-fma -mf16c`) also passes the 2B 4/4
+   token-exact at 31.7 tok/s on the i7-8086K. The 4B and 9B also pass the forced AVX-only and
+   AVX2/F16C no-FMA builds; native i5-2500K and native no-FMA hardware are still needed for a support claim.
 
 ### P2 — tuning the three AVX2 CPUs
 
@@ -341,7 +413,7 @@ workload can set `OMP_NUM_THREADS=8`. Raw probe logs are in `bench-logs/thread-s
 
 | CPU | 2B | 4B | 9B | 24K context | Required before a support claim |
 |---|---:|---:|---:|---:|---|
-| i5-2500K | 2B forced-AVX pass | not re-run | measure only | 2B/4B if RAM allows | native hardware, verify, bench |
+| i5-2500K | 2B forced-AVX pass | forced tiers 4/4 | forced tiers 4/4 | 2B/4B if RAM allows | native hardware, verify, bench |
 | Xeon W-2133 | target | target | target | yes | verify, bench, thread/AVX-512 result |
 | i9-13900K | target | target | target | yes | verify, bench, P/E thread default |
 | i7-8086K | engine + server verified | engine + server verified | engine + server verified | yes | repeat run |
@@ -349,7 +421,8 @@ workload can set `OMP_NUM_THREADS=8`. Raw probe logs are in `bench-logs/thread-s
 A checked cell needs a recorded `kindi verify` pass and a benchmark row. “Builds” alone is not support.
 `engine verified` for the i7-8086K means the CPU library built on WSL2 and natively on Windows,
 `kindi verify` passed and the 6-thread 24K benchmark completed. Its native CPU server chat path is
-now verified for the 2B, 4B and 9B; the remaining open item is a repeat timing run.
+now verified for the 2B, 4B and 9B; the remaining open item is a repeat timing run. Forced-tier
+results are compatibility evidence, not native support for the i5-2500K.
 
 ## Commands for the validation machine
 
@@ -361,6 +434,10 @@ to get the keyed filename the production loader expects.
 gcc -O3 -mavx2 -mfma -mf16c -fopenmp -fno-math-errno -shared -fPIC \
     -o /tmp/libkcpu.so kindi/kcpu.c -lm
 
+# AVX2/F16C without FMA for a host or VM with FMA masked
+gcc -O3 -mavx2 -mno-fma -mf16c -fopenmp -fno-math-errno -shared -fPIC \
+    -o /tmp/libkcpu-avx2-nofma.so kindi/kcpu.c -lm
+
 # AVX-only fallback for Sandy Bridge and other AVX CPUs
 gcc -O3 -mavx -mno-avx2 -mno-fma -mno-f16c -fopenmp -fno-math-errno -shared -fPIC \
     -o /tmp/libkcpu-avx.so kindi/kcpu.c -lm
@@ -371,6 +448,8 @@ KINDI_DEVICE=cpu KINDI_CPU_CACHE=/tmp/kindi-cpu python3 -m kindi verify
 KINDI_DEVICE=cpu KINDI_CPU_CACHE=/tmp/kindi-cpu python3 -m kindi bench
 # forced AVX-only exactness on a real pack (builds the keyed library itself)
 KINDI_CPU_AVX_PACKS=/path/to/pack python3 -m pytest tests/test_cpu_avx_fallback.py -q
+# forced AVX2/F16C no-FMA exactness on a real pack
+KINDI_CPU_NO_FMA_PACKS=/path/to/pack python3 -m pytest tests/test_cpu_avx_fallback.py -q
 ```
 
 `kindi verify` needs the converted pack and the matching reference file. The installer's `--threads N`
@@ -384,7 +463,9 @@ which would fault on Sandy Bridge even when the engine itself is built for AVX o
 ## Open decisions
 
 - Can the AVX-only fallback be run on native Sandy Bridge hardware to turn the forced-build result
-  into a support claim? The forced build is exact on the 2B; the 4B/9B still need a re-run.
+  into a support claim? The forced build is exact on the 2B, 4B and 9B; native Sandy Bridge hardware is still needed.
+- Can the AVX2/F16C no-FMA path be run on native hardware or a VM with FMA masked? The forced
+  2B/4B/9B runs are token-exact at 31.7/15.8/10.4 tok/s; native no-FMA hardware is still unmeasured.
 - Should the supported tier use explicit `-mavx2 -mfma -mf16c` or `-march=native`? The old container
   gcc and the Raptor Lake detection make this a testable choice, not a preference.
 - For the i9-13900K, is the default 8 P-core threads, 16 P-core threads, or all 24 cores? Measure

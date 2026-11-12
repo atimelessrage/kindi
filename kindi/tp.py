@@ -22,7 +22,9 @@ A launch plan records one token's kernels once (function, grid, block, ctypes ar
 cuLaunchKernel; only the token id and the position change between tokens (Dyn arguments). The exchange epochs are
 counted on the GPU."""
 import ctypes
+import hashlib
 import json
+import math
 import os
 import time
 
@@ -365,8 +367,12 @@ class Shard(object):
         self.tp, self.card, self.log = tp, card, log
         self.D, self.NL, self.HD, self.HK, self.HB = tp.D, tp.NL, tp.HD, tp.HK, tp.HB
         self.dims = tp.dims
-        self.NK, self.NV = tp.NKg // tp.W, tp.NVg // tp.W
-        self.NH, self.NHKV = tp.NHg // tp.W, tp.NHKVg // tp.W
+        self.k0, self.k1 = tp.gdn_groups[card]         # GDN q/k groups (their v heads move with them)
+        self.v0, self.v1 = tp.gdn_v[card]              # GDN v heads / state channels
+        self.q0, self.q1 = tp.attn_q[card]             # attention q heads
+        self.kv0, self.kv1 = tp.attn_kv[card]          # attention KV heads
+        self.NK, self.NV = self.k1 - self.k0, self.v1 - self.v0
+        self.NH, self.NHKV = self.q1 - self.q0, self.kv1 - self.kv0
         self.G = self.NH // self.NHKV
         self.g0, self.g1 = tp.ffn_rows[card]           # gate/up rows (whole Hadamard blocks)
         self.d0, self.d1 = tp.ffn_cols[card]           # ffn_down columns
@@ -391,13 +397,13 @@ class Shard(object):
         tp, c, HK, HD = self.tp, self.card, self.HK, self.HD
         NK, NV, NKg = self.NK, self.NV, tp.NKg
         rep = NV // NK
-        k0 = c * NK
+        k0 = self.k0
         qk_rows = [(k0 * HK, (k0 + NK) * HK), (NKg * HK + k0 * HK, NKg * HK + (k0 + NK) * HK)]
         v_rows = [(2 * NKg * HK + (r * NKg + k0) * HK, 2 * NKg * HK + (r * NKg + k0 + NK) * HK) for r in range(rep)]
         gate_rows = [(a - 2 * NKg * HK, b - 2 * NKg * HK) for a, b in v_rows]
         vh = _ranges(*[(r * NKg + k0, r * NKg + k0 + NK) for r in range(rep)])          # this card's v heads
-        gv0 = c * NV * HK                                                              # grouped GDN output columns
-        h0, kvh0, a0 = c * self.NH, c * self.NHKV, c * self.NH * HD
+        gv0 = self.v0 * HK                                                             # grouped GDN output columns
+        h0, kvh0, a0 = self.q0, self.kv0, self.q0 * HD
         tern, flt = {}, {}
         for il in range(self.NL):
             p = "blk.%d." % il
@@ -838,6 +844,105 @@ class Shard(object):
 
 # ====================================================================================== the engine
 
+def tp_split_mode():
+    """KINDI_TP_SPLIT: auto derives the two cards' shares from their free VRAM; equal (the default)
+    keeps the historical 50/50 layout. Auto still uses equal when the usable capacities are close."""
+    raw = os.environ.get("KINDI_TP_SPLIT", "equal").strip().lower()
+    if raw in ("auto", "vram", "1", "on"):
+        return "auto"
+    if raw in ("", "equal", "off", "0"):
+        return "equal"
+    raise SystemExit("kindi: KINDI_TP_SPLIT must be auto or equal (got %r)" % raw)
+
+
+def vram_share(free, reserve):
+    """The first card's share of the usable free bytes. An unusable measurement is 50/50."""
+    usable = [max(0, int(x) - int(reserve)) for x in free]
+    if len(usable) != 2 or min(usable) <= 0 or sum(usable) <= 0:
+        return 0.5
+    return usable[0] / float(sum(usable))
+
+
+def _aligned_split(total, fraction, unit):
+    """The nearest multiple of unit to total * fraction, strictly between 0 and total."""
+    total, unit = int(total), int(unit)
+    if unit <= 0 or total <= 0 or total % unit or total < 2 * unit:
+        return None
+    slots = total // unit
+    k = int(round(total * float(fraction) / unit))
+    k = max(1, min(slots - 1, k))
+    return k * unit
+
+
+def _aligned_half(total, unit):
+    """An aligned fallback when a component is too small for a proportional split."""
+    total, unit = int(total), int(unit)
+    if unit <= 0 or total < 2 * unit or total % unit:
+        raise SystemExit("kindi: a tensor-parallel component of %d is too small to split" % total)
+    slots = total // unit
+    return max(1, min(slots - 1, slots // 2)) * unit
+
+
+def plan_split(dims, hb, vocab, fraction):
+    """A complete per-card layout for a two-card tensor-parallel run.
+
+    Every local width that a fold kernel consumes is a multiple of the pack's Hadamard block:
+    GDN v heads are HB-aligned (the q/k groups move with their v heads), attention q heads are
+    HB-aligned with their KV heads, the FFN rows and columns are whole HB blocks, and the output
+    head is split on 16-row units. A component that is too small for an aligned proportional
+    split keeps an aligned near-half split instead. The equal 50/50 path never calls this.
+    """
+    hb = int(hb)
+    NKg = int(dims["groups"])
+    HK = int(dims["state_size"])
+    HD = int(dims["head_dim"])
+    NHg = int(dims["heads"])
+    NHKVg = int(dims["kv_heads"])
+    NFFg = int(dims["ffn"])
+    NVg = int(dims["gdn_inner"]) // HK
+    if not 0.0 < float(fraction) < 1.0:
+        raise SystemExit("kindi: a tensor-parallel share must be between 0 and 1 (got %r)" % fraction)
+    if NVg % NKg or NHg % NHKVg:
+        raise SystemExit("kindi: the grouped GDN/attention dimensions do not divide evenly")
+    for width, what in ((NVg * HK, "GDN"), (NHg * HD, "attention"), (NFFg, "FFN")):
+        if hb <= 0 or width % hb:
+            raise SystemExit("kindi: the %s width %d is not a multiple of Hadamard block %d; "
+                             "proportional splitting is not aligned" % (what, width, hb))
+    rep = NVg // NKg
+    g_unit = hb // math.gcd(hb, rep * HK)                 # GDN groups that keep NV * HK HB-aligned
+    nk0 = _aligned_split(NKg, fraction, g_unit)
+    if nk0 is None:
+        nk0 = _aligned_half(NKg, g_unit)
+    nv0 = nk0 * rep
+    q_per_kv = NHg // NHKVg
+    kv_unit = hb // math.gcd(hb, q_per_kv * HD)           # KV heads that keep NH * HD HB-aligned
+    kv0 = _aligned_split(NHKVg, fraction, kv_unit)
+    if kv0 is None:
+        kv0 = _aligned_half(NHKVg, kv_unit)
+    q0 = kv0 * q_per_kv
+    f0 = _aligned_split(NFFg, fraction, hb)
+    if f0 is None:
+        f0 = _aligned_half(NFFg, hb)
+    h0 = _aligned_split(vocab, fraction, 16) if int(vocab) % 16 == 0 else None
+    if h0 is None:
+        h0 = max(1, min(int(vocab) - 1, int(vocab) // 2))
+    return {
+        "gdn_groups": [(0, nk0), (nk0, NKg)],
+        "gdn_v": [(0, nv0), (nv0, NVg)],
+        "attn_q": [(0, q0), (q0, NHg)],
+        "attn_kv": [(0, kv0), (kv0, NHKVg)],
+        "ffn_rows": [(0, f0), (f0, NFFg)],
+        "ffn_cols": [(0, f0), (f0, NFFg)],
+        "head_split": [0, h0, int(vocab)],
+    }
+
+
+def layout_tag(layout):
+    """A filesystem-safe tag that keys the per-card g5 caches by the whole layout."""
+    raw = json.dumps(layout, sort_keys=True, separators=(",", ":")).encode("ascii")
+    return "-s" + hashlib.sha1(raw).hexdigest()[:10]
+
+
 class TPEngine(object):
     """Same interface as Engine (reset, feed, step, generate) over two cards."""
 
@@ -870,25 +975,61 @@ class TPEngine(object):
         self.NVg = self.dims["gdn_inner"] // self.HK
         self.NFFg = self.dims["ffn"]
         self.inv_freq = np.float64(self.dims["rope_base"]) ** (-2.0 * np.arange(self.dims["rope_dim"] // 2) / self.dims["rope_dim"])
+        self.split_mode = tp_split_mode()
+        self.split_tag = ""
+        self.split_layout = None
         if self.W == 1:
+            self.gdn_groups, self.gdn_v = [(0, self.NKg)], [(0, self.NVg)]
+            self.attn_q, self.attn_kv = [(0, self.NHg)], [(0, self.NHKVg)]
             self.ffn_rows, self.ffn_cols, self.head_split = [(0, self.NFFg)], [(0, self.NFFg)], [0, VOCAB]
+            self.split_layout = {"gdn_groups": self.gdn_groups, "gdn_v": self.gdn_v,
+                                 "attn_q": self.attn_q, "attn_kv": self.attn_kv,
+                                 "ffn_rows": self.ffn_rows, "ffn_cols": self.ffn_cols,
+                                 "head_split": self.head_split}
         else:
-            for x in (self.NKg, self.NVg, self.NHKVg):
-                if x % 2:
-                    raise SystemExit("kindi: dimensions do not split over two cards")
-            # FFN: gate/up in whole Hadamard blocks (an odd middle block on both cards), down columns split in half
-            nb = self.NFFg // self.HB
-            half = self.NFFg // 2
-            if half % 512:
-                raise SystemExit("kindi: the FFN width does not split over two cards")
-            self.ffn_rows = [(0, (nb + 1) // 2 * self.HB), (nb // 2 * self.HB, self.NFFg)]
-            self.ffn_cols = [(0, half), (half, self.NFFg)]
-            if os.environ.get("KINDI_TC", "0") == "1":
-                # the tc plans (spec.py) take whole 1024-column units: the odd middle block goes to card 0
-                m = (nb + 1) // 2 * self.HB
-                self.ffn_rows = self.ffn_cols = [(0, m), (m, self.NFFg)]
-                self.split_tag = "-b"
-            self.head_split = [0, VOCAB // 2, VOCAB]
+            layout = None
+            if self.split_mode == "auto":
+                free = []
+                for c in range(self.W):
+                    with cp.cuda.Device(c):
+                        free.append(rt.memGetInfo()[0])
+                fraction = vram_share(free, 512 * 2 ** 20)
+                fraction = min(0.8, max(0.2, fraction))
+                if abs(fraction - 0.5) > 0.05:
+                    layout = plan_split(self.dims, self.HB, VOCAB, fraction)
+                    self.split_tag = layout_tag(layout)
+                    log("plan engine: proportional split %.0f%% / %.0f%% from %.2f / %.2f GiB free"
+                        % (100 * fraction, 100 * (1 - fraction), free[0] / 2 ** 30, free[1] / 2 ** 30))
+            if layout is None:
+                for x in (self.NKg, self.NVg, self.NHg, self.NHKVg):
+                    if x % 2:
+                        raise SystemExit("kindi: dimensions do not split over two cards")
+                # FFN: gate/up in whole Hadamard blocks (an odd middle block on both cards), down columns split in half
+                nb = self.NFFg // self.HB
+                half = self.NFFg // 2
+                if half % 512:
+                    raise SystemExit("kindi: the FFN width does not split over two cards")
+                self.gdn_groups = [(0, self.NKg // 2), (self.NKg // 2, self.NKg)]
+                self.gdn_v = [(0, self.NVg // 2), (self.NVg // 2, self.NVg)]
+                self.attn_q = [(0, self.NHg // 2), (self.NHg // 2, self.NHg)]
+                self.attn_kv = [(0, self.NHKVg // 2), (self.NHKVg // 2, self.NHKVg)]
+                self.ffn_rows = [(0, (nb + 1) // 2 * self.HB), (nb // 2 * self.HB, self.NFFg)]
+                self.ffn_cols = [(0, half), (half, self.NFFg)]
+                self.head_split = [0, VOCAB // 2, VOCAB]
+                if os.environ.get("KINDI_TC", "0") == "1":
+                    # the tc plans (spec.py) take whole 1024-column units: the odd middle block goes to card 0
+                    m = (nb + 1) // 2 * self.HB
+                    self.ffn_rows = self.ffn_cols = [(0, m), (m, self.NFFg)]
+                    self.split_tag = "-b"
+            else:
+                self.gdn_groups, self.gdn_v = layout["gdn_groups"], layout["gdn_v"]
+                self.attn_q, self.attn_kv = layout["attn_q"], layout["attn_kv"]
+                self.ffn_rows, self.ffn_cols = layout["ffn_rows"], layout["ffn_cols"]
+                self.head_split = layout["head_split"]
+            self.split_layout = {"gdn_groups": self.gdn_groups, "gdn_v": self.gdn_v,
+                                 "attn_q": self.attn_q, "attn_kv": self.attn_kv,
+                                 "ffn_rows": self.ffn_rows, "ffn_cols": self.ffn_cols,
+                                 "head_split": self.head_split}
         self.idx = json.load(open(os.path.join(pack, "index.json")))
         self.bi = json.load(open(os.path.join(pack, "bcodes_index.json")))["tensors"]
         self.tied_head = "output.weight" not in self.bi   # tied embeddings (2B, 4B): the head is token_embd

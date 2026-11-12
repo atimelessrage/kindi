@@ -40,8 +40,8 @@ converted `PQ2_0`/`Q2_0` file is byte-identical to the `PTQ1_0` pack.
 
 ## CPU engine requirements
 
-`kindi/kcpu.c` requires **AVX** at build time. The detected fast-path instruction sets are
-**AVX, AVX2, FMA, F16C**; AVX2, FMA and F16C are used when the compiler enables them, and an AVX-only build uses the fallback kernels. The build is `-march=native`; on Windows it is clang + libomp, elsewhere gcc + OpenMP.
+`kindi/kcpu.c` requires **AVX** at build time. The detected instruction-set kernels are
+**AVX, AVX2, FMA, F16C**. `kindi/cpu.py` builds one library per tier (`-mavx2 -mfma -mf16c`, `-mavx2 -mno-fma -mf16c`, `-mavx2 -mfma -mno-f16c`, `-mavx2`, `-mavx`) and loads the best one the CPU supports, or the tier named by `KINDI_CPU_ISA`. FMA is optional: without it the AVX2 kernel uses separate multiply/add. Windows builds use clang + libomp, elsewhere gcc + OpenMP.
 
 See [CPU-SUPPORT.md](CPU-SUPPORT.md) for the per-CPU matrix and gates.
 

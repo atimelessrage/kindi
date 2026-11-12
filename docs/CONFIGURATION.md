@@ -30,10 +30,12 @@ individual value. The Docker image sets
 |---|---|---|
 | `host` | `127.0.0.1` | address to listen on; `0.0.0.0` serves your network - then also set `api_key` |
 | `port` | `8093` | |
-| `api_key` | (empty) | if set, every `/v1` request needs `Authorization: Bearer <api_key>`; `/health` stays open |
+| `api_key` | (empty) | if set, every `/v1` request needs `Authorization: Bearer <api_key>`; `/health` stays open for liveness but its queue, GPU, uptime and usage details need the same header |
 | `model_name` | `auto` | the model id `/v1/models` reports; `auto` takes it from the pack (the Bonsai ids are `bonsai2-2b`, `bonsai2-4b`, `bonsai2-9b` and `bonsai2-27b`; Nanbeige and Gemma packs use their own ids); clients may send any model name |
 | `max_body_mb` | `16` | maximum HTTP request body in MiB; larger requests get `413` before the engine is touched |
 | `queue_max` | `8` | requests allowed to wait behind the active one; further requests get `429` with `Retry-After: 1` |
+| `rate_limit_per_min` | `0` | generation requests allowed per source address per fixed minute; further requests get `429` with `Retry-After`; `0` disables it. Health, metrics and model listing are exempt. Behind a reverse proxy, all clients share the proxy address |
+| `log_json` | `0` | `1`: one JSON line per inference request on stdout (`request_id`, `status`, `duration_ms`, `queue_wait_ms`, token counts and `gen_tok_s`); the response also carries `X-Request-ID` |
 
 ### Engine
 
@@ -96,6 +98,7 @@ and the rest).
 | `KINDI_DEVICE` | `gpu` | `cpu` = the CPU engine (2B, 4B, 9B). Kindi also uses the CPU engine when CuPy is not installed |
 | `KINDI_CPU_CACHE` | `~/.cache/kindi` | the folder for the built CPU library; the file is keyed by host CPU and compiler (`libkcpu-<key>.so`) |
 | `KINDI_TP` | (auto) | `1` = the plan engine, `0` = the single-card engine. The 27B always uses the plan engine |
+| `KINDI_TP_SPLIT` | `equal` | two-card plan: `auto` gives each card a share of GDN groups, attention heads, FFN blocks and output-head rows from its free VRAM (after a 512 MiB reserve; aligned to the pack's Hadamard block, so on the 27B the GDN and attention splits stay equal while FFN and head move). `equal` keeps the historical 50/50 layout. The 10% deadband keeps equal-capacity cards equal under `auto` |
 | `KINDI_CARDS` | (all, at most 2) | the number of cards for the plan engine |
 | `KINDI_CHUNK` | `256` | prompt tokens per chunk; `0` = one token at a time. The default is `128` on Kepler (sm_30) |
 | `KINDI_CHUNK_MIN` | `32` | the smallest part of a prompt that goes through a chunk |

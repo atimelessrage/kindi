@@ -4,8 +4,11 @@ The whole forward pass of a token runs in C (kcpu.c, one OpenMP parallel region 
 kindi.engine.Engine: reset(), feed(tok, pos), step(tok, pos) -> greedy token, generate(ids, n), logits in
 self.ylog[:self.ylog_n]. Loads a Kindi pack (kindi convert) and repacks the ternary weights into pair codes
 ("perm8": per 8-row block and 128-column group, 64 words of 32 bits; one vpermps gives 8 rows x 2 columns).
-kcpu.c is built on first use (-O3 -march=native -fopenmp) into KINDI_CPU_CACHE (default ~/.cache/kindi): gcc on
-Linux, and on Windows clang with the MSVC headers and libomp that its driver finds (KINDI_CC, KINDI_LLVM override).
+kcpu.c is built on first use into KINDI_CPU_CACHE (default ~/.cache/kindi): gcc on Linux, and on Windows
+clang with the MSVC headers and libomp that its driver finds (KINDI_CC, KINDI_LLVM override). Five ISA tiers
+are defined (AVX2/FMA/F16C, AVX2/F16C without FMA, AVX2/FMA without F16C, AVX2, AVX-only); the host's flags
+select one, it is built with explicit -m flags, and the loaded library reports its tier in kc_isa_name().
+KINDI_CPU_ISA=auto|avx2-fma-f16c|avx2-f16c-no-fma|avx2-fma|avx2|avx-only overrides the selection.
 Threads: OMP_NUM_THREADS, or one per physical core of this process's CPUs by default (OMP_PROC_BIND=close,
 OMP_PLACES=cores). The physical-core default is the portable choice; 8 threads (two SMT pairs) can be
 faster under WSL2/libgomp on the 2B/9B, but 10/12 and native Windows 8 are slower. See
@@ -35,6 +38,25 @@ F32 = np.float32
 PF = ctypes.POINTER(ctypes.c_float)
 PU8 = ctypes.POINTER(ctypes.c_uint8)
 PU16 = ctypes.POINTER(ctypes.c_uint16)
+
+# One library per ISA tier, built on demand with explicit flags so a cache can serve different CPUs.
+# The labels are also the cache tag and what kcpu.c:kc_isa_name() reports back.
+ISA_BUILDS = {
+    "avx2-fma-f16c": ("-mavx2", "-mfma", "-mf16c"),
+    "avx2-f16c-no-fma": ("-mavx2", "-mno-fma", "-mf16c"),
+    "avx2-fma": ("-mavx2", "-mfma", "-mno-f16c"),
+    "avx2": ("-mavx2", "-mno-fma", "-mno-f16c"),
+    "avx-only": ("-mavx", "-mno-avx2", "-mno-fma", "-mno-f16c"),
+}
+ISA_ORDER = ("avx2-fma-f16c", "avx2-f16c-no-fma", "avx2-fma", "avx2", "avx-only")
+ISA_FEATURES = {
+    "avx2-fma-f16c": ("avx", "avx2", "fma", "f16c"),
+    "avx2-f16c-no-fma": ("avx", "avx2", "f16c"),
+    "avx2-fma": ("avx", "avx2", "fma"),
+    "avx2": ("avx", "avx2"),
+    "avx-only": ("avx",),
+}
+FMA_ISAS = ("avx2-fma-f16c", "avx2-fma")
 
 
 class Mat(ctypes.Structure):
@@ -75,103 +97,143 @@ def _llvm_root(cc):
     return root if os.path.isdir(os.path.join(root, "lib")) else None
 
 
-def _native_has_fma(cc=None):
-    """Whether the compiler's -march=native enables FMA on this host.
+def _compiler_flags(cc=None):
+    """The ISA flags the compiler enables for this host, or None when it cannot be probed.
 
-    Only the Windows CRT link needs this: the static libcmt expf contains FMA instructions even
-    with -mno-fma, so an AVX-only build must use the dynamic UCRT.  If the probe fails, prefer the
-    safe dynamic runtime rather than assuming FMA is available.
+    Windows has no /proc/cpuinfo, so the compiler that will build the library is asked what
+    -march=native defines. The same probe answers the CRT question: the static libcmt expf
+    contains FMA instructions even with -mno-fma.
     """
-    cc = cc or os.environ.get("KINDI_CC", "clang")
+    cc = cc or os.environ.get("KINDI_CC", "clang" if os.name == "nt" else "gcc")
     try:
         result = subprocess.run([cc, "-march=native", "-dM", "-E", "-x", "c", "-"],
                                 input=b"", stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     except OSError:
-        return False
-    return result.returncode == 0 and b"__FMA__" in result.stdout
+        return None
+    if result.returncode:
+        return None
+    macros = result.stdout.decode("utf-8", "replace")
+    return {name for name, macro in (("avx", "__AVX__"), ("avx2", "__AVX2__"),
+                                     ("fma", "__FMA__"), ("f16c", "__F16C__"))
+            if macro in macros}
 
 
-def _build_cmd(src, so, win=None, native_fma=True):
-    """The compiler command line: gcc on Linux; clang and libomp on Windows.
+def _native_has_fma(cc=None):
+    """Whether the compiler's -march=native enables FMA on this host (False if unknown)."""
+    flags = _compiler_flags(cc)
+    return bool(flags and "fma" in flags)
 
-    clang's driver finds the MSVC headers and Windows SDK through vswhere, so no vcvars shell is needed;
-    the build stays an argument vector (paths from KINDI_CPU_CACHE are literal). -ffp-contract=off keeps
-    Windows output on the same side of the FMA rounding as the gcc build that the references were made with.
+
+def _build_cmd(src, so, win=None, native_fma=None, isa=None):
+    """The compiler command line for one ISA tier: gcc on Linux; clang and libomp on Windows.
+
+    `isa` names a tier in ISA_BUILDS and replaces `-march=native` with explicit flags, so the
+    cached library does not depend on the build host. clang's driver finds the MSVC headers and
+    Windows SDK through vswhere, so no vcvars shell is needed; the build stays an argument vector
+    (paths from KINDI_CPU_CACHE are literal). -ffp-contract=off keeps Windows output on the same
+    side of the FMA rounding as the gcc build that the references were made with.
     """
     if win is None:
         win = os.name == "nt"
+    if isa is not None and isa not in ISA_BUILDS:
+        raise ValueError("unknown CPU ISA tier %r" % isa)
+    march = list(ISA_BUILDS[isa]) if isa is not None else ["-march=native"]
     if not win:
-        return ["gcc", "-O3", "-march=native", "-fopenmp", "-fno-math-errno", "-shared", "-fPIC",
-                "-o", so, src, "-lm"]
+        return ["gcc", "-O3"] + march + ["-fopenmp", "-fno-math-errno", "-shared", "-fPIC",
+                                          "-o", so, src, "-lm"]
     cc = os.environ.get("KINDI_CC", "clang")
-    cmd = [cc, "-O3", "-march=native", "-fopenmp", "-fno-math-errno", "-ffp-contract=off",
-           "-shared", "-o", so, src]
+    cmd = [cc, "-O3"] + march + ["-fopenmp", "-fno-math-errno", "-ffp-contract=off",
+                                  "-shared", "-o", so, src]
     root = _llvm_root(cc)
     if root:
         cmd += ["-L", os.path.join(root, "lib"), "-llibomp"]
     # The static libcmt expf contains FMA instructions even with -mno-fma; use the dynamic
-    # UCRT only when the host compiler does not enable FMA, so an AVX-only (Sandy Bridge) build
-    # cannot fault in the math runtime while native AVX2 builds keep the existing static CRT.
-    if not native_fma:
+    # UCRT when the selected tier does not use FMA, so a no-FMA AVX2 build and an AVX-only
+    # (Sandy Bridge) build cannot fault in the math runtime while FMA builds keep the
+    # existing static CRT.
+    uses_fma = (isa in FMA_ISAS) if isa is not None else (
+        _native_has_fma() if native_fma is None else native_fma)
+    if not uses_fma:
         cmd += ["-Xlinker", "/nodefaultlib:libcmt", "-Xlinker", "/defaultlib:msvcrt"]
     return cmd
 
 
-def _build(src, so):
-    """Compile kcpu.c without a shell, so paths from KINDI_CPU_CACHE stay literal."""
-    native_fma = _native_has_fma() if os.name == "nt" else True
-    cmd = _build_cmd(src, so, native_fma=native_fma)
+def _build(src, so, isa=None):
+    """Compile kcpu.c for one ISA tier without a shell, so paths from KINDI_CPU_CACHE stay literal."""
+    if isa is not None:
+        native_fma = isa in FMA_ISAS
+    elif os.name == "nt":
+        native_fma = _native_has_fma()
+    else:
+        native_fma = True
+    cmd = _build_cmd(src, so, native_fma=native_fma, isa=isa)
     try:
         result = subprocess.run(cmd)
     except OSError as e:
         raise SystemExit("kindi: could not run %s (%s); it needs gcc with OpenMP, or clang and libomp on Windows"
                          % (cmd[0], e))
     if result.returncode:
-        raise SystemExit("kindi: could not build the CPU engine (%s); it needs gcc with OpenMP, or clang and "
-                         "libomp on Windows, and a CPU with AVX (docs/CPU-SUPPORT.md)" % so)
+        raise SystemExit("kindi: could not build the CPU engine for %s (%s); it needs gcc with OpenMP, or "
+                         "clang and libomp on Windows, and a CPU with AVX (docs/CPU-SUPPORT.md)"
+                         % (isa or "native", so))
 
 
-def _cache_key():
+def _cache_key(isa=None):
     """Identify the build that a cached CPU library came from.
 
-    A shared cache must not hand one machine's `-march=native` binary to another CPU, or reuse a
-    gcc build after the compiler changed. The key covers the OS, architecture, compiler choice,
-    the host CPU identity/flags and the compiler command line.
+    An explicit-tier key covers the OS, architecture, compiler and flags, so it can be shared by
+    hosts with the same tier. The native fallback (no flags exposed) also covers the host CPU
+    identity: a `-march=native` binary must never be handed to a different machine.
     """
     parts = [os.name, platform.machine(),
-             os.environ.get("KINDI_CC", "gcc" if os.name != "nt" else "clang")]
-    if os.name == "nt":
-        parts.append(os.environ.get("PROCESSOR_IDENTIFIER", platform.processor() or ""))
+             os.environ.get("KINDI_CC", "gcc" if os.name != "nt" else "clang"),
+             "isa=" + (isa or "native")]
+    if isa is None:
+        native_fma = True
+        if os.name == "nt":
+            native_fma = _native_has_fma()
+            parts.append(os.environ.get("PROCESSOR_IDENTIFIER", platform.processor() or ""))
+            parts.append("fma" if native_fma else "no-fma")
+        else:
+            info = _read("/proc/cpuinfo") or ""
+            parts.extend(line.strip() for line in info.splitlines()
+                         if line.startswith(("model name", "flags", "Features")))
     else:
-        info = _read("/proc/cpuinfo") or ""
-        parts.extend(line.strip() for line in info.splitlines()
-                     if line.startswith(("model name", "flags", "Features")))
-    parts.append(" ".join(_build_cmd("kcpu.c", "libkcpu")))
+        native_fma = isa in FMA_ISAS
+    parts.append(" ".join(_build_cmd("kcpu.c", "libkcpu", native_fma=native_fma, isa=isa)))
     return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()[:16]
 
 
-def _so_path(cache=None):
-    """The keyed cache path, so machines and toolchains cannot share a native binary."""
+def _so_path(cache=None, isa=None):
+    """The cache path for one ISA tier; the key covers the tier, compiler and OS."""
     cache = cache or os.environ.get("KINDI_CPU_CACHE") or os.path.join(
         os.path.expanduser("~"), ".cache", "kindi")
     ext = "dll" if os.name == "nt" else "so"
-    return os.path.join(cache, "libkcpu-%s.%s" % (_cache_key(), ext))
+    return os.path.join(cache, "libkcpu-%s.%s" % (_cache_key(isa), ext))
 
 
 def _lib():
     src = os.path.join(HERE, "kcpu.c")
     cache = os.environ.get("KINDI_CPU_CACHE") or os.path.join(os.path.expanduser("~"), ".cache", "kindi")
     os.makedirs(cache, exist_ok=True)
-    so = _so_path(cache)
+    isa = select_isa()
+    so = _so_path(cache, isa)
     if not os.path.exists(so) or os.path.getmtime(so) < os.path.getmtime(src):
         check_features()
-        _build(src, so)
+        _build(src, so, isa)
     if os.name == "nt":
         root = _llvm_root(os.environ.get("KINDI_CC", "clang"))
         if root and os.path.isdir(os.path.join(root, "bin")):
             os.add_dll_directory(os.path.join(root, "bin"))      # libomp.dll the built DLL links against
     lib = ctypes.CDLL(so)
     lib.kc_init()
+    lib.kc_isa.restype = ctypes.c_int
+    lib.kc_isa_name.restype = ctypes.c_char_p
+    built = lib.kc_isa_name().decode("ascii")
+    if isa is not None and built != isa:
+        raise SystemExit("kindi: the CPU library at %s reports %s, expected %s; delete it and retry"
+                         % (so, built, isa))
+    lib.kindi_isa = built
     lib.kc_step.argtypes = [ctypes.POINTER(Model), ctypes.c_int, ctypes.c_int, ctypes.c_int]
     lib.kc_step.restype = ctypes.c_int
     lib.kc_embed.argtypes = [ctypes.POINTER(Model), ctypes.c_int]
@@ -215,6 +277,16 @@ def _read(path):
 CPU_FEATURES = (("avx", "AVX"), ("avx2", "AVX2"), ("fma", "FMA3"), ("f16c", "F16C"))
 CPU_REQUIRED = (("avx", "AVX"),)
 
+CPU_TIER_LABELS = {
+    "avx2-fma-f16c": "AVX2/FMA/F16C fast path",
+    "avx2-f16c-no-fma": "AVX2/F16C without FMA (separate multiply/add)",
+    "avx2-fma": "AVX2/FMA with software F16C",
+    "avx2": "AVX2 with software F16C and no FMA",
+    "avx-only": "AVX-only fallback",
+    "unknown": "unknown until the compiler selects the path",
+    "unsupported": "unsupported (AVX missing)",
+}
+
 
 def _cpu_model(text):
     """The model name from /proc/cpuinfo, or the platform's best fallback."""
@@ -248,8 +320,64 @@ def feature_report():
     """
     text = _read("/proc/cpuinfo")
     flags = _cpu_flags(text)
+    if flags is None and os.name == "nt":
+        flags = _compiler_flags()          # Windows has no /proc/cpuinfo; ask the build compiler
     return {"model": _cpu_model(text), "physical": _physical_cores(), "logical": os.cpu_count(),
             "features": {name: None if flags is None else name in flags for name, _ in CPU_FEATURES}}
+
+
+def cpu_tier(report=None):
+    """The `kcpu.c` path this host should use: AVX2 (with optional FMA/F16C) or AVX-only.
+
+    AVX remains the baseline.  AVX2 is used whenever the compiler enables it; FMA is optional,
+    and an AVX2/F16C host without it takes the separate multiply/add branch in `rows8`.  An
+    AVX-only host uses the scalar fallback.  Unknown flags make no claim: the compile-time checks
+    in `kcpu.c` remain the authority.
+    """
+    report = feature_report() if report is None else report
+    f = report["features"]
+    if f.get("avx") is False:
+        return "unsupported"
+    if f.get("avx") is None:
+        return "unknown"
+    if f.get("avx2"):
+        if f.get("f16c") and f.get("fma"):
+            return "avx2-fma-f16c"
+        if f.get("f16c"):
+            return "avx2-f16c-no-fma"
+        if f.get("fma"):
+            return "avx2-fma"
+        return "avx2"
+    return "avx-only"
+
+
+def select_isa(report=None, forced=None):
+    """The ISA tier to load: the best one this CPU supports, or KINDI_CPU_ISA / `forced`.
+
+    None means the OS exposes no flags; the caller then keeps the `-march=native` build and the
+    compile-time gates in kcpu.c are the authority. A forced tier that this CPU explicitly does
+    not support is an error: loading it would execute an illegal instruction.
+    """
+    report = feature_report() if report is None else report
+    flags = report["features"]
+    choice = os.environ.get("KINDI_CPU_ISA", "auto") if forced is None else forced
+    choice = (choice or "auto").strip().lower().replace("_", "-")
+    choice = {"native": "auto", "avxonly": "avx-only",
+              "avx2-f16c": "avx2-f16c-no-fma"}.get(choice, choice)
+    if choice != "auto" and choice not in ISA_BUILDS:
+        raise SystemExit("kindi: KINDI_CPU_ISA must be auto or one of %s (got %r)"
+                         % (", ".join(ISA_ORDER), choice))
+    if choice != "auto":
+        missing = [name.upper() for name in ISA_FEATURES[choice] if flags.get(name) is False]
+        if missing:
+            raise SystemExit("kindi: KINDI_CPU_ISA=%s needs %s; this CPU lacks %s"
+                             % (choice, ", ".join(n.upper() for n in ISA_FEATURES[choice]),
+                                ", ".join(missing)))
+        return choice
+    tier = cpu_tier(report)
+    if tier == "unsupported":
+        raise SystemExit("kindi: the CPU engine needs AVX; this CPU lacks AVX (%s)" % report["model"])
+    return None if tier == "unknown" else tier
 
 
 def missing_features(report=None):
@@ -403,6 +531,7 @@ class Engine(object):
         t0 = time.time()
         self.threads = _configure_threads(threads)
         self.lib = _lib()
+        self.isa = getattr(self.lib, "kindi_isa", "native")
         self.ctx = int(ctx)
         man = json.load(open(os.path.join(pack, "kindi_pack.json")))
         d = self.dims = dict(DEFAULT_DIMS, **man.get("dimensions", {}))
@@ -496,8 +625,8 @@ class Engine(object):
         self.hsl, self.shortlist = None, 0
         self.shortlist = 0
         self.vocab = json.load(open(os.path.join(pack, "vocab.json")))
-        (log or (lambda *a: None))("kindi-cpu ready: %s, %s threads, ctx %d (%.1fs)" % (
-            man.get("model"), self.threads, self.ctx, time.time() - t0))
+        (log or (lambda *a: None))("kindi-cpu ready: %s, %s, %s threads, ctx %d (%.1fs)" % (
+            man.get("model"), self.isa, self.threads, self.ctx, time.time() - t0))
 
     def reset(self):
         for a in self.M + self.conv + self.Kc + self.Vc:

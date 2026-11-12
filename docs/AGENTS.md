@@ -15,14 +15,24 @@ Besides `/v1`, Kindi serves what an agent host needs to observe and to connect a
 
 - `GET /metrics` - Prometheus text. `kindi_requests_total`, `kindi_prompt_tokens_total`,
   `kindi_cached_prompt_tokens_total`, `kindi_completion_tokens_total`, `kindi_spec_drafted_tokens_total`,
-  `kindi_spec_accepted_tokens_total`, `kindi_queue_depth`, `kindi_queue_max`, `kindi_uptime_seconds` and
-  `kindi_model_info{model,ctx,head}`. It is protected by the API key when one is set.
+  `kindi_spec_accepted_tokens_total`, `kindi_queue_depth`, `kindi_queue_max`, `kindi_rate_limit_per_min`,
+  `kindi_rate_limited_total`, `kindi_uptime_seconds` and `kindi_model_info{model,ctx,head}`. It is protected
+  by the API key when one is set.
+- `log_json = 1` (`KINDI_LOG_JSON=1`) writes one JSON line per inference request on stdout: `request_id`
+  (also returned as `X-Request-ID`), `status`, `duration_ms`, `queue_wait_ms`, `stream`, and on success
+  `prompt_tokens`, `cached_tokens`, `completion_tokens`, `gen_tok_s` and `finish`. Rejected, cancelled and
+  failed requests are logged too; `/health`, `/metrics` and `/v1/models` are not. Headers and the API key
+  are never logged.
 - `GET /api/tags`, `POST /api/chat`, `POST /api/generate` - Ollama's API, so Ollama clients and chat UIs work
   without an OpenAI shim. `stream` defaults to true and the body is NDJSON; `options.num_predict` maps to
   `max_tokens`; `options.keep_alive`, `num_ctx`, `num_thread` and `format` are ignored. The API key applies here
   too.
-- `GET /health` also reports the queue: `queue.waiting`, `queue.max` and `queue.rejected`. It is
-  unauthenticated and includes model, context and GPU details; keep it on loopback or protect it at a proxy.
+- `GET /health` is a liveness probe: it always returns `ok`, `kindi`, `commit`, `model` and `ctx`. When
+  `api_key` is set, the detailed view - `queue.waiting`, `queue.max`, `queue.rejected`, `busy`, `stats`,
+  `uptime_s` and GPU free/total MiB - requires `Authorization: Bearer <api_key>`. Keep `/health` on loopback
+  unless a proxy protects the detailed view.
+- `POST /v1/completions` and `/v1/embeddings` are not implemented and return 404; use
+  `POST /v1/chat/completions` for text generation.
 - Image input is rejected with HTTP 400 when the selected pack has no vision weights. The current packs are
   text-only; remove `image_url`/`input_image` parts and Ollama `images`, or use a text-only prompt.
 
@@ -37,7 +47,8 @@ Besides `/v1`, Kindi serves what an agent host needs to observe and to connect a
    behind the request that Kindi still reads.
 3. **One retry at most**, and no parallel requests: Kindi serves one request at a time. Up to 8 requests may
    wait behind the active one; beyond that the server answers **HTTP 429** with `Retry-After: 1`. Wait a second
-   and retry once instead of opening more connections.
+   and retry once instead of opening more connections. For a shared server, `KINDI_RATE_LIMIT_PER_MIN` adds a
+   per-source generation cap; health, metrics and model listing stay exempt.
 4. **A short system prompt and few tools.** Every tool schema is prompt text. Keep the tool list fixed between calls.
    A different set of tools per call changes the start of the prompt, and then the cache cannot help.
 5. **Temperature 0.1-0.7.** Greedy (`0`) is reproducible; the model publisher recommends 0.7 / top_p 0.8 / top_k 20 with `presence_penalty` 1.5. Set `sampling_profile = publisher` in `kindi.conf` for the whole publisher profile, including the thinking profile (1.0 / 0.95 / 20, presence 1.0, up to 8K output). A request's own `presence_penalty` (-2..2) overrides the config value.
@@ -52,7 +63,15 @@ final metrics were `kindi_requests_rejected_total 3` with 0 errors. The eight qu
 serially behind the active request. This confirms the queue bounds waiting clients instead of
 letting them accumulate.
 
-Watch a long first read with `curl -s localhost:8093/health` - the `busy` field shows `prompt_read` progress.
+Watch a long first read with `curl -s localhost:8093/health` - the `busy` field shows `prompt_read` progress (send `Authorization: Bearer <api_key>` for that field when a key is configured).
+
+## Browser clients and CORS
+
+Kindi sends no CORS headers. A browser app served from another origin cannot call it directly; put the app and
+Kindi behind the same reverse proxy, or proxy `/v1` through the app's server. Do not expose the API key in browser
+JavaScript. This is deliberate: the server is designed for server-side agents and desktop clients, and a permissive
+CORS policy would turn a LAN key into a browser-readable credential.
+
 
 ## Examples
 

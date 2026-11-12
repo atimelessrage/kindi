@@ -176,10 +176,12 @@ def render(models=None, fmts=None, kv=None, isa=None):
             f["format"], f["type"], f["group"], f["block"], f["bpw"]))
 
     lines += ["", "## CPU engine requirements", "",
-              "`kindi/kcpu.c` requires **AVX** at build time. The detected fast-path instruction sets are",
-              ("**%s**; AVX2, FMA and F16C are used when the compiler enables them, and an AVX-only build"
-               " uses the fallback kernels. The build is `-march=native`; on Windows it is clang + libomp,"
-               " elsewhere gcc + OpenMP.") % (", ".join(isa) or "none detected"),
+              "`kindi/kcpu.c` requires **AVX** at build time. The detected instruction-set kernels are",
+              ("**%s**. `kindi/cpu.py` builds one library per tier (`-mavx2 -mfma -mf16c`,"
+               " `-mavx2 -mno-fma -mf16c`, `-mavx2 -mfma -mno-f16c`, `-mavx2`, `-mavx`) and loads the"
+               " best one the CPU supports, or the tier named by `KINDI_CPU_ISA`. FMA is optional:"
+               " without it the AVX2 kernel uses separate multiply/add. Windows builds use clang +"
+               " libomp, elsewhere gcc + OpenMP.") % (", ".join(isa) or "none detected"),
               "", "See [CPU-SUPPORT.md](CPU-SUPPORT.md) for the per-CPU matrix and gates."]
 
     lines += ["", "## K/V cache modes", "",

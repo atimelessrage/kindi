@@ -90,6 +90,24 @@ def test_source_block_never_pipes_curl_into_tar():
     assert block.index('sha256sum "$part"') < block.index('tar -xzf "$part"')
 
 
+def test_port_probe_does_not_require_ss():
+    """The installer may run on a minimal host without iproute2; it must still avoid stealing a port."""
+    text = installer_text()
+    start = text.index("port_free() {")
+    end = text.index("\n}", start) + 2
+    block = text[start:end]
+    assert "command -v ss" in block
+    assert "/dev/tcp/127.0.0.1/$p" in block
+    assert "treating it as free" in block
+
+
+def test_verify_speed_parse_has_a_fallback():
+    """An older verify log may omit the speed line; pipefail must not kill the installer there."""
+    text = installer_text()
+    assert "grep -o '[0-9.]* tokens/s over the run' \"$VERIFY_OUT\" | awk '{print $1}' || true" in text
+    assert '[ -n "$sp" ] || sp="?"' in text
+
+
 def test_matching_source_archive_is_extracted():
     got = run_block("a" * 64)
     if got is None:

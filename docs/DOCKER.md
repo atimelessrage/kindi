@@ -7,9 +7,11 @@ Kindi has three images:
 
 | Image | Dockerfile | Contents | For |
 |---|---|---|---|
-| `kindi:0.5.0` | `docker/Dockerfile` | Ubuntu 18.04, CUDA 10.2, Python 3.6, CuPy 9.6, FastAPI, Kindi | NVIDIA cards from Kepler on, and the CPU engine |
+| `kindi:0.5.0` | `docker/Dockerfile` | Ubuntu 18.04, CUDA 10.2, Python 3.6, CuPy 9.6, FastAPI, Kindi; includes a `/health` `HEALTHCHECK` | NVIDIA cards from Kepler on, and the CPU engine |
 | `kindi-rocm:0.5.0` | `docker/Dockerfile.rocm` | Ubuntu 24.04, ROCm 6.3.3, Python 3.12, CuPy 14.2.0 built for ROCm, FastAPI, Kindi | AMD RDNA3 graphics (tested: Radeon 780M) |
 | `kindi-rocm7:0.5.0` | `docker/Dockerfile.rocm7` | Ubuntu 24.04, ROCm 7 (HIP 7.16), Python 3.12, CuPy 14.2.0 (cupy-rocm-7-0), FastAPI, Kindi | AMD RDNA 3.5 graphics (tested: Radeon 840M, Radeon 8060S) |
+
+All three images include a `/health` `HEALTHCHECK`. It answers during model load only after the server starts and does not require an API key (the key still protects the detailed health view).
 
 Everything Kindi reads or writes lives in one volume mounted at `/data`:
 

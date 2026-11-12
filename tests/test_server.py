@@ -48,6 +48,7 @@ class _FakeKindi(object):
         self.busy = {"active": False, "phase": "", "prompt_tokens": 0, "cached": 0,
                      "read": 0, "generated": 0, "started": 0.0}
         self.stats = {"requests": 0, "prompt_tokens": 0, "cached_tokens": 0, "completion_tokens": 0}
+        self.calls = 0
         self.t0 = 0.0
 
     def head_active(self):
@@ -61,6 +62,7 @@ class _FakeKindi(object):
             if not isinstance(m, dict) or "role" not in m:
                 raise TypeError("missing role")
         cached = len(self.runner.tokens)
+        self.calls += 1
         self.last_req = req
         yield "text", "ok"
         yield "done", {
@@ -162,6 +164,75 @@ def test_non_loopback_without_api_key_warns(monkeypatch):
     assert any("without api_key" in message and "0.0.0.0" in message for message in logs)
 
 
+def _access_app(monkeypatch, tmp_path, **cfg):
+    pack = tmp_path / "text-pack"
+    pack.mkdir(exist_ok=True)
+    (pack / "kindi_pack.json").write_text('{"model": "bonsai2-2b"}', encoding="utf-8")
+    K = _FakeKindi()
+    monkeypatch.setattr(server, "_make_engine", lambda c, log: K)
+    lines = []
+    app = server.create_app(dict({"model_name": "bonsai2-2b", "api_key": "", "pack": str(pack)}, **cfg),
+                            log=lines.append)
+    return app, K, lines
+
+
+def _last_access_line(lines):
+    parsed = [json.loads(line) for line in lines if line.startswith("{")]
+    assert parsed, lines
+    return parsed[-1]
+
+
+def test_json_access_log_records_a_completion(monkeypatch, tmp_path):
+    app, _K, lines = _access_app(monkeypatch, tmp_path, log_json=1)
+    with TestClient(app) as client:
+        r = client.post("/v1/chat/completions",
+                        json={"messages": [{"role": "user", "content": "hello"}]},
+                        headers={"X-Request-ID": "test-request-1"})
+    assert r.status_code == 200, r.text
+    assert r.headers["x-request-id"] == "test-request-1"
+    line = _last_access_line(lines)
+    assert line["request_id"] == "test-request-1"
+    assert line["method"] == "POST" and line["path"] == "/v1/chat/completions"
+    assert line["status"] == 200 and line["stream"] is False
+    assert line["prompt_tokens"] == 3 and line["completion_tokens"] == 1
+    assert line["cached_tokens"] == 3
+    assert isinstance(line["duration_ms"], float) and isinstance(line["queue_wait_ms"], float)
+
+
+def test_json_access_log_records_a_rejected_request(monkeypatch, tmp_path):
+    app, K, lines = _access_app(monkeypatch, tmp_path, log_json=1)
+    with TestClient(app) as client:
+        r = client.post("/v1/chat/completions", json={"messages": "not a list"})
+    assert r.status_code == 400, r.text
+    line = _last_access_line(lines)
+    assert line["status"] == 400
+    assert "messages must be a non-empty list" in line["error"]
+    assert K.last_req is None
+
+
+def test_json_access_log_records_a_stream(monkeypatch, tmp_path):
+    app, _K, lines = _access_app(monkeypatch, tmp_path, log_json=1)
+    with TestClient(app) as client:
+        with client.stream("POST", "/v1/chat/completions",
+                           json={"messages": [{"role": "user", "content": "hello"}],
+                                 "stream": True}) as r:
+            assert r.status_code == 200, r.text
+            body = "".join(r.iter_text())
+    assert "[DONE]" in body
+    line = _last_access_line(lines)
+    assert line["stream"] is True and line["status"] == 200
+    assert line["completion_tokens"] == 1
+
+
+def test_json_access_log_is_off_by_default(monkeypatch, tmp_path):
+    app, _K, lines = _access_app(monkeypatch, tmp_path)
+    with TestClient(app) as client:
+        r = client.post("/v1/chat/completions",
+                        json={"messages": [{"role": "user", "content": "hello"}]})
+    assert r.status_code == 200, r.text
+    assert [line for line in lines if line.startswith("{")] == []
+
+
 @pytest.mark.parametrize(("name", "value"), (
     ("KINDI_MAX_BODY_MB", "not-a-number"),
     ("KINDI_MAX_BODY_MB", "0"),
@@ -183,13 +254,67 @@ def test_api_key_is_required_and_matches_exactly(auth_client):
     assert client.get("/v1/models", headers={"Authorization": "Bearer secret-token"}).status_code == 200
 
 
+def test_health_hides_details_without_the_api_key(auth_client):
+    client, _ = auth_client
+    public = client.get("/health")
+    assert public.status_code == 200, public.text
+    assert public.json() == {"ok": True, "kindi": server.__version__, "commit": server.COMMIT,
+                             "model": "bonsai2-2b", "ctx": 4096}
+    full = client.get("/health", headers={"Authorization": "Bearer secret-token"})
+    assert full.status_code == 200, full.text
+    assert full.json()["queue"]["waiting"] == 0
+    assert "gpu_free_mib" in full.json() and "stats" in full.json()
+
+
+def test_health_without_a_key_keeps_the_detailed_view(app_client):
+    client, _ = app_client
+    body = client.get("/health").json()
+    assert body["ok"] is True and body["model"] == "bonsai2-2b"
+    assert body["queue"]["max"] == server.MAX_QUEUE
+    assert "gpu_free_mib" in body and "uptime_s" in body
+
+
 def test_config_limits_are_applied(monkeypatch):
     K = _FakeKindi()
     monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
     app = server.create_app({"model_name": "bonsai2-2b", "api_key": "",
-                             "max_body_mb": 1, "queue_max": 2}, log=lambda *a: None)
+                             "max_body_mb": 1, "queue_max": 2, "rate_limit_per_min": 30},
+                            log=lambda *a: None)
     assert app.state.max_body_bytes == 1024 * 1024
     assert K.gate.max_queue == 2
+
+
+def test_rate_limiter_uses_a_fixed_window_per_client():
+    now = [0.0]
+    limiter = server.RateLimiter(2, clock=lambda: now[0])
+    assert limiter.retry_after("a") == 0
+    assert limiter.retry_after("a") == 0
+    assert limiter.retry_after("a") == 60
+    assert limiter.retry_after("b") == 0          # another source has its own budget
+    assert limiter.rejected == 1
+    now[0] = 60.0
+    assert limiter.retry_after("a") == 0          # the next minute starts a fresh window
+
+
+def test_rate_limited_generation_is_429_with_retry_after(monkeypatch):
+    K = _FakeKindi()
+    monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
+    app = server.create_app({"model_name": "bonsai2-2b", "api_key": "", "rate_limit_per_min": 2},
+                            log=lambda *a: None)
+    payload = {"messages": [{"role": "user", "content": "hi"}], "stream": False}
+    with TestClient(app) as client:
+        assert client.post("/v1/chat/completions", json=payload).status_code == 200
+        assert client.post("/v1/chat/completions", json=payload).status_code == 200
+        blocked = client.post("/v1/chat/completions", json=payload)
+        assert blocked.status_code == 429, blocked.text
+        assert blocked.json()["error"]["type"] == "rate_limit_exceeded"
+        assert 1 <= int(blocked.headers["retry-after"]) <= 60
+        assert client.get("/health").status_code == 200      # a monitor is never limited
+        assert client.get("/v1/models").status_code == 200
+        metrics = client.get("/metrics").text
+        assert "kindi_rate_limit_per_min 2" in metrics
+        assert "kindi_rate_limited_total 1" in metrics
+    assert K.calls == 2                                   # the rejected request never reached the engine
 
 
 def test_queue_gate_bounds_the_wait():
@@ -206,6 +331,38 @@ def test_queue_gate_bounds_the_wait():
     gate.release()
     gate.release()
     assert gate.admitted == 0          # release never underflows
+
+
+def test_queue_gate_rejects_concurrent_admissions_without_overcommit():
+    """Concurrent contenders cannot over-admit or lose the active slot."""
+    gate = server.Gate(0)
+    gate.enter()
+    results = []
+    lock = threading.Lock()
+
+    def contender():
+        try:
+            gate.enter()
+        except server.QueueFull:
+            with lock:
+                results.append("rejected")
+        else:
+            with lock:
+                results.append("entered")
+            gate.release()
+
+    threads = [threading.Thread(target=contender) for _ in range(32)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert results == ["rejected"] * 32
+    assert gate.rejected == 32
+    assert gate.admitted == 1
+    gate.release()
+    assert gate.admitted == 0
+    assert gate.waiting == 0
 
 
 def test_full_queue_is_429_with_retry_after(monkeypatch):
@@ -247,6 +404,8 @@ def test_metrics_endpoint_reports_the_model_and_queue(app_client):
     assert "kindi_queue_max %d" % server.MAX_QUEUE in body
     assert "kindi_queue_depth 0" in body
     assert "kindi_requests_rejected_total 0" in body
+    assert "kindi_rate_limit_per_min 0" in body
+    assert "kindi_rate_limited_total 0" in body
     assert "kindi_cache_errors_total 0" in body
 
 
@@ -356,6 +515,75 @@ def test_ollama_images_are_400_without_vision_weights(app_client):
         assert K.last_req is None
         assert K.runner.eng.resets == 0
         assert K.runner.tokens == [1, 2, 3]
+
+
+def _shared_prefix(a, b):
+    n = 0
+    for x, y in zip(a, b):
+        if x != y:
+            break
+        n += 1
+    return n
+
+
+def _message_tokens(req):
+    return [ord(ch) for m in req.get("messages") or [] for ch in str(m.get("content") or "")]
+
+
+class _PrefixKindi(_FakeKindi):
+    """A stub whose reply is derived from the shared prefix, not the new suffix."""
+
+    def __init__(self):
+        super().__init__()
+        self.runner.tokens = []
+        self.last_cached = None
+
+    def generate(self, req, cancel=None):
+        ids = _message_tokens(req)
+        cached = _shared_prefix(self.runner.tokens, ids)
+        shared = ids[:cached] if cached else ids
+        reply = "reply: " + "".join(chr(c) for c in shared)
+        self.runner.tokens = ids
+        self.last_req = req
+        self.last_cached = cached
+        self.stats["requests"] += 1
+        self.stats["prompt_tokens"] += len(ids)
+        self.stats["cached_tokens"] += cached
+        self.stats["completion_tokens"] += 1
+        yield "text", reply
+        yield "done", {
+            "content": reply, "tool_calls": [], "reasoning": "", "finish": "stop", "logprobs": None,
+            "usage": {"prompt_tokens": len(ids), "completion_tokens": 1, "total_tokens": len(ids) + 1,
+                      "prompt_tokens_details": {"cached_tokens": cached}},
+            "timing": {"prompt_s": 0.0, "gen_s": 0.0, "gen_tok_s": 0.0},
+        }
+
+
+def test_shared_prefix_reports_cached_tokens_and_identical_reply(monkeypatch, tmp_path):
+    pack = tmp_path / "text-pack"
+    pack.mkdir()
+    (pack / "kindi_pack.json").write_text('{"model": "bonsai2-2b"}', encoding="utf-8")
+    K = _PrefixKindi()
+    monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
+    app = server.create_app({"model_name": "bonsai2-2b", "api_key": "", "pack": str(pack)},
+                            log=lambda *a: None)
+
+    with TestClient(app) as client:
+        first = client.post("/v1/chat/completions",
+                            json={"messages": [{"role": "user", "content": "shared prefix"}]})
+        second = client.post("/v1/chat/completions",
+                             json={"messages": [{"role": "user", "content": "shared prefix plus suffix"}]})
+
+    assert first.status_code == 200, first.text
+    assert second.status_code == 200, second.text
+    first_body, second_body = first.json(), second.json()
+    prefix = len("shared prefix")
+    assert first_body["usage"]["prompt_tokens_details"]["cached_tokens"] == 0
+    assert second_body["usage"]["prompt_tokens_details"]["cached_tokens"] == prefix
+    assert K.last_cached == prefix
+    assert K.stats["cached_tokens"] == prefix
+    assert first_body["choices"][0]["message"]["content"] == second_body["choices"][0]["message"]["content"]
+    assert first_body["choices"][0]["message"]["content"] == "reply: shared prefix"
 
 
 def test_oversized_body_is_413_and_keeps_the_prompt_cache(app_client):

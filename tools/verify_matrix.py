@@ -20,7 +20,9 @@ Examples:
 A saved baseline is a copy of one run's results.json. Pass it with --baseline
 on a later run to print status transitions and throughput deltas; use
 --save-baseline to write the new run as the next baseline. Both may be combined
-to compare against the old baseline and replace it in one command.
+to compare against the old baseline and replace it in one command. Add
+--fail-on-regression to make a status/exactness loss, a missing baseline cell
+or a throughput drop beyond --max-tps-drop-pct exit non-zero.
 """
 from __future__ import annotations
 
@@ -390,6 +392,55 @@ def compare_results(rows: list[dict], baseline_payload: dict) -> tuple[list[dict
     return comparisons, baseline_only
 
 
+def _exactness_counts(value) -> tuple[int, int, int] | None:
+    """Parse the pass/tie/fail string used in a comparison row."""
+    try:
+        parts = [int(part) for part in str(value).split("/")]
+    except (TypeError, ValueError):
+        return None
+    return tuple(parts) if len(parts) == 3 else None
+
+
+def regression_failures(comparisons: list[dict], baseline_only: list[dict],
+                        max_tps_drop_pct: float | None) -> list[str]:
+    """Return the baseline regressions that the CI lane must reject.
+
+    A cell regresses when a previously passing cell stops passing, when its
+    exact pass count falls (or its fail count rises), when a baseline cell is
+    absent from the current run, or when throughput falls by more than the
+    configured percentage. New cells and improvements are allowed.
+    """
+    failures: list[str] = []
+    for row in comparisons:
+        cell = "%s/%s" % (row["model"], row["mode"])
+        if row.get("baseline_status") == "pass" and row.get("status") != "pass":
+            failures.append("%s: status pass -> %s" % (cell, row.get("status")))
+
+        before = _exactness_counts(row.get("baseline_exactness"))
+        after = _exactness_counts(row.get("exactness"))
+        if before is not None and after is not None:
+            if after[0] < before[0] or after[2] > before[2]:
+                failures.append("%s: exactness %s -> %s" %
+                                (cell, row["baseline_exactness"], row["exactness"]))
+
+        baseline_tps = row.get("baseline_tokens_per_second")
+        current_tps = row.get("tokens_per_second")
+        if isinstance(baseline_tps, (int, float)) and baseline_tps > 0:
+            if not isinstance(current_tps, (int, float)):
+                failures.append("%s: throughput missing (baseline %.1f tok/s)" %
+                                (cell, float(baseline_tps)))
+            elif max_tps_drop_pct is not None:
+                drop_pct = 100.0 * (float(baseline_tps) - float(current_tps)) / float(baseline_tps)
+                if drop_pct > float(max_tps_drop_pct) + 1e-9:
+                    failures.append("%s: throughput %.1f -> %.1f tok/s (%.1f%% drop, limit %.1f%%)" %
+                                    (cell, float(baseline_tps), float(current_tps), drop_pct,
+                                     float(max_tps_drop_pct)))
+
+    for row in baseline_only:
+        failures.append("%s/%s: baseline cell missing from this run" % (row["model"], row["mode"]))
+    return failures
+
+
 def _format_tps(value) -> str:
     return "n/a" if value is None else "%.1f" % float(value)
 
@@ -424,7 +475,8 @@ def _print_comparison(comparisons: list[dict], baseline_only: list[dict], baseli
 
 
 def _write_comparison(out_dir: Path, comparisons: list[dict], baseline_only: list[dict],
-                      baseline_payload: dict, baseline_path: Path, args: argparse.Namespace) -> tuple[Path, Path]:
+                      baseline_payload: dict, baseline_path: Path, args: argparse.Namespace,
+                      regressions: list[str] | None = None) -> tuple[Path, Path]:
     csv_path = out_dir / "comparison.csv"
     json_path = out_dir / "comparison.json"
     with csv_path.open("w", encoding="utf-8", newline="") as f:
@@ -457,6 +509,7 @@ def _write_comparison(out_dir: Path, comparisons: list[dict], baseline_only: lis
         "baseline_git_revision": baseline_payload.get("git_revision"),
         "results": comparisons,
         "baseline_only": baseline_only,
+        "regressions": regressions or [],
     }
     json_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="\n")
     return csv_path, json_path
@@ -512,6 +565,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="compare against a saved results.json baseline")
     ap.add_argument("--save-baseline", type=Path, default=None,
                     help="save this run's results.json as a baseline")
+    ap.add_argument("--fail-on-regression", action="store_true",
+                    help="exit non-zero when the baseline comparison regresses (needs --baseline)")
+    ap.add_argument("--max-tps-drop-pct", type=float, default=None,
+                    help="fail when throughput drops by more than this percentage (needs --baseline)")
     ap.add_argument("--dry-run", action="store_true",
                     help="print the commands and exit without running or writing")
     args = ap.parse_args(argv)
@@ -520,6 +577,13 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("--cards must be at least 1")
     if args.timeout <= 0:
         raise SystemExit("--timeout must be positive")
+    if args.fail_on_regression and args.baseline is None:
+        raise SystemExit("--fail-on-regression needs --baseline")
+    if args.max_tps_drop_pct is not None:
+        if args.max_tps_drop_pct < 0:
+            raise SystemExit("--max-tps-drop-pct must not be negative")
+        if args.baseline is None:
+            raise SystemExit("--max-tps-drop-pct needs --baseline")
     models = _split_choice(args.models, MODELS, "model")
     modes = _split_choice(args.modes, MODES, "mode")
     args.pack_dir = args.pack_dir.expanduser().resolve()
@@ -563,11 +627,20 @@ def main(argv: list[str] | None = None) -> int:
 
     csv_path, json_path = _write_results(args.out, rows, args)
     _print_table(rows)
+    regressions: list[str] = []
     if baseline_payload is not None:
         comparisons, baseline_only = compare_results(rows, baseline_payload)
         _print_comparison(comparisons, baseline_only, args.baseline)
+        if args.fail_on_regression:
+            regressions = regression_failures(comparisons, baseline_only, args.max_tps_drop_pct)
+            if regressions:
+                print("\nregression gate: FAIL")
+                for failure in regressions:
+                    print("  - " + failure)
+            else:
+                print("\nregression gate: PASS (no status, exactness, coverage or throughput regression)")
         comparison_csv, comparison_json = _write_comparison(
-            args.out, comparisons, baseline_only, baseline_payload, args.baseline, args)
+            args.out, comparisons, baseline_only, baseline_payload, args.baseline, args, regressions)
         print("\nwrote comparison %s and %s" % (comparison_csv, comparison_json))
     counts = {}
     for row in rows:
@@ -577,6 +650,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.save_baseline is not None:
         saved = save_baseline(json_path, args.save_baseline)
         print("saved baseline %s" % saved)
+    if args.fail_on_regression and regressions:
+        return 1
     return 0 if counts.get("pass", 0) == len(rows) else 1
 
 

@@ -47,10 +47,39 @@ def run_case(cpuinfo):
             with open(path, "w", encoding="utf-8", newline="\n") as f:
                 f.write(cpuinfo)
         script = ("#!/usr/bin/env bash\nset -euo pipefail\n"
+                  + function_block("cpu_flag") + "\n"
                   + function_block("cpu_has_avx") + "\n"
                   + "KINDI_CPUINFO=cpuinfo\n"
                   + "if cpu_has_avx; then echo yes; else echo no; fi\n")
         case = os.path.join(d, "case.sh")
+        with open(case, "w", encoding="utf-8", newline="\n") as f:
+            f.write(script)
+        proc = subprocess.run([bash, case], cwd=d, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              timeout=60)
+        return proc.returncode, proc.stdout.decode("utf-8", "replace").strip(), \
+            proc.stderr.decode("utf-8", "replace")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def run_tier(cpuinfo):
+    """Run the installer's own tier classifier against a fake /proc/cpuinfo."""
+    bash = shutil.which("bash")
+    if bash is None:
+        return None
+    d = tempfile.mkdtemp(prefix="kindi-cpu-tier-")
+    try:
+        path = os.path.join(d, "cpuinfo")
+        if cpuinfo is not None:
+            with open(path, "w", encoding="utf-8", newline="\n") as f:
+                f.write(cpuinfo)
+        script = ("#!/usr/bin/env bash\nset -euo pipefail\n"
+                  + function_block("cpu_flag") + "\n"
+                  + function_block("cpu_has_avx") + "\n"
+                  + function_block("cpu_isa_tier") + "\n"
+                  + "KINDI_CPUINFO=cpuinfo\n"
+                  + "cpu_isa_tier\n")
+        case = os.path.join(d, "tier.sh")
         with open(case, "w", encoding="utf-8", newline="\n") as f:
             f.write(script)
         proc = subprocess.run([bash, case], cwd=d, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -88,8 +117,45 @@ def test_missing_cpuinfo_is_rejected():
     assert out == "no"
 
 
+def test_avx2_f16c_without_fma_is_supported():
+    got = run_tier("processor\t: 0\nflags\t\t: sse avx avx2 f16c\n")
+    if got is None:
+        return
+    code, out, err = got
+    assert code == 0, err
+    assert out == "avx2-f16c-no-fma"
+
+
+def test_full_isa_tier_is_reported():
+    got = run_tier("processor\t: 0\nflags\t\t: sse avx avx2 fma f16c\n")
+    if got is None:
+        return
+    code, out, err = got
+    assert code == 0, err
+    assert out == "avx2-fma-f16c"
+
+
+def test_avx_only_tier_is_reported():
+    got = run_tier("processor\t: 0\nflags\t\t: sse avx\n")
+    if got is None:
+        return
+    code, out, err = got
+    assert code == 0, err
+    assert out == "avx-only"
+
+
+def test_missing_cpuinfo_has_no_tier():
+    got = run_tier(None)
+    if got is None:
+        return
+    code, out, err = got
+    assert code == 0, err
+    assert out == "none"
+
+
 def test_installer_uses_the_preflight_for_cpu_setups():
     text = installer_text()
     assert "CPU_AVX=0" in text and "CPU_AVX=1" in text
+    assert "CPU_TIER" in text and "cpu_isa_tier" in text
     assert 'if [ "$CPU_AVX" = 1 ]' in text
     assert "the CPU engine needs AVX" in text

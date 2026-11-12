@@ -33,7 +33,9 @@ Please do not test against systems you do not own or have permission to test.
   waiting queue is bounded. A full queue returns HTTP 429 with `Retry-After`; retry once rather than
   opening more connections.
 - **Secret scanning.** `.pre-commit-config.yaml` and the CI `secret-scan` job run detect-secrets
-  against `.secrets.baseline`. Update the baseline only after reviewing a newly flagged value; the
+  against `.secrets.baseline`. The hook and CI scan every tracked text file; only the baseline is
+  excluded. CI also rejects a stale baseline. Update it with
+  `python tools/check_secret_baseline.py --update` only after reviewing a newly flagged value; the
   baseline stores hashes, not the secret values.
 - **Installer.** `install.sh` is designed to be reviewed before running. It downloads models with
   pinned SHA-256 hashes and asks before privileged changes. Prefer a release archive with a verified

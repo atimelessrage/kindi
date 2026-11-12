@@ -20,6 +20,8 @@ DEFAULTS = {
     "model_name": "auto",              # infer the reported id from the selected pack
     "max_body_mb": "16",                # largest request body the HTTP server accepts
     "queue_max": "8",                   # requests that may wait behind the active one
+    "rate_limit_per_min": "0",          # generation requests per source address per minute (0: off)
+    "log_json": "0",                    # 1: one JSON access-log line per inference request
     # engine
     "ctx": "24576",                     # requested context; each backend clamps it to available device memory
     "head": "exact",                    # exact | fast (shortlist head, ~15% faster, approximate)
@@ -47,7 +49,7 @@ DEFAULTS = {
 }
 
 INT_KEYS = {"repeat_stop", "lookup", "port", "ctx", "fast_clusters", "checkpoint_every", "checkpoint_budget_mb", "prefix_max", "prefix_min", "park_max",
-            "max_tokens", "top_k", "repeat_last_n", "max_body_mb", "queue_max"}
+            "max_tokens", "top_k", "repeat_last_n", "max_body_mb", "queue_max", "rate_limit_per_min", "log_json"}
 FLOAT_KEYS = {"temperature", "top_p", "min_p", "repeat_penalty", "presence_penalty"}
 PATH_KEYS = {"pack", "state_dir"}
 
@@ -63,6 +65,8 @@ def _validate(cfg):
         ("port", 1, 65535),
         ("max_body_mb", 1, None),
         ("queue_max", 0, None),
+        ("rate_limit_per_min", 0, None),
+        ("log_json", 0, 1),
         ("ctx", 1, None),
         ("fast_clusters", 1, None),
         ("checkpoint_every", 1, None),

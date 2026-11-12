@@ -271,3 +271,144 @@ def test_plan_engine_refuses_the_9b_before_building_plans(spec_tp, monkeypatch):
         (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
          spec._chunk.reserve, spec._chunk.build) = saved
         spec._installed[0] = False
+
+
+# ------------------------------------------------------- proportional two-card layout
+def test_tp_split_mode_defaults_to_equal_and_accepts_auto(spec_tp, monkeypatch):
+    _, tp = spec_tp
+    monkeypatch.delenv("KINDI_TP_SPLIT", raising=False)
+    assert tp.tp_split_mode() == "equal"
+    for raw in ("auto", "vram", "1", "on"):
+        monkeypatch.setenv("KINDI_TP_SPLIT", raw)
+        assert tp.tp_split_mode() == "auto"
+    for raw in ("equal", "off", "0"):
+        monkeypatch.setenv("KINDI_TP_SPLIT", raw)
+        assert tp.tp_split_mode() == "equal"
+    monkeypatch.setenv("KINDI_TP_SPLIT", "total-vram")
+    with pytest.raises(SystemExit, match="KINDI_TP_SPLIT must be auto or equal"):
+        tp.tp_split_mode()
+
+
+def test_vram_share_uses_usable_free_bytes(spec_tp):
+    _, tp = spec_tp
+    reserve = 512 << 20
+    assert tp.vram_share([16 << 30, 8 << 30], reserve) == pytest.approx((15.5 / 23.0), abs=1e-6)
+    assert tp.vram_share([8 << 30, 8 << 30], reserve) == 0.5
+    assert tp.vram_share([0, 8 << 30], reserve) == 0.5       # an unusable card never gets a bigger share
+    assert tp.vram_share([0, 0], reserve) == 0.5
+
+
+def _b27_dims():
+    # 27B: 16 GDN key groups, 48 value heads of width 128 (rep 3), 24 q / 4 KV heads, 64 layers, HB 1024
+    return {"groups": 16, "state_size": 128, "gdn_inner": 6144, "heads": 24, "kv_heads": 4,
+            "head_dim": 256, "ffn": 17408}
+
+
+def test_proportional_layout_splits_where_alignment_permits(spec_tp):
+    _, tp = spec_tp
+    L = tp.plan_split(_b27_dims(), 1024, 248320, 2 / 3)
+    # 16 GDN key groups with 3 v heads each: a 1024-point fold needs 8 key groups, so this
+    # pack keeps 8/8 and 24/24; the 4 KV heads need 2 each for a 1024-point attention fold,
+    # so q stays 12/12. FFN and the output head can still take the free-VRAM share.
+    assert L["gdn_groups"] == [(0, 8), (8, 16)]
+    assert L["gdn_v"] == [(0, 24), (24, 48)]
+    assert L["attn_kv"] == [(0, 2), (2, 4)]
+    assert L["attn_q"] == [(0, 12), (12, 24)]
+    assert L["ffn_rows"] == L["ffn_cols"] == [(0, 11264), (11264, 17408)]
+    assert L["head_split"] == [0, 165552, 248320]
+    for rows in (L["gdn_groups"], L["gdn_v"], L["attn_q"], L["attn_kv"], L["ffn_rows"]):
+        for a, b in rows:
+            assert b > a
+    for a, b in L["gdn_v"]:
+        assert ((b - a) * 128) % 1024 == 0
+    for a, b in L["attn_q"]:
+        assert ((b - a) * 256) % 1024 == 0
+    for a, b in L["ffn_rows"]:
+        assert (b - a) % 1024 == 0
+    assert L["head_split"][1] % 16 == 0
+    assert L["head_split"][2] - L["head_split"][1] > 0
+    assert tp.layout_tag(L) != tp.layout_tag(tp.plan_split(_b27_dims(), 1024, 248320, 0.5))
+
+
+def test_proportional_gdn_split_for_a_two_to_one_model(spec_tp):
+    # A geometry with two v heads per key group (gdn_inner 4096) can split GDN 12/4 while
+    # keeping every local NV * HK width on a 1024-point boundary. The 27B (rep 3) cannot:
+    # 12 key groups give 36 * 128 = 4608 features, not a whole 1024-point block.
+    _, tp = spec_tp
+    dims = dict(_b27_dims(), gdn_inner=4096)
+    L = tp.plan_split(dims, 1024, 248320, 2 / 3)
+    assert L["gdn_groups"] == [(0, 12), (12, 16)]
+    assert L["gdn_v"] == [(0, 24), (24, 32)]
+    assert L["attn_kv"] == [(0, 2), (2, 4)]
+    assert L["attn_q"] == [(0, 12), (12, 24)]
+    assert L["ffn_rows"] == [(0, 11264), (11264, 17408)]
+
+
+def test_equal_fraction_keeps_the_even_blocks(spec_tp):
+    _, tp = spec_tp
+    L = tp.plan_split(_b27_dims(), 1024, 248320, 0.5)
+    assert L["gdn_groups"] == [(0, 8), (8, 16)]
+    assert L["gdn_v"] == [(0, 24), (24, 48)]
+    assert L["attn_kv"] == [(0, 2), (2, 4)]     # 4 KV heads, 2-head alignment: the only valid split
+    assert L["ffn_rows"] == [(0, 8192), (8192, 17408)]
+
+
+def test_proportional_layout_refuses_an_unaligned_pack(spec_tp):
+    _, tp = spec_tp
+    dims = _b27_dims()
+    dims["ffn"] += 1
+    with pytest.raises(SystemExit, match="not a multiple of Hadamard block"):
+        tp.plan_split(dims, 1024, 248320, 2 / 3)
+    with pytest.raises(SystemExit, match="share must be between 0 and 1"):
+        tp.plan_split(_b27_dims(), 1024, 248320, 1.0)
+
+
+def test_shard_slices_follow_the_proportional_offsets(spec_tp):
+    """Card 1 gets GDN key groups [8,16) with v heads 24..47 tiled, q heads [12,24), 2 KV heads and FFN [11264,17408)."""
+    _, tp = spec_tp
+    L = tp.plan_split(_b27_dims(), 1024, 248320, 2 / 3)
+    sh = object.__new__(tp.Shard)
+    sh.tp = types.SimpleNamespace(NKg=16, NVg=48, NFFg=17408, head_split=L["head_split"])
+    sh.card = 1
+    sh.k0, sh.k1 = L["gdn_groups"][1]
+    sh.v0, sh.v1 = L["gdn_v"][1]
+    sh.q0, sh.q1 = L["attn_q"][1]
+    sh.kv0, sh.kv1 = L["attn_kv"][1]
+    sh.NK, sh.NV = sh.k1 - sh.k0, sh.v1 - sh.v0
+    sh.NH, sh.NHKV = sh.q1 - sh.q0, sh.kv1 - sh.kv0
+    sh.g0, sh.g1 = L["ffn_rows"][1]
+    sh.d0, sh.d1 = L["ffn_cols"][1]
+    sh.NFF = sh.g1 - sh.g0
+    sh.HK, sh.HD, sh.NL, sh.D = 128, 256, 4, 5120
+    sh.dims = {"full_attention_interval": 4}
+    tern, flt = tp.Shard._slices(sh)
+    qkv = tern["blk.0.attn_qkv.weight"][0]
+    assert qkv[:2].tolist() == [1024, 1025]          # q group 8
+    assert qkv[-2:].tolist() == [10238, 10239]       # the last tiled v head
+    assert flt["blk.0.ssm_alpha.weight"][1].tolist() == [8, 9, 10, 11, 12, 13, 14, 15,
+                                                         24, 25, 26, 27, 28, 29, 30, 31,
+                                                         40, 41, 42, 43, 44, 45, 46, 47]
+    assert tern["blk.0.ssm_out.weight"][1] == (3072, 6144)
+    assert tern["blk.3.attn_q.weight"][0][:2].tolist() == [6144, 6145]
+    assert tern["blk.3.attn_q.weight"][0][-2:].tolist() == [12286, 12287]
+    assert tern["blk.3.attn_k.weight"][0][:2].tolist() == [512, 513]
+    assert tern["blk.3.attn_k.weight"][0][-1] == 1023
+    assert tern["blk.3.attn_output.weight"][1] == (3072, 6144)
+    assert tern["blk.0.ffn_gate.weight"][0][0] == 11264
+    assert tern["blk.0.ffn_gate.weight"][0][-1] == 17407
+    assert tern["blk.0.ffn_down.weight"][1] == (11264, 17408)
+    assert tern["output.weight"][0][0] == 165552
+    assert tern["output.weight"][0][-1] == 248319
+    assert sh.cols == {"sV": (3072, 6144), "sA": (3072, 6144), "sF": (11264, 17408)}
+
+
+def test_engine_fingerprint_includes_the_tp_layout(spec_tp):
+    from kindi import cache
+    _, tp = spec_tp
+    a = types.SimpleNamespace(W=2, split_layout={"gdn_groups": [(0, 8), (8, 16)]})
+    b = types.SimpleNamespace(W=2, split_layout={"gdn_groups": [(0, 12), (12, 16)]})
+    fa, da = cache.engine_fingerprint(a, {"head": "exact"})
+    fb, db = cache.engine_fingerprint(b, {"head": "exact"})
+    assert fa != fb
+    assert da["tp_split"] == a.split_layout
+    assert db["tp_split"] == b.split_layout

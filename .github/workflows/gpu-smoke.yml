@@ -1,14 +1,44 @@
 name: GPU smoke
 
-# Manual only: GitHub-hosted runners do not have a GPU, and the model pack is too large to
-# commit. The job expects a self-hosted runner with the labels `self-hosted` and `gpu`, plus a
+# Manual only: GitHub-hosted runners do not have a GPU, and the model packs are too large to
+# commit. The jobs expect a self-hosted runner with the labels `self-hosted` and `gpu`, plus a
 # working CUDA/CuPy installation. See docs/CI.md.
 on:
   workflow_dispatch:
     inputs:
       pack:
-        description: Absolute path to a converted Kindi pack on the runner
+        description: Absolute path to a converted Kindi pack on the runner (server smoke and long context)
         required: true
+        type: string
+      pack_dir:
+        description: Directory with bonsai-2b/4b/9b packs for the token-exactness matrix (optional)
+        required: false
+        default: ""
+        type: string
+      models:
+        description: Comma-separated models for the matrix
+        required: false
+        default: "2b,4b,9b"
+        type: string
+      modes:
+        description: Comma-separated modes for the matrix (plain, tc)
+        required: false
+        default: "plain"
+        type: string
+      baseline:
+        description: Absolute path to a previous verify-matrix results.json (optional; enables the performance gate)
+        required: false
+        default: ""
+        type: string
+      max_tps_drop_pct:
+        description: Allowed throughput drop against the baseline, in percent
+        required: false
+        default: "10"
+        type: string
+      ctx:
+        description: Context requested by the long-context benchmark
+        required: false
+        default: "24576"
         type: string
 
 permissions:
@@ -17,13 +47,14 @@ permissions:
 jobs:
   verify-and-serve:
     name: GPU verify and server boundary
+    if: ${{ inputs.pack != '' }}
     runs-on: [self-hosted, gpu]
     timeout-minutes: 45
     env:
       KINDI_PACK: ${{ inputs.pack }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
         with:
           python-version: "3.11"
       - name: Install test dependencies
@@ -44,7 +75,80 @@ jobs:
           python -c 'import json, urllib.request; body = {"messages": [{"role": "user", "content": "Reply with OK."}], "max_tokens": 8, "temperature": 0}; req = urllib.request.Request("http://127.0.0.1:8199/v1/chat/completions", data=json.dumps(body).encode(), headers={"Content-Type": "application/json"}); response = json.load(urllib.request.urlopen(req, timeout=120)); assert response["choices"][0]["message"]["content"]'
       - name: Upload the server log on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: kindi-gpu-server-log
           path: ${{ runner.temp }}/kindi-server.log
+
+  token-exactness-and-performance:
+    name: GPU token exactness and performance regression
+    if: ${{ inputs.pack_dir != '' }}
+    runs-on: [self-hosted, gpu]
+    timeout-minutes: 120
+    env:
+      KINDI_PACK_DIR: ${{ inputs.pack_dir }}
+      KINDI_BASELINE: ${{ inputs.baseline }}
+      KINDI_MATRIX_OUT: ${{ runner.temp }}/verify-matrix
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: python -m pip install -r tests/requirements-test.txt
+      - name: Verify tokens and gate against the baseline
+        shell: bash
+        run: |
+          if [ -n "$KINDI_BASELINE" ]; then
+            python tools/verify_matrix.py \
+              --pack-dir "$KINDI_PACK_DIR" \
+              --models "${{ inputs.models }}" \
+              --modes "${{ inputs.modes }}" \
+              --out "$KINDI_MATRIX_OUT" \
+              --baseline "$KINDI_BASELINE" \
+              --fail-on-regression \
+              --max-tps-drop-pct "${{ inputs.max_tps_drop_pct }}"
+          else
+            echo "::warning::No baseline supplied; token exactness is checked, but performance regression is not."
+            python tools/verify_matrix.py \
+              --pack-dir "$KINDI_PACK_DIR" \
+              --models "${{ inputs.models }}" \
+              --modes "${{ inputs.modes }}" \
+              --out "$KINDI_MATRIX_OUT"
+          fi
+      - name: Upload the verify matrix
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: kindi-gpu-verify-matrix
+          path: ${{ runner.temp }}/verify-matrix
+          if-no-files-found: warn
+
+  long-context:
+    name: GPU long-context 24K
+    if: ${{ inputs.pack != '' }}
+    runs-on: [self-hosted, gpu]
+    timeout-minutes: 90
+    env:
+      KINDI_PACK: ${{ inputs.pack }}
+      KINDI_LONG_OUT: ${{ runner.temp }}/long-context
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: python -m pip install -r tests/requirements-test.txt
+      - name: Bench at the requested context
+        run: >
+          python tools/check_long_context.py
+          --pack "$KINDI_PACK"
+          --ctx "${{ inputs.ctx }}"
+          --out "$KINDI_LONG_OUT"
+      - name: Upload the long-context result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: kindi-gpu-long-context
+          path: ${{ runner.temp }}/long-context
+          if-no-files-found: warn

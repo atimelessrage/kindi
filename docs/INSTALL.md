@@ -4,6 +4,10 @@
 computer can run, with the best one first, and then downloads and checks the models, converts them, checks the
 output against llama.cpp and starts the servers as services.
 
+This installer is **Linux-only**. Windows users can follow [WINDOWS.md](WINDOWS.md) for the
+verified native CPU path; native Windows GPU execution is not validated, and GPU work should use
+the Linux Docker image or WSL2.
+
 ```bash
 curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh | bash
 ```
@@ -173,8 +177,9 @@ bash install.sh --uninstall --purge  # also ~/.kindi
 
 ## Tested
 
-Each test is a real install, a chat request, a tool-call request and `--uninstall --purge` (Kindi 0.3.0-dev,
-2026-10-24).
+These are the last recorded full installer tests: a real install, a chat request, a tool-call request and
+`--uninstall --purge` (Kindi 0.3.0-dev, 2026-10-24). They have not been re-run for every 0.5.0 card; the
+0.5.0 hardware evidence is in [CARDS.md](CARDS.md) and [BENCHMARKS.md](BENCHMARKS.md).
 
 | Computer | Setup | Result |
 |---|---|---|

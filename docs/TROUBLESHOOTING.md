@@ -22,7 +22,7 @@ client's timeout and limit retries (see [AGENTS.md](AGENTS.md)); watch progress 
 localhost:8093/health`.
 
 **Answers are slow on every turn of an agent.** Check that the agent sends the same tools and system prompt each
-time. `/health` and the server log show `prompt: N reused, M read` per request.
+time. `/health` (send `Authorization: Bearer <api_key>` when a key is configured) and the server log show `prompt: N reused, M read` per request.
 
 **`401 invalid API key`.** The server has `api_key` set; send `Authorization: Bearer <key>`.
 
@@ -41,7 +41,7 @@ Re-run `kindi convert --force` from the official file and check the driver.
 
 **The server answers `429` and `Retry-After: 1`.** Up to eight requests may wait behind the active one
 (`KINDI_QUEUE_MAX`). Wait a second and retry once; do not open more parallel connections or retry in a loop.
-Watch `queue.waiting`, `queue.max` and `queue.rejected` in `/health`.
+Watch `queue.waiting`, `queue.max` and `queue.rejected` in `/health` (send `Authorization: Bearer <api_key>` when a key is configured).
 
 **The server exits after a CUDA error, or keeps restarting.** Kindi exits instead of serving from a broken CUDA
 context. Check `nvidia-smi`, `dmesg` and the container log; restart the container only after the GPU is healthy.

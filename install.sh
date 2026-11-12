@@ -141,10 +141,26 @@ need_sudo() {
   SUDO="sudo"
 }
 human() { awk -v b="$1" 'BEGIN { split("B KB MB GB TB", u); i = 1; while (b >= 1024 && i < 5) { b /= 1024; i++ } printf "%.1f %s", b, u[i] }'; }
-# The CPU engine requires AVX. Check before downloading or building anything; a GPU setup is still
-# valid on a CPU without AVX, so the caller decides whether to hide or refuse CPU setups.
+# The CPU engine requires AVX. AVX2 with F16C is the fast path; FMA is optional and the AVX2
+# kernel falls back to separate multiply/add when it is absent. An AVX-only CPU uses the scalar
+# fallback. Check before downloading or building anything; a GPU setup is still valid on a CPU
+# without AVX, so the caller decides whether to hide or refuse CPU setups.
+cpu_flag() {
+  grep -qw "$1" "${KINDI_CPUINFO:-/proc/cpuinfo}" 2>/dev/null
+}
 cpu_has_avx() {
-  grep -qw avx "${KINDI_CPUINFO:-/proc/cpuinfo}" 2>/dev/null
+  cpu_flag avx
+}
+cpu_isa_tier() {
+  if ! cpu_flag avx; then echo none; return 0; fi
+  if cpu_flag avx2; then
+    if cpu_flag f16c; then
+      if cpu_flag fma; then echo avx2-fma-f16c; else echo avx2-f16c-no-fma; fi
+    elif cpu_flag fma; then echo avx2-fma
+    else echo avx2; fi
+  else
+    echo avx-only
+  fi
 }
 
 DOCKER="docker"
@@ -188,8 +204,19 @@ RAM_MB=$(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo)
 AVAIL_MB=$(awk '/MemAvailable/ {print int($2 / 1024)}' /proc/meminfo)
 CORES=$(nproc)
 CPU_AVX=0
+CPU_TIER=none
+CPU_PATH="unavailable"
 if cpu_has_avx; then
   CPU_AVX=1
+  CPU_TIER=$(cpu_isa_tier)
+  case "$CPU_TIER" in
+    avx2-fma-f16c) CPU_PATH="AVX2/FMA/F16C"; info "CPU engine: AVX2/FMA/F16C fast path" ;;
+    avx2-f16c-no-fma) CPU_PATH="AVX2/F16C without FMA"; info "CPU engine: AVX2/F16C without FMA (separate multiply/add)" ;;
+    avx2-fma) CPU_PATH="AVX2/FMA with software F16C"; info "CPU engine: AVX2/FMA, software F16C" ;;
+    avx2) CPU_PATH="AVX2 with software F16C"; info "CPU engine: AVX2, software F16C and no FMA" ;;
+    avx-only) CPU_PATH="AVX-only fallback"; info "CPU engine: AVX-only fallback" ;;
+    *) warn "unexpected CPU ISA tier '${CPU_TIER}': the compiler will choose the path" ;;
+  esac
 else
   warn "this CPU does not report AVX: the CPU engine is unavailable; GPU servers are still supported"
 fi
@@ -608,7 +635,7 @@ if [ "$GPU" != cpu ]; then
   fi
 fi
 if [ "$CPU_AVX" = 1 ] && { [ "$MODEL" = auto ] || [ "$MODEL" = 2b ]; }; then
-  add_cfg "cpu|2b|" "$(model_label 2b) on the CPU ($CORES threads; slow, no GPU needed)"
+  add_cfg "cpu|2b|" "$(model_label 2b) on the CPU ($CORES threads; ${CPU_PATH}; slow, no GPU needed)"
 fi
 [ "${#CFG[@]}" -gt 0 ] || die "model '${MODEL}' does not run on the selected hardware (run without --model to see what does)"
 # the all-cards setup: the best model on every card (a pair that runs one model together counts as one); first
@@ -644,7 +671,24 @@ fi
 
 # the servers: give each its cards, a container name and a port
 SV_B=(); SV_M=(); SV_C=(); SV_NAME=(); SV_PORT=(); USED="|"
-port_free() { ! { ss -ltnH 2>/dev/null | awk '{print $4}' | grep -E "[:.]$1\$" >/dev/null; }; }
+port_free() {     # true when the port is free; do not assume ss exists on the host
+  local p=$1
+  if command -v ss >/dev/null 2>&1; then
+    ! { ss -ltnH 2>/dev/null | awk '{print $4}' | grep -E "[:.]$p\$" >/dev/null; }
+  elif command -v timeout >/dev/null 2>&1; then
+    # No ss: a localhost connection succeeds only when something is listening. A timeout is treated as occupied,
+    # not as free, because the caller is about to publish a Docker port on this address.
+    if timeout 1 bash -c "exec 3<>/dev/tcp/127.0.0.1/$p" 2>/dev/null; then
+      return 1
+    else
+      [ "$?" -eq 124 ] && return 1
+      return 0
+    fi
+  else
+    warn "cannot check whether port $p is free (ss and timeout are missing); treating it as free"
+    return 0
+  fi
+}
 port_ok() {       # free, or held by one of this installer's servers (it is replaced)
   port_free "$1" && return 0
   local h; h=$($DOCKER ps --format '{{.Names}} {{.Ports}}' 2>/dev/null | awk -v p=":$1->" 'index($0, p) {print $1}')
@@ -983,7 +1027,8 @@ for i in $(seq 0 $((NS - 1))); do
     VX=(); [ -n "$CPUS" ] && VX=(--cpus "$CPUS")
     if $DOCKER run --rm ${VX[@]+"${VX[@]}"} ${BASE[@]+"${BASE[@]}"} ${GARGS[@]+"${GARGS[@]}"} ${ENV[@]+"${ENV[@]}"} -e "KINDI_PACK=/data/pack-$M" -e KINDI_HEAD=exact "$IMAGE" verify > "$VERIFY_OUT" 2>&1; then
       grep -E "PASS|FAIL" "$VERIFY_OUT" | sed 's/^\[[^]]*\] /    /' | sed -n 1,6p
-      sp=$(grep -o '[0-9.]* tokens/s over the run' "$VERIFY_OUT" | awk '{print $1}')
+      sp=$(grep -o '[0-9.]* tokens/s over the run' "$VERIFY_OUT" | awk '{print $1}' || true)
+      [ -n "$sp" ] || sp="?"          # an older verify log without the speed line must not fail under pipefail
       if [ "$M" = nanbeige ]; then ok "server $((i + 1)): agrees with llama.cpp on each prompt, up to a llama.cpp tie (${sp} tokens/s over the check)"
       elif [ "$M" = nemotron ]; then ok "server $((i + 1)): agrees with llama.cpp on the first 12 tokens or more of each prompt (${sp} tokens/s over the check)"
       else ok "server $((i + 1)): token-exact with llama.cpp (${sp} tokens/s over the check, prompt tokens included)"; fi

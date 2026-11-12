@@ -25,5 +25,8 @@ WORKDIR /opt/kindi
 ENV KINDI_PACK=/data/pack KINDI_STATE_DIR=/data/state KINDI_HOST=0.0.0.0 CUPY_CACHE_DIR=/data/state/cupy
 VOLUME ["/data"]
 EXPOSE 8093
+# The health endpoint needs no key for liveness; with KINDI_API_KEY set it still returns 200 with a minimal body.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=300s --retries=3 \
+  CMD python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8093/health', timeout=3)"
 ENTRYPOINT ["python3", "-m", "kindi"]
 CMD ["serve"]

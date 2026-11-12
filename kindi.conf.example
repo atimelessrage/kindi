@@ -16,6 +16,10 @@ model_name = auto
 # largest request body accepted (MiB) and requests allowed to wait behind the active one
 max_body_mb = 16
 queue_max = 8
+# per source address generation requests per minute (0: off); health, metrics and model listing are exempt
+rate_limit_per_min = 0
+# 1: one JSON access-log line per inference request (request id, status, queue wait, tokens/s)
+log_json = 0
 
 # --- engine
 ctx = 24576

@@ -132,6 +132,9 @@ def engine_fingerprint(eng, cfg):
         "head": cfg.get("head", "exact"),
         "code": {},
     }
+    if getattr(eng, "W", 1) > 1 and getattr(eng, "split_layout", None) is not None:
+        d["tp_split"] = eng.split_layout
+    if hasattr(eng, "cache_fingerprint"): d["tandem"] = eng.cache_fingerprint()
     for name in _arith_files(here):
         p = os.path.join(here, name)
         if os.path.exists(p):
@@ -231,8 +234,8 @@ class Openings(object):
         for a, h in zip(eng.conv, Cs):
             _set_host(a, h)
         for i in range(len(eng.Kc)):
-            eng.Kc[i][:p] = z["K%d" % i]
-            eng.Vc[i][:p] = z["V%d" % i]
+            _to_dev(eng.Kc[i], p, z["K%d" % i])
+            _to_dev(eng.Vc[i], p, z["V%d" % i])
         self.entries[key]["used"] = time.time()
         try:
             meta = json.load(open(os.path.join(d, "meta.json")))

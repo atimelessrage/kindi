@@ -155,6 +155,42 @@ def test_compare_marks_a_new_cell():
     assert row["tokens_per_second_delta"] is None
 
 
+def test_regression_gate_rejects_status_exactness_and_throughput_losses():
+    mod = load()
+    baseline = {"results": [_row(status="pass", tps=40.0, passes=3, ties=1, fails=0)]}
+    current = [_row(status="fail", tps=30.0, passes=2, ties=0, fails=2)]
+    comparisons, baseline_only = mod.compare_results(current, baseline)
+    failures = mod.regression_failures(comparisons, baseline_only, max_tps_drop_pct=10)
+    assert any("status pass -> fail" in failure for failure in failures)
+    assert any("exactness 3/1/0 -> 2/0/2" in failure for failure in failures)
+    assert any("25.0% drop" in failure for failure in failures)
+
+
+def test_regression_gate_allows_improvements_and_a_new_cell():
+    mod = load()
+    baseline = {"results": [_row(status="pass", tps=30.0, passes=2, ties=2, fails=0)]}
+    current = [
+        _row(status="pass", tps=35.0, passes=3, ties=1, fails=0),
+        _row(status="pass", tps=20.0, passes=4, ties=0, fails=0),
+    ]
+    current[1]["model"] = "4b"
+    comparisons, baseline_only = mod.compare_results(current, baseline)
+    assert mod.regression_failures(comparisons, baseline_only, max_tps_drop_pct=10) == []
+
+
+def test_regression_gate_rejects_missing_cells_and_throughput():
+    mod = load()
+    baseline = {"results": [
+        _row(status="pass", tps=40.0, passes=4, ties=0, fails=0),
+        {**_row(status="pass", tps=40.0), "mode": "plain"},
+    ]}
+    current = [_row(status="pass", tps=None, passes=4, ties=0, fails=0)]
+    comparisons, baseline_only = mod.compare_results(current, baseline)
+    failures = mod.regression_failures(comparisons, baseline_only, max_tps_drop_pct=10)
+    assert any("throughput missing" in failure for failure in failures)
+    assert any("27b/plain: baseline cell missing" in failure for failure in failures)
+
+
 def test_save_baseline_and_compare_cli(tmp_path, capsys, monkeypatch):
     mod = load()
     packs = tmp_path / "packs"
@@ -201,3 +237,39 @@ def test_dry_run_uses_27b_override(tmp_path, capsys):
     assert "27b tc" in text
     assert str(pack27) in text
     assert "KINDI_TC_TMAX=4" in text
+
+
+def test_fail_on_regression_cli_exits_nonzero(tmp_path, capsys, monkeypatch):
+    mod = load()
+    packs = tmp_path / "packs"
+    pack = packs / "bonsai-27b"
+    pack.mkdir(parents=True)
+    (pack / "kindi_pack.json").write_text("{}", encoding="utf-8")
+    out = tmp_path / "out"
+    baseline = tmp_path / "baseline.json"
+    baseline.write_text(json.dumps({"results": [_row(status="pass", tps=40.0)]}), encoding="utf-8")
+
+    monkeypatch.setattr(mod, "run_cell", lambda *args, **kwargs: _row(status="pass", tps=30.0))
+    rc = mod.main([
+        "--models", "27b", "--modes", "tc", "--pack-dir", str(packs),
+        "--out", str(out), "--baseline", str(baseline),
+        "--fail-on-regression", "--max-tps-drop-pct", "10",
+    ])
+
+    assert rc == 1
+    comparison = json.loads((out / "comparison.json").read_text(encoding="utf-8"))
+    assert len(comparison["regressions"]) == 1
+    output = capsys.readouterr().out
+    assert "regression gate: FAIL" in output
+    assert "25.0% drop" in output
+
+
+def test_fail_on_regression_needs_a_baseline(tmp_path):
+    mod = load()
+    try:
+        mod.main(["--models", "27b", "--modes", "tc", "--pack-dir", str(tmp_path),
+                  "--out", str(tmp_path / "out"), "--fail-on-regression"])
+    except SystemExit as exc:
+        assert "needs --baseline" in str(exc)
+    else:
+        raise AssertionError("expected a SystemExit")

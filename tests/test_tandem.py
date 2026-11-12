@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from kindi import tandem
+from kindi import cache, tandem
 from kindi.engine import Engine
 
 
@@ -30,6 +30,26 @@ class FakeEngine(object):
         self.ylog_n, self.ylog_map = 5, None
         self.k = object()
         self.aout = np.zeros(1, dtype=np.int32)
+        self.dims = {"full_attention_interval": 2}
+        self.NL = 4
+        self._kvi = {1: 0, 3: 1}
+        self.isa, self.threads = "fake", 1
+        self.M, self.conv = [None] * self.NL, [None] * self.NL
+        self.Kc, self.Vc = [None] * 2, [None] * 2
+        if layers is None:                     # the CPU engine owns the whole model
+            self.M = [np.zeros(1, dtype=np.float32) for _ in (0, 2)]
+            self.conv = [np.zeros(1, dtype=np.float32) for _ in (0, 2)]
+            self.Kc = [np.zeros((self.ctx, 1, 1), dtype=np.float16) for _ in (1, 3)]
+            self.Vc = [np.zeros((self.ctx, 1, 1), dtype=np.float16) for _ in (1, 3)]
+        else:                                  # the GPU engine owns only its range
+            for il in self.layers:
+                if il in self._kvi:
+                    k = self._kvi[il]
+                    self.Kc[k] = np.zeros((self.ctx, 1, 1), dtype=np.float16)
+                    self.Vc[k] = np.zeros((self.ctx, 1, 1), dtype=np.float16)
+                else:
+                    self.M[il] = np.zeros(1, dtype=np.float32)
+                    self.conv[il] = np.zeros(1, dtype=np.float32)
 
     def begin(self, tok):
         self.calls.append(("begin", int(tok)))
@@ -73,6 +93,9 @@ class FakeEngine(object):
         self.calls.append(("reset",))
         self.h.fill(0)
         self.pending = 0
+        for a in self.M + self.conv + self.Kc + self.Vc:
+            if a is not None:
+                a.fill(0)
 
 
 @pytest.fixture
@@ -142,15 +165,67 @@ def test_invalid_split_is_rejected_before_a_backend_is_built(fake_pack, fake_bac
         tandem.TandemEngine(fake_pack, cpu_layers=1, mode="middle", log=lambda *a: None)
 
 
-def test_runner_reads_the_prompt_and_steps_the_last_token(fake_pack, fake_backends):
+def cache_cfg(tmp_path):
+    return {"checkpoint_every": "16", "prefix_max": "0", "prefix_min": "0", "park_max": "0",
+            "checkpoint_budget_mb": "0", "state_dir": str(tmp_path), "head": "exact"}
+
+
+def test_runner_reads_the_prompt_and_steps_the_last_token(fake_pack, fake_backends, tmp_path):
     eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=1, mode="cpu-first", log=lambda *a: None)
-    runner = tandem.TandemRunner(eng, log=lambda *a: None)
+    runner = tandem.TandemRunner(eng, cache_cfg(tmp_path), "test", log=lambda *a: None)
     nxt, cached = runner.prepare([1, 2, 3], 3)
     assert nxt == 77 and cached == 0
     assert runner.tokens == [1, 2, 3]
     assert ("get_hidden",) in eng.cpu.calls
     assert runner.step(4) == 77
     assert runner.tokens == [1, 2, 3, 4]
+
+
+def test_joint_checkpoint_contains_both_owners(fake_pack, fake_backends):
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first", log=lambda *a: None)
+    view = eng.cache_view()
+    assert view.M[0] is eng.cpu.M[0]
+    assert view.M[1] is eng.gpu.M[2]
+    assert view.Kc[0] is eng.cpu.Kc[0]
+    assert view.Kc[1] is eng.gpu.Kc[1]
+    assert view.conv[0] is eng.cpu.conv[0] and view.conv[1] is eng.gpu.conv[2]
+
+
+def test_joint_checkpoint_restores_both_owners(fake_pack, fake_backends, tmp_path):
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first", log=lambda *a: None)
+    view = eng.cache_view()
+    for i, a in enumerate(view.M):
+        a.fill(10 + i)
+    for i, a in enumerate(view.conv):
+        a.fill(30 + i)
+    runner = tandem.TandemRunner(eng, cache_cfg(tmp_path), "test", log=lambda *a: None)
+    runner._save_ckpt(4)
+    for a in view.M + view.conv:
+        a.fill(0)
+    runner._restore(runner.ckpt[4])
+    assert [int(a[0]) for a in view.M] == [10, 11]
+    assert [int(a[0]) for a in view.conv] == [30, 31]
+
+
+def test_joint_prefix_reuse_resumes_at_a_checkpoint(fake_pack, fake_backends, tmp_path):
+    eng = tandem.TandemEngine(fake_pack, ctx=512, cpu_layers=2, mode="gpu-first", log=lambda *a: None)
+    runner = tandem.TandemRunner(eng, cache_cfg(tmp_path), "test", log=lambda *a: None)
+    first = list(range(300))
+    nxt, cached = runner.prepare(first, len(first), len(first))
+    assert nxt == 88 and cached == 0
+    second = first[:260] + [100, 101]
+    nxt, cached = runner.prepare(second, len(second), len(second))
+    assert cached == 256
+    assert runner.tokens == second
+
+
+def test_joint_fingerprint_separates_the_two_placements(fake_pack, fake_backends, tmp_path):
+    cpu_first = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first", log=lambda *a: None)
+    gpu_first = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="gpu-first", log=lambda *a: None)
+    cfg = cache_cfg(tmp_path)
+    a = cache.engine_fingerprint(cpu_first.cache_view(), cfg)[0]
+    b = cache.engine_fingerprint(gpu_first.cache_view(), cfg)[0]
+    assert a != b
 
 
 def test_layer_tensor_selection_keeps_only_owned_layers_and_optional_ends():

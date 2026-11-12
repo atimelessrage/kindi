@@ -1,6 +1,9 @@
-"""Prompt-cache decisions that need no engine: prefix matching, spacing, parking, eviction."""
+"""Prompt-cache decisions that need no engine: prefix matching, spacing, parking, eviction,
+and the saved-opening K/V restore path."""
 import os
 from types import SimpleNamespace
+
+import numpy as np
 
 from kindi import cache
 from kindi.cache import Runner, _lcp
@@ -72,6 +75,69 @@ def test_arithmetic_fingerprint_includes_new_compiled_kernels(tmp_path):
     assert "new_kernel.cu" in files and "new_kernel.c" in files
     assert "notes.txt" not in files
     assert "engine.py" in files and "spec.py" in files
+
+
+class _CupyLikeKv(object):
+    """A CuPy-like K/V array: ``.set`` is the in-place path; plain assignment is not."""
+
+    def __init__(self, shape, fill):
+        self.data = np.full(shape, fill, dtype=np.float16)
+        self.set_calls = 0
+
+    def __getitem__(self, key):
+        return _CupyLikeKvSlice(self, key)
+
+    def __setitem__(self, key, value):
+        raise AssertionError("Openings.load used a plain CuPy assignment; use _to_dev/.set")
+
+    def set(self, value):
+        self.data[...] = value
+
+
+class _CupyLikeKvSlice(object):
+    def __init__(self, parent, key):
+        self.parent, self.key = parent, key
+
+    def get(self):
+        return self.parent.data[self.key].copy()
+
+    def set(self, value):
+        self.parent.data[self.key] = value
+        self.parent.set_calls += 1
+
+
+class _FakeOpeningEngine(object):
+    def __init__(self, ctx=8):
+        self.ctx = ctx
+        self.M = [np.array([1], dtype=np.float32)]
+        self.conv = [np.array([2], dtype=np.float32)]
+        self.Kc = [_CupyLikeKv((ctx, 2, 2), 3)]
+        self.Vc = [_CupyLikeKv((ctx, 2, 2), 4)]
+
+
+def test_saved_opening_restores_kv_prefix_through_the_cupy_set_path(tmp_path):
+    """The disk restore must use CuPy's in-place ``.set`` path for K/V, not ``dst[:p] = host``.
+
+    A plain CuPy assignment from a NumPy array takes a different path and previously left the K/V
+    wrong on the real GPU path.  The fake array rejects that assignment, so this test fails if
+    ``Openings.load`` regresses while remaining GPU-free.
+    """
+    eng = _FakeOpeningEngine()
+    log = []
+    openings = cache.Openings(eng, str(tmp_path / "openings"), 4, log.append)
+    tokens = [11, 12, 13]
+    openings.save(tokens, [np.array([7], dtype=np.float32)], [np.array([8], dtype=np.float32)])
+
+    for a in eng.Kc + eng.Vc:
+        a.data.fill(-1)
+    p, Ms, Cs = openings.load(openings.key_of(tokens))
+
+    assert p == 3
+    assert Ms[0][0] == 7 and Cs[0][0] == 8
+    np.testing.assert_array_equal(eng.Kc[0].data[:p], np.full((p, 2, 2), 3, dtype=np.float16))
+    np.testing.assert_array_equal(eng.Vc[0].data[:p], np.full((p, 2, 2), 4, dtype=np.float16))
+    assert np.all(eng.Kc[0].data[p:] == -1) and np.all(eng.Vc[0].data[p:] == -1)
+    assert eng.Kc[0].set_calls == 1 and eng.Vc[0].set_calls == 1
 
 
 def test_engine_fingerprint_hashes_every_compiled_kernel():

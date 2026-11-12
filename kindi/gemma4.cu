@@ -169,6 +169,41 @@ extern "C" __global__ void k_g4_bf16_mv(const unsigned short* w,const float* x,f
     }
 }
 
+// FP8 E4M3FN (type 43) and E5M2 (type 44), decoded exactly to float32.  E4M3 has no infinities:
+// 0x7f / 0xff are NaN and every other exponent-15 value is finite.  E5M2 keeps IEEE inf/NaN.
+__device__ __forceinline__ float g4_fp8_value(unsigned char b,int type) {
+    unsigned int u=b;
+    if(type==43) {
+        unsigned int e=(u>>3)&15u,m=u&7u;
+        if(e==15u&&m==7u)return __int_as_float(0x7fc00000);
+        float v=e==0u?(float)m*0x1p-9f:(1.0f+(float)m*0.125f)*exp2f((float)((int)e-7));
+        return (u&128u)?-v:v;
+    }
+    unsigned int e=(u>>2)&31u,m=u&3u;
+    if(e==31u)return m?__int_as_float(0x7fc00000):((u&128u)?__int_as_float(0xff800000):__int_as_float(0x7f800000));
+    float v=e==0u?(float)m*0x1p-16f:(1.0f+(float)m*0.25f)*exp2f((float)((int)e-15));
+    return (u&128u)?-v:v;
+}
+extern "C" __global__ void k_g4_fp8_mv(const unsigned char* w,const float* x,float* y,int rows,int cols,int type) {
+    int row=blockIdx.x,tid=threadIdx.x,lane=tid&31,warp=tid>>5;
+    if(row>=rows)return;
+    float sum=0.0f;
+    for(int j=tid;j<cols;j+=blockDim.x)sum=fmaf(g4_fp8_value(w[(size_t)row*cols+j],type),x[j],sum);
+    sum=g4_warp_sum(sum);
+    __shared__ float partial[8];
+    if(lane==0)partial[warp]=sum;
+    __syncthreads();
+    if(warp==0) {
+        sum=lane<(blockDim.x>>5)?partial[lane]:0.0f;
+        sum=g4_warp_sum(sum);
+        if(lane==0)y[row]=sum;
+    }
+}
+extern "C" __global__ void k_g4_fp8_dequant(const unsigned char* w,float* out,int n,int type) {
+    int i=blockIdx.x*blockDim.x+threadIdx.x;
+    if(i<n)out[i]=g4_fp8_value(w[i],type);
+}
+
 // 6-bit scale and min j (0..7) of a Q4_K/Q5_K block from its 12 scale bytes s. Let k = j mod 4 and u = j / 4; with
 // x = s[k], y = s[k+4], z = s[k+8]: the low 4 bits come from x/y (u = 0) or from the two nibbles of z (u = 1), and
 // bits 4-5 come from bits 4-5 (u = 0) or 6-7 (u = 1) of x for the scale and of y for the min
@@ -520,13 +555,15 @@ extern "C" __global__ void k_g4_quant_mm4(const unsigned char* w,const float* x,
 
 __device__ __forceinline__ void g4_embed_row(const unsigned char* weights,float* out,int token,int width,int type) {
     int lane=threadIdx.x;
-    int bytes_per_row=type==11?(width/256)*110:type==111?(width/256)*112:(width/32)*18;
+    int bytes_per_row=type==11?(width/256)*110:type==111?(width/256)*112:type==30?width*2:(type==43||type==44)?width:(width/32)*18;
     const unsigned char* row=weights+(size_t)token*bytes_per_row;
     const signed char lut[16]={-127,-104,-83,-65,-49,-35,-22,-10,1,13,25,38,53,69,89,113};
     for(int i=lane;i<width;i+=blockDim.x) {
         float v;
         if(type==11) v=g4_qweight<11>(row,i);
         else if(type==111) v=g4_qweight<111>(row,i);
+        else if(type==30) v=__uint_as_float((unsigned)reinterpret_cast<const unsigned short*>(row)[i]<<16);
+        else if(type==43||type==44) v=g4_fp8_value(row[i],type);
         else {
             const unsigned char* b=row+(i/32)*18;
             int local=i%32;
@@ -543,13 +580,15 @@ extern "C" __global__ void k_g4_embed(const unsigned char* weights,float* out,in
 extern "C" __global__ void k_g4_embed_batch(const unsigned char* weights,const int* tokens,float* out,
                                                int ntokens,int width,int type) {
     int t=blockIdx.x,lane=threadIdx.x;
-    int bytes_per_row=type==11?(width/256)*110:type==111?(width/256)*112:(width/32)*18;
+    int bytes_per_row=type==11?(width/256)*110:type==111?(width/256)*112:type==30?width*2:(type==43||type==44)?width:(width/32)*18;
     const unsigned char* row=weights+(size_t)tokens[t]*bytes_per_row;
     const signed char lut[16]={-127,-104,-83,-65,-49,-35,-22,-10,1,13,25,38,53,69,89,113};
     for(int i=lane;i<width;i+=blockDim.x) {
         float v;
         if(type==11)v=g4_qweight<11>(row,i);
         else if(type==111)v=g4_qweight<111>(row,i);
+        else if(type==30)v=__uint_as_float((unsigned)reinterpret_cast<const unsigned short*>(row)[i]<<16);
+        else if(type==43||type==44)v=g4_fp8_value(row[i],type);
         else {const unsigned char* b=row+(i/32)*18;int local=i%32;int q=(b[2+(local&15)]>>(local>=16?4:0))&15;v=g4_half(b)*(float)lut[q];}
         out[(size_t)t*width+i]=v;
     }

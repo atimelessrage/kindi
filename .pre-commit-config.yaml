@@ -1,9 +1,11 @@
 # Secret scanning for local commits. The same baseline is enforced by the CI secret-scan job.
 # Install: python -m pip install pre-commit && pre-commit install
+# Keep this hook aligned with CI: do not exclude text extensions such as .md, .json or .log.
+# Those are common places for a pasted key, and detect-secrets should inspect them.
 repos:
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:
       - id: detect-secrets
         args: ["--baseline", ".secrets.baseline"]
-        exclude: '\.(json|lock|log|md|txt)$'
+        exclude: '^\.secrets\.baseline$'

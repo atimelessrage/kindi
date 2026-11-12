@@ -38,6 +38,7 @@ def test_built_in_defaults():
     assert cfg["sampling_profile"] == "default"
     assert cfg["max_body_mb"] == 16
     assert cfg["queue_max"] == 8
+    assert cfg["rate_limit_per_min"] == 0
     assert cfg["explicit"] == frozenset()
 
 
@@ -51,10 +52,11 @@ def test_file_beats_defaults(clean_env):
 
 
 def test_server_limits_can_be_set_in_the_config_file(clean_env):
-    path = write_conf(clean_env, "max_body_mb = 4\nqueue_max = 2\n")
+    path = write_conf(clean_env, "max_body_mb = 4\nqueue_max = 2\nrate_limit_per_min = 30\n")
     cfg = config.load(explicit=path)
     assert cfg["max_body_mb"] == 4
     assert cfg["queue_max"] == 2
+    assert cfg["rate_limit_per_min"] == 30
 
 
 def test_environment_beats_file(clean_env, monkeypatch):
@@ -113,6 +115,7 @@ def test_invalid_sampling_profile_is_rejected(clean_env):
     ("ctx", "0", "ctx must be at least"),
     ("max_body_mb", "0", "max_body_mb must be at least"),
     ("queue_max", "-1", "queue_max must be at least"),
+    ("rate_limit_per_min", "-1", "rate_limit_per_min must be at least"),
     ("checkpoint_every", "0", "checkpoint_every must be at least"),
     ("fast_clusters", "0", "fast_clusters must be at least"),
     ("max_tokens", "0", "max_tokens must be at least"),

@@ -172,6 +172,12 @@ def cmd_info(cfg, a):
         "%s=%s" % (label, "unknown" if report["features"].get(name) is None else
                    ("yes" if report["features"][name] else "no"))
         for name, label in cpu_backend.CPU_FEATURES))
+    tier = cpu_backend.cpu_tier(report)
+    print("CPU engine path: %s" % cpu_backend.CPU_TIER_LABELS.get(tier, tier))
+    forced = os.environ.get("KINDI_CPU_ISA", "")
+    build = cpu_backend.select_isa(report)
+    print("CPU engine build: %s%s" % (build or "native (-march=native)",
+                                      " (KINDI_CPU_ISA)" if forced and forced != "auto" else ""))
     print("config: %s" % cfg["source"])
     for k in sorted(C.DEFAULTS):
         v = cfg[k]

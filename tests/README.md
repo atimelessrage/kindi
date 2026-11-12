@@ -10,19 +10,22 @@ Run from the repository root:
 ```sh
 python -m compileall -q kindi
 python -m pytest tests/ -q
+# Optional local coverage gate (matches the CPU CI job):
+python -m pytest tests/ -q --cov=kindi --cov-report=term --cov-fail-under=27
 bash -n install.sh
 ```
 
 The suite uses stub engines and stand-in CuPy where needed. It covers config precedence, the chat
 template and tool-call round trips, tokenizer behavior, sampling, cache decisions, the HTTP boundary
 (validation, auth, body caps, queue, Ollama endpoints, image rejection), startup pack checks, the
-plan-engine guards, the tracked-file secret/personal-data guard, the installer's GRUB fixture and
+plan-engine guards, the tracked-file secret/personal-data guard and detect-secrets baseline checks, the installer's GRUB fixture and
 CPU ISA preflight, and GPU-driver selection. No CUDA device or model pack is required.
 
 `tests/requirements-test.txt` lists the test dependencies. The same commands run in the CPU job of
 `.github/workflows/ci.yml`. A separate `cpu-engine-smoke` job compiles `kindi/kcpu.c` with gcc for
 the AVX2/FMA/F16C tier and runs `test_cpu_build.py`, `test_cpu_threads.py` and `test_cpu_smoke.py`;
-the smoke test loads the library and checks the ctypes ABI without a model pack. The manual
+`test_cpu_build.py` also builds and loads the AVX2/F16C no-FMA and AVX-only fallbacks. The smoke
+test loads the library and checks the ctypes ABI without a model pack. The manual
 self-hosted GPU lane is described in [docs/CI.md](../docs/CI.md); it is not run by hosted CI.
 
 ## Turing reference suite (optional)

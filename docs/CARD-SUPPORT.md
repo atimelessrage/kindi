@@ -24,9 +24,11 @@ A card is supported when all of these hold:
 This is stricter than “the kernels compile”. A card that runs only after manual environment overrides is
 not supported.
 
-Kindi consumes its own Bonsai PTQ1_0 packs and Nanbeige GGUF. The NVFP4/FP8/AWQ/GPTQ/EXL2 boxes in a
-generic GPU table are hardware capabilities, not Kindi formats; they do not imply support here. The
-5060 Ti’s native FP4 is not used by Kindi today.
+Kindi consumes its own Bonsai PTQ1_0 packs and Nanbeige GGUF. BF16 (GGUF type 30) and FP8 E4M3/E5M2
+(types 43/44) are accepted in the Gemma 4 GGUF path and as FP8/BF16 auxiliary tensors in a Bonsai
+conversion, but there is no native FP8 tensor-core path and no real-model validation yet; see
+[FP8-BF16.md](FP8-BF16.md). The NVFP4/FP8/AWQ/GPTQ/EXL2 boxes in a generic GPU table are hardware
+capabilities, not claims that Kindi uses them; the 5060 Ti’s native FP4 is not used by Kindi today.
 
 ## Verify matrix
 

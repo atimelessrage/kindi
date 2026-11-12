@@ -7,7 +7,8 @@ Ternary tensors (GGUF type 143 = PTQ1_0: per 128 weights, qs[24] | qh[2] | fp16 
 slot-major ([slot][row]); the scales are transposed to [phase][row]. The engine repacks this at load time into its
 own layout (layout.py). The Hadamard rotation Prism ML folded into the weights stays folded: the engine applies the
 matching transform to the activations, using the sign vectors stored in the GGUF (prism.hadamard.*).
-Float32 tensors are copied verbatim. Vocabulary and BPE merges come from the GGUF tokenizer metadata.
+Float32 tensors are copied verbatim; BF16, FP8 E4M3 and FP8 E5M2 tensors are widened exactly to float32.
+Vocabulary and BPE merges come from the GGUF tokenizer metadata.
 
 Pack files: bcodes.bin, dpm.bin, f32.bin, signs_2048.f32, signs_6144.f32, vocab.json, merges.txt, index.json,
 bcodes_index.json, kindi_pack.json."""
@@ -19,9 +20,10 @@ import time
 import numpy as np
 
 from . import __version__
+from .dtypes import BF16, FP8_E4M3, FP8_E5M2, bf16_to_f32, fp8_to_f32
 from .gguf import GGUF
 
-PTQ1_0, PQ2_0, Q2_0, F32, BF16 = 143, 142, 42, 0, 30
+PTQ1_0, PQ2_0, Q2_0, F32 = 143, 142, 42, 0
 # ternary tensor type -> (weights per scale group, block bytes, name). The pack keeps one fp16 scale per 128
 # weights, so a Q2_0 file (upstream type 42, groups of 64) is folded two groups at a time.
 TERNARY = {PTQ1_0: (128, 28, "PTQ1_0"), PQ2_0: (128, 34, "PQ2_0"), Q2_0: (64, 18, "Q2_0")}
@@ -137,7 +139,7 @@ def convert(gguf_path, out_dir, log=print):
     if profile not in PROFILES:
         raise SystemExit("kindi convert: unsupported Ternary-Bonsai-2 dimensions %r" % (profile,))
     types = {t[2] for t in g.tensors}
-    if not types <= {PTQ1_0, PQ2_0, Q2_0, F32, BF16}:
+    if not types <= {PTQ1_0, PQ2_0, Q2_0, F32, BF16, FP8_E4M3, FP8_E5M2}:
         raise SystemExit("kindi convert: needs a PTQ1_0, PQ2_0 or Q2_0 GGUF (found tensor types %s)" % sorted(types))
     hd = {k.split("prism.hadamard.")[-1]: v for k, v in g.kv.items() if k.startswith("prism.hadamard.")}
     sv = np.array(hd["sign_values"], dtype=np.float32)
@@ -205,8 +207,11 @@ def convert(gguf_path, out_dir, log=print):
         else:
             n = rows * ne0
             if ty == BF16:                      # the 27B stores ssm_alpha / ssm_beta in bf16: widen exactly to f32
-                v = np.frombuffer(src.read(2 * n), dtype="<u2").astype(np.uint32) << 16
-                ff.write(v.astype("<u4").tobytes())
+                v = bf16_to_f32(np.frombuffer(src.read(2 * n), dtype="<u2"))
+                ff.write(v.astype("<f4").tobytes())
+            elif ty in (FP8_E4M3, FP8_E5M2):    # FP8 auxiliary tensors: exact decode, then the ordinary f32 path
+                v = fp8_to_f32(np.frombuffer(src.read(n), dtype=np.uint8), ty)
+                ff.write(v.astype("<f4").tobytes())
             else:
                 ff.write(np.frombuffer(src.read(4 * n), dtype="<f4").tobytes())
             rec.update({"f32_off": f32_off, "nfloats": n})

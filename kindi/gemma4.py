@@ -31,8 +31,35 @@ def _ptx_module(src,arch):
     m=function.Module(); m.load(ptx.encode())
     return m
 
+def _fp8_module():
+    """Compile the native FP8 prompt GEMM.  PTX 8.4 introduced the e4m3/e5m2 m16n8k32 mma and
+    sm_89 is the first target that has it; the sm_89 form is portable, so a Blackwell driver JITs
+    the same PTX for sm_100/sm_120 tensor cores."""
+    import re
+    from cupy.cuda import compiler,function
+    src=open(os.path.join(os.path.dirname(__file__),"gemma4_fp8.cu"),encoding="utf-8").read()
+    ptx,_=compiler._NVRTCProgram(src,"gemma4_fp8.cu").compile(("-arch=compute_75",))
+    if isinstance(ptx,bytes): ptx=ptx.decode()
+    ptx=re.sub(r"\.version \d+\.\d+",".version 8.4",ptx,count=1)
+    ptx=re.sub(r"\.target sm_\d+",".target sm_89",ptx,count=1)
+    m=function.Module(); m.load(ptx.encode())
+    return m
+
+def fp8_kernels():
+    """The native FP8 kernels on an Ada (sm_89) or Blackwell CUDA device, else None."""
+    try:
+        import cupy as cp
+        if getattr(cp.cuda.runtime,"is_hip",False): return None
+        if int(cp.cuda.Device().compute_capability)<89: return None
+        mod=_fp8_module()
+        return {"quant":{43:mod.get_function("k_g4_fp8_quant_t43"),44:mod.get_function("k_g4_fp8_quant_t44")},
+                "mm":{43:mod.get_function("k_g4_fp8mm_t43"),44:mod.get_function("k_g4_fp8mm_t44")}}
+    except Exception as exc:
+        print("kindi: native FP8 tensor-core kernels unavailable: %s" % exc)
+        return None
+
 class Kernels:
-    NAMES=("k_g4_attn_ffn_norm_residual","k_g4_rmsnorm","k_g4_residual","k_g4_gelu_mul","k_g4_ple_gate","k_g4_softcap","k_g4_rope","k_g4_q8_mv","k_g4_f32_mv","k_g4_bf16_mv","k_g4_q32","k_g4_quant_mm4","k_g4_qkv_mm4","k_g4_embed_batch","k_g4_rope_batch","k_g4_iq4xs_dp4a_mv","k_g4_iq4xs_dual_dp4a_mv","k_g4_quant_mv","k_g4_embed","k_g4_scale_vector","k_g4_dequant_q3_rows","k_g4_q3_mv_selected","k_g4_qkv_mv","k_g4_dual_quant_mv","k_g4_attn_scores","k_g4_attn_softmax","k_g4_attn_values","k_g4_attn_split_part","k_g4_attn_split_merge",
+    NAMES=("k_g4_attn_ffn_norm_residual","k_g4_rmsnorm","k_g4_residual","k_g4_gelu_mul","k_g4_ple_gate","k_g4_softcap","k_g4_rope","k_g4_q8_mv","k_g4_f32_mv","k_g4_bf16_mv","k_g4_fp8_mv","k_g4_fp8_dequant","k_g4_q32","k_g4_quant_mm4","k_g4_qkv_mm4","k_g4_embed_batch","k_g4_rope_batch","k_g4_iq4xs_dp4a_mv","k_g4_iq4xs_dual_dp4a_mv","k_g4_quant_mv","k_g4_embed","k_g4_scale_vector","k_g4_dequant_q3_rows","k_g4_q3_mv_selected","k_g4_qkv_mv","k_g4_dual_quant_mv","k_g4_attn_scores","k_g4_attn_softmax","k_g4_attn_values","k_g4_attn_split_part","k_g4_attn_split_merge",
          "k_g4_embed_dev","k_g4_rope_dev","k_g4_kv_store","k_g4_attn_dev_part_g1","k_g4_attn_dev_part_g2","k_g4_attn_dev_part_g4","k_g4_attn_dev_part_g8",
          "k_g4_attn_dev_merge","k_g4_attn_dev_merge_live","k_g4_kv_store_batch",
          )+tuple("k_g4_%s_w%d"%(k,w) for k in ("iq4w_mv","iq4w_dual_mv","q3k_mv","q6k_mv","q2k_mv","q5k_mv","q3p_mv","q6p_mv","q8k_mv","k4_mv","k4_dual_mv") for w in (1,2,4,8))\
@@ -87,6 +114,9 @@ class Ops:
             src=open(os.path.join(here,"gemma4.cu"),encoding="utf-8").read()+open(os.path.join(here,"gemma4_tc.cu"),encoding="utf-8").read()
             mod=_ptx_module(src,"sm_"+cc)
             self.tcmm={t:mod.get_function("k_g4_tcmm_t%d"%t) for t in (8,10,11,13,14,23,123,111,114,108)}
+        self.fp8=None
+        if cc!="hip" and int(cc)>=89 and os.environ.get("KINDI_G4_FP8","1")!="0":
+            self.fp8=fp8_kernels()
         # start-up checks of the matrix-core paths (each is turned off, with a log line, if it fails)
         if self.hgemm is not None and not self._hgemm_ok(): self.hgemm=None
         if self.tcmm and self.dp4a and not self._tcmm_ok(): self.tcmm=None
@@ -126,12 +156,20 @@ class Ops:
         return self._vec(self.k.k_g4_softcap,self.cp.ascontiguousarray(x),extra=(np.float32(cap),))
     def embedding_batch(self,packed,tokens,width,gguf_type):
         cp=self.cp; tokens=cp.ascontiguousarray(tokens,dtype=cp.int32).reshape(-1); n=int(tokens.size)
+        if gguf_type not in (11,20,30,43,44,111):
+            raise ValueError("Kindi embedding batch does not yet support GGUF type %d" % int(gguf_type))
         out=cp.empty((n,int(width)),dtype=cp.float32)
         self.k.k_g4_embed_batch((n,),(256,),(packed,tokens,out,np.int32(n),np.int32(width),np.int32(gguf_type)))
         return out
     def qkv_batch(self,qw,kw,vw,x,qrows,kvrows,cols,qtype,ktype,vtype,with_kv=True):
         cp=self.cp;x=cp.ascontiguousarray(x,dtype=cp.float32);nt=int(x.shape[0])
         qrows,kvrows,cols=int(qrows),int(kvrows),int(cols);total=qrows+(2*kvrows if with_kv else 0)
+        types=(qtype,ktype,vtype) if with_kv else (qtype,)
+        if any(t in (30,43,44) for t in types):       # BF16/FP8: widen to f32 for the batch product
+            q=self.linear_batch(qw,x,qrows,cols,qtype)
+            if not with_kv: return q
+            return cp.concatenate((q,self.linear_batch(kw,x,kvrows,cols,ktype),
+                                   self.linear_batch(vw,x,kvrows,cols,vtype)),axis=1)
         out=cp.empty((nt,total),dtype=cp.float32)
         if self.mmq_on and cols%256==0 and all(t in (8,10,11,13,14,23,123,111,114,108) for t in (qtype,ktype,vtype)):
             xq=self.quant_input(x.reshape(-1),nt*cols)
@@ -159,12 +197,20 @@ class Ops:
             (packed,qx,xs,out,np.int32(rows),np.int32(cols),np.int32(nt),np.int32(ldy)))
         return out
     def linear_batch(self,packed,x,rows,cols,gguf_type,xq=None):
+        if gguf_type in (43,44) and getattr(self,"fp8",None) is not None and int(cols)%32==0:
+            cp=self.cp; x=cp.ascontiguousarray(x,dtype=cp.float32)
+            nt=int(x.shape[0]); rows,cols=int(rows),int(cols)
+            q,s=self.quant_fp8(x,gguf_type)
+            out=cp.empty((nt,rows),dtype=cp.float32)
+            self.fp8["mm"][gguf_type](((rows+63)//64,(nt+63)//64),(256,),
+                (packed,q,s,out,np.int32(rows),np.int32(cols),np.int32(nt)))
+            return out
         if gguf_type in (8,10,11,13,14,23,123,111,114,108) and int(cols)%256==0 and self.mmq_on:
             x=self.cp.ascontiguousarray(x,dtype=self.cp.float32); rows,cols=int(rows),int(cols)
             return self.mmq(packed,x,rows,cols,gguf_type,self.cp.empty((int(x.shape[0]),rows),dtype=self.cp.float32),rows,xq)
-        if gguf_type==30 and self.mmq_on:     # BF16: widen to float32 for this batch and use cuBLAS
+        if gguf_type in (30,43,44):           # BF16/FP8: widen to float32 for this batch and use cuBLAS
             cp=self.cp; x=cp.ascontiguousarray(x,dtype=cp.float32)
-            w=(packed.view(cp.uint16).astype(cp.uint32)<<16).view(cp.float32).reshape(int(rows),int(cols))
+            w=self._dequant(packed,rows,cols,gguf_type)
             return x@w.T
         cp=self.cp; x=cp.ascontiguousarray(x,dtype=cp.float32); nt=int(x.shape[0]); rows,cols=int(rows),int(cols)
         out=cp.empty((nt,rows),dtype=cp.float32)
@@ -172,7 +218,7 @@ class Ops:
         return out
     def embedding(self,packed,token,width,gguf_type):
         cp=self.cp
-        if gguf_type not in (11,20,111):
+        if gguf_type not in (11,20,30,43,44,111):
             raise ValueError("Kindi embedding lookup does not yet support GGUF type %d" % int(gguf_type))
         out=cp.empty(int(width),dtype=cp.float32)
         if isinstance(token,cp.ndarray):      # graph decode: st[0] on the device
@@ -217,17 +263,35 @@ class Ops:
         qx=self.cp.empty(cols,dtype=self.cp.int8); xs=self.cp.empty(cols//32,dtype=self.cp.float32)
         self.k.k_g4_q32((cols//32,),(32,),(x,qx,xs,np.int32(cols)))
         return qx,xs
+    def quant_fp8(self,x,kind):
+        """Dynamic per-token E4M3/E5M2 quantization for the native FP8 prompt GEMM: q * scale ~= x."""
+        cp=self.cp; x=cp.ascontiguousarray(x,dtype=cp.float32)
+        nt,cols=map(int,x.shape)
+        q=cp.empty((nt,cols),dtype=cp.uint8); s=cp.empty(nt,dtype=cp.float32)
+        self.fp8["quant"][kind]((nt,),(256,),(x,q,s,np.int32(cols),np.int32(nt)))
+        return q.reshape(-1),s
     def kq(self,packed,qx,xs,out,rows,cols,gguf_type):
         """dp4a K-quant matvec into out (a contiguous array or slice)"""
         name,rpw=_KQ[gguf_type]
         self.rows_launch(name,rows,rpw,(packed,qx,xs,out,np.int32(rows),np.int32(cols)))
+
+    def _dequant(self,packed,rows,cols,gguf_type):
+        """Materialise a BF16/FP8 matrix as float32 for a cuBLAS batch product."""
+        cp=self.cp; rows,cols=int(rows),int(cols)
+        if gguf_type==30:
+            return (packed.view(cp.uint16).astype(cp.uint32)<<16).view(cp.float32).reshape(rows,cols)
+        if gguf_type in (43,44):
+            out=cp.empty((rows,cols),dtype=cp.float32); n=rows*cols
+            self.k.k_g4_fp8_dequant(((n+255)//256,),(256,),(packed,out,np.int32(n),np.int32(gguf_type)))
+            return out
+        raise ValueError("Kindi dequantization does not support GGUF type %d" % int(gguf_type))
     def rows_launch(self,name,rows,rpw,args):
         """launch a split-K matvec: WPR warps per row group, chosen so the launch has about 2560 warps"""
         groups=(rows+rpw-1)//rpw; wpr=1
         while wpr<8 and groups*wpr<self.warps: wpr*=2
         getattr(self.k,"k_g4_%s_w%d"%(name,wpr))(((groups*wpr+7)//8,),(256,),args)
     def linear(self,packed,x,rows,cols,gguf_type):
-        """Kindi CUDA row-vector GEMV for GGUF Q8_0, F32 and BF16 tensors."""
+        """Kindi CUDA row-vector GEMV for GGUF Q8_0, F32, BF16 and FP8 tensors."""
         cp=self.cp
         x=cp.ascontiguousarray(x,dtype=cp.float32).reshape(-1)
         rows,cols=int(rows),int(cols)
@@ -237,6 +301,10 @@ class Ops:
             fn=self.k.k_g4_q8_mv
         elif gguf_type==0: fn=self.k.k_g4_f32_mv
         elif gguf_type==30: fn=self.k.k_g4_bf16_mv
+        elif gguf_type in (43,44):
+            fn=self.k.k_g4_fp8_mv
+            fn((rows,),(256,),(packed,x,out,np.int32(rows),np.int32(cols),np.int32(gguf_type)))
+            return out
         elif gguf_type==108:                  # Kindi Q8 layout
             qx,xs=self.quant_input(x,cols)
             self.k.k_g4_q8r_mv(((rows+15)//16,),(256,),(packed,qx,xs,out,np.int32(rows),np.int32(cols)))
@@ -265,6 +333,12 @@ class Ops:
         cp=self.cp
         x=cp.ascontiguousarray(x,dtype=cp.float32).reshape(-1)
         qrows,kvrows,cols=int(qrows),int(kvrows),int(cols)
+        types=(qtype,ktype,vtype) if with_kv else (qtype,)
+        if any(t in (30,43,44) for t in types):       # dense float formats use the GEMV path
+            q=self.linear(qw,x,qrows,cols,qtype)
+            if not with_kv: return q
+            return cp.concatenate((q,self.linear(kw,x,kvrows,cols,ktype),
+                                   self.linear(vw,x,kvrows,cols,vtype)))
         total=qrows+(2*kvrows if with_kv else 0)
         out=cp.empty(total,dtype=cp.float32)
         if self.kq_dp4a and cols%256==0 and all(t in _KQ for t in ((qtype,ktype,vtype) if with_kv else (qtype,))):
@@ -325,9 +399,10 @@ class Ops:
 
 # GGML quant type -> (elements per block, bytes per block)
 _QUANTS = {0:(1,4), 8:(32,34), 10:(256,84), 11:(256,110), 12:(256,144),
-           13:(256,176), 14:(256,210), 20:(32,18), 23:(256,136), 30:(1,2)}
+           13:(256,176), 14:(256,210), 20:(32,18), 23:(256,136), 30:(1,2),
+           43:(1,1), 44:(1,1)}
 _NAMES = {0:"F32",8:"Q8_0",10:"Q2_K",11:"Q3_K",12:"Q4_K",13:"Q5_K",
-          14:"Q6_K",20:"IQ4_NL",23:"IQ4_XS",30:"BF16"}
+          14:"Q6_K",20:"IQ4_NL",23:"IQ4_XS",30:"BF16",43:"F8_E4M3",44:"F8_E5M2"}
 
 def inspect_model(path):
     g=GGUF(path)
@@ -436,6 +511,7 @@ class EmbeddingPipeline:
         self.residency=self.file.load_resident(cp,reserve_bytes=reserve_bytes)
         self.ops=Ops()
         self.D=info["dimensions"]["width"]; self.NL=info["dimensions"]["layers"]; self.P=info["dimensions"]["per_layer_dim"]
+        self.ple_type=self.file.tensors["per_layer_token_embd.weight"]["type"]
     def _f32(self,name,shape):
         raw=self.file._resident[name]
         return raw.view(self.cp.float32).reshape(shape)
@@ -444,11 +520,11 @@ class EmbeddingPipeline:
         if token<0 or token>=self.info["dimensions"]["vocab"]:
             raise ValueError("token id is outside the Gemma 4 vocabulary")
         w=self.file._resident
-        x=self.ops.embedding(w["token_embd.weight"],token,self.D,11)
+        x=self.ops.embedding(w["token_embd.weight"],token,self.D,self.file.tensors["token_embd.weight"]["type"])
         x=self.ops.scale(x,np.sqrt(float(self.D)))
-        ple_tok=self.ops.embedding(w["per_layer_token_embd.weight"],token,self.NL*self.P,20)
+        ple_tok=self.ops.embedding(w["per_layer_token_embd.weight"],token,self.NL*self.P,self.ple_type)
         ple_tok=self.ops.scale(ple_tok,np.sqrt(float(self.P))).reshape(self.NL,self.P)
-        proj=self.ops.linear(w["per_layer_model_proj.weight"],x,self.NL*self.P,self.D,30)
+        proj=self.ops.linear(w["per_layer_model_proj.weight"],x,self.NL*self.P,self.D,self.file.tensors["per_layer_model_proj.weight"]["type"])
         proj=proj.reshape(self.NL,self.P)
         norm=self._f32("per_layer_proj_norm.weight",(self.P,))
         proj=self.ops.rmsnorm(proj,norm)
@@ -467,6 +543,8 @@ class Engine(object):
         reserve=int(os.environ.get("KINDI_G4_RESERVE_MB","1024"))*1024*1024
         self.residency=self.file.load_resident(cp,reserve_bytes=reserve)
         self.ops=Ops()
+        self.emb_type=self.file.tensors["token_embd.weight"]["type"]
+        self.ple_type=self.file.tensors["per_layer_token_embd.weight"]["type"]
         d=self.info["dimensions"]
         self.D=d["width"]; self.NL=d["layers"]; self.V=d["vocab"]
         self.NH=d["heads"]; self.NHKV=d["kv_heads"]; self.P=d["per_layer_dim"]
@@ -511,13 +589,20 @@ class Engine(object):
         self._graph=None
         self.ple_host="per_layer_token_embd.weight" in self.file.host
         if self.ple_host:
-            rb=(self.NL*self.P//32)*18
+            block,size=_QUANTS[self.ple_type]
+            rb=(self.NL*self.P//block)*size
             self._ple_table=np.frombuffer(self.file.raw("per_layer_token_embd.weight"),dtype=np.uint8).reshape(-1,rb)
             self._ple_row=cp.empty(rb,dtype=cp.uint8)
             self.log("per-layer token embedding in host memory (%.1f GiB); one row is copied per token" %
                      (self._ple_table.nbytes/2**30))
         if os.environ.get("KINDI_G4_K4","1")!="0": self.repack_iq4()
         if os.environ.get("KINDI_G4_PAD","1")!="0" and self.ops.kq_dp4a and self.ops.mmq_on: self.pad_kquants()
+        self.emb_type=self.file.tensors["token_embd.weight"]["type"]
+        self.ple_type=self.file.tensors["per_layer_token_embd.weight"]["type"]
+        graph_types={8,10,11,13,14,23,108,111,114,123}
+        graph_names=["blk.%d.%s.weight"%(i,n) for i in range(self.NL) for n in
+                     ("attn_q","attn_k","attn_v","attn_output","ffn_gate","ffn_up","ffn_down","inp_gate","proj")]
+        self.graph_ok=all(self.file.tensors[n]["type"] in graph_types for n in graph_names if n in self.file.tensors)
         self.log("Kindi Gemma 4 CUDA ready on %s: %.1f GiB packed weights, ctx %d" %
                  (self.residency["device"],self.residency["weight_bytes"]/2**30,self.ctx))
     def repack_iq4(self):
@@ -655,11 +740,11 @@ class Engine(object):
         """one decode step with fused kernels, token and position in st (captured once as a CUDA graph)"""
         cp=self.cp; k=self.ops.k; D=self.D; f32=self._f32; R=self.file._resident
         eps=np.float32(self.eps); e6=np.float32(1e-6)           # e6: the default of Ops.rmsnorm, as in _forward
-        x=(self.ops.embedding(self._emb_row,0,D,11) if getattr(self,"emb_host",False) else
+        x=(self.ops.embedding(self._emb_row,0,D,self.emb_type) if getattr(self,"emb_host",False) else
            self.ops.embedding(R["token_embd.weight"],st,D,self.file.tensors["token_embd.weight"]["type"]))
         x=self.ops.scale(x,np.sqrt(float(D)))
-        ple_tok=(self.ops.embedding(self._ple_row,0,self.NL*self.P,20) if self.ple_host else
-                 self.ops.embedding(R["per_layer_token_embd.weight"],st,self.NL*self.P,20))
+        ple_tok=(self.ops.embedding(self._ple_row,0,self.NL*self.P,self.ple_type) if self.ple_host else
+                 self.ops.embedding(R["per_layer_token_embd.weight"],st,self.NL*self.P,self.ple_type))
         ple_tok=self.ops.scale(ple_tok,np.sqrt(float(self.P))).reshape(self.NL,self.P)
         ple_proj=self._linear("per_layer_model_proj.weight",x).reshape(self.NL,self.P)
         ple_proj=self.ops.rmsnorm(ple_proj,f32("per_layer_proj_norm.weight",(self.P,)))
@@ -740,16 +825,20 @@ class Engine(object):
     def forward(self,token,pos,logits=True):
         cp=self.cp; token=int(token); pos=int(pos)
         if pos<0 or pos>=self.ctx: raise OverflowError("Gemma 4 context limit reached")
-        if logits and self.shortlist<=0 and os.environ.get("KINDI_G4_GRAPH","1")!="0":
+        if logits and self.shortlist<=0 and self.graph_ok and os.environ.get("KINDI_G4_GRAPH","1")!="0":
             return self._graph_forward(token,pos)
         return self._forward(token,pos,logits)
     def _forward(self,token,pos,logits=True):
         cp=self.cp
-        x=self.ops.embedding(self.file._resident["token_embd.weight"],token,self.D,self.file.tensors["token_embd.weight"]["type"])
+        if getattr(self,"emb_host",False):
+            self._emb_row.set(self._emb_table[int(token)])
+            x=self.ops.embedding(self._emb_row,0,self.D,self.emb_type)
+        else:
+            x=self.ops.embedding(self.file._resident["token_embd.weight"],token,self.D,self.file.tensors["token_embd.weight"]["type"])
         x=self.ops.scale(x,np.sqrt(float(self.D)))
         if self.ple_host: self._ple_row.set(self._ple_table[int(token)])
-        ple_tok=(self.ops.embedding(self._ple_row,0,self.NL*self.P,20) if self.ple_host else
-                 self.ops.embedding(self.file._resident["per_layer_token_embd.weight"],token,self.NL*self.P,20))
+        ple_tok=(self.ops.embedding(self._ple_row,0,self.NL*self.P,self.ple_type) if self.ple_host else
+                 self.ops.embedding(self.file._resident["per_layer_token_embd.weight"],token,self.NL*self.P,self.ple_type))
         ple_tok=self.ops.scale(ple_tok,np.sqrt(float(self.P))).reshape(self.NL,self.P)
         ple_proj=self._linear("per_layer_model_proj.weight",x).reshape(self.NL,self.P)
         ple_proj=self.ops.rmsnorm(ple_proj,self._f32("per_layer_proj_norm.weight",(self.P,)))
@@ -825,15 +914,15 @@ class Engine(object):
         if pos<0 or pos+nt>self.ctx:raise OverflowError("Gemma 4 prefill exceeds context")
         ids=cp.asarray(tokens,dtype=cp.int32); positions=cp.arange(pos,pos+nt,dtype=cp.int32)
         if getattr(self,"emb_host",False):
-            x=self.ops.embedding_batch(cp.asarray(self._emb_table[np.asarray(tokens,dtype=np.int64)]),cp.arange(nt,dtype=cp.int32),self.D,11)
+            x=self.ops.embedding_batch(cp.asarray(self._emb_table[np.asarray(tokens,dtype=np.int64)]),cp.arange(nt,dtype=cp.int32),self.D,self.emb_type)
         else:
             x=self.ops.embedding_batch(self.file._resident["token_embd.weight"],ids,self.D,self.file.tensors["token_embd.weight"]["type"])
         x=self.ops.scale(x,np.sqrt(float(self.D)))
         if self.ple_host:                  # gather this batch's rows on the host, then decode them on the card
             rows=cp.asarray(self._ple_table[np.asarray(tokens,dtype=np.int64)])
-            ple_tok=self.ops.embedding_batch(rows,cp.arange(nt,dtype=cp.int32),self.NL*self.P,20)
+            ple_tok=self.ops.embedding_batch(rows,cp.arange(nt,dtype=cp.int32),self.NL*self.P,self.ple_type)
         else:
-            ple_tok=self.ops.embedding_batch(self.file._resident["per_layer_token_embd.weight"],ids,self.NL*self.P,20)
+            ple_tok=self.ops.embedding_batch(self.file._resident["per_layer_token_embd.weight"],ids,self.NL*self.P,self.ple_type)
         ple_tok=self.ops.scale(ple_tok,np.sqrt(float(self.P))).reshape(nt,self.NL,self.P)
         proj=self.ops.linear_batch(self.file._resident["per_layer_model_proj.weight"],x,self.NL*self.P,self.D,30)
         proj=self.ops.rmsnorm(proj.reshape(nt,self.NL,self.P),self._f32("per_layer_proj_norm.weight",(self.P,)))

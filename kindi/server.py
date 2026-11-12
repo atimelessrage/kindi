@@ -9,7 +9,8 @@
   GET  /metrics                Prometheus text: requests, tokens, speculative stats, queue, uptime
 
 One request at a time (one engine on one GPU); up to KINDI_QUEUE_MAX requests wait behind it, and the next one gets
-HTTP 429 with Retry-After instead of waiting without a bound. Thinking is off unless the request sets
+HTTP 429 with Retry-After instead of waiting without a bound. KINDI_RATE_LIMIT_PER_MIN can also cap generation
+requests per source address. Thinking is off unless the request sets
 chat_template_kwargs.enable_thinking (or top-level enable_thinking); a stream then carries the thinking as
 delta.reasoning_content. thinking_budget_tokens (or thinking_budget) caps it: at the budget the server closes the
 thinking itself and the model goes on to answer. temperature 0 = greedy (token-exact with llama.cpp in the exact head
@@ -17,6 +18,7 @@ mode). Request bodies are capped at 16 MiB (KINDI_MAX_BODY_MB); when api_key is 
 import asyncio
 import codecs
 import concurrent.futures
+import contextvars
 import hmac
 import json
 import math
@@ -71,6 +73,11 @@ MAX_BODY_BYTES = MAX_BODY_MB * 1024 * 1024
 # One engine runs one request; this bounds how many clients may wait behind it (KINDI_QUEUE_MAX=0: no waiting).
 MAX_QUEUE = _env_int("KINDI_QUEUE_MAX", os.environ.get("KINDI_QUEUE_MAX", "8"), 0)
 
+# The access-log record of the request on this task. The middleware sets it; the generator wrapper
+# receives the same dict because the engine runs on the GPU thread, where a context variable does not
+# follow.
+_CURRENT = contextvars.ContextVar("kindi_request", default=None)
+
 
 class QueueFull(Exception):
     """The bounded wait behind the active request is full: an HTTP 429 with Retry-After."""
@@ -107,6 +114,45 @@ class Gate(object):
     def waiting(self):
         with self._lock:
             return max(0, self.admitted - 1)
+
+
+class RateLimiter(object):
+    """A fixed-window per-source limit for generation requests.
+
+    The queue bounds how many requests wait for the engine, but it does not stop one client from refilling the
+    queue forever. This limiter is deliberately in-process and per source address: it is a cheap overload guard,
+    not a distributed quota. ``per_minute=0`` disables it. Health, metrics and model-listing requests are not
+    counted, so a monitor cannot lock itself out.
+    """
+
+    def __init__(self, per_minute, clock=None):
+        self.per_minute = max(0, int(per_minute))
+        self._clock = clock or time.monotonic
+        self._lock = threading.Lock()
+        self._clients = {}
+        self.rejected = 0
+
+    def retry_after(self, client):
+        """Return 0 if allowed, else the whole seconds until the window resets."""
+        if not self.per_minute:
+            return 0
+        now = self._clock()
+        window = int(now // 60)
+        key = client or "-"
+        with self._lock:
+            current = self._clients.get(key)
+            if current is None or current[0] != window:
+                if len(self._clients) >= 4096:
+                    self._clients = {k: v for k, v in self._clients.items() if v[0] == window}
+                    if len(self._clients) >= 4096:          # a burst of distinct sources: drop the oldest key
+                        self._clients.pop(next(iter(self._clients)))
+                self._clients[key] = [window, 1]
+                return 0
+            if current[1] < self.per_minute:
+                current[1] += 1
+                return 0
+            self.rejected += 1
+            return max(1, int(math.ceil(60.0 - (now % 60.0))))
 
 
 class RequestTooLarge(ValueError):
@@ -372,7 +418,7 @@ class Kindi(object):
             self.tok = Tok(self.eng.vocab, os.path.join(pack, "merges.txt"))
             if tandem != "off":
                 from .tandem import TandemRunner
-                self.runner = TandemRunner(self.eng, log=log, progress=self.busy)
+                self.runner = TandemRunner(self.eng, cfg, self.pack_id, log=log, progress=self.busy)
             else:
                 self.runner = Runner(self.eng, cfg, self.pack_id, log, progress=self.busy)
             self.sample = Sampler(self.eng)
@@ -819,8 +865,67 @@ def create_app(cfg, log=print):
     app.state.max_body_bytes = (MAX_BODY_BYTES if max_body_mb is None
                                 else _env_int("max_body_mb", max_body_mb, 1) * 1024 * 1024)
     gate = K.gate = Gate(cfg.get("queue_max", MAX_QUEUE))
+    limiter = RateLimiter(cfg.get("rate_limit_per_min", 0))
+    access_log = bool(cfg.get("log_json"))
+
+    def _access(meta, status=200, info=None, error=None):
+        """One JSON line per inference request when log_json is on. Headers and the key are never logged."""
+        if not access_log or not meta or not meta.get("id") or meta.get("logged"):
+            return
+        meta["logged"] = True
+        line = {"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "level": "info" if status < 400 else "warning", "msg": "request",
+                "request_id": meta["id"], "method": meta["method"], "path": meta["path"],
+                "status": status,
+                "duration_ms": round((time.time() - meta["t0"]) * 1000, 1),
+                "queue_wait_ms": round(meta["wait"] * 1000, 1),
+                "stream": bool(meta["stream"]), "model": model_id}
+        if error:
+            line["error"] = str(error)[:200]
+        if info:
+            usage, timing = info.get("usage") or {}, info.get("timing") or {}
+            line.update(prompt_tokens=usage.get("prompt_tokens"),
+                        completion_tokens=usage.get("completion_tokens"),
+                        cached_tokens=(usage.get("prompt_tokens_details") or {}).get("cached_tokens"),
+                        gen_tok_s=timing.get("gen_tok_s"), finish=info.get("finish"))
+        log(json.dumps(line, ensure_ascii=False))
+
+    def _logged(gen, meta, stream):
+        """Relay the engine generator unchanged and write its access line when it finishes or fails."""
+        meta["stream"] = stream
+        info, status, error = None, 200, None
+        try:
+            for kind, val in gen:
+                if kind == "done":
+                    info = val
+                yield kind, val
+        except OverflowError as e:
+            status, error = 400, str(e)
+            raise
+        except ValueError as e:
+            status, error = 400, str(e)
+            raise
+        except Exception as e:  # noqa: BLE001 - the endpoint turns this into its own error response
+            status, error = 500, str(e)
+            raise
+        finally:
+            _access(meta, status, info, error)
+
+    @app.middleware("http")
+    async def _request_meta(request, call_next):
+        rid = request.headers.get("x-request-id", "")
+        if not (8 <= len(rid) <= 64 and all(c.isalnum() or c in "-._" for c in rid)):
+            rid = "req-" + uuid.uuid4().hex[:16]
+        meta = {"id": rid, "method": request.method, "path": request.url.path,
+                "t0": time.time(), "wait": 0.0, "stream": False, "logged": False}
+        _CURRENT.set(meta)
+        request.state.kindi_meta = meta
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = rid
+        return response
 
     def _err(code, msg, typ="invalid_request_error", headers=None):
+        _access(_CURRENT.get(), code, error=msg)
         return JSONResponse({"error": {"message": msg, "type": typ, "code": typ}},
                             status_code=code, headers=headers)
 
@@ -833,6 +938,14 @@ def create_app(cfg, log=print):
             return True
         supplied = request.headers.get("authorization", "")
         return hmac.compare_digest(supplied.encode("utf-8"), ("Bearer " + key).encode("utf-8"))
+
+    def _rate_limited(request):
+        """A 429 response when this source address exhausted its generation budget, else None."""
+        wait = limiter.retry_after(request.client.host if request.client else "-")
+        if wait:
+            return _err(429, "rate limit exceeded: retry in %d s (KINDI_RATE_LIMIT_PER_MIN=%d)"
+                        % (wait, limiter.per_minute), "rate_limit_exceeded", {"Retry-After": str(wait)})
+        return None
 
     OLLAMA_OPTIONS = (("temperature", "temperature"), ("top_p", "top_p"), ("top_k", "top_k"),
                       ("repeat_penalty", "repeat_penalty"), ("repeat_last_n", "repeat_last_n"),
@@ -920,6 +1033,9 @@ def create_app(cfg, log=print):
     async def _ollama(request, prompt_mode):
         if not _auth(request):
             return _err(401, "invalid API key", "authentication_error")
+        limited = _rate_limited(request)
+        if limited is not None:
+            return limited
         try:
             body = await _read_json_body(request)
         except RequestTooLarge as e:
@@ -936,11 +1052,15 @@ def create_app(cfg, log=print):
             return _busy(e)
         created = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         cancel = threading.Event()
+        meta = _CURRENT.get() or {}
+        meta["stream"] = bool(stream)
         if stream:
             def events():
                 try:
+                    t_wait = time.time()
                     with K.lock:
-                        for kind, val in K.generate(req, cancel):
+                        meta["wait"] = time.time() - t_wait
+                        for kind, val in _logged(K.generate(req, cancel), meta, True):
                             if kind == "text":
                                 line = {"model": model_id, "created_at": created, "done": False}
                                 if prompt_mode:
@@ -965,9 +1085,11 @@ def create_app(cfg, log=print):
             return StreamingResponse(_relay_ndjson(events(), cancel), media_type="application/x-ndjson")
 
         def run():
+            t_wait = time.time()
             with K.lock:
+                meta["wait"] = time.time() - t_wait
                 info = None
-                for kind, val in K.generate(req, cancel):
+                for kind, val in _logged(K.generate(req, cancel), meta, False):
                     if kind == "done":
                         info = val
                 return info
@@ -992,7 +1114,14 @@ def create_app(cfg, log=print):
             gate.release()
 
     @app.get("/health")
-    def health():
+    def health(request: Request):
+        # A probe needs only liveness, version, model and context. The detailed view (GPU memory, queue, token
+        # counters and live progress) is available without a key on loopback, but is protected when api_key is set:
+        # /health is often exposed so a container or LAN monitor can poll it, and that probe must not become an
+        # unauthenticated inventory/usage endpoint.
+        body = {"ok": True, "kindi": __version__, "commit": COMMIT, "model": model_id, "ctx": K.eng.ctx}
+        if not _auth(request):
+            return body
         free = total = 0
         if K.cp is not None and os.environ.get("KINDI_DEVICE", "gpu") != "cpu":
             try:
@@ -1005,10 +1134,11 @@ def create_app(cfg, log=print):
             busy = {"phase": b["phase"], "elapsed_s": round(time.time() - b["started"]),
                     "prompt_tokens": b["prompt_tokens"], "reused": b["cached"],
                     "prompt_read": "%d/%d" % (b["read"], b["prompt_tokens"] - b["cached"]), "generated": b["generated"]}
-        return {"ok": True, "kindi": __version__, "commit": COMMIT, "model": model_id, "ctx": K.eng.ctx, "head": K.head_active(),
-                "uptime_s": round(time.time() - K.t0), "busy": busy, "stats": K.stats,
-                "queue": {"waiting": gate.waiting, "max": gate.max_queue, "rejected": gate.rejected},
-                "gpu_free_mib": round(free / 1048576.0), "gpu_total_mib": round(total / 1048576.0)}
+        body.update({"head": K.head_active(), "uptime_s": round(time.time() - K.t0), "busy": busy, "stats": K.stats,
+                     "queue": {"waiting": gate.waiting, "max": gate.max_queue, "rejected": gate.rejected},
+                     "rate_limit_per_min": limiter.per_minute, "rate_limited": limiter.rejected,
+                     "gpu_free_mib": round(free / 1048576.0), "gpu_total_mib": round(total / 1048576.0)})
+        return body
 
     @app.get("/v1/models")
     def models(request: Request):
@@ -1049,11 +1179,29 @@ def create_app(cfg, log=print):
                "kindi_requests_total %d" % g("requests"))
         metric("kindi_requests_rejected_total", "counter", "requests rejected because the queue was full",
                "kindi_requests_rejected_total %d" % gate.rejected)
+        metric("kindi_rate_limit_per_min", "gauge", "KINDI_RATE_LIMIT_PER_MIN: per-client generation budget",
+               "kindi_rate_limit_per_min %d" % limiter.per_minute)
+        metric("kindi_rate_limited_total", "counter", "requests rejected by the per-client rate limit",
+               "kindi_rate_limited_total %d" % limiter.rejected)
         metric("kindi_request_errors_total", "counter", "requests that failed after admission",
                "kindi_request_errors_total %d" % g("errors"))
         cache_errors = getattr(getattr(K, "runner", None), "cache_errors", 0)
         metric("kindi_cache_errors_total", "counter", "cache fallbacks after a damaged opening or failed unpark",
                "kindi_cache_errors_total %d" % cache_errors)
+        g4 = getattr(K, "g4cache", None)
+        if g4 is not None:
+            m = g4.metrics()
+            for name, typ, help_text, key in (
+                    ("kindi_g4_cache_budget_bytes", "gauge", "Gemma 4 host prompt-cache byte budget", "budget_bytes"),
+                    ("kindi_g4_cache_used_bytes", "gauge", "Gemma 4 host prompt-cache bytes held now", "used_bytes"),
+                    ("kindi_g4_cache_peak_bytes", "gauge", "Gemma 4 host prompt-cache peak bytes held", "peak_bytes"),
+                    ("kindi_g4_cache_checkpoints", "gauge", "Gemma 4 host ring checkpoints held", "checkpoints"),
+                    ("kindi_g4_cache_parked", "gauge", "Gemma 4 parked conversations held in host memory", "parked"),
+                    ("kindi_g4_cache_evictions_total", "counter", "Gemma 4 host snapshots and conversations evicted", "evictions"),
+                    ("kindi_g4_cache_evicted_bytes_total", "counter", "Gemma 4 host bytes evicted", "evicted_bytes"),
+                    ("kindi_g4_cache_checkpoints_dropped_total", "counter", "Gemma 4 checkpoints evicted", "checkpoints_dropped"),
+                    ("kindi_g4_cache_parked_dropped_total", "counter", "Gemma 4 parked conversations evicted", "parked_dropped")):
+                metric(name, typ, help_text, "%s %d" % (name, m[key]))
         metric("kindi_prompt_tokens_total", "counter", "prompt tokens processed",
                "kindi_prompt_tokens_total %d" % g("prompt_tokens"))
         metric("kindi_cached_prompt_tokens_total", "counter", "prompt tokens served from the cache",
@@ -1092,6 +1240,9 @@ def create_app(cfg, log=print):
     async def completions(request: Request):
         if not _auth(request):
             return _err(401, "invalid API key", "authentication_error")
+        limited = _rate_limited(request)
+        if limited is not None:
+            return limited
         try:
             req = await _read_json_body(request)
         except RequestTooLarge as e:
@@ -1115,6 +1266,8 @@ def create_app(cfg, log=print):
             return "data: " + json.dumps(d, ensure_ascii=False) + "\n\n"
 
         cancel = threading.Event()
+        meta = _CURRENT.get() or {}
+        meta["stream"] = bool(req.get("stream"))
 
         if req.get("stream"):
             # an oversized or invalid prompt is an HTTP 400 now: after the first byte the status is always 200
@@ -1133,11 +1286,13 @@ def create_app(cfg, log=print):
                 return _busy(e)
 
             def _sse_locked():
+                t_wait = time.time()
                 with K.lock:
+                    meta["wait"] = time.time() - t_wait
                     yield chunk({"role": "assistant", "content": ""})
                     held, in_call = "", False
                     try:
-                        for kind, val in K.generate(req, cancel):
+                        for kind, val in _logged(K.generate(req, cancel), meta, True):
                             if kind == "reasoning":
                                 yield chunk({"reasoning_content": val})
                             elif kind == "text":
@@ -1220,9 +1375,11 @@ def create_app(cfg, log=print):
             return _busy(e)
 
         def run():
+            t_wait = time.time()
             with K.lock:
+                meta["wait"] = time.time() - t_wait
                 info = None
-                for kind, val in K.generate(req, cancel):
+                for kind, val in _logged(K.generate(req, cancel), meta, False):
                     if kind == "done":
                         info = val
                 return info

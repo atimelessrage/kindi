@@ -83,7 +83,8 @@ see [docs/INSTALL.md](docs/INSTALL.md).
 1. Find the port of the server. At the end, the installer shows the port of each server. The first server uses
    port 8093, the second server uses 8094, and so on.
 2. Make sure that the server runs. Open `http://localhost:8093/health` in a browser, or use
-   `curl -s localhost:8093/health`. The answer shows the model, the context size and the server state.
+   `curl -s localhost:8093/health`. The answer shows the model and context size; if you set an `api_key`, send
+   `Authorization: Bearer <api_key>` to see the queue, GPU and usage details.
 3. Connect a chat client. Kindi uses the OpenAI API at `http://localhost:8093/v1`. In Open WebUI, LM Studio, Jan or
    pi, add an "OpenAI-compatible" connection with this address. The API key can be any text, unless you set an
    `api_key`. The model id is in `/health` (for example `bonsai2-2b`).
@@ -110,7 +111,7 @@ connections only from the same computer (see [Run the server](#run-the-server)).
 
 | | |
 |---|---|
-| GPU | NVIDIA, compute capability 3.0 (Kepler) or later. Tested: Quadro K420 (1 GB and 2 GB), Quadro K1200 (one card, or two in tensor parallel), Quadro K6000, Tesla P100 16 GB, GeForce GTX 1080, GeForce RTX 3080. Supported: the GeForce RTX 20, 30 and 40 series. The RTX 20 Turing tensor-core specialization is still pending a real sm_75 verify; the RTX 50 (Blackwell) path is detected but not yet verified (see [docs/CARDS.md](docs/CARDS.md)). Speed numbers are only for the cards in the tables below. On Turing (sm_75) cards such as the RTX 4000, `KINDI_TC=1` selects a separate Turing tensor-core backend ([docs/TURING-TENSOR-CORES.md](docs/TURING-TENSOR-CORES.md)). AMD: Radeon 780M (RDNA3, gfx1103) with 32 GB of computer memory or more; Radeon 840M and Radeon 8060S (RDNA 3.5, gfx1152 and gfx1151); see [docs/AMD.md](docs/AMD.md). With no GPU, the CPU engine runs on x86-64 with AVX; an AVX-only fallback covers CPUs without AVX2, FMA and F16C. |
+| GPU | NVIDIA, compute capability 3.0 (Kepler) or later. Tested: Quadro K420 (1 GB and 2 GB), Quadro K1200 (one card, or two in tensor parallel), Quadro K6000, Tesla P100 16 GB, GeForce GTX 1080, GeForce RTX 3080. Supported: the GeForce RTX 20, 30 and 40 series. The RTX 20 Turing tensor-core specialization is still pending a real sm_75 verify; the RTX 50 (Blackwell) path is detected but not yet verified (see [docs/CARDS.md](docs/CARDS.md)). Speed numbers are only for the cards in the tables below. On Turing (sm_75) cards such as the RTX 4000, `KINDI_TC=1` selects a separate Turing tensor-core backend ([docs/TURING-TENSOR-CORES.md](docs/TURING-TENSOR-CORES.md)). AMD: Radeon 780M (RDNA3, gfx1103) with 32 GB of computer memory or more; Radeon 840M and Radeon 8060S (RDNA 3.5, gfx1152 and gfx1151); see [docs/AMD.md](docs/AMD.md). With no GPU, the CPU engine runs on x86-64 with AVX; it selects an AVX2/FMA/F16C, AVX2/F16C, AVX2 or AVX-only build at startup (separate multiply/add when FMA is absent), and `KINDI_CPU_ISA` pins a tier. |
 | Driver | Kepler: the NVIDIA **470** series (the last driver branch with Kepler support). Later cards: a current driver. The image has CUDA 10.2; the host needs only the driver. AMD: the `amdgpu` driver of Linux and the kernel option `amdgpu.cwsr_enable=0`; ROCm 6.3 is in the `kindi-rocm` image, and ROCm 7 (for RDNA 3.5) is in the `kindi-rocm7` image. |
 | OS | Linux x86-64 (developed on Ubuntu 24.04 with Docker; the image itself is Ubuntu 18.04) |
 | RAM / disk | 2B: 4 GB RAM, ~1.5 GB disk. 27B: ~14 GB of free RAM for its first start (two K1200 cards: ~5 GB) and ~19 GB of disk. The Docker image takes ~4 GB more. |
@@ -150,6 +151,9 @@ docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.5.0 in
 More in [docs/DOCKER.md](docs/DOCKER.md).
 
 ### Natively
+
+Windows users: [docs/WINDOWS.md](docs/WINDOWS.md) has the verified native CPU quickstart and
+its limits. The installer is Linux-only, and native Windows GPU execution has not been validated.
 
 You need CUDA 10.2 (toolkit with NVRTC and cuBLAS), Python 3.6 or later that CuPy 9.6 supports, and:
 
@@ -276,7 +280,7 @@ The output layer scores all 248,320 vocabulary entries for every generated token
   99.4 % of the time.
 
 To change the head while the server runs, with no restart, use `kindi head fast` / `kindi head exact` (Docker:
-`docker exec kindi python3 -m kindi head fast`). `/health` shows the current mode.
+`docker exec kindi python3 -m kindi head fast`). `/health` shows the current mode in its detailed view (send `Authorization: Bearer <api_key>` when a key is configured).
 
 ## The prompt cache
 

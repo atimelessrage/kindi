@@ -65,3 +65,4 @@ def test_cpu_requirements_are_read_from_kcpu_c():
     isa = sm.cpu_isa()
     assert "AVX" in isa and "AVX2" in isa and "FMA" in isa and "F16C" in isa
     assert "AVX-512" not in isa        # the source has no 512-bit intrinsics
+    assert "FMA is optional" in matrix_text()
