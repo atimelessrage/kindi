@@ -83,6 +83,22 @@ The generated file is not edited by hand and is checked by
 Records are append-only in practice: do not rewrite an old decision to make it look as
 if it was always correct. Mark it `superseded` and link the replacement.
 
+## Roadmap reconciliation
+
+When `docs/ROADMAP.md` or a gate in a requirement changes:
+
+1. Link the roadmap item to the requirement ID whose acceptance gate it uses.
+2. Update the requirement status, acceptance criteria and evidence; prefer `retired` or
+   `superseded` over deleting still-useful history.
+3. Add a decision or lesson when the outcome changes a hard-to-reverse choice or reveals
+   an assumption that was wrong.
+4. Regenerate `REQUIREMENTS-HISTORY.md` after the requirement files are committed.
+5. Update user-facing docs and examples for any resulting behavior change.
+
+A roadmap item is not done merely because code exists. Its requirement must point at the
+test, benchmark log or commit that satisfies the stated gate, or the roadmap must keep it
+open, blocked, experimental or retired.
+
 ## External documentation
 
 User-visible behavior belongs in `README.md`, `docs/*.md` or `examples/`, not only in

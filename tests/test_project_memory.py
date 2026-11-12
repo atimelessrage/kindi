@@ -50,6 +50,10 @@ def test_project_skill_is_discoverable():
     assert text.startswith("---\nname: project-memory\n")
     assert "description:" in text
     assert "docs/development/README.md" in text
+    assert "## Context-compaction reset" in text
+    assert "Reconcile the roadmap with git" in text
+    assert "Deleted requirements" in text
+    assert "git show <hash>:docs/development/requirements/REQ-NNNN.md" in text
 
 
 def test_commit_hashes_and_deleted_requirements_are_recorded(tmp_path):
