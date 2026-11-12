@@ -14,6 +14,20 @@ It complements the user-facing documentation in `docs/` and the handoff notes in
 | [`KNOWLEDGE.md`](KNOWLEDGE.md) | Operational facts, commands and support caveats. |
 | [`../../.agents/skills/project-memory/SKILL.md`](../../.agents/skills/project-memory/SKILL.md) | The project-local workflow skill. |
 
+## Authoritative sources
+
+When two pages disagree, use the source for that kind of claim:
+
+| claim | authoritative source |
+|---|---|
+| supported capabilities and unverified targets | `docs/SUPPORT-MATRIX.md` and `docs/CARD-SUPPORT.md` |
+| exactness requirements | `docs/development/requirements/REQ-*.md` with `REQUIREMENTS-HISTORY.md` |
+| configuration keys and environment variables | generated `docs/CONFIGURATION-REFERENCE.md` |
+| tandem runtime status and measured numbers | `docs/TANDEM-STATUS.md` and `docs/TANDEM-RUNTIME.md` |
+| benchmark tables | generated `docs/benchmarks/CROSS-MODE.md` / `.csv` |
+| release pin and installer artifact | `docs/RELEASE-CHECKLIST.md` and `docs/INSTALL.md` |
+| secret baseline and scan policy | `.secrets.baseline`, `tools/check_secret_baseline.py` and `tests/test_no_secrets.py` |
+
 ## The rule
 
 A change is not complete until its requirement, design, decision, lesson or external

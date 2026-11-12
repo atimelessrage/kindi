@@ -29,8 +29,9 @@ Besides `/v1`, Kindi serves what an agent host needs to observe and to connect a
   too.
 - `GET /health` is a liveness probe: it always returns `ok`, `kindi`, `commit`, `model` and `ctx`. When
   `api_key` is set, the detailed view - `queue.waiting`, `queue.max`, `queue.rejected`, `busy`, `stats`,
-  `uptime_s` and GPU free/total MiB - requires `Authorization: Bearer <api_key>`. Keep `/health` on loopback
-  unless a proxy protects the detailed view.
+  `uptime_s` and GPU free/total MiB - requires `Authorization: Bearer <api_key>`. With no key, the detailed
+  view is loopback-only; a non-loopback bind gets only liveness. Keep `/health` on loopback unless a proxy
+  protects the detailed view.
 - `POST /v1/completions` and `/v1/embeddings` are not implemented and return 404; use
   `POST /v1/chat/completions` for text generation.
 - Image input is rejected with HTTP 400 when the selected pack has no vision weights. The current packs are
@@ -48,7 +49,9 @@ Besides `/v1`, Kindi serves what an agent host needs to observe and to connect a
 3. **One retry at most**, and no parallel requests: Kindi serves one request at a time. Up to 8 requests may
    wait behind the active one; beyond that the server answers **HTTP 429** with `Retry-After: 1`. Wait a second
    and retry once instead of opening more connections. For a shared server, `KINDI_RATE_LIMIT_PER_MIN` adds a
-   per-source generation cap; health, metrics and model listing stay exempt.
+   per-source generation cap; health, metrics and model listing stay exempt. That limit is a best-effort
+   in-process operator guard, not an anti-abuse boundary: behind a reverse proxy all clients share the proxy
+   address, and direct LAN clients can use many addresses.
 4. **A short system prompt and few tools.** Every tool schema is prompt text. Keep the tool list fixed between calls.
    A different set of tools per call changes the start of the prompt, and then the cache cannot help.
 5. **Temperature 0.1-0.7.** Greedy (`0`) is reproducible; the model publisher recommends 0.7 / top_p 0.8 / top_k 20 with `presence_penalty` 1.5. Set `sampling_profile = publisher` in `kindi.conf` for the whole publisher profile, including the thinking profile (1.0 / 0.95 / 20, presence 1.0, up to 8K output). A request's own `presence_penalty` (-2..2) overrides the config value.

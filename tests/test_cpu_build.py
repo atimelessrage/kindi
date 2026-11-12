@@ -20,7 +20,7 @@ def _cc():
     pytest.skip("neither gcc nor clang is installed")
 
 
-def test_build_passes_paths_as_arguments(monkeypatch, tmp_path):
+def test_build_passes_paths_as_arguments(monkeypatch, tmp_path, capsys):
     seen = {}
     monkeypatch.setattr(cpu, "_native_has_fma", lambda: True)
 
@@ -32,6 +32,7 @@ def test_build_passes_paths_as_arguments(monkeypatch, tmp_path):
     src, so = str(tmp_path / "kcpu.c"), str(tmp_path / "libkcpu.so")
     cpu._build(src, so)
     assert seen["cmd"] == cpu._build_cmd(src, so)
+    assert "building CPU library with %s" % " ".join(seen["cmd"]) in capsys.readouterr().err
 
 
 def test_linux_build_uses_gcc_with_the_documented_flags(tmp_path):

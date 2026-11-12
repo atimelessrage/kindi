@@ -79,7 +79,7 @@ plain `k1200x2` split, and a pre-6.0 + 6.0-or-newer pair runs with `KINDI_G5=0`.
 It is not SLI. Model entries are targets pending verification, not current claims; no mixed-card execution has
 been recorded.
 
-| Card | Arch / CC | Current installer class | Single target | Dual target | Required path |
+| Card | Arch / CC | Current installer class | Single target (unverified) | Dual target (unverified) | Required path |
 |---|---|---|---|---|---|
 | GT 1030 2 GB | Pascal 6.1 | `maxwell` | 2B; 4B only if the fitted context is acceptable | not useful | plain engine; 2 GB context/memory test |
 | P106-100 6 GB | Pascal 6.1 | `maxwell` | 9B/4B/2B | 27B with a P4000 (14 GB total) or another supported card; plain split; unverified | plain plan engine, no TC; P106+P4000 uses the 5-trit path; single/dual installer routing is tested, no P106 run yet; the dense CPU+GPU tandem runtime is implemented (see [TANDEM-STATUS.md](TANDEM-STATUS.md)); see [P106.md](P106.md) |

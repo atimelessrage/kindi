@@ -89,7 +89,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_BLOCKING_SYNC` | `1` | `kindi/chunk.py:461` (+7 more) |
 | `KINDI_CACHE_TIMING` | (unset) | `kindi/cache.py:743` |
 | `KINDI_CARDS` | (unset) | `kindi/spec.py:1754` (+3 more) |
-| `KINDI_CC` | `clang` or `"clang" if os.name == "nt" else "gcc"` or `"gcc" if os.name != "nt" else "clang"` | `kindi/cpu.py:107` (+3 more) |
+| `KINDI_CC` | `clang` or `"clang" if os.name == "nt" else "gcc"` or `"gcc" if os.name != "nt" else "clang"` | `kindi/cpu.py:108` (+3 more) |
 | `KINDI_CHUNK` | `256` or `"512" if all(f16_prompt(s.card) for s in eng.cards) else "256"` or `"256" if major >= 5 else "128"` | `kindi/chunk.py:158` (+2 more) |
 | `KINDI_CHUNK_ATT` | `flash` | `kindi/chunk.py:425` |
 | `KINDI_CHUNK_MIN` | `32` | `kindi/chunk.py:487` (+1 more) |
@@ -100,7 +100,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_CKPT_PINNED` | `"1" if os.path.exists("/dev/dxg") else "0"` | `kindi/cache.py:34` |
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:572` |
 | `KINDI_CONFIG` | (unset) | `kindi/config.py:114` (+1 more) |
-| `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:209` (+2 more) |
+| `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:211` (+2 more) |
 | `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:177` (+1 more) |
 | `KINDI_D1` | `0` | `kindi/spec.py:713` |
 | `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:482` |
@@ -143,7 +143,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_KEXPF` | (empty) | `kindi/spec.py:153` |
 | `KINDI_KV` | `q8_0` | `kindi/tp.py:48` |
 | `KINDI_KV_EXPERIMENTAL` | `0` | `kindi/tp.py:52` |
-| `KINDI_LLVM` | (unset) | `kindi/cpu.py:90` |
+| `KINDI_LLVM` | (unset) | `kindi/cpu.py:91` |
 | `KINDI_MEM_RESERVE_MB` | `96` or `32` | `kindi/engine.py:266` (+2 more) |
 | `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:634` |
 | `KINDI_NB_CPUF` | `0.55` | `kindi/nanbeige.py:33` |

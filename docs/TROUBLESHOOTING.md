@@ -51,6 +51,20 @@ The installer uses `--restart unless-stopped`, so a persistent error becomes a r
 Remove the image part or use a text-only prompt. A pack is vision-capable only when its `kindi_pack.json` names
 `vision` or `mmproj` weights; this release does not load them.
 
-**The CPU engine cannot build.** The first CPU start needs `gcc` with OpenMP. Check `gcc --version`; the build uses
-`-march=native`, so a binary copied from another CPU may not run. Set `KINDI_CPU_CACHE` to a writable directory if
-the default cache is not usable.
+**`/health` shows only `ok`, `kindi`, `commit`, `model` and `ctx`.** Detailed health fields are available with
+`Authorization: Bearer <api_key>` when `api_key` is set. With no key, those details are loopback-only: a
+non-loopback bind gets only liveness. If you need queue/GPU details from a monitor, set `api_key` and send the
+header, or bind the server to loopback.
+
+**The CPU engine cannot build.** The first CPU start needs `gcc` with OpenMP on Linux, or `clang` with `libomp` on
+Windows. Check `gcc --version` or `clang --version`; the build uses `-march=native`, so a binary copied from another
+CPU may not run. Kindi logs the exact compiler command it runs. Recovery knobs:
+
+- `KINDI_CPU_CACHE=/path/to/writable/cache` - use a writable cache directory instead of `~/.cache/kindi`.
+- `KINDI_CC=gcc` or `KINDI_CC=clang` - choose the compiler explicitly; it is part of the cached library key.
+- `KINDI_LLVM=/path/to/llvm` - point at the LLVM installation that contains `lib/` and `bin/` on Windows.
+- `KINDI_CPU_ISA=auto|avx2-fma-f16c|avx2-f16c-no-fma|avx2-fma|avx2|avx-only` - force an explicit ISA tier;
+  an unsupported forced tier fails before building instead of running an illegal instruction.
+
+`KINDI_CC` and `KINDI_LLVM` are operator-controlled local settings, not a security boundary: if the server process
+inherits untrusted environment variables, they can choose which compiler runs at first CPU-library build.

@@ -25,6 +25,7 @@ import platform
 import shutil
 import struct
 import subprocess
+import sys
 import time
 
 import numpy as np
@@ -167,6 +168,7 @@ def _build(src, so, isa=None):
     else:
         native_fma = True
     cmd = _build_cmd(src, so, native_fma=native_fma, isa=isa)
+    print("kindi: building CPU library with %s" % " ".join(cmd), file=sys.stderr, flush=True)
     try:
         result = subprocess.run(cmd)
     except OSError as e:
