@@ -380,9 +380,11 @@ workload can set `OMP_NUM_THREADS=8`. Raw probe logs are in `bench-logs/thread-s
 5. AVX is the baseline. The AVX2 path is selected with `__AVX2__`, F16C with `__F16C__`, and FMA
    with `__FMA__`. An AVX2 build without FMA uses the same table/permute kernel with separate
    multiply/add; an AVX-only build uses an AVX table lookup and software fp16 conversion.
-6. There is no runtime dispatch: `cpu.py` builds with `-march=native`, so the host compiler chooses
-   the full FMA, AVX2/F16C no-FMA, or AVX-only path when the CPU supports it. This keeps the build
-   and ABI simple; a separate portable AVX binary is not produced.
+6. Runtime dispatch exists: `cpu.py` selects from explicit `-m` flag tiers (full FMA,
+   AVX2/F16C no-FMA, AVX-only) at startup (`ISA_BUILDS`/`select_isa`), so the host compiler
+   is no longer free to smuggle in instructions the tier does not allow. A separate
+   portable AVX binary is still not produced; native i5-2500K / native no-FMA hardware
+   runs are still needed for a support claim.
 7. `kindi verify` was run on the 2B with `-mavx -mno-avx2 -mno-fma -mno-f16c`: 4/4 token-exact.
    A forced AVX2/F16C no-FMA build (`-mavx2 -mno-fma -mf16c`) also passes the 2B 4/4
    token-exact at 31.7 tok/s on the i7-8086K. The 4B and 9B also pass the forced AVX-only and

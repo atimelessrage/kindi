@@ -143,7 +143,7 @@ def render_md(rows):
 
     measured_tandem = [m for m in MODELS if by[("tandem", m)]["available"] == 1]
     missing_tandem = [m for m in MODELS if m not in measured_tandem]
-    if measured_tandem == MODELS:
+    if measured_tandem == list(MODELS):
         tandem_intro = "All tandem rows below are measured on 2026-11-12."
     elif measured_tandem:
         tandem_intro = ("Measured tandem rows in the table below come from 2026-11-12 (models: %s); "
