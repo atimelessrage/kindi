@@ -526,3 +526,15 @@ please tell us.
 
 `kindi verify` checks the output against llama.cpp. `kindi bench` gives the write speed at several positions and
 the prompt reading speed. [CARDS.md](CARDS.md) gives the settings for each card.
+
+`kindi bench --sample-vram` additionally samples device-wide VRAM from `nvidia-smi` (every 0.5 s by
+default, `--vram-sample-s` to change it) and logs the peak with its delta over the idle baseline:
+
+```sh
+kindi --pack ~/.kindi/packs/bonsai-2b bench --sample-vram
+kindi --pack ~/.kindi/packs/bonsai-2b --ctx 8192 bench --tandem cpu-first --tandem-cpu-layers 6 --sample-vram
+```
+
+The peak includes the desktop and any other process (it is device-wide), so record the baseline in
+the same run; without `nvidia-smi` the line says so and the benchmark still completes. Use it for
+larger-than-VRAM capacity claims: free memory after load alone does not show the transient peak.

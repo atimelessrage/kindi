@@ -219,10 +219,16 @@ dense MLP and layer-scoped plans. This runtime remains dense-only.
 
 1. **Larger-than-VRAM exactness:** both 27B placements are exact at 8K (2026-11-12).
 2. **Peak VRAM:** full-GPU 27B baseline 7,238 MiB at 8K; tandem `cpu-first` 7,005 MiB and
-   `gpu-first` 7,017 MiB at 8K. The 2B `cpu-first` throughput rate is recorded in CROSS-MODE; 4B/9B throughput and a larger-than-VRAM throughput row with sampled peak remain open.
+   `gpu-first` 7,017 MiB at 8K. The 2B/4B/9B `cpu-first` throughput rates are recorded in
+   CROSS-MODE; `kindi bench --sample-vram` now logs a sampled device-wide peak, and a 27B
+   larger-than-VRAM throughput row with sampled peak at 8K context is queued behind the
+   checkpoint-cost runs.
 3. **Joint cache:** end-state reuse, joint-checkpoint restore and saved-opening reloads through the
    HTTP server are measured on both placements at 512 tokens, and in-process equality now passes at
-   4K/8K; saved-opening reloads at 4K/8K and checkpoint cost at longer contexts remain open.
+   4K/8K. Saved-opening reloads at 4K/8K also pass in both placements (27B: 8K extension 8,176,
+   branch/saved-opening 6,144 cached, exact; owned-slice CPU loads 114.6 s `cpu-first` / 105.8 s
+   `gpu-first`; evidence `bench-logs/tandem-cache/saved-27b-8k.json`). Checkpoint-only cost/VRAM
+   at 4K/8K (`measure_prefix.py --checkpoint-only --vram`) is in flight.
 4. **Tuning:** measure the layer boundary (`n`) and prompt reading on the actual small-card target.
 5. **MoE:** design in [MOE-TANDEM.md](MOE-TANDEM.md); implementation only after a real MoE backend
    with per-expert tensors and router logits exists.

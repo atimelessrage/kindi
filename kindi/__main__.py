@@ -245,6 +245,8 @@ def main(argv=None):
     s = sub.add_parser("verify", help="check against llama.cpp's reference output")
     _tandem_args(s)
     s = sub.add_parser("bench", help="measure speed")
+    s.add_argument("--sample-vram", action="store_true", help="sample device-wide VRAM and log the peak during the run")
+    s.add_argument("--vram-sample-s", type=float, default=None, help="VRAM sampling interval in seconds (default: 0.5)")
     _tandem_args(s)
     s = sub.add_parser("serve", help="run the OpenAI-compatible server")
     s.add_argument("--host")
@@ -274,6 +276,10 @@ def main(argv=None):
         cfg["tandem"] = a.tandem
     if getattr(a, "tandem_cpu_layers", None) is not None:
         cfg["tandem_cpu_layers"] = a.tandem_cpu_layers
+    if getattr(a, "sample_vram", False):
+        cfg["sample_vram"] = True
+    if getattr(a, "vram_sample_s", None) is not None:
+        cfg["vram_sample_s"] = a.vram_sample_s
     return {"convert": cmd_convert, "fast-head": cmd_fast_head, "verify": cmd_verify, "bench": cmd_bench,
             "serve": cmd_serve, "chat": cmd_chat, "head": cmd_head, "info": cmd_info,
             "models": cmd_models, "use": cmd_use}[a.cmd](cfg, a)

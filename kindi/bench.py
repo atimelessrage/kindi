@@ -27,9 +27,15 @@ def run(cfg, log=print):
             return 2
         from .nanbeige_cli import bench
         return bench(cfg, man, log=log)
+    from .vram import VramMonitor
+    vram = VramMonitor(cfg.get("vram_sample_s", 0.5)) if cfg.get("sample_vram") else None
+    if vram is not None:
+        vram.start()
     cl = os.path.join(pack, "head_clusters.npz")
     eng = make_engine(pack, ctx=cfg["ctx"], clusters=dict(np.load(cl)) if os.path.exists(cl) else None, log=log,
                        tandem=cfg.get("tandem", "off"), cpu_layers=cfg.get("tandem_cpu_layers"))
+    if vram is not None:
+        vram.mark("loaded")
     if cp is not None:
         free, total = cp.cuda.runtime.memGetInfo()
         log("GPU memory: %.0f MiB free of %.0f with a %d-token context" % (free / 2 ** 20, total / 2 ** 20, eng.ctx))
@@ -57,4 +63,12 @@ def run(cfg, log=print):
             ms = timed(lambda i: eng.step(2000 + i, p + i), 10)
             log("generation (%s head) at position %5d: %5.1f tokens/s" % (name, p, 1000 / ms))
     eng.shortlist = 0
+    if vram is not None:
+        vram.stop()
+        s = vram.summary()
+        if s.get("available"):
+            log("VRAM peak (sampled, device-wide): %d MiB used (%d MiB over idle), %d MiB free, peak in %s, %d samples"
+                % (s["peak_used_mib"], s["peak_delta_mib"], s["peak_free_mib"], s["peak_phase"], s["sample_count"]))
+        else:
+            log("VRAM peak (sampled): nvidia-smi unavailable, no samples taken")
     return 0
