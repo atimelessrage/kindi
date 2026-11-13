@@ -25,9 +25,14 @@ anti-regression floor, not a quality claim: most CUDA, CuPy, model-loading and v
 uncovered because hosted CI has no GPU or model pack. Raise the floor only with measured coverage,
 and do not exclude hardware modules merely to make the number look better.
 
-The performance half of the roadmap gate remains opt-in in the manual GPU lane. A tok/s number is
-only comparable on the same runner, card, driver and CuPy/CUDA build, so it needs a recorded
-baseline rather than a hosted-CPU threshold.
+The performance half of the roadmap gate is `tools/check_perf_baseline.py`: it compares the
+recorded `docs/benchmarks/CROSS-MODE.csv` against `docs/benchmarks/perf-baseline.json` and fails
+when a measured cell disappears or regresses by more than 15%. The CPU CI job runs this gate, so
+an accidental overwrite of the recorded numbers fails CI; the GPU lane should regenerate the
+matrix on its runner and run the same gate for a real throughput check. A tok/s number is only
+comparable on the same runner, card, driver and CuPy/CUDA build, so re-recording the baseline
+(`--update`) is a deliberate, reviewed step — never a drive-by. `tests/test_perf_baseline.py`
+pins the gate behaviour.
 
 ## CUDA static analysis
 

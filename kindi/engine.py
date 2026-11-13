@@ -24,7 +24,7 @@ def _cupy_arch_fix():
         if cp.cuda.runtime.is_hip or getattr(compiler, "_kindi_arch_fix", False):
             return
         mx = compiler._get_max_compute_capability()
-    except Exception:
+    except Exception:  # noqa: BLE001 - best-effort NVRTC arch fix; the default stays if it fails
         return
 
     def _get_arch():

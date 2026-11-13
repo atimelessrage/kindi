@@ -363,7 +363,7 @@ def _two_cards():
             return False
         names = [cp.cuda.runtime.getDeviceProperties(i)["name"] for i in range(2)]
         return names[0] == names[1]
-    except Exception:
+    except Exception:  # noqa: BLE001 - device probe: any failure means "not a matching pair"
         return False
 
 class Kindi(object):
@@ -831,7 +831,7 @@ def _after_engine_error(K, e):
     if r is not None:
         try:
             r.eng.reset(); r.tokens = []; r.ckpt.clear()
-        except Exception:
+        except Exception:  # noqa: BLE001 - reset is best-effort; the engine is being discarded anyway
             pass
     if getattr(K, "cp", None) is None or os.environ.get("KINDI_DEVICE", "gpu") == "cpu":
         return                                   # the CPU engine has no GPU context to lose
@@ -839,7 +839,7 @@ def _after_engine_error(K, e):
     try:
         K.cp.cuda.runtime.deviceSynchronize()
         K.cp.cuda.runtime.memGetInfo()
-    except Exception:
+    except Exception:  # noqa: BLE001 - the probe itself failing proves the context is broken
         broken = True
     if broken:
         print("[kindi] the GPU context is broken (%s): exiting so that the server restarts" % e, flush=True)
@@ -857,7 +857,7 @@ def create_app(cfg, log=print):
     log("[kindi] building engine for %s ..." % cfg.get("model_name", "model"))
     try:
         K = GPU_THREAD.submit(_make_engine, cfg, log).result()
-    except Exception:
+    except Exception:  # noqa: BLE001 - logged and re-raised; startup must fail, not serve
         log("[kindi] engine construction failed")
         raise
     log("[kindi] engine ready for %s" % cfg.get("model_name", "model"))
@@ -1338,7 +1338,7 @@ def create_app(cfg, log=print):
                         yield "data: " + json.dumps({"error": {"message": str(e), "type": "context_length_exceeded"}}) + "\n\n"
                     except ValueError as e:
                         yield "data: " + json.dumps({"error": {"message": str(e), "type": "invalid_request_error"}}) + "\n\n"
-                    except Exception as e:
+                    except Exception as e:  # noqa: BLE001 - engine failure becomes an SSE error event, by design
                         yield "data: " + json.dumps({"error": {"message": "kindi: %s" % e, "type": "server_error"}}) + "\n\n"
                         _after_engine_error(K, e)
                     yield "data: [DONE]\n\n"
@@ -1408,7 +1408,7 @@ def create_app(cfg, log=print):
             return _err(400, str(e), "context_length_exceeded")
         except ValueError as e:
             return _err(400, str(e))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - engine failure becomes a 500, by design
             _after_engine_error(K, e)
             return _err(500, "kindi: %s" % e, "server_error")
         finally:

@@ -54,7 +54,7 @@ def fp8_kernels():
         mod=_fp8_module()
         return {"quant":{43:mod.get_function("k_g4_fp8_quant_t43"),44:mod.get_function("k_g4_fp8_quant_t44")},
                 "mm":{43:mod.get_function("k_g4_fp8mm_t43"),44:mod.get_function("k_g4_fp8mm_t44")}}
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - FP8 is an optional kernel path; fall back to the plain path
         print("kindi: native FP8 tensor-core kernels unavailable: %s" % exc)
         return None
 
@@ -105,10 +105,10 @@ class Ops:
                     M,Kd=a.shape; N=b.shape[0]
                     fn(((M+63)//64,(N+63)//64),(256,),(a,np.int32(Kd),b,np.int32(ldb or Kd),c,np.int32(N),np.int32(M),np.int32(N),np.int32(Kd)))
                 self.hgemm=hgemm
-            except Exception: self.hgemm=None
+            except Exception: self.hgemm=None  # noqa: BLE001 - optional hgemm kernel; plain path is the fallback
         if cc=="hip" and os.environ.get("KINDI_G4_TC","1")!="0":       # RDNA3 WMMA (gfx11)
             try: self.tcmm={t:self.k.mod.get_function("k_g4_wmma_t%d"%t) for t in (8,10,11,13,14,23,123,111,114,108)}; self.tcmm_tokens=128
-            except Exception: self.tcmm=None
+            except Exception: self.tcmm=None  # noqa: BLE001 - optional WMMA path; plain path is the fallback
         if cc!="hip" and int(cc)>=80 and os.environ.get("KINDI_G4_TC","1")!="0":
             here=os.path.dirname(__file__)
             src=open(os.path.join(here,"gemma4.cu"),encoding="utf-8").read()+open(os.path.join(here,"gemma4_tc.cu"),encoding="utf-8").read()

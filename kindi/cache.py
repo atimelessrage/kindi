@@ -72,7 +72,7 @@ def _free_device_pool():
     try:
         import cupy
         cupy.get_default_memory_pool().free_all_blocks()
-    except Exception:
+    except Exception:  # noqa: BLE001 - best-effort pool release; no GPU/CuPy may be present
         pass
 
 
@@ -662,7 +662,7 @@ class Runner(object):
         if best_i is not None:
             try:
                 self._unpark(best_i, best_p)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - only OOM is swallowed (checked below); others re-raise
                 if "OutOfMemory" not in type(e).__name__:
                     raise
                 self.cache_errors += 1

@@ -132,7 +132,7 @@ def _free_bytes(cp, devices):
             # a card that drives a desktop (WDDM, more than 1 GB used) pages well before it is full: keep 500 MB more
             extra = 500 if f[3].lower() in ("enabled", "yes") and int(f[1]) > 1024 else 0
             used[_bus(f[0])] = ((int(f[1]) + extra) * 2 ** 20, int(f[2]) * 2 ** 20)
-    except Exception:
+    except Exception:  # noqa: BLE001 - nvidia-smi is best-effort; CuPy memGetInfo below is the fallback
         pass
     for d in devices:
         with cp.cuda.Device(d):
@@ -141,7 +141,7 @@ def _free_bytes(cp, devices):
         # CUDA_VISIBLE_DEVICES renumbers the cards
         try:
             key = _bus(cp.cuda.runtime.deviceGetPCIBusId(d))
-        except Exception:
+        except Exception:  # noqa: BLE001 - PCI bus id is best-effort; unmatched cards use CuPy numbers
             key = None
         if key in used:                    # WSL's CUDA reports about 1.1 GB less than is free; nvidia-smi is right
             f = used[key][1] - used[key][0]

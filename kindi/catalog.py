@@ -46,7 +46,7 @@ def _cards():
             n = p["name"].decode() if isinstance(p["name"], bytes) else str(p["name"])
             out.append((n, int(p["totalGlobalMem"]) >> 20))
         return out
-    except Exception:
+    except Exception:  # noqa: BLE001 - device listing probe: no GPU/CuPy means no cards
         return []
 
 
