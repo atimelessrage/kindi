@@ -9,7 +9,7 @@ Audit date: **2026-11-12**
 > checkpoint-cost rows, the 2B CPU-layer sweep). **Section 11 is the current
 > "what is better / what is worse" list; sections 10 and earlier are kept as the
 > history at their own dates.** The best-of branch is merged into `main`: both
-> `main` and `freebuff/tandem-cpu-recovery` are at `3951a0ed223bf1afba2d8319601e64b014a97082`. The installer source
+> `main` and `freebuff/tandem-cpu-recovery` are at `0cd58bcd223bf1afba2d8319601e64b014a97082`. The installer source
 > pin and the `0.5.0` version identity remain a release-owner publication step, not
 > a code-complete claim.
 
@@ -22,20 +22,20 @@ everything described here has been re-run on current hardware.
 
 | | Stock “normal” Kindi 0.5 | Clean local 0.5 snapshot | Current worktree |
 |---|---|---|---|
-| Ref | `v0.5.0` tag, `1c4cc3e01732f0fada4ab7030ccf4f7651e01053` | `clean/kindi-0.5`, `1b0cbf780b57d464cdb3e5e9acf75ed49256d622` | `main` and `freebuff/tandem-cpu-recovery`, `3951a0ed223bf1afba2d8319601e64b014a97082` |
+| Ref | `v0.5.0` tag, `1c4cc3e01732f0fada4ab7030ccf4f7651e01053` | `clean/kindi-0.5`, `1b0cbf780b57d464cdb3e5e9acf75ed49256d622` | `main` and `freebuff/tandem-cpu-recovery`, `0cd58bcd223bf1afba2d8319601e64b014a97082` |
 | Date | 2026-11-09 | clean snapshot of local 0.5 work | 2026-11-13 (merged state) |
 | Tracked files | 102 | 216 | 322 |
 | Test modules | **0** (`tests/` does not exist) | 25 | 53 tracked test modules |
 | Docs files | 12 | 84 | 139 tracked paths under `docs/` |
-| Git state | release tag | clean | `main` fast-forwarded to the best-of branch at `3951a0ed223bf1afba2d8319601e64b014a97082`; generated coverage artifacts are ignored; `bench-logs/` is ignored local evidence |
+| Git state | release tag | clean | `main` fast-forwarded to the best-of branch at `0cd58bcd223bf1afba2d8319601e64b014a97082`; generated coverage artifacts are ignored; `bench-logs/` is ignored local evidence |
 
 The primary comparison below is against the **stock `v0.5.0` tag**. `clean/kindi-0.5`
 already contains earlier local audit, CPU, server and documentation work, so it is a
 narrower comparison, not the stock release. Relative to that clean snapshot, the committed branch has **181 changed tracked paths
-with +18,448/−610 lines**.
+with +18,511/−620 lines**.
 
 Relative to the stock tag, the committed branch (`v0.5.0..HEAD`) changes **268 tracked
-files with +32,816/−372 lines**. The generated `.coverage`/`coverage.json` artifacts
+files with +32,869/−372 lines**. The generated `.coverage`/`coverage.json` artifacts
 are now ignored; `bench-logs/` remains ignored local evidence.
 
 Evidence labels used below:
@@ -338,7 +338,7 @@ Some were fixed afterward; see section 8.
    27B throughput-plus-peak row landed on 2026-11-13 (§11).
 
 8. **Shared-worktree merge risk is resolved for this branch.** Both worktrees are
-   at `3951a0ed223bf1afba2d8319601e64b014a97082` and `T:/kindi` is clean. Future shared-file work still needs the
+   at `0cd58bcd223bf1afba2d8319601e64b014a97082` and `T:/kindi` is clean. Future shared-file work still needs the
    AGENTS.md lease protocol; blindly copying either worktree over the other will
    lose work.
 
@@ -364,7 +364,7 @@ retains the same main-merge and installer-source problems.
 ## 6. Recommended order of work
 
 1. **Finish the release decision:** the best-of branch is merged into `main` at
-   `3951a0ed223bf1afba2d8319601e64b014a97082`. Decide the version, publish the matching installer artifact, and
+   `0cd58bcd223bf1afba2d8319601e64b014a97082`. Decide the version, publish the matching installer artifact, and
    point `SOURCE_COMMIT`/SHA-256 at the exact release commit. Do not ship an
    installer that fetches `fd54148` while claiming the current tree.
 2. **Fix the test entry point:** exclude `bench-logs/` from pytest collection or remove
@@ -393,16 +393,16 @@ Run in the current worktree on 2026-11-12:
 | `python -m kindi.config_reference --check` | exit 0 |
 | `python -m kindi.support_matrix --check` | exit 0 |
 | `git -c core.whitespace=cr-at-eol diff --check` | exit 0 |
-| `git status --short` | `main` and the feature branch identical at `3951a0ed223bf1afba2d8319601e64b014a97082`; coverage artifacts ignored; `bench-logs/` ignored |
-| `git diff --stat v0.5.0..HEAD` | 268 tracked paths, +32,816/−372 |
+| `git status --short` | `main` and the feature branch identical at `0cd58bcd223bf1afba2d8319601e64b014a97082`; coverage artifacts ignored; `bench-logs/` ignored |
+| `git diff --stat v0.5.0..HEAD` | 268 tracked paths, +32,869/−372 |
 | `kindi verify` 2B/4B/9B (2026-11-12 evening) | ALL PASS, 153.7 / 108.9 / 74.6 tok/s |
 | 27B tandem gate, `cpu-first` (2026-11-12) | **4/4 prompts, 40/40 each; peak 7,005 MiB; 8,192 ctx; exit 0** |
 | 27B tandem gate, `gpu-first` (2026-11-12) | **4/4 prompts, 40/40 each; peak 7,017 MiB; 8,192 ctx; exit 0** |
-| `python -m pytest -q tests/` (2026-11-13, `3951a0ed223bf1afba2d8319601e64b014a97082`) | **494 passed, 19 skipped**, exit 0 |
+| `python -m pytest -q tests/` (2026-11-13, `0cd58bcd223bf1afba2d8319601e64b014a97082`) | **494 passed, 19 skipped**, exit 0 |
 | `python -m pytest -q tests/test_vram_monitor.py tests/test_verify_bench_contracts.py` | 9 passed (sampled-peak VRAM and verify/bench contracts) |
 | `python tools/project_memory.py --check`, `build_cross_mode.py --check`, `support_matrix --check`, `config_reference --check`, `compileall`, `git diff --check` | all exit 0 |
 
-The best-of work is merged into `main` at `3951a0ed223bf1afba2d8319601e64b014a97082`. No push was performed. The
+The best-of work is merged into `main` at `0cd58bcd223bf1afba2d8319601e64b014a97082`. No push was performed. The
 benchmark numbers are quoted from the repository’s recorded logs and docs except
 where a run is stated.
 
@@ -468,7 +468,7 @@ Updated "what is worse or no longer works" list (as of 2026-11-12 evening):
   accepts `--tandem cpu-first|gpu-first --tandem-cpu-layers N` and `--sample-vram`.
 - **Installer pin and version** — the installer `SOURCE_COMMIT` names
   `fd54148`, `kindi/__init__.py` still says `0.5.0`, while `main` is merged at
-  `3951a0ed223bf1afba2d8319601e64b014a97082`. Publishing and retargeting the installer are explicit release decisions
+  `0cd58bcd223bf1afba2d8319601e64b014a97082`. Publishing and retargeting the installer are explicit release decisions
   left for the release owner.
 - **9B tc** (Hadamard 4096 refused), **4B tc** (3 exact + 1 accepted tie with FD
   fallback; forced-FD 2/4), **k8v4** (2B 2/4, 9B unavailable),
@@ -533,7 +533,7 @@ Updated "what is worse or no longer works" list (as of `15913b6`):
 - **Rate limiting** remains process-local per source address (documented; behind a
   proxy all clients share one address).
 
-## 11. Measurement rounds (2026-11-13, `15913b6..3951a0ed223bf1afba2d8319601e64b014a97082`)
+## 11. Measurement rounds (2026-11-13, `15913b6..0cd58bcd223bf1afba2d8319601e64b014a97082`)
 
 Six commits since §10. This section is the current statement of what is better and what is
 still worse; §10 and earlier keep their own dates.
@@ -583,7 +583,7 @@ still worse; §10 and earlier keep their own dates.
   named `f8c81b7` and 462 tests; it now names the real HEAD, 494 passed / 19 skipped, the new
   bench flag and the revised open gates.
 
-### 11.2 Still worse or not working (as of `3951a0ed223bf1afba2d8319601e64b014a97082`)
+### 11.2 Still worse or not working (as of `0cd58bcd223bf1afba2d8319601e64b014a97082`)
 
 - **Installer pin and version — unchanged.** `SOURCE_COMMIT=fd54148`, `KINDI_VERSION=0.5.0`;
   the published installer still delivers stock-0.5-era code without tandem, owned-slice CPU
