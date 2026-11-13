@@ -104,7 +104,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:177` (+1 more) |
 | `KINDI_D1` | `0` | `kindi/spec.py:713` |
 | `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:482` |
-| `KINDI_DEVICE` | `gpu` | `kindi/bench.py:8` (+4 more) |
+| `KINDI_DEVICE` | `gpu` | `kindi/bench.py:15` (+4 more) |
 | `KINDI_DP4A` | `"1" if rt.is_hip else "0"` | `kindi/tp.py:391` |
 | `KINDI_FD` | `0` | `kindi/spec.py:581` (+3 more) |
 | `KINDI_FD_CH` | (empty) | `kindi/spec.py:132` |
