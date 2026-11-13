@@ -21,11 +21,11 @@ def test_generated_files_are_current():
     assert (ROOT / "docs" / "benchmarks" / "CROSS-MODE.csv").read_text(encoding="utf-8") == table
 
 
-def test_matrix_shows_all_three_modes():
+def test_matrix_shows_all_four_modes():
     rows = load().matrix()
-    assert {r["mode"] for r in rows} == {"cpu", "gpu", "tandem"}
+    assert {r["mode"] for r in rows} == {"cpu", "gpu", "tc", "tandem"}
     assert {r["model"] for r in rows} == {"2b", "4b", "9b"}
-    for mode in ("cpu", "gpu"):
+    for mode in ("cpu", "gpu", "tc"):
         cells = [r for r in rows if r["mode"] == mode]
         assert len(cells) == 3
         assert all(r["available"] == 1 and r["read"] and r["gen_24000"] for r in cells)

@@ -718,3 +718,27 @@ the quarantined `k8v4` cache and the 4B's FD-fallback caveat now documented in `
 `docs/CARD-SUPPORT.md` and `docs/ROADMAP.md`. No regression: 2B tc is still 4/4 (388.3 tok/s)
 and the 9B tc cell now records `refused` in `tools/verify_matrix.py`. Evidence:
 `bench-logs/verify-matrix-9b-tc/`, `bench-logs/verify-matrix-9b-tc-refused2/`.
+
+## 15. Tensor-core rows in the cross-mode matrix + the 27B `gpu-first` 24K row (2026-11-13)
+
+The plan engine is now the fourth mode of the cross-mode matrix (`cpu`/`gpu`/`tc`/`tandem`), with
+three new perf-baseline cells (`tc/2b`, `tc/4b`, `tc/9b`) guarding its throughput in CI. The
+measurements are medians of three fresh-process `kindi bench` runs per model at 24,576 context
+with the exact head (`KINDI_TP=1`, `KINDI_TC=1`, `KINDI_FD=1`, `KINDI_ATT_TC=1`, `KINDI_TC_TMAX=4`,
+`KINDI_KV=q8_0`; `KINDI_TC_HP=1` for the 9B), `--sample-vram` for the sampled peak:
+
+| model | read | 100 | 2K | 8K | 16K | 24K | peak | vs GPU-only |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| 2B | 471.7 | 349.1 | 327.4 | 325.2 | 319.4 | 299.2 | 1,645 MiB | 1.9x |
+| 4B | 214.1 | 174.0 | 173.6 | 156.6 | 141.7 | 127.8 | 3,311 MiB | 1.6x |
+| 9B | 133.9 | 114.7 | 111.3 | 108.7 | 103.2 | 97.0 | 3,257 MiB | 1.6x |
+
+Evidence: `docs/benchmarks/2026-11-13-i7-8086k-rtx4060ti-tc/` (runs.csv + sanitized bench JSONs/logs).
+The generator (`docs/benchmarks/build_cross_mode.py`) gained `tc_rows()`, a tensor-core table
+section and a speedup-over-GPU-only section; `tests/test_cross_mode_benchmarks.py` now asserts
+four modes.
+
+Also measured the missing 27B matrix cell: `gpu-first` at 24,576 context reads 8.5 and generates
+7.4/6.2/4.5/3.3/2.7 tok/s at 100/2K/8K/16K/24K, with a sampled peak of 7,339 MiB (633 MiB free
+after load). The 27B table in `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md`
+and `docs/TANDEM-RUNTIME.md` is now complete in both placements at both contexts.

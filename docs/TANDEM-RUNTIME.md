@@ -247,6 +247,7 @@ the 4K/8K saved-opening evidence: [27B-8K.md](benchmarks/2026-11-12-i7-8086k-rtx
 | 8,192 | tandem `gpu-first` | 9.4 | 7.6 | 6.6 | 5.3 | - | - | 7,027 MiB | 923 MiB |
 | 8,192 | full GPU (plan engine) | 37.2 | 34.8 | 34.3 | 33.0 | - | - | 7,473 MiB | 477 MiB |
 | 24,576 | tandem `cpu-first` | 10.5 | 8.4 | 8.0 | 6.0 | 3.8 | 3.0 | 7,699 MiB | 251 MiB |
+| 24,576 | tandem `gpu-first` | 8.5 | 7.4 | 6.2 | 4.5 | 3.3 | 2.7 | 7,339 MiB | 611 MiB |
 | 24,576 | full GPU (plan engine) | 37.4 | 34.9 | 34.2 | 33.0 | 31.6 | 30.2 | 7,783 MiB | 167 MiB |
 
 The joint checkpoint is **149.6 MiB** (37.4 MiB CPU owner, 112.2 MiB GPU owner) and does not grow

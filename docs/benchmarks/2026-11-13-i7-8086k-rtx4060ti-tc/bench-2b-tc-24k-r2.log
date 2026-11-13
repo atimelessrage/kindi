@@ -1,0 +1,16 @@
+C:\Users\ICH\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+[kindi 00:48:22] blocking sync: card 0 primary context flags 0x4 (set: 0)
+[kindi 00:48:23] card 0: 0.41 GB of weights, streamed (0s)
+[kindi 00:48:23] card 0: weights repacked for the tensor cores (0.0s)
+[kindi 00:48:23] tensor-core plans ready: T = 1 .. 4, 274 nodes per decode token (0.1s; 6399 MiB free on the card)
+[kindi 00:48:23] plan engine ready: 1 card, ctx 24576, K/V q8_0, weights 5-trit lane (1.4s)
+[kindi 00:48:23] GPU memory: 6399 MiB free of 8187 with a 24576-token context
+[kindi 00:48:23] prompt reading:       470.9 tokens/s
+[kindi 00:48:23] generation (exact head) at position   100: 349.1 tokens/s
+[kindi 00:48:24] generation (exact head) at position  2000: 333.9 tokens/s
+[kindi 00:48:24] generation (exact head) at position  8000: 336.5 tokens/s
+[kindi 00:48:24] generation (exact head) at position 16000: 327.2 tokens/s
+[kindi 00:48:24] generation (exact head) at position 24000: 302.8 tokens/s
+[kindi 00:48:24] VRAM peak (sampled, device-wide): 1645 MiB used (783 MiB over idle), 6305 MiB free, peak in loaded, 6 samples
+[kindi 00:48:24] wrote bench-logs/tc/2b-r2.json

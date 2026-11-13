@@ -1,0 +1,29 @@
+{
+  "cpu_layers": null,
+  "ctx": 24576,
+  "device": "gpu",
+  "free_mib_after_load": 4787,
+  "gen_tok_s": {
+    "exact:100": 114.7,
+    "exact:16000": 102.9,
+    "exact:2000": 111.3,
+    "exact:24000": 97.0,
+    "exact:8000": 108.3
+  },
+  "model": "Ternary-Bonsai-2-9B",
+  "pack": "C:\\Users\\ICH\\.kindi\\packs\\bonsai-9b",
+  "read_tok_s": 133.9,
+  "tandem": "off",
+  "total_mib": 8187,
+  "vram_peak": {
+    "available": true,
+    "baseline_used_mib": 862,
+    "interval_s": 0.5,
+    "peak_delta_mib": 2395,
+    "peak_free_mib": 4693,
+    "peak_phase": "loaded",
+    "peak_used_mib": 3257,
+    "sample_count": 9,
+    "source": "nvidia-smi memory.used (device-wide)"
+  }
+}

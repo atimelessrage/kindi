@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Build the cross-mode benchmark matrix: CPU-only, GPU-only and GPU+CPU tandem.
+"""Build the cross-mode benchmark matrix: CPU-only, GPU-only, GPU tensor-core (plan engine),
+GPU+CPU tandem.
 
 The CPU and GPU cells come from the measured runs in this folder. Measured tandem runs are
 read from the 2026-11-12 tandem folder when they are complete; models without complete tandem
 data stay `n/a`. The dense runtime exists (docs/TANDEM-RUNTIME.md), so an absent tandem cell is
-a measurement gap rather than an absent code path. `--check` exits 1 when CROSS-MODE.md or
-CROSS-MODE.csv is stale.
+a measurement gap rather than an absent code path. Tensor-core rows come from the 2026-11-13 tc
+folder; the 9B needs `KINDI_TC_HP=1` (see `kindi/spec.py`). `--check` exits 1 when CROSS-MODE.md
+or CROSS-MODE.csv is stale.
 """
 import argparse
 import csv
@@ -18,12 +20,13 @@ HERE = Path(__file__).resolve().parent
 CPU_RUNS = HERE / "2026-11-10-i7-8086k-windows-cpu" / "runs.csv"
 GPU_RUNS = HERE / "2026-11-09-i7-8086k-rtx4060ti" / "runs.csv"
 TANDEM_RUNS = HERE / "2026-11-12-i7-8086k-rtx4060ti-tandem" / "runs.csv"
+TC_RUNS = HERE / "2026-11-13-i7-8086k-rtx4060ti-tc" / "runs.csv"
 MD = HERE / "CROSS-MODE.md"
 CSV = HERE / "CROSS-MODE.csv"
 POSITIONS = (100, 2000, 8000, 16000, 24000)
 METRICS = ("read",) + tuple("gen_%d" % p for p in POSITIONS)
 MODELS = ("2b", "4b", "9b")
-LABELS = {"cpu": "CPU only", "gpu": "GPU only", "tandem": "GPU+CPU tandem"}
+LABELS = {"cpu": "CPU only", "gpu": "GPU only", "tc": "GPU tensor-core (plan)", "tandem": "GPU+CPU tandem"}
 TANDEM_SOURCE = "no throughput benchmark (runtime in docs/TANDEM-RUNTIME.md)"
 
 
@@ -104,9 +107,34 @@ def tandem_rows():
     return out
 
 
+def tc_rows():
+    """Measured tensor-core (plan-engine) runs; a model without complete data stays unavailable."""
+    if not TC_RUNS.is_file():
+        return {}
+    vals = {m: {k: [] for k in METRICS} for m in MODELS}
+    for row in _read_csv(TC_RUNS):
+        model = row.get("model")
+        if model not in MODELS:
+            continue
+        try:
+            got = {"read": float(row["prompt"])}
+            got.update({k: float(row["gen_%d" % p]) for k, p in zip(METRICS[1:], POSITIONS)})
+        except (KeyError, TypeError, ValueError):
+            continue
+        for k, v in got.items():
+            vals[model][k].append(v)
+    out = {}
+    for model, cells in vals.items():
+        if not cells["read"] or any(len(cells[k]) != len(cells["read"]) for k in METRICS):
+            continue
+        out[model] = {k: statistics.median(v) for k, v in cells.items()}
+        out[model]["runs"] = len(cells["read"])
+    return out
+
+
 def matrix():
     """One row per mode and model; incomplete tandem data stays explicitly unavailable."""
-    cpu, gpu, tandem = cpu_rows(), gpu_rows(), tandem_rows()
+    cpu, gpu, tandem, tc = cpu_rows(), gpu_rows(), tandem_rows(), tc_rows()
     rows = []
     for model in MODELS:
         rows.append(dict(mode="cpu", available=1, model=model, runs=1,
@@ -114,6 +142,11 @@ def matrix():
         rows.append(dict(mode="gpu", available=1, model=model, runs=gpu[model]["runs"],
                          source="2026-11-09-i7-8086k-rtx4060ti (median of 3)",
                          **{k: gpu[model][k] for k in METRICS}))
+        if model in tc:
+            rows.append(dict(mode="tc", available=1, model=model, runs=tc[model]["runs"],
+                             source="2026-11-13-i7-8086k-rtx4060ti-tc (median of %d; "
+                                    "9B with KINDI_TC_HP=1)" % tc[model]["runs"],
+                             **{k: tc[model][k] for k in METRICS}))
         if model in tandem:
             t = tandem[model]
             rows.append(dict(
@@ -170,6 +203,9 @@ def render_md(rows):
         "  24,576-token context. One fresh-process run per model; no WSL.",
         "- **GPU only:** the card runs every layer; the CPU only drives the process (Windows 10, CuPy",
         "  14.2.0). Three fresh-process runs per model; the table uses their median.",
+        "- **GPU tensor-core (plan):** `KINDI_TP=1` `KINDI_TC=1` (plan engine, tensor cores) on the",
+        "  same card; the 9B runs with `KINDI_TC_HP=1` (4096 Hadamard blocks are refused otherwise).",
+        "  Three fresh-process runs per model; the table uses their median.",
         "- **GPU+CPU tandem:** the dense `TandemEngine` exists and is token-exact on the 2B/9B (`docs/TANDEM-RUNTIME.md`). %s" % tandem_intro,
         "",
         "\"Read\" is the benchmark's 1,000-token prompt-reading probe. 100, 2K, 8K, 16K and 24K are",
@@ -178,7 +214,7 @@ def render_md(rows):
         "| Model | Mode | Read | 100 | 2K | 8K | 16K | 24K |",
         "|---|---|---:|---:|---:|---:|---:|---:|"]
     for model in MODELS:
-        for mode in ("gpu", "cpu", "tandem"):
+        for mode in ("gpu", "tc", "cpu", "tandem"):
             r = by[(mode, model)]
             lines.append("| %s | %s | %s |" % (model.upper(), LABELS[mode],
                                                " | ".join(cell(r[k]) for k in METRICS)))
@@ -191,6 +227,8 @@ def render_md(rows):
         ""]
     if measured_tandem:
         lines.append("Tandem source: [2026-11-12-i7-8086k-rtx4060ti-tandem](2026-11-12-i7-8086k-rtx4060ti-tandem/README.md).")
+    if any(("tc", m) in by and by[("tc", m)]["available"] == 1 for m in MODELS):
+        lines.append("Tensor-core source: [2026-11-13-i7-8086k-rtx4060ti-tc](2026-11-13-i7-8086k-rtx4060ti-tc/README.md).")
     lines += [
         "",
         "## GPU-only speedup over CPU-only",
@@ -201,6 +239,17 @@ def render_md(rows):
         c, g = by[("cpu", model)], by[("gpu", model)]
         lines.append("| %s | %s |" % (model.upper(), " | ".join(
             "%.1fx" % (g[k] / c[k]) for k in METRICS[1:])))
+    lines += [
+        "",
+        "## Tensor-core (plan engine) speedup over GPU-only",
+        "",
+        "| Model | 100 | 2K | 8K | 16K | 24K |",
+        "|---|---:|---:|---:|---:|---:|"]
+    for model in MODELS:
+        if ("tc", model) in by and by[("tc", model)]["available"] == 1:
+            g, t = by[("gpu", model)], by[("tc", model)]
+            lines.append("| %s | %s |" % (model.upper(), " | ".join(
+                "%.1fx" % (t[k] / g[k]) for k in METRICS[1:])))
     if measured_tandem == MODELS:
         tandem_status = "All tandem cells are recorded from 2026-11-12."
     elif measured_tandem:
@@ -237,8 +286,10 @@ def render_md(rows):
         "  larger models are GPU targets.",
         "- **CPU is native Windows, not WSL2.** The 2026-11-09 WSL2 page is kept as history; its CPU cells",
         "  are no longer the cross-mode source.",
-        "- **One CPU run per cell.** There is no variance or thermal control; the GPU cells have three",
-        "  runs and a spread of a few percent.",
+        "- **One CPU run per cell.** There is no variance or thermal control; the GPU and tensor-core",
+        "  cells have three runs and a spread of a few percent.",
+        "- **Tensor-core cells are medians of three fresh-process runs (2026-11-13).** The 9B cell",
+        "  runs with `KINDI_TC_HP=1`; without it the engine refuses HB 4096 (see `kindi/spec.py`).",
         "- **24K is the deepest measured position.** The packs advertise 262,144 tokens, but no 32K/64K",
         "  cross-mode run exists.",
         "- This is a speed table, not a correctness test. The token-exact `verify` results are recorded in",
