@@ -1,0 +1,42 @@
+"""CI configuration guards: pinned test deps and the static-analysis job stay wired.
+
+These are requirement-level checks on the delivered harness, not implementation tests:
+the test dependencies must stay bounded (an open spec lets CI break with no commit) and
+the CUDA static-analysis harness must stay invoked from ci.yml (D5).
+"""
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def _reqs():
+    lines = []
+    for raw in (ROOT / "tests" / "requirements-test.txt").read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if line and not line.startswith("#"):
+            lines.append(line)
+    return lines
+
+
+def test_test_requirements_are_bounded():
+    reqs = _reqs()
+    assert reqs, "requirements file must list dependencies"
+    for line in reqs:
+        assert ">=" in line and "<" in line, "unbounded dependency spec: %s" % line
+    by_name = {line.split(">=")[0].strip() for line in reqs}
+    assert {"pytest", "pytest-cov", "fastapi", "pydantic", "httpx", "numpy"} <= by_name
+
+
+def test_static_analysis_job_invokes_the_harness():
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert "static-analysis:" in ci
+    assert "python tests/static/run_static_analysis.py" in ci
+    assert (ROOT / "tests" / "static" / "run_static_analysis.py").exists()
+
+
+def test_workflow_actions_are_pinned_to_shas():
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    for line in ci.splitlines():
+        if "uses:" in line:
+            ref = line.split("uses:")[-1].strip().split()[0]
+            assert "@" in ref and len(ref.rsplit("@", 1)[-1]) >= 40, "unpinned action: %s" % ref

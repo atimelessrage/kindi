@@ -37,8 +37,51 @@ TARGETS = (
 )
 
 
+def ensure_cupy_importable():
+    """Hosted CI has no GPU, so `import cupy` fails there. build_tu only needs the pure
+    string helpers in kindi.chunk/kindi.spec, so install a minimal stub module when the real
+    CuPy is unavailable. The stub only has to survive module import: no kernel is compiled."""
+    try:
+        import cupy  # noqa: F401
+        return
+    except Exception:
+        pass
+    import types
+
+    class _DummyMeta(type):
+        def __getattr__(cls, _n):
+            return _Dummy
+
+        def __call__(cls, *_a, **_k):
+            return object.__new__(_Dummy)
+
+    class _Dummy(metaclass=_DummyMeta):
+        def __init__(self, *_a, **_k):
+            pass
+
+        def __getattr__(self, _n):
+            return _Dummy
+
+    def _mod(name):
+        m = types.ModuleType(name)
+        m.__getattr__ = lambda _n: _Dummy
+        sys.modules[name] = m
+        return m
+
+    fake = _mod("cupy")
+    cuda = _mod("cupy.cuda")
+    runtime = _mod("cupy.cuda.runtime")
+    runtime.is_hip = False
+    cuda.runtime = runtime
+    fake.cuda = cuda
+    for _sub in ("compiler", "function", "device", "stream", "memory",
+                 "pinned_memory", "cupy_types"):
+        setattr(cuda, _sub, _mod("cupy.cuda." + _sub))
+
+
 def build_tu(tc_name, tca_name):
     """kindi.cu + the generated wrappers + spec.cu + tc*.cu + tcf.cu + tca*.cu, in SpecKernels' order"""
+    ensure_cupy_importable()
     from kindi import chunk
     from kindi.spec import HERE as KINDIR, WRAP
     base = open(os.path.join(KINDIR, "kindi.cu"), encoding="utf-8").read()

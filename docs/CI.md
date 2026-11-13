@@ -29,6 +29,21 @@ The performance half of the roadmap gate remains opt-in in the manual GPU lane. 
 only comparable on the same runner, card, driver and CuPy/CUDA build, so it needs a recorded
 baseline rather than a hosted-CPU threshold.
 
+## CUDA static analysis
+
+The `static-analysis` job installs `cppcheck` and `clang-tidy-18` on the hosted runner and runs
+`tests/static/run_static_analysis.py`, which builds the Turing (sm_75) and Ampere (sm_86)
+translation units the way `kindi.spec.SpecKernels` does and analyses them as source only
+(`tests/static/cuda_stub.h` supplies the CUDA declarations; no CUDA toolkit or GPU is needed).
+Hosted runners have no CuPy, so the harness installs a minimal stub `cupy` module when the real
+one is unavailable — it only has to survive module import while the translation units are built.
+The script exits non-zero when an analyser fails to run; warnings are reported, not gated.
+Validated locally (tools absent): the Turing TU builds and the script skips cleanly with exit 0.
+
+`tests/requirements-test.txt` is deliberately bounded (`pytest>=7,<10`, `fastapi>=0.100,<1`,
+`pydantic>=2,<3`, …): the suite is verified on those majors, and an open-ended spec would let
+CI break with no commit. `tests/test_ci_config.py` pins both contracts.
+
 ## Secret baseline and local hook
 
 The secret scan is intentionally tracked-file based. CI runs

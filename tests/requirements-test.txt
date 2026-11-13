@@ -1,8 +1,10 @@
 # CPU-only test dependencies. The server tests exercise FastAPI's TestClient, which needs httpx.
 # GPU/model-pack runs are separate and are not installed here.
-pytest>=7
-pytest-cov>=5
-fastapi>=0.79
-pydantic>=1.9
-httpx>=0.23
-numpy>=1.19
+# Bounds are deliberate: the suite is verified on the pinned majors below, and an open-ended
+# spec would let CI break with no commit (e.g. a future pydantic 3 with an older FastAPI).
+pytest>=7,<10
+pytest-cov>=5,<8
+fastapi>=0.100,<1
+pydantic>=2,<3
+httpx>=0.23,<1
+numpy>=1.19,<3
