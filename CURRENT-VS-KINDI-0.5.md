@@ -6,8 +6,8 @@ Audit date: **2026-11-12**
 > Sections 8–10 record the post-audit improvements, the 2026-11-12 evening 27B
 > tandem implementation/gate and the later requirement/structural-coverage work.
 > The best-of branch is now merged into `main`: both `main` and
-> `freebuff/tandem-cpu-recovery` are at `082c5da` (after the 4B/9B tandem
-> throughput completion and the owned-slice CPU load). The installer source pin and
+> `freebuff/tandem-cpu-recovery` are at `15913b6` (after the audit-remediation,
+> perf-gate, roadmap-refresh and coverage rounds). The installer source pin and
 > the `0.5.0` version identity remain a release-owner publication step, not a
 > code-complete claim.
 
@@ -20,20 +20,20 @@ everything described here has been re-run on current hardware.
 
 | | Stock “normal” Kindi 0.5 | Clean local 0.5 snapshot | Current worktree |
 |---|---|---|---|
-| Ref | `v0.5.0` tag, `1c4cc3e01732f0fada4ab7030ccf4f7651e01053` | `clean/kindi-0.5`, `1b0cbf780b57d464cdb3e5e9acf75ed49256d622` | `main` and `freebuff/tandem-cpu-recovery`, `082c5dab3480daa6a7ab05f952e1e2fc64bc9d77` |
-| Date | 2026-11-09 | clean snapshot of local 0.5 work | 2026-11-12 (merged state) |
-| Tracked files | 102 | 216 | 301 |
-| Test modules | **0** (`tests/` does not exist) | 25 | 47 tracked test modules |
-| Docs files | 12 | 84 | 128 tracked paths under `docs/` |
-| Git state | release tag | clean | `main` fast-forwarded to the best-of branch at `082c5da`; generated coverage artifacts are ignored; `bench-logs/` is ignored local evidence |
+| Ref | `v0.5.0` tag, `1c4cc3e01732f0fada4ab7030ccf4f7651e01053` | `clean/kindi-0.5`, `1b0cbf780b57d464cdb3e5e9acf75ed49256d622` | `main` and `freebuff/tandem-cpu-recovery`, `15913b620037875ccc10a248cbd7fae0eaef264e` |
+| Date | 2026-11-09 | clean snapshot of local 0.5 work | 2026-11-12/13 (merged state) |
+| Tracked files | 102 | 216 | 308 |
+| Test modules | **0** (`tests/` does not exist) | 25 | 51 tracked test modules |
+| Docs files | 12 | 84 | 129 tracked paths under `docs/` |
+| Git state | release tag | clean | `main` fast-forwarded to the best-of branch at `15913b6`; generated coverage artifacts are ignored; `bench-logs/` is ignored local evidence |
 
 The primary comparison below is against the **stock `v0.5.0` tag**. `clean/kindi-0.5`
 already contains earlier local audit, CPU, server and documentation work, so it is a
-narrower comparison, not the stock release. Relative to that clean snapshot, the committed branch has **156 changed tracked paths
-with +16,878/−587 lines**.
+narrower comparison, not the stock release. Relative to that clean snapshot, the committed branch has **167 changed tracked paths
+with +17,480/−608 lines**.
 
-Relative to the stock tag, the committed branch (`v0.5.0..HEAD`) changes **245 tracked
-files with +31,253/−356 lines**. The generated `.coverage`/`coverage.json` artifacts
+Relative to the stock tag, the committed branch (`v0.5.0..HEAD`) changes **254 tracked
+files with +31,848/−370 lines**. The generated `.coverage`/`coverage.json` artifacts
 are now ignored; `bench-logs/` remains ignored local evidence.
 
 Evidence labels used below:
@@ -330,7 +330,7 @@ Some were fixed afterward; see section 8.
    27B throughput-plus-peak gate remains open (§9).
 
 8. **Shared-worktree merge risk is resolved for this branch.** Both worktrees are
-   at `082c5da` and `T:/kindi` is clean. Future shared-file work still needs the
+   at `15913b6` and `T:/kindi` is clean. Future shared-file work still needs the
    AGENTS.md lease protocol; blindly copying either worktree over the other will
    lose work.
 
@@ -356,7 +356,7 @@ retains the same main-merge and installer-source problems.
 ## 6. Recommended order of work
 
 1. **Finish the release decision:** the best-of branch is merged into `main` at
-   `082c5da`. Decide the version, publish the matching installer artifact, and
+   `15913b6`. Decide the version, publish the matching installer artifact, and
    point `SOURCE_COMMIT`/SHA-256 at the exact release commit. Do not ship an
    installer that fetches `fd54148` while claiming the current tree.
 2. **Fix the test entry point:** exclude `bench-logs/` from pytest collection or remove
@@ -385,13 +385,13 @@ Run in the current worktree on 2026-11-12:
 | `python -m kindi.config_reference --check` | exit 0 |
 | `python -m kindi.support_matrix --check` | exit 0 |
 | `git -c core.whitespace=cr-at-eol diff --check` | exit 0 |
-| `git status --short` | `main` and the feature branch identical at `082c5da`; coverage artifacts ignored; `bench-logs/` ignored |
+| `git status --short` | `main` and the feature branch identical at `15913b6`; coverage artifacts ignored; `bench-logs/` ignored |
 | `git diff --stat v0.5.0..HEAD` | 243 tracked paths, +31,125/−353 |
 | `kindi verify` 2B/4B/9B (2026-11-12 evening) | ALL PASS, 153.7 / 108.9 / 74.6 tok/s |
 | 27B tandem gate, `cpu-first` (2026-11-12) | **4/4 prompts, 40/40 each; peak 7,005 MiB; 8,192 ctx; exit 0** |
 | 27B tandem gate, `gpu-first` (2026-11-12) | **4/4 prompts, 40/40 each; peak 7,017 MiB; 8,192 ctx; exit 0** |
 
-The best-of work is merged into `main` at `082c5da`. No push was performed. The
+The best-of work is merged into `main` at `15913b6`. No push was performed. The
 benchmark numbers are quoted from the repository’s recorded logs and docs except
 where a run is stated.
 
@@ -457,7 +457,7 @@ Updated "what is worse or no longer works" list (as of 2026-11-12 evening):
   `--tandem cpu-first|gpu-first --tandem-cpu-layers N`.
 - **Installer pin and version** — the installer `SOURCE_COMMIT` names
   `fd54148`, `kindi/__init__.py` still says `0.5.0`, while `main` is merged at
-  `082c5da`. Publishing and retargeting the installer are explicit release decisions
+  `15913b6`. Publishing and retargeting the installer are explicit release decisions
   left for the release owner.
 - **9B tc** (Hadamard 4096 refused), **4B tc** (3 exact + 1 accepted tie with FD
   fallback; forced-FD 2/4), **k8v4** (2B 2/4, 9B unavailable),
@@ -468,6 +468,56 @@ Updated "what is worse or no longer works" list (as of 2026-11-12 evening):
 - **Tracked bench logs** — the force-added 4B/9B tandem raw logs initially leaked the
   local Windows home path in the CuPy warning line and failed `test_no_secrets.py`;
   both logs are now sanitized like the 2B log, and the full suite passes again.
-- **`git diff --check` without the project's `cr-at-eol`** still flags trailing CRs in
-  `kindi/gemma4_cache.py` from earlier uncommitted edits; with `-c core.whitespace=cr-at-eol`
-  it exits 0.
+- **`git diff --check` trailing CRs** — resolved: with a clean tree both plain
+  `git diff --check` and the `cr-at-eol` form exit 0 (verified 2026-11-13).
+
+## 10. Audit-remediation and harness rounds (2026-11-12/13, `082c5da..15913b6`)
+
+Eleven commits since the `082c5da` state above. The genuinely new or better items:
+
+- **Cross-mode builder bug fixed** — `measured_tandem == MODELS` compared a list to a
+  tuple, so the generated `CROSS-MODE.md` always claimed unmeasured tandem rows remain
+  `n/a` even with all three models measured. Fixed to `list(MODELS)`, matrix
+  regenerated, regression test added. The CSV was always correct; the headline
+  markdown intro was wrong.
+- **Perf-regression gate** — `tools/check_perf_baseline.py` compares the recorded
+  CROSS-MODE numbers against `docs/benchmarks/perf-baseline.json` (9 cells, 15%
+  tolerance) and runs in the CPU CI job; `tests/test_perf_baseline.py` pins pass,
+  regression-fail and missing-cell behavior.
+- **CI static analysis** — the CUDA static-analysis harness now runs in CI
+  (`static-analysis` job: cppcheck + clang-tidy-18) via a GPU-free CuPy stub for
+  translation-unit building; verified locally (Turing TU builds, tools skip exit 0).
+- **Pinned test dependencies** — `tests/requirements-test.txt` is bounded
+  (`pytest>=7,<10`, `fastapi>=0.100,<1`, `pydantic>=2,<3`, …) with
+  `tests/test_ci_config.py` guarding the pins, the static job and SHA-pinned actions.
+- **Zero-coverage modules covered** — `kindi/catalog.py` (user-visible `kindi models`
+  fit logic) and `kindi/sched.py` (blocking-sync opt-out), then `kindi/lookup.py`
+  (prompt-lookup drafting) and `kindi/spm.py` (SentencePiece tokenizer), all with
+  requirement-based tests.
+- **Broad-except audit** — all 27 `except Exception` sites in `kindi/*.py` now carry
+  a `noqa` rationale (best-effort probes, logged fallbacks, error-response mapping);
+  no behavior changes.
+- **Handoff hygiene** — `AGENTS.md` opens with a live Current-state section, the
+  worktree table HEAD is guarded by `tests/test_agents_handoff.py` (it caught the
+  drift twice), and `docs/ROADMAP.md` was corrected to match the landed state.
+- **Secret baseline refreshed** — after reviewing every flagged line (public SHA-256
+  checksums and `API_KEY=none` only), and a new local pack path in `AGENTS.md` was
+  generalized so no machine-specific path is tracked.
+
+Updated "what is worse or no longer works" list (as of `15913b6`):
+
+- **Installer pin and version** — still `SOURCE_COMMIT=fd54148`, `KINDI_VERSION=0.5.0`;
+  the published installer therefore still delivers stock-0.5-era code without tandem,
+  owned-slice CPU load, or the server hardening. Release-owner publication step;
+  no push has been performed.
+- **Tandem still does not beat GPU-only** (2B 35.8 vs 160.6 tok/s at 24K; 4B 20.0 vs
+  79.8; 9B 16.0 vs 62.3) and the **larger-than-VRAM (27B) throughput row with sampled
+  peak** remains unmeasured. The 27B 8K saved-opening measurement is in flight
+  (512/4K saved-opening reloads pass in both placements).
+- **9B tc** (Hadamard 4096 refused), **4B tc** (3 exact + 1 accepted tie; forced-FD
+  2/4), **k8v4** (2B 2/4, 9B unavailable), **Blackwell/FP8/BF16 validation**,
+  **MoE/Gemma-4 26B backend**, **mixed-card/P106/5060 Ti/Turing/Arc hardware** —
+  unchanged explicit non-goals (§4.1). The GPU CI lane exists but no runner is
+  registered, so none of these can be verified automatically yet.
+- **Rate limiting** remains process-local per source address (documented; behind a
+  proxy all clients share one address).
