@@ -260,17 +260,28 @@ The CPU-layer boundary is now measured too: on the 2B at 24,576 context the knee
 layers, and 24K decode falls from 118.9 tok/s (2 layers) to 18.2 (12 layers) while every split
 stays below GPU-only. See the [tandem benchmark README](benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/README.md).
 
+On the 27B the boundary is different: 8 CPU layers cannot hold a 24K context (auto-reduced to
+17,664 tokens with 23 MiB free), 16 layers keep it (7,699 MiB peak), and going to 24/32 layers
+lowers the peak to 6,103/5,115 MiB at a 35-50% rate cost. The capacity question was settled the
+same evening: the loader silently reduces context to fit, and on this card a full-GPU 27B holds
+~37K tokens while the 16-layer tandem holds ~30K (7,812/7,518 MiB peaks). The split never gains
+usable context here; it trades throughput for headroom. Full table: [27B-8K.md](benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md).
+
 ## Next gates
 
 1. **Larger-than-VRAM exactness:** both 27B placements are exact at 8K (2026-11-12).
 2. **Peak VRAM and rate:** recorded for the 27B at 8K and 24K in both placements against a
-   full-GPU baseline, with `kindi bench --sample-vram` (2026-11-13). The remaining gate is a
-   context or card where the full-GPU engine genuinely cannot load; on this card even 24K fits.
+   full-GPU baseline, with `kindi bench --sample-vram` (2026-11-13). The capacity question is
+   settled on this card: requesting 65,536 or 131,072 tokens reduces to 37,120 (full GPU) and
+   30,464 (tandem), and the tandem is always the more reduced engine here. A genuinely closing
+   case needs a device where the full-GPU engine cannot run at a usable context yet a split can.
 3. **Joint cache:** end-state reuse, joint-checkpoint restore and saved-opening reloads through the
    HTTP server are measured on both placements at 512 tokens; in-process equality and saved-opening
    reloads pass at 4K/8K on the 9B and 27B, and the 27B joint checkpoint costs 54.5-61.5 ms to save
    and 27.0-28.5 ms to restore in both placements.
-4. **Tuning:** the 2B CPU-layer boundary is measured (knee at 4-6 layers; every split is below
-   GPU-only). Prompt reading on the small-card target and a 27B boundary sweep remain open.
+4. **Tuning:** the 2B boundary is measured (knee at 4-6 layers) and the 27B boundary is too
+   (24K needs at least 16 CPU layers here; 24-32 layers buy memory at a steep rate cost). Prompt
+   reading on the target small card and any faster split remain open; every split is below
+   GPU-only on this card.
 5. **MoE:** design in [MOE-TANDEM.md](MOE-TANDEM.md); implementation only after a real MoE backend
    with per-expert tensors and router logits exists.

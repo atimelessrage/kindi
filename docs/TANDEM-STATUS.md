@@ -60,10 +60,9 @@ It still does **not** have:
 
 - a MoE backend and GPU copy path; the copy-only slot manager is in `kindi/expert_cache.py` and the
   design is in [MOE-TANDEM.md](MOE-TANDEM.md), but there is no router, pack or engine integration;
-- a context or card where the full-GPU engine genuinely cannot load. The 27B throughput-plus-peak
-  row now exists at 8K and 24K for both placements and for full GPU, and on this card even the
-  24K full-GPU workspace loads (167 MiB free); the split is a headroom trade, not a capacity
-  requirement here ([TANDEM-RUNTIME.md](TANDEM-RUNTIME.md));
+- a device where the full-GPU engine cannot run at a usable context yet a split can. On the 4060 Ti
+  the 27B full-GPU caps at ~37K tokens and the tandem at ~30K after auto-reduction, so the split is
+  a headroom trade here, not a capacity requirement ([TANDEM-RUNTIME.md](TANDEM-RUNTIME.md));
 - a layer-contiguous streaming pack format or a converter that emits one (the CPU backend
   now skips unowned layers at load, but the pack on disk is unchanged);
 - native Sandy Bridge or no-FMA hardware validation; the five-tier CPU dispatch and AVX-only
@@ -158,14 +157,14 @@ design sketches.
 
 The dense placement and handoff are done. The next steps are:
 
-1. Find a genuinely larger-than-VRAM case. The 27B rate and sampled peak are now recorded at 8K
-   and 24K for both placements and full GPU, and the full-GPU engine still loads at 24K on this
-   card; a longer context or a smaller card is needed to test the capacity claim.
+1. The capacity measurement is done on this card: full-GPU loads 24K; requesting 65,536 or
+   131,072 tokens reduces to 37,120 (tandem: 30,464), so the split does not gain context.
+   A genuinely larger-than-VRAM case needs a smaller card where neither fits.
 2. Saved-opening reloads and checkpoint cost are measured at 4K/8K in both placements for the 9B
    and the 27B (27B: 54.5-61.5 ms save, 27.0-28.5 ms restore, 149.6 MiB state). Server cache
    metrics at those contexts remain open.
-3. The 2B CPU-layer boundary is swept (knee at 4-6 layers); a 27B sweep and prompt reading on the
-   target small card remain open.
+3. The 2B (knee 4-6 layers) and 27B (24K needs >=16 CPU layers) boundaries are swept; prompt
+   reading on the target small card and any faster split remain open.
 4. Implement the MoE expert cache from [MOE-TANDEM.md](MOE-TANDEM.md) only after a MoE backend with
    per-expert tensors and router logits exists; it is a different algorithm, not a flag on this one.
 5. Build `hostram` pinned/mmap primitives and a layer-contiguous pack format if the measurements

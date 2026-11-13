@@ -539,3 +539,11 @@ kindi --pack ~/.kindi/packs/bonsai-2b --ctx 8192 bench --tandem cpu-first --tand
 The peak includes the desktop and any other process (it is device-wide), so record the baseline in
 the same run; without `nvidia-smi` the line says so and the benchmark still completes. Use it for
 larger-than-VRAM capacity claims: free memory after load alone does not show the transient peak.
+
+`--json FILE` writes the same numbers in machine-readable form (read rate, generation rate per
+position, placement, context and any sampled peak), so recorded runs do not have to be scraped back
+out of the log:
+
+```sh
+kindi --pack ~/.kindi/packs/bonsai-2b bench --sample-vram --json bench-2b.json
+```

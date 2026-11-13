@@ -655,3 +655,45 @@ GPU-only rows, and the discrepancy is bounded by the observed run-to-run spread
 | was | now |
 |---|---|
 | Tandem matrix rows are single runs, up to 32% off a re-measurement | medians of three fresh-process runs per model; the perf baseline holds them and only the tandem cells were re-recorded |
+
+## 13. Capacity and the 27B boundary (2026-11-13)
+
+The report's remaining capacity question — a context where full-GPU cannot run but the split
+can — is now answered on the 4060 Ti, and the answer is not what the project hoped.
+
+**The loader reduces context instead of failing.** Requesting 65,536 or 131,072 tokens on the
+27B loads with fewer tokens:
+
+| requested | engine | actual context | peak | free after load | free at peak |
+|---:|---|---:|---:|---:|---:|
+| 24,576 | tandem `cpu-first` (16 layers) | 24,576 | 7,699 MiB | 687 MiB | 251 MiB |
+| 24,576 | full GPU | 24,576 | 7,783 MiB | 463 MiB | 167 MiB |
+| 65,536 | tandem `cpu-first` (16 layers) | 30,464 | 7,518 MiB | 383 MiB | 432 MiB |
+| 65,536 | full GPU | 37,120 | 7,812 MiB | 23 MiB | 138 MiB |
+| 131,072 | tandem `cpu-first` (16 layers) | 30,464 | 7,448 MiB | 383 MiB | 502 MiB |
+| 131,072 | full GPU | 37,120 | 7,806 MiB | 23 MiB | 144 MiB |
+
+Full GPU caps near **37K** and the 16-layer tandem near **30K**, and both snap to the same
+reduced size regardless of the request, so the split buys headroom, not usable context. A truly
+closing case needs a device where the full-GPU engine cannot run at a usable context yet a split
+can. Evidence: `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md`.
+
+**The 27B layer boundary was swept.** At 24,576 requested context (`cpu-first`):
+
+| CPU layers | actual ctx | read | 100 | 2K | 8K | 16K | 24K | peak | free after load |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 8 | 17,664 (reduced) | 16.1 | 14.8 | 13.6 | 9.9 | 7.6 | – | 7,723 MiB | 23 MiB |
+| 16 | 24,576 | 10.5 | 8.4 | 8.0 | 6.0 | 3.8 | 3.0 | 7,699 MiB | 687 MiB |
+| 24 | 24,576 | 6.8 | 5.6 | 5.3 | 3.6 | 2.6 | 2.1 | 6,103 MiB | 1,689 MiB |
+| 32 | 24,576 | 5.2 | 4.6 | 4.1 | 2.9 | 2.0 | 1.7 | 5,115 MiB | 2,677 MiB |
+
+8 CPU layers cannot hold a 24K context and are reduced to 17,664 tokens with 23 MiB free. From
+16 layers the requested context holds, but each added 8 layers costs 35-50% of decode rate for
+another ~1.0-1.6 GiB of peak. **16 layers is the 24K boundary** on this card; 24-32 layers are
+a memory purchase at a steep rate cost, and every split stays far below full GPU (read 37.4, 24K
+decode 30.2). A smaller card gets a different, measured answer with the same command; the tuning
+gate from §11 is closed for the 2B and 27B on this host.
+
+Also new in this round: **`kindi bench --json FILE`** writes a run's numbers (read rate, per-
+position generation, placement, context, sampled peak) in machine-readable form, so recorded
+runs no longer need log scraping (`kindi/bench.py`, `tests/test_bench_json.py`).
