@@ -10,7 +10,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `fbaa975114c7f9fac24f31968bb079ac5fc67447` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean;
+- **HEAD:** `5360c7f5851901ef6486af17953f3ff843e93789` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean;
   guarded by `tests/test_agents_handoff.py`). Full suite last measured there:
   494 passed, 19 skipped, 1 warning; the 27% line-and-branch coverage floor is unchanged.
 - **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
