@@ -111,6 +111,24 @@ GitHub-hosted runners, and a skipped job is not verification. Record the runner,
 CuPy/CUDA versions and pack hash with the run. Until that run exists, the dual-card rows remain
 unverified as described in [CARD-SUPPORT.md](CARD-SUPPORT.md).
 
+### Registering the runner (M6)
+
+The lane is ready; the missing piece is a registered runner. On the GPU host (a working NVIDIA
+driver, the CuPy version used by the image, and the packs under `~/.kindi/packs/`):
+
+1. In the fork's GitHub settings go to **Actions → Runners → New self-hosted runner** and follow
+   the printed download/configure commands.
+2. At configure time pass the labels `self-hosted` and `gpu` (the Blackwell lane additionally
+   needs `sm_100` or `sm_120` — one runner per architecture, or one runner with both labels).
+3. Install the runner as a service (`./svc.sh install`) so it survives reboots, then dispatch
+   **GPU smoke** from the Actions tab with the pack path and record the run (runner, card,
+   driver, CuPy/CUDA, pack hash) in [CARD-SUPPORT.md](CARD-SUPPORT.md).
+4. Then run `python tools/check_perf_baseline.py` against the regenerated CROSS-MODE.csv on
+   that runner for the real throughput gate.
+
+Until step 3 has run at least once, every GPU-verified card row in the docs stays a manual
+measurement, and `gpu-smoke.yml` remains an unused lane.
+
 ## Blackwell FP8 lane
 
 [.github/workflows/blackwell-fp8.yml](../.github/workflows/blackwell-fp8.yml) is a separate manual
