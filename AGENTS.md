@@ -10,7 +10,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `0cd58bced04415fbf7c82868f57ed9a8b3f5df7f` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean;
+- **HEAD:** `3cfb8b5bd0d1840a169e738b1681b878618ce205` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean;
   guarded by `tests/test_agents_handoff.py`). Full suite last measured there:
   494 passed, 19 skipped, 1 warning; the 27% line-and-branch coverage floor is unchanged.
 - **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
@@ -55,8 +55,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `0cd58bced04415fbf7c82868f57ed9a8b3f5df7f` | main checkout; clean; best-of main |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `0cd58bced04415fbf7c82868f57ed9a8b3f5df7f` | this session; best-of main (identical to `main`) |
+| `T:/kindi` | `main` | `3cfb8b5bd0d1840a169e738b1681b878618ce205` | main checkout; clean; best-of main |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `3cfb8b5bd0d1840a169e738b1681b878618ce205` | this session; best-of main (identical to `main`) |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
