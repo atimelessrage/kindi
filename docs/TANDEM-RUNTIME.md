@@ -155,13 +155,18 @@ commands, timings and IDs: `bench-logs/tandem-cache/RESULTS-9B.md`.
   token per backend call.
 - **One GPU.** The split composes with the CPU engine only; the two-card `TPEngine` is not a tandem
   owner.
-- **27B: both placements exact; 2B/4B/9B throughput recorded.** The 2026-11-12 gate records
-  `cpu-first` and `gpu-first` (below) with sampled peaks. The `cpu-first` cells in
-  [CROSS-MODE.md](benchmarks/CROSS-MODE.md) now have real `bench` throughput runs at a
+- **27B: both placements exact; 2B/4B/9B/27B throughput and peaks recorded.** The 2026-11-12
+  gate records `cpu-first` and `gpu-first` exactness with sampled peaks. The `cpu-first` cells
+  in [CROSS-MODE.md](benchmarks/CROSS-MODE.md) have real `bench` throughput runs at a
   24,576-token context (2B read 80.9, generation 65.7/71.3/55.5/43.4/35.8; 4B read 62.5,
   generation 52.1/51.4/33.5/24.8/20.0; 9B read 39.9, generation 28.5/35.8/28.2/20.1/16.0
-  tok/s; free-after-load in the tandem benchmark README, not a sampled peak). The
-  larger-than-VRAM gate still needs a measured tandem throughput row with sampled peak.
+  tok/s). The 27B row with sampled peak is in
+  [27B-8K.md](benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md): 7.2-8.4 tok/s at 100
+  against 34.9 full-GPU, 446 MiB (8K) and 193 MiB (24K) less peak.
+- **The capacity premise needs restating.** On this card the full-GPU 27B loads at 8,192 and at
+  24,576 context (peaks 7,473 and 7,783 MiB, 477 and 167 MiB free), so the split is not what
+  makes the model runnable here. It buys headroom at a 4-6x throughput cost; a real
+  larger-than-VRAM row still needs a context or a card where the full-GPU engine cannot load.
 
 ## 27B gate (2026-11-12)
 
@@ -188,7 +193,8 @@ below the full-GPU baseline**. The context stayed at 8,192 (`reduced: false`). T
 The `gpu-first` placement also passed **4/4 prompts, 40/40 tokens each** (GPU 0..47 with the
 embedding, CPU 48..63, CPU head; combined load 413.3 s; sampled peak **7,017 MiB total**, 5,857
 MiB over idle, 1,171 MiB left) — 221 MiB below the full-GPU baseline; the context was never
-reduced. The 2026-11-11 attempt (CPU ready in 435.4 s, then the GPU owner rejected the pack) is
+reduced. The 2026-11-13 rerun with the owned-slice CPU load reproduces both placements exactly
+with 105.8-114.6 s loads; see [27B-8K.md](benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md). The 2026-11-11 attempt (CPU ready in 435.4 s, then the GPU owner rejected the pack) is
 kept as history in `RESULTS.md`. The fixed `--probe-gpu-owner` preflight constructs both 27B GPU
 ranges at 8,192 context.
 
@@ -215,20 +221,42 @@ miss compute is a separate lane, enabled only after bitwise parity. The Gemma 4 
 [GEMMA4-26B-MOE.md](GEMMA4-26B-MOE.md); it uses top-8 experts, fused gate/up tensors, a parallel
 dense MLP and layer-scoped plans. This runtime remains dense-only.
 
+## 27B rate, peak and checkpoint cost (2026-11-13)
+
+Measured on the same host with `kindi bench --sample-vram` (one fresh process per cell, exact
+head) and `measure_prefix.py --checkpoint-only --vram` at 8,192 context. Full table, commands and
+the 4K/8K saved-opening evidence: [27B-8K.md](benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md).
+
+| context | engine | read | 100 | 2K | 8K | 16K | 24K | peak | free at peak |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 8,192 | tandem `cpu-first` | 10.5 | 7.2 | 7.9 | 5.6 | - | - | 7,027 MiB | 923 MiB |
+| 8,192 | tandem `gpu-first` | 9.4 | 7.6 | 6.6 | 5.3 | - | - | 7,027 MiB | 923 MiB |
+| 8,192 | full GPU (plan engine) | 37.2 | 34.8 | 34.3 | 33.0 | - | - | 7,473 MiB | 477 MiB |
+| 24,576 | tandem `cpu-first` | 10.5 | 8.4 | 8.0 | 6.0 | 3.8 | 3.0 | 7,699 MiB | 251 MiB |
+| 24,576 | full GPU (plan engine) | 37.4 | 34.9 | 34.2 | 33.0 | 31.6 | 30.2 | 7,783 MiB | 167 MiB |
+
+The joint checkpoint is **149.6 MiB** (37.4 MiB CPU owner, 112.2 MiB GPU owner) and does not grow
+with context, since it holds recurrent state rather than K/V: 54.5-61.5 ms median save and
+27.0-28.5 ms median restore at 4K and 8K in both placements, five samples each. Saved-opening
+reloads are exact at 4K and 8K (extension 4,080/8,176 tokens, branch and saved opening
+3,072/6,144 cached). The 512 MB budget keeps one copy and logs one dropped copy; K/V at 8K is
+512 MiB per split and stays in the two engines.
+
+The CPU-layer boundary is now measured too: on the 2B at 24,576 context the knee is 4-6 CPU
+layers, and 24K decode falls from 118.9 tok/s (2 layers) to 18.2 (12 layers) while every split
+stays below GPU-only. See the [tandem benchmark README](benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/README.md).
+
 ## Next gates
 
 1. **Larger-than-VRAM exactness:** both 27B placements are exact at 8K (2026-11-12).
-2. **Peak VRAM:** full-GPU 27B baseline 7,238 MiB at 8K; tandem `cpu-first` 7,005 MiB and
-   `gpu-first` 7,017 MiB at 8K. The 2B/4B/9B `cpu-first` throughput rates are recorded in
-   CROSS-MODE; `kindi bench --sample-vram` now logs a sampled device-wide peak, and a 27B
-   larger-than-VRAM throughput row with sampled peak at 8K context is queued behind the
-   checkpoint-cost runs.
+2. **Peak VRAM and rate:** recorded for the 27B at 8K and 24K in both placements against a
+   full-GPU baseline, with `kindi bench --sample-vram` (2026-11-13). The remaining gate is a
+   context or card where the full-GPU engine genuinely cannot load; on this card even 24K fits.
 3. **Joint cache:** end-state reuse, joint-checkpoint restore and saved-opening reloads through the
-   HTTP server are measured on both placements at 512 tokens, and in-process equality now passes at
-   4K/8K. Saved-opening reloads at 4K/8K also pass in both placements (27B: 8K extension 8,176,
-   branch/saved-opening 6,144 cached, exact; owned-slice CPU loads 114.6 s `cpu-first` / 105.8 s
-   `gpu-first`; evidence `bench-logs/tandem-cache/saved-27b-8k.json`). Checkpoint-only cost/VRAM
-   at 4K/8K (`measure_prefix.py --checkpoint-only --vram`) is in flight.
-4. **Tuning:** measure the layer boundary (`n`) and prompt reading on the actual small-card target.
+   HTTP server are measured on both placements at 512 tokens; in-process equality and saved-opening
+   reloads pass at 4K/8K, and the joint checkpoint costs 54.5-61.5 ms to save and 27.0-28.5 ms to
+   restore in both placements.
+4. **Tuning:** the 2B CPU-layer boundary is measured (knee at 4-6 layers; every split is below
+   GPU-only). Prompt reading on the small-card target and a 27B boundary sweep remain open.
 5. **MoE:** design in [MOE-TANDEM.md](MOE-TANDEM.md); implementation only after a real MoE backend
    with per-expert tensors and router logits exists.

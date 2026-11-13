@@ -6,8 +6,10 @@ per-layer entry point is wired to a partial GPU engine in both dense placements;
 expert-cache path is designed in [MOE-TANDEM.md](MOE-TANDEM.md) and has a model-free state-machine
 prototype plus a [Gemma 4 26B adaptation](GEMMA4-26B-MOE.md), but no backend or integration. The
 27B `cpu-first` and `gpu-first` splits are token-exact at 8,192 context (peaks 7,005 / 7,017 MiB
-vs the 7,238 MiB full-GPU baseline, 2026-11-12); the CROSS-MODE throughput rows are still
-open.**
+vs the 7,238 MiB full-GPU baseline, 2026-11-12). On 2026-11-13 the 27B rate and sampled peak were
+measured at 8K and 24K in both placements, the joint checkpoint cost was measured, and the 2B
+CPU-layer boundary was swept: the full-GPU 27B also fits this card at 24K (7,783 MiB peak), so the
+split trades 4-6x throughput for 446 MiB (8K) / 193 MiB (24K) of peak.**
 This page records what this branch actually contains, why the interrupted WIP cannot be merged as-is,
 and the gate for deleting it. Archived with the other no-go work in [ROADMAP.md](ROADMAP.md).
 
@@ -56,9 +58,10 @@ It still does **not** have:
 
 - a MoE backend and GPU copy path; the copy-only slot manager is in `kindi/expert_cache.py` and the
   design is in [MOE-TANDEM.md](MOE-TANDEM.md), but there is no router, pack or engine integration;
-- a larger-than-VRAM tandem throughput row with a sampled peak (the 2B/4B/9B CROSS-MODE
-  `cpu-first` rows are recorded; both 27B placements passed at 8K on 2026-11-12;
-  [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md));
+- a context or card where the full-GPU engine genuinely cannot load. The 27B throughput-plus-peak
+  row now exists at 8K and 24K for both placements and for full GPU, and on this card even the
+  24K full-GPU workspace loads (167 MiB free); the split is a headroom trade, not a capacity
+  requirement here ([TANDEM-RUNTIME.md](TANDEM-RUNTIME.md));
 - a layer-contiguous streaming pack format or a converter that emits one (the CPU backend
   now skips unowned layers at load, but the pack on disk is unchanged);
 - native Sandy Bridge or no-FMA hardware validation; the five-tier CPU dispatch and AVX-only
@@ -153,13 +156,14 @@ design sketches.
 
 The dense placement and handoff are done. The next steps are:
 
-1. Run a larger-than-VRAM (27B) tandem throughput benchmark at the CROSS-MODE positions
-   so the capacity use case has a rate plus a sampled peak (the 2B/4B/9B CROSS-MODE rows
-   are recorded; full-GPU and both tandem 27B peaks are recorded at 8K).
-2. Saved-opening reloads, server cache metrics and checkpoint cost at longer contexts remain to be
-   measured; the in-process end-state and joint-checkpoint paths now pass in both placements.
-3. Measure and tune the CPU layer boundary (`--tandem-cpu-layers`) and prompt reading on the
-   target small card.
+1. Find a genuinely larger-than-VRAM case. The 27B rate and sampled peak are now recorded at 8K
+   and 24K for both placements and full GPU, and the full-GPU engine still loads at 24K on this
+   card; a longer context or a smaller card is needed to test the capacity claim.
+2. Saved-opening reloads and checkpoint cost are measured at 4K/8K in both placements
+   (54.5-61.5 ms save, 27.0-28.5 ms restore, 149.6 MiB state). Server cache metrics at those
+   contexts remain open.
+3. The 2B CPU-layer boundary is swept (knee at 4-6 layers); a 27B sweep and prompt reading on the
+   target small card remain open.
 4. Implement the MoE expert cache from [MOE-TANDEM.md](MOE-TANDEM.md) only after a MoE backend with
    per-expert tensors and router logits exists; it is a different algorithm, not a flag on this one.
 5. Build `hostram` pinned/mmap primitives and a layer-contiguous pack format if the measurements
