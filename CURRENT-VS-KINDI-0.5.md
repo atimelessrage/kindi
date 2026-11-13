@@ -3,13 +3,15 @@
 Audit date: **2026-11-12**
 
 > This file records the pre-improvement audit and the fixes that followed.
-> Sections 8–10 record the post-audit improvements, the 2026-11-12 evening 27B
-> tandem implementation/gate and the later requirement/structural-coverage work.
-> The best-of branch is now merged into `main`: both `main` and
-> `freebuff/tandem-cpu-recovery` are at `15913b6` (after the audit-remediation,
-> perf-gate, roadmap-refresh and coverage rounds). The installer source pin and
-> the `0.5.0` version identity remain a release-owner publication step, not a
-> code-complete claim.
+> Sections 8–11 record the post-audit improvements, the 2026-11-12 evening 27B
+> tandem implementation/gate, the later requirement/structural-coverage work, and
+> the 2026-11-13 measurement rounds (sampled-peak VRAM, the 27B rate/peak and
+> checkpoint-cost rows, the 2B CPU-layer sweep). **Section 11 is the current
+> "what is better / what is worse" list; sections 10 and earlier are kept as the
+> history at their own dates.** The best-of branch is merged into `main`: both
+> `main` and `freebuff/tandem-cpu-recovery` are at `d3198cb`. The installer source
+> pin and the `0.5.0` version identity remain a release-owner publication step, not
+> a code-complete claim.
 
 This report compares the current `freebuff/tandem-cpu-recovery` worktree with the
 stock Kindi **0.5.0** release. It separates verified behavior from recorded benchmark
@@ -20,20 +22,20 @@ everything described here has been re-run on current hardware.
 
 | | Stock “normal” Kindi 0.5 | Clean local 0.5 snapshot | Current worktree |
 |---|---|---|---|
-| Ref | `v0.5.0` tag, `1c4cc3e01732f0fada4ab7030ccf4f7651e01053` | `clean/kindi-0.5`, `1b0cbf780b57d464cdb3e5e9acf75ed49256d622` | `main` and `freebuff/tandem-cpu-recovery`, `15913b620037875ccc10a248cbd7fae0eaef264e` |
-| Date | 2026-11-09 | clean snapshot of local 0.5 work | 2026-11-12/13 (merged state) |
-| Tracked files | 102 | 216 | 308 |
-| Test modules | **0** (`tests/` does not exist) | 25 | 51 tracked test modules |
-| Docs files | 12 | 84 | 129 tracked paths under `docs/` |
-| Git state | release tag | clean | `main` fast-forwarded to the best-of branch at `15913b6`; generated coverage artifacts are ignored; `bench-logs/` is ignored local evidence |
+| Ref | `v0.5.0` tag, `1c4cc3e01732f0fada4ab7030ccf4f7651e01053` | `clean/kindi-0.5`, `1b0cbf780b57d464cdb3e5e9acf75ed49256d622` | `main` and `freebuff/tandem-cpu-recovery`, `d3198cb29816e590745a566d39fd0fa1a184c1da` |
+| Date | 2026-11-09 | clean snapshot of local 0.5 work | 2026-11-13 (merged state) |
+| Tracked files | 102 | 216 | 312 |
+| Test modules | **0** (`tests/` does not exist) | 25 | 53 tracked test modules |
+| Docs files | 12 | 84 | 130 tracked paths under `docs/` |
+| Git state | release tag | clean | `main` fast-forwarded to the best-of branch at `d3198cb`; generated coverage artifacts are ignored; `bench-logs/` is ignored local evidence |
 
 The primary comparison below is against the **stock `v0.5.0` tag**. `clean/kindi-0.5`
 already contains earlier local audit, CPU, server and documentation work, so it is a
-narrower comparison, not the stock release. Relative to that clean snapshot, the committed branch has **167 changed tracked paths
-with +17,480/−608 lines**.
+narrower comparison, not the stock release. Relative to that clean snapshot, the committed branch has **171 changed tracked paths
+with +17,929/−608 lines**.
 
-Relative to the stock tag, the committed branch (`v0.5.0..HEAD`) changes **254 tracked
-files with +31,848/−370 lines**. The generated `.coverage`/`coverage.json` artifacts
+Relative to the stock tag, the committed branch (`v0.5.0..HEAD`) changes **258 tracked
+files with +32,297/−370 lines**. The generated `.coverage`/`coverage.json` artifacts
 are now ignored; `bench-logs/` remains ignored local evidence.
 
 Evidence labels used below:
@@ -70,8 +72,11 @@ replacement release.
 
 - **27B tandem** is implemented and measured in both placements (`cpu-first` peak 7,005 MiB,
   `gpu-first` 7,017 MiB, vs the 7,238 MiB full-GPU baseline, at 8,192 context, 2026-11-12).
-  The 2B/4B/9B `cpu-first` CROSS-MODE tandem throughput rows are recorded; tandem
-  still does not beat GPU-only throughput.
+  Its rate and sampled peak are now measured at 8K and 24K against a full-GPU baseline
+  (7.2-8.4 vs 34.8-34.9 tok/s at position 100; 446 MiB less peak at 8K), and the joint
+  checkpoint costs 54.5-61.5 ms to save. Tandem still does not beat GPU-only throughput,
+  and the full-GPU engine also loads at 24K on this card, so the "larger than VRAM"
+  premise is not yet demonstrated.
 - **9B tensor-core plan** is refused (Hadamard block 4096); **4B tc** is 3 exact + 1 accepted
   tie with the FD fallback (forced FD was 2/4); **k8v4** is absent for 9B and only 2/4 on 2B.
 - **Blackwell FP8/BF16 and real FP8 models** are not validated; the local Blackwell gate
@@ -108,18 +113,21 @@ Recorded results:
 | 27B `cpu-first` (CPU 0..15, GPU 16..63, GPU head), 8,192 context | 4/4 exact, 40/40 tokens each; combined load 385.6 s (full-model CPU load); peak **7,005 MiB** vs 7,238 MiB full-GPU baseline | `bench-logs/tandem-27b-gate/cpu-first-8192.json` |
 | 27B `gpu-first` (GPU 0..47 + embedding, CPU 48..63, CPU head), 8,192 context | 4/4 exact, 40/40 tokens each; combined load 413.3 s (full-model CPU load); peak **7,017 MiB** vs 7,238 MiB full-GPU baseline | `bench-logs/tandem-27b-gate/gpu-first-8192.json` |
 | 2B/4B/9B `cpu-first` CROSS-MODE throughput, 24,576 ctx | 2B read 80.9, gen 65.7/71.3/55.5/43.4/35.8; 4B read 62.5, gen 52.1/51.4/33.5/24.8/20.0; 9B read 39.9, gen 28.5/35.8/28.2/20.1/16.0 tok/s; free-after-load 6411/5431/4635 MiB | `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/` |
+| 27B rate + sampled peak, 8K and 24K, both placements and full GPU | tandem 7.2-8.4 tok/s at position 100 vs 34.8-34.9 full GPU; peaks 7,027 vs 7,473 MiB at 8K and 7,699 vs 7,783 MiB at 24K | [27B-8K.md](docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md) |
+| 27B joint cache at 4K/8K | saved-opening reloads exact in both placements; 149.6 MiB checkpoint, 54.5-61.5 ms save, 27.0-28.5 ms restore; checkpoint-only peaks 6,842/6,833 MiB (4K) and 7,030/7,027 MiB (8K) | same |
+| 9B saved opening at 4K/8K | extension 4,080/8,176, branch and saved opening 3,072/6,144, cache-off 0, exact in both placements; loads 33.3-39.5 s | `bench-logs/tandem-cache/saved-9b-4k.json`, `saved-9b-8k.json` |
+| 2B CPU-layer sweep, 24,576 ctx | 2/4/6/8/12 CPU layers: 118.9/41.7/39.5/22.6/18.2 tok/s at 24K; knee at 4-6 layers | `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/README.md` |
 
 The cache work also fixed a real bug: `Openings.load` assigned a NumPy K/V array into a
 CuPy view with a plain assignment, which CuPy treated as a scalar fill. It now uses the
 in-place `_to_dev` copy. A GPU-free regression test reproduces the scalar-fill failure.
 This is a concrete correctness improvement over the pre-fix state.
 
-**Not covered:** cumulative-B (33B), MoE, long-context *saved-opening reload*
-on 9B, and a larger-than-VRAM (27B) tandem throughput row with a sampled peak.
-The 2B/4B/9B CROSS-MODE rows are recorded and do not beat GPU-only. The 105–108 s
-9B CPU load was a full-model load; the CPU engine now loads only its owned
-16-of-64-layer slice (measured owned-slice loads: 17.2 s for 4B, 32.4 s for 9B),
-so the old ≈365 s 27B full-load figure no longer describes a tandem start.
+**Not covered:** cumulative-B (33B) and MoE. The 2B/4B/9B CROSS-MODE rows, the 27B
+rate/peak rows and the 2B layer sweep are recorded, and none of them beats GPU-only.
+The 105–108 s 9B CPU load was a full-model load; the CPU engine now loads only its
+owned slice (measured owned-slice loads: 17.2 s for 4B, 32.4 s for 9B, 105.8-114.6 s
+for the 27B), so the old ≈365 s 27B full-load figure no longer describes a tandem start.
 
 ### 3.2 CPU portability and CPU serving
 
@@ -240,7 +248,7 @@ not yet meet their own gates. They should not be presented as supported.
 
 | Area | Current state | Why it matters |
 |---|---|---|
-| **27B tandem** | implemented and measured in both placements: `cpu-first` 4/4 (peak 7,005 MiB) and `gpu-first` 4/4 (peak 7,017 MiB), all 40/40 tokens each, vs the 7,238 MiB full-GPU baseline (8,192 context, 2026-11-12); 2B/4B/9B `cpu-first` CROSS-MODE tandem throughput rows are recorded. | The “larger than VRAM” use case works in both placements. The plain GPU engine now accepts grouped-query ratios up to 8:1 at head size 256, reusing the existing generic-GQA kernels; the 4:1 fast paths are unchanged. |
+| **27B tandem** | exact 4/4 in both placements (`cpu-first` peak 7,005 MiB, `gpu-first` 7,017 MiB, vs 7,238 MiB full-GPU at 8,192 context, 2026-11-12); 2026-11-13 rate plus sampled peak at 8K and 24K for both placements and full GPU (7.2-8.4 vs 34.8-34.9 tok/s at 100; 446 MiB less peak at 8K, 193 MiB at 24K); joint cache exact at 4K/8K with saved-opening reloads in both placements. | The split is exact and it saves peak VRAM, but it is **4-6x slower**, and the full-GPU engine still loads at 24K on the 4060 Ti (7,783 MiB peak, 167 MiB free), so this is a headroom trade, not a capacity requirement. A genuinely larger-than-VRAM row still needs a longer context or a smaller card. |
 | **9B tensor-core plan** | Refused before graph build because the Hadamard block is 4096. | The 9B tc cell is not available; plain 9B is 4/4. |
 | **4B tensor-core plan** | 3 exact + 1 accepted llama.cpp tie with the FD fallback at 164.6 tok/s (the forced-FD run was 2/4); plain 4B is 4/4 at 114.9 tok/s. | The tc path is a conditional pass, not a general replacement; forced-FD exactness remains open. |
 | **2B/9B k8v4** | 2B k8v4 is 2/4 against q8_0; 9B k8v4 is unavailable. 4B k8v4 is 4/4. | Experimental lossy cache; do not enable by default or describe as 9B-ready. |
@@ -250,7 +258,7 @@ not yet meet their own gates. They should not be presented as supported.
 | **Mixed cards, P106, RTX 5060 Ti, Turing hardware** | Installer offers mixed pairs and P106 single/dual profiles; docs mark them unverified. No mixed-card execution record. | Installer acceptance is not hardware validation. A user can be offered a pair that has never produced a token. |
 | **Intel Arc A770** | Separate SYCL/oneAPI backend; M0 audit only, M1 blocked on hardware. | Design-only; not part of the current support surface. |
 | **Continuous batching** | Archived as a no-go. The server serves one active request and queues the rest; the queue does not increase throughput. | The server scales operationally, not computationally. Multi-GPU replicas still need `tp.py` work. |
-| **Long-context tandem evidence** | 9B saved-opening reload at 4K/8K and a larger-than-VRAM tandem throughput row with sampled peak were not measured. The 2B/4B/9B CROSS-MODE 24K tandem rows are recorded. | Do not generalize the 512-context 9B results to long-context serving or memory. |
+| **Long-context tandem evidence** | complete for the 9B and 27B: saved-opening reloads at 4K/8K exact in both placements (9B 4,080/8,176 extension and 3,072/6,144 branch/opening, 33.3-39.5 s loads, 82-221 s cache-off read versus 0.39-0.72 s cached; 27B 8,176/6,144 with 105.8-114.6 s loads). 2B/4B/9B CROSS-MODE 24K rows and a 2B CPU-layer sweep are recorded. | Checkpoint cost grows with layer count (19.3 MiB on the 2B, 50.3 on the 9B, 149.6 on the 27B) even though context does not change it; budget host RAM accordingly. The cached-read times are harness timings, not a serving-rate claim. |
 
 ### 4.2 Current-state breakage and release blockers
 
@@ -326,11 +334,11 @@ Some were fixed afterward; see section 8.
 7. **GPU behavior was revalidated after the audit (2026-11-12 evening).** `kindi verify`
    reports ALL PASS on the 2B (4/4, 153.7 tok/s), 4B (4/4, 108.9) and 9B (4/4, 74.6), and
    the 27B tandem gate is exact 4/4 in both placements — all with the refactored
-   attention code. The 2B/4B/9B CROSS-MODE tandem throughput rows are recorded; the
-   27B throughput-plus-peak gate remains open (§9).
+   attention code. The 2B/4B/9B CROSS-MODE tandem throughput rows are recorded. The
+   27B throughput-plus-peak row landed on 2026-11-13 (§11).
 
 8. **Shared-worktree merge risk is resolved for this branch.** Both worktrees are
-   at `15913b6` and `T:/kindi` is clean. Future shared-file work still needs the
+   at `d3198cb` and `T:/kindi` is clean. Future shared-file work still needs the
    AGENTS.md lease protocol; blindly copying either worktree over the other will
    lose work.
 
@@ -356,7 +364,7 @@ retains the same main-merge and installer-source problems.
 ## 6. Recommended order of work
 
 1. **Finish the release decision:** the best-of branch is merged into `main` at
-   `15913b6`. Decide the version, publish the matching installer artifact, and
+   `d3198cb`. Decide the version, publish the matching installer artifact, and
    point `SOURCE_COMMIT`/SHA-256 at the exact release commit. Do not ship an
    installer that fetches `fd54148` while claiming the current tree.
 2. **Fix the test entry point:** exclude `bench-logs/` from pytest collection or remove
@@ -368,7 +376,7 @@ retains the same main-merge and installer-source problems.
    The repository already has honest limitation pages; make those the support contract,
    not the target matrix.
 4. **Confirm the release commit:** the 2B/4B/9B `verify`, both 27B tandem gate
-   placements and the 462-test suite are recorded for the merged state; a rerun
+   placements and the 494-test suite are recorded for the merged state; a rerun
    on the exact release commit remains the release gate.
 5. **Keep the AGENTS.md lease protocol for any future shared-file work** so the
    main worktree and feature worktrees do not drift again.
@@ -385,13 +393,16 @@ Run in the current worktree on 2026-11-12:
 | `python -m kindi.config_reference --check` | exit 0 |
 | `python -m kindi.support_matrix --check` | exit 0 |
 | `git -c core.whitespace=cr-at-eol diff --check` | exit 0 |
-| `git status --short` | `main` and the feature branch identical at `15913b6`; coverage artifacts ignored; `bench-logs/` ignored |
-| `git diff --stat v0.5.0..HEAD` | 243 tracked paths, +31,125/−353 |
+| `git status --short` | `main` and the feature branch identical at `d3198cb`; coverage artifacts ignored; `bench-logs/` ignored |
+| `git diff --stat v0.5.0..HEAD` | 258 tracked paths, +32,297/−370 |
 | `kindi verify` 2B/4B/9B (2026-11-12 evening) | ALL PASS, 153.7 / 108.9 / 74.6 tok/s |
 | 27B tandem gate, `cpu-first` (2026-11-12) | **4/4 prompts, 40/40 each; peak 7,005 MiB; 8,192 ctx; exit 0** |
 | 27B tandem gate, `gpu-first` (2026-11-12) | **4/4 prompts, 40/40 each; peak 7,017 MiB; 8,192 ctx; exit 0** |
+| `python -m pytest -q tests/` (2026-11-13, `d3198cb`) | **494 passed, 19 skipped**, exit 0 |
+| `python -m pytest -q tests/test_vram_monitor.py tests/test_verify_bench_contracts.py` | 9 passed (sampled-peak VRAM and verify/bench contracts) |
+| `python tools/project_memory.py --check`, `build_cross_mode.py --check`, `support_matrix --check`, `config_reference --check`, `compileall`, `git diff --check` | all exit 0 |
 
-The best-of work is merged into `main` at `15913b6`. No push was performed. The
+The best-of work is merged into `main` at `d3198cb`. No push was performed. The
 benchmark numbers are quoted from the repository’s recorded logs and docs except
 where a run is stated.
 
@@ -453,11 +464,11 @@ Updated "what is worse or no longer works" list (as of 2026-11-12 evening):
 - **27B `gpu-first`** — measured, and `gpu-first` now works in both placements, so the
   partial-plan owner design the report used to call for is no longer needed on either path.
 - **Tandem throughput** — 2B/4B/9B `cpu-first` have recorded numbers at the CROSS-MODE
-  positions; a larger-than-VRAM (27B) throughput row with sampled peak remains open. `bench` accepts
-  `--tandem cpu-first|gpu-first --tandem-cpu-layers N`.
+  positions, and the 27B rate-plus-sampled-peak row followed on 2026-11-13 (§11). `bench`
+  accepts `--tandem cpu-first|gpu-first --tandem-cpu-layers N` and `--sample-vram`.
 - **Installer pin and version** — the installer `SOURCE_COMMIT` names
   `fd54148`, `kindi/__init__.py` still says `0.5.0`, while `main` is merged at
-  `15913b6`. Publishing and retargeting the installer are explicit release decisions
+  `d3198cb`. Publishing and retargeting the installer are explicit release decisions
   left for the release owner.
 - **9B tc** (Hadamard 4096 refused), **4B tc** (3 exact + 1 accepted tie with FD
   fallback; forced-FD 2/4), **k8v4** (2B 2/4, 9B unavailable),
@@ -521,3 +532,93 @@ Updated "what is worse or no longer works" list (as of `15913b6`):
   registered, so none of these can be verified automatically yet.
 - **Rate limiting** remains process-local per source address (documented; behind a
   proxy all clients share one address).
+
+## 11. Measurement rounds (2026-11-13, `15913b6..d3198cb`)
+
+Six commits since §10. This section is the current statement of what is better and what is
+still worse; §10 and earlier keep their own dates.
+
+### 11.1 New or better
+
+- **`kindi bench --sample-vram` — sampled device-wide peak.** `kindi/vram.py` samples
+  `nvidia-smi` memory on a background thread and logs the peak with its idle delta and the
+  phase it happened in (`--vram-sample-s` sets the interval). A host without `nvidia-smi`
+  logs that and the benchmark still finishes. Pinned by `tests/test_vram_monitor.py`. Until
+  now the only peak sampler lived in an ignored `bench-logs/` harness, so a long-context or
+  split-memory claim could not be reproduced from the product.
+- **27B rate and sampled peak, 8K and 24K, both placements plus a full-GPU baseline.**
+
+  | ctx | engine | read | 100 | 2K | 8K | 16K | 24K | sampled peak | free at peak |
+  |---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+  | 8K | tandem `cpu-first` | 10.5 | 7.2 | 7.9 | 5.6 | - | - | 7,027 MiB | 923 MiB |
+  | 8K | tandem `gpu-first` | 9.4 | 7.6 | 6.6 | 5.3 | - | - | 7,027 MiB | 923 MiB |
+  | 8K | full GPU | 37.2 | 34.8 | 34.3 | 33.0 | - | - | 7,473 MiB | 477 MiB |
+  | 24K | tandem `cpu-first` | 10.5 | 8.4 | 8.0 | 6.0 | 3.8 | 3.0 | 7,699 MiB | 251 MiB |
+  | 24K | full GPU | 37.4 | 34.9 | 34.2 | 33.0 | 31.6 | 30.2 | 7,783 MiB | 167 MiB |
+
+  Same session, same idle baseline, exact head. The split saves **446 MiB of peak at 8K**
+  and **193 MiB at 24K**, and costs **4-6x** decode throughput.
+- **27B joint cache at 4K/8K.** Checkpoint 149.6 MiB (37.4 CPU owner + 112.2 GPU owner),
+  54.5-61.5 ms median save and 27.0-28.5 ms median restore in both placements; saved-opening
+  reloads exact (extension 8,176, branch and opening 6,144 cached); checkpoint-only peaks
+  6,842/6,833 MiB at 4K and 7,030/7,027 MiB at 8K. The checkpoint does not grow with
+  context, because it holds recurrent state, not K/V.
+- **9B saved-opening reloads at 4K/8K — the last open cache cell.** Both placements are exact:
+  4,080/8,176 extension tokens, 3,072/6,144 branch and saved-opening tokens, cache-off 0, and the
+  cached continuation matches cache-off token for token. The owned-slice CPU load cuts the 9B
+  start to 33.3-39.5 s (from 105-108 s), and the same eight tokens take 82-221 s cache-off against
+  0.39-0.72 s cached. Evidence: `bench-logs/tandem-cache/saved-9b-4k.json`, `saved-9b-8k.json`.
+- **2B CPU-layer boundary sweep**, 24,576 context, `cpu-first`: 2 layers 122.8 read / 118.9
+  at 24K; 4 layers 110.5 / 41.7; 6 layers 94.6 / 39.5; 8 layers 85.6 / 22.6; 12 layers
+  80.0 / 18.2 tok/s. The knee is 4-6 layers; every split stays below GPU-only (160.6 at
+  24K), so the knob buys memory, not speed.
+- **Tracked benchmark evidence page.** `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md`
+  records the 27B cache, checkpoint, rate and peak numbers with commands, so the evidence is
+  reviewable in the repository instead of only in ignored logs.
+- **Contract tests for two previously untested user-visible paths.** `tests/test_verify_bench_contracts.py`
+  pins `kindi verify` reference routing (2B/4B/9B/27B, 2B default, `None` for an unknown
+  size) and the `kindi bench` refusal of the Nanbeige backend on a CPU host; both modules
+  were at 0% coverage.
+- **Handoff document fixed rather than stale.** `AGENTS.md`'s live current-state block still
+  named `f8c81b7` and 462 tests; it now names the real HEAD, 494 passed / 19 skipped, the new
+  bench flag and the revised open gates.
+
+### 11.2 Still worse or not working (as of `d3198cb`)
+
+- **Installer pin and version — unchanged.** `SOURCE_COMMIT=fd54148`, `KINDI_VERSION=0.5.0`;
+  the published installer still delivers stock-0.5-era code without tandem, owned-slice CPU
+  load or the server hardening. Release-owner publication step; no push was performed.
+- **Tandem still does not beat GPU-only, at any size.** 2B 35.8 vs 160.6 tok/s at 24K, 4B 20.0
+  vs 79.8, 9B 16.0 vs 62.3, 27B 7.2-8.4 vs 34.8-34.9 at position 100. The split is exact and
+  cheaper in peak VRAM; it is not faster.
+- **The "larger than VRAM" premise is not demonstrated on this card.** The full-GPU 27B loads
+  at 8K and at 24K (7,473 and 7,783 MiB peaks, 477 and 167 MiB free). A real capacity row
+  needs a longer context or a smaller card; the documents now say this instead of implying a
+  capacity win.
+- **Measurement variance is not controlled.** The 2B 6-layer tandem row reads 94.6 tok/s in
+  the 2026-11-13 session against 80.9 recorded on 2026-11-12 (about 17%), which is larger than
+  the perf gate's 15% tolerance. All matrix rows remain single-session, single-run numbers;
+  the gate compares the committed CSV with the committed baseline and cannot detect drift
+  between sessions.
+- **Unchanged explicit non-goals:** 9B tensor-core plan (Hadamard 4096 refused), 4B tc
+  (3 exact + 1 accepted tie), k8v4 (2B 2/4, 9B unavailable), Blackwell FP8/BF16 and real FP8
+  models, MoE/Gemma 4 26B backend, mixed-card/P106/RTX 5060 Ti/Turing/Intel Arc hardware,
+  native Sandy Bridge/no-FMA, AVX-512/VNNI, Dory D1, Raon/Gemma 26B backends.
+- **GPU CI lane has no runner**, so none of the GPU-backed gates above run automatically;
+  registration steps are in `docs/CI.md`.
+- **Rate limiting stays process-local** per source address; behind a proxy every client shares
+  one address.
+- **`/health` is still a breaking change** for unauthenticated monitors (intentional security
+  fix; §4.2 item 6).
+
+### 11.3 What was fixed in this round rather than only listed
+
+| was | now |
+|---|---|
+| No product way to measure a transient VRAM peak; only an ignored harness | `kindi bench --sample-vram` with unit tests and docs |
+| 27B "throughput row with sampled peak" open for two rounds | measured at 8K and 24K, both placements, against a full-GPU baseline |
+| 27B saved-opening reload and checkpoint cost at long context open | exact at 4K/8K; cost and peak recorded |
+| CPU-layer boundary unmeasured ("tune n") | 2B sweep with the knee identified and documented |
+| Capacity premise overstated in `ROADMAP`/`TANDEM-*` | restated with the measured full-GPU 24K peak |
+| `kindi/verify.py`, `kindi/bench.py` at 0% coverage | contract tests for both |
+| `AGENTS.md` live state stale by five commits | updated with the real HEAD, suite count and gates |

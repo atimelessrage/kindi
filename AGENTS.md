@@ -10,17 +10,19 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `f8c81b7` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean;
-  guarded by `tests/test_agents_handoff.py`). Full suite last measured before that:
-  462 passed, 19 skipped, 27.15% line-and-branch coverage.
-- **Shipped on main:** dense tandem runtime (2B/4B/9B throughput recorded, exactness at
-  512/4K/8K, 27B exactness + peaks), owned-slice CPU load, multi-ISA CPU dispatch,
-  FP8 `mma.sync` kernels (no real model), MoE expert-cache prototype (no backend),
+- **HEAD:** `d3198cb` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean;
+  guarded by `tests/test_agents_handoff.py`). Full suite last measured there:
+  494 passed, 19 skipped, 1 warning; the 27% line-and-branch coverage floor is unchanged.
+- **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
+  512/4K/8K; 2B CPU-layer sweep; joint checkpoint 149.6 MiB on the 27B at 54.5-61.5 ms
+  save), owned-slice CPU load, `kindi bench --sample-vram` sampled-peak VRAM, multi-ISA CPU
+  dispatch, FP8 `mma.sync` kernels (no real model), MoE expert-cache prototype (no backend),
   rate limiting, JSON access log, coverage floor, perf-baseline gate, CI static analysis.
-- **Open gates:** installer pin/version (release owner), tandem-beats-GPU (tuning),
-  larger-than-VRAM (27B) throughput + sampled peak, GPU CI runner registration
-  (steps in `docs/CI.md`), mixed-card/P106/Arc hardware runs, real FP8/BF16 models,
-  Dory D1, Raon/Gemma 26B backends, AVX-512. See `docs/ROADMAP.md`.
+- **Open gates:** installer pin/version (release owner), tandem-beats-GPU (tuning), a
+  genuinely larger-than-VRAM case (the full-GPU 27B still loads at 24K on the 4060 Ti),
+  9B plan engine (Hadamard 4096), GPU CI runner registration (steps in `docs/CI.md`),
+  mixed-card/P106/Arc hardware runs, real FP8/BF16 models, Dory D1, Raon/Gemma 26B backends,
+  AVX-512. See `docs/ROADMAP.md`.
 - **Shared-file owners:** the newest lease row in the table below owns its files until
   marked done; `T:/kindi/AGENTS.md` is the main worktree's bridge note, not this file.
 
@@ -162,6 +164,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | Permanent project memory and roadmap/git reconciliation | this worktree | `freebuff/tandem-cpu-recovery` | `.agents/skills/project-memory/SKILL.md`, `docs/development/README.md`, `tests/test_project_memory.py`, `AGENTS.md` | done; the skill now has a context-compaction reset recipe, roadmap-vs-git reconciliation step, deleted-requirement recovery with `git show`, and a rule that roadmap items need requirement evidence; `docs/development/README.md` mirrors the reconciliation gate and `AGENTS.md` points agents to it. Evidence: 456 passed, 19 skipped; `project_memory --check`, docs links, config/support `--check`, `compileall`, `bash -n install.sh` and `git diff --check` pass |
 | Current vs Kindi 0.5 report refresh (round 2) | this worktree | `freebuff/tandem-cpu-recovery` | `CURRENT-VS-KINDI-0.5.md`, `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/bench-4b-cpu-first-24k.log`, `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/bench-9b-cpu-first-24k.log`, `AGENTS.md` | done; report refreshed to `082c5da` (301 files, 245 changed vs stock, 2B/4B/9B tandem rows, owned-slice CPU loads 17.2/32.4 s), and the force-added 4B/9B bench logs sanitized after they failed `test_no_secrets` with a local home path. Evidence: full suite 462 passed/19 skipped at 27.15% line-and-branch coverage, `project_memory --check`, docs/project-memory 6 passed, `git diff --check` pass |
 | 2B tandem CPU-layer sweep | this worktree | `freebuff/tandem-cpu-recovery` | `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/README.md`, `docs/TANDEM-RUNTIME.md`, `docs/ROADMAP.md`, `AGENTS.md` | done; 24,576-token context, `cpu-first`, same session: 2 layers 122.8 read / 118.9 at 24K, 4 layers 110.5 / 41.7, 6 layers 94.6 / 39.5, 8 layers 85.6 / 22.6, 12 layers 80.0 / 18.2 tok/s; knee at 4-6 CPU layers, all splits below GPU-only 160.6 at 24K. Raw logs `bench-logs/tandem-cache/sweep-2b-cpu-first-l*.log`; the 6-layer row is faster than the earlier recorded 80.9, both real single runs from different sessions |
+| 9B saved-opening at 4K/8K | this worktree | `freebuff/tandem-cpu-recovery` | `docs/TANDEM-RUNTIME.md`, `docs/TANDEM-STATUS.md`, `docs/ROADMAP.md`, `CURRENT-VS-KINDI-0.5.md`, `AGENTS.md` | done; both placements exact at 4,096 and 8,192 context: extension 4,080/8,176 of 4,085/8,181, branch 3,072/6,144, saved opening 3,072/6,144, cache-off 0; loads 33.3-39.5 s with the owned-slice CPU engine (was 105-108 s full-model); cache-off read 82-221 s vs 0.39-0.72 s cached; evidence `bench-logs/tandem-cache/saved-9b-4k.json`, `saved-9b-8k.json`. This closes the last open joint-cache cell |
 | Verify/bench contract tests | this worktree | `freebuff/tandem-cpu-recovery` | `tests/test_verify_bench_contracts.py`, `AGENTS.md` | done; verify.reference_for routes 2b/4b/9b/27b reference files by pack manifest with 2b default and None for unknown sizes; bench refuses the Nanbeige backend on CPU with exit 2. Evidence: 5 passed with handoff guard |
 | Lookup drafting + SPM tokenizer tests | this worktree | `freebuff/tandem-cpu-recovery` | `tests/test_lookup_spm.py`, `AGENTS.md` | done; 8 requirement-based tests cover prompt-lookup drafting (copy-after-match, no-history, low-acceptance length 0, kept() decay) and the SentencePiece tokenizer on a synthetic vocab (space prefix + merge, byte fallback, special-token split, round trip); both modules were at 0% coverage. Evidence: 8 passed; single-file --cov runs hang while the GPU is busy, so coverage was not re-measured here |
 | Roadmap accuracy + AGENTS current-state section | this worktree | `freebuff/tandem-cpu-recovery` | `docs/ROADMAP.md`, `AGENTS.md` | done; corrected stale roadmap claims (4B/9B tandem throughput recorded, static analysis in CI, perf gate in CPU job) and added the live Current-state section with shared-file ownership (AGENTS-trim gate). Evidence: handoff/project-memory/docs tests 7 passed, project_memory --check, git diff --check pass |

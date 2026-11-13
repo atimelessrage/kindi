@@ -43,7 +43,9 @@ The 2026-11-11/12 slices in this branch add:
   `bench-logs/tandem-cache/RESULTS.md` and `LONG-CONTEXT-RESULTS.md`;
 - the 9B pack passed the 512-context check in both placements with 6 CPU layers: extension 320,
   branch 256 and saved opening 256, all exact against cache-off; CPU load 105-108 s, GPU load
-  5.8-6.0 s; see `bench-logs/tandem-cache/RESULTS-9B.md`;
+  5.8-6.0 s; see `bench-logs/tandem-cache/RESULTS-9B.md`; saved-opening reloads also pass at
+  4K/8K in both placements (4,080/8,176 extension, 3,072/6,144 branch and saved opening, exact;
+  33.3-39.5 s owned-slice loads; `saved-9b-4k.json`, `saved-9b-8k.json`);
 - a prepare-only 2B measurement in both placements: 320/325 and 256/261 tokens reused, a 19.27 MiB
   joint recurrent checkpoint, 8.7-8.9 ms median save and 3.3-3.5 ms median restore; see
   `bench-logs/tandem-cache/PREFIX-RESULTS.md`;
@@ -159,9 +161,9 @@ The dense placement and handoff are done. The next steps are:
 1. Find a genuinely larger-than-VRAM case. The 27B rate and sampled peak are now recorded at 8K
    and 24K for both placements and full GPU, and the full-GPU engine still loads at 24K on this
    card; a longer context or a smaller card is needed to test the capacity claim.
-2. Saved-opening reloads and checkpoint cost are measured at 4K/8K in both placements
-   (54.5-61.5 ms save, 27.0-28.5 ms restore, 149.6 MiB state). Server cache metrics at those
-   contexts remain open.
+2. Saved-opening reloads and checkpoint cost are measured at 4K/8K in both placements for the 9B
+   and the 27B (27B: 54.5-61.5 ms save, 27.0-28.5 ms restore, 149.6 MiB state). Server cache
+   metrics at those contexts remain open.
 3. The 2B CPU-layer boundary is swept (knee at 4-6 layers); a 27B sweep and prompt reading on the
    target small card remain open.
 4. Implement the MoE expert cache from [MOE-TANDEM.md](MOE-TANDEM.md) only after a MoE backend with

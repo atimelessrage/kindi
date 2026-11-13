@@ -143,6 +143,20 @@ restore was 256, and a fresh runner loaded the 256-token saved opening in both p
 cached outputs matched cache-off. The 50 MB joint checkpoint was spaced every 256 tokens. Full
 commands, timings and IDs: `bench-logs/tandem-cache/RESULTS-9B.md`.
 
+The 9B saved-opening reloads were then measured at 4,096 and 8,192 context in both placements
+(2026-11-13), with the owned-slice CPU load:
+
+| context | placement | extension cached | branch cached | saved opening cached | exact | load | cache-off read | cached read |
+|---:|---|---:|---:|---:|---|---:|---:|---:|
+| 4,096 | `cpu-first` | 4,080 / 4,085 | 3,072 | 3,072 | yes | 39.5 s | 82 s | 0.39 s |
+| 4,096 | `gpu-first` | 4,080 / 4,085 | 3,072 | 3,072 | yes | 33.6 s | 103 s | 0.57 s |
+| 8,192 | `cpu-first` | 8,176 / 8,181 | 6,144 | 6,144 | yes | 33.3 s | 179 s | 0.44 s |
+| 8,192 | `gpu-first` | 8,176 / 8,181 | 6,144 | 6,144 | yes | 33.6 s | 221 s | 0.72 s |
+
+Every cached continuation produced the same token IDs as its cache-off control, and each saved
+opening was written by the branch and then loaded into a fresh runner. Evidence:
+`bench-logs/tandem-cache/saved-9b-4k.json` and `saved-9b-8k.json`.
+
 ## Current limits
 
 - **Dense Bonsai only.** The manifest check accepts a Bonsai pack and rejects the Gemma 4 /
@@ -254,8 +268,8 @@ stays below GPU-only. See the [tandem benchmark README](benchmarks/2026-11-12-i7
    context or card where the full-GPU engine genuinely cannot load; on this card even 24K fits.
 3. **Joint cache:** end-state reuse, joint-checkpoint restore and saved-opening reloads through the
    HTTP server are measured on both placements at 512 tokens; in-process equality and saved-opening
-   reloads pass at 4K/8K, and the joint checkpoint costs 54.5-61.5 ms to save and 27.0-28.5 ms to
-   restore in both placements.
+   reloads pass at 4K/8K on the 9B and 27B, and the 27B joint checkpoint costs 54.5-61.5 ms to save
+   and 27.0-28.5 ms to restore in both placements.
 4. **Tuning:** the 2B CPU-layer boundary is measured (knee at 4-6 layers; every split is below
    GPU-only). Prompt reading on the small-card target and a 27B boundary sweep remain open.
 5. **MoE:** design in [MOE-TANDEM.md](MOE-TANDEM.md); implementation only after a real MoE backend
