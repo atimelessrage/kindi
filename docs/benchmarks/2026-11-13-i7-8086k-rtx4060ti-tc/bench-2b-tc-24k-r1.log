@@ -1,4 +1,4 @@
-C:\Users\ICH\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+%USERPROFILE%\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
   warnings.warn(
 [kindi 00:48:18] blocking sync: card 0 primary context flags 0x4 (set: 0)
 [kindi 00:48:19] card 0: 0.41 GB of weights, streamed (0s)
