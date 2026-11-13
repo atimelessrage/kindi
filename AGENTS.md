@@ -55,8 +55,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `0eb2dfd74bb43ce0a6fe60e4bc75514f1c1f1d66` | main checkout; clean; best-of main |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `0eb2dfd74bb43ce0a6fe60e4bc75514f1c1f1d66` | this session; best-of main (identical to `main`) |
+| `T:/kindi` | `main` | `f0f0433` | main checkout; clean; best-of main |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `f0f0433` | this session; best-of main (identical to `main`) |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
