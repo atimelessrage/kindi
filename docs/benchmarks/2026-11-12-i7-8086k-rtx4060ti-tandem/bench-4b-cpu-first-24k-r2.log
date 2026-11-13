@@ -1,0 +1,13 @@
+CuPy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+[kindi 22:34:11] kindi-cpu ready: Ternary-Bonsai-2-4B, avx2-fma-f16c, 6 threads, ctx 24576 (16.2s)
+[kindi 22:34:11] GPU: NVIDIA GeForce RTX 4060 Ti, sm_89, 34 SMs, 8187 MiB
+[kindi 22:34:14] engine ready: ctx 24576, head plain (3.1s)
+[kindi 22:34:14] tandem cpu-first: CPU layers 0..5, GPU layers 6..31, 24576-token context, GPU head
+[kindi 22:34:14] GPU memory: 5431 MiB free of 8187 with a 24576-token context
+[kindi 22:34:15] prompt reading:        49.3 tokens/s
+[kindi 22:34:15] generation (exact head) at position   100:  47.0 tokens/s
+[kindi 22:34:15] generation (exact head) at position  2000:  43.8 tokens/s
+[kindi 22:34:16] generation (exact head) at position  8000:  25.0 tokens/s
+[kindi 22:34:16] generation (exact head) at position 16000:  22.3 tokens/s
+[kindi 22:34:17] generation (exact head) at position 24000:  15.9 tokens/s

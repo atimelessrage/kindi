@@ -144,10 +144,13 @@ def render_md(rows):
     measured_tandem = [m for m in MODELS if by[("tandem", m)]["available"] == 1]
     missing_tandem = [m for m in MODELS if m not in measured_tandem]
     if measured_tandem == list(MODELS):
-        tandem_intro = "All tandem rows below are measured on 2026-11-12."
+        tandem_intro = ("All tandem rows below are measured on 2026-11-13, three fresh-process runs per\n"
+                        "  model; the table uses their median, like the GPU-only rows. The original 2026-11-12 single\n"
+                        "  runs are kept as `bench-<model>-cpu-first-24k.log` in the source folder.")
     elif measured_tandem:
-        tandem_intro = ("Measured tandem rows in the table below come from 2026-11-12 (models: %s); "
-                        "the other tandem rows say `n/a` because they have not been measured."
+        tandem_intro = ("Measured tandem rows in the table below are the median of three fresh-process runs\n"
+                        "  per model (2026-11-13) (models: %s); the other tandem rows say `n/a` because they have\n"
+                        "  not been measured."
                         % ", ".join(m.upper() for m in measured_tandem))
     else:
         tandem_intro = "No throughput benchmark has been run at these positions; the rows below say `n/a` and no tandem number is claimed."

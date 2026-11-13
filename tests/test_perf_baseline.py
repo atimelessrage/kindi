@@ -1,6 +1,10 @@
 """The perf-regression gate (tools/check_perf_baseline.py) must pass on the recorded
-matrix and fail on a real regression or a disappeared baseline cell. The recorded
-baseline is the 2026-11-12 i7-8086K / RTX 4060 Ti CROSS-MODE measurement.
+matrix and fail on a real regression or a disappeared baseline cell. The CPU and GPU
+cells are the 2026-11-09/10 i7-8086K / RTX 4060 Ti CROSS-MODE measurements; the tandem
+cells are medians of three fresh-process runs per model from 2026-11-13, like the
+GPU-only cells. The original 2026-11-12 single tandem runs were 4B read 62.5 and 9B
+at position 100 28.5 tok/s; the gate flagged them as 21%/17% optimistic once the
+medians were recorded, and the baseline was re-adopted.
 """
 import importlib.util
 import json

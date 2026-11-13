@@ -172,8 +172,8 @@ opening was written by the branch and then loaded into a fresh runner. Evidence:
 - **27B: both placements exact; 2B/4B/9B/27B throughput and peaks recorded.** The 2026-11-12
   gate records `cpu-first` and `gpu-first` exactness with sampled peaks. The `cpu-first` cells
   in [CROSS-MODE.md](benchmarks/CROSS-MODE.md) have real `bench` throughput runs at a
-  24,576-token context (2B read 80.9, generation 65.7/71.3/55.5/43.4/35.8; 4B read 62.5,
-  generation 52.1/51.4/33.5/24.8/20.0; 9B read 39.9, generation 28.5/35.8/28.2/20.1/16.0
+  24,576-token context, medians of three fresh-process runs (2B read 84.3, generation 79.8/72.3/58.8/43.2/34.9;
+  4B read 49.3, generation 47.0/43.8/31.7/23.7/16.7; 9B read 38.1, generation 37.5/34.7/25.4/20.5/15.2
   tok/s). The 27B row with sampled peak is in
   [27B-8K.md](benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md): 7.2-8.4 tok/s at 100
   against 34.9 full-GPU, 446 MiB (8K) and 193 MiB (24K) less peak.

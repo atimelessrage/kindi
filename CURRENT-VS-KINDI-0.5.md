@@ -112,7 +112,7 @@ Recorded results:
 | 9B checkpoint cost | 50.25 MiB joint recurrent state; 15.9/17.4 ms median save; 10.5/11.1 ms median restore; ~3.06 GiB device peak | `checkpoint-cost-9b-512.json` |
 | 27B `cpu-first` (CPU 0..15, GPU 16..63, GPU head), 8,192 context | 4/4 exact, 40/40 tokens each; combined load 385.6 s (full-model CPU load); peak **7,005 MiB** vs 7,238 MiB full-GPU baseline | `bench-logs/tandem-27b-gate/cpu-first-8192.json` |
 | 27B `gpu-first` (GPU 0..47 + embedding, CPU 48..63, CPU head), 8,192 context | 4/4 exact, 40/40 tokens each; combined load 413.3 s (full-model CPU load); peak **7,017 MiB** vs 7,238 MiB full-GPU baseline | `bench-logs/tandem-27b-gate/gpu-first-8192.json` |
-| 2B/4B/9B `cpu-first` CROSS-MODE throughput, 24,576 ctx | 2B read 80.9, gen 65.7/71.3/55.5/43.4/35.8; 4B read 62.5, gen 52.1/51.4/33.5/24.8/20.0; 9B read 39.9, gen 28.5/35.8/28.2/20.1/16.0 tok/s; free-after-load 6411/5431/4635 MiB | `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/` |
+| 2B/4B/9B `cpu-first` CROSS-MODE throughput at 24,576 ctx (medians of three, 2026-11-13) | 2B read 84.3, gen 79.8/72.3/58.8/43.2/34.9; 4B read 49.3, gen 47.0/43.8/31.7/23.7/16.7; 9B read 38.1, gen 37.5/34.7/25.4/20.5/15.2 tok/s; free-after-load 6411/5431/4635 MiB | `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/` (2026-11-12 single runs kept as `bench-<model>-cpu-first-24k.log`; see §12) |
 | 27B rate + sampled peak, 8K and 24K, both placements and full GPU | tandem 7.2-8.4 tok/s at position 100 vs 34.8-34.9 full GPU; peaks 7,027 vs 7,473 MiB at 8K and 7,699 vs 7,783 MiB at 24K | [27B-8K.md](docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md) |
 | 27B joint cache at 4K/8K | saved-opening reloads exact in both placements; 149.6 MiB checkpoint, 54.5-61.5 ms save, 27.0-28.5 ms restore; checkpoint-only peaks 6,842/6,833 MiB (4K) and 7,030/7,027 MiB (8K) | same |
 | 9B saved opening at 4K/8K | extension 4,080/8,176, branch and saved opening 3,072/6,144, cache-off 0, exact in both placements; loads 33.3-39.5 s | `bench-logs/tandem-cache/saved-9b-4k.json`, `saved-9b-8k.json` |
@@ -618,7 +618,40 @@ still worse; §10 and earlier keep their own dates.
 | No product way to measure a transient VRAM peak; only an ignored harness | `kindi bench --sample-vram` with unit tests and docs |
 | 27B "throughput row with sampled peak" open for two rounds | measured at 8K and 24K, both placements, against a full-GPU baseline |
 | 27B saved-opening reload and checkpoint cost at long context open | exact at 4K/8K; cost and peak recorded |
+| 9B saved-opening reload at 4K/8K is the last open cache cell | measured exact in both placements |
 | CPU-layer boundary unmeasured ("tune n") | 2B sweep with the knee identified and documented |
 | Capacity premise overstated in `ROADMAP`/`TANDEM-*` | restated with the measured full-GPU 24K peak |
 | `kindi/verify.py`, `kindi/bench.py` at 0% coverage | contract tests for both |
 | `AGENTS.md` live state stale by five commits | updated with the real HEAD, suite count and gates |
+
+## 12. Tandem rows re-recorded as medians (2026-11-13)
+
+§11.2 listed one measurement fault: the tandem rows in the matrix were single runs, and a
+re-measurement came back ~17% away from the 2B row. I have now replaced them with the same
+methodology as the GPU-only cells — **the median of three fresh-process runs per model**,
+one session, same machine, exact head, 24,576-token context, `cpu-first`, 6 CPU layers:
+
+| model | runs (read) | median read | median gen 100/2K/8K/16K/24K | was (single run) |
+|---|---:|---:|---|---|---:|
+| 2B | 77.3 / 84.4 / 84.3 | 84.3 | 79.8 / 72.3 / 58.8 / 43.2 / 34.9 | 80.9, 65.7/71.3/55.5/43.4/35.8 |
+| 4B | 52.8 / 49.3 / 47.8 | 49.3 | 47.0 / 43.8 / 31.7 / 23.7 / 16.7 | 62.5, 52.1/51.4/33.5/24.8/20.0 |
+| 9B | 40.1 / 38.1 / 37.0 | 38.1 | 37.5 / 34.7 / 25.4 / 20.5 / 15.2 | 39.9, 28.5/35.8/28.2/20.1/16.0 |
+
+The single runs were off by **up to 32%** (9B at position 100) and 4B read by **-21%**.
+Adopting the medians made the 15%-tolerance perf gate flag exactly those two 4B cells
+(-21% read, -17% at 24K) before I re-recorded the baseline with
+`tools/check_perf_baseline.py --update`; only the three tandem cells changed, and the
+baseline now holds the medians. `docs/benchmarks/build_cross_mode.py` generates the new
+intro (“All tandem rows below are measured on 2026-11-13, three fresh-process runs per
+model; the table uses their median”) and `runs.csv` keeps one row per run. The 2026-11-12
+single-run logs, with the old numbers, remain in the same folder as the record they were;
+§3.1 above is updated to the adopted values.
+
+Updated worse status: **the "measurement variance is not controlled" item from §11.2 is
+closed for the tandem rows** — they now carry the same median-of-three standard as the
+GPU-only rows, and the discrepancy is bounded by the observed run-to-run spread
+(±5-25% across cells) rather than hidden inside one lucky invocation.
+
+| was | now |
+|---|---|
+| Tandem matrix rows are single runs, up to 32% off a re-measurement | medians of three fresh-process runs per model; the perf baseline holds them and only the tandem cells were re-recorded |

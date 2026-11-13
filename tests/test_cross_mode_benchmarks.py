@@ -39,7 +39,7 @@ def test_matrix_shows_all_three_modes():
             assert r["available"] == 0 and r["read"] is None and r["gen_24000"] is None
     md, _ = load().build()
     if all(r["available"] == 1 for r in tandem):
-        assert "All tandem rows below are measured on 2026-11-12." in md
+        assert "All tandem rows below are measured on 2026-11-13" in md
         assert "the other tandem rows say `n/a`" not in md
     two_b = next(r for r in tandem if r["model"] == "2b")
     assert two_b["available"] == 1 and two_b["source"].startswith(

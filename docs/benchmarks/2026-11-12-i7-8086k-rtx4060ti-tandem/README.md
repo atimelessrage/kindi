@@ -1,13 +1,22 @@
-# 2026-11-12 tandem throughput, i7-8086K + RTX 4060 Ti
+# Tandem throughput, i7-8086K + RTX 4060 Ti
 
 Real `kindi bench` runs of the dense tandem runtime on the same machine and
-24,576-token context as the cross-mode CPU/GPU cells, one fresh process per model.
+24,576-token context as the cross-mode CPU/GPU cells. The numbers in the table are
+the **median of three fresh-process runs per model** (2026-11-13), the same
+methodology as the GPU-only cells. The original 2026-11-12 single runs
+(2B read 80.9, 4B read 62.5, 9B read 39.9) are kept as `bench-<model>-cpu-first-24k.log`.
 
 | model | placement | CPU layers | read | 100 | 2K | 8K | 16K | 24K |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| 2B | cpu-first (CPU 0..5, GPU 6..23, GPU head) | 6 | 80.9 | 65.7 | 71.3 | 55.5 | 43.4 | 35.8 |
-| 4B | cpu-first (CPU 0..5, GPU 6..31, GPU head) | 6 | 62.5 | 52.1 | 51.4 | 33.5 | 24.8 | 20.0 |
-| 9B | cpu-first (CPU 0..5, GPU 6..31, GPU head) | 6 | 39.9 | 28.5 | 35.8 | 28.2 | 20.1 | 16.0 |
+| 2B | cpu-first (CPU 0..5, GPU 6..23, GPU head) | 6 | 84.3 | 79.8 | 72.3 | 58.8 | 43.2 | 34.9 |
+| 4B | cpu-first (CPU 0..5, GPU 6..31, GPU head) | 6 | 49.3 | 47.0 | 43.8 | 31.7 | 23.7 | 16.7 |
+| 9B | cpu-first (CPU 0..5, GPU 6..31, GPU head) | 6 | 38.1 | 37.5 | 34.7 | 25.4 | 20.5 | 15.2 |
+
+> **The single-run rows were off by up to 30%.** One re-measurement (the 2B 6-layer sweep
+> run) read 94.6 against the recorded 80.9. Re-running all three models three times moved
+> 4B read by **-21%** and 9B at position 100 by **+32%**; the perf gate flagged the 4B row
+> (-21% read, -17% at 24K) before the new medians were adopted. Single tandem runs are not
+> spec-grade evidence; medians are what [CROSS-MODE.md](../CROSS-MODE.md) reports.
 
 Commands:
 
@@ -20,14 +29,14 @@ PATH='/c/Program Files/clang+llvm-18.1.8-x86_64-pc-windows-msvc/bin:'$PATH \
 python -m kindi --pack '~/.kindi/packs/bonsai-9b' bench --tandem cpu-first --tandem-cpu-layers 6
 ```
 
-The raw outputs are `bench-2b-cpu-first-24k.log`, `bench-4b-cpu-first-24k.log` and
-`bench-9b-cpu-first-24k.log`. The CPU engine built `avx2-fma-f16c`, 6 threads;
-loads were 27.4 s (2B), 17.2 s (4B) and 32.4 s (9B, owned-slice CPU load). `bench`
+The raw outputs are the 2026-11-12 single runs `bench-2b-cpu-first-24k.log`,
+`bench-4b-cpu-first-24k.log` and `bench-9b-cpu-first-24k.log`, and the 2026-11-13 median
+runs `bench-<model>-cpu-first-24k-r1..3.log`. The CPU engine built `avx2-fma-f16c`, 6
+threads; loads were 27.4 s (2B), 17.2 s (4B) and 32.4 s (9B, owned-slice CPU load). `bench`
 reported free memory after load of 6411 MiB (2B), 5431 MiB (4B) and 4635 MiB (9B)
-of 8187 MiB. That is free-after-load, not a sampled peak. `runs.csv` is the
-machine-readable input consumed by `docs/benchmarks/build_cross_mode.py`; it
-records `free_mib` for these runs but the cross-mode tables do not present free
-memory or claim a peak from it.
+of 8187 MiB in every run. That is free-after-load, not a sampled peak. `runs.csv` holds
+one row per run; `docs/benchmarks/build_cross_mode.py` takes the median of each model’s
+rows. The cross-mode tables do not present free memory or claim a peak from it.
 
 All three cross-mode tandem rows are now measured. Tandem still does not beat
 GPU-only on this machine (cf. `docs/benchmarks/CROSS-MODE.md`). The 27B gate has
@@ -56,6 +65,6 @@ the long-context cost grows faster than the VRAM saving. GPU-only 2B at 24K is
 speed. Commands: `kindi --pack ~/.kindi/packs/bonsai-2b bench --tandem cpu-first
 --tandem-cpu-layers N`; raw logs `bench-logs/tandem-cache/sweep-2b-cpu-first-l*.log`.
 
-The row at 6 layers is faster here than the recorded 2B row above (94.6 versus
-80.9 read); both are real single runs from different sessions, and the sweep's
-purpose is the same-session trend, not a new headline number.
+The row at 6 layers is faster here than the recorded median (94.6 versus 84.3 read);
+both are real runs from different sessions, and the sweep's purpose is the same-session
+trend, not a new headline number.

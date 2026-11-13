@@ -9,7 +9,9 @@ drafting.
   24,576-token context. One fresh-process run per model; no WSL.
 - **GPU only:** the card runs every layer; the CPU only drives the process (Windows 10, CuPy
   14.2.0). Three fresh-process runs per model; the table uses their median.
-- **GPU+CPU tandem:** the dense `TandemEngine` exists and is token-exact on the 2B/9B (`docs/TANDEM-RUNTIME.md`). All tandem rows below are measured on 2026-11-12.
+- **GPU+CPU tandem:** the dense `TandemEngine` exists and is token-exact on the 2B/9B (`docs/TANDEM-RUNTIME.md`). All tandem rows below are measured on 2026-11-13, three fresh-process runs per
+  model; the table uses their median, like the GPU-only rows. The original 2026-11-12 single
+  runs are kept as `bench-<model>-cpu-first-24k.log` in the source folder.
 
 "Read" is the benchmark's 1,000-token prompt-reading probe. 100, 2K, 8K, 16K and 24K are
 generation at that token position in the allocated 24,576-token context. Tokens/s.
@@ -18,13 +20,13 @@ generation at that token position in the allocated 24,576-token context. Tokens/
 |---|---|---:|---:|---:|---:|---:|---:|
 | 2B | GPU only | 190.0 | 169.0 | 163.3 | 175.4 | 171.7 | 160.6 |
 | 2B | CPU only | 45.1 | 35.9 | 29.3 | 19.4 | 11.9 | 8.2 |
-| 2B | GPU+CPU tandem | 80.9 | 65.7 | 71.3 | 55.5 | 43.4 | 35.8 |
+| 2B | GPU+CPU tandem | 84.3 | 79.8 | 72.3 | 58.8 | 43.2 | 34.9 |
 | 4B | GPU only | 129.0 | 106.2 | 101.9 | 90.8 | 89.3 | 79.8 |
 | 4B | CPU only | 19.2 | 15.2 | 13.4 | 6.8 | 4.3 | 3.1 |
-| 4B | GPU+CPU tandem | 62.5 | 52.1 | 51.4 | 33.5 | 24.8 | 20.0 |
+| 4B | GPU+CPU tandem | 49.3 | 47.0 | 43.8 | 31.7 | 23.7 | 16.7 |
 | 9B | GPU only | 90.3 | 77.8 | 76.8 | 71.6 | 67.4 | 62.3 |
 | 9B | CPU only | 9.9 | 8.7 | 7.7 | 4.9 | 3.5 | 2.6 |
-| 9B | GPU+CPU tandem | 39.9 | 28.5 | 35.8 | 28.2 | 20.1 | 16.0 |
+| 9B | GPU+CPU tandem | 38.1 | 37.5 | 34.7 | 25.4 | 20.5 | 15.2 |
 
 Sources: [2026-11-10-i7-8086k-windows-cpu](2026-11-10-i7-8086k-windows-cpu/README.md) (6 threads,
 native Windows) and [2026-11-09-i7-8086k-rtx4060ti](2026-11-09-i7-8086k-rtx4060ti/README.md). The
