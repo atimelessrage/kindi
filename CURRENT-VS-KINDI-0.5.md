@@ -24,18 +24,18 @@ everything described here has been re-run on current hardware.
 |---|---|---|---|
 | Ref | `v0.5.0` tag, `1c4cc3e01732f0fada4ab7030ccf4f7651e01053` | `clean/kindi-0.5`, `1b0cbf780b57d464cdb3e5e9acf75ed49256d622` | `main` and `freebuff/tandem-cpu-recovery`, `0cd58bcd223bf1afba2d8319601e64b014a97082` |
 | Date | 2026-11-09 | clean snapshot of local 0.5 work | 2026-11-13 (merged state) |
-| Tracked files | 102 | 216 | 322 |
+| Tracked files | 102 | 216 | 342 |
 | Test modules | **0** (`tests/` does not exist) | 25 | 53 tracked test modules |
 | Docs files | 12 | 84 | 139 tracked paths under `docs/` |
 | Git state | release tag | clean | `main` fast-forwarded to the best-of branch at `0cd58bcd223bf1afba2d8319601e64b014a97082`; generated coverage artifacts are ignored; `bench-logs/` is ignored local evidence |
 
 The primary comparison below is against the **stock `v0.5.0` tag**. `clean/kindi-0.5`
 already contains earlier local audit, CPU, server and documentation work, so it is a
-narrower comparison, not the stock release. Relative to that clean snapshot, the committed branch has **181 changed tracked paths
-with +18,511/−620 lines**.
+narrower comparison, not the stock release. Relative to that clean snapshot, the committed branch has **201 changed tracked paths
+with +19,091/−630 lines**.
 
-Relative to the stock tag, the committed branch (`v0.5.0..HEAD`) changes **268 tracked
-files with +32,869/−372 lines**. The generated `.coverage`/`coverage.json` artifacts
+Relative to the stock tag, the committed branch (`v0.5.0..HEAD`) changes **288 tracked
+files with +33,439/−372 lines**. The generated `.coverage`/`coverage.json` artifacts
 are now ignored; `bench-logs/` remains ignored local evidence.
 
 Evidence labels used below:
@@ -394,7 +394,7 @@ Run in the current worktree on 2026-11-12:
 | `python -m kindi.support_matrix --check` | exit 0 |
 | `git -c core.whitespace=cr-at-eol diff --check` | exit 0 |
 | `git status --short` | `main` and the feature branch identical at `0cd58bcd223bf1afba2d8319601e64b014a97082`; coverage artifacts ignored; `bench-logs/` ignored |
-| `git diff --stat v0.5.0..HEAD` | 268 tracked paths, +32,869/−372 |
+| `git diff --stat v0.5.0..HEAD` | 288 tracked paths, +33,439/−372 |
 | `kindi verify` 2B/4B/9B (2026-11-12 evening) | ALL PASS, 153.7 / 108.9 / 74.6 tok/s |
 | 27B tandem gate, `cpu-first` (2026-11-12) | **4/4 prompts, 40/40 each; peak 7,005 MiB; 8,192 ctx; exit 0** |
 | 27B tandem gate, `gpu-first` (2026-11-12) | **4/4 prompts, 40/40 each; peak 7,017 MiB; 8,192 ctx; exit 0** |
