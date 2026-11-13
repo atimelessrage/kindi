@@ -697,3 +697,24 @@ gate from §11 is closed for the 2B and 27B on this host.
 Also new in this round: **`kindi bench --json FILE`** writes a run's numbers (read rate, per-
 position generation, placement, context, sampled peak) in machine-readable form, so recorded
 runs no longer need log scraping (`kindi/bench.py`, `tests/test_bench_json.py`).
+
+## 14. The 9B tensor-core plan (HB 4096) (2026-11-13)
+
+The plan engine's HB 4096 refusal was stale: the kernels have dispatched the 4096 folds since the
+27B work (`ff_rmsfold<8,8>`, `ff_smfold<8>`, `ff_fold<8>`), and only the Python gate still
+refused. Lifting it and running the real verify showed:
+
+| 9B run | result | tok/s |
+|---|---|---|
+| plain (KINDI_TP=0) | 4/4 | 76.3 - 80.0 |
+| tc, default int8 activations | 3/4 (prompt 1 flips at token 36) | 125 |
+| tc, `KINDI_TC_HP=1` | 4/4 | 122.7 |
+
+The flip was isolated to activation precision: fold-split, FF, FD, ATT_TC and TMAX toggles all
+left it unchanged and only HP (two int8 rows per token) made it exact. `kindi/spec.py` now
+refuses HB 4096 unless `KINDI_TC_HP=1` (before the repack, not after), so the default tc path
+keeps refusing with the measured reason and the exact path is opt-in — the same standing rule as
+the quarantined `k8v4` cache and the 4B's FD-fallback caveat now documented in `docs/CARDS.md`,
+`docs/CARD-SUPPORT.md` and `docs/ROADMAP.md`. No regression: 2B tc is still 4/4 (388.3 tok/s)
+and the 9B tc cell now records `refused` in `tools/verify_matrix.py`. Evidence:
+`bench-logs/verify-matrix-9b-tc/`, `bench-logs/verify-matrix-9b-tc-refused2/`.

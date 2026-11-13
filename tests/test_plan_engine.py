@@ -256,8 +256,9 @@ def test_the_v4_kernels_are_compiled_and_wrapped(spec_tp):
     assert "k_attn_vq4w_m" in spec.FUSED
 
 
-def test_plan_engine_refuses_the_9b_before_building_plans(spec_tp, monkeypatch):
-    """KINDI_TC=1 installs a build_plans wrapper; the 9B (HB 4096) must stop there, not in a kernel."""
+def test_plan_engine_refuses_the_9b_unless_hp(spec_tp, monkeypatch):
+    """KINDI_TC=1 installs a build_plans wrapper; the 9B (HB 4096) is refused unless the
+    high-precision activations are on (measured: 4/4 with KINDI_TC_HP=1, 3/4 without)."""
     spec, tp = spec_tp
     shard_cls = tp.Shard
     saved = (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
@@ -265,9 +266,29 @@ def test_plan_engine_refuses_the_9b_before_building_plans(spec_tp, monkeypatch):
     monkeypatch.setenv("KINDI_TC", "1")
     try:
         spec.install(log=lambda *a, **k: None)
-        with pytest.raises(SystemExit,
-                           match=r"tensor-core plan engine supports Hadamard blocks of 512 and 1024"):
+        with pytest.raises(SystemExit, match=r"refuses Hadamard blocks of 4096 unless KINDI_TC_HP=1"):
             tp.Shard.build_plans(_probe(4096))
+    finally:
+        (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
+         spec._chunk.reserve, spec._chunk.build) = saved
+        spec._installed[0] = False
+
+
+def test_plan_engine_accepts_the_9b_with_hp(spec_tp, monkeypatch):
+    """With KINDI_TC_HP=1 the HB 4096 guard passes (the tcf.cu folds dispatch
+    ff_rmsfold<8>/ff_smfold<8>/ff_fold<8> for 4096) and the build proceeds."""
+    spec, tp = spec_tp
+    shard_cls = tp.Shard
+    saved = (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
+             spec._chunk.reserve, spec._chunk.build)
+    monkeypatch.setenv("KINDI_TC", "1")
+    monkeypatch.setattr(spec, "HP", True)          # HP is read at import time
+    probe = _probe(4096)
+    probe.tp = types.SimpleNamespace(W=1)          # one card: the tp.py guard accepts HB 4096 with W == 1
+    try:
+        spec.install(log=lambda *a, **k: None)
+        with pytest.raises(AttributeError):   # the guard passed; the next statement reads s.hA
+            tp.Shard.build_plans(probe)
     finally:
         (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
          spec._chunk.reserve, spec._chunk.build) = saved
