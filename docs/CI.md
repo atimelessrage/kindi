@@ -147,7 +147,7 @@ means the synthetic E4M3/E5M2 quantization, GEMM and `Ops.linear_batch` checks p
 Blackwell card, not that a real FP8 model was validated. No Blackwell runner is registered for
 this worktree, so the workflow has not run; a local gate on the Ada-only host returned
 `unsupported` (exit 2) on 2026-11-12, recorded in
-[bench-logs/blackwell-fp8-ada-refusal-20261112/RESULTS.md](../bench-logs/blackwell-fp8-ada-refusal-20261112/RESULTS.md).
+[bench-logs/blackwell-fp8-ada-refusal-20261112/RESULTS.md](benchmarks/blackwell-fp8-ada-refusal-20261112/RESULTS.md).
 It is not a Blackwell result.
 
 ## Performance baseline

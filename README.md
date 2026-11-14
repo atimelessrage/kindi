@@ -107,6 +107,9 @@ If the server is on a different computer, use its address in place of `localhost
 connections only from the same computer (see [Run the server](#run-the-server)). For more about clients, see
 [Use it](#use-it) and [docs/AGENTS.md](docs/AGENTS.md).
 
+Not sure where the documentation lives or which page to trust? Start at the
+[docs index](docs/README.md) and [docs/GOALS.md](docs/GOALS.md).
+
 ## Requirements
 
 | | |

@@ -8,7 +8,7 @@ base checkpoint.
 
 This page resolves the R0 questions in [RAON-1-MINI.md](RAON-1-MINI.md) and the M0 questions in
 [MOE-TANDEM.md](MOE-TANDEM.md). Full machine-readable evidence is in
-[`bench-logs/raon-r0/`](../bench-logs/raon-r0/README.md).
+[`bench-logs/raon-r0/`](benchmarks/raon-r0/README.md).
 
 ## 1. Sources and pins
 
@@ -31,7 +31,7 @@ shards and GGUF payload were not downloaded.
 | model code | `modeling_raon1_mini.py` SHA-256 `ca0742570e8c9b730115f2feedbcd9f424dc47d21b132729f27c4d8ac6998fc6` |
 | chat template | SHA-256 `34a9f0219d315211631885b22d8e4973943c092ef319b57c11853127e392b0ac` |
 | tokenizer config | SHA-256 `d5d612aeef88d4564d2010ab7f65b7e54821acfd7ccda80739dd19761840bcde` |
-| full pins | [`source-pins.json`](../bench-logs/raon-r0/source-pins.json) |
+| full pins | [`source-pins.json`](benchmarks/raon-r0/source-pins.json) |
 
 Base shard SHA-256 values (full list in `source-pins.json`):
 
@@ -93,10 +93,10 @@ The complete inventories are generated from the actual headers, not from a templ
 
 | artifact | contents |
 |---|---|
-| [`base-tensor-inventory.json`](../bench-logs/raon-r0/base-tensor-inventory.json) | **19,434** base tensors with `name`, `dtype`, `shape`, `bytes`, shard |
-| [`gguf-q4km-tensor-inventory.json`](../bench-logs/raon-r0/gguf-q4km-tensor-inventory.json) | **731** GGUF tensors with `name`, `shape`, `type_id`, `type`, `offset`, `bytes` |
-| [`manifest-summary.json`](../bench-logs/raon-r0/manifest-summary.json) | counts, per-layer bytes, cache formulas, comparisons |
-| [`build_manifest.py`](../bench-logs/raon-r0/build_manifest.py) | the reproducible validator/builder |
+| [`base-tensor-inventory.json`](benchmarks/raon-r0/base-tensor-inventory.json) | **19,434** base tensors with `name`, `dtype`, `shape`, `bytes`, shard |
+| [`gguf-q4km-tensor-inventory.json`](benchmarks/raon-r0/gguf-q4km-tensor-inventory.json) | **731** GGUF tensors with `name`, `shape`, `type_id`, `type`, `offset`, `bytes` |
+| [`manifest-summary.json`](benchmarks/raon-r0/manifest-summary.json) | counts, per-layer bytes, cache formulas, comparisons |
+| [`build_manifest.py`](benchmarks/raon-r0/build_manifest.py) | the reproducible validator/builder |
 
 ### 3.1 Base role counts
 
@@ -354,4 +354,4 @@ gate.
 - It does not claim a router tie rule that the released code does not specify.
 
 Related: [RAON-1-MINI.md](RAON-1-MINI.md), [MOE-TANDEM.md](MOE-TANDEM.md),
-[ROADMAP.md](ROADMAP.md), [`bench-logs/raon-r0/README.md`](../bench-logs/raon-r0/README.md).
+[ROADMAP.md](ROADMAP.md), [`bench-logs/raon-r0/README.md`](benchmarks/raon-r0/README.md).

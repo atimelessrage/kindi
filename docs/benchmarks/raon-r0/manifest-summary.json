@@ -1,0 +1,537 @@
+{
+  "source_pins": {
+    "base_revision": "8c9b802acacdbda9df16606689fcf437cf7262fb",
+    "gguf_revision": "cd61e81afcdfdf4b13cb345b3587c0ba4b918d00",
+    "llama_cpp_commit": "fb895662d25868756a19253ca5e0688f99b18994",
+    "official_repo_commit": "cfa219538a11a0f10a6ae40ede76bdb8efc4dc4e"
+  },
+  "base": {
+    "tensor_count": 19434,
+    "tensor_bytes": 32699649368,
+    "dtypes": {
+      "BF16": 892,
+      "F32": 110,
+      "F8_E4M3": 9216,
+      "U8": 9216
+    },
+    "parameters": {
+      "header_total": 28783218602,
+      "hf_summary_total": 28783218402,
+      "scalar_tensors_excluded_by_hf": 200,
+      "active": 4317319082,
+      "active_fraction": 0.14999431236991723
+    },
+    "layers": [
+      {
+        "layer": 0,
+        "attention": "rda",
+        "mlp": "dense",
+        "tensors": 40,
+        "bytes": 319109624,
+        "expert_slots": 0
+      },
+      {
+        "layer": 1,
+        "attention": "rda",
+        "mlp": "moe",
+        "tensors": 810,
+        "bytes": 1254636536,
+        "expert_slots": 128
+      },
+      {
+        "layer": 2,
+        "attention": "rda",
+        "mlp": "moe",
+        "tensors": 810,
+        "bytes": 1254636536,
+        "expert_slots": 128
+      },
+      {
+        "layer": 3,
+        "attention": "mla",
+        "mlp": "moe",
+        "tensors": 803,
+        "bytes": 1198707416,
+        "expert_slots": 128
+      },
+      {
+        "layer": 4,
+        "attention": "rda",
+        "mlp": "moe",
+        "tensors": 810,
+        "bytes": 1254636536,
+        "expert_slots": 128
+      },
+      {
+        "layer": 5,
+        "attention": "rda",
+        "mlp": "moe",
+        "tensors": 810,
+        "bytes": 1254636536,
+        "expert_slots": 128
+      },
+      {
+        "layer": 6,
+        "attention": "rda",
+        "mlp": "moe",
+        "tensors": 810,
+        "bytes": 1254636536,
+        "expert_slots": 128
+      },
+      {
+        "layer": 7,
+        "attention": "mla",
+        "mlp": "moe",
+        "tensors": 803,
+        "bytes": 1198707416,
+        "expert_slots": 128
+      },
+      {
+        "layer": 8,
+        "attention": "rda",
+        "mlp": "moe",
+        "tensors": 810,
+        "bytes": 1254636536,
+        "expert_slots": 128
+      },
+      {
+        "layer": 9,
+        "attention": "rda",
+        "mlp": "moe",
+        "tensors": 810,
+        "bytes": 1254636536,
+        "expert_slots": 128
+      },
+      {
+        "layer": 10,
+        "attention": "rda",
+        "mlp": "moe",
+        "tensors": 810,
+        "bytes": 1254636536,
+        "expert_slots": 128
+      },
+      {
+        "layer": 11,
+        "attention": "mla",
+        "mlp": "moe",
+        "tensors": 803,
+        "bytes": 1198707416,
+        "expert_slots": 128
+      },
+      {
+        "layer": 12,
+        "attention": "rda",
+        "mlp": "moe",
+        "tensors": 810,
+        "bytes": 1254636536,
+        "expert_slots": 128
+      },
+      {
+        "layer": 13,
+        "attention": "rda",
+        "mlp": "moe",
+        "tensors": 810,
+        "bytes": 1254636536,
+        "expert_slots": 128
+      },
+      {
+        "layer": 14,
+        "attention": "rda",
+        "mlp": "moe",
+        "tensors": 810,
+        "bytes": 1254636536,
+        "expert_slots": 128
+      },
+      {
+        "layer": 15,
+        "attention": "mla",
+        "mlp": "moe",
+        "tensors": 803,
+        "bytes": 1198707416,
+        "expert_slots": 128
+      },
+      {
+        "layer": 16,
+        "attention": "rda",
+        "mlp": "moe",
+        "tensors": 810,
+        "bytes": 1254636536,
+        "expert_slots": 128
+      },
+      {
+        "layer": 17,
+        "attention": "rda",
+        "mlp": "moe",
+        "tensors": 810,
+        "bytes": 1254636536,
+        "expert_slots": 128
+      },
+      {
+        "layer": 18,
+        "attention": "rda",
+        "mlp": "moe",
+        "tensors": 810,
+        "bytes": 1254636536,
+        "expert_slots": 128
+      },
+      {
+        "layer": 19,
+        "attention": "mla",
+        "mlp": "moe",
+        "tensors": 803,
+        "bytes": 1198707416,
+        "expert_slots": 128
+      },
+      {
+        "layer": 20,
+        "attention": "rda",
+        "mlp": "moe",
+        "tensors": 810,
+        "bytes": 1254636536,
+        "expert_slots": 128
+      },
+      {
+        "layer": 21,
+        "attention": "rda",
+        "mlp": "moe",
+        "tensors": 810,
+        "bytes": 1254636536,
+        "expert_slots": 128
+      },
+      {
+        "layer": 22,
+        "attention": "rda",
+        "mlp": "moe",
+        "tensors": 810,
+        "bytes": 1254636536,
+        "expert_slots": 128
+      },
+      {
+        "layer": 23,
+        "attention": "mla",
+        "mlp": "moe",
+        "tensors": 803,
+        "bytes": 1198707416,
+        "expert_slots": 128
+      },
+      {
+        "layer": 24,
+        "attention": "mla",
+        "mlp": "moe",
+        "tensors": 803,
+        "bytes": 1198707416,
+        "expert_slots": 128
+      }
+    ],
+    "layer_types": {
+      "rda": 18,
+      "mla": 7,
+      "moe": 24,
+      "dense": 1
+    },
+    "expert_slots": 3072,
+    "expert_tensors": 18432,
+    "expert_bytes": 26471301120,
+    "expert_bytes_per_slot": 8616960,
+    "core_bytes": 6228348248,
+    "attention_schedule_zero_based": {
+      "rda": [
+        0,
+        1,
+        2,
+        4,
+        5,
+        6,
+        8,
+        9,
+        10,
+        12,
+        13,
+        14,
+        16,
+        17,
+        18,
+        20,
+        21,
+        22
+      ],
+      "mla": [
+        3,
+        7,
+        11,
+        15,
+        19,
+        23,
+        24
+      ]
+    },
+    "shard_count": 7,
+    "shard_file_bytes": 32702145088,
+    "index": {
+      "index_total_size": 32699649368,
+      "shard_count": 7,
+      "shard_file_bytes": 32702145088,
+      "headers": {
+        "model-00001-of-00007.safetensors": {
+          "header_bytes": 404248,
+          "downloaded_header_bytes": 8388608,
+          "tensor_count": 3145,
+          "metadata": {
+            "format": "pt"
+          }
+        },
+        "model-00002-of-00007.safetensors": {
+          "header_bytes": 419800,
+          "downloaded_header_bytes": 8388608,
+          "tensor_count": 3259,
+          "metadata": {
+            "format": "pt"
+          }
+        },
+        "model-00003-of-00007.safetensors": {
+          "header_bytes": 419608,
+          "downloaded_header_bytes": 8388608,
+          "tensor_count": 3264,
+          "metadata": {
+            "format": "pt"
+          }
+        },
+        "model-00004-of-00007.safetensors": {
+          "header_bytes": 415040,
+          "downloaded_header_bytes": 8388608,
+          "tensor_count": 3223,
+          "metadata": {
+            "format": "pt"
+          }
+        },
+        "model-00005-of-00007.safetensors": {
+          "header_bytes": 422048,
+          "downloaded_header_bytes": 8388608,
+          "tensor_count": 3296,
+          "metadata": {
+            "format": "pt"
+          }
+        },
+        "model-00006-of-00007.safetensors": {
+          "header_bytes": 413016,
+          "downloaded_header_bytes": 8388608,
+          "tensor_count": 3230,
+          "metadata": {
+            "format": "pt"
+          }
+        },
+        "model-00007-of-00007.safetensors": {
+          "header_bytes": 1904,
+          "downloaded_header_bytes": 8388608,
+          "tensor_count": 17,
+          "metadata": {
+            "format": "pt"
+          }
+        }
+      }
+    }
+  },
+  "gguf_q4_k_m": {
+    "tensor_count": 731,
+    "tensor_bytes": 19674385728,
+    "file_bytes": 19686434240,
+    "data_start": 12048512,
+    "gguf_version": 3,
+    "type_counts": {
+      "F16": 122,
+      "F32": 321,
+      "Q4_K": 51,
+      "Q5_0": 12,
+      "Q6_K": 143,
+      "Q8_0": 82
+    },
+    "metadata": {
+      "general.architecture": "raon1",
+      "general.basename": "Raon-1",
+      "general.file_type": 15,
+      "general.finetune": "preview",
+      "general.license": "apache-2.0",
+      "general.name": "Raon 1 Mini Preview",
+      "general.quantization_version": 2,
+      "general.sampling.temp": 1.0,
+      "general.sampling.top_k": 20,
+      "general.sampling.top_p": 0.949999988079071,
+      "general.size_label": "mini",
+      "general.tags": [
+        "raon",
+        "text-generation"
+      ],
+      "general.type": "model",
+      "raon1.activation.situ_beta": 4.0,
+      "raon1.activation.situ_linear_beta": 25.0,
+      "raon1.attention.head_count": 40,
+      "raon1.attention.head_count_kv": [
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        1
+      ],
+      "raon1.attention.key_length": 576,
+      "raon1.attention.key_length_mla": 192,
+      "raon1.attention.kv_lora_rank": 512,
+      "raon1.attention.latent_norm_rms_epsilon": 9.999999974752427e-07,
+      "raon1.attention.layer_norm_rms_epsilon": 9.999999747378752e-06,
+      "raon1.attention.q_lora_rank": 576,
+      "raon1.attention.value_length": 512,
+      "raon1.attention.value_length_mla": 128,
+      "raon1.block_count": 25,
+      "raon1.context_length": 262144,
+      "raon1.embedding_length": 2560,
+      "raon1.expert_count": 128,
+      "raon1.expert_feed_forward_length": 1088,
+      "raon1.expert_gating_func": 2,
+      "raon1.expert_shared_count": 1,
+      "raon1.expert_used_count": 6,
+      "raon1.expert_weights_norm": true,
+      "raon1.expert_weights_scale": 1.0,
+      "raon1.feed_forward_length": 12032,
+      "raon1.hyper_connection.count": 4,
+      "raon1.hyper_connection.epsilon": 9.999999747378752e-06,
+      "raon1.hyper_connection.magnitude": 2.0,
+      "raon1.kda.gate_lower_bound": -5.0,
+      "raon1.kda.head_dim": 128,
+      "raon1.leading_dense_block_count": 1,
+      "raon1.rope.dimension_count": 64,
+      "raon1.ssm.conv_kernel": 4,
+      "raon1.ssm.time_step_rank": 128,
+      "raon1.vocab_size": 259840,
+      "tokenizer.ggml.add_bos_token": false,
+      "tokenizer.ggml.add_eos_token": false,
+      "tokenizer.ggml.eos_token_id": 259202,
+      "tokenizer.ggml.merges": {
+        "count": 258944
+      },
+      "tokenizer.ggml.model": "gpt2",
+      "tokenizer.ggml.normalizer.nfc": true,
+      "tokenizer.ggml.padding_token_id": 259200,
+      "tokenizer.ggml.pre": "raon",
+      "tokenizer.ggml.token_type": {
+        "count": 259840
+      },
+      "tokenizer.ggml.tokens": {
+        "count": 259840
+      }
+    },
+    "packed_expert_tensors": 72,
+    "packed_expert_bytes_per_expert_values": [
+      1566720,
+      1914880,
+      2959360
+    ],
+    "packed_expert_bytes_per_expert_by_layer": {
+      "1": 6092800,
+      "2": 6092800,
+      "3": 5048320,
+      "4": 5048320,
+      "5": 6092800,
+      "6": 5048320,
+      "7": 5048320,
+      "8": 6092800,
+      "9": 5048320,
+      "10": 5048320,
+      "11": 6092800,
+      "12": 5048320,
+      "13": 5048320,
+      "14": 6092800,
+      "15": 5048320,
+      "16": 5048320,
+      "17": 6092800,
+      "18": 5048320,
+      "19": 5048320,
+      "20": 6092800,
+      "21": 6092800,
+      "22": 6092800,
+      "23": 6092800,
+      "24": 6092800
+    },
+    "packed_expert_bytes_per_layer": {
+      "1": 779878400,
+      "2": 779878400,
+      "3": 646184960,
+      "4": 646184960,
+      "5": 779878400,
+      "6": 646184960,
+      "7": 646184960,
+      "8": 779878400,
+      "9": 646184960,
+      "10": 646184960,
+      "11": 779878400,
+      "12": 646184960,
+      "13": 646184960,
+      "14": 779878400,
+      "15": 646184960,
+      "16": 646184960,
+      "17": 779878400,
+      "18": 646184960,
+      "19": 646184960,
+      "20": 779878400,
+      "21": 779878400,
+      "22": 779878400,
+      "23": 779878400,
+      "24": 779878400
+    }
+  },
+  "cache": {
+    "mla_layers": 7,
+    "rda_layers": 18,
+    "compressed_mla_bytes_per_token": 8064,
+    "compressed_mla_kib_per_token": 7.875,
+    "expanded_hf_mla_bytes_per_token": 179200,
+    "expanded_hf_mla_kib_per_token": 175.0,
+    "rda_state_bytes_per_sequence": 48844800,
+    "rda_state_mib_per_sequence": 46.58203125,
+    "context_tokens": 262144,
+    "compressed_mla_bytes_at_context": 2113929216,
+    "compressed_mla_gib_at_context": 1.96875,
+    "expanded_hf_mla_bytes_at_context": 46976204800,
+    "expanded_hf_mla_gib_at_context": 43.75,
+    "total_compressed_state_gib_at_context": 2.014240264892578,
+    "total_expanded_hf_state_gib_at_context": 43.79549026489258,
+    "notes": "Published model card: ~8 KiB/token BF16, i.e. 7 MLA layers x 576 BF16 values = 8,064 B/token. The HF reference DynamicCache stores expanded per-head K/V (40 x 192 + 40 x 128) x 2 B x 7 = 179,200 B/token. The GGUF metadata exposes key_length=576 and value_length=512; the exact llama.cpp cache layout must be confirmed from its source, not inferred from the model card."
+  },
+  "comparison": {
+    "base_tensor_bytes": 32699649368,
+    "q4_file_bytes": 19686434240,
+    "q4_to_base_ratio": 0.6020380836029765,
+    "base_expert_share": 0.8095285922516623,
+    "base_active_expert_bytes_6_of_128": 1240842240,
+    "base_cold_6_expert_bytes": 51701760,
+    "q4_expert_bytes_per_slot_min": 5048320,
+    "q4_expert_bytes_per_slot_max": 6092800,
+    "q4_cold_6_expert_bytes_min": 30289920,
+    "q4_cold_6_expert_bytes_max": 36556800
+  },
+  "validation": {
+    "base_index_matches_headers": true,
+    "all_3072_expert_slots_have_128_ids_and_6_tensors": true,
+    "base_params_match_hf_safetensors_summary": true,
+    "gguf_metadata_matches_config": true,
+    "gguf_file_type_q4_k_m": 15
+  }
+}

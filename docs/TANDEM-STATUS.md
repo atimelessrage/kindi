@@ -18,7 +18,7 @@ GPU-only 2B/4B/9B cells and the measured 2B/4B/9B GPU+CPU tandem rows. This page
 status source; other pages link here rather than restating tandem details.
 The dense runtime's real 2B/9B exactness and one-run timings are in
 [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md); the 9B cache evidence is in
-`bench-logs/tandem-cache/RESULTS-9B.md`.
+`docs/benchmarks/tandem-cache/RESULTS-9B.md`.
 
 ## Answer
 
@@ -40,15 +40,15 @@ The 2026-11-11/12 slices in this branch add:
   token-for-token; an HTTP server saved and reloaded a 344-token opening after a restart, reporting
   344 cached tokens versus 0 with the cache off; the same check passed at 4K/8K context with
   1,024/2,048-token checkpoints (4,080/8,176 extension tokens and 3,072/6,144 branch tokens); see
-  `bench-logs/tandem-cache/RESULTS.md` and `LONG-CONTEXT-RESULTS.md`;
+  `docs/benchmarks/tandem-cache/RESULTS.md` and `LONG-CONTEXT-RESULTS.md`;
 - the 9B pack passed the 512-context check in both placements with 6 CPU layers: extension 320,
   branch 256 and saved opening 256, all exact against cache-off; CPU load 105-108 s, GPU load
-  5.8-6.0 s; see `bench-logs/tandem-cache/RESULTS-9B.md`; saved-opening reloads also pass at
+  5.8-6.0 s; see `docs/benchmarks/tandem-cache/RESULTS-9B.md`; saved-opening reloads also pass at
   4K/8K in both placements (4,080/8,176 extension, 3,072/6,144 branch and saved opening, exact;
   33.3-39.5 s owned-slice loads; `saved-9b-4k.json`, `saved-9b-8k.json`);
 - a prepare-only 2B measurement in both placements: 320/325 and 256/261 tokens reused, a 19.27 MiB
   joint recurrent checkpoint, 8.7-8.9 ms median save and 3.3-3.5 ms median restore; see
-  `bench-logs/tandem-cache/PREFIX-RESULTS.md`;
+  `docs/benchmarks/tandem-cache/PREFIX-RESULTS.md`;
 - `engine.Engine(layers=..., embed=..., head=...)`: a partial GPU engine that uploads only the
   owned layer tensors and keeps only their GDN/KV state;
 - `cpu.Engine(layers=..., embed=..., head=...)`: the CPU engine now does the same, so a

@@ -135,7 +135,7 @@ tokens (extension) and **256/261** tokens (branch) in both placements. The joint
 checkpoint is **19.27 MiB**; five-sample medians were **8.7-8.9 ms** to save and **3.3-3.5 ms** to
 restore. The checkpoint contains both owners' `M`/`conv` arrays. K/V (6.00 MiB at this context)
 stays in the two engines and is not part of the measured copy; saved openings store K/V. See
-[PREFIX-RESULTS.md](../bench-logs/tandem-cache/PREFIX-RESULTS.md).
+[PREFIX-RESULTS.md](benchmarks/tandem-cache/PREFIX-RESULTS.md).
 
 ### HTTP server restart
 

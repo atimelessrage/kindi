@@ -31,8 +31,8 @@ coverage.json
 # raw local evidence and scratch audits (may contain local paths or prompts)
 bench-logs/
 optimizing-mixed-gpu-rig.json
-Buffy_ReviewAudit_*.txt
-MuseEmber_ReviewAudit_*.txt
+*_ReviewAudit_*.txt
+*_ProblemsOnly_*.txt
 ConsultProposals*.txt
 manual_help_needed.txt
 # key material

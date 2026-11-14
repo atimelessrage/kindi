@@ -91,13 +91,13 @@ the same tool on a self-hosted runner labelled `self-hosted`, `gpu` and the sele
 (`sm_100` or `sm_120`); dispatch it once with each architecture to cover both variants. It needs
 no model pack. This host has only an Ada RTX 4060 Ti. A local gate run on 2026-11-12 (`--arch auto`) detected
 compute capability 89 and returned **unsupported** with exit 2; the result is recorded in
-[bench-logs/blackwell-fp8-ada-refusal-20261112/RESULTS.md](../bench-logs/blackwell-fp8-ada-refusal-20261112/RESULTS.md).
+[bench-logs/blackwell-fp8-ada-refusal-20261112/RESULTS.md](benchmarks/blackwell-fp8-ada-refusal-20261112/RESULTS.md).
 No Blackwell line has been produced; the lane's existence is not a hardware result.
 
 A dispatch attempt on 2026-11-12 was blocked before any runner job: the local GPU is sm_89, the
 workflow was untracked and absent from both remote branches, and no authenticated Actions client
 was available. The exact checks are recorded in
-[bench-logs/blackwell-fp8-dispatch-20261112/DISPATCH-BLOCKED.md](../bench-logs/blackwell-fp8-dispatch-20261112/DISPATCH-BLOCKED.md).
+[bench-logs/blackwell-fp8-dispatch-20261112/DISPATCH-BLOCKED.md](benchmarks/blackwell-fp8-dispatch-20261112/DISPATCH-BLOCKED.md).
 Neither Blackwell architecture has a hardware result.
 
 ## Bonsai packs
