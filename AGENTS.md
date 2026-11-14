@@ -10,7 +10,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `36208e5` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean;
+- **HEAD:** `b0b5465` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean;
   guarded by `tests/test_agents_handoff.py`). Full suite last measured there:
   536 passed, 10 skipped, 1 warning; the 27% line-and-branch coverage floor is unchanged.
 - **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
@@ -23,7 +23,9 @@ line of evidence (command + result). A task must be resumable from this file alo
   ~37K full-GPU / ~30K tandem tokens, so the split buys headroom, not context), 9B plan engine
   (Hadamard 4096), GPU CI runner registration (steps in `docs/CI.md`), mixed-card/P106/Arc
   hardware runs, whether the tandem helps pre-tensor-core cards (Pascal, M4000 — measured cells
-  defined in `docs/ROADMAP.md` Cards), real FP8/BF16 models, Dory D1, Raon/Gemma 26B backends, AVX-512. See
+  defined in `docs/ROADMAP.md` Cards), the nine prior-art items in
+  `docs/EXTERNAL-ENGINES.md` (first one: measure our own CPU/PCIe ratio),
+  real FP8/BF16 models, Dory D1, Raon/Gemma 26B backends, AVX-512. See
   `docs/ROADMAP.md`. 27B boundary: 24K needs >=16 CPU layers here; 24-32 layers buy memory at
   a 35-50% rate cost.
 - **Shared-file owners:** the newest lease row in the table below owns its files until
@@ -56,8 +58,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `36208e5` | main checkout; clean; best-of main |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `36208e5` | this session; best-of main (identical to `main`) |
+| `T:/kindi` | `main` | `b0b5465` | main checkout; clean; best-of main |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `b0b5465` | this session; best-of main (identical to `main`) |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
@@ -105,6 +107,7 @@ the next agent needs in front of them; when a task finishes, move its row to the
 
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
+| Prior-art review: llama.cpp 1.0.0, Strata 0.2.13, tandem.cpp | this worktree | `freebuff/tandem-cpu-recovery` | `docs/EXTERNAL-ENGINES.md` (new), `docs/ROADMAP.md`, `docs/README.md`, `AGENTS.md` | done, planning only (no code): nine ranked items with numeric gates in ROADMAP "Prior-art follow-ups (2026-11-14)" — measured CPU/PCIe split rule, calibration cache, `kindi kld` quality gate, determinism gate, `kindi plan` dry-run, K/V prefix sharing, CPU-set thread count, FP8 K/V (gated on KLD), Windows unbuffered load; MoE cache semantics recorded as design parity. Notable correction: llama.cpp's refcounted checkpoints do not apply to our checkpoints (ours already copy state only) — the duplicates are parked/persisted K/V |
 | Review finding fixes (2026-11-14 third audit) | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/vram.py`, `kindi/bench.py`, `kindi/tandem.py`, `kindi/convert.py`, `tests/test_agents_handoff.py`, `tests/test_vram_monitor.py`, `tests/test_tandem.py`, `tests/test_bench_json.py`, `docs/TANDEM-RUNTIME.md`, `docs/BENCHMARKS.md`, `AGENTS.md` | done. CONFIRMED and fixed: (1) handoff guard excused a stale table - the parent rule let be6e3a9 (a content commit) keep its parent's hash, so the test now also requires every commit that touches `AGENTS.md` to refresh the hashes (protocol rule 5a); (2) `--sample-vram` read GPU 0 only - it now parses the index column and maps the engine's ordinal through `CUDA_VISIBLE_DEVICES` (`vram.visible_device`); (3) the estimate charged the head even in gpu-first (322 MiB over-count) and hid the per-layer GDN state in a flat scratch allowance - `state_bytes()` now charges ~3.1 MiB per owned GDN layer and the head only when the GPU owns the last layer (27B 24K `gdn:16` plain estimate 6,208 MiB vs ~6,240 measured, was ~100 MiB under); (4) `gdn:` with no count is a `SystemExit`, not a `ValueError` traceback; (5) `ctx_reduced` lost its 47-token fudge (any `eng.ctx < ctx_requested` is a reduction); (6) `convert.py` closes its four multi-GB files through an `ExitStack` on a mid-convert error. REJECTED as a measurement error: "the plan-owner peak exceeds its estimate by 208 MiB" compares device-wide `peak_used` (which includes the ~950 MiB the desktop holds) with an engine-bytes estimate; against `peak_delta` the plan estimate is ~890 MiB conservative. STALE: the problems report is not tracked in either worktree (`git ls-files` is empty) and the audit files are already ignored (`.gitignore:34-35`). SKIPPED with reason: the 34 `json.load(open(...))` sites are short-lived pack reads (closed at GC, no locked files observed in convert/install); a sweep would touch 13 modules for no measured failure. |
 | Old-card tandem measurement on the roadmap | this worktree | `freebuff/tandem-cpu-recovery` | `docs/ROADMAP.md`, `AGENTS.md` | done; Cards bullet + open gates: measure whether (and which placement of) the CPU+GPU tandem helps Pascal/M4000 cards, cells defined |
 | Plain-engine q8_0 K/V + 27B split re-measure | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/engine.py`, `kindi/tandem.py`, `kindi/__main__.py`, `tests/test_tandem.py`, `tests/test_plain_kv.py`, `docs/TANDEM-RUNTIME.md`, `docs/CONFIGURATION.md`, `docs/CONFIGURATION-REFERENCE.md`, `docs/ROADMAP.md`, `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plain-q8/`, `docs/development/requirements/REQ-0013.md`, `CURRENT-VS-KINDI-0.5.md`, `AGENTS.md` | done; plain engine `KINDI_KV=q8_0`/`kv=` reuses the plan kernels (`k_store_q8`/`k_q8row`/`k_attn_sq8t`/`k_attn_vq8w`/`k_attn_combn`), chunked prompt path off in q8 mode, K/V exposed as `tp.Dist` views (cache round-trip exact); standalone stays fp16; tandem plain owner always q8. Exact: 2B/9B/27B verify 4/4 (standalone q8 and tandem). 27B 24K `gdn:16`: plain-q8 peak ~7,110 MiB (995 free) vs 7,721 fp16, plan re-run 6,091 (1,985 free). Evidence: `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plain-q8/RESULTS.md`; 529 passed, 10 skipped |
