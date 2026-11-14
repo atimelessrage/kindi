@@ -6,6 +6,7 @@
   kindi bench                   measure speed and GPU memory
   kindi kld                     teacher-forced KLD quality gate for lossy K/V caches (vs fp16)
   kindi calibrate               measure the per-machine tuning once (5-trit configs, placement, draft length)
+  kindi plan                    dry-run placement report (no weights loaded; --assume-vram-gib tests a card's split)
   kindi serve                   run the OpenAI-compatible server
   kindi chat                    chat in the terminal (no server needed)
   kindi head exact|fast         choose the output head of a running server (next request, no restart)
@@ -80,6 +81,11 @@ def cmd_bench(cfg, a):
     _setup_gpu_env(cfg)
     from .bench import run
     return run(cfg, log=log)
+
+
+def cmd_plan(cfg, a):
+    from . import plan as _plan
+    return _plan.run(cfg, a)
 
 
 def cmd_kld(cfg, a):
@@ -281,9 +287,16 @@ def main(argv=None):
     s.add_argument("--sample-vram", action="store_true", help="sample device-wide VRAM and log the peak during the run")
     s = sub.add_parser("kld", help="teacher-forced KLD quality gate for lossy K/V caches against fp16")
     s.add_argument("--json", default=None, metavar="FILE", help="also record the numbers in a machine-readable JSON file")
-    sub.add_parser("calibrate", help="measure the per-machine tuning once and persist it")
+    s = sub.add_parser("calibrate", help="measure the per-machine tuning once and persist it")
     s.add_argument("--vram-sample-s", type=float, default=None, help="VRAM sampling interval in seconds (default: 0.5)")
     _tandem_args(s)
+    s = sub.add_parser("plan", help="dry-run placement report without loading weights (--assume-* for an absent card)")
+    s.add_argument("--ctx", type=int, default=None)
+    _tandem_args(s)
+    s.add_argument("--assume-vram-gib", type=float, default=None, help="the card's free VRAM, instead of probing it")
+    s.add_argument("--assume-ram-gib", type=float, default=None, help="the host RAM, instead of probing it")
+    s.add_argument("--assume-cores", type=int, default=None, help="the CPU cores, instead of probing them")
+    s.add_argument("--json", default=None, metavar="FILE", help="also record the report in a machine-readable JSON file")
     s = sub.add_parser("serve", help="run the OpenAI-compatible server")
     s.add_argument("--host")
     s.add_argument("--port", type=int)
@@ -321,7 +334,7 @@ def main(argv=None):
     if getattr(a, "vram_sample_s", None) is not None:
         cfg["vram_sample_s"] = a.vram_sample_s
     return {"convert": cmd_convert, "fast-head": cmd_fast_head, "verify": cmd_verify, "bench": cmd_bench, "kld": cmd_kld, "calibrate": cmd_calibrate,
-            "serve": cmd_serve, "chat": cmd_chat, "head": cmd_head, "info": cmd_info,
+            "plan": cmd_plan, "serve": cmd_serve, "chat": cmd_chat, "head": cmd_head, "info": cmd_info,
             "models": cmd_models, "use": cmd_use}[a.cmd](cfg, a)
 
 

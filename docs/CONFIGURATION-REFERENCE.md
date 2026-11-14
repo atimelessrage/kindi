@@ -112,7 +112,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:581` |
 | `KINDI_CONFIG` | (unset) | `kindi/config.py:120` (+1 more) |
 | `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:211` (+4 more) |
-| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:198` (+1 more) |
+| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:204` (+1 more) |
 | `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:46` |
 | `KINDI_D1` | `0` | `kindi/spec.py:722` |
 | `KINDI_DATA` | `/data` | `kindi/container.py:243` |
@@ -253,9 +253,9 @@ variables, and are therefore not listed twice here.
 | `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1867` |
 | `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:193` |
 | `KINDI_TANDEM_DEBUG_TIMING` | `0` | `kindi/tandem.py:584` |
-| `KINDI_TANDEM_GPU` | `auto` | `kindi/tandem.py:481` |
+| `KINDI_TANDEM_GPU` | `auto` | `kindi/plan.py:135` (+2 more) |
 | `KINDI_TANDEM_RATIO` | (unset) | `kindi/tandem.py:268` |
-| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/tandem.py:524` (+1 more) |
+| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/plan.py:229` (+2 more) |
 | `KINDI_TC` | `0` | `kindi/spec.py:81` (+3 more) |
 | `KINDI_TC_B2` | (empty) | `kindi/tc.py:51` |
 | `KINDI_TC_DP4A` | `0` | `kindi/tc.py:74` |
@@ -271,6 +271,6 @@ variables, and are therefore not listed twice here.
 | `KINDI_TC_TUNE` | `0` | `kindi/spec.py:436` (+1 more) |
 | `KINDI_TESTED_CC` | (empty) | `kindi/tc.py:39` |
 | `KINDI_THP` | `0` | `kindi/engine.py:88` |
-| `KINDI_TP` | (empty) | `kindi/engine.py:736` (+1 more) |
+| `KINDI_TP` | (empty) | `kindi/engine.py:736` (+2 more) |
 | `KINDI_TP_SPLIT` | `equal` | `kindi/tp.py:992` |
 | `KINDI_VERIFY_ON_START` | (unset) | `kindi/container.py:245` |
