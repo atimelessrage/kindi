@@ -10,7 +10,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `f7ae33b2f9927d428117526c5c1ce341d2e8cfea` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean;
+- **HEAD:** `56a26e8df37e0281d6d4cd0ffe90f30178a5f9c2` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean;
   guarded by `tests/test_agents_handoff.py`). Full suite last measured there:
   494 passed, 19 skipped, 1 warning; the 27% line-and-branch coverage floor is unchanged.
 - **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
@@ -55,8 +55,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `f7ae33b2f9927d428117526c5c1ce341d2e8cfea` | main checkout; clean; best-of main |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `f7ae33b2f9927d428117526c5c1ce341d2e8cfea` | this session; best-of main (identical to `main`) |
+| `T:/kindi` | `main` | `56a26e8df37e0281d6d4cd0ffe90f30178a5f9c2` | main checkout; clean; best-of main |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `56a26e8df37e0281d6d4cd0ffe90f30178a5f9c2` | this session; best-of main (identical to `main`) |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
@@ -173,6 +173,7 @@ commits were merged. The corrupt tandem WIP was not merged into `main`; restart 
 | 9B tensor-core plan engine (HB 4096) | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/spec.py`, `tests/test_plan_engine.py`, `docs/ROADMAP.md`, `docs/CARDS.md`, `docs/CARD-SUPPORT.md`, `AGENTS.md` | done; the gate now refuses HB 4096 unless `KINDI_TC_HP=1` (before the repack, not after), because with the default int8 activations one 9B prompt flips at token 36 (3/4) while HP gives 4/4 at 122.7 tok/s (plain 76.3-80.0). The fold split, FF, FD, ATT_TC and TMAX toggles all left the flip unchanged, isolating it to activation precision; the kernels already dispatched ff_rmsfold<8,8>/ff_smfold<8>/ff_fold<8>. 2B tc still 4/4 (388.3 tok/s, no regression); 9B tc records `refused` in verify_matrix. Two tests pin the refusal-without-HP and acceptance-with-HP |
 | Cross-mode tc rows + 27B gpu-first 24K row | this worktree | `freebuff/tandem-cpu-recovery` | `docs/benchmarks/build_cross_mode.py`, `docs/benchmarks/CROSS-MODE.md`, `docs/benchmarks/CROSS-MODE.csv`, `docs/benchmarks/perf-baseline.json`, `docs/benchmarks/2026-11-13-i7-8086k-rtx4060ti-tc/**`, `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md`, `docs/TANDEM-RUNTIME.md`, `docs/ROADMAP.md`, `tests/test_cross_mode_benchmarks.py`, `CURRENT-VS-KINDI-0.5.md`, `AGENTS.md` | done; tc rows are medians of three (2B read 471.7, 4B 214.1, 9B 133.9; 24K gen 299.2/127.8/97.0, peaks 1,645/3,311/3,257 MiB) and the perf gate now guards 12 cells; 27B gpu-first 24K (read 8.5, gen 7.4/6.2/4.5/3.3/2.7, peak 7,339 MiB) completes the 27B table |
 | verify_matrix tc-hp mode | this worktree | `freebuff/tandem-cpu-recovery` | `tools/verify_matrix.py`, `tests/test_verify_matrix.py`, `docs/ROADMAP.md`, `CURRENT-VS-KINDI-0.5.md`, `AGENTS.md` | done; the matrix gained a `tc-hp` mode (tc + `KINDI_TC_HP=1`) because without it the 9B tc cell can only ever record `refused`; measured 9B tc-hp PASS 4/4 at 123.9 tok/s (docs: ROADMAP plan-engine bullet now names tc-hp) |
+| Audit findings: dispatch, JSON ctx, tc-hp defaults | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/engine.py`, `kindi/bench.py`, `kindi/spec.py`, `tests/test_bench_json.py`, `docs/CONFIGURATION.md`, `docs/CONFIGURATION-REFERENCE.md`, `docs/ROADMAP.md`, `CURRENT-VS-KINDI-0.5.md`, `AGENTS.md` | done; plan engine is now the default for every model it supports (`KINDI_TP=0` keeps plain) and the 9B log line states the HP requirement; bench JSON carries ctx_requested + ctx_reduced. Evidence: 2B default verify 4/4 at 253.4 tok/s via the plan engine; new test pins the reduced-ctx JSON; full focused set 17 passed; config_reference --check, perf gate, git diff --check pass |
 | Verify/bench contract tests | this worktree | `freebuff/tandem-cpu-recovery` | `tests/test_verify_bench_contracts.py`, `AGENTS.md` | done; verify.reference_for routes 2b/4b/9b/27b reference files by pack manifest with 2b default and None for unknown sizes; bench refuses the Nanbeige backend on CPU with exit 2. Evidence: 5 passed with handoff guard |
 | Lookup drafting + SPM tokenizer tests | this worktree | `freebuff/tandem-cpu-recovery` | `tests/test_lookup_spm.py`, `AGENTS.md` | done; 8 requirement-based tests cover prompt-lookup drafting (copy-after-match, no-history, low-acceptance length 0, kept() decay) and the SentencePiece tokenizer on a synthetic vocab (space prefix + merge, byte fallback, special-token split, round trip); both modules were at 0% coverage. Evidence: 8 passed; single-file --cov runs hang while the GPU is busy, so coverage was not re-measured here |
 | Roadmap accuracy + AGENTS current-state section | this worktree | `freebuff/tandem-cpu-recovery` | `docs/ROADMAP.md`, `AGENTS.md` | done; corrected stale roadmap claims (4B/9B tandem throughput recorded, static analysis in CI, perf gate in CPU job) and added the live Current-state section with shared-file ownership (AGENTS-trim gate). Evidence: handoff/project-memory/docs tests 7 passed, project_memory --check, git diff --check pass |
