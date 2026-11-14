@@ -10,9 +10,9 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `9cb4887` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean;
+- **HEAD:** `df851a3` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean;
   guarded by `tests/test_agents_handoff.py`). Full suite last measured there:
-  494 passed, 19 skipped, 1 warning; the 27% line-and-branch coverage floor is unchanged.
+  511 passed, 19 skipped, 1 warning; the 27% line-and-branch coverage floor is unchanged.
 - **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
   512/4K/8K; 2B CPU-layer sweep; joint checkpoint 149.6 MiB on the 27B at 54.5-61.5 ms
   save), owned-slice CPU load, `kindi bench --sample-vram` sampled-peak VRAM, multi-ISA CPU
@@ -55,8 +55,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `9cb4887` | main checkout; clean; best-of main |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `9cb4887` | this session; best-of main (identical to `main`) |
+| `T:/kindi` | `main` | `df851a3` | main checkout; clean; best-of main |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `df851a3` | this session; best-of main (identical to `main`) |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
@@ -194,7 +194,8 @@ or a syntax check as a runtime verification.
 
 ## Definition of done
 
-- The no-GPU gate passes (first four rows above).
+- The no-GPU gate passes: `bash -n install.sh`, `compileall`, `pytest -q` and the GRUB fixture test
+  (the rows above that need no GPU).
 - If the server or cache changed: an invalid request returns 400 (not 500) and does not clear
   the prompt cache; a valid request right after it still hits the cache.
 - If `install.sh` changed: `bash -n`, the fixture test, and `--dry-run` on Linux. Kernel edits
@@ -205,7 +206,6 @@ or a syntax check as a runtime verification.
   `docs/development/` rather than only in chat.
 - The AGENTS.md worktree table names the current HEAD (guarded by `tests/test_agents_handoff.py`).
 - The report names what was not verified.
-
 
 ## History
 
