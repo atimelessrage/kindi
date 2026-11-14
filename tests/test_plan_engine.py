@@ -128,6 +128,44 @@ def test_optional_turns_a_broken_accelerator_off_with_one_line(spec_tp):
     assert len(said) == 1 and "speculation off" in said[0] and "no config.json" in said[0]
 
 
+def test_a_garbage_mtp_head_switches_speculation_off_and_the_engine_still_generates(spec_tp, monkeypatch, tmp_path):
+    """The corrupt-head path, with the real MTPDraft: the file exists, so it passes the
+    head_paths existence check and the reserve's getsize, then MTPDraft raises (np.load on
+    garbage) inside _build. The engine must come out with mtp=None and still generate."""
+    spec, tp = spec_tp
+    shard_cls = tp.Shard
+    saved = (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
+             spec._chunk.reserve, spec._chunk.build, spec.build)
+    garbage = tmp_path / "head.npz"
+    garbage.write_bytes(b"this is not an npz file" * 64)
+    monkeypatch.setenv("KINDI_TC", "1")
+    monkeypatch.setenv("KINDI_SPEC", "mtp")
+    monkeypatch.setenv("KINDI_MTP_HEAD", str(garbage))
+    monkeypatch.delenv("KINDI_SPEC_DRAFT_HEAD", raising=False)
+    said = []
+    try:
+        spec._chunk.build = lambda eng: None                    # o_build, captured by install
+        spec.build = lambda eng, log: None                      # the tc plan build: nothing to do here
+        spec.install(log=said.append)
+        eng = types.SimpleNamespace(
+            cards=[types.SimpleNamespace(tc_layout=True, tcb={})],
+            log=said.append, drafter=None)
+        with pytest.raises(Exception):                          # the real constructor fails on garbage
+            spec._mtp.MTPDraft(eng, str(garbage), log=said.append)
+        spec._chunk.build(eng)                                  # must not raise
+        assert eng.mtp is None
+        assert any("speculation off" in s and "head.npz" in s for s in said)
+        eng.reset = lambda: None
+        eng.feed_batch = lambda ids, pos=0: None
+        eng.step = lambda tok, pos: 0
+        out = spec.generate_spec(eng, [5, 6], 20, k=4, drafter=_Draft())
+        assert len(out) == 20                                   # plain stepping, no verify pass
+    finally:
+        (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
+         spec._chunk.reserve, spec._chunk.build, spec.build) = saved
+        spec._installed[0] = False
+
+
 def test_a_broken_dspine_drafter_does_not_abort_the_engine_build(spec_tp, monkeypatch):
     """DSpine was the one accelerator site without the _optional guard: a stale KINDI_DSPINE
     directory (or a corrupt config.json inside it) raised out of _build, so `kindi serve`
