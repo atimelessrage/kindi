@@ -223,3 +223,30 @@ def test_engine_fingerprint_hashes_every_compiled_kernel():
     compiled = {name for name in os.listdir(here) if name.endswith((".cu", ".c"))}
     assert compiled <= set(description["code"])
     assert "engine.py" in description["code"]
+
+
+def test_runner_metrics_report_budget_held_and_drops():
+    r = bare_runner()
+    r.budget, r.state_bytes = 10_000, 100
+    r.ckpt = {0: object(), 64: object()}
+    r.parked = [{"ckpt": {}, "kv_bytes": 50}]
+    r.peak_bytes = r.evictions = r.evicted_bytes = r.checkpoints_dropped = r.parked_dropped = 0
+    m = r.metrics()
+    assert m["budget_bytes"] == 10_000
+    assert m["used_bytes"] == 2 * 100 + 100 + 50   # checkpoints + parked end state + parked K/V
+    assert m["peak_bytes"] == m["used_bytes"]
+    assert m["checkpoints"] == 2 and m["parked"] == 1
+    assert m["evictions"] == m["evicted_bytes"] == 0
+    r.peak_bytes = 999                                # the peak never goes down
+    assert r.metrics()["peak_bytes"] == 999
+
+
+def test_runner_metrics_count_parked_drops():
+    r = bare_runner()
+    r.budget, r.state_bytes = 10_000, 100
+    r.ckpt, r.parked = {}, [{"ckpt": {}, "kv_bytes": 30, "session": None}]
+    r.peak_bytes = r.evictions = r.evicted_bytes = r.checkpoints_dropped = r.parked_dropped = 0
+    r._drop_parked()
+    m = r.metrics()
+    assert m["parked"] == 0 and m["parked_dropped"] == 1
+    assert m["evicted_bytes"] == 100 + 30

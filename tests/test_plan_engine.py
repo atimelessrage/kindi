@@ -110,6 +110,59 @@ def test_an_unset_head_is_silent(spec_tp):
     assert said == []
 
 
+def test_optional_returns_the_built_accelerator(spec_tp):
+    spec, _ = spec_tp
+    said = []
+    assert spec._optional(said.append, "the DSpine drafter", lambda: "built") == "built"
+    assert said == []
+
+
+def test_optional_turns_a_broken_accelerator_off_with_one_line(spec_tp):
+    spec, _ = spec_tp
+    said = []
+
+    def broken():
+        raise FileNotFoundError("no config.json")
+
+    assert spec._optional(said.append, "the DSpine drafter /x", broken) is None
+    assert len(said) == 1 and "speculation off" in said[0] and "no config.json" in said[0]
+
+
+def test_a_broken_dspine_drafter_does_not_abort_the_engine_build(spec_tp, monkeypatch):
+    """DSpine was the one accelerator site without the _optional guard: a stale KINDI_DSPINE
+    directory (or a corrupt config.json inside it) raised out of _build, so `kindi serve`
+    never started - the same failure class as the MTP head guard above."""
+    spec, tp = spec_tp
+    shard_cls = tp.Shard
+    saved = (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
+             spec._chunk.reserve, spec._chunk.build, spec.build)
+    monkeypatch.setenv("KINDI_TC", "1")
+    monkeypatch.setenv("KINDI_SPEC", "dspine")
+    monkeypatch.setenv("KINDI_DSPINE", "/no/such/directory")
+    monkeypatch.delenv("KINDI_SPEC_DRAFT_HEAD", raising=False)
+    said = []
+    try:
+        spec._chunk.build = lambda eng: None                    # o_build, captured by install
+        spec.build = lambda eng, log: None                      # the tc plan build: nothing to do here
+        spec.install(log=said.append)
+        monkeypatch.setattr(spec._dsp, "fits", lambda s: True)
+
+        def broken(eng, d, log=print):
+            raise FileNotFoundError("no config.json")
+
+        monkeypatch.setattr(spec._dsp, "DSpine", broken)
+        eng = types.SimpleNamespace(
+            cards=[types.SimpleNamespace(tc_layout=True, tcb={"FEAT": object()})],
+            _dsp_want=True, log=said.append, drafter=None)
+        spec._chunk.build(eng)                                  # must not raise
+        assert eng.dspine is None
+        assert any("speculation off" in s and "/no/such/directory" in s for s in said)
+    finally:
+        (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
+         spec._chunk.reserve, spec._chunk.build, spec.build) = saved
+        spec._installed[0] = False
+
+
 # ------------------------------------------------------------------ TMAX: the largest T-token pass
 def test_tmax_default_plans_the_eight_token_verify(tmax):
     # the 2B plan engine's measured best runs the verify pass at T = 8 (k = 7 drafts + 1)

@@ -1692,6 +1692,19 @@ def optional_path(name, log=print):
     return None
 
 
+def _optional(log, what, fn):
+    """Build an optional accelerator: its value, or None after one log line if the build fails.
+
+    Optional artifacts (a draft head, an MTP head, the DSpine drafter, the 2B drafter) are
+    accelerators: they must switch off, never abort engine construction. Required artifacts
+    (the pack, the tokenizer) still fail loudly - they are not built through here."""
+    try:
+        return fn()
+    except Exception as e:            # noqa: BLE001 - an optional accelerator must not stop the model
+        log("speculation off: %s did not load (%s)" % (what, e))
+        return None
+
+
 def head_paths(sm, log=print):
     """The MTP head files the mode will use, each checked once: KINDI_MTP_HEAD for the model's own
     head (mtp, auto) and KINDI_SPEC_DRAFT_HEAD for the 2B drafter's (draft2b, both, auto)."""
@@ -1786,20 +1799,18 @@ def install(log=print):
                 eng.drafter = Draft2B(_drafter[0])
                 eng.log("speculative draft model attached: %s, ctx %d" % (_drafter[0].pack, _drafter[0].ctx))
                 if os.environ.get("KINDI_SPEC_DRAFT_HEAD"):
-                    try:
-                        eng.drafter.mtp = _mtp.MTPDraft(_drafter[0], os.environ["KINDI_SPEC_DRAFT_HEAD"], log=eng.log)
-                    except Exception as e:            # noqa: BLE001 - an optional head must not stop the model
-                        eng.log("speculation off: the draft head %s did not load (%s)"
-                                % (os.environ["KINDI_SPEC_DRAFT_HEAD"], e))
+                    head = os.environ["KINDI_SPEC_DRAFT_HEAD"]
+                    eng.drafter.mtp = _optional(eng.log, "the draft head %s" % head,
+                                                lambda: _mtp.MTPDraft(_drafter[0], head, log=eng.log))
             if os.environ.get("KINDI_SPEC") in ("mtp", "auto") and os.environ.get("KINDI_MTP_HEAD") and not _building_drafter[0]:
-                try:
-                    eng.mtp = _mtp.MTPDraft(eng, os.environ["KINDI_MTP_HEAD"], log=eng.log)
-                except Exception as e:                # noqa: BLE001 - an optional head must not stop the model
-                    eng.log("speculation off: the MTP head %s did not load (%s)"
-                            % (os.environ["KINDI_MTP_HEAD"], e))
+                head = os.environ["KINDI_MTP_HEAD"]
+                eng.mtp = _optional(eng.log, "the MTP head %s" % head,
+                                    lambda: _mtp.MTPDraft(eng, head, log=eng.log))
             if getattr(eng, "_dsp_want", False) and not _building_drafter[0]:
                 if _dsp.fits(eng.cards[0]) and "FEAT" in eng.cards[0].tcb:
-                    eng.dspine = _dsp.DSpine(eng, os.environ["KINDI_DSPINE"], log=eng.log)
+                    dsp = os.environ["KINDI_DSPINE"]
+                    eng.dspine = _optional(eng.log, "the DSpine drafter %s" % dsp,
+                                           lambda: _dsp.DSpine(eng, dsp, log=eng.log))
                 else:
                     eng.log("dspine: not used (it drafts for the 27B on one NVIDIA card with the tensor-core plans)")
 
@@ -1851,11 +1862,13 @@ def install(log=print):
         cards = os.environ.get("KINDI_CARDS")
         os.environ["KINDI_CARDS"] = "1"
         try:
-            _drafter[0] = _tp.TPEngine(os.environ["KINDI_SPEC_PACK"], ctx=int(os.environ.get("KINDI_SPEC_CTX") or os.environ.get("KINDI_SPEC_WINDOW", "8192")),
-                                       log=lambda *a: log("draft: " + " ".join(str(x) for x in a)))
-        except Exception as e:                    # noqa: BLE001 - the 2B drafter is an accelerator
+            pack = os.environ["KINDI_SPEC_PACK"]
+            _drafter[0] = _optional(log, "the draft pack %s" % pack,
+                                    lambda: _tp.TPEngine(pack, ctx=int(os.environ.get("KINDI_SPEC_CTX") or os.environ.get("KINDI_SPEC_WINDOW", "8192")),
+                                                         log=lambda *a: log("draft: " + " ".join(str(x) for x in a))))
+        except Exception as e:                    # noqa: BLE001 - creating the drafter must not leave the flag set
             _drafter[0] = None
-            log("speculation off: the draft pack %s did not load (%s)"
+            log("speculation off: the draft pack %s did not build (%s)"
                 % (os.environ.get("KINDI_SPEC_PACK"), e))
         finally:
             _building_drafter[0] = False          # also on the failure path: the next engine is a full one

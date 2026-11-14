@@ -87,14 +87,18 @@ Each key can also be set from the environment as `KINDI_<KEY>` (for example `KIN
 These have no config key. The default is the code's own fallback (empty: unset); the last column
 is where it is read, which is where the full description lives.
 
+Every config key above is also settable as `KINDI_<KEY>` (upper-cased, `-` as `_`), so a key
+like `max_body_mb` is read as `KINDI_MAX_BODY_MB`; those names are the same setting, not extra
+variables, and are therefore not listed twice here.
+
 | variable | default | read in |
 |---|---|---|
 | `KINDI_ATT_TC` | `0` | `kindi/chunk.py:440` (+1 more) |
-| `KINDI_BATCH` | `4` | `kindi/spec.py:1827` (+1 more) |
+| `KINDI_BATCH` | `4` | `kindi/spec.py:1838` (+1 more) |
 | `KINDI_BENCH_ATTN` | (unset) | `kindi/dsv41.py:1157` |
 | `KINDI_BLOCKING_SYNC` | `1` | `kindi/chunk.py:472` (+7 more) |
-| `KINDI_CACHE_TIMING` | (unset) | `kindi/cache.py:1051` |
-| `KINDI_CARDS` | (unset) | `kindi/spec.py:1851` (+4 more) |
+| `KINDI_CACHE_TIMING` | (unset) | `kindi/cache.py:1069` |
+| `KINDI_CARDS` | (unset) | `kindi/spec.py:1862` (+4 more) |
 | `KINDI_CC` | `clang` or `"clang" if os.name == "nt" else "gcc"` or `"gcc" if os.name != "nt" else "clang"` | `kindi/cpu.py:108` (+3 more) |
 | `KINDI_CHUNK` | `256` or `"512" if all(f16_prompt(s.card) for s in eng.cards) else "256"` or `"256" if major >= 5 else "128"` | `kindi/chunk.py:158` (+2 more) |
 | `KINDI_CHUNK_ATT` | `flash` | `kindi/chunk.py:436` |
@@ -223,29 +227,29 @@ is where it is read, which is where the full description lives.
 | `KINDI_NVCC` | `/usr/local/cuda/bin/nvcc` | `kindi/dsv41.py:52` |
 | `KINDI_NVCC2` | `/usr/local/cuda-12.4/bin/nvcc` | `kindi/dsv41.py:92` |
 | `KINDI_P100_FP16_PROMPT` | (empty) | `kindi/chunk.py:95` |
-| `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:903` (+1 more) |
-| `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:904` |
+| `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:921` (+1 more) |
+| `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:922` |
 | `KINDI_PIPE` | `1` | `kindi/dsv41.py:443` |
-| `KINDI_PROMPT_CACHE` | `1` | `kindi/cache.py:749` (+1 more) |
+| `KINDI_PROMPT_CACHE` | `1` | `kindi/cache.py:751` (+1 more) |
 | `KINDI_Q8X2` | `1` | `kindi/chunk.py:270` |
 | `KINDI_SAMPLER_ORDER` | `llama` | `kindi/sampling.py:19` |
 | `KINDI_SM2` | (empty) | `kindi/spec.py:741` |
 | `KINDI_SPEC` | `0` | `kindi/dspine.py:41` (+7 more) |
 | `KINDI_SPEC_B0_K2_MAX` | `1024` | `kindi/spec.py:58` |
 | `KINDI_SPEC_B2_MAX` | `0` | `kindi/spec.py:59` |
-| `KINDI_SPEC_CTX` | (unset) | `kindi/spec.py:1854` |
-| `KINDI_SPEC_DRAFT_HEAD` | (unset) | `kindi/spec.py:1788` (+2 more) |
+| `KINDI_SPEC_CTX` | (unset) | `kindi/spec.py:1867` |
+| `KINDI_SPEC_DRAFT_HEAD` | (unset) | `kindi/spec.py:1801` (+1 more) |
 | `KINDI_SPEC_GUARD` | `1` | `kindi/spec.py:1128` |
 | `KINDI_SPEC_GUARD_BOUND` | `2.5` | `kindi/spec.py:1005` |
 | `KINDI_SPEC_GUARD_BOUND_DEPTH` | `8192` | `kindi/spec.py:1007` |
 | `KINDI_SPEC_GUARD_FROM` | `32768` | `kindi/spec.py:62` |
 | `KINDI_SPEC_GUARD_LOG` | (unset) | `kindi/spec.py:1042` |
 | `KINDI_SPEC_K` | `4` | `kindi/spec.py:1252` (+1 more) |
-| `KINDI_SPEC_KNOWN` | `1` | `kindi/cache.py:1018` |
+| `KINDI_SPEC_KNOWN` | `1` | `kindi/cache.py:1036` |
 | `KINDI_SPEC_MTP_K2_MAX` | `8192` | `kindi/spec.py:57` |
-| `KINDI_SPEC_PACK` | (unset) | `kindi/spec.py:1849` (+2 more) |
+| `KINDI_SPEC_PACK` | (unset) | `kindi/spec.py:1860` (+2 more) |
 | `KINDI_SPEC_SAMPLE` | `1` | `kindi/spec.py:1260` |
-| `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1854` |
+| `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1867` |
 | `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:193` |
 | `KINDI_TANDEM_GPU` | `auto` | `kindi/tandem.py:480` |
 | `KINDI_TANDEM_RATIO` | (unset) | `kindi/tandem.py:267` |

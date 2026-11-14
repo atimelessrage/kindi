@@ -740,6 +740,8 @@ class Runner(object):
         self.progress = progress or {}
         self.cache_errors = 0                         # observable fallbacks: a damaged opening or a failed unpark
         self.last_cache_error = ""
+        self.peak_bytes = 0                           # eviction telemetry for /metrics (mirrors gemma4_cache)
+        self.evictions = self.evicted_bytes = self.checkpoints_dropped = self.parked_dropped = 0
         self.tokens, self.ckpt, self.parked = [], {}, []
         self.fingerprint = engine_fingerprint(eng, cfg)
         log("engine fingerprint %s: %s" % (self.fingerprint[0], json.dumps({k: v for k, v in self.fingerprint[1].items()
@@ -810,6 +812,7 @@ class Runner(object):
            was dropped while its copies were still the active conversation's, and returning to it read it all again)."""
         dropped = 0
         while self._held() > self.budget:
+            self.peak_bytes = max(getattr(self, "peak_bytes", 0), self._held())
             refs = {}
             for d in [self.ckpt] + [P["ckpt"] for P in self.parked]:
                 for v in d.values():
@@ -826,12 +829,15 @@ class Runner(object):
                     victim = (self.ckpt, cand[0])
             if victim is not None:
                 del victim[0][victim[1]]
+                self.checkpoints_dropped = getattr(self, "checkpoints_dropped", 0) + 1
+                self.evicted_bytes = getattr(self, "evicted_bytes", 0) + self.state_bytes
             elif self.parked:
                 self._drop_parked()
             else:
                 break
             dropped += 1
         if dropped:
+            self.evictions = getattr(self, "evictions", 0) + dropped
             self.log("prompt cache: %d copies dropped to stay within %d MB (%d MB held)"
                      % (dropped, self.budget // 2 ** 20, self._held() // 2 ** 20))
 
@@ -850,7 +856,19 @@ class Runner(object):
         return len(self.parked) - 1
 
     def _drop_parked(self):
-        self.parked.pop(self._victim())
+        P = self.parked.pop(self._victim())
+        self.parked_dropped = getattr(self, "parked_dropped", 0) + 1
+        self.evicted_bytes = getattr(self, "evicted_bytes", 0) + self.state_bytes + P.get("kv_bytes", 0)
+
+    def metrics(self):
+        """eviction telemetry for /metrics and tests"""
+        held = self._held()
+        self.peak_bytes = max(getattr(self, "peak_bytes", 0), held)
+        return {"budget_bytes": self.budget, "used_bytes": held,
+                "peak_bytes": self.peak_bytes, "checkpoints": len(self.ckpt),
+                "parked": len(self.parked), "evictions": self.evictions,
+                "evicted_bytes": self.evicted_bytes, "checkpoints_dropped": self.checkpoints_dropped,
+                "parked_dropped": self.parked_dropped}
 
     def _restore(self, st):
         if self.slot is not None and self.slot.restore(st):

@@ -50,6 +50,23 @@ STATUS = {
     "lightning-30b": ["separate backend", "n/a", "n/a", "n/a"],
 }
 
+# The configuration each recorded verify row was measured against: the reference configuration
+# for `kindi verify` (exact head, q8_0 K/V unless the row says otherwise). The generator refuses
+# to render a model without a sentence here, so a new model cannot be added without saying which
+# configuration its numbers are the reference for.
+REF = {
+    "bonsai-2b": "plain engine, exact head, q8_0 K/V (GPU and CPU verify both 4/4; the tensor-core"
+                 " plan engine is also 4/4)",
+    "bonsai-4b": "plain engine, exact head, q8_0 K/V (GPU and CPU verify both 4/4)",
+    "bonsai-9b": "plain engine, exact head, q8_0 K/V (GPU verify 4/4; the tensor-core plans need"
+                 " KINDI_TC_HP=1 for the 9B's HB 4096)",
+    "bonsai-27b": "tensor-core plan engine, exact head (3 exact + tie on the 4060 Ti); the plain"
+                  " engine has no recorded verify row",
+    "nemotron-e4b": "separate backend; no `kindi verify` reference configuration recorded",
+    "nanbeige-33b": "separate backend; no `kindi verify` reference configuration recorded",
+    "lightning-30b": "separate backend; no `kindi verify` reference configuration recorded",
+}
+
 EVIDENCE = [
     ("CPU engine on the i7-8086K, native Windows", "benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md"),
     ("CPU engine on the i7-8086K, WSL2", "benchmarks/2026-11-09-i7-8086k-cpu/README.md"),
@@ -301,6 +318,10 @@ def render(models=None, fmts=None, kv=None, isa=None, card_results=None):
     if missing:
         raise SystemExit("kindi: no verification row for %s; add it to "
                          "kindi/support_matrix.py:STATUS" % ", ".join(sorted(missing)))
+    missing_ref = [mid for mid in models if mid not in REF]
+    if missing_ref:
+        raise SystemExit("kindi: no reference configuration for %s; add it to "
+                         "kindi/support_matrix.py:REF" % ", ".join(sorted(missing_ref)))
     lines = HEADER.splitlines()
 
     lines += ["", "## Models", "",
@@ -346,6 +367,14 @@ def render(models=None, fmts=None, kv=None, isa=None, card_results=None):
               "|---|" + "---|" * len(CAPABILITIES)]
     for mid in models:
         lines.append("| `%s` | %s |" % (mid, " | ".join(_cell(c) for c in STATUS[mid])))
+
+    lines += ["", "## Reference configuration", "",
+              "The configuration each verify row above was measured against - the one `kindi verify`",
+              "compares against. Anything else (K8/V4, the fast head, speculation) is measured as a",
+              "delta from this, not as the reference itself.",
+              "", "| model | reference configuration |", "|---|---|"]
+    for mid in models:
+        lines.append("| `%s` | %s |" % (mid, _cell(REF[mid])))
 
     registry = _read_registry() if card_results is None else card_results
     lines += ["", "## Cards", "",

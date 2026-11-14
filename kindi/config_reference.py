@@ -51,6 +51,10 @@ ENV_HEADER = """\
 
 These have no config key. The default is the code's own fallback (empty: unset); the last column
 is where it is read, which is where the full description lives.
+
+Every config key above is also settable as `KINDI_<KEY>` (upper-cased, `-` as `_`), so a key
+like `max_body_mb` is read as `KINDI_MAX_BODY_MB`; those names are the same setting, not extra
+variables, and are therefore not listed twice here.
 """
 
 

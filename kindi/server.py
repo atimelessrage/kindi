@@ -1448,6 +1448,20 @@ def create_app(cfg, log=print):
         opening_save_failures = getattr(getattr(getattr(K, "runner", None), "openings", None), "save_failures", 0)
         metric("kindi_opening_save_failures_total", "counter", "saved-opening writes that failed and were skipped",
                "kindi_opening_save_failures_total %d" % opening_save_failures)
+        run_metrics = getattr(getattr(K, "runner", None), "metrics", None)
+        if callable(run_metrics):
+            m = run_metrics()
+            for name, typ, help_text, key in (
+                    ("kindi_cache_budget_bytes", "gauge", "host prompt-cache byte budget", "budget_bytes"),
+                    ("kindi_cache_used_bytes", "gauge", "host prompt-cache bytes held now", "used_bytes"),
+                    ("kindi_cache_peak_bytes", "gauge", "host prompt-cache peak bytes held", "peak_bytes"),
+                    ("kindi_cache_checkpoints", "gauge", "host prompt-cache checkpoints held", "checkpoints"),
+                    ("kindi_cache_parked", "gauge", "host prompt-cache parked conversations held", "parked"),
+                    ("kindi_cache_evictions_total", "counter", "host prompt-cache copies dropped to fit the budget", "evictions"),
+                    ("kindi_cache_evicted_bytes_total", "counter", "host prompt-cache bytes evicted", "evicted_bytes"),
+                    ("kindi_cache_checkpoints_dropped_total", "counter", "host prompt-cache checkpoints dropped", "checkpoints_dropped"),
+                    ("kindi_cache_parked_dropped_total", "counter", "host prompt-cache parked conversations dropped", "parked_dropped")):
+                metric(name, typ, help_text, "%s %d" % (name, m[key]))
         g4 = getattr(K, "g4cache", None)
         if g4 is not None:
             m = g4.metrics()

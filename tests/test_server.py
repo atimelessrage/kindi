@@ -431,6 +431,24 @@ def test_metrics_endpoint_reports_the_model_and_queue(app_client):
     assert "kindi_cache_errors_total 0" in body
 
 
+def test_metrics_reports_the_prompt_cache_telemetry(app_client):
+    # the main prompt cache exposes the same telemetry shape as the Gemma 4 cache (D3)
+    _, K = app_client
+    K.runner.metrics = lambda: {"budget_bytes": 1000, "used_bytes": 400, "peak_bytes": 700,
+                                "checkpoints": 2, "parked": 1, "evictions": 3,
+                                "evicted_bytes": 300, "checkpoints_dropped": 2, "parked_dropped": 1}
+    body = app_client[0].get("/metrics").text
+    assert "kindi_cache_budget_bytes 1000" in body
+    assert "kindi_cache_used_bytes 400" in body
+    assert "kindi_cache_peak_bytes 700" in body
+    assert "kindi_cache_checkpoints 2" in body
+    assert "kindi_cache_parked 1" in body
+    assert "kindi_cache_evictions_total 3" in body
+    assert "kindi_cache_evicted_bytes_total 300" in body
+    assert "kindi_cache_checkpoints_dropped_total 2" in body
+    assert "kindi_cache_parked_dropped_total 1" in body
+
+
 def test_metrics_and_ollama_endpoints_need_the_api_key(auth_client):
     client, _ = auth_client
     for path in ("/metrics", "/api/tags"):
