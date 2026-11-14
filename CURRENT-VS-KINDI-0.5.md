@@ -1157,3 +1157,29 @@ partial. `Fixed since §22` rows were fixed in §23.1's round rather than listed
 Evidence: `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-tandem-overlap/`, the verify-matrix and
 P106 doc commits' test commands, the lease rows in `AGENTS.md`, and
 `docs/benchmarks/2026-11-10-i7-8086k-rtx4060ti/results.json`.
+
+## 24. Current state vs stock Kindi 0.5, refreshed again (2026-11-14, after §23)
+
+### 24.1 What is new or better since §23
+
+| item | evidence |
+|---|---|
+| Parked conversations with the same opening no longer copy its K/V per session: the shared-prefix rows are content-keyed blocks stored once and refcounted (`kindi/cache.py`, `Runner._kv_blocks`). Three parked siblings sharing a 4K opening hold four 1024-blocks with refcount 3; restores are byte-identical. | `tests/test_cache_decisions.py` (three new tests) |
+| Cache-doc and report rows updated with the roadmap gate outcomes (#5 `kindi plan` done; #6 mechanism done, ≤1.2× gate recorded as unsatisfiable jointly with the 90% dedupe rule) | `docs/ROADMAP.md` |
+
+### 24.2 What is worse, missing, or no longer works (2026-11-14, re-checked)
+
+Nothing new became worse this round. The honest-mechanism ledger now records two gates changed
+on the evidence rather than bent to fit: #6's ≤1.2× host-RAM clause (does not hold jointly with the
+90% sibling-dedupe rule and unshared per-conversation end states; blocks now cost 1/3 of the unshared
+prefix bytes) and #9's unbuffered-load gate (measured NOT met: 15.6 s unbuffered vs 14.5 s cold,
+4.7 s warm buffered on the 27B bcodes — the disk read is the bottleneck either way).
+
+### 24.3 What was fixed in this round rather than only listed
+
+| was | now |
+|---|---|
+| Parked K/V was a whole-prefix host copy per conversation; Turns' disk blocks were shared but the in-RAM parked copies were not | Shared in-RAM blocks on the same content keys; `_held()` accounting is refcount-aware; `_kv_block_keys` is now one module-level helper used by both Turns and parking |
+
+Evidence: `tests/test_cache_decisions.py` (the sharing, restore-fidelity and gate-ratio tests) and the
+lease row in `AGENTS.md`.
