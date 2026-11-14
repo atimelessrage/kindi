@@ -635,8 +635,10 @@ def make_engine(pack, ctx=4096, clusters=None, log=print, tandem="off", cpu_laye
     two = cp.cuda.runtime.getDeviceCount() >= 2
     dims = man.get("dimensions", {})
     # the plan engine (kindi.tp) also runs on one card: it is the one that has the 27B's kernels (6 q heads per K/V
-    # head, Hadamard blocks of 1024, q8_0 K/V)
-    plan_model = dims.get("heads", 8) != 4 * dims.get("kv_heads", 2) or int(man.get("hadamard_block", 512)) == 1024
+    # head, Hadamard blocks of 1024, q8_0 K/V). It is also the faster engine on the models that have it:
+    # 2B tc read 471 vs 190 plain, 4B 214 vs 129, 9B 134 vs 90 tok/s (CROSS-MODE tc rows). So by default the
+    # plan engine is used for every model it supports, not only the 27B; KINDI_TP=0 keeps the plain engine.
+    plan_model = True
     # AMD GPUs with many CUs (Strix Halo, gfx1151): the 2B, 4B and 9B (512- and 4096-point folds) also run faster on
     # the plan engine's 5-trit products (2B write 173 -> 259, 9B 52 -> 89 tokens/s); measured there only
     if cp.cuda.runtime.is_hip and int(man.get("hadamard_block", 512)) in (512, 4096) and not two:

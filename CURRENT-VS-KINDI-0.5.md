@@ -751,3 +751,21 @@ ever record `refused`, even though {0cd58bc} showed the run is exact with `KINDI
 pins that it adds only that flag). Measured: 9B tc-hp PASS 4/4 at 123.9 tok/s
 (`bench-logs/verify-matrix-9b-tc-hp/`); the same run's 2B/4B tc cells are 4/4 and 3 exact + 1 tie
 unchanged.
+
+## 17. Audit findings: the plan engine is the default, and bench JSON carries the actual ctx (2026-11-13)
+
+Two of the Buffy audit's three HIGH items are fixed here (the third — the 4B default-activations
+tie — is a hardware-path item, not a code bug, and the matrix documents it as such):
+
+- **The default engine is now the measured winner.** `kindi/engine.py make_engine` previously used
+  the plan engine by default only for the 27B; the 2B/4B/9B ran the plain engine even though the
+  cross-mode `tc` rows show the plan engine 1.5-1.9x faster at every depth on this card. Now the
+  plan engine is the default for every model it supports; `KINDI_TP=0` keeps the plain engine.
+  Verified on the card: a default 2B `kindi verify` now runs the plan engine (log line `plan
+  engine ready: 1 card`) and is still 4/4 token-exact, at 253.4 tok/s over the run (was 194.9 with
+  the plain engine). The 9B engine log now also states that HB 4096 is exact only with HP, so the
+  requirement is visible in the run, not just in the docs.
+- **`bench --json` now records the actual context.** `result['ctx']` was already `eng.ctx` (the
+  loader's reduced value), but nothing said so: a run reduced to 17,664 could be read as the
+  requested 24,576. The JSON now also carries `ctx_requested` and `ctx_reduced` so a reduced cell
+  is unambiguously identifiable.

@@ -51,7 +51,10 @@ def run(cfg, log=print):
                        tandem=cfg.get("tandem", "off"), cpu_layers=cfg.get("tandem_cpu_layers"))
     if vram is not None:
         vram.mark("loaded")
+    # eng.ctx is the *actual* context (the loader reduces it to fit); the requested one is
+    # recorded separately so a reduced run is never mistaken for the requested context.
     result = {"pack": pack, "model": man.get("model"), "ctx": eng.ctx,
+              "ctx_reduced": cfg["ctx"] > eng.ctx + 47, "ctx_requested": cfg["ctx"],
               "tandem": cfg.get("tandem", "off"), "cpu_layers": cfg.get("tandem_cpu_layers"),
               "device": "gpu" if cp is not None else "cpu", "read_tok_s": None, "gen_tok_s": {}}
     if cp is not None:

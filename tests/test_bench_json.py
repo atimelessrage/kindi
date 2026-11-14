@@ -38,6 +38,8 @@ def test_bench_json_records_the_printed_numbers(tmp_path, monkeypatch):
     assert rc == 0
     got = json.loads(open(dest, encoding="utf-8").read())
     assert got["ctx"] == 24576
+    assert got["ctx_requested"] == 24576
+    assert got["ctx_reduced"] is False
     assert got["tandem"] == "off"
     assert got["device"] == "cpu"
     # every printed rate appears in the JSON, cell by cell
@@ -48,6 +50,27 @@ def test_bench_json_records_the_printed_numbers(tmp_path, monkeypatch):
     assert "wrote %s" % dest in text
     assert sorted(k.split(":")[0] for k in got["gen_tok_s"]) == ["exact"] * len(got["gen_tok_s"])
     assert sorted(int(k.split(":")[1]) for k in got["gen_tok_s"]) == [100, 2000, 8000, 16000, 24000]
+
+
+def test_bench_json_records_the_actual_ctx_when_reduced(tmp_path, monkeypatch):
+    """When the loader reduces the context to fit, the JSON carries the actual ctx (from
+    eng.ctx) and flags the reduction, so a 17,664-token run is never recorded as 24,576."""
+    monkeypatch.setenv("KINDI_DEVICE", "cpu")
+    dest = str(tmp_path / "b.json")
+
+    class SmallEngine(FakeEngine):
+        def __init__(self, pack, ctx=None, clusters=None, tandem=None, cpu_layers=None, **_):
+            super().__init__(pack, ctx=ctx, clusters=clusters, tandem=tandem, cpu_layers=cpu_layers)
+            self.ctx = 17664                # the loader reduced the requested 24,576 to fit
+
+    monkeypatch.setattr("kindi.engine.make_engine", SmallEngine)
+    rc = bench.run({"pack": str(tmp_path), "ctx": 24576, "fast_clusters": 256, "json": dest},
+                   log=lambda *a, **k: None)
+    assert rc == 0
+    got = json.loads(open(dest, encoding="utf-8").read())
+    assert got["ctx"] == 17664
+    assert got["ctx_requested"] == 24576
+    assert got["ctx_reduced"] is True
 
 
 def test_bench_json_records_tandem_placement(tmp_path, monkeypatch):
