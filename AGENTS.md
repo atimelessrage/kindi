@@ -10,9 +10,9 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `df851a3` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean;
+- **HEAD:** `0d1d5fd` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean;
   guarded by `tests/test_agents_handoff.py`). Full suite last measured there:
-  511 passed, 19 skipped, 1 warning; the 27% line-and-branch coverage floor is unchanged.
+  516 passed, 19 skipped, 1 warning; the 27% line-and-branch coverage floor is unchanged.
 - **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
   512/4K/8K; 2B CPU-layer sweep; joint checkpoint 149.6 MiB on the 27B at 54.5-61.5 ms
   save), owned-slice CPU load, `kindi bench --sample-vram` sampled-peak VRAM, multi-ISA CPU
@@ -55,8 +55,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `df851a3` | main checkout; clean; best-of main |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `df851a3` | this session; best-of main (identical to `main`) |
+| `T:/kindi` | `main` | `0d1d5fd` | main checkout; clean; best-of main |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `0d1d5fd` | this session; best-of main (identical to `main`) |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
@@ -100,6 +100,7 @@ the next agent needs in front of them; when a task finishes, move its row to the
 
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
+| Tandem plan-engine GPU owner | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/tp.py`, `kindi/tandem.py`, `kindi/engine.py`, `kindi/kindi.cu`, `kindi/bench.py`, `kindi/verify.py`, `kindi/server.py`, `kindi/__main__.py`, `tests/test_tandem.py`, `tests/test_plan_engine.py`, `docs/TANDEM-RUNTIME.md`, `docs/ROADMAP.md`, `docs/CONFIGURATION-REFERENCE.md`, `docs/development/**`, `CURRENT-VS-KINDI-0.5.md`, `AGENTS.md` | done; `TPEngine(layers=,embed=,head=)` owns an arbitrary subset (only the owned tensors load, K/V only for the owned attention layers, f32 per layer) and steps one prebuilt plan per block with the residual add inside the plan (`k_padd`; a CuPy add per block cost 17% of a 2B token). `--tandem-gpu auto|plan|plain` (`KINDI_TANDEM_GPU`) picks the owner, plan on one card; `gpu_estimate(..., owner=)` charges the owner's real allocation. Exact: 2B cpu-first and gpu-first 4/4, 9B `gdn:6` 4/4, 2B joint cache 320/325 + 256/261. 27B 24K `gdn:16`: peak **6,004** MiB (n=5, 5,862-6,083) vs **7,721** plain, 1,985 MiB free, decode inside noise. 48K: 19 GDN layers hold all 49,152 tokens (peak 6,876) where unsplit reduces to 30,976. Fixed the plan engine's 1024-token floor for partial engines (256). Evidence: `bench-logs/tandem-plan-owner/`, `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plan-owner/RESULTS.md`; 516 passed, 19 skipped |
 | Cross-mode tc rows + 27B gpu-first 24K row | this worktree | `freebuff/tandem-cpu-recovery` | `docs/benchmarks/build_cross_mode.py`, `docs/benchmarks/CROSS-MODE.md`, `docs/benchmarks/CROSS-MODE.csv`, `docs/benchmarks/perf-baseline.json`, `docs/benchmarks/2026-11-13-i7-8086k-rtx4060ti-tc/**`, `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md`, `docs/TANDEM-RUNTIME.md`, `docs/ROADMAP.md`, `tests/test_cross_mode_benchmarks.py`, `CURRENT-VS-KINDI-0.5.md`, `AGENTS.md` | done; tc rows are medians of three (2B read 471.7, 4B 214.1, 9B 133.9; 24K gen 299.2/127.8/97.0, peaks 1,645/3,311/3,257 MiB) and the perf gate now guards 12 cells; 27B gpu-first 24K (read 8.5, gen 7.4/6.2/4.5/3.3/2.7, peak 7,339 MiB) completes the 27B table |
 | verify_matrix tc-hp mode | this worktree | `freebuff/tandem-cpu-recovery` | `tools/verify_matrix.py`, `tests/test_verify_matrix.py`, `docs/ROADMAP.md`, `CURRENT-VS-KINDI-0.5.md`, `AGENTS.md` | done; the matrix gained a `tc-hp` mode (tc + `KINDI_TC_HP=1`) because without it the 9B tc cell can only ever record `refused`; measured 9B tc-hp PASS 4/4 at 123.9 tok/s (docs: ROADMAP plan-engine bullet now names tc-hp) |
 | Audit findings: dispatch, JSON ctx, tc-hp defaults | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/engine.py`, `kindi/bench.py`, `kindi/spec.py`, `tests/test_bench_json.py`, `docs/CONFIGURATION.md`, `docs/CONFIGURATION-REFERENCE.md`, `docs/ROADMAP.md`, `CURRENT-VS-KINDI-0.5.md`, `AGENTS.md` | done; plan engine is now the default for every model it supports (`KINDI_TP=0` keeps plain) and the 9B log line states the HP requirement; bench JSON carries ctx_requested + ctx_reduced. Evidence: 2B default verify 4/4 at 253.4 tok/s via the plan engine; new test pins the reduced-ctx JSON; full focused set 17 passed; config_reference --check, perf gate, git diff --check pass |
