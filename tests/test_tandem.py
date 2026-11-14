@@ -265,6 +265,19 @@ def test_auto_planner_prefers_gdn_layers_and_respects_the_budget():
     assert len(big) > len(cpu) and all((il + 1) % 4 for il in big)
 
 
+def test_auto_target_frees_at_least_the_requested_headroom():
+    dims = {"layers": 32, "full_attention_interval": 4, "kv_heads": 4, "head_dim": 256}
+    mb = 2 ** 20
+    sizes = {"layers": {il: 56 * mb for il in range(32)}, "embed": 258 * mb, "head": 258 * mb, "f32": 28 * mb}
+    full = tandem.gpu_estimate(dims, sizes, 8192)
+    # the model fits easily, but the target asks for 1 GiB of headroom on top
+    cpu = tandem.plan_cpu_layers(dims, sizes, 8192, 64 << 30, reserve_mib=0, target_mib=1024)
+    assert cpu and all((il + 1) % 4 for il in cpu)
+    assert full - tandem.gpu_estimate(dims, sizes, 8192, cpu) >= 1024 * mb
+    # a target of 0 is a no-op
+    assert tandem.plan_cpu_layers(dims, sizes, 8192, 64 << 30, reserve_mib=0, target_mib=0) == ()
+
+
 def test_auto_planner_refuses_when_nothing_can_fit():
     dims = {"layers": 8, "full_attention_interval": 4, "kv_heads": 2, "head_dim": 16}
     sizes = {"layers": {il: 1000 for il in range(8)}, "embed": 10, "head": 10, "f32": 10}

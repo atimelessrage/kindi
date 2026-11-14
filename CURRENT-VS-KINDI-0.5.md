@@ -905,7 +905,9 @@ when the model already fits:
   load, sampled peak 7,257 MiB, read 8.3 / decode 6.3-7.0 tok/s.
 
 `KINDI_TANDEM_RESERVE_MB` (default 512) is the headroom it leaves; a hand-picked `gdn:16` is slightly
-faster (7.9 at 24K) because it leaves only 283 MiB.
+faster (7.9 at 24K) because it leaves only 283 MiB. `auto:1024` asks for headroom *freed* instead and
+splits even when the model fits: on the 9B at 8,192 it moved 14 GDN layers, left 5,523 MiB free and ran
+17.5 read / 16.9 at 8K — a card-sharing choice, not a throughput one.
 
 One bug fixed on the way: the partial-range engine's context fit charged the GPU owner for **every**
 attention layer of the model instead of the ones it loads, so a split reduced context more than the

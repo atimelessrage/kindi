@@ -239,8 +239,14 @@ predicts 7,778 MiB against a measured plan-engine peak of 7,783 MiB.
 | 27B | 24,576, 5,100 MiB free | 39 CPU layers (still GDN-only) |
 
 A hand-picked `gdn:16` is faster at 24K (7.9 tok/s) because it leaves only 283 MiB free; `auto` keeps
-the 512 MiB reserve by default (`KINDI_TANDEM_RESERVE_MB`). Units: `auto:1024` asks for an extra
-1,024 MiB of headroom and works even when the model would fit unsplit.
+the 512 MiB reserve by default (`KINDI_TANDEM_RESERVE_MB`).
+
+`auto:1024` asks for **1,024 MiB of headroom freed**, not merely for a model that leaves that much, so
+it splits even when the model would fit unsplit. Measured on the 9B at 8,192: 14 GDN layers on the CPU,
+5,523 MiB free after load, read 17.5 and 8K decode 16.9 tok/s — useful when something else needs the
+card, not a throughput choice. The freed number the planner reports is against the **plain** engine's
+allocation, which is ~600 MiB above the plan engine's row at 8K (q8_0 K/V vs fp16), so do not compare
+it with a full-GPU row taken on the plan engine.
 
 ### The split frees much less VRAM than the layer count suggests
 

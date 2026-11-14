@@ -134,24 +134,30 @@ def plan_cpu_layers(dims, sizes, ctx, free_bytes, reserve_mib=512, target_mib=No
     NL = int(dims["layers"])
     interval = max(1, int(dims["full_attention_interval"]))
     budget = int(free_bytes) - int(reserve_mib) * 2 ** 20
-    if target_mib is not None:
-        budget -= int(target_mib) * 2 ** 20
+    free_target = None if target_mib is None else int(target_mib) * 2 ** 20
+    full = gpu_estimate(dims, sizes, ctx, ())
 
     order = [il for il in range(NL) if (il + 1) % interval] + [il for il in range(NL)
                                                               if (il + 1) % interval == 0]
     cpu = []
-    while gpu_estimate(dims, sizes, ctx, cpu) > budget:
+    while True:
+        est = gpu_estimate(dims, sizes, ctx, cpu)
+        over = est > budget
+        short = free_target is not None and (full - est) < free_target
+        if not over and not short:
+            break
         if len(cpu) + 1 >= NL:
             raise SystemExit("kindi: tandem auto cannot fit this model at %d tokens on the free GPU memory "
                              "(needs about %d MiB more); reduce --ctx"
-                             % (int(ctx), (gpu_estimate(dims, sizes, ctx, cpu) - budget) // 2 ** 20))
+                             % (int(ctx), max(est - budget, 0) // 2 ** 20))
         cpu.append(order[len(cpu)])
     if not cpu:
         return ()
     cpu = tuple(sorted(cpu))
-    log("tandem auto: %d CPU layer%s (%s) frees the GPU to ~%d MiB of its %d MiB budget"
+    est = gpu_estimate(dims, sizes, ctx, cpu)
+    log("tandem auto: %d CPU layer%s (%s) takes the GPU side to ~%d MiB (%d MiB freed; %d MiB budget)"
         % (len(cpu), "" if len(cpu) == 1 else "s", ",".join(str(x) for x in cpu),
-           gpu_estimate(dims, sizes, ctx, cpu) // 2 ** 20, budget // 2 ** 20))
+           est // 2 ** 20, (full - est) // 2 ** 20, budget // 2 ** 20))
     return cpu
 
 
