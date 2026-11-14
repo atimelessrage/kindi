@@ -43,7 +43,9 @@ def kv_mode():
     """The K/V cache format selected by KINDI_KV. q8_0 is the default and preserves the old cache.
 
     k8v4 is experimental and lossy: its 4-bit V does not reproduce the fp16 K/V reference (2B `kindi verify`:
-    2 of 4 prompts, first difference at tokens 35-36), so it is refused unless KINDI_KV_EXPERIMENTAL=1.
+    2 of 4 prompts, first difference at tokens 35-36; `kindi kld` measures its teacher-forced drift at
+    1.3e-04/2.3e-04 nats at 2K/8K, ~500-1000x q8_0's ~2e-7 and growing with context, so the quarantine
+    stands on the measurement), so it is refused unless KINDI_KV_EXPERIMENTAL=1.
     The gate lives here because this is the only place the format is selected, before any pack is read."""
     value = os.environ.get("KINDI_KV", "q8_0").strip().lower()
     if value in ("q8", "q8_0"):
@@ -52,7 +54,8 @@ def kv_mode():
         if os.environ.get("KINDI_KV_EXPERIMENTAL", "0") != "1":
             raise SystemExit(
                 "kindi: KINDI_KV=k8v4 is an experimental, lossy cache (4-bit V): it is not token-exact with "
-                "the fp16 K/V reference (2B `kindi verify`: 2 of 4 prompts, first difference at tokens 35-36). "
+                "the fp16 K/V reference (2B `kindi verify`: 2 of 4 prompts, first difference at tokens 35-36; "
+                "`kindi kld`: 1.3e-04/2.3e-04 nats at 2K/8K vs q8_0's ~2e-07). "
                 "Set KINDI_KV_EXPERIMENTAL=1 to use it; q8_0 is the supported default.")
         return "k8v4"
     raise SystemExit("kindi: KINDI_KV must be q8_0 or k8v4 (got %r)" % value)

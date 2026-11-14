@@ -10,7 +10,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `9c32bff` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean; guarded by `tests/test_agents_handoff.py`). Full suite last measured there: 566 passed, 10 skipped, 1 warning; the 27% line-and-branch coverage floor is unchanged.
+- **HEAD:** `af04cdb` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean; guarded by `tests/test_agents_handoff.py`). Full suite last measured there: 566 passed, 10 skipped, 1 warning; the 27% line-and-branch coverage floor is unchanged.
 - **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
   512/4K/8K; 2B CPU-layer sweep; joint checkpoint 149.6 MiB on the 27B at 54.5-61.5 ms
   save), owned-slice CPU load, `kindi bench --sample-vram` sampled-peak VRAM, multi-ISA CPU
@@ -56,8 +56,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `9c32bff` | main checkout; clean; best-of main |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `9c32bff` | this session; best-of main (identical to `main`) |
+| `T:/kindi` | `main` | `af04cdb` | main checkout; clean; best-of main |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `af04cdb` | this session; best-of main (identical to `main`) |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
@@ -105,6 +105,7 @@ the next agent needs in front of them; when a task finishes, move its row to the
 
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
+| `kindi kld` quality gate + 2B numbers at 2K/8K (2026-11-14) | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/kld.py` (new), `kindi/__main__.py`, `tests/test_kld.py` (new), `kindi/tp.py`, `kindi/support_matrix.py`, `docs/ROADMAP.md`, `docs/BENCHMARKS.md`, `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-kld-2b/` (new), `AGENTS.md` | done (roadmap gate 3). New `kindi kld` subcommand: teacher-forced KLD + same-top share + PPL ratio vs the fp16 plain-engine reference, lockstep ref+variant passes, warmup 64, exact head only, `--json`. Measured on the 2B (4060 Ti 8 GB): q8_0 = 2.07-2.74e-07 nats KLD, 100% same-top, PPL ratio 1.000002-1.00001 at 2K/8K (plain and plan engines identical, so no engine-noise confound); `k8v4` = 1.29e-04/2.27e-04 nats (~470x/~1,090x q8_0, PPL +0.09%/+0.11%, 1.75x growth 2K->8K). Quarantine re-derived: stands on the graded numbers (tp.py + support-matrix now cite KLD), q8_0 distribution-lossless; gate 8 (FP8) must beat the q8_0 row. 9 unit tests (softmax/KL/summarize math, fast-head refusal, CLI wiring, JSON roundtrip). |
 | Other drafter pairs: 4B->27B, 2B->4B (2026-11-14) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/MTP.md`, `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-drafter-24k/drafter-pairs-RESULTS.md` (new), `AGENTS.md` | done. Same host/method as the 24K drafter row: **4B->27B does not fit at all** (drafter loads, 4,979 MiB left; the 27B's 5.60 GB cannot stream; the loader refuses a 1024-token context and the server exits). **2B->4B fits fully** (24,576 unreduced) with 45.6% acceptance (73/160, 40 passes) **and still loses** (111 warm tokens: 1.30 s at 85.6 tok/s without, 1.47 s at 75.5 with, 0.88x) - the 4B pass is too cheap for acceptance to pay, same law as 9B at 0.98x. Recorded in `docs/MTP.md` and the dated evidence dir. |
 | 27B + 2B drafter at 24K on 8 GB (2026-11-14) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/MTP.md`, `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-drafter-24k/` (new), `AGENTS.md` | done. Measured on the 4060 Ti (8,188 MiB) with the pinned 27B pack: **the drafter does not fit at 24K** - context reduces 24,576 -> 12,032 (free 323 -> 115 MiB, so the drafter costs ~1.6 GB); where it fits it still pays 1.54x (5,012-token prompt, 136 completed: 5.00 s at 27.2 tok/s without, 3.25 s at 41.8 with), consistent with the 8K 1.56x row. `kindi bench` only times the exact head, so fit comes from two `bench --json` runs and speed from two real server completions (one run each). Recorded in `docs/MTP.md` and the dated RESULTS dir; 24K-with-drafter on 8 GB is a tandem-slice question. |
 | Garbage MTP head end-to-end (2026-11-14) | this worktree | `freebuff/tandem-cpu-recovery` | `tests/test_plan_engine.py`, `AGENTS.md` | done. Follow-up to the graceful-degradation row: `test_a_garbage_mtp_head_switches_speculation_off_and_the_engine_still_generates` writes a non-npz garbage file, first proves the real `MTPDraft` raises on it (np.load, before any CUDA), then drives the real `_build` with `KINDI_SPEC=mtp`/`KINDI_MTP_HEAD=garbage` on a stand-in tc engine and asserts `eng.mtp is None`, one `speculation off` log line naming the file, and a full 20-token `generate_spec` run on that same engine object. Verified non-vacuous: fails against pre-fix `kindi/spec.py` (HEAD~1), passes against the fixed one. |

@@ -653,3 +653,13 @@ out of the log:
 ```sh
 kindi --pack ~/.kindi/packs/bonsai-2b bench --sample-vram --json bench-2b.json
 ```
+
+`kindi kld --json FILE` is the quality gate for lossy K/V caches (roadmap gate 3): teacher-forced
+KLD + same-top-token share + PPL ratio of each lossy cache against the fp16 whole-model reference,
+at 2K and 8K on the configured pack (the 2B default). Example:
+
+```sh
+kindi --pack ~/.kindi/packs/bonsai-2b kld --json kld-2b.json
+```
+
+The current numbers live with the dated evidence under [benchmarks/](benchmarks/).

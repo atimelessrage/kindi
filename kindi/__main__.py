@@ -4,6 +4,7 @@
   kindi fast-head               build the cluster file for the fast head (optional; ~2 minutes)
   kindi verify                  check greedy output against llama.cpp's reference (token for token)
   kindi bench                   measure speed and GPU memory
+  kindi kld                     teacher-forced KLD quality gate for lossy K/V caches (vs fp16)
   kindi serve                   run the OpenAI-compatible server
   kindi chat                    chat in the terminal (no server needed)
   kindi head exact|fast         choose the output head of a running server (next request, no restart)
@@ -78,6 +79,16 @@ def cmd_bench(cfg, a):
     _setup_gpu_env(cfg)
     from .bench import run
     return run(cfg, log=log)
+
+
+def cmd_kld(cfg, a):
+    _setup_gpu_env(cfg)
+    from .kld import run, write_json
+    results = run(cfg, log=log)
+    if getattr(a, "json", None):
+        write_json(results, a.json)
+        log("wrote %s" % a.json)
+    return 0
 
 
 def _require_pack(cfg):
@@ -260,6 +271,8 @@ def main(argv=None):
     s = sub.add_parser("bench", help="measure speed")
     s.add_argument("--json", default=None, metavar="FILE", help="also record the numbers in a machine-readable JSON file")
     s.add_argument("--sample-vram", action="store_true", help="sample device-wide VRAM and log the peak during the run")
+    s = sub.add_parser("kld", help="teacher-forced KLD quality gate for lossy K/V caches against fp16")
+    s.add_argument("--json", default=None, metavar="FILE", help="also record the numbers in a machine-readable JSON file")
     s.add_argument("--vram-sample-s", type=float, default=None, help="VRAM sampling interval in seconds (default: 0.5)")
     _tandem_args(s)
     s = sub.add_parser("serve", help="run the OpenAI-compatible server")
@@ -298,7 +311,7 @@ def main(argv=None):
         cfg["sample_vram"] = True
     if getattr(a, "vram_sample_s", None) is not None:
         cfg["vram_sample_s"] = a.vram_sample_s
-    return {"convert": cmd_convert, "fast-head": cmd_fast_head, "verify": cmd_verify, "bench": cmd_bench,
+    return {"convert": cmd_convert, "fast-head": cmd_fast_head, "verify": cmd_verify, "bench": cmd_bench, "kld": cmd_kld,
             "serve": cmd_serve, "chat": cmd_chat, "head": cmd_head, "info": cmd_info,
             "models": cmd_models, "use": cmd_use}[a.cmd](cfg, a)
 

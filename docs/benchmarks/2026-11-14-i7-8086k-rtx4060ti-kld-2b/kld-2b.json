@@ -1,0 +1,74 @@
+[
+  {
+    "ctx": 2048,
+    "kld_nats": 2.737972465061563e-07,
+    "pack": "C:\\Users\\ICH\\.kindi\\packs\\bonsai-2b",
+    "ppl_ratio": 1.0000023921372332,
+    "ppl_ref": 1.0125286093348274,
+    "same_top_share": 1.0,
+    "seconds": 60.0,
+    "steps": 1983,
+    "variant": "plain-q8",
+    "warmup": 64
+  },
+  {
+    "ctx": 2048,
+    "kld_nats": 2.744416671200036e-07,
+    "pack": "C:\\Users\\ICH\\.kindi\\packs\\bonsai-2b",
+    "ppl_ratio": 1.0000024206925382,
+    "ppl_ref": 1.0125286093348274,
+    "same_top_share": 1.0,
+    "seconds": 56.3,
+    "steps": 1983,
+    "variant": "tp-q8",
+    "warmup": 64
+  },
+  {
+    "ctx": 2048,
+    "kld_nats": 0.00012940975556018482,
+    "pack": "C:\\Users\\ICH\\.kindi\\packs\\bonsai-2b",
+    "ppl_ratio": 1.0008798168465483,
+    "ppl_ref": 1.0125286093348274,
+    "same_top_share": 1.0,
+    "seconds": 57.7,
+    "steps": 1983,
+    "variant": "tp-k8v4",
+    "warmup": 64
+  },
+  {
+    "ctx": 8192,
+    "kld_nats": 2.0721111455939165e-07,
+    "pack": "C:\\Users\\ICH\\.kindi\\packs\\bonsai-2b",
+    "ppl_ratio": 1.0000096891328276,
+    "ppl_ref": 1.0118045292664712,
+    "same_top_share": 1.0,
+    "seconds": 220.7,
+    "steps": 8127,
+    "variant": "plain-q8",
+    "warmup": 64
+  },
+  {
+    "ctx": 8192,
+    "kld_nats": 2.0818159377283568e-07,
+    "pack": "C:\\Users\\ICH\\.kindi\\packs\\bonsai-2b",
+    "ppl_ratio": 1.0000087486902796,
+    "ppl_ref": 1.0118045292664712,
+    "same_top_share": 1.0,
+    "seconds": 196.1,
+    "steps": 8127,
+    "variant": "tp-q8",
+    "warmup": 64
+  },
+  {
+    "ctx": 8192,
+    "kld_nats": 0.000226596203569654,
+    "pack": "C:\\Users\\ICH\\.kindi\\packs\\bonsai-2b",
+    "ppl_ratio": 1.0011011219814192,
+    "ppl_ref": 1.0118045292664712,
+    "same_top_share": 1.0,
+    "seconds": 198.2,
+    "steps": 8127,
+    "variant": "tp-k8v4",
+    "warmup": 64
+  }
+]
