@@ -1085,3 +1085,75 @@ Evidence: `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-determinism/`,
 `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-drafter-24k/`,
 `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-kld-2b/`, the lease rows in `AGENTS.md`, and the
 commands in each lease row.
+
+## 23. Current state vs stock Kindi 0.5, refreshed again (2026-11-14 later)
+
+This section supersedes §22 wherever they differ; §§1–22 are history at their own dates. HEAD is
+`df818be` on both `main` and `freebuff/tandem-cpu-recovery`; the suite is **602 passed, 11 skipped**
+(one of the handoff-guard failures seen mid-round was the previous commit's stale worktree table;
+the guard is green at `df818be`). Tracked files: 465 (stock 0.5: 102); test modules: 59 (stock: 0);
+docs paths: 209 (stock: 12). Every §22.2 row was re-checked against this tree; none is fixable in a
+docs round (verdicts below), and nothing new became worse since §22.
+
+### 23.1 What is new or better since §22
+
+- **One command now covers the whole support contract.** `tools/verify_matrix.py` gained the serve/bench
+extras (`8c8037b`): per model, the catalog offer (criterion 1, fit vs the card's VRAM), a measured
+  `kindi bench --json` row (5), and a server/cache cycle (2+4: boot, two requests with the repeat a
+  cache hit, an invalid 400, restart on the same state dir, hit again, bit-identical replies),
+  landing in `results.json` with `--no-serve`/`--no-bench` opt-outs. Measured on the 4060 Ti:
+  verify 4/4, serve `cached [0, 256, 256, 253]`, bench gen 187.9 tok/s, `offered: True`. The rig
+  runbook (`docs/OLD-CARD-RIG.md`) is now that one command, and its session was dry-run end to end
+  (`592ee52`): all 19 commands across the runbook and card pages parse and behave on this host;
+  this found and fixed the P106 one/two-card sections pointing at legacy `~/.kindi/pack{,9b,27b}`
+  paths while everything else uses `~/.kindi/packs/bonsai-*` (the corrected 9B verify line passes
+  here: 4/4 at 103.7 tok/s).
+- **The overlap design's step 0 landed, with its honest verdict.** `KINDI_TANDEM_DEBUG_TIMING`
+  adds the designed per-run decomposition probe (off = the old `_run` byte for byte; `bench`
+  records `tandem_timing`), and the 27B-24K `gdn:12` plan-owner gate baseline is re-recorded:
+  **9.9 tok/s at the 24K position, read 13.6, 5,949 MiB sampled peak** (the §22-era 7.9 row predates
+  the plan owner; the ≥25% target re-derives to ≥12.4 tok/s). Decomposition over 76 tokens:
+  cpu 62.2 ms (5.18 ms/layer) + gpu 8.0 + transfer 2.85 (7/token, 0.41 ms each) + head 14.2 = 87.3 ms.
+  **The design's premise is now in question, on the record:** the 8K "~6 ms dispatch gap" does not
+  reproduce at 24K — the CPU run is already at the raw 4–6 ms kernel rate — so the worker thread
+  must be re-justified before it is built, and the head (16% of the token) and transfers come first
+  on these numbers. The head was read for free wins before this verdict: `finish()` is the output-norm
+  fold plus the exact-head GEMV and a GPU argmax — per-token compute, not sync overhead — so there
+  is no trivial cut and the remaining speed work is staged staging + head-side, as the design now says.
+  Evidence: `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-tandem-overlap/`.
+- **Two doc-vs-code lies removed.** `kindi bench` did not accept `--tandem`/`--tandem-cpu-layers`/
+  `--tandem-gpu` even though `kindi/__main__.py`'s docstring said verify/bench/serve/chat all do;
+  they are on the bench parser now, pinned by a `--help` test. (Found while landing step 0, which
+  is the first time anyone ran the design doc's own gate command.)
+- **Registry coverage widened.** `kindi/support_matrix.py`'s `CARDS` now registers the RTX 4060 Ti
+  (measured: 2B tc 4/4 @ 382.7, 4B tc failed at token 6, 9B tc refused→defaulted), the GTX 1080 and
+  the K1200 (honestly `not measured` — only old MoE speed prose exists for them, no verify payload).
+
+### 23.2 What is worse, missing, or no longer works (2026-11-14, all re-checked)
+
+All checked on this tree. **Bold** = worse than stock 0.5; the rest are new features that stay
+partial. `Fixed since §22` rows were fixed in §23.1's round rather than listed here.
+
+| Item | Status vs stock 0.5 | Fixable now? |
+|---|---|---|
+| **The tandem is still slower than GPU-only** — 27B @ 24K: 9.9 tok/s with the plan owner at 12 CPU layers, vs ~30 unsplit; the split buys memory, not speed. Step 0 (probe + baseline) is landed; the ≥25% build is re-pending re-justification, since the decomposition puts the CPU run at raw kernel rate already, the head at 14.2 ms/token and transfers at 0.41 ms each | New feature below its own promise; step 0 done | No: the remaining work (pinned staging, head-side, thread) is kernel-touching GPU implementation, and the only honest next move is the design's own re-justification |
+| **The installer artifact itself is still unpublished** — pin/version resolved to the published v0.6.0 tarball in-tree; publishing the installer release asset stays the release owner's step (`docs/RELEASE-CHECKLIST.md`, present) | Worse than the tree, not the stock release | No: release-owner step |
+| 9B + 2B drafter does not pay (0.98x); 27B + drafter does not fit at 24K on 8 GB (12K cap); 4B → 27B does not fit at all. Measured answers in `docs/MTP.md`, not open questions | Not a stock feature | No: measurements; fit is a tandem-slice question |
+| `KINDI_TC_HP` caps the verify pass at T = 4 | New trade, taken for 4/4 exactness | Needs a wider-HP kernel pass (GPU work) |
+| 4B tc 3 exact + 1 tie; k8v4 quarantined (KLD 1.3e-04/2.3e-04 nats vs q8_0 ~2e-07) | New features partial | Accuracy path; neither is a default |
+| GPU CI lane has no runner; the four-card rig run still does not exist (P106/P4000/M4000/1080/K1200 render `not measured`) | Same as stock | No: runner registration + hardware run are user steps |
+| No GPU run of the 0.6.0 backends (MoE/DeepSeek/Lightning/DSpine) in this session; `install.ps1` unrun | New surface, unverified | Needs the runner/hardware; unclaimed until then |
+| Benchmark rows are single-session (perf gate compares committed CSV to committed baseline) | Same | Repeat-run policy still an open proposal; `tc` rows are medians of three |
+
+### 23.3 What was fixed in this round rather than only listed
+
+| was | now |
+|---|---|
+| The five-point support contract took four commands (matrix cells, bench rows, serve cycle, catalog offer) | `verify_matrix` records all five per model in `results.json`; the runbook is the single command; all 19 runbook/card commands dry-run, with the P106 legacy paths found and corrected |
+| The overlap design's step 0 was prose (probe "required before any tuning change is believed", gate command unrun) | Probe landed and exercised (bench `"tandem_timing"`), gate baseline re-recorded, and the step-0 verdict recorded in the design + ROADMAP — including that its core premise fails at 24K |
+| `kindi bench --tandem*` rejected despite the docstring promising it | Flags on the bench parser, pinned by test |
+| The registry knew three cards, none measured | 4060 Ti registered from a real dual-mode run; 1080/K1200 registered with honest `not measured` cells |
+
+Evidence: `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-tandem-overlap/`, the verify-matrix and
+P106 doc commits' test commands, the lease rows in `AGENTS.md`, and
+`docs/benchmarks/2026-11-10-i7-8086k-rtx4060ti/results.json`.
