@@ -364,6 +364,7 @@ option `amdgpu.cwsr_enable=0`. [AMD.md](AMD.md) gives the settings.
 | generation | not yet measured; expect Maxwell-class speed |
 
 - 8 GB of memory. The 27B can be tried manually with `KINDI_PACK=/data/pack27b`; the engine fits the context to the free memory. It is not offered by default.
+- The rig session script (commands, evidence, fallbacks) is [OLD-CARD-RIG.md](OLD-CARD-RIG.md); `KINDI_TC=1` on sm_52 refuses by design and that refusal is the expected record.
 
 ## GeForce 940M, 2 GB (Maxwell 1.0, sm_50)
 

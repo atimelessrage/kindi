@@ -283,3 +283,65 @@ def test_fail_on_regression_needs_a_baseline(tmp_path):
         assert "needs --baseline" in str(exc)
     else:
         raise AssertionError("expected a SystemExit")
+
+
+def test_environment_records_the_card_driver_and_pack_hash(tmp_path, monkeypatch):
+    # a rig result without the card and the pack hash cannot be entered into the support matrix
+    mod = load()
+    pack = tmp_path / "bonsai-9b"
+    pack.mkdir()
+    manifest = pack / "kindi_pack.json"
+    manifest.write_text(json.dumps({"source_sha256": "abc123", "hadamard_block": 4096}), encoding="utf-8")
+    (pack / "w.bin").write_bytes(b"x" * 10)
+    import subprocess
+    real_run = subprocess.run
+
+    def fake_run(command, **kwargs):
+        if command and command[0] == "nvidia-smi":
+            return subprocess.CompletedProcess(command, 0, "0, Quadro P4000, 535.104.05, 8192, 6.1\n", "")
+        return real_run(command, **kwargs)
+
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+    record = mod.environment([pack])
+    assert record["gpus"] == [{"index": "0", "name": "Quadro P4000", "driver": "535.104.05",
+                               "memory_mib": 8192, "compute_capability": "6.1"}]
+    entry = record["packs"][0]
+    assert entry["source_sha256"] == "abc123"
+    assert entry["hadamard_block"] == 4096
+    assert entry["bytes"] == manifest.stat().st_size + 10
+    described = mod._describe_environment(record)
+    assert "Quadro P4000 sm 6.1, driver 535.104.05, 8192 MiB" in described
+
+
+def test_environment_without_nvidia_smi_is_recorded_not_fatal(tmp_path, monkeypatch):
+    # a CPU-only host (or a container without the tool) still writes a comparable results.json
+    mod = load()
+
+    def fake_run(command, **kwargs):
+        if command and command[0] == "nvidia-smi":
+            raise FileNotFoundError("nvidia-smi")
+        raise AssertionError(command)
+
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+    record = mod.environment([])
+    assert record["gpus"] == []
+    assert record["packs"] == []
+    assert mod._describe_environment(record).startswith("no card detected")
+
+
+def test_results_json_records_the_environment(tmp_path, monkeypatch, capsys):
+    mod = load()
+    packs = tmp_path / "packs"
+    pack = packs / "bonsai-2b"
+    pack.mkdir(parents=True)
+    (pack / "kindi_pack.json").write_text(json.dumps({"source_sha256": "def456"}), encoding="utf-8")
+    monkeypatch.setattr(mod, "run_cell", lambda *args, **kwargs: _row(status="pass", tps=30.0))
+    monkeypatch.setattr(mod, "_gpus", lambda: [{"index": "0", "name": "Quadro M4000", "driver": "535.104.05",
+                                                "memory_mib": 8192, "compute_capability": "5.2"}])
+    rc = mod.main(["--models", "2b", "--modes", "plain", "--pack-dir", str(packs),
+                   "--out", str(tmp_path / "out")])
+    assert rc == 0
+    payload = json.loads((tmp_path / "out" / "results.json").read_text(encoding="utf-8"))
+    assert payload["environment"]["gpus"][0]["name"] == "Quadro M4000"
+    assert payload["environment"]["packs"][0]["source_sha256"] == "def456"
+    assert "recorded: Quadro M4000 sm 5.2" in capsys.readouterr().out

@@ -30,6 +30,7 @@ import argparse
 import csv
 import json
 import os
+import platform
 import re
 import shlex
 import subprocess
@@ -286,7 +287,95 @@ def run_cell(
     }
 
 
-def _write_results(out_dir: Path, rows: list[dict], args: argparse.Namespace) -> tuple[Path, Path]:
+def _gpus() -> list[dict]:
+    """The cards this run used, from nvidia-smi; empty on a CPU-only host or without the tool."""
+    query = "index,name,driver_version,memory.total,compute_cap"
+    try:
+        out = subprocess.run(
+            ["nvidia-smi", "--query-gpu=" + query, "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if out.returncode != 0:
+        return []
+    gpus = []
+    for line in out.stdout.splitlines():
+        fields = [field.strip() for field in line.split(",")]
+        if len(fields) != 5:
+            continue
+        index, name, driver, memory, cc = fields
+        try:
+            memory_mib = int(float(memory))
+        except ValueError:
+            memory_mib = None
+        gpus.append({"index": index, "name": name, "driver": driver,
+                     "memory_mib": memory_mib, "compute_capability": cc})
+    return gpus
+
+
+def _packs_used(packs: list[Path]) -> list[dict]:
+    """Each pack with the hash of what it was exported from: a result is only comparable to another
+    run of the same pack."""
+    rows = []
+    for pack in packs:
+        entry: dict = {"path": _display_path(pack)}
+        try:
+            manifest = json.loads((pack / "kindi_pack.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError, AttributeError):
+            manifest = {}
+        if isinstance(manifest, dict):
+            for key in ("source_sha256", "hadamard_block", "bits", "model"):
+                if key in manifest:
+                    entry[key] = manifest[key]
+        try:
+            entry["bytes"] = sum(p.stat().st_size for p in pack.rglob("*") if p.is_file())
+        except OSError:
+            pass
+        rows.append(entry)
+    return rows
+
+
+def environment(packs: list[Path]) -> dict:
+    """What the run ran on and against: cards and driver from nvidia-smi, CuPy/CUDA, the platform
+    and the packs with their source hashes. Every part degrades to None or an empty list when it
+    cannot be read, so a CPU-only or tool-less host still writes a comparable record. A rig result
+    without the card and the pack hash cannot be reproduced or entered into the support matrix."""
+    record: dict = {
+        "platform": platform.platform(),
+        "python": sys.version.split()[0],
+        "gpus": _gpus(),
+        "cupy": None,
+        "cuda_runtime": None,
+        "packs": _packs_used(packs),
+    }
+    try:
+        import cupy                                    # noqa: PLC0415 - optional, GPU host only
+        record["cupy"] = getattr(cupy, "__version__", None)
+        record["cuda_runtime"] = int(cupy.cuda.runtime.runtimeGetVersion())
+    except Exception:                                  # noqa: BLE001 - a missing CuPy is a normal CPU run
+        pass
+    return record
+
+
+def _describe_environment(record: dict) -> str:
+    parts = []
+    if record["gpus"]:
+        parts.append("; ".join(
+            "%s sm %s, driver %s, %s MiB" % (g["name"], g["compute_capability"], g["driver"], g["memory_mib"])
+            for g in record["gpus"]
+        ))
+    else:
+        parts.append("no card detected")
+    if record["cupy"]:
+        parts.append("CuPy %s" % record["cupy"])
+    if record["cuda_runtime"]:
+        parts.append("CUDA runtime %d" % record["cuda_runtime"])
+    return ", ".join(parts)
+
+
+def _write_results(out_dir: Path, rows: list[dict], args: argparse.Namespace,
+                   packs: list[Path] | None = None) -> tuple[Path, Path]:
     csv_path = out_dir / "results.csv"
     json_path = out_dir / "results.json"
     with csv_path.open("w", encoding="utf-8", newline="") as f:
@@ -315,6 +404,7 @@ def _write_results(out_dir: Path, rows: list[dict], args: argparse.Namespace) ->
         "pack_27b": None if args.pack_27b is None else _display_path(args.pack_27b),
         "cards": args.cards,
         "timeout_s": args.timeout,
+        "environment": environment(packs or []),
         "results": rows,
     }
     json_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="\n")
@@ -621,10 +711,13 @@ def main(argv: list[str] | None = None) -> int:
     baseline_payload = load_baseline(args.baseline) if args.baseline is not None else None
     args.out.mkdir(parents=True, exist_ok=True)
     rows = []
+    packs_used: list[Path] = []
     total = len(models) * len(modes)
     index = 0
     for model in models:
         pack = pack_for(model, args.pack_dir, args.pack_27b)
+        if pack not in packs_used:
+            packs_used.append(pack)
         for mode in modes:
             index += 1
             if not (pack / "kindi_pack.json").is_file():
@@ -636,8 +729,9 @@ def main(argv: list[str] | None = None) -> int:
                 print("[%d/%d] %s %s: %s" % (index, total, model, mode, row["status"]), flush=True)
             rows.append(row)
 
-    csv_path, json_path = _write_results(args.out, rows, args)
+    csv_path, json_path = _write_results(args.out, rows, args, packs_used)
     _print_table(rows)
+    print("recorded: %s" % _describe_environment(json.loads(json_path.read_text(encoding="utf-8"))["environment"]))
     regressions: list[str] = []
     if baseline_payload is not None:
         comparisons, baseline_only = compare_results(rows, baseline_payload)
