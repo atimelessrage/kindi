@@ -73,6 +73,14 @@ costs ~1.6 GB. Where it fits it still pays: at 5,012 tokens of context, 136 toke
 5.00 s without and 3.25 s with (27.2 -> 41.8 tok/s, 1.54x), consistent with the 8K row above. So on
 8 GB you choose 24K without the drafter or 12K with it; 24K *with* the drafter needs a tandem slice.
 
+**The other pairs, same host and method** (evidence in the same directory): a **4B drafter next to the
+27B does not fit at all** - it loads (0.92 GB of weights, plans ready) and then the 27B cannot even
+stream its 5.60 GB of weights: the loader refuses with "not enough GPU memory for a 1024-token
+context" and the server exits. And a **2B drafter next to the 4B fits fully** (24,576 unreduced) with
+good acceptance (73/160 = 45.6%) **and still loses**: 111 warm tokens in 1.30 s without (85.6 tok/s)
+vs 1.47 s with (75.5 tok/s, 0.88x). The 4B target pass is too cheap next to a drafter step + T=4 verify
+for 45% acceptance to pay - the same law as the 9B row, one size smaller. Fits does not imply helps.
+
 ## How auto mode selects
 
 - A model with its own head (the 2B with `KINDI_MTP_HEAD`): the head, greedy requests only.
