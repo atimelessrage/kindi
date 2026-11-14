@@ -13,6 +13,8 @@ import json
 import os
 import sys
 
+import numpy as np
+
 from . import tandem as _t
 
 
@@ -81,10 +83,25 @@ def _owner(kind, assume_vram):
     return _t._pick_owner("auto")
 
 
+def _moe_free_bytes(assume_vram_gib):
+    if assume_vram_gib is not None:
+        return int(float(assume_vram_gib) * 2 ** 30)
+    vram = _free_vram_gib()
+    if vram is None:
+        raise SystemExit("kindi: no CUDA device visible here; plan an MoE placement with "
+                         "--assume-vram-gib (or run this on the rig)")
+    return int(vram[0] * 2 ** 30)
+
+
 def describe(pack, ctx, spec, mode="cpu-first", gpu_kind=None,
-             assume_vram_gib=None, assume_ram_gib=None, assume_cores=None, reserve_mib=512):
+             assume_vram_gib=None, assume_ram_gib=None, assume_cores=None, reserve_mib=512,
+             usage_path=None, moe_cache_mib=None, dcache=None):
     """The placement report as a dict; no weight tensor is read, only indexes and the manifest."""
     man = _manifest(pack)
+    if man.get("backend") == "kindi_lightning":
+        return describe_moe(pack, ctx, _moe_free_bytes(assume_vram_gib),
+                            usage_path=usage_path, moe_cache_mib=moe_cache_mib,
+                            dcache=dcache, reserve_mb=reserve_mib)
     dims = dict(man.get("dimensions") or {})
     lines = []          # (choice, reason) pairs, printed in order
     out = {"pack": pack, "model": man.get("model"), "backend": man.get("backend"),
@@ -214,6 +231,141 @@ def _command(pack, mode, spec):
     return "%s -m kindi --pack %s%s" % (sys.executable, pack, tail)
 
 
+_Q2, _Q8, _F32 = 42, 8, 0                     # lightning.py's tensor-type ids
+
+
+def _lt_dense_bytes(tinfo):
+    """Lightning's `_plan` dense loop (non-expert tensors; F32/Q8/Q2 byte rules)."""
+    total = 0
+    for name, (ne, ty, _off) in tinfo.items():
+        if "_exps" in name or name == "token_embd.weight":
+            continue
+        n = int(np.prod(ne)) if ne else 0
+        total += n // 64 * 18 if ty == _Q2 else n // 32 * 34 if ty == _Q8 else n * 4
+    return total
+
+
+def _lt_buf_bytes(s, chunk):
+    f = chunk * (2 * s.n_embd + s.d_in + s.d_xbc + 2 * s.d_inner + s.n_exp + s.n_ffsh + s.n_embd) * 4
+    f += chunk * s.n_used * (s.n_ff + s.n_embd) * 4 + chunk * s.n_used * s.n_ff * 1.5
+    return int(f + chunk * max(s.d_in, s.n_ffsh) * 1.5 + s.vocab * 4 + (64 << 20))
+
+
+def _lt_fit(s, free_bytes, dense, kv, state, buf_bytes, reserve, eb, moe_layers):
+    """Lightning's placement math (`_plan` plus the min-card rule), free of the engine's GPU work.
+
+    Returns (n_card, room) or None when even n_used experts per layer do not fit."""
+    n_moe = len(moe_layers)
+    room = free_bytes - dense - kv - state - buf_bytes - reserve
+    fit = max(0, room // (n_moe * eb)) if n_moe else 0
+    if fit < s.n_exp and n_moe > 2:
+        dcache = max(s.n_used, int(os.environ.get("KINDI_LT_DCACHE", "10")))
+        fit = max(0, int((room - 2 * s.n_exp * eb - n_moe * dcache * eb) // ((n_moe - 2) * eb)))
+    if fit < s.n_used:
+        return None, room
+    return min(s.n_exp, fit), room
+
+
+def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
+                 dcache=None, reserve_mb=None):
+    """The MoE strategy for a `kindi_lightning` pack: expert tiers (+ decode slots), not a layer split.
+
+    Same arithmetic as `lightning._plan`; the weights are never read - the GGUF header, `Spec` and
+    `tinfo` carry everything the fit needs. `--moe-cache-mib` caps the experts' card budget; the
+    weighted placement and measured-use share come from `kindi/moe.py` and the usage file."""
+    from .gguf import GGUF
+    from .lightning import Spec
+    from .moe import MoESpec, Usage, plan as moe_plan
+
+    man = _manifest(pack)
+    gguf_path = man.get("model_path")
+    if not gguf_path or not os.path.isfile(gguf_path):
+        raise SystemExit("kindi: the Lightning pack manifest names no readable GGUF (model_path: %r)"
+                         % gguf_path)
+    g = GGUF(gguf_path)
+    s = Spec(g)
+    tinfo = {n: (ne, ty, off) for n, ne, ty, off in g.tensors}
+    moe_layers = [il for il, k in enumerate(s.kind) if k == "moe"]
+    eb = 2 * s.n_ff * s.n_embd // 64 * 18                     # one expert: up + down
+    n_attn, n_moe = s.kind.count("attn"), s.kind.count("moe")
+    dense = _lt_dense_bytes(tinfo)
+    kv = n_attn * 2 * s.n_kv * s.hd * 2 * int(ctx)
+    state = s.kind.count("ssm") * (s.n_sh * 64 * s.d_state + s.d_xbc * 3) * 4
+    reserve = (int(os.environ.get("KINDI_LT_RESERVE_MB", "350")) if reserve_mb is None
+               else int(reserve_mb)) * 2 ** 20
+    if dcache is None:
+        dcache = max(s.n_used, int(os.environ.get("KINDI_LT_DCACHE", "10")))
+    else:
+        dcache = int(dcache)
+    room = free_bytes - dense - kv - state - reserve
+    lines = [("model", "%s (%s, %d layers, %d MoE layers, %d experts, %d per token)"
+              % (man.get("model"), man.get("backend"), s.n_layer, n_moe, s.n_exp, s.n_used)),
+             ("strategy", "moe-expert-tiers: the dense core and shared expert live on the card; "
+              "routed experts are tiered card / pinned host / mmap, and the last-used dcache="
+              "%d per layer stay in device slots (the engine's LRU)" % dcache),
+             ("host ram", "the whole expert set + dense core (~%.1f GiB) stays readable from host RAM"
+              % ((n_moe * s.n_exp * eb + dense) / 2 ** 30)),
+             ("reserve", "%d MiB kept free (the CUDA context, kernels and pool rounding; the engine "
+              "adds more after a failed load)" % (reserve // 2 ** 20))]
+    n_card = None
+    if moe_cache_mib is not None:
+        cap = int(moe_cache_mib) * 2 ** 20
+        n_card = max(0, cap // (n_moe * eb))
+        lines.append(("cache cap", "--moe-cache-mib caps the experts' card budget at %d MiB: %d of %d "
+                      "experts per layer on the card" % (int(moe_cache_mib), n_card, s.n_exp)))
+    else:
+        n_card, room = _lt_fit(s, free_bytes, dense, kv, state, _lt_buf_bytes(s, 512),
+                               reserve, eb, moe_layers)
+    if n_card is None or n_card < s.n_used:
+        lines.append(("experts", "nothing fits (%d experts per MoE layer cannot be resident at "
+                      "this context and free VRAM; the engine needs at least %d per token): "
+                      "reduce --ctx or add free VRAM" % (n_card or 0, s.n_used)))
+        return {"pack": pack, "model": man.get("model"), "strategy": "moe-expert-tiers",
+                "lines": lines, "n_card": n_card if n_card is not None else 0,
+                "n_exp": s.n_exp, "fit": False,
+                "command": "%s -m kindi --pack %s bench" % (sys.executable, pack)}
+    # weighted placement, mirroring lightning._plan_weighted's candidate scan
+    usage_path = usage_path or os.environ.get("KINDI_LT_USAGE") or os.path.join(
+        os.path.dirname(__file__), "lightning-experts.json")
+    spec = MoESpec(moe_layers, s.n_exp, s.n_used, eb, shared=True)
+    usage = Usage.load(spec, usage_path)
+    placement = None
+    if usage.has_counts() and os.environ.get("KINDI_MOE_WEIGHTED", "1") != "0":
+        room2 = free_bytes - dense - kv - state - _lt_buf_bytes(s, 512) - reserve
+        budget = room2 - 2 * (s.n_exp - n_card) * eb - n_moe * dcache * eb
+        best = None
+        for m in sorted(set(list(range(max(s.n_used, n_card - 64), n_card + 1, 4)) + [n_card])):
+            b = room2 - 2 * (s.n_exp - m) * eb - n_moe * dcache * eb
+            if b < m * n_moe * eb:
+                continue
+            try:
+                p = moe_plan(spec, usage, b, min_card=m, weighted=True)
+            except MemoryError:
+                continue
+            f = p.served("card")
+            if best is None or (f is not None and f > best[0] + 1e-9):
+                best = (f, p, m)
+        if best is not None:
+            placement = best[1]
+            n_card = min(placement.counts("card").values())
+    if placement is not None:
+        head = placement.describe()
+        lines.append(("experts", "%s (usage-weighted placement; the most-used experts stay on the card)"
+                      % head))
+    else:
+        suffix = "" if n_card >= s.n_exp else ", the rest in pinned host memory"
+        lines.append(("experts", "%d of %d experts per layer on the card%s"
+                      % (n_card, s.n_exp, suffix)))
+    est = dense + kv + state + reserve + n_moe * n_card * eb
+    lines.append(("placement", "~%.2f GiB on the card at ctx %d (%d MiB of %d MiB free); host experts are "
+                  "read over PCIe through per-expert pointer tables" % (
+                      est / 2 ** 30, int(ctx), est // 2 ** 20, int(free_bytes) // 2 ** 20)))
+    return {"pack": pack, "model": man.get("model"), "strategy": "moe-expert-tiers",
+            "lines": lines, "n_card": n_card, "n_exp": s.n_exp, "fit": True,
+            "estimate_mib": est // 2 ** 20,
+            "command": "%s -m kindi --pack %s bench" % (sys.executable, pack)}
+
+
 def run(cfg, a, log=print):
     """CLI entry point: print the report (and optionally its JSON), always 0."""
     pack = cfg.get("pack")
@@ -226,12 +378,18 @@ def run(cfg, a, log=print):
                    assume_vram_gib=getattr(a, "assume_vram_gib", None),
                    assume_ram_gib=getattr(a, "assume_ram_gib", None),
                    assume_cores=getattr(a, "assume_cores", None),
+                   usage_path=getattr(a, "usage", None),
+                   moe_cache_mib=getattr(a, "moe_cache_mib", None),
+                   dcache=getattr(a, "dcache", None),
                    reserve_mib=int(os.environ.get("KINDI_TANDEM_RESERVE_MB", "512")))
     for choice, reason in rep["lines"]:
         log("%-11s %s" % (choice + ":", reason))
     log("follow up: %s" % rep["command"])
-    log("verify:    %s -m kindi --pack %s verify --tandem %s --tandem-cpu-layers %s"
-        % (sys.executable, pack, med, spec or "auto"))
+    if rep.get("strategy") == "moe-expert-tiers":
+        log("verify:    %s -m kindi --pack %s verify" % (sys.executable, pack))
+    else:
+        log("verify:    %s -m kindi --pack %s verify --tandem %s --tandem-cpu-layers %s"
+            % (sys.executable, pack, med, spec or "auto"))
     if getattr(a, "json", None):
         from .bench import bench_json
         bench_json(rep, a.json)

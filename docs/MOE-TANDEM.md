@@ -1,7 +1,12 @@
 # MoE expert-cache tandem path
 
 Status: **design plus a model-free cache prototype; Raon-1 mini R0 and a Gemma 4 26B-A4B
-adaptation recorded, 2026-11-12. The first planned backend target is still Raon-1 mini;
+adaptation recorded, 2026-11-12. **The MoE placement strategy has its first runnable surface:
+`kindi plan` on a `kindi_lightning` pack reports the expert-tier strategy (dense core + shared
+expert on the card, routed experts tiered card / pinned host / mmap, last-used decode slots) from
+the GGUF header and the engine's own fit arithmetic, with one reason per choice and the actual
+`bench`/`verify` commands for tenants who don't own the card (`--assume-vram-gib`, `--usage`,
+`--moe-cache-mib`, `--dcache`).** The first planned backend target is still Raon-1 mini;
 `kindi/expert_cache.py` implements the copy-only slot, pin, LRU, transient-slot and metrics state
 machine, and `tests/test_moe_cache.py` covers it with synthetic slots. The Gemma 4 profile is a
 second backend contract in [GEMMA4-26B-MOE.md](GEMMA4-26B-MOE.md), not a second implementation.

@@ -181,7 +181,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_LLVM` | (unset) | `kindi/cpu.py:91` |
 | `KINDI_LOG_RAW` | (unset) | `kindi/lightning_gen.py:322` (+2 more) |
 | `KINDI_LT_CHUNK` | (unset) | `kindi/lightning.py:144` |
-| `KINDI_LT_DCACHE` | `10` | `kindi/lightning.py:43` |
+| `KINDI_LT_DCACHE` | `10` | `kindi/lightning.py:43` (+2 more) |
 | `KINDI_LT_DGRP` | `mvdg` | `kindi/lightning.py:764` |
 | `KINDI_LT_GRAPH` | `1` | `kindi/lightning.py:870` |
 | `KINDI_LT_K35` | (unset) | `kindi/lightning.py:115` |
@@ -191,10 +191,11 @@ variables, and are therefore not listed twice here.
 | `KINDI_LT_NSPLIT` | `32` | `kindi/lightning.py:26` |
 | `KINDI_LT_NSPLIT_TC` | `64` | `kindi/lightning.py:27` |
 | `KINDI_LT_PRE6` | `"1" if self.cc >= 60 else "0"` | `kindi/lightning.py:129` |
-| `KINDI_LT_RESERVE_MB` | `350` | `kindi/lightning.py:247` |
+| `KINDI_LT_RESERVE_MB` | `350` | `kindi/lightning.py:247` (+1 more) |
 | `KINDI_LT_SELFCHECK` | `1` | `kindi/lightning_gen.py:180` |
 | `KINDI_LT_SM75` | (unset) | `kindi/lightning.py:132` |
 | `KINDI_LT_TC` | `1` | `kindi/lightning.py:127` |
+| `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:328` |
 | `KINDI_MEM_RESERVE_MB` | `96` or `32` | `kindi/engine.py:305` (+3 more) |
 | `KINDI_MODEL` | (empty) | `kindi/container.py:240` |
 | `KINDI_MOE_COPY` | `0` | `kindi/dsv41.py:356` |
@@ -202,7 +203,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_MOE_CPUS1` | `20-23,32-39` | `kindi/dsv41.py:124` (+2 more) |
 | `KINDI_MOE_DROP_CACHE` | `1` | `kindi/dsv41.py:362` |
 | `KINDI_MOE_SHARE0` | `0.667` | `kindi/dsv41.py:350` (+2 more) |
-| `KINDI_MOE_WEIGHTED` | `1` | `kindi/lightning.py:256` (+1 more) |
+| `KINDI_MOE_WEIGHTED` | `1` | `kindi/lightning.py:256` (+2 more) |
 | `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:665` |
 | `KINDI_NB_CPUF` | `0.55` | `kindi/nanbeige.py:34` |
 | `KINDI_NB_EMBD_HOST` | `"1" if kepler(cp, devices[0]) else "0"` | `kindi/nanbeige.py:272` |
@@ -253,9 +254,9 @@ variables, and are therefore not listed twice here.
 | `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1867` |
 | `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:193` |
 | `KINDI_TANDEM_DEBUG_TIMING` | `0` | `kindi/tandem.py:584` |
-| `KINDI_TANDEM_GPU` | `auto` | `kindi/plan.py:135` (+2 more) |
+| `KINDI_TANDEM_GPU` | `auto` | `kindi/plan.py:152` (+2 more) |
 | `KINDI_TANDEM_RATIO` | (unset) | `kindi/tandem.py:268` |
-| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/plan.py:229` (+2 more) |
+| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/plan.py:384` (+2 more) |
 | `KINDI_TC` | `0` | `kindi/spec.py:81` (+3 more) |
 | `KINDI_TC_B2` | (empty) | `kindi/tc.py:51` |
 | `KINDI_TC_DP4A` | `0` | `kindi/tc.py:74` |
