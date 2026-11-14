@@ -51,6 +51,9 @@ def run(cfg, log=print):
             return 2
         from .lightning_cli import bench
         return bench(cfg, man, log=log)
+    if man.get("backend") == "kindi_cascade":
+        log("kindi bench: the Cascade backend is converter/validator only; GPU K-quant Nemotron-H kernels are pending")
+        return 2
     from .vram import VramMonitor
     # sample the card the engine will run on (the cupy device ordinal), not unconditionally GPU 0
     dev = 0

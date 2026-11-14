@@ -139,7 +139,9 @@ def convert(gguf_path, out_dir, log=print):
         log("recognized Gemma 4 GGUF: %d tensors, %s quantization; Kindi native CUDA decoder" %
             (info["tensor_count"], info["tensor_types"]))
         return manifest
-    from . import lightning_cli, nanbeige_cli
+    from . import cascade, lightning_cli, nanbeige_cli
+    if cascade.is_cascade(g):
+        return cascade.convert(g, gguf_path, out_dir, __version__, PACK_FORMAT, sha256, log=log)
     moe_reason = unsupported_reason(g)
     if moe_reason:
         raise SystemExit("kindi convert: " + moe_reason)

@@ -64,15 +64,6 @@ def unsupported_reason(g):
             why,
         )
 
-    if arch == "nemotron_h_moe" and "cascade" in str(name).lower():
-        types = sorted(_tensor_types(g))
-        return (
-            "Nemotron Cascade 2 30B-A3B is a recognized nemotron_h_moe file, but Kindi's "
-            "Lightning backend only runs the ternary Q2_0 build. This file has GGUF tensor "
-            "types %s; support needs a K-quant Nemotron-H backend and a pinned reference, "
-            "not the Q2_0 Lightning kernel set." % (types if types else "unknown")
-        )
-
     if arch == "gemma4":
         names = _tensor_names(g)
         kv = getattr(g, "kv", None) or {}

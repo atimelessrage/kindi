@@ -213,7 +213,9 @@ def cmd_info(cfg, a):
     if os.path.exists(man):
         m = json.load(open(man))
         print("pack: %s - %s, from %s" % (cfg["pack"], m.get("model"), m.get("source_file")))
-        if m.get("backend") == "kindi_lightning":
+        if m.get("backend") == "kindi_cascade":
+            print("backend: Kindi Cascade (Nemotron Cascade 2 converter/validator; GPU kernels pending)")
+        elif m.get("backend") == "kindi_lightning":
             print("backend: Kindi Lightning CUDA (Nemotron-H MoE), exact head")
         elif m.get("backend") == "kindi_gemma4":
             print("backend: Kindi Gemma 4 CUDA")

@@ -22,7 +22,7 @@ def convert(g, gguf_path, out_dir, version, pack_format, sha256, log=print):
             raise SystemExit(
                 "kindi convert: Nemotron Cascade 2 30B-A3B has tensor types %s; Kindi Lightning "
                 "reads only the ternary Nemotron 3.5 Lightning 30B-A3B Q2_0 build (F32, Q8_0 and "
-                "Q2_0). Cascade 2 needs a K-quant Nemotron-H backend."
+                "Q2_0). Cascade 2 is routed to the kindi_cascade converter/validator."
                 % sorted(types - SUPPORTED_TYPES)
             )
         raise SystemExit("kindi convert: this Nemotron-H MoE file has tensor types %s; Kindi reads F32, Q8_0 and "

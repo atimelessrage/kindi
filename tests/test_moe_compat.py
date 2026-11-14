@@ -34,17 +34,15 @@ def test_each_requested_small_moe_architecture_is_recognized(arch, model):
     assert "does not have a native backend" in reason
 
 
-def test_nemotron_cascade_2_is_not_mistaken_for_lightning_q2():
+def test_nemotron_cascade_2_is_handled_by_the_cascade_path_not_the_generic_refusal():
+    # convert.py routes Cascade 2 to kindi/cascade.py before this classifier;
+    # the generic unsupported-MoE message must not claim it either.
     g = FakeGGUF(
         "nemotron_h_moe",
         "Nemotron Cascade 2 30B-A3B",
         tensors=[("blk.0.ffn_gate_exps.weight", [1856, 2688, 128], 12, 0)],
     )
-    reason = unsupported_reason(g)
-    assert reason is not None
-    assert "Nemotron Cascade 2" in reason
-    assert "[12]" in reason
-    assert "Q2_0" in reason
+    assert unsupported_reason(g) is None
 
 
 def test_ternary_lightning_is_left_to_the_lightning_backend():

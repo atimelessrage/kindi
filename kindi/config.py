@@ -165,7 +165,7 @@ def load(explicit=None, overrides=None):
     if cfg["model_name"] == "auto":
         manifest = os.path.join(cfg["pack"], "kindi_pack.json")
         m = json.load(open(manifest)) if os.path.isfile(manifest) else {}
-        if m.get("backend") in ("kindi_gemma4", "kindi_lightning"):
+        if m.get("backend") in ("kindi_gemma4", "kindi_lightning", "kindi_cascade"):
             cfg["model_name"] = m.get("model_id", "gemma4")
         else:
             # the GGUF's general.name, then its file name: some files name the model only "Hf"

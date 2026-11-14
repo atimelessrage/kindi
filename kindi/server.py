@@ -416,6 +416,8 @@ class Kindi(object):
             self.variant = "nanbeige"
             self.nanbeige = NanbeigeBackend(man, cfg, log=log)
             self.eng, self.tok, self.runner, self.sample = self.nanbeige.eng, self.nanbeige.tok, None, None
+        elif man.get("backend") == "kindi_cascade":        # Nemotron Cascade 2: converter/validator only so far
+            raise SystemExit("kindi: Nemotron Cascade 2 is converter/validator only; GPU K-quant Nemotron-H kernels are pending, so it cannot be served yet")
         elif man.get("backend") == "kindi_lightning":     # Nemotron-H MoE GGUF (Nemotron 3.5 Lightning 30B-A3B)
             from .lightning_gen import LightningBackend
             self.variant = "lightning"
