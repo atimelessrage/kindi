@@ -1,6 +1,6 @@
 # Current worktree vs Kindi 0.5.0
 
-Audit date: **2026-11-12**
+Audit date: **2026-11-12**; refreshed in §22 (**2026-11-14**, HEAD `3f42a6a`) and §21 (2026-11-14 evening)
 
 > This file records the pre-improvement audit and the fixes that followed.
 > Sections 8–11 record the post-audit improvements, the 2026-11-12 evening 27B
@@ -1002,3 +1002,86 @@ partial.
 Evidence: `615cdca` (accelerators, dead knob, bench JSON, MTP table), `549c030` (docs guard and
 links), `c449385` (prior art), the plan-owner and plain-q8 lease rows in `AGENTS.md`, and the two
 verify runs quoted above (9B with HP: 4/4 at 122.6 tok/s; 9B with no variable: 4/4 at 122.4).
+
+## 22. Current state vs stock Kindi 0.5, refreshed again (2026-11-14)
+
+This section supersedes §21 wherever they differ; §§1–20 are history at their own dates. HEAD is
+`3f42a6a` on both `main` and `freebuff/tandem-cpu-recovery`; the suite is **566 passed, 10 skipped**
+(at `2537471`; the focused rounds since add 9 KLD + 8 calib tests, all green). Tracked files: 459
+(stock 0.5: 102); test modules: 61 (stock: 0); docs paths: 203 (stock: 12).
+
+### 22.1 What is new or better
+
+- **The 0.6.0 upstream backends are in the tree** (merged 2026-11-14, §21 only knew the fork):
+  MoE (`kindi/moe*.py`), DeepSeek V4.1 Flash (`kindi/dsv41*`), Nemotron Lightning
+  (`kindi/lightning*`), the DSpine drafter (`kindi/dspine*`), container entrypoint + compose,
+  the Kindi Bridge, `install.ps1`, `/v1/tokenize` + `/detokenize`, `dry_run`, and upstream's
+  priority scheduler. Merge conflicts (18 files) were resolved best-of: upstream SCHED flow kept,
+  wrapped in the fork's `_logged` + `gate` queue bounds. Not GPU-verified for the new backends
+  (no hardware run of MoE/DeepSeek/Lightning/DSpine in this session).
+- **Both §21.2 release blockers are resolved in the tree.** The installer now pins
+  `KINDI_VERSION=0.6.0` with the published v0.6.0 tarball's sha256
+  (`613f7320…`), instead of `fd54148`/0.5.0, and `kindi/__init__.py` + README + CHANGELOG carry
+  0.6.0 (verified: `tests/test_installer_source.py` + `tests/test_version_consistency.py` pass).
+  What remains is the release owner's publication step for the *installer artifact* itself, which
+  no code change in this tree can do.
+- **A graded quality gate for every lossy cache** (`kindi kld`, ROADMAP gate 3, landed this round):
+  teacher-forced KLD + same-top share + PPL ratio vs the fp16 reference. On the 2B: q8_0 measures
+  ~2e-7 nats (distribution-lossless in practice, plain and plan engines identical, so no engine
+  confound), and `k8v4` measures 1.29e-04/2.27e-04 nats (~470–1,090x q8_0, context-growing) — the
+  quarantine now rests on those numbers, and gate 8 (FP8) must beat the q8_0 row.
+- **The per-machine tuning is persisted once** (`kindi calibrate`, ROADMAP gate 2): kernel configs,
+  split-ratio snapshot, planner picks and draft length in one keyed file. Cache parity is met on
+  this host (<=0.3% gen-rate delta); the >=20 s startup clause is hardware-bound (NVIDIA tuning is
+  0.2 s, the TC path has no g5 timing at all; the discard costs tens of seconds only on HIP).
+- **Determinism is now a measured property, first run 2026-11-14** (ROADMAP item 4): 10/10
+  identical greedy completions on the 2B (`180e7392dce5`) and 9B (`d5b027f65ade`) through one
+  server process each, exact head and speculation off. The historical 9B int8-activation flip does
+  not reproduce under default settings here. Evidence and the "legitimately breaks it" list
+  (lossy caches, dynamic offload, speculation, sampling) are in
+  `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-determinism/`.
+- **Speculation has three more measured rows** (same host/method as §21's): 27B + 2B drafter does
+  **not fit at 24K** on 8 GB (context 24,576 → 12,032, the drafter costs ~1.6 GB) but still pays
+  1.54x where it fits; **4B → 27B does not fit at all** (loader refuses a 1024-token context);
+  **2B → 4B fits fully with 45.6% acceptance and still loses** (0.88x) — the same ~13x pass-cost
+  law as the 9B row, one size smaller. A garbage MTP head is now proven end-to-end to switch
+  speculation off and let the engine generate (`tests/test_plan_engine.py`, fails on the pre-fix
+  tree).
+- **The tandem's speed half is designed** (`docs/TANDEM-OVERLAP-DESIGN.md`, ROADMAP goal row now
+  "designed, not started"): worker thread + one dispatch per run + double-buffered pinned staging,
+  against the measured dispatch gap (11.7 ms effective vs 4–6 ms raw per CPU GDN layer), with the
+  in-token chain stated serial by dependency.
+- **A real CPU-server boot is tested** (`tests/test_server_cpu.py`): the real `create_app` with
+  `KINDI_DEVICE=cpu` on a real 2B pack answers `/health`, `/v1/models`, and a greedy completion
+  over HTTP (2 passed, ~25 s), closing the hole where only stubbed engines and pack presence were
+  tested.
+
+### 22.2 What is worse, or no longer works (2026-11-14)
+
+All checked on this tree. **Bold** = worse than stock 0.5; the rest are new features that stay
+partial. Rows struck from §21.2's list are noted where they were resolved.
+
+| Item | Status vs stock 0.5 | Fixable now? |
+|---|---|---|
+| **The tandem is still slower than GPU-only** — 27B @ 24K: 8.0 tok/s at the `rate` pick (vs 30.2 unsplit); the split buys memory, not speed, and the >=25% overlap gate is designed but not implemented | New feature below its own promise | Only by implementing the drafted scheduler (a kernel-touching GPU build, not a docs round) |
+| **The installer artifact itself is still unpublished** — the pin now targets the published v0.6.0 source tarball, but publishing the installer release asset remains the release owner's step (`docs/RELEASE-CHECKLIST.md`) | Worse than the tree, not the stock release | No: release-owner step |
+| 9B + 2B drafter does not pay (0.98x, 41%); 27B + drafter does not fit at 24K on 8 GB (12K cap); 4B → 27B does not fit at all. All three are now *measured answers* in `docs/MTP.md`, not open questions | Not a stock feature | No: these are the measurements; the fit limits are tandem-slice questions |
+| `KINDI_TC_HP` caps the verify pass at T = 4 (the 9B's drafter drafts at most 3 tokens) | New trade, taken for 4/4 exactness | Documented; revisit only with a wider HP pass |
+| 4B tc stays 3 exact + 1 accepted tie; k8v4 stays quarantined (now on KLD numbers: 1.3e-04/2.3e-04 nats vs q8_0's ~2e-07, and 2/4 greedy) | New features partial | Hardware/accuracy path; both quarantined, neither is a default |
+| GPU CI lane has no runner, so no GPU-backed claim runs automatically; the four-card rig run still does not exist (P106/P4000/M4000 render `not measured`) | Same as stock | No: runner registration and the rig run are hardware/user steps |
+| No GPU run of the 0.6.0 backends (MoE/DeepSeek/Lightning/DSpine) in this session; `install.ps1` unrun | Same as stock (new surface, unverified) | Needs the registered runner or the hardware; the backends stay unclaimed until then |
+| Benchmark rows are single-session (the perf gate compares committed CSV to committed baseline, so it cannot see cross-session drift) | Same | Partly: `tc` rows are medians of three; a repeat-run policy for the rest is still open |
+
+### 22.3 What was fixed in this round rather than only listed
+
+| was | now |
+|---|---|
+| Determinism was claim-only (exactness was asserted via `verify`, never re-run the same request twice) | Measured 10/10 identical on 2B and 9B (ROADMAP item 4 first run), with the legitimate-breaker list written down; evidence dir above |
+| §21.2 listed the installer pin and version identity as the top blockers | Verified resolved in-tree (0.6.0 pin + version, consistency tests green); only the publication step remains, stated precisely |
+| The drafter table had one context (8K) and one pair each for 27B/9B | 24K fit verdict + three more pairs measured; the "installer offers the drafter to the 27B only" rule is now a four-point measurement |
+| Every optional accelerator could be an optional *failure* (the DSpine site was unwrapped by the 0.6.0 merge) | `_optional` now wraps all four build sites; the garbage-head path is proven end-to-end (a real `MTPDraft` raises on garbage, the real `_build` nulls the head, `generate_spec` still emits 20 tokens) |
+
+Evidence: `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-determinism/`,
+`docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-drafter-24k/`,
+`docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-kld-2b/`, the lease rows in `AGENTS.md`, and the
+commands in each lease row.
