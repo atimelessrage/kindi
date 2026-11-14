@@ -14,12 +14,20 @@ def is_lightning(g):
 
 def convert(g, gguf_path, out_dir, version, pack_format, sha256, log=print):
     from collections import Counter
+    kv = g.kv
     types = {t for _, _, t, _ in g.tensors}
     if not types <= SUPPORTED_TYPES:
+        name = kv.get("general.name") or "this Nemotron-H MoE file"
+        if "cascade" in str(name).lower():
+            raise SystemExit(
+                "kindi convert: Nemotron Cascade 2 30B-A3B has tensor types %s; Kindi Lightning "
+                "reads only the ternary Nemotron 3.5 Lightning 30B-A3B Q2_0 build (F32, Q8_0 and "
+                "Q2_0). Cascade 2 needs a K-quant Nemotron-H backend."
+                % sorted(types - SUPPORTED_TYPES)
+            )
         raise SystemExit("kindi convert: this Nemotron-H MoE file has tensor types %s; Kindi reads F32, Q8_0 and "
                          "Q2_0" % sorted(types - SUPPORTED_TYPES))
     os.makedirs(out_dir, exist_ok=True)
-    kv = g.kv
     man = {
         "kindi_version": version, "pack_format": pack_format, "backend": "kindi_lightning",
         "model": kv.get("general.name"), "model_id": "nemotron-lightning-30b",

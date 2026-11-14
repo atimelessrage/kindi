@@ -112,9 +112,19 @@ def convert(gguf_path, out_dir, log=print):
     t0 = time.time()
     selftest()
     g = GGUF(gguf_path)
-    if g.kv.get("general.architecture") == "gemma4":
+    arch = g.kv.get("general.architecture")
+    from .moe_compat import unsupported_reason
+    if arch == "gemma4":
         from .gemma4 import inspect_model
-        info = inspect_model(gguf_path)
+        try:
+            info = inspect_model(gguf_path)
+        except ValueError:
+            # The 26B-A4B MoE has the gemma4 architecture key but a different geometry and
+            # expert tensors. Name that explicitly instead of leaking the E4B shape error.
+            reason = unsupported_reason(g)
+            if reason:
+                raise SystemExit("kindi convert: " + reason)
+            raise
         os.makedirs(out_dir, exist_ok=True)
         manifest = {
             "kindi_version": __version__, "pack_format": PACK_FORMAT, "backend": "kindi_gemma4",
@@ -130,12 +140,15 @@ def convert(gguf_path, out_dir, log=print):
             (info["tensor_count"], info["tensor_types"]))
         return manifest
     from . import lightning_cli, nanbeige_cli
+    moe_reason = unsupported_reason(g)
+    if moe_reason:
+        raise SystemExit("kindi convert: " + moe_reason)
     if lightning_cli.is_lightning(g):
         return lightning_cli.convert(g, gguf_path, out_dir, __version__, PACK_FORMAT, sha256, log=log)
     if nanbeige_cli.is_llama_iq(g):
         return nanbeige_cli.convert(g, gguf_path, out_dir, __version__, PACK_FORMAT, sha256, log=log)
-    if g.kv.get("general.architecture") != "qwen35":
-        raise SystemExit("kindi convert: expected a qwen35, Gemma 4, llama (K / I-quant) or nemotron_h_moe GGUF")
+    if arch != "qwen35":
+        raise SystemExit("kindi convert: expected a qwen35, Gemma 4, llama (K / I-quant) or nemotron_h_moe GGUF, got %r" % arch)
     profile = (g.kv.get("qwen35.block_count"), g.kv.get("qwen35.embedding_length"),
                g.kv.get("qwen35.feed_forward_length"), g.kv.get("qwen35.attention.head_count"),
                g.kv.get("qwen35.attention.head_count_kv"), g.kv.get("qwen35.ssm.group_count"))
