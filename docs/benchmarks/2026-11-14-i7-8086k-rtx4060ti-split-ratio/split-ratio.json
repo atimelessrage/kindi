@@ -1,0 +1,110 @@
+{
+  "kind": "kindi-split-ratio/1",
+  "measured_utc": "2026-11-14T17:47:50Z",
+  "git_revision": "cdfc1b2",
+  "gpu": "NVIDIA GeForce RTX 4060 Ti",
+  "pack": {
+    "path": "T:\\kindi-packs\\bonsai-27b",
+    "source_sha256": "53107f530aa52eb00912263ab1ee29bd199261c87cd7b4ad4ca1318c1fe33ee3"
+  },
+  "dimensions": {
+    "layers": 64,
+    "width": 5120,
+    "full_attention_interval": 4
+  },
+  "pcie": {
+    "256MiB": {
+      "h2d_gib_s": 4.06,
+      "d2h_gib_s": 1.99
+    },
+    "32MiB": {
+      "h2d_gib_s": 4.6,
+      "d2h_gib_s": 2.24
+    }
+  },
+  "boundary_hidden_ms": 0.0094,
+  "cpu": {
+    "threads": 6,
+    "isa": "avx2-fma-f16c",
+    "gdn_layer": 1,
+    "attention_layer": 3,
+    "cpu_gdn_ms": 6.15,
+    "cpu_gdn_range_ms": [
+      5.798,
+      7.537
+    ],
+    "cpu_attention_ms_at_0": 5.796,
+    "cpu_attention_range_ms": [
+      5.56,
+      7.896
+    ],
+    "source": "live, kindi.cpu.Engine.layer median of 25 on an owned 2-layer slice"
+  },
+  "split_probe": {
+    "11": 91.506,
+    "13": 134.975,
+    "16": 125.1,
+    "20": 201.515
+  },
+  "cpu_gdn_effective_ms": 11.706,
+  "derived": {
+    "gpu_layer_ms_at_24k": 0.5174,
+    "kv_scan_ms_per_1024": 0.176,
+    "cpu_attention_slope": "the gap between the recorded gdn-first (7.9 tok/s) and cpu-first (2.9 tok/s) 24K rows, i.e. attention layers on the CPU grow with the context; they stay on the GPU",
+    "source": "derived from the recorded full-GPU 2K/24K token times; PCIe and CPU layer cells are live measurements"
+  },
+  "predicted_tok_s": {
+    "8k": {
+      "0": 28.97,
+      "4": 12.61,
+      "8": 8.06,
+      "11": 6.35,
+      "12": 5.92,
+      "16": 4.68,
+      "19": 4.05,
+      "20": 3.87,
+      "24": 3.3,
+      "28": 2.88
+    },
+    "24k": {
+      "0": 26.78,
+      "4": 12.18,
+      "8": 7.88,
+      "11": 6.23,
+      "12": 5.83,
+      "16": 4.62,
+      "19": 4.0,
+      "20": 3.83,
+      "24": 3.27,
+      "28": 2.85
+    }
+  },
+  "validation": {
+    "recorded_8k_decode_tok_s": {
+      "8": 10.7,
+      "12": 6.7,
+      "16": 5.5,
+      "20": 4.6,
+      "24": 3.8,
+      "28": 3.2
+    },
+    "validation_error_pct": {
+      "8": -24.7,
+      "12": -11.6,
+      "16": -14.9,
+      "20": -15.9,
+      "24": -13.2,
+      "28": -10.0
+    },
+    "recorded_gdn16_plain": {
+      "tok_s_at_24k": 7.9,
+      "peak_mib": 7744
+    },
+    "recorded_auto_plan": {
+      "layers": 11,
+      "tok_s_at_24k": 7.9,
+      "peak_mib": 6449
+    }
+  },
+  "errors": {}
+}

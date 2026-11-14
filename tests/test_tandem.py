@@ -317,6 +317,83 @@ def test_auto_planner_refuses_when_nothing_can_fit():
         tandem.plan_cpu_layers(dims, sizes, 1024, 0, reserve_mib=0)
 
 
+def test_parse_layers_accepts_the_rate_forms():
+    assert tandem._parse_layers("rate") == "rate"
+    assert tandem._parse_layers("rate:0.25") == "rate:0.25"
+    # a rate floor is a fraction; bare "0.25" is not a layer count and must raise
+    with pytest.raises(ValueError):
+        tandem._parse_layers("0.25")
+
+
+def _fake_ratio():
+    # full-GPU 30 tok/s, each CPU GDN layer costs 2 tok/s: rate falls linearly with the count
+    return {"kind": "kindi-split-ratio/1", "pack": {"source_sha256": "sha"},
+            "predicted_tok_s": {"8k": {str(n): 30.0 - 2 * n for n in range(33)},
+                               "24k": {str(n): 30.0 - 2 * n for n in range(33)}}}
+
+
+def _rate_fixture():
+    dims = {"layers": 32, "full_attention_interval": 4, "kv_heads": 4, "head_dim": 256}
+    sizes = {"layers": {il: 56 * 2 ** 20 for il in range(32)}, "embed": 0, "head": 258 * 2 ** 20,
+             "f32": 28 * 2 ** 20}
+    total = tandem.gpu_estimate(dims, sizes, 8192)
+    # a budget like the 27B at 24K: the model fits only from 11 CPU layers on
+    fitted = tandem.plan_cpu_layers(dims, sizes, 8192, total - 600 * 2 ** 20, reserve_mib=0)
+    return dims, sizes, total, fitted
+
+
+def test_rate_planner_takes_the_fastest_fitting_split_without_a_floor():
+    dims, sizes, total, fitted = _rate_fixture()
+    pick = tandem.plan_cpu_layers_rate(dims, sizes, 8192, total - 600 * 2 ** 20, reserve_mib=0,
+                                       owner="plain", ratio=_fake_ratio())
+    assert pick == fitted                     # the same fitting boundary the fit-only planner finds
+    assert tandem._predicted_rate(_fake_ratio(), len(pick), 8192) == pytest.approx(30.0 - 2 * len(pick))
+
+
+def test_rate_planner_with_a_floor_frees_as_much_as_the_floor_allows():
+    dims, sizes, total, fitted = _rate_fixture()
+    # 20% of 30 tok/s is 6 tok/s. Rates are 30-2N, so the largest count still at or above the
+    # floor is N=12; the smallest count that fits the budget is 11. The floor pick is allowed
+    # to offload one more layer than the fastest pick, in exchange for more VRAM freed.
+    pick = tandem.plan_cpu_layers_rate(dims, sizes, 8192, total - 600 * 2 ** 20, reserve_mib=0,
+                                       rate_floor=0.2, owner="plain", ratio=_fake_ratio())
+    assert len(pick) == 12 and len(pick) > len(fitted)
+    assert tandem._predicted_rate(_fake_ratio(), len(pick), 8192) == pytest.approx(6.0)
+    assert all((il + 1) % 4 for il in pick)  # still only GDN layers are moved
+
+
+def test_rate_planner_refuses_a_floor_no_fitting_split_can_keep():
+    dims, sizes, total, fitted = _rate_fixture()
+    with pytest.raises(SystemExit, match="rate floor"):
+        # 95% of 30 is 28.5 tok/s; the smallest fitting count is already slower
+        tandem.plan_cpu_layers_rate(dims, sizes, 8192, total - 600 * 2 ** 20, reserve_mib=0,
+                                    rate_floor=0.95, owner="plain", ratio=_fake_ratio())
+
+
+def test_rate_planner_without_a_calibration_behaves_as_the_fit_only_pick(tmp_path, monkeypatch):
+    dims, sizes, total, fitted = _rate_fixture()
+    monkeypatch.setattr(tandem, "load_ratio", lambda **kw: None)
+    logs = []
+    pick = tandem.plan_cpu_layers_rate(dims, sizes, 8192, total - 600 * 2 ** 20, reserve_mib=0,
+                                       owner="plain", log=logs.append)
+    assert pick == fitted
+    assert any("no split-ratio calibration" in line for line in logs)
+
+
+def test_load_ratio_matches_the_pack_hash(tmp_path, monkeypatch):
+    def write(name, payload):
+        (tmp_path / name).write_text(json.dumps(payload), encoding="utf-8")
+    other = _fake_ratio()
+    write("a.json", other)
+    mine = _fake_ratio()
+    mine["pack"]["source_sha256"] = "SHAME"
+    write("b.json", mine)
+    assert tandem.load_ratio(pack_sha="SHAME", path=str(tmp_path / "b.json")) is not None
+    assert tandem.load_ratio(pack_sha="OTHER", path=str(tmp_path / "b.json")) is None
+    monkeypatch.setenv("KINDI_TANDEM_RATIO", str(tmp_path / "a.json"))
+    assert tandem.load_ratio(pack_sha=None, path=str(tmp_path / "a.json")) is not None
+
+
 def test_auto_placement_resolves_before_the_backends_are_built(fake_pack, fake_backends, monkeypatch):
     dims = {"layers": 4, "full_attention_interval": 2, "kv_heads": 1, "head_dim": 8}
     (Path(fake_pack) / "kindi_pack.json").write_text(json.dumps({"dimensions": dims}), encoding="utf-8")

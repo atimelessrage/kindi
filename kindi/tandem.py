@@ -56,7 +56,8 @@ def _parse_layers(text):
     except ValueError:
         pass
     low = text.lower()
-    if low.startswith("gdn:") or low == "auto" or low.startswith("auto:"):
+    if (low.startswith("gdn:") or low == "auto" or low.startswith("auto:")
+            or low == "rate" or low.startswith("rate:")):
         return low
     parts = [p.strip() for p in text.replace(";", ",").split(",") for p in p.split() if p.strip()]
     flat = []
@@ -254,6 +255,122 @@ def plan_cpu_layers(dims, sizes, ctx, free_bytes, reserve_mib=512, target_mib=No
     return cpu
 
 
+def load_ratio(pack_sha=None, path=None):
+    """The split-ratio calibration for this pack, or None.
+
+    ``tools/measure_split_ratio.py`` writes ``~/.cache/kindi/tandem/kindi-split-ratio-*.json``
+    (roadmap item 2's seed); the runtime picks the file matching this pack's source hash.
+    ``KINDI_TANDEM_RATIO`` overrides with an explicit path (the tracked benchmark copy)."""
+    candidates = []
+    if path is not None:
+        candidates.append(path)
+    override = os.environ.get("KINDI_TANDEM_RATIO")
+    if override:
+        candidates.append(override)
+    cache = os.path.join(os.path.expanduser("~"), ".cache", "kindi", "tandem")
+    if pack_sha:
+        candidates.extend(os.path.join(cache, name) for name in
+                          sorted(os.listdir(cache)) if name.startswith("kindi-split-ratio-")
+                          and name.endswith(".json")) if os.path.isdir(cache) else []
+    for candidate in candidates:
+        try:
+            with open(candidate, encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(data, dict) or data.get("kind") != "kindi-split-ratio/1":
+            continue
+        if pack_sha is not None and str((data.get("pack") or {}).get("source_sha256")) != str(pack_sha):
+            continue
+        if not isinstance(data.get("predicted_tok_s"), dict):
+            continue
+        return data
+    return None
+
+
+def _predicted_rate(ratio, n, ctx):
+    """Predicted tokens/s for a gdn:N split (see ``tools/measure_split_ratio.py``).
+
+    Interpolates the calibration's two recorded contexts; below 8K it stays at the 8K row.
+    """
+    table = (ratio or {}).get("predicted_tok_s") or {}
+    low = table.get("8k") or {}
+    high = table.get("24k") or {}
+    if not low and not high:
+        return None
+    key = str(n)
+    if low and high:
+        if key in low and key in high:
+            t = min(1.0, max(0.0, (int(ctx) - 8192) / (24576 - 8192)))
+            return low[key] * (1 - t) + high[key] * t
+        return None
+    row = low if low else high
+    return row.get(key)
+
+
+def plan_cpu_layers_rate(dims, sizes, ctx, free_bytes, reserve_mib=512, rate_floor=None,
+                         ratio=None, log=None, owner="plan", pack_sha=None):
+    """The CPU layer set a measured ratio would pick: `rate`, or `rate:<frac>` with a floor.
+
+    Candidates are the gdn-first counts that fit the GPU side (`gpu_estimate` <= budget, the
+    same gate the fit planner uses). With a calibration the predicted rate breaks the tie
+    between counts instead of free memory being the only judge (roadmap prior-art item 1).
+    Bare `rate` takes the fastest fitting pick (smallest count); `rate:0.25` takes the largest
+    count the calibration still predicts at >= 25% of the full-GPU rate. Without a calibration
+    it must not invent numbers, so it behaves as the fit-only planner and says so in the log.
+    """
+    log = log or (lambda *a: None)
+    NL = int(dims["layers"])
+    interval = max(1, int(dims.get("full_attention_interval", 4)))
+    budget = int(free_bytes) - int(reserve_mib) * 2 ** 20
+    if ratio is None:
+        ratio = load_ratio(pack_sha=pack_sha)
+    feeds = (ratio or {}).get("predicted_tok_s") or {}
+    full_rate = _predicted_rate(ratio, 0, ctx) if ratio else None
+    floor_rate = None if (rate_floor is None or full_rate is None) else rate_floor * full_rate
+
+    def fits(count):
+        layers = gdn_first(dims, count) if count else ()
+        return gpu_estimate(dims, sizes, ctx, layers, owner=owner) <= budget
+
+    gdn_total = NL - sum(1 for il in range(NL) if (il + 1) % interval == 0)
+    viable = [count for count in range(min(NL, gdn_total)) if fits(count)]
+    if not viable:
+        raise SystemExit("kindi: tandem rate cannot fit this model at %d tokens on the free GPU "
+                         "memory; reduce --ctx" % int(ctx))
+    if not ratio:
+        log("tandem rate: no split-ratio calibration found for this pack, so it falls back to the "
+            "fit-only pick (run tools/measure_split_ratio.py to calibrate this machine)")
+    if floor_rate is not None:
+        pick = None
+        for count in sorted(viable, reverse=True):          # largest count keeping the floor
+            rate = _predicted_rate(ratio, count, ctx)
+            if rate is not None and rate >= floor_rate:
+                pick = (count, rate)
+                break
+        if pick is None:
+            raise SystemExit("kindi: tandem rate floor %.0f%% of the full-GPU rate cannot be kept "
+                             "while fitting at %d tokens; lower the rate floor or the context"
+                             % (100 * rate_floor, int(ctx)))
+        count, rate = pick
+    else:
+        count = viable[0]
+        rate = _predicted_rate(ratio, count, ctx) if ratio else None
+        if rate is None:
+            rate = 0
+    layers = gdn_first(dims, count)
+    est = gpu_estimate(dims, sizes, ctx, layers, owner=owner)
+    log("tandem rate: %d CPU layer%s (%s) by %s takes the %s GPU side to ~%d MiB "
+        "(predicted ~%.1f tok/s at %d tokens%s)"
+        % (len(layers), "" if len(layers) == 1 else "s",
+           ",".join(str(x) for x in layers),
+           "the measured ratio at a rate floor of %.0f%% of full-GPU" % (100 * rate_floor)
+           if floor_rate is not None else "the fastest fitting split (calibrated)",
+           owner, est // 2 ** 20, rate, int(ctx),
+           " (full GPU predicted %.1f)" % full_rate if full_rate else ""))
+    return tuple(layers)
+
+
 def gdn_first(dims, count):
     """The first ``count`` layers that are not full-attention, ascending.
 
@@ -374,10 +491,13 @@ class TandemEngine(object):
                 elif kind == "auto":
                     cpu_layers = "auto"
                     auto_target = int(arg) if arg.strip() else None
+                elif kind == "rate":
+                    cpu_layers = "rate"
+                    auto_target = float(arg) if arg.strip() else None
                 else:
-                    raise SystemExit("kindi: --tandem-cpu-layers %r is not a count, a layer set or gdn:N/auto"
+                    raise SystemExit("kindi: --tandem-cpu-layers %r is not a count, a layer set or gdn:N/auto/rate"
                                      % cpu_layers)
-        if cpu_layers == "auto":
+        if cpu_layers in ("auto", "rate"):
             from .engine import cp as _cp
             if _cp is None:
                 raise SystemExit("kindi: tandem auto needs a CUDA/ROCm GPU to read the free memory")
@@ -389,9 +509,16 @@ class TandemEngine(object):
                                  "a split would only make it slower - run without --tandem, or ask for a "
                                  "target with --tandem-cpu-layers auto:<MiB>"
                                  % (int(ctx), need, free // 2 ** 20))
-            cpu_layers = plan_cpu_layers(dims, sizes, ctx, free,
-                                         reserve_mib=int(os.environ.get("KINDI_TANDEM_RESERVE_MB", "512")),
-                                         target_mib=auto_target, log=self.log, owner=self.gpu_kind)
+            if cpu_layers == "auto":
+                cpu_layers = plan_cpu_layers(dims, sizes, ctx, free,
+                                             reserve_mib=int(os.environ.get("KINDI_TANDEM_RESERVE_MB", "512")),
+                                             target_mib=auto_target, log=self.log, owner=self.gpu_kind)
+            else:
+                cpu_layers = plan_cpu_layers_rate(
+                    dims, sizes, ctx, free,
+                    reserve_mib=int(os.environ.get("KINDI_TANDEM_RESERVE_MB", "512")),
+                    rate_floor=auto_target, log=self.log, owner=self.gpu_kind,
+                    pack_sha=man.get("source_sha256"))
         cpu_first = self.mode == "cpu-first"
         if isinstance(cpu_layers, (list, tuple)):
             explicit = tuple(int(x) for x in cpu_layers)

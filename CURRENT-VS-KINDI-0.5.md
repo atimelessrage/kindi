@@ -959,6 +959,16 @@ tests; §19's 500 is two rounds older).
   Linux figure exists); pre-commit gained `check-merge-conflict`/`check-case-conflict`; the three
   `tandem-cache` scripts that tracked pages tell you to run are tracked next to them; the dory goldens
   and hashes the page cites are tracked.
+- **A measured CPU-vs-PCIe ratio now picks the tandem split.** `tools/measure_split_ratio.py` measures
+  this machine end to end (PCIe staged 4.5/2.3 GiB/s, hidden handover 0.009 ms, raw CPU GDN layer
+  4-6 ms, effective 11.7 ms in the live tandem pipeline - about half of it dispatch, not PCIe) and
+  `kindi/tandem.py` picks by that ratio through `--tandem-cpu-layers rate[:frac]` (fastest fitting
+  count, or the largest count a rate floor can afford; a fallback that says so, never fake numbers).
+  At 27B/24K the ratio predicts the smallest fitting count (11/12 CPU layers, plan owner) - the same
+  boundary as the recorded `auto` best-fit, and the earlier hand-set `gdn:16` was five steps
+  further and slightly slower. Predicted rates validate −10% to −25% against the recorded 8K sweep.
+  Evidence in `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-split-ratio/`; the beat-7.9-by-10%
+  gate clause is open pending the live rate-pick bench.
 
 ### 21.2 What is worse, or no longer works (2026-11-14)
 

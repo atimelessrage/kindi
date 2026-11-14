@@ -35,6 +35,17 @@ between them per token.
   at that context, the head, the f32 file and a measured scratch allowance. It **refuses instead of
   splitting** when the model already fits, and refuses with the missing amount when no split can fit.
   `KINDI_TANDEM_RESERVE_MB` (default 512) sets the free memory it leaves behind.
+- **`rate`** (or **`rate:0.25`** to keep at least 25% of the full-GPU rate) — picks by the measured
+  CPU-vs-PCIe ratio, not by free memory alone (roadmap prior-art item 1, from tandem.cpp). It reads a
+  split-ratio calibration written by `tools/measure_split_ratio.py` (the keyed JSON in
+  `~/.cache/kindi/tandem/`; `KINDI_TANDEM_RATIO` overrides the path) and picks the fastest fitting
+  `gdn:` count, or, with a floor, the largest count the calibration still predicts above a fraction of
+  the full-GPU rate. Without a calibration it falls back to the fit-only pick and says so in the log;
+  a floor that no fitting split can meet is a refusal, not a fallback.
+
+Fewer CPU layers is always faster, so on most machines `rate` lands on the same count `auto` finds;
+the value of the measured ratio is in the prediction it reports and in the rate floor, which answers
+"can I afford to move more layers off the card?" without re-measuring the machine by hand.
 
 **`--tandem-gpu auto|plan|plain`** picks the engine that owns the GPU half (`KINDI_TANDEM_GPU` sets a
 default). `auto` — the default — takes the plan engine (`kindi/tp.py`) whenever one card is visible and
