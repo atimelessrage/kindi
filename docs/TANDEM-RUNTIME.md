@@ -8,7 +8,8 @@ joint-cache checks pass in both placements, including saved-opening reloads. The
 is a model-free state-machine prototype with a Gemma 4 26B backend adaptation in
 [MOE-TANDEM.md](MOE-TANDEM.md) and [GEMMA4-26B-MOE.md](GEMMA4-26B-MOE.md); there is no MoE backend or
 integration. Every split is still slower than GPU-only on this card.
-The runtime is `kindi/tandem.py`, with the per-layer GPU API in `kindi/engine.py`. The recovery
+The runtime is `kindi/tandem.py`, with the per-layer GPU API in `kindi/engine.py` (plain owner) and
+`kindi/tp.py:TPEngine(layers=...)` (plan owner, the default). The recovery
 history and the cleanup gate for the interrupted branch are in [TANDEM-STATUS.md](TANDEM-STATUS.md);
 the original design is [CPU_GPU_TANDEM_DESIGN.md](CPU_GPU_TANDEM_DESIGN.md).
 
@@ -34,6 +35,14 @@ between them per token.
   at that context, the head, the f32 file and a measured scratch allowance. It **refuses instead of
   splitting** when the model already fits, and refuses with the missing amount when no split can fit.
   `KINDI_TANDEM_RESERVE_MB` (default 512) sets the free memory it leaves behind.
+
+**`--tandem-gpu auto|plan|plain`** picks the engine that owns the GPU half (`KINDI_TANDEM_GPU` sets a
+default). `auto` — the default — takes the plan engine (`kindi/tp.py`) whenever one card is visible and
+`KINDI_TP` is not `0`. It is the better owner because it loads only the GPU-owned tensors, keeps the
+q8_0 K/V cache (half of fp16) for the attention layers it owns, reads the f32 file per tensor instead of
+uploading it whole, and keeps the embedding in pinned host memory. `plain` keeps the fp16-K/V engine and
+stays available for an A/B comparison; it is also the only owner for a split across two GPU cards, which
+a plan owner cannot do. See [the GPU owner](#the-gpu-owner-plan-engine-not-plain) for the measurements.
 
 `kindi bench --json` records the resolved `cpu_range`/`gpu_range` of a run, so a recorded split is
 unambiguous.
@@ -221,7 +230,8 @@ genuinely larger than the card, which is the 27B case below.
 
 Same layer count off the GPU, same short-context rate, and **2.7x** the 24K decode rate. The GDN-first
 placement keeps 384 MiB more K/V on the card at 24K (the 4 attention layers it does not offload), which
-is the price of the flat curve.
+is the price of the flat curve. The tandem rows in this table are the **plain** GPU owner; the plan
+owner's peaks are 1.7 GiB lower at the same placement (see the next section).
 
 ### `auto`: the split is only as big as it has to be (2026-11-14)
 
@@ -248,23 +258,62 @@ card, not a throughput choice. The freed number the planner reports is against t
 allocation, which is ~600 MiB above the plan engine's row at 8K (q8_0 K/V vs fp16), so do not compare
 it with a full-GPU row taken on the plan engine.
 
-### The split frees much less VRAM than the layer count suggests
+### The GPU owner: plan engine, not plain (2026-11-14)
 
-Offloading 16 of 64 layers does not free 16/64 of the pack on the 27B: the measured peak only fell from
-7,783 to 7,434 MiB. The reason is that a tandem's GPU owner is the **plain** engine, and on the 27B the
-plain engine is much heavier per layer than the plan engine: `KINDI_TP=0` cannot load the full 27B at
-24,576 context at all (`not enough GPU memory for this model: 0 MiB free after the weights`), while the
-plan engine loads it with 7,783 MiB peak and runs it at 30 tok/s. The plan engine's 27B plan also uses
-the q8_0 K/V cache, which halves K/V bytes; the plain engine has no K/V mode and is always fp16.
+A split only frees what its GPU owner does not allocate, and the owner used to be the plain engine: it
+uploads the whole f32 file, has no K/V mode (always fp16) and is much heavier per layer on the 27B than
+the plan engine (`KINDI_TP=0` cannot load the full 27B at 24,576 at all). The plan engine can now be the
+owner (`--tandem-gpu plan`, the default): `TPEngine(layers=...)` loads only the owned tensors, allocates
+K/V only for the owned attention layers, reads the f32 file per tensor and steps one block at a time
+(`begin`/`layer`/`flush`/`get_hidden`/`set_hidden`/`finish`) with one prebuilt plan per block. Each
+block's residual add is resolved inside its plan (`k_padd`), so no per-token CuPy call sits between
+blocks — a CuPy add per block cost 17% of a 2B token.
 
-So the tandem's VRAM saving is real but small on this card, and its rate cost is large. The two ways to
-make the split pay off are engineering, not tuning:
+27B, 24,576-token context, `cpu-first`, RTX 4060 Ti 8 GB, i7-8086K (medians of the runs in
+`bench-logs/tandem-plan-owner/`, five fresh processes for `gdn:16`):
 
-1. **Give the tandem a plan-engine GPU owner.** `kindi/tp.py:TPEngine` has no per-layer API; it fuses
-   layers into a plan. Extending its plan to start at an arbitrary layer is the change that would make an
-offloaded layer free what it should.
-2. **A q8_0 K/V cache in the plain engine.** At 24K the 27B's 16 attention layers hold 1.5 GiB of fp16
-   K/V; q8_0 would return ~0.75 GiB without touching a single weight.
+| owner | placement | free after load | sampled peak | read | decode at 24K |
+|---|---|---:|---:|---:|---:|
+| plain | `gdn:16` | 197 MiB | 7,721 MiB | 7.5 | 4.5 |
+| plan | `gdn:16` | **1,985 MiB** | **6,004 MiB** (5,862-6,083) | 7.2 (5.5-9.0) | 5.8 (4.7-6.4) |
+| plan | `auto` = 11 layers | 1,319 MiB | 6,449 MiB (6,444-6,756) | 9.2 (8.4-11.2) | 7.9 (4.5-9.3) |
+| full GPU (plan engine, no split) | — | 404 MiB | 7,783 MiB | 37.4 | 30.2 |
+
+Same placement, **1.7 GiB less peak** (6.0 vs 7.7 GiB): an offloaded layer now frees its weights (about
+107 MiB on this model) *and* its share of the heaviest per-layer state, and the layers that stay cost
+half the K/V. Decode at 24K is within this machine's run-to-run noise of the plain owner (5.5-9.0 tok/s
+across five runs of one cell); the split is still far slower than the unsplit plan engine, because the
+CPU-owned layers dominate the token. Load is also cheaper: 11 CPU layers load in 87 s against 122 s for
+16, and the GPU side ranged-loads its tensors out of the existing 5-trit cache instead of writing a
+second multi-GB cache file.
+
+The full record (commands, medians, ranges and the exactness runs) is
+[benchmarks/2026-11-14-i7-8086k-rtx4060ti-plan-owner/RESULTS.md](benchmarks/2026-11-14-i7-8086k-rtx4060ti-plan-owner/RESULTS.md).
+
+The estimate follows the owner: `gpu_estimate(..., owner=...)` charges the plain engine the whole f32
+file, the device copy of the embedding and fp16 K/V, and the plan engine the owned layers' f32 slices,
+no embedding and q8_0 K/V. On the 27B at 24K the plan estimate predicts 6,548 MiB and the run peaked at
+6,444-6,756 MiB, so `auto` keeps the 512 MiB reserve it promises.
+
+What the freed memory buys is context, not rate: asked for 49,152 tokens, the unsplit plan engine reduces
+the context to **30,976** (122 MiB free), while the plan-owner split keeps all **49,152** (1,074 MiB
+free). That is the case this card could not serve before, and it costs rate:
+
+| request | placement | context held | free after load | peak | read | decode at 100 / 2K / 8K / 16K / 24K |
+|---|---|---|---:|---:|---:|---|
+| 49,152 unsplit | — (plan engine) | 30,976 | 122 MiB | 7,872 MiB | 34.2 | 21.0 / 28.5 / 29.7 / 28.0 / 27.3 |
+| 49,152 | `auto` = 19 GDN layers | **49,152** | 1,240 MiB | 6,876 MiB | 5.3 | 4.9 / 4.9 / 2.8 / 2.7 / 2.0 |
+
+The 48K split is 1.6x the context of the unsplit engine on the same card and leaves 1.2 GiB after load,
+but it is 10-15x slower per token: at 48K the CPU owns 19 of 64 layers and every token pays them. Use it
+when the context is the requirement, not when rate is.
+
+### Joint cache and small contexts
+
+The joint prompt cache works with the plan owner: on the 2B at a 512-token context the extension reused
+320 of 325 prompt tokens and the branch 256 of 261, cache-off controls reused 0, and all continuations
+matched token for token (checkpoint 19.27 MiB, save 29 ms, restore 4 ms). A partial plan engine has no
+chunked or batched prompt path, so its context floor is 256 tokens instead of the full engine's 1024.
 
 ## Current limits
 
@@ -276,8 +325,8 @@ offloaded layer free what it should.
   median restore.
 - **No fast head, speculative decoding or `feed_batch`.** The tandem runner is exact-head and one
   token per backend call.
-- **One GPU.** The split composes with the CPU engine only; the two-card `TPEngine` is not a tandem
-  owner.
+- **One GPU owner.** The split composes with the CPU engine and one GPU engine: the plan engine (one
+  card) or the plain engine. A split across two GPU cards is not a tandem placement.
 - **27B: both placements exact; 2B/4B/9B/27B throughput and peaks recorded.** The 2026-11-12
   gate records `cpu-first` and `gpu-first` exactness with sampled peaks. The `cpu-first` cells
   in [CROSS-MODE.md](benchmarks/CROSS-MODE.md) have real `bench` throughput runs at a

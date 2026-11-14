@@ -48,7 +48,8 @@ def run(cfg, log=print):
         vram.start()
     cl = os.path.join(pack, "head_clusters.npz")
     eng = make_engine(pack, ctx=cfg["ctx"], clusters=dict(np.load(cl)) if os.path.exists(cl) else None, log=log,
-                       tandem=cfg.get("tandem", "off"), cpu_layers=cfg.get("tandem_cpu_layers"))
+                       tandem=cfg.get("tandem", "off"), cpu_layers=cfg.get("tandem_cpu_layers"),
+                       gpu=cfg.get("tandem_gpu"))
     if vram is not None:
         vram.mark("loaded")
     # eng.ctx is the *actual* context (the loader reduces it to fit); the requested one is

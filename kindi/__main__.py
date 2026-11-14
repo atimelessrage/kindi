@@ -9,7 +9,8 @@
   kindi head exact|fast         choose the output head of a running server (next request, no restart)
   kindi info                    show the configuration, the pack and the GPU
 Global options: --config FILE, --pack DIR, --state-dir DIR, --ctx N.
-Tandem: verify/bench/serve/chat accept --tandem cpu-first|gpu-first --tandem-cpu-layers N|LIST|gdn:N,
+Tandem: verify/bench/serve/chat accept --tandem cpu-first|gpu-first --tandem-cpu-layers N|LIST|gdn:N
+        and --tandem-gpu auto|plan|plain (the plan engine owner frees the offloaded layers' VRAM),
 where LIST is an explicit layer set (0,1,2,4 or 0-2,4-6) and gdn:N moves the first N gated-delta
 (non-attention) layers to the CPU, which keeps decode flat with context."""
 import argparse
@@ -230,6 +231,10 @@ def _tandem_args(s):
                         "gdn:N (the first N non-attention layers) or auto[:MiB] (the smallest "
                         "set that makes the context fit, or refuse when no split is needed) "
                         "(default: a quarter of the model)")
+    s.add_argument("--tandem-gpu", choices=("auto", "plan", "plain"), default=None,
+                   help="engine that owns the GPU side of a tandem split: auto (the plan engine, "
+                        "which loads only the GPU-owned layers and uses q8_0 K/V), plan or plain "
+                        "(the fp16-K/V engine; the only owner for a two-card split)")
 
 
 def main(argv=None):
@@ -283,6 +288,8 @@ def main(argv=None):
         cfg["tandem"] = a.tandem
     if getattr(a, "tandem_cpu_layers", None) is not None:
         cfg["tandem_cpu_layers"] = a.tandem_cpu_layers
+    if getattr(a, "tandem_gpu", None) is not None:
+        cfg["tandem_gpu"] = a.tandem_gpu
     if getattr(a, "json", None) is not None:
         cfg["json"] = a.json
     if getattr(a, "sample_vram", False):

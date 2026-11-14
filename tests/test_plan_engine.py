@@ -205,7 +205,7 @@ def test_kv_mode_rejects_an_unknown_cache(spec_tp, monkeypatch):
 def test_k8v4_saves_eight_kib_per_position(spec_tp):
     """27B geometry: q8_0 K+V is 34,816 bytes/token; q8_0 K + 4-bit V is 26,624."""
     _, tp = spec_tp
-    shard = types.SimpleNamespace(NATT=16, NHKV=4, HD=256, NH=24, dims={"rope_dim": 64},
+    shard = types.SimpleNamespace(NATT=16, NATT_own=16, NHKV=4, HD=256, NH=24, dims={"rope_dim": 64},
                                   tp=types.SimpleNamespace(kv="q8_0"))
     q8 = tp.Shard.per_pos_bytes(shard)
     shard.tp.kv = "k8v4"
@@ -390,7 +390,9 @@ def test_shard_slices_follow_the_proportional_offsets(spec_tp):
     _, tp = spec_tp
     L = tp.plan_split(_b27_dims(), 1024, 248320, 2 / 3)
     sh = object.__new__(tp.Shard)
-    sh.tp = types.SimpleNamespace(NKg=16, NVg=48, NFFg=17408, head_split=L["head_split"])
+    # layers= (all four, the full-engine case) and need_head= are the fields a partial shard narrows
+    sh.tp = types.SimpleNamespace(NKg=16, NVg=48, NFFg=17408, head_split=L["head_split"],
+                                  layers=tuple(range(4)), need_head=True)
     sh.card = 1
     sh.k0, sh.k1 = L["gdn_groups"][1]
     sh.v0, sh.v1 = L["gdn_v"][1]
