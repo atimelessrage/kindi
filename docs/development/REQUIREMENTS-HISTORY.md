@@ -22,7 +22,7 @@ the state at that commit.
 | [REQ-0010](requirements/REQ-0010.md) | Internal and external documentation stay current | active | `f25509f9ba89` | `f25509f9ba89` |
 | [REQ-0011](requirements/REQ-0011.md) | Credentials and personal data stay out of the repository | active | `f25509f9ba89` | `f25509f9ba89` |
 | [REQ-0012](requirements/REQ-0012.md) | K8/V4 is experimental and quarantined | experimental | `f25509f9ba89` | `f25509f9ba89` |
-| [REQ-0013](requirements/REQ-0013.md) | A tandem's GPU owner frees the layers it does not run | active | uncommitted | uncommitted |
+| [REQ-0013](requirements/REQ-0013.md) | A tandem's GPU owner frees the layers it does not run | active | `0d1d5fd349b5` | `0d1d5fd349b5` |
 
 `uncommitted` means the requirement file is not in `HEAD` yet. Commit the requirement
 and run the generator again to record its real added/last-modified hashes.
