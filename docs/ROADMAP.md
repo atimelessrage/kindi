@@ -66,6 +66,14 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   Ollama-compatible endpoints; multi-GPU replicas need `kindi/tp.py` work.
 - **Cards:** single/dual card support targets are in [CARD-SUPPORT.md](CARD-SUPPORT.md). The P106-100
   single-card (2B/4B/9B) and two-card (27B) offers are installer-tested but not measured on hardware.
+  Whether the CPU+GPU tandem helps pre-tensor-core cards — Pascal (GTX 1080, P106-100) and the
+  FirePro/Quadro M4000 — is unmeasured and worth a dedicated pass one day: on a card without tensor
+  cores the GPU side is slower per token, so the exchange rate of the split (VRAM freed per point of
+  decode lost) may differ from the RTX 4060 Ti's, and the optimal placement (GDN-first vs
+  contiguous, `cpu-first` vs `gpu-first`) may differ too. Measure per card and model (2B/9B; 27B if
+  it loads): `kindi verify` 4/4 token-exact, sampled peak, read + decode at 100/2K/8K/24K, tandem
+  against the same card's full-GPU run — see [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md) for the commands
+  and the cells to record.
   The dense CPU+GPU tandem runtime now exists and is token-exact in both placements on 2B, 9B and
   27B; the 27B split exactness/memory gate passed on 2026-11-12 (4/4, 40/40 tokens each; peaks
   7,005/7,017 MiB vs 7,238 MiB full-GPU), and its rate plus sampled peak is recorded at 8K and 24K
