@@ -68,6 +68,23 @@ def _changed_agents_lines():
     return adds if adds else None
 
 
+def test_agents_current_state_head_line_names_current_head():
+    """The '## Current state' HEAD line is what the next agent reads first; it rotted to `07e0640` while
+    HEAD had moved on (seen 2026-11-14 during the §25 round, when the line said e4267e6 at HEAD 07e0640).
+    It must name HEAD or its parent (the parent is the only hash a bump commit can know)."""
+    head = _rev("HEAD")
+    if not head:
+        return
+    parent = _rev("HEAD^")
+    text = (ROOT / "AGENTS.md").read_text(encoding="utf-8", errors="replace")
+    m = re.search(r"^- \*\*HEAD:\*\* `([0-9a-f]{7,40})`", text, re.M)
+    assert m, "Current-state HEAD line not found in AGENTS.md"
+    h = m.group(1)
+    ok = head.startswith(h) or (bool(parent) and parent.startswith(h))
+    assert ok, ("AGENTS.md Current-state HEAD line says %s but HEAD is %s; bump the line in the "
+                "same commit" % (h, head))
+
+
 def test_agents_worktree_table_names_current_head():
     head = _rev("HEAD")
     if not head:
