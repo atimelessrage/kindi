@@ -263,7 +263,13 @@ stays below GPU-only. See the [tandem benchmark README](benchmarks/2026-11-12-i7
 
 On the 27B the boundary is different: 8 CPU layers cannot hold a 24K context (auto-reduced to
 17,664 tokens with 23 MiB free), 16 layers keep it (7,699 MiB peak), and going to 24/32 layers
-lowers the peak to 6,103/5,115 MiB at a 35-50% rate cost. The capacity question was settled the
+lowers the peak to 6,103/5,115 MiB at a 35-50% rate cost. At 8K, stepping 8 -> 28 layers in
+steps of 4 lowers the peak 7,427 -> 5,277 MiB at a flat 428-432 MiB saved per step and
+15-37% decode cost per step (read 16.8 -> 6.5, 8K decode 10.7 -> 3.2): the exchange rate is
+~27-29 MiB saved per percent of decode rate, with no knee — the flat trade is the finding, and
+beyond 28 layers it is dominated by rate. For 24K the boundary is instead the capacity
+threshold at 16 layers (loads and keeps 24,576 with 687 MiB free, while 8 layers reduce to
+17,664 with 23 free). The capacity question was settled the
 same evening: the loader silently reduces context to fit, and on this card a full-GPU 27B holds
 ~37K tokens while the 16-layer tandem holds ~30K (7,812/7,518 MiB peaks). The split never gains
 usable context here; it trades throughput for headroom. Full table: [27B-8K.md](benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md).

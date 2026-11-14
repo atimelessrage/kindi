@@ -767,5 +767,27 @@ tie — is a hardware-path item, not a code bug, and the matrix documents it as 
   requirement is visible in the run, not just in the docs.
 - **`bench --json` now records the actual context.** `result['ctx']` was already `eng.ctx` (the
   loader's reduced value), but nothing said so: a run reduced to 17,664 could be read as the
-  requested 24,576. The JSON now also carries `ctx_requested` and `ctx_reduced` so a reduced cell
-  is unambiguously identifiable.
+  requested 24,576. The JSON now also carries `ctx_requested` and `ctx_reduced` so a reduced   cell is unambiguously identifiable.
+
+## 18. The 27B boundary where the split stops being worth it (2026-11-13)
+
+At 8,192 context (`cpu-first`, steps of 4 CPU layers, `--sample-vram`):
+
+| CPU layers | read | 100 | 2K | 8K | peak | saved vs full GPU |
+|---:|---:|---:|---:|---:|---:|---:|
+| 8 | 16.8 | 15.6 | 13.6 | 10.7 | 7,427 MiB | 46 MiB |
+| 12 | 12.4 | 10.9 | 10.4 | 6.7 | 6,995 MiB | 478 MiB |
+| 16 | 9.3 | 8.6 | 7.9 | 5.5 | 6,567 MiB | 906 MiB |
+| 20 | 7.4 | 6.2 | 6.0 | 4.6 | 6,139 MiB | 1,334 MiB |
+| 24 | 7.6 | 6.4 | 6.0 | 3.8 | 5,707 MiB | 1,766 MiB |
+| 28 | 6.5 | 4.2 | 3.4 | 3.2 | 5,277 MiB | 2,196 MiB |
+
+There is no knee: every step saves 428-432 MiB of peak for 15-37% of decode rate, a flat
+exchange of ~27-29 MiB saved per percent of decode rate given up, and by 28 layers the read
+rate is 1/3 of the 8-layer rate. On this card the split does not stop being worth it at a
+layer count — it is dominated on rate at every layer count above the minimum that fits, and
+the answer swaps only if the target card has fewer than ~7,427 MiB free at load. For 24K the
+boundary is the capacity threshold instead: 8 layers are auto-reduced to 17,664 with 23 MiB
+free (cannot serve 24K), while 16 layers keep 24,576 with 687 MiB free. Evidence:
+`bench-logs/tandem-cache/boundary-27b-l{8,12,16,20,24,28}-8k.{json,log}`; table in
+`docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md`.
