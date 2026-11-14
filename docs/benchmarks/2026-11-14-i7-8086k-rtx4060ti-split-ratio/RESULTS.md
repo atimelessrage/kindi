@@ -45,13 +45,31 @@ cost. At 24K: N=0 → 26.8/..., N=11 → 6.2, N=16 → 4.6. Predicted best-fit =
 
 ## The `rate` pick at 27B@24K and the gate verdict
 
-New table: the `rate` pick on this machine at 24K (started, see evidence below); to be filled with
-the measured number rather than a promise:
+`python -m kindi --pack T:/kindi-packs/bonsai-27b --ctx 24576 bench --tandem cpu-first --tandem-cpu-layers rate --sample-vram` (2026-11-14, run at git `cdfc1b2`, log `bench-logs/split-ratio/27b-24k-rate.log` - gitignored evidence... the tracked bench JSON is `bench-logs/split-ratio/27b-24k-rate.json`):
+
+12 CPU layers (`0,1,2,4,5,6,8,9,10,12,13,14`) by the fastest fitting split with the 512 MiB
+reserve (1,226 MiB free after load, 24,576 unreduced, plan owner). Read 8.4 tok/s; generation
+7.2/7.1/7.7/8.0/**8.0** tok/s at 100/2K/8K/16K/**24K**; sampled VRAM peak **6,151 MiB**.
 
 | Gate clause | Measured | Verdict |
 |---|---|---|
-| Predicts the best `gdn:N` within one step | (`11` recorded `auto` best-fit, rate picks `11`/`12` by free memory) | within one step at the fitting boundary, which on this machine is what the model can hold. A larger count buys nothing: rate falls monotonically with N. |
-| Beats the recorded 7.9 tok/s at the same sampled peak by >=10% | (bench rerunning; compare with RECORDED_GDN16_PLAIN 7.9 @ 7,744 MiB and RECORDED_AUTO_PLAN 7.9 @ 6,449 MiB) | pending the bench |
+| Predicts the best `gdn:N` within one step | `rate` picked **12** CPU layers (smallest fitting count with the reserve at the free VRAM the session found); the recorded `auto` best-fit is **11** | **met**. Within one step of the recorded best-fit boundary, which on this machine is what the model can hold. The earlier hand-set `gdn:16` was 5 steps further and slightly slower. |
+| Beats the recorded 7.9 tok/s at the same sampled peak by >=10% | 24K generation **8.0 tok/s at 6,151 MiB peak** vs recorded plain `gdn:16` 7.9 @ 7,744 and plan `auto` 7.9 @ 6,449 | **not met**: 8.0 is +1.3% over 7.9, not +10% (needs 8.7). Hmm, and the peak is 1,593 MiB (plain) / 298 MiB (plan `auto`) **lower** than the recorded sampled peaks - the split the ratio found is one CPU layer more, at a lower peak for the same rate. |
+
+So the ratio delivers the pick (fewer steps than the hand search to the same boundary, one more
+CPU layer for 298 MiB less peak) and the beat clause is the honest negative: on this machine the
+smallest fitting count is the fastest possible, and 7.9 tok/s is what it is there. A repeat run
+that lands 8.7+ would meet the letter of the clause (the recorded plan-auto row spans 4.5–9.3
+tok/s in TANDEM-RUNTIME, so the check is noisy by construction), but the single honest measurement
+is 8.0.
+
+One note on prediction accuracy: in this run the planner printed a predicted 12.4 tok/s (from the
+stale `nocard` cache file, written by the first buggy tool run); the live calibration file predicts
+5.8 tok/s at N=12, next to the measured 8.0 (the model is systematically a bit pessimistic, like the
+8K validation). The stale `nocard` file has since been fixed so the live measurement is preferred
+(a live measurement whose `gpu` is non-null outranks a stale no-card file; same `pack_sha` match).
+
+What the ratio changed versus the hand-set count: nothing to the count itself on this machine
 
 What the ratio changed versus the hand-set count: nothing to the count itself on this machine
 (`rate` and `auto` land on the same fitting boundary), but the pick now comes with a printed

@@ -255,7 +255,7 @@ def plan_cpu_layers(dims, sizes, ctx, free_bytes, reserve_mib=512, target_mib=No
     return cpu
 
 
-def load_ratio(pack_sha=None, path=None):
+def load_ratio(pack_sha=None, path=None, cache_dir=None):
     """The split-ratio calibration for this pack, or None.
 
     ``tools/measure_split_ratio.py`` writes ``~/.cache/kindi/tandem/kindi-split-ratio-*.json``
@@ -267,11 +267,12 @@ def load_ratio(pack_sha=None, path=None):
     override = os.environ.get("KINDI_TANDEM_RATIO")
     if override:
         candidates.append(override)
-    cache = os.path.join(os.path.expanduser("~"), ".cache", "kindi", "tandem")
+    cache = cache_dir or os.path.join(os.path.expanduser("~"), ".cache", "kindi", "tandem")
     if pack_sha:
         candidates.extend(os.path.join(cache, name) for name in
                           sorted(os.listdir(cache)) if name.startswith("kindi-split-ratio-")
                           and name.endswith(".json")) if os.path.isdir(cache) else []
+    valid = []
     for candidate in candidates:
         try:
             with open(candidate, encoding="utf-8") as f:
@@ -284,8 +285,16 @@ def load_ratio(pack_sha=None, path=None):
             continue
         if not isinstance(data.get("predicted_tok_s"), dict):
             continue
-        return data
-    return None
+        if not data.get("gpu"):
+            # a stale early-run file written with no card detected must not outrank a live one
+            valid.append((1, str(data.get("measured_utc") or ""), candidate, data))
+            continue
+        valid.append((0, str(data.get("measured_utc") or ""), candidate, data))
+    if not valid:
+        return None
+    valid.sort(key=lambda v: v[1], reverse=True)   # newest first
+    valid.sort(key=lambda v: v[0])                  # ...then a live measurement over a stale no-card file
+    return valid[0][3]
 
 
 def _predicted_rate(ratio, n, ctx):

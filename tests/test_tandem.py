@@ -380,6 +380,23 @@ def test_rate_planner_without_a_calibration_behaves_as_the_fit_only_pick(tmp_pat
     assert any("no split-ratio calibration" in line for line in logs)
 
 
+def test_load_ratio_prefers_a_live_measurement_over_a_stale_nocard_file(tmp_path, monkeypatch):
+    cache_dir = tmp_path / ".cache" / "kindi" / "tandem"
+    cache_dir.mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    old = {"kind": "kindi-split-ratio/1", "measured_utc": "2026-11-14T00:00:00Z", "gpu": None,
+           "pack": {"source_sha256": "SHAME"}, "predicted_tok_s": {"24k": {"12": 12.45}}}
+    new = {"kind": "kindi-split-ratio/1", "measured_utc": "2026-11-14T01:00:00Z",
+           "gpu": "NVIDIA GeForce RTX 4060 Ti",
+           "pack": {"source_sha256": "SHAME"}, "predicted_tok_s": {"24k": {"12": 5.83}}}
+    f_old = cache_dir / "kindi-split-ratio-nocard-SHAME.json"
+    f_new = cache_dir / "kindi-split-ratio-nvidia-SHAME.json"
+    f_old.write_text(json.dumps(old))
+    f_new.write_text(json.dumps(new))
+    got = tandem.load_ratio(pack_sha="SHAME", cache_dir=str(cache_dir))
+    assert got["predicted_tok_s"]["24k"]["12"] == 5.83
+
+
 def test_load_ratio_matches_the_pack_hash(tmp_path, monkeypatch):
     def write(name, payload):
         (tmp_path / name).write_text(json.dumps(payload), encoding="utf-8")
