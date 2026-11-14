@@ -87,11 +87,19 @@ plain `k1200x2` split, and a pre-6.0 + 6.0-or-newer pair runs with `KINDI_G5=0`.
 It is not SLI. Model entries are targets pending verification, not current claims; no mixed-card execution has
 been recorded.
 
+“Triple” means one independent server on each of three cards. The split-model engines (`kindi/tp.py` and
+`kindi/gemma4_tp.py`) support at most two cards, and `profile_of()` refuses a three-card split for them.
+With `install.sh`, an explicit `--gpu 0,1,2` builds one single-card setup for each selected card, while
+`--gpu all` can also run the two-card split plus a single-card server on the remaining card; `--config Nx3`
+gives three servers of one card kind. Nanbeige’s separate multi-stage backend is not part of this Bonsai/Gemma
+matrix.
+
 | Card | Arch / CC | Current installer class | Single target (unverified) | Dual target (unverified) | Required path |
 |---|---|---|---|---|---|
 | GT 1030 2 GB | Pascal 6.1 | `maxwell` | 2B; 4B only if the fitted context is acceptable | not useful | plain engine; 2 GB context/memory test |
 | P106-100 6 GB | Pascal 6.1 | `maxwell` | 9B/4B/2B | 27B with a P4000 (14 GB total) or another supported card; plain split; unverified | plain plan engine, no TC; P106+P4000 uses the 5-trit path; single/dual installer routing is tested, no P106 run yet; the dense CPU+GPU tandem runtime is implemented (see [TANDEM-STATUS.md](TANDEM-STATUS.md)); see [P106.md](P106.md) |
 | Quadro M4000 8 GB ([page](M4000.md), [rig script](OLD-CARD-RIG.md)) | Maxwell 5.2 | `maxwell` | 9B/4B/2B; 27B only if the 8 GB fit is verified | 27B, including with a P4000; plain split, `KINDI_G5=0`; unverified | plain plan engine, no TC; the mixed pair forces 2-bit weights on both cards |
+| Quadro M5000 8 GB ([user report in CARDS.md](CARDS.md#quadro-m5000-8-gb-maxwell-sm52-user-report)) | Maxwell 5.2 | `maxwell` | 9B/4B/2B; 27B manual-pack work has a user report at 24K–28K (not yet a matrix row) | 27B, including with a P4000; plain split, `KINDI_G5=0`; unverified | plain plan engine, no TC; the mixed pair forces 2-bit weights on both cards; `sm_52` (pre-0.6 installers reported `sm_50`) |
 | Quadro P4000 8 GB ([page](P4000.md), [rig script](OLD-CARD-RIG.md)) | Pascal 6.1 | `pascal8` | 27B/9B/4B/2B | 27B alone or with a P106/M4000; plain split; unverified | plain plan engine, no TC; the dp4a kernels exist but `pascal8` does not enable `KINDI_TC=1` |
 | Quadro RTX 4000 8 GB | Turing 7.5 | `turing` | 27B/9B/4B/2B | 27B alone or with a 4060 Ti on the plain split (no TC); unverified | Turing tensor-core backend (`KINDI_TC=1`); CUDA 10.2 supports sm_75 |
 | RTX 4060 Ti 8 GB | Ada 8.9 | `tc` | 27B/9B/4B/2B; tc plan verify: 2B 4/4, 4B 3 exact + 1 tie (FD fallback), 9B refused, 27B pass (3 exact + 1 tie; 4B/9B plain 4/4) | 27B with another sm_80+ card via `tc2`; 27B with an RTX 4000 via plain split; no mixed run | `tc` profile, 24,576-token default; PTX patch; 27B also benchmarks and serves at 24,576 tokens, but note the 9B tc gap and the 4B's FD fallback before a full support claim |
@@ -189,6 +197,7 @@ the 2×8 GB pair offers 27B, not 33B.
 | GT 1030 2 GB | single | measure | no | no | no |
 | P106-100 6 GB | single | single | single | 2×P106 only | no |
 | M4000 8 GB | single | single | single | single or 2× | no |
+| M5000 8 GB | single | single | single | single or 2× | no |
 | P4000 8 GB | single | single | single | single or 2× | no |
 | RTX 4000 8 GB | single | single | single | single or 2× | no |
 | 4060 Ti 8 GB | single | single | single | single (tc; 24K + server/cache) | no (2× = 16 GB) |

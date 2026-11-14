@@ -36,6 +36,8 @@ CARDS = {
     "p106-100": ("NVIDIA P106-100", "Pascal 6.1", "maxwell", ("p106",)),
     "p4000": ("Quadro P4000", "Pascal 6.1", "pascal8", ("p4000", "quadro p4000")),
     "m4000": ("Quadro M4000", "Maxwell 5.2", "maxwell", ("m4000", "quadro m4000")),
+    "m5000": ("Quadro M5000", "Maxwell 5.2", "maxwell", ("m5000", "quadro m5000")),
+    "rtx4000": ("Quadro RTX 4000", "Turing 7.5", "turing", ("rtx 4000", "quadro rtx 4000")),
 }
 
 CARD_MODELS = ("2b", "4b", "9b", "27b")     # short names, in render order

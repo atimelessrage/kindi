@@ -111,6 +111,8 @@ cells render `not measured` until one is folded.
 | NVIDIA P106-100 | Pascal 6.1 | maxwell | not measured | not measured | not measured | not measured | not measured |
 | Quadro P4000 | Pascal 6.1 | pascal8 | not measured | not measured | not measured | not measured | not measured |
 | Quadro M4000 | Maxwell 5.2 | maxwell | not measured | not measured | not measured | not measured | not measured |
+| Quadro M5000 | Maxwell 5.2 | maxwell | not measured | not measured | not measured | not measured | not measured |
+| Quadro RTX 4000 | Turing 7.5 | turing | not measured | not measured | not measured | not measured | not measured |
 
 ## Evidence
 

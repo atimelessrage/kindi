@@ -120,6 +120,41 @@ def test_rtx_5060_ti_16gb_is_tensor_core():
     assert "27b" in info["models"].split(), info
 
 
+def test_single_m5000_is_the_maxwell_8gb_class():
+    info = one_card("Quadro M5000", 8192, "5.2")
+    if info is None:
+        return
+    assert info["class"] == "maxwell", info
+    assert info["models"] == "9b nemotron 4b 2b", info
+
+
+def test_single_p4000_uses_the_pascal8_64k_profile():
+    info = one_card("Quadro P4000", 8192, "6.1")
+    if info is None:
+        return
+    assert info["class"] == "pascal8", info
+    assert info["models"] == "27b lightning nemotron 9b 4b 2b", info
+    profile_info = profile(["Quadro P4000"], [8192], ["6.1"], model="27b", cards="0")
+    if profile_info is None:
+        return
+    assert profile_info["profile"] == "pascal8" and profile_info["ctx"] == "65536", profile_info
+
+
+def test_single_rtx_4000_uses_the_turing_tensor_core_profile():
+    info = one_card("Quadro RTX 4000", 8192, "7.5")
+    if info is None:
+        return
+    assert info["class"] == "turing", info
+    assert info["models"] == "27b lightning nemotron 9b 4b 2b", info
+    profile_info = profile(["Quadro RTX 4000"], [8192], ["7.5"], model="27b", cards="0")
+    if profile_info is None:
+        return
+    assert profile_info["profile"] == "turing" and profile_info["ctx"] == "65536", profile_info
+    for flag in ("KINDI_CARDS=1", "KINDI_TC=1", "KINDI_ATT_TC=1", "KINDI_SPEC=draft2b",
+                 "CUDA_VISIBLE_DEVICES=0"):
+        assert flag in profile_info["env"], (flag, profile_info)
+
+
 def test_two_p106_cards_pair():
     # 6 GB Pascal is the maxwell memory class, but two of them are a valid 27B pair (12 GB total)
     info = pair("NVIDIA P106-100", 6077, "6.1", "NVIDIA P106-100", 6077, "6.1")
@@ -159,6 +194,15 @@ def test_two_p106_cards_use_the_27b_dual_profile_without_tensor_cores():
     for flag in ("KINDI_CARDS=2", "KINDI_REPEAT_STOP=1", "KINDI_CHECKPOINT_BUDGET_MB=4096"):
         assert flag in info["env"], (flag, info)
     assert "KINDI_TC=1" not in info["env"], info
+
+
+def test_two_rtx_4000_cards_use_the_plain_dual_profile():
+    info = profile(["Quadro RTX 4000"] * 2, [8192, 8192], ["7.5", "7.5"], model="27b")
+    if info is None:
+        return
+    assert info["profile"] == "k1200x2" and info["ctx"] == "24576", info
+    assert "KINDI_CARDS=2" in info["env"], info
+    assert "KINDI_TC=1" not in info["env"], info  # the Turing backend is one card only
 
 
 def test_two_rtx_4060_ti_cards_pair():
@@ -226,6 +270,19 @@ def test_p106_and_p4000_pair_on_the_plain_engine():
     assert "KINDI_TC=1" not in info["env"], info
 
 
+def test_m5000_and_p4000_pair_with_the_two_bit_fallback():
+    info = pair("Quadro M5000", 8192, "5.2", "Quadro P4000", 8192, "6.1")
+    if info is None:
+        return
+    assert info["class0"] == "maxwell" and info["class1"] == "pascal8", info
+    assert info["pair"] == "yes", info
+    profile_info = profile(["Quadro M5000", "Quadro P4000"], [8192, 8192], ["5.2", "6.1"])
+    if profile_info is None:
+        return
+    assert profile_info["profile"] == "k1200x2", profile_info
+    assert "KINDI_G5=0" in profile_info["env"], profile_info
+
+
 def test_m4000_and_p4000_pair_with_the_two_bit_fallback():
     info = pair("Quadro M4000", 8192, "5.2", "Quadro P4000", 8192, "6.1")
     if info is None:
@@ -245,6 +302,23 @@ def test_mixed_pair_still_needs_four_gb_each():
     if info is None:
         return
     assert info["pair"] == "no", info
+
+
+def test_profile_of_refuses_a_three_card_split():
+    # Bonsai/Gemma tensor parallel is a two-card engine; --gpu 0,1,2 means three independent servers.
+    got = run_case(table(["Quadro P4000"] * 3, [8192] * 3, ["6.1"] * 3) + """
+SV_B=(cuda); SV_M=(27b); SV_C=("0,1,2")
+CTX=auto; MEMORY=""; THREADS=""; CORES=16; RAM_MB=65536
+AGFX=(); AMEM=(); MTPF=""; XPACKS=(); ENV=(); NEED_MTP=0
+mtp_ready() { return 1; }
+die() { echo "die: $*" >&2; return 1; }
+profile_of 0
+""")
+    if got is None:
+        return
+    code, _out, err = got
+    assert code != 0, err
+    assert "at most two cards" in err, err
 
 
 def test_tc2_profile_for_two_8gb_ada_cards():

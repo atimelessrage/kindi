@@ -441,7 +441,7 @@ option `amdgpu.cwsr_enable=0`. [AMD.md](AMD.md) gives the settings.
 | memory | 8 GB GDDR5, 256-bit, 256 GB/s, on-die ECC; PCIe 3.0 x16 half-height, 105 W, four DisplayPort 1.3 |
 | installer class | `pascal8` (sm_61 with 8,192 MiB clears the 7,500 MiB gate) |
 | models | 27B, 9B, 4B, 2B in that order - one of only three classes that offers the 27B on one card; the 8 GB fit is unverified |
-| variables | `KINDI_CTX=24576`, `KINDI_BLOCKING_SYNC=0`, `KINDI_CHUNK_Q8` on by default on sm_61 |
+| variables | `KINDI_CTX=65536`, `KINDI_BLOCKING_SYNC=0`, `KINDI_CHUNK_Q8` on by default on sm_61 |
 | tensor cores | none; the dp4a Pascal kernels exist (`tc.pascal()` accepts major 6) but `pascal8` does not enable `KINDI_TC=1`, so forcing it is the interesting experiment |
 | pairs | P4000 + P106 is offered without `KINDI_G5=0` (both cards 5-trit); M4000 + P4000 with `KINDI_G5=0` |
 | generation | not yet measured; the GTX 1080 (same sm_61 family) is 4/4 token-exact on the 27B, but the P4000 still needs its own run |

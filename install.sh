@@ -99,7 +99,8 @@ Options:
                    card; lightning = Nemotron 3.5 Lightning 30B-A3B, a mixture of experts, on NVIDIA cards with 6 GB
                    or more)
   --ctx N          context length in tokens (default: the profile's; the engine fits it to the free memory)
-  --gpu G          N (one NVIDIA card), N,M (two cards), amd or amdN (an AMD card), all, or cpu (default: choose)
+  --gpu G          N (one NVIDIA card), N,M (two cards split over one model), N,M,K (one independent
+                   server on each of three cards), amd or amdN (an AMD card), all, or cpu (default: choose)
   --port P         server port on 127.0.0.1 (default ${PORT})
   --lan            also serve the local network (other computers can use Kindi). Off by default. The installer
                    makes an API key (kept in ${DIR}/api-key) that every client must send, unless --api-key none
@@ -777,23 +778,37 @@ add_cfg() { CFG+=("$1"); CFG_N+=("$2"); }
 want() { [ "$MODEL" = auto ] || [ "$MODEL" = "$1" ]; }
 SINGLE=()         # the single-server setups (for the all-cards setup)
 PAIR=""          # two NVIDIA cards that run one model together
+TRIPLE_MULTI=0   # --gpu N,M,K: one independent server on each selected card (the split-model engine is 1-2 cards)
 if [ "$GPU" != cpu ]; then
   if [ "$NG" -gt 0 ]; then
-    if [[ "$GPU" == *,* ]]; then pa=$(card_k "${GPU%%,*}") || die "no NVIDIA GPU ${GPU%%,*}"; pb=$(card_k "${GPU##*,}") || die "no NVIDIA GPU ${GPU##*,}"
+    if [[ "$GPU" == *,*,* ]]; then
+      # Three or more cards listed explicitly are independent servers, never a three-card
+      # tensor-parallel engine: kindi/tp.py and kindi/gemma4_tp.py are two-card engines. `--gpu all`
+      # still offers the usual two-card split plus a single-card server on the third card.
+      TRIPLE_MULTI=1; pa=""; pb=""
+      IFS=',' read -r -a _gpu_list <<< "$GPU"
+      order=""
+      for _g in "${_gpu_list[@]}"; do
+        _k=$(card_k "$_g") || die "no NVIDIA GPU $_g"
+        order="$order $_k"
+      done
+    elif [[ "$GPU" == *,* ]]; then pa=$(card_k "${GPU%%,*}") || die "no NVIDIA GPU ${GPU%%,*}"; pb=$(card_k "${GPU##*,}") || die "no NVIDIA GPU ${GPU##*,}"
     elif [ "$NG" -ge 2 ] && { [ "$GPU" = auto ] || [ "$GPU" = all ]; }; then pa=0; pb=1
     else pa=""; pb=""; fi
     PAIR=""
-    if [ -n "$pa" ] && pair_ok "$pa" "$pb"; then
+    if [ "$TRIPLE_MULTI" = 0 ] && [ -n "$pa" ] && pair_ok "$pa" "$pb"; then
       PAIR="${GIDX[$pa]},${GIDX[$pb]}"
       want 27b && add_cfg "cuda|27b|$PAIR" "$(model_label 27b) on GPUs ${PAIR}, split over both cards"
       want nemotron && add_cfg "cuda|nemotron|$PAIR" "$(model_label nemotron) on GPUs ${PAIR}, split over both cards"
-    elif [[ "$GPU" == *,* ]] && ! { want nanbeige && nb_cards "$pa" "$pb" >/dev/null; }; then die "GPUs ${GPU} cannot run one model together (two supported cards with at least 4 GB each, such as a P106 and a P4000, can; Nanbeige 33B needs sm_80 cards or Tesla P100s with 16.2 GB in total, plus 0.7 GB for each more card)"
+    elif [ "$TRIPLE_MULTI" = 0 ] && [[ "$GPU" == *,* ]] && ! { want nanbeige && nb_cards "$pa" "$pb" >/dev/null; }; then die "GPUs ${GPU} cannot run one model together (two supported cards with at least 4 GB each, such as a P106 and a P4000, can; Nanbeige 33B needs sm_80 cards or Tesla P100s with 16.2 GB in total, plus 0.7 GB for each more card)"
     fi
-    if [[ "$GPU" != *,* ]] && [[ "$GPU" != amd* ]]; then
+    if { [[ "$GPU" != *,* ]] || [ "$TRIPLE_MULTI" = 1 ]; } && [[ "$GPU" != amd* ]]; then
       # one card: the card with the most memory first, then each other kind of card. A setup on a kind of card
-      # takes any free card of that kind, so "1,1" runs setup 1 on two such cards.
+      # takes any free card of that kind, so "1,1" runs setup 1 on two such cards. An explicit N,M,K list
+      # keeps `order` built above and gets the same single-card setups for its selected cards.
       # (with one card, grep finds nothing and exits 1: pipefail would stop the installer here)
-      if [ "$GPU" = auto ] || [ "$GPU" = all ]; then best=$(pick_card); order="$best $(seq 0 $((NG - 1)) | { grep -vx "$best" || true; } | tr '\n' ' ')"
+      if [ "$TRIPLE_MULTI" = 1 ]; then : # order already holds the selected card positions
+      elif [ "$GPU" = auto ] || [ "$GPU" = all ]; then best=$(pick_card); order="$best $(seq 0 $((NG - 1)) | { grep -vx "$best" || true; } | tr '\n' ' ')"
       else order=$(card_k "$GPU") || die "no NVIDIA GPU ${GPU}"; fi
       seen="|"
       for k in $order; do
@@ -811,7 +826,8 @@ if [ "$GPU" != cpu ]; then
     fi
   fi
   if [ "$NG" -gt 0 ] && want nanbeige && [[ "$GPU" != amd* ]]; then
-    case "$GPU" in auto|all) cand=$(seq 0 $((NG - 1))) ;; *,*) cand="$pa $pb" ;; *) cand=$(card_k "$GPU") || cand="" ;; esac
+    if [ "$TRIPLE_MULTI" = 1 ]; then cand="$order"
+    else case "$GPU" in auto|all) cand=$(seq 0 $((NG - 1))) ;; *,*) cand="$pa $pb" ;; *) cand=$(card_k "$GPU") || cand="" ;; esac; fi
     if nbc=$(nb_cards $cand); then
       add_cfg "cuda|nanbeige|$nbc" "$(model_label nanbeige) on GPU$([[ "$nbc" == *,* ]] && echo "s ${nbc}, layers split over the cards" || echo " ${nbc}")"
     fi
@@ -833,7 +849,7 @@ fi
 [ "${#CFG[@]}" -gt 0 ] || die "model '${MODEL}' does not run on the selected hardware (run without --model to see what does)"
 # the all-cards setup: the best model on every card (a pair that runs one model together counts as one); first
 # when the machine has more than one GPU that is not in such a pair
-if [ "$GPU" = auto ] || [ "$GPU" = all ]; then
+if [ "$GPU" = auto ] || [ "$GPU" = all ] || [ "$TRIPLE_MULTI" = 1 ]; then
   srv=""; lab=""; cnt=0
   if [ -n "$PAIR" ]; then srv="${CFG[0]}"; IFS='|' read -r b m c <<< "${CFG[0]}"; lab="$(short "$m") on GPUs ${PAIR} (split)"; cnt=1; fi
   for s in ${SINGLE[@]+"${SINGLE[@]}"}; do
@@ -936,6 +952,7 @@ profile_of() {
       PROFILE=nanbeige; C=${CTX/auto/16384}; MEM=10g
       ENV+=(-e KINDI_REPEAT_STOP=1 -e KINDI_MAX_TOKENS=16384)
     elif [[ "$CARDS" == *,* ]]; then
+      [[ "$CARDS" == *,*,* ]] && die "the split-model engine supports at most two cards; for a third card use one independent server on each card (--gpu 0,1,2) or a two-card split plus a single-card server (--gpu all)"
       k2=$(card_k "${CARDS##*,}"); V2=${GMEM[$k2]}
       if [ "${GCC[$k]/./}" -ge 80 ] && [ "${GCC[$k2]/./}" -ge 80 ]; then
         # two Ada/Blackwell cards: the tensor-core plan engine, the context fitted to the smaller card.

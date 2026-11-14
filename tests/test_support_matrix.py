@@ -73,6 +73,8 @@ def test_the_cards_section_lists_the_rig_cards():
     assert "| NVIDIA P106-100 | Pascal 6.1 | maxwell |" in text
     assert "| Quadro P4000 | Pascal 6.1 | pascal8 |" in text
     assert "| Quadro M4000 | Maxwell 5.2 | maxwell |" in text
+    assert "| Quadro M5000 | Maxwell 5.2 | maxwell | not measured | not measured | not measured | not measured | not measured |" in text
+    assert "| Quadro RTX 4000 | Turing 7.5 | turing | not measured | not measured | not measured | not measured | not measured |" in text
     assert "| Quadro M4000 | Maxwell 5.2 | maxwell | not measured | not measured | not measured | not measured | not measured |" in text
 
 
@@ -127,6 +129,17 @@ def test_from_verify_derives_the_cells_from_the_run(tmp_path, monkeypatch):
     assert "| Quadro P4000 | Pascal 6.1 | pascal8 | plain 4/4 @ 30.1 tok/s · tc refused | not run |" in text
     assert "[results](benchmarks/2026-11-16-p4000/results.json)" in text
     assert "| Quadro M4000 | Maxwell 5.2 | maxwell | not measured | not measured | not measured | not measured | not measured |" in text
+
+
+def test_from_verify_accepts_m5000_and_rtx4000_slugs(tmp_path, monkeypatch):
+    import json as _json
+    monkeypatch.setattr(sm, "_evidence_link", lambda _src: "benchmarks/t/results.json")
+    for name, slug in (("Quadro M5000", "m5000"), ("Quadro RTX 4000", "rtx4000")):
+        source = tmp_path / ("%s.json" % slug)
+        source.write_text(_json.dumps(_payload(card_name=name)), encoding="utf-8")
+        got_slug, _cells = sm.apply_results(str(source), registry_path=tmp_path / "registry.json",
+                                            matrix_path=None)
+        assert got_slug == slug
 
 
 def test_from_verify_refuses_a_gitignored_source():
