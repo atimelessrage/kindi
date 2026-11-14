@@ -31,6 +31,7 @@ import time
 import numpy as np
 import cupy as cp
 
+from . import calib as _calib
 from . import hostram
 from . import layout
 from .engine import Kernels, DEFAULT_DIMS, VOCAB
@@ -141,6 +142,18 @@ def _g5_pins(s):
     return s.g5pins
 
 
+def _calib_key(s):
+    """(gpu identity, pack source hash) for the calibration cache, or None when it cannot name them."""
+    try:
+        pack_sha = getattr(s.tp, "man", {}).get("source_sha256") if hasattr(s, "tp") else None
+        gpu = _calib.gpu_identity()
+        if pack_sha and gpu:
+            return gpu, str(pack_sha)
+    except Exception:
+        pass
+    return None
+
+
 def g5_tuned(s, name, R, NG, rowpar):
     """(threads, rows per thread, splits) for a 5-trit product of shape (R, 128 NG) on card s: timed once per shape."""
     pins = _g5_pins(s) if rt.is_hip and not s.g5l and os.environ.get("KINDI_G5_PIN", "1") == "1" else {}
@@ -158,6 +171,13 @@ def g5_tuned(s, name, R, NG, rowpar):
     cache = s.__dict__.setdefault("g5cfg", {})
     if key in cache:
         return cache[key]
+    ck = _calib_key(s)
+    if ck is not None:
+        hit = _calib.lookup_g5(ck[0], ck[1], bool(s.g5l), R, NG, rowpar)
+        if hit is not None and hit[2] * R <= s.gpart.size:
+            cache[key] = hit[:3]
+            s.__dict__.setdefault("g5var", {})[key] = hit[3]
+            return hit[:3]
     K = s.k
     W5 = s.w[name][1]
     Ws = [W5]
@@ -258,7 +278,9 @@ def g5_tuned(s, name, R, NG, rowpar):
     s.__dict__.setdefault("g5var", {})[key] = var
     if os.environ.get("KINDI_G5_TUNELOG"):
         print("g5 tune %s: %s %s %.1f us, %.0f GB/s" % (key, best[1:], var, best[0] * 1e3, R * NG * 28 / best[0] / 1e6), flush=True)
-    cache[key] = best[1:]
+        cache[key] = best[1:]
+    if ck is not None:
+        _calib.store_g5(ck[0], ck[1], bool(s.g5l), R, NG, rowpar, (*best[1:], var))
     return best[1:]
 
 

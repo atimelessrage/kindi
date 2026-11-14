@@ -663,3 +663,12 @@ kindi --pack ~/.kindi/packs/bonsai-2b kld --json kld-2b.json
 ```
 
 The current numbers live with the dated evidence under [benchmarks/](benchmarks/).
+
+`kindi calibrate` persists the per-machine tuning once (`kindi/calib.py`): the keyed file
+(`~/.cache/kindi/calib/<gpu>-<pack-sha>.json`, `KINDI_CALIB_DIR` overrides) holds the measured
+5-trit kernel configs - the shapes `tp.g5_tuned` would otherwise re-time at every start on the
+non-TC plan path and HIP - plus the split-ratio snapshot, the planner's placement picks and the
+effective draft length as data. Later starts read the configs instead of timing; on the NVIDIA
+tensor-core path there is no g5 timing to persist (measured: 0.2 s there, and the TC path does
+not call `g5_tuned` at all). The cached file is stamped with the engine build (version + kernel
+source hash), so a kernel change is a miss, never stale configs.

@@ -51,8 +51,10 @@ See [CPU-SUPPORT.md](CPU-SUPPORT.md) for the per-CPU matrix and gates.
 From `kindi/tp.py:kv_mode()`. Default: `q8_0`; accepted: `k8v4`, `q8_0`.
 
 `k8v4` is experimental and lossy: its 4-bit V is not token-exact with the fp16
-reference (2B `kindi verify`: 2 of 4 prompts), so it is refused unless
-`KINDI_KV_EXPERIMENTAL=1`. `q8_0` is the supported default.
+reference (2B `kindi verify`: 2 of 4 prompts; `kindi kld` teacher-forced KLD 1.3e-04/2.3e-04
+nats at 2K/8K, ~500-1000x q8_0's ~2e-07 and growing with context - the quarantine rests
+on that measurement), so it is refused unless `KINDI_KV_EXPERIMENTAL=1`. `q8_0` is the
+supported default (KLD ~2e-07 nats, PPL ratio 1.000002, 100% same-top at 2K/8K on the 2B).
 
 ## Verified capabilities
 
