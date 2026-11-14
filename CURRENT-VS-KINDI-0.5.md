@@ -1,6 +1,12 @@
-# Current worktree vs Kindi 0.5.0
+# Current worktree vs Kindi (now 0.6.0)
 
-Audit date: **2026-11-12**; refreshed in §22 (**2026-11-14**, HEAD `3f42a6a`) and §21 (2026-11-14 evening)
+Audit date: **2026-11-12**; refreshed in §22 (**2026-11-14**, HEAD `3f42a6a`) and §21 (2026-11-14 evening).
+**The comparison baseline is stock 0.6.0 since 2026-11-14 evening** (upstream merged wholesale;
+§25 is the current evaluation against 0.6.0, §§1–24 are preserved as the history against 0.5.0).
+The filename keeps its historical `0.5` suffix.
+Upstream `v0.6.0` (`179710c`) and the post-tag `origin/main` head `dce89df` (container-registry
+docs) are both fully contained in our HEAD. The merge deleted no upstream file: the tree vs
+`v0.6.0` is a strict superset (349 files changed, +45,950/−438 lines).
 
 > This file records the pre-improvement audit and the fixes that followed.
 > Sections 8–11 record the post-audit improvements, the 2026-11-12 evening 27B
@@ -16,9 +22,10 @@ Audit date: **2026-11-12**; refreshed in §22 (**2026-11-14**, HEAD `3f42a6a`) a
 > a code-complete claim.
 
 This report compares the current `freebuff/tandem-cpu-recovery` worktree with the
-stock Kindi **0.5.0** release. It separates verified behavior from recorded benchmark
-evidence, incomplete features, and release-hygiene problems. It is not a claim that
-everything described here has been re-run on current hardware.
+stock Kindi release. §§1–24 are preserved as the history vs **0.5.0**; the current
+baseline (since 2026-11-14 evening) is **0.6.0** (see §25). It separates verified behavior
+from recorded benchmark evidence, incomplete features, and release-hygiene problems. It is
+not a claim that everything described here has been re-run on current hardware.
 
 ## 1. Baselines and current state
 
@@ -1183,3 +1190,67 @@ prefix bytes) and #9's unbuffered-load gate (measured NOT met: 15.6 s unbuffered
 
 Evidence: `tests/test_cache_decisions.py` (the sharing, restore-fidelity and gate-ratio tests) and the
 lease row in `AGENTS.md`.
+
+## 25. Current state vs stock Kindi 0.6.0 (2026-11-14, late evening)
+
+Baseline: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream head `dce89df`
+(container-registry docs, 2026-11-13). Both are ancestors of our HEAD `07e0640` — the 0.6.0
+merge landed on 2026-11-14 (commit `f635513`, 18 conflicted files over 172 diverged commits)
+and has been carried forward since. The tree vs `v0.6.0` is a **strict superset**: 349 files
+changed, +45,950/−438 lines, and **no file deleted** — the merge resolutions kept every
+upstream file and added fork behavior on top of it. The full suite at this HEAD:
+**618 passed, 11 skipped, 1 warning** (who the comparison was §22: 564 passed at the merge).
+
+### 25.1 What 0.6.0 brought that 0.5 did not have (now in the tree)
+
+| 0.6.0 item | in this tree | status here |
+|---|---|---|
+| MoE backend (`kindi/moe*.py`, `moe_cpu.c`) | present (merged) | **no GPU run in this session**; the fork adds expert-tier *planning* on top (`kindi plan` MoE strategy, `kindi/moe.py plan()`) |
+| DeepSeek-V4.1-Flash backend (`kindi/dsv41*`) | present (merged) | **GPU-unverified here** |
+| Nemotron Lightning (`kindi/lightning*`) | present (merged) | **GPU-unverified here**; `kindi plan` can describe its tiering header-only |
+| **DSpine drafter** (`kindi/dspine.py`, `kindi/dspine.cu`) | present (merged); `spec.py` hooks (`_dsp_want`, `eng.dspine`) wired | **GPU-unverified here**; the fork additionally wraps the build in `spec._optional` (audit N1) so a broken DSpine degrades to no-speculation instead of aborting startup |
+| Container entrypoint + compose, Kindi Bridge, `install.ps1` | present (merged) | `install.ps1` **not run on Windows in this session** |
+| Turn-save cache (`turn_keep`, `turn_disk_mb`), priority scheduler, `/v1/tokenize` + `/detokenize`, `dry_run` | present (merged) | CPU-tested, no Windows install run |
+| New card classes (M5000 sm_52 fix, Lightning offers, DSpine profile) | present (merged) | rig-measured cards remain `not measured` except the 4060 Ti |
+
+### 25.2 What this fork has *beyond* stock 0.6.0 (better, verified)
+
+| fork item | evidence |
+|---|---|
+| Dense tandem runtime (2B/4B/9B/27B, plan-engine GPU owner, GDN-first `gdn:N`, `auto`/`rate` planners) | measured rows in `docs/benchmarks/`; the plan owner cut the 27B 24K peak from 7,721 → 6,091 MiB and holds 49,152 tokens where the unsplit engine reduces to 30,976 |
+| `kindi kld` quality gate (q8_0 2.07–2.74e-07 nats, k8v4 quarantined on numbers) | `docs/ROADMAP.md` gate 3; `docs/benchmarks/...-kld-2b/` |
+| Calibration cache (`kindi/calib.py`, `kindi calibrate`): parity ≤0.3% 27B tuned vs cached | roadmap gate 2 (machine bound: ≥20 s startup needs HIP) |
+| `kindi plan`: dry-run placement report (dense + MoE tiers; live agreement 12 layers both ways) | prior-art #5 |
+| Physical-core thread count (104.6 vs 86.1 tok/s at 6 vs 12 threads) | prior-art #7 |
+| Parked K/V prefix blocks shared once and refcounted (not N copies) | prior-art #6 mechanism; restores byte-identical |
+| Audit fixes on top of the merge: optional-accelerator degradation, `kindi_cache_*` telemetry, reference-config section | 2026-11-14 audit round, N1/N3–N5/D3/D4 |
+| Cache/sharing/regression tests: 618 passing total vs stock 0.6.0's own suite | this report §22/§24 evidence |
+
+### 25.3 What is worse, missing, or unverified vs stock 0.6.0 (honest list)
+
+Nothing upstream was deleted. Deliberate divergences kept from the fork:
+
+| divergence | why |
+|---|---|
+| `presence_penalty` stays a config float key (upstream moved validation to the server; config defaults and `profiles.py` still read it) | local coherence; documented in the merge commit |
+| Server stats keep the fork's superset keys; `/health` unions both queue views + `drafting` | documented merge resolution (§22) |
+| Installer pins the published v0.6.0 tarball sha256 `613f7320…` | fork cannot republish upstream's artifact; the **installer release asset itself is still unpublished** (release-owner step) |
+| Turn-save entries' stored rows live under different keys than `Turns` blocks | cosmetic; no upstream rows are read by this fork |
+
+Still real and orderable against 0.6.0:
+
+- The 0.6 backends (MoE / DeepSeek / Lightning / DSpine) have **no GPU run record in this session** — the first thing to check with real hardware is that `kindi verify` passes with `KINDI_USING=dsv41`/`KINDI_BACKEND=lightning`/`KINDI_DRAFTER=dspine` on the rig, not just that the modules exist.
+- `install.ps1` has never been run on Windows hardware.
+- Tandem is still slower than GPU-only on 1 GPU (24K decode ~8 vs ~31-34 tok/s equivalent measured rows at 8K/24K); the overlap step-0 said the worker thread needs re-justification (CPU compute 62.2 ms/token dominates at 24K on the 27B-24K row).
+- FT8 K/V gate (#8, FP8) remains gated on KLD ≤ q8_0 and unmeasured; #9 (Windows unbuffered load) measured NOT met; #6's ≤1.2× clause recorded unsatisfiable with the dedupe rule (blocks cost 1/(N) of unshared instead).
+
+### 25.4 What was fixed in this round rather than only listed
+
+| was | now |
+|---|---|
+| The comparison baseline was 0.5.0 (the report title said so); §§1–24 are 0.5 history | baseline is 0.6.0 (title/header updated; §25 is the current evaluation) |
+| `main` (the worktree tree) lagged our HEAD by 3 commits | fast-forwarded to `07e0640` (identical to `freebuff/tandem-cpu-recovery`) |
+| The merge dropped no upstream file (it was 18 files conflicted, real risk of loss) | verified: `git diff --diff-filter=D v0.6.0..HEAD` is empty |
+
+Evidence: `git merge-base --is-ancestor origin/main HEAD`, the diff above, the suite run at
+`07e0640`, and the lease rows in `AGENTS.md`.
