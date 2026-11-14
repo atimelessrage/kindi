@@ -70,6 +70,46 @@ def tmax(spec_tp, monkeypatch):
     importlib.reload(spec)
 
 
+# ------------------------------------- optional accelerators must switch off, never stop the engine
+def test_a_missing_mtp_head_switches_speculation_off(spec_tp, monkeypatch, tmp_path):
+    # before 2026-11-14 a stale KINDI_MTP_HEAD raised FileNotFoundError from os.path.getsize inside
+    # the engine's __init__ wrapper, so `kindi serve` never started
+    spec, _ = spec_tp
+    said = []
+    monkeypatch.setenv("KINDI_MTP_HEAD", str(tmp_path / "gone.npz"))
+    assert spec.head_paths("mtp", said.append) == []
+    assert "KINDI_MTP_HEAD" not in os.environ           # cleared: nothing downstream retries it
+    assert said and "gone.npz" in said[0] and "not a file" in said[0]
+
+
+def test_an_existing_mtp_head_is_kept_and_not_logged(spec_tp, monkeypatch, tmp_path):
+    spec, _ = spec_tp
+    head = tmp_path / "head.npz"
+    head.write_bytes(b"x" * 64)
+    said = []
+    monkeypatch.setenv("KINDI_MTP_HEAD", str(head))
+    assert spec.head_paths("mtp", said.append) == [str(head)]
+    assert os.environ["KINDI_MTP_HEAD"] == str(head)
+    assert said == []
+
+
+def test_the_draft_head_is_only_checked_in_the_modes_that_use_it(spec_tp, monkeypatch, tmp_path):
+    spec, _ = spec_tp
+    monkeypatch.setenv("KINDI_SPEC_DRAFT_HEAD", str(tmp_path / "gone.npz"))
+    monkeypatch.delenv("KINDI_MTP_HEAD", raising=False)
+    assert spec.head_paths("mtp", lambda *a: None) == []        # mtp never reads the drafter's head
+    assert os.environ["KINDI_SPEC_DRAFT_HEAD"]                  # ... so it stays for the next mode
+    assert spec.head_paths("draft2b", lambda *a: None) == []    # this one does, and drops it
+    assert "KINDI_SPEC_DRAFT_HEAD" not in os.environ
+
+
+def test_an_unset_head_is_silent(spec_tp):
+    spec, _ = spec_tp
+    said = []
+    assert spec.head_paths("auto", said.append) == []           # the normal case: nothing to say
+    assert said == []
+
+
 # ------------------------------------------------------------------ TMAX: the largest T-token pass
 def test_tmax_default_plans_the_eight_token_verify(tmax):
     # the 2B plan engine's measured best runs the verify pass at T = 8 (k = 7 drafts + 1)

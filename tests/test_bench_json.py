@@ -52,6 +52,15 @@ def test_bench_json_records_the_printed_numbers(tmp_path, monkeypatch):
     assert sorted(int(k.split(":")[1]) for k in got["gen_tok_s"]) == [100, 2000, 8000, 16000, 24000]
 
 
+def test_bench_json_creates_a_missing_directory(tmp_path, monkeypatch):
+    # a typo'd or new directory used to end the run with a traceback *after* the measurement, and a
+    # 27B run costs two minutes; the row must land instead
+    from kindi import bench
+    dest = str(tmp_path / "new" / "nested" / "bench.json")
+    bench.bench_json({"ok": True}, dest)
+    assert json.loads(open(dest, encoding="utf-8").read()) == {"ok": True}
+
+
 def test_bench_json_records_the_actual_ctx_when_reduced(tmp_path, monkeypatch):
     """When the loader reduces the context to fit, the JSON carries the actual ctx (from
     eng.ctx) and flags the reduction, so a 17,664-token run is never recorded as 24,576."""

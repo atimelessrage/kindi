@@ -56,6 +56,22 @@ each card. The cells give tok/s and (speed-up). The full tables are internal mea
 The output of every mode was the same as without speculation. B2 was slower than the 2B drafter alone (B0) on
 both cards.
 
+### Where a drafter pays, and where it does not
+
+Measured on the i7-8086K + RTX 4060 Ti, 2026-11-14, greedy, 8K context, one prompt per pair
+(the 27B and the 9B both drafting with the same 2B pack, k = 3):
+
+| target | no speculation | 2B drafter, k=3 | accepted | the target pass costs |
+|---|---|---|---|---|
+| 27B, 200 tokens | 40.0 tok/s | **62.5 tok/s (1.56x)** | 112/261 = 43% | ~13x a drafter step |
+| 9B, 400 tokens | 115 tok/s | 113 tok/s (0.98x) | 221/534 = 41% | ~5x a drafter step |
+
+The same drafter and almost the same acceptance give opposite answers. A draft pays only when the target
+pass is far more expensive than a drafter step *and* the accepted run is long enough to cover the verify
+pass (about 2.3 plain steps at T = 4 here). At 41-43% acceptance that holds for the 27B and not for the
+9B, so the installer offers the 2B drafter to the 27B only. Do not add it to the 9B without measuring
+acceptance first. Output was byte-identical in every run: speculation changes the speed, never a token.
+
 ## How auto mode selects
 
 - A model with its own head (the 2B with `KINDI_MTP_HEAD`): the head, greedy requests only.
@@ -71,6 +87,13 @@ both cards.
 The speculation guard (`KINDI_SPEC_GUARD`, on by default) pauses speculation when it is slower than plain
 decoding. It works from 32K tokens of context (`KINDI_SPEC_GUARD_FROM`, default 32768). Below 32K, its pauses cost
 9-12% on the RTX 3060.
+
+## When a head or drafter file is missing
+
+An MTP head, a draft head and the 2B drafter are optional. If one is missing or does not load, Kindi
+prints one line (`speculation off: ...`) and serves without it - the same fallback the installer
+makes below. The reply is unchanged; only the speed is. (Before 2026-11-14 a stale path in
+`kindi.conf` stopped the server from starting at all.)
 
 ## How to turn it off
 

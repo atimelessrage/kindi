@@ -6,6 +6,7 @@ read under `kindi/`. These tests fail when a key or switch is added, renamed or 
 regenerating the file (`python -m kindi.config_reference`), which is what keeps a switch like
 `KINDI_TC` from going missing again.
 """
+import re
 from pathlib import Path
 
 from kindi import config, config_reference
@@ -18,6 +19,19 @@ def reference_text():
 def test_reference_is_current():
     assert reference_text() == config_reference.render(), \
         "docs/CONFIGURATION-REFERENCE.md is stale; run `python -m kindi.config_reference`"
+
+
+def test_every_documented_switch_is_read_by_the_code():
+    """The generated reference can only see a *deficit* (a read with no row). The prose guide can
+    also drift the other way: a row survives after its read is deleted, and then a documented knob
+    silently does nothing. `KINDI_STREAM_LOAD` was exactly that until 2026-11-14."""
+    prose = Path(config_reference.ROOT, "docs", "CONFIGURATION.md").read_text(encoding="utf-8")
+    named = set(re.findall(r"\b(KINDI_[A-Z0-9_]+)\b", prose))
+    read = set(config_reference.env_vars())
+    keys = {"KINDI_" + k.upper() for k in config.DEFAULTS}
+    surplus = sorted(named - read - keys)
+    assert not surplus, ("documented in docs/CONFIGURATION.md but never read by the code (or the "
+                         "row is stale - drop it): %s" % surplus)
 
 
 def test_every_config_key_is_listed():

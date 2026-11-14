@@ -1643,6 +1643,46 @@ def _tc_backend(card):
     return None
 
 
+# ================================================================== optional artifacts
+# A drafter pack, an MTP head and a draft head are accelerators: they make a reply faster and never
+# change a token. A path that is missing, unreadable or the wrong size must therefore turn the
+# accelerator off with one line, not abort engine construction - the installer already behaves that
+# way (it prints a line and serves without MTP), and before this the engine did not: a stale
+# KINDI_MTP_HEAD in kindi.conf raised FileNotFoundError from os.path.getsize inside the engine's
+# __init__ wrapper, so `kindi serve` never started.
+def optional_path(name, log=print):
+    """The path an optional artifact variable names, or None after one log line if it is not a file.
+    An unset variable is None without a word (the normal case). The variable is cleared, so nothing
+    downstream tries the path again."""
+    path = os.environ.get(name)
+    if not path:
+        return None
+    try:
+        ok = os.path.isfile(path)
+    except OSError:                       # a path the OS refuses to stat (length, device, permissions)
+        ok = False
+    if ok:
+        return path
+    log("speculation off: %s=%s is not a file" % (name, path))
+    os.environ.pop(name, None)
+    return None
+
+
+def head_paths(sm, log=print):
+    """The MTP head files the mode will use, each checked once: KINDI_MTP_HEAD for the model's own
+    head (mtp, auto) and KINDI_SPEC_DRAFT_HEAD for the 2B drafter's (draft2b, both, auto)."""
+    out = []
+    if sm in ("mtp", "auto"):
+        p = optional_path("KINDI_MTP_HEAD", log)
+        if p:
+            out.append(p)
+    if sm in ("draft2b", "both", "auto"):
+        p = optional_path("KINDI_SPEC_DRAFT_HEAD", log)
+        if p:
+            out.append(p)
+    return out
+
+
 # ====================================================================================== install
 _installed = [False]
 _drafter = [None]
@@ -1722,9 +1762,17 @@ def install(log=print):
                 eng.drafter = Draft2B(_drafter[0])
                 eng.log("speculative draft model attached: %s, ctx %d" % (_drafter[0].pack, _drafter[0].ctx))
                 if os.environ.get("KINDI_SPEC_DRAFT_HEAD"):
-                    eng.drafter.mtp = _mtp.MTPDraft(_drafter[0], os.environ["KINDI_SPEC_DRAFT_HEAD"], log=eng.log)
+                    try:
+                        eng.drafter.mtp = _mtp.MTPDraft(_drafter[0], os.environ["KINDI_SPEC_DRAFT_HEAD"], log=eng.log)
+                    except Exception as e:            # noqa: BLE001 - an optional head must not stop the model
+                        eng.log("speculation off: the draft head %s did not load (%s)"
+                                % (os.environ["KINDI_SPEC_DRAFT_HEAD"], e))
             if os.environ.get("KINDI_SPEC") in ("mtp", "auto") and os.environ.get("KINDI_MTP_HEAD") and not _building_drafter[0]:
-                eng.mtp = _mtp.MTPDraft(eng, os.environ["KINDI_MTP_HEAD"], log=eng.log)
+                try:
+                    eng.mtp = _mtp.MTPDraft(eng, os.environ["KINDI_MTP_HEAD"], log=eng.log)
+                except Exception as e:                # noqa: BLE001 - an optional head must not stop the model
+                    eng.log("speculation off: the MTP head %s did not load (%s)"
+                            % (os.environ["KINDI_MTP_HEAD"], e))
 
     _tp.Shard._load = _load
     _chunk.reserve = _reserve
@@ -1750,13 +1798,16 @@ def install(log=print):
         os.environ["KINDI_BATCH"] = "1"           # (the tensor-core plans replace the batch plan)
         os.environ.setdefault("KINDI_MEM_RESERVE_MB", "256")   # the graphs are instantiated after the context fit
         sm = os.environ.get("KINDI_SPEC")
-        hps = [os.environ.get("KINDI_MTP_HEAD") if sm in ("mtp", "auto") else None,
-               os.environ.get("KINDI_SPEC_DRAFT_HEAD") if sm in ("draft2b", "both", "auto") else None]
-        hps = [h for h in hps if h]
+        hps = head_paths(sm, log)                 # a missing head clears its variable and says so
         if hps and not _building_drafter[0] and not getattr(self, "_mtp_rsv", 0):
             # the MTP heads' weights and buffers: kept out of the context fit (loaded after the build)
-            self._mtp_rsv = sum(os.path.getsize(h) // 2 ** 20 + 160 for h in hps)
-            os.environ["KINDI_MEM_RESERVE_MB"] = str(int(os.environ["KINDI_MEM_RESERVE_MB"]) + self._mtp_rsv)
+            try:
+                self._mtp_rsv = sum(os.path.getsize(h) // 2 ** 20 + 160 for h in hps)
+            except OSError as e:                  # vanished between the check and here: no reservation
+                log("speculation off: a head file could not be measured (%s)" % e)
+                self._mtp_rsv = 0
+            if self._mtp_rsv:
+                os.environ["KINDI_MEM_RESERVE_MB"] = str(int(os.environ["KINDI_MEM_RESERVE_MB"]) + self._mtp_rsv)
         o_init(self, pack, ctx, *a, **k)
 
     _tp.TPEngine.__init__ = init_
@@ -1769,12 +1820,16 @@ def install(log=print):
         try:
             _drafter[0] = _tp.TPEngine(os.environ["KINDI_SPEC_PACK"], ctx=int(os.environ.get("KINDI_SPEC_CTX") or os.environ.get("KINDI_SPEC_WINDOW", "8192")),
                                        log=lambda *a: log("draft: " + " ".join(str(x) for x in a)))
+        except Exception as e:                    # noqa: BLE001 - the 2B drafter is an accelerator
+            _drafter[0] = None
+            log("speculation off: the draft pack %s did not load (%s)"
+                % (os.environ.get("KINDI_SPEC_PACK"), e))
         finally:
+            _building_drafter[0] = False          # also on the failure path: the next engine is a full one
             if cards is None:
                 os.environ.pop("KINDI_CARDS", None)
             else:
                 os.environ["KINDI_CARDS"] = cards
-        _building_drafter[0] = False
     o_reset = _tp.TPEngine.reset
 
     def reset_(self):

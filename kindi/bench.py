@@ -23,6 +23,9 @@ def _cupy():
 
 def bench_json(result, path):
     """Write one benchmark result as JSON (per-run row)."""
+    parent = os.path.dirname(os.path.abspath(path))
+    if parent and not os.path.isdir(parent):
+        os.makedirs(parent, exist_ok=True)      # a new directory is cheaper than losing a 27B run
     with open(path, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2, sort_keys=True)
         f.write("\n")
@@ -112,6 +115,9 @@ def run(cfg, log=print):
             result["vram_peak"] = {"available": False, "interval_s": vram.interval}
             log("VRAM peak (sampled): nvidia-smi unavailable, no samples taken")
     if cfg.get("json"):
-        bench_json(result, cfg["json"])
-        log("wrote %s" % cfg["json"])
+        try:
+            bench_json(result, cfg["json"])
+            log("wrote %s" % cfg["json"])
+        except OSError as e:                     # the numbers above are still the result
+            log("could not write %s (%s); the numbers above are the run" % (cfg["json"], e))
     return 0

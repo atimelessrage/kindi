@@ -85,10 +85,10 @@ is where it is read, which is where the full description lives.
 | variable | default | read in |
 |---|---|---|
 | `KINDI_ATT_TC` | `0` | `kindi/chunk.py:429` (+1 more) |
-| `KINDI_BATCH` | `4` | `kindi/spec.py:1750` (+1 more) |
+| `KINDI_BATCH` | `4` | `kindi/spec.py:1798` (+1 more) |
 | `KINDI_BLOCKING_SYNC` | `1` | `kindi/chunk.py:461` (+7 more) |
 | `KINDI_CACHE_TIMING` | (unset) | `kindi/cache.py:743` |
-| `KINDI_CARDS` | (unset) | `kindi/spec.py:1767` (+4 more) |
+| `KINDI_CARDS` | (unset) | `kindi/spec.py:1818` (+4 more) |
 | `KINDI_CC` | `clang` or `"clang" if os.name == "nt" else "gcc"` or `"gcc" if os.name != "nt" else "clang"` | `kindi/cpu.py:108` (+3 more) |
 | `KINDI_CHUNK` | `256` or `"512" if all(f16_prompt(s.card) for s in eng.cards) else "256"` or `"256" if major >= 5 else "128"` | `kindi/chunk.py:158` (+2 more) |
 | `KINDI_CHUNK_ATT` | `flash` | `kindi/chunk.py:425` |
@@ -177,8 +177,8 @@ is where it is read, which is where the full description lives.
 | `KINDI_SPEC` | `0` | `kindi/spec.py:1201` (+4 more) |
 | `KINDI_SPEC_B0_K2_MAX` | `1024` | `kindi/spec.py:57` |
 | `KINDI_SPEC_B2_MAX` | `0` | `kindi/spec.py:58` |
-| `KINDI_SPEC_CTX` | (unset) | `kindi/spec.py:1770` |
-| `KINDI_SPEC_DRAFT_HEAD` | (unset) | `kindi/spec.py:1724` (+2 more) |
+| `KINDI_SPEC_CTX` | (unset) | `kindi/spec.py:1821` |
+| `KINDI_SPEC_DRAFT_HEAD` | (unset) | `kindi/spec.py:1764` (+2 more) |
 | `KINDI_SPEC_GUARD` | `1` | `kindi/spec.py:1107` |
 | `KINDI_SPEC_GUARD_BOUND` | `2.5` | `kindi/spec.py:984` |
 | `KINDI_SPEC_GUARD_BOUND_DEPTH` | `8192` | `kindi/spec.py:986` |
@@ -187,9 +187,9 @@ is where it is read, which is where the full description lives.
 | `KINDI_SPEC_K` | `4` | `kindi/spec.py:1219` (+1 more) |
 | `KINDI_SPEC_KNOWN` | `1` | `kindi/cache.py:711` |
 | `KINDI_SPEC_MTP_K2_MAX` | `8192` | `kindi/spec.py:56` |
-| `KINDI_SPEC_PACK` | (unset) | `kindi/spec.py:1765` (+1 more) |
+| `KINDI_SPEC_PACK` | (unset) | `kindi/spec.py:1816` (+2 more) |
 | `KINDI_SPEC_SAMPLE` | `1` | `kindi/spec.py:1225` |
-| `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1770` |
+| `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1821` |
 | `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:193` |
 | `KINDI_TANDEM_GPU` | `auto` | `kindi/tandem.py:354` |
 | `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/tandem.py:393` |
