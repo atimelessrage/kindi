@@ -226,7 +226,9 @@ def _tandem_args(s):
                    help="split the Bonsai layers between the CPU and one GPU (default: off)")
     s.add_argument("--tandem-cpu-layers", default=None,
                    help="layers the CPU owns in a tandem split: a count (cpu-first prefix / "
-                        "gpu-first suffix) or an explicit list such as 0,1,2,4,5,6 / 0-2,4-6 "
+                        "gpu-first suffix), an explicit list such as 0,1,2,4,5,6 / 0-2,4-6, "
+                        "gdn:N (the first N non-attention layers) or auto[:MiB] (the smallest "
+                        "set that makes the context fit, or refuse when no split is needed) "
                         "(default: a quarter of the model)")
 
 

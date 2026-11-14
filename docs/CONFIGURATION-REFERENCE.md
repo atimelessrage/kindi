@@ -191,6 +191,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_SPEC_SAMPLE` | `1` | `kindi/spec.py:1225` |
 | `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1770` |
 | `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:167` |
+| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/tandem.py:289` |
 | `KINDI_TC` | `0` | `kindi/spec.py:80` (+2 more) |
 | `KINDI_TC_B2` | (empty) | `kindi/tc.py:51` |
 | `KINDI_TC_DP4A` | `0` | `kindi/tc.py:74` |

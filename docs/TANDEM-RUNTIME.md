@@ -28,7 +28,12 @@ between them per token.
 - a **count** — `6`: a contiguous CPU prefix (`cpu-first`) or suffix (`gpu-first`), the original behavior;
 - an **explicit layer set** — `0,1,2,4,5,6` or `0-2,4-6`: any sorted subset, so the two backends can interleave;
 - **`gdn:N`** — the first `N` gated-delta (non-attention) layers, ascending. Attention layers stay on the
-  GPU. This is the placement to prefer; see [where to put the CPU layers](#where-to-put-the-cpu-layers).
+  GPU. This is the placement to prefer; see [where to put the CPU layers](#where-to-put-the-cpu-layers);
+- **`auto`** (or **`auto:MiB`** to also leave that much room) — the smallest `gdn:`-style set that makes
+  the requested context fit, computed from the pack's own tensor sizes, the fp16 K/V per attention layer
+  at that context, the head, the f32 file and a measured scratch allowance. It **refuses instead of
+  splitting** when the model already fits, and refuses with the missing amount when no split can fit.
+  `KINDI_TANDEM_RESERVE_MB` (default 512) sets the free memory it leaves behind.
 
 `kindi bench --json` records the resolved `cpu_range`/`gpu_range` of a run, so a recorded split is
 unambiguous.
@@ -217,6 +222,25 @@ genuinely larger than the card, which is the 27B case below.
 Same layer count off the GPU, same short-context rate, and **2.7x** the 24K decode rate. The GDN-first
 placement keeps 384 MiB more K/V on the card at 24K (the 4 attention layers it does not offload), which
 is the price of the flat curve.
+
+### `auto`: the split is only as big as it has to be (2026-11-14)
+
+Hand-picking a layer count is easy to get wrong in both directions, so `--tandem-cpu-layers auto`
+computes the minimum set. It uses the pack's real tensor sizes (`kindi/tandem.py:pack_bytes`: bcodes
+plus one fp16 scale per 128-column group, or 4 bytes per f32 value), the fp16 K/V of each attention
+layer the GPU keeps, the output head, the whole f32 file and a 192 MiB scratch allowance, checked
+against the free VRAM before the model loads. The estimate is accurate: on this 27B at 24,576 it
+predicts 7,778 MiB against a measured plan-engine peak of 7,783 MiB.
+
+| model | request | `auto` result |
+|---|---|---|
+| 9B | 24,576 | refuses: "already fits at 24576 tokens (~3282 MiB needed, 7075 MiB free); a split would only make it slower" |
+| 27B | 24,576 | 19 CPU layers (0,1,2,4,5,6,8,9,10,12,13,14,16,17,18,20,21,22,24), context kept at 24,576 unreduced, 522 MiB free after load, sampled peak 7,257 MiB, read 8.3 and decode 6.3-7.0 tok/s |
+| 27B | 24,576, 5,100 MiB free | 39 CPU layers (still GDN-only) |
+
+A hand-picked `gdn:16` is faster at 24K (7.9 tok/s) because it leaves only 283 MiB free; `auto` keeps
+the 512 MiB reserve by default (`KINDI_TANDEM_RESERVE_MB`). Units: `auto:1024` asks for an extra
+1,024 MiB of headroom and works even when the model would fit unsplit.
 
 ### The split frees much less VRAM than the layer count suggests
 

@@ -891,6 +891,22 @@ Two honest limits came out of the same runs, and both are now documented rather 
   engine has no K/V mode. Making the split pay off is therefore a plan-engine owner or a q8_0 cache in
   the plain engine — not another layer sweep.
 
+### `auto`: the split is only as big as it must be
+
+`--tandem-cpu-layers auto` (or `auto:MiB`) computes the smallest GDN-first set that makes the requested
+context fit, from the pack's real tensor sizes, fp16 K/V per kept attention layer, the head, the f32
+file and a measured scratch allowance, against the free VRAM before loading. It is accurate to 5 MiB
+(27B at 24K: predicts 7,778 MiB, plan-engine peak measured 7,783) and it refuses instead of splitting
+when the model already fits:
+
+- 9B at 24,576: *"already fits at 24576 tokens (~3282 MiB needed, 7075 MiB free); a split would only
+  make it slower"* — the same conclusion as the §19 9B measurements, now enforced by the flag.
+- 27B at 24,576: 19 CPU layers (GDN-only), context kept at 24,576 **unreduced**, 522 MiB free after
+  load, sampled peak 7,257 MiB, read 8.3 / decode 6.3-7.0 tok/s.
+
+`KINDI_TANDEM_RESERVE_MB` (default 512) is the headroom it leaves; a hand-picked `gdn:16` is slightly
+faster (7.9 at 24K) because it leaves only 283 MiB.
+
 One bug fixed on the way: the partial-range engine's context fit charged the GPU owner for **every**
 attention layer of the model instead of the ones it loads, so a split reduced context more than the
 memory allowed. The 27B with 8 CPU layers at 24,576 requested now holds **19,712** tokens instead of
