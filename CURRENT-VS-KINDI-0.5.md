@@ -804,6 +804,11 @@ This section supersedes the §2 bottom line and the §11.2 worse list. Numbers a
 the recorded evidence in §§12–18; the focused gates in §7 and the suite count below
 were verified on or near this tree (full suite: **500 passed, 19 skipped**).
 
+> **Two rows of §19.2 are stale as of 2026-11-14; §21 corrects them.** `/health` still returns the
+detailed view (busy, uptime, stats, queue, GPU memory) to a caller that supplies the `api_key` - only
+the unauthenticated response is minimal - and the split no longer "buys headroom, not context": the
+plan-engine owner holds all 49,152 tokens of the 27B where the unsplit engine reduces to 30,976.
+
 ### 19.1 What is new or better
 
 - **Default engine is the plan engine** (§17). `make_engine` uses the plan engine for
@@ -914,3 +919,76 @@ attention layer of the model instead of the ones it loads, so a split reduced co
 memory allowed. The 27B with 8 CPU layers at 24,576 requested now holds **19,712** tokens instead of
 17,664 (+11.6%), same split, same card. Evidence: `bench-logs/tandem-improve/` (JSON + logs per run,
 with the resolved layer sets).
+
+## 21. Current state vs stock 0.5, refreshed again (`615cdca`, 2026-11-14 evening)
+
+This section supersedes §19.2 wherever they differ; §20's measurements stand. Everything here was
+checked on this tree, and the suite is **545 passed, 10 skipped** (the count after this round's new
+tests; §19's 500 is two rounds older).
+
+### 21.1 What is new or better
+
+- **The 9B tensor-core path runs exact by default.** `make_engine` sets `KINDI_TC_HP=1` for a pack
+  folded with Hadamard block 4096 before `kindi.spec` is imported, so the 9B no longer stops with
+  "refuses Hadamard 4096" and no longer needs a flag. Verified on the RTX 4060 Ti with no
+  `KINDI_TC_HP` in the environment: `kindi verify` **4/4 prompts token-exact, 122.4 tok/s** (the
+  plain engine measures 74.6-80.0). `KINDI_TC_HP=0` still refuses, with the reason in the message.
+  The trade that comes with it: with HP the verify pass is T = 4, so a drafter on such a pack drafts
+  at most 3 tokens (the 2B keeps T = 8).
+- **A plan-engine GPU owner for the split** (landed 2026-11-14 before this round):
+  `TPEngine(layers=, embed=, head=)` owns an arbitrary subset with q8_0 K/V, so the split's GPU half
+  is no longer the plain engine. 27B at 24K, same `gdn:16`: peak **6,004 MiB** (n = 5,
+  5,862-6,083) against **7,721 MiB**, decode inside noise; at 49,152 tokens the split holds all of
+  them (peak 6,876 MiB) where the unsplit plan engine reduces to 30,976.
+- **`KINDI_KV=q8_0` in the plain engine**: it reuses the plan kernels, so a `KINDI_TP=0` run or a
+  split carries half the K/V bytes (27B 24K peak 7,110 MiB against 7,721 fp16), exact 4/4 on the
+  2B/9B/27B in both owners.
+- **Prior art is recorded with gates**: `docs/EXTERNAL-ENGINES.md` and the roadmap's
+  "Prior-art follow-ups (2026-11-14)" list nine items with numeric gates (measured CPU/PCIe split
+  rule, calibration cache, KLD quality gate, determinism gate, `kindi plan` dry run, K/V prefix
+  sharing, CPU-set thread count, FP8 K/V behind the KLD gate, Windows unbuffered load). The page
+  also records that llama.cpp's reference-counted checkpoints do **not** apply here: our checkpoints
+  already copy only the recurrent state.
+- **Speculation has a measured rule instead of a table of hopes.** `docs/MTP.md` now carries
+  27B 40.0 -> 62.5 tok/s (**1.56x**, 43% acceptance) and 9B 115 -> 113 (**0.98x**, 41%) on this
+  host, with the reason: a drafter pays when the target pass is ~13x a drafter step (27B) and not
+  when it is ~5x (9B).
+- **A broken optional accelerator no longer stops the server**, and the docs guard checks something
+  again - both in 21.3, because they were bugs, not features.
+- **Harness**: `tests/README.md` publishes per-module coverage (31% total, floor stays 27% until a
+  Linux figure exists); pre-commit gained `check-merge-conflict`/`check-case-conflict`; the three
+  `tandem-cache` scripts that tracked pages tell you to run are tracked next to them; the dory goldens
+  and hashes the page cites are tracked.
+
+### 21.2 What is worse, or no longer works (2026-11-14)
+
+All checked on this tree. **Bold** = worse than stock 0.5; the rest are new features that stay
+partial.
+
+| Item | Status vs stock 0.5 | Fixable now? |
+|---|---|---|
+| **Installer pin still delivers stock 0.5** - `install.sh` pins `SOURCE_COMMIT=fd54148` with `KINDI_VERSION=0.5.0`, so the published installer ships neither the tandem, the plan-engine default, nor the 9B default above | Worse than the tree | No - release-owner step (`docs/RELEASE-CHECKLIST.md`): publish the artifact, retarget the pin and its sha256 |
+| **Version identity** - `kindi/__init__.py`, README, CHANGELOG and the image tag still say `0.5.0` | Worse (identity) | No - same publication step; `tests/test_version_consistency.py` keeps pin, package and installer aligned |
+| **The tandem is still slower than GPU-only** - plan owner at 24K: 5.8 tok/s against 30.2 unsplit, because the CPU-owned layers dominate the token. The peak-VRAM win does not move the `>=25%` gate | New feature below its own promise | Not in a docs round: prior-art item 1 (measured CPU/PCIe ratio) is the first step and needs no new kernels |
+| `KINDI_STREAM_LOAD` is gone - documented but read nowhere since streaming became unconditional. The row is removed, so a config file that sets it gets silence (it never did anything on this tree) | Same behaviour, honest docs | Done, see 21.3 |
+| **9B + 2B drafter does not pay** - 0.98x at 41% acceptance; the installer offers the drafter to the 27B only | Not a stock feature | No: that is the measured answer, now written into `docs/MTP.md` so it is not re-tried blind |
+| **`KINDI_TC_HP` caps the verify pass at T = 4** - the 9B's new default also caps its drafter to 3 tokens | New trade, taken for 4/4 exactness | Documented; revisit only with a wider HP pass |
+| 4B tc stays 3 exact + 1 accepted tie (forced FD 2/4); k8v4 stays 2B 2/4 and 9B unavailable | New features partial | Hardware/accuracy path; both quarantined, neither is a default |
+| GPU CI lane has no runner, so no GPU-backed claim runs automatically; rate limiting is process-local per address (all clients share one behind a proxy) | Same as stock, documented | No: runner registration is the user's step (`docs/CI.md`); the limiter is by design |
+| Benchmark rows are single-session and the perf gate compares the committed CSV with a committed baseline, so it cannot see cross-session drift (a 2B row once differed 17% between sessions) | Same | Partly: `tc` rows are medians of three; the rest needs a repeat-run policy |
+
+### 21.3 What was fixed in this round rather than only listed
+
+| was | now |
+|---|---|
+| A stale `KINDI_MTP_HEAD`, a moved draft head or a bad `KINDI_SPEC_PACK` raised inside engine construction, so `kindi serve` never started because of an optional accelerator | `optional_path()`/`head_paths()` clear the variable with one `speculation off: ...` line; the head and drafter builds are guarded, and `_building_drafter` resets on the failure path too. 4 tests |
+| `KINDI_STREAM_LOAD` documented but read nowhere | row removed; `test_every_documented_switch_is_read_by_the_code` fails on any documented-but-unread switch - it failed on exactly this one before the row went |
+| `kindi bench --json` ended a finished run with a traceback when its directory did not exist | creates the directory; an `OSError` is logged and the printed numbers still stand. 1 test |
+| The docs-link guard collected **0 of 92** files (it skipped any path part named `.freebuff`, and this worktree lives under it) | compares repo-relative parts; two new guards (a label must point where the link goes, no link into gitignored evidence); six labels and seven links fixed, missing dory evidence promoted |
+| The 9B tc plan needed `KINDI_TC_HP=1` by hand | `make_engine` selects it for HB-4096 packs; verified 4/4 at 122.4 tok/s with no variable set. 1 test |
+| `docs/MTP.md` had no 9B row, so the same experiment would be repeated | the 27B/9B drafter table with acceptance and the cost rule |
+| Coverage was a single global number | per-module table in `tests/README.md` (31% total); floor unchanged until a Linux figure exists |
+
+Evidence: `615cdca` (accelerators, dead knob, bench JSON, MTP table), `549c030` (docs guard and
+links), `c449385` (prior art), the plan-owner and plain-q8 lease rows in `AGENTS.md`, and the two
+verify runs quoted above (9B with HP: 4/4 at 122.6 tok/s; 9B with no variable: 4/4 at 122.4).

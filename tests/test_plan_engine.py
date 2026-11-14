@@ -207,6 +207,19 @@ def _probe(hb):
     return shard
 
 
+def test_hb_4096_packs_get_the_exact_activations_by_default(monkeypatch):
+    # 4/4 with the high-precision activations against 3/4 without (measured on the 4060 Ti), so for an
+    # HB-4096 pack the exact setting is the default instead of a flag every user has to find
+    from kindi import engine as _eng
+    monkeypatch.delenv("KINDI_TC_HP", raising=False)
+    assert _eng.tc_hp_for({"hadamard_block": 4096}) == "1"
+    assert _eng.tc_hp_for({"hadamard_block": "4096"}) == "1"
+    assert _eng.tc_hp_for({"hadamard_block": 1024}) is None
+    assert _eng.tc_hp_for({}) is None                 # a pack without the key folds 512
+    monkeypatch.setenv("KINDI_TC_HP", "0")           # an explicit choice always wins (it then refuses)
+    assert _eng.tc_hp_for({"hadamard_block": 4096}) is None
+
+
 def test_tensor_parallel_plans_refuse_hadamard_4096(spec_tp):
     # the 9B pack's Hadamard block: the two-card plans only store K/V for HB 1024
     _, tp = spec_tp

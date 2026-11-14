@@ -198,7 +198,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_TC_DP4A` | `0` | `kindi/tc.py:74` |
 | `KINDI_TC_DUAL` | `1` | `kindi/spec.py:347` |
 | `KINDI_TC_GRAPHS` | `0` | `kindi/spec.py:325` |
-| `KINDI_TC_HP` | `0` | `kindi/spec.py:65` |
+| `KINDI_TC_HP` | `0` | `kindi/engine.py:754` (+1 more) |
 | `KINDI_TC_INC` | (empty) | `kindi/spec.py:172` |
 | `KINDI_TC_LANE` | (empty) | `kindi/tc.py:83` |
 | `KINDI_TC_MM` | `2` | `kindi/chunk.py:295` |
@@ -208,5 +208,5 @@ is where it is read, which is where the full description lives.
 | `KINDI_TC_TUNE` | `0` | `kindi/spec.py:429` (+1 more) |
 | `KINDI_TESTED_CC` | (empty) | `kindi/tc.py:39` |
 | `KINDI_THP` | `0` | `kindi/engine.py:88` |
-| `KINDI_TP` | (empty) | `kindi/engine.py:713` (+1 more) |
+| `KINDI_TP` | (empty) | `kindi/engine.py:736` (+1 more) |
 | `KINDI_TP_SPLIT` | `equal` | `kindi/tp.py:967` |
