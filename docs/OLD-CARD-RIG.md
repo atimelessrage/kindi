@@ -73,7 +73,21 @@ record it as the mixed-pair number.
 ## What to send back
 
 - `bench-logs/verify-matrix-<card>/results.json` - it carries the card, driver, CuPy/CUDA and the
-  pack hash, so the run is reproducible.
+  pack hash, so the run is reproducible. Copy it into the tracked tree and fold it into the matrix;
+  this is the step that stops the rig numbers becoming a hand-typed table:
+
+```bash
+mkdir -p docs/benchmarks/<date>-<card>
+cp bench-logs/verify-matrix-<card>/results.json docs/benchmarks/<date>-<card>/results.json
+python -m kindi.support_matrix --from-verify docs/benchmarks/<date>-<card>/results.json
+```
+
+`--from-verify` writes the card's cells into the tracked registry
+`docs/benchmarks/card-results.json` (deriving exactness, tie and speed from the run's rows - a
+refusal is recorded as a result, never as an error) and regenerates `docs/SUPPORT-MATRIX.md`. It
+refuses a path under `bench-logs/` because a link to gitignored evidence would break; it also
+refuses an unrecorded card name (register it in `kindi/support_matrix.py` first) and a multi-card
+run without `--card <slug>`.
 - `bench-logs/<card>-2b.json`, `-9b.json` (and `-27b.json` when it ran).
 - `nvidia-smi -q -d MEMORY,CLOCK` if a token rate or a peak looks wrong.
 - The full log of the first failing cell, if any, not a summary line.

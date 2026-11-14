@@ -28,7 +28,10 @@ A card is supported when all of these hold:
 5. The setup is in `docs/CARDS.md` with its settings and a measured result.
 
 This is stricter than “the kernels compile”. A card that runs only after manual environment overrides is
-not supported.
+not supported. Measured per-card numbers land in the `## Cards` section of
+[SUPPORT-MATRIX.md](SUPPORT-MATRIX.md) without hand-copying: `python -m kindi.support_matrix
+--from-verify <results.json>` folds a `tools/verify_matrix.py` run into the tracked registry
+`docs/benchmarks/card-results.json` (see [OLD-CARD-RIG.md](OLD-CARD-RIG.md)).
 
 Kindi consumes its own Bonsai PTQ1_0 packs and Nanbeige GGUF. BF16 (GGUF type 30) and FP8 E4M3/E5M2
 (types 43/44) are accepted in the Gemma 4 GGUF path and as FP8/BF16 auxiliary tensors in a Bonsai

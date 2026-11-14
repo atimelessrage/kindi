@@ -67,6 +67,24 @@ feature is behind its explicit experimental switch.
 | `nemotron-e4b` | separate backend | n/a | n/a | n/a |
 | `nanbeige-33b` | separate backend | n/a | n/a | n/a |
 
+## Cards
+
+Measured per-card results from `tools/verify_matrix.py` runs, folded into the tracked
+registry `docs/benchmarks/card-results.json` by::
+
+```sh
+python -m kindi.support_matrix --from-verify docs/benchmarks/<date>-<card>/results.json
+```
+
+A card without a record shows `not measured`. A refusal is a measured result, not a
+failure: on sm_52 the `tc` cell records the by-design refusal.
+
+| card | arch | class | 2B | 4B | 9B | 27B | evidence |
+|---|---|---|---|---|---|---|---|
+| NVIDIA P106-100 | Pascal 6.1 | maxwell | not measured | not measured | not measured | not measured | not measured |
+| Quadro P4000 | Pascal 6.1 | pascal8 | not measured | not measured | not measured | not measured | not measured |
+| Quadro M4000 | Maxwell 5.2 | maxwell | not measured | not measured | not measured | not measured | not measured |
+
 ## Evidence
 
 | page | what |

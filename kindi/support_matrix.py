@@ -8,8 +8,14 @@ format or switch cannot be missing from the matrix: `python -m kindi.support_mat
 
 The verification columns are a curated table (`STATUS` below) that names the recorded result.
 They are not re-measured by this generator; `render()` fails when a catalog model has no row.
+
+The per-card rows come from a tracked registry, `docs/benchmarks/card-results.json`, which
+`--from-verify <results.json>` fills from a `tools/verify_matrix.py` run. That is the rig path:
+the numbers are derived from the run's rows, never hand-copied, and the matrix stays generated
+(and `--check`-able) because the registry is checked in.
 """
 import ast
+import json
 import os
 import re
 import sys
@@ -17,6 +23,18 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 MATRIX = os.path.join(ROOT, "docs", "SUPPORT-MATRIX.md")
+CARD_RESULTS = os.path.join(ROOT, "docs", "benchmarks", "card-results.json")
+
+# The cards this generator can record a verify_matrix run against. The rig cards (unmeasured)
+# and the measured ones stay together so the matrix shows measured and unmeasured alike.
+CARDS = {
+    # slug: (display name, architecture, installer class, name aliases)
+    "p106-100": ("NVIDIA P106-100", "Pascal 6.1", "maxwell", ("p106",)),
+    "p4000": ("Quadro P4000", "Pascal 6.1", "pascal8", ("p4000", "quadro p4000")),
+    "m4000": ("Quadro M4000", "Maxwell 5.2", "maxwell", ("m4000", "quadro m4000")),
+}
+
+CARD_MODELS = ("2b", "4b", "9b", "27b")     # short names, in render order
 
 CAPABILITIES = ["GPU verify", "CPU verify", "PQ2_0/Q2_0", "K8/V4"]
 
@@ -145,7 +163,135 @@ def cpu_isa():
     return feats
 
 
-def render(models=None, fmts=None, kv=None, isa=None):
+def _read_registry(path=CARD_RESULTS):
+    """the tracked card-results registry, or an empty one before the first rig run"""
+    if not os.path.exists(path):
+        return {"cards": {}}
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError) as exc:
+        raise SystemExit("kindi: cannot read %s: %s" % (path, exc))
+    if not isinstance(data, dict) or not isinstance(data.get("cards"), dict):
+        raise SystemExit("kindi: %s must be {\"cards\": {...}}" % path)
+    return data
+
+
+def _write_registry(registry, path=CARD_RESULTS):
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(registry, f, indent=2, sort_keys=True)
+        f.write("\n")
+
+
+def _slug_for(payload, card=None):
+    """which known card a verify_matrix payload ran on, from its recorded environment."""
+    if card is not None:
+        if card not in CARDS:
+            raise SystemExit("kindi: unknown card %r; known cards: %s" % (card, ", ".join(CARDS)))
+        return card
+    gpus = []
+    try:
+        gpus = payload.get("environment", {}).get("gpus", []) or []
+    except AttributeError:
+        pass
+    if len(gpus) != 1:
+        raise SystemExit(
+            "kindi: %d cards recorded, so the run has no single card; pass --card instead "
+            "(known cards: %s). A mixed pair run has no single-card row to fill."
+            % (len(gpus), ", ".join(CARDS)))
+    name = str(gpus[0].get("name", "")).lower()
+    for slug, (_, _, _, aliases) in CARDS.items():
+        if any(alias in name for alias in aliases):
+            return slug
+    raise SystemExit(
+        "kindi: card %r is not a known card; register it in kindi/support_matrix.py CARDS first, "
+        "then rerun (known cards: %s)" % (gpus[0].get("name"), ", ".join(CARDS)))
+
+
+def _cell_text(row):
+    """one verify_matrix row as a matrix cell: exactness, tie and speed, no derived claims"""
+    status = row.get("status")
+    if status == "pass":
+        if row.get("prompts_tie"):
+            text = "%d exact + tie" % (row.get("prompts_pass") or 0)
+        else:
+            total = ((row.get("prompts_pass") or 0) + (row.get("prompts_tie") or 0)
+                     + (row.get("prompts_fail") or 0)) or 4
+            text = "%d/%d" % (row.get("prompts_pass") or 0, total)
+        if row.get("tokens_per_second"):
+            text += " @ %.1f tok/s" % row["tokens_per_second"]
+        return text
+    if status == "fail":
+        diff = row.get("first_diff_token")
+        return "failed%s" % (" (first diff %s)" % diff if diff is not None else "")
+    return str(status)                                      # refused, timeout, missing...
+
+
+def _cells_from_results(rows):
+    """model short name -> "plain ... · tc ...", in CELL order; not-run where the run skipped it"""
+    by_model = {}
+    for row in rows:
+        model = str(row.get("model", ""))
+        short = model[len("bonsai-"):] if model.startswith("bonsai-") else model
+        by_model.setdefault(short, {})[str(row.get("mode", ""))] = _cell_text(row)
+    cells = {}
+    for short in CARD_MODELS:
+        modes = by_model.get(short, {})
+        parts = ["%s %s" % (mode, modes[mode]) for mode in ("plain", "tc", "tc-hp") if mode in modes]
+        cells[short] = " · ".join(parts) if parts else "not run"
+    return cells
+
+
+def _evidence_link(source):
+    """the docs-relative link for a recorded run; a gitignored path would break the link guard"""
+    text = str(source).replace("\\", "/")
+    if text.startswith("bench-logs/") or "/bench-logs/" in text:
+        raise SystemExit(
+            "kindi: %s is gitignored, so the matrix would link to a file nobody can read; "
+            "copy the results.json into docs/benchmarks/<date>-<card>/ and pass that path" % source)
+    if not text.startswith("docs/"):
+        raise SystemExit(
+            "kindi: %s is not under docs/, so it cannot be linked from the matrix and would not "
+            "be tracked; copy the results.json into docs/benchmarks/<date>-<card>/ and pass that "
+            "path" % source)
+    return text[len("docs/"):]
+
+
+def apply_results(source, registry_path=CARD_RESULTS, card=None, matrix_path=MATRIX, check_only=False):
+    """fold one verify_matrix results.json into the registry and regenerate the matrix.
+
+    Returns the slug recorded and the cells it produced. A refusal in the run is recorded as a
+    result, never raised; only an unusable input or an unknown card is an error.
+    """
+    try:
+        with open(source, encoding="utf-8") as f:
+            payload = json.load(f)
+    except (OSError, ValueError) as exc:
+        raise SystemExit("kindi: cannot read %s: %s" % (source, exc))
+    if check_only:
+        return None, {}
+    rows = payload.get("results")
+    if not isinstance(rows, list):
+        raise SystemExit("kindi: %s has no results rows; use a verify_matrix results.json" % source)
+    slug = _slug_for(payload, card)
+    link = _evidence_link(source)
+    cells = _cells_from_results(rows)
+    registry = _read_registry(registry_path)
+    registry["cards"][slug] = {
+        "cells": cells,
+        "evidence": link,
+        "git": payload.get("git_revision"),
+        "measured": payload.get("started_utc"),
+    }
+    _write_registry(registry, registry_path)
+    if matrix_path is not None:
+        text = render(card_results=registry)
+        with open(matrix_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+    return slug, cells
+
+
+def render(models=None, fmts=None, kv=None, isa=None, card_results=None):
     models = catalog() if models is None else models
     fmts = formats() if fmts is None else fmts
     kv = kv_modes() if kv is None else kv
@@ -200,6 +346,31 @@ def render(models=None, fmts=None, kv=None, isa=None):
     for mid in models:
         lines.append("| `%s` | %s |" % (mid, " | ".join(_cell(c) for c in STATUS[mid])))
 
+    registry = _read_registry() if card_results is None else card_results
+    lines += ["", "## Cards", "",
+              "Measured per-card results from `tools/verify_matrix.py` runs, folded into the tracked",
+              "registry `docs/benchmarks/card-results.json` by::",
+              "", "```sh",
+              "python -m kindi.support_matrix --from-verify docs/benchmarks/<date>-<card>/results.json",
+              "```",
+              "",
+              "A card without a record shows `not measured`. A refusal is a measured result, not a",
+              "failure: on sm_52 the `tc` cell records the by-design refusal.",
+              "", "| card | arch | class | " + " | ".join(short.upper() for short in CARD_MODELS)
+              + " | evidence |",
+              "|---|---|---|" + "---|" * (len(CARD_MODELS) + 1)]
+    for slug, (name, arch, klass, _) in CARDS.items():
+        entry = (registry.get("cards") or {}).get(slug) or {}
+        cells = entry.get("cells") or {}
+        rendered = [cells.get(short, "not measured") for short in CARD_MODELS]
+        evidence = "not measured"
+        if entry.get("evidence"):
+            when = str(entry.get("measured") or "")[:10]
+            evidence = ("measured %s · " % when if when else "") + "[results](%s)" % entry["evidence"]
+        lines.append("| %s | %s | %s | %s | %s |" % (
+            _cell(name), _cell(arch), _cell(klass),
+            " | ".join(_cell(c) for c in rendered), _cell(evidence)))
+
     lines += ["", "## Evidence", "", "| page | what |", "|---|---|"]
     for title, path in EVIDENCE:
         lines.append("| [%s](%s) | %s |" % (path, path, title))
@@ -220,6 +391,23 @@ def render(models=None, fmts=None, kv=None, isa=None):
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
+    if "--from-verify" in argv:
+        index = argv.index("--from-verify")
+        if index + 1 >= len(argv):
+            sys.stderr.write("kindi: --from-verify needs a results.json path\n")
+            return 1
+        source = argv[index + 1]
+        card = None
+        if "--card" in argv:
+            at = argv.index("--card")
+            if at + 1 >= len(argv):
+                sys.stderr.write("kindi: --card needs a slug (%s)\n" % ", ".join(CARDS))
+                return 1
+            card = argv[at + 1]
+        slug, cells = apply_results(source, card=card)
+        sys.stdout.write("recorded %s from %s: %s\n" % (
+            slug, source, "; ".join("%s: %s" % (short, cells[short]) for short in CARD_MODELS)))
+        return 0
     text = render()
     if "--check" in argv:
         current = _read(MATRIX) if os.path.exists(MATRIX) else ""
