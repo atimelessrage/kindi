@@ -11,7 +11,7 @@ Audit date: **2026-11-12**
 > the `tc`/`tc-hp` matrix rows, the plan-engine default dispatch and the 27B 8K boundary
 > sweep. **Section 19 is the current "what is better / what is worse" list; sections
 > 18 and earlier are kept as the history at their own dates.** The best-of branch is merged
-> into `main`: both `main` and `freebuff/tandem-cpu-recovery` are at `5618126`. The installer source
+> into `main`: both `main` and `freebuff/tandem-cpu-recovery` are at `0c393e5`. The installer source
 > pin and the `0.5.0` version identity remain a release-owner publication step, not
 > a code-complete claim.
 
@@ -24,7 +24,7 @@ everything described here has been re-run on current hardware.
 
 | | Stock “normal” Kindi 0.5 | Clean local 0.5 snapshot | Current worktree |
 |---|---|---|---|
-| Ref | `v0.5.0` tag, `1c4cc3e01732f0fada4ab7030ccf4f7651e01053` | `clean/kindi-0.5`, `1b0cbf780b57d464cdb3e5e9acf75ed49256d622` | `main` and `freebuff/tandem-cpu-recovery`, `5618126` |
+| Ref | `v0.5.0` tag, `1c4cc3e01732f0fada4ab7030ccf4f7651e01053` | `clean/kindi-0.5`, `1b0cbf780b57d464cdb3e5e9acf75ed49256d622` | `main` and `freebuff/tandem-cpu-recovery`, `0c393e5` |
 | Date | 2026-11-09 | clean snapshot of local 0.5 work | 2026-11-13 (merged state) |
 | Tracked files | 102 | 216 | 342 |
 | Test modules | **0** (`tests/` does not exist) | 25 | 55 tracked test modules |
@@ -55,7 +55,7 @@ Evidence labels used below:
 The current worktree is a substantial functional expansion over stock 0.5, not a clean
 replacement release.
 
-**Genuinely better (current state, `5618126`):**
+**Genuinely better (current state, `0c393e5`):**
 
 - A real dense CPU+GPU tandem runtime that is token-exact on the 2B, 9B and 27B in both
   placements, with a joint prompt cache and saved-opening reload, and a measured
@@ -798,7 +798,7 @@ free (cannot serve 24K), while 16 layers keep 24,576 with 687 MiB free. Evidence
 `bench-logs/tandem-cache/boundary-27b-l{8,12,16,20,24,28}-8k.{json,log}`; table in
 `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md`.
 
-## 19. Current state vs stock 0.5, refreshed (`5618126`, 2026-11-13)
+## 19. Current state vs stock 0.5, refreshed (`0c393e5`, 2026-11-13)
 
 This section supersedes the §2 bottom line and the §11.2 worse list. Numbers are from
 the recorded evidence in §§12–18; the focused gates in §7 and the suite count below
@@ -850,7 +850,7 @@ that remain partial.
 |---|---|
 | `MuseEmber_ReviewAudit_*.txt` untracked reports could be committed accidentally | `.gitignore` covers them; `git status` is clean apart from the report |
 | §16 contained a stray `{0cd58bc}` placeholder | replaced with the §14 reference |
-| §1/§2 headline numbers stale (HEAD, module count, diff stat, §2 predating §§15–18) | refreshed to `5618126`; §19 supersedes §2 |
+| §1/§2 headline numbers stale (HEAD, module count, diff stat, §2 predating §§15–18) | refreshed to `0c393e5`; §19 supersedes §2 |
 | Everything else in §19.2 | verified real and still present; not fixable without GPU/hardware, a published release, or the user's GitHub runner step — so reported, not claimed fixed |
 
 ## 20. Tandem placement: the CPU layer set matters more than the layer count (2026-11-14)
