@@ -93,3 +93,22 @@ the noise.
 report names. For each finding, cite the file and function at HEAD and state the verdict (real,
 stale, already documented); only then fix. Record the verdict in project memory so the next agent
 does not re-open a settled question — and never "fix" a stale finding by rewriting correct code.
+
+## L-0007: A device-wide VRAM peak is not an engine-bytes measurement
+
+**Observation:** The 2026-11-14 third audit concluded that the tandem `auto` planner's estimate was
+wrong by "up to 208 MiB" because the 27B run's `peak_used_mib` (device-wide, from nvidia-smi) was
+above the estimate. It was comparing two different quantities: `peak_used_mib` includes the desktop
+and every other process on the card (~950 MiB on the benchmark host), while `gpu_estimate` counts the
+engine's own bytes. Against `peak_delta_mib` (peak minus the sampled idle baseline) the plan estimate
+was ~890 MiB *conservative*, not optimistic.
+
+**Evidence, checked at `36208e5`:** 27B, 24,576 tokens, `gdn:16`, plain owner: estimate 6,208 MiB
+vs ~6,240 MiB actually used (34 MiB under, was ~100 MiB under before the per-layer GDN state was
+charged explicitly). Plan owner: estimate 6,142 MiB vs ~5,250 MiB used. Both runs recorded in
+`docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plain-q8/RESULTS.md`.
+
+**Practice:** Compare an estimate with `peak_delta_mib` or with `total - free_after_load`, never with
+raw `peak_used_mib`, and say which baseline the number is relative to. The same distinction decides
+whether `--sample-vram` is measuring the right card at all: it now selects the engine's device rather
+than GPU 0, because on a two-card host a bare first row is another card's number.
