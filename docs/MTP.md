@@ -66,6 +66,13 @@ pass (about 2.3 plain steps at T = 4 here). At 41-43% acceptance that holds for 
 9B, so the installer offers the 2B drafter to the 27B only. Do not add it to the 9B without measuring
 acceptance first. Output was byte-identical in every run: speculation changes the speed, never a token.
 
+**At 24K on the 8 GB card the drafter does not fit** (2026-11-14, same host; evidence in
+`docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-drafter-24k/`): with the drafter the loader reduces
+the 27B context from 24,576 to **12,032** tokens (323 MiB free without, 115 MiB with) - the drafter
+costs ~1.6 GB. Where it fits it still pays: at 5,012 tokens of context, 136 tokens completed in
+5.00 s without and 3.25 s with (27.2 -> 41.8 tok/s, 1.54x), consistent with the 8K row above. So on
+8 GB you choose 24K without the drafter or 12K with it; 24K *with* the drafter needs a tandem slice.
+
 ## How auto mode selects
 
 - A model with its own head (the 2B with `KINDI_MTP_HEAD`): the head, greedy requests only.
