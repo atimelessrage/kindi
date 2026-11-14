@@ -10,6 +10,16 @@ The script exits 0 only when every selected cell passes. A 9B tc refusal is a
 recorded result, not a script abort: it prints as `refused` and makes the run
 exit 1, which is the correct signal that the matrix is not all-pass.
 
+One command covers the whole support contract (docs/CARD-SUPPORT.md): per
+model it also records the installer/catalog offer (criterion 1, from
+kindi/catalog.py fits against the card's VRAM), a measured bench row
+(criterion 5, `kindi bench --json`), and one server/cache cycle (criteria 2
+and 4: the model loads, serves greedy completions, and after a restart the
+prompt cache still hits, with bit-identical replies). The serve/bench extras
+run once per model in the first requested mode; `--no-serve` / `--no-bench`
+skip them. Their statuses are recorded in results.json and printed; the exit
+code stays driven by the verify cells.
+
 Examples:
   python tools/verify_matrix.py
   python tools/verify_matrix.py --models 2b,4b,9b,27b --modes tc \
@@ -33,14 +43,19 @@ import os
 import platform
 import re
 import shlex
+import socket
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:        # tools/ runs with tools/ as sys.path[0]; `kindi` must import
+    sys.path.insert(0, str(ROOT))
 MODELS = ("2b", "4b", "9b", "27b")
 # "tc-hp" is the tc mode plus KINDI_TC_HP=1: the 9B (Hadamard 4096) is refused
 # by default and only exact with the high-precision activations.
@@ -228,6 +243,207 @@ def _missing_row(model: str, mode: str, pack: Path, cards: int) -> dict:
     }
 
 
+SERVE_PROMPT = (
+    "The quick brown fox jumps over the lazy dog while the tandem scheduler "
+    "splits the model between the CPU and the GPU and keeps the cache coherent "
+    "across restarts. " * 8)                # ~700 tokens: a cacheable opening
+
+SERVE_MODEL = "bonsai-verify-matrix"       # request model for the serve cycle
+
+
+def offered(model: str, vram_mib: int | None) -> bool | None:
+    """Criterion 1: the catalog offers this model on a card of `vram_mib` MiB."""
+    if vram_mib is None:
+        return None
+    try:
+        from kindi import catalog
+        entry = catalog.MODELS.get("bonsai-" + model)
+    except (ImportError, AttributeError):
+        entry = None
+    if entry is None:
+        return None
+    return int(entry.get("one") or 0) <= int(vram_mib)
+
+
+def _free_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def _http(port: int, path: str, body: dict | None, timeout: float) -> tuple[int, dict]:
+    """One HTTP request against the serve-cycle server; body None means GET."""
+    req = urllib.request.Request("http://127.0.0.1:%d%s" % (port, path),
+                                 data=None if body is None else json.dumps(body).encode(),
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            payload = resp.read()
+            return resp.status, (json.loads(payload) if payload else {})
+    except urllib.error.HTTPError as exc:
+        payload = exc.read()
+        try:
+            return exc.code, (json.loads(payload) if payload else {})
+        except ValueError:
+            return exc.code, {}
+    except (urllib.error.URLError, OSError) as exc:
+        return 0, {"error": str(exc)}
+
+
+def _complete(port: int, timeout: float) -> tuple[int, dict]:
+    return _http(port, "/v1/chat/completions", {
+        "model": SERVE_MODEL,
+        "messages": [{"role": "user", "content": SERVE_PROMPT}],
+        "temperature": 0, "max_tokens": 32}, timeout)
+
+
+def _cached_tokens(resp: dict) -> int:
+    try:
+        return int(resp["usage"]["prompt_tokens_details"]["cached_tokens"])
+    except (KeyError, TypeError, ValueError):
+        return 0
+
+
+def _wait_health(port: int, proc, timeout: float) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            return False
+        status, _ = _http(port, "/health", None, 5.0)
+        if status == 200:
+            return True
+        time.sleep(0.5)
+    return False
+
+
+def _stop(proc) -> None:
+    if proc is None:
+        return
+    proc.terminate()
+    try:
+        proc.wait(timeout=30)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+
+
+def run_serve_cycle(model: str, mode: str, pack: Path, out_dir: Path, cards: int,
+                     timeout: float, python: str = sys.executable) -> dict:
+    """Criterion 2 (the model loads and serves) and 4 (the cache survives a restart).
+
+    Boot the server, complete twice (the repeat must be a cache hit), ask an
+    invalid request (400, and the cache must survive it), restart the process
+    on the same state dir, and complete again (the saved opening must hit
+    after the restart). All four replies must be bit-identical.
+    """
+    log_path = out_dir / "logs" / ("serve-%s-%s.log" % (model, mode))
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    state_dir = out_dir / ("state-%s" % model)
+    state_dir.mkdir(parents=True, exist_ok=True)
+    port = _free_port()
+    env = child_env(mode, cards)
+    env.update({"KINDI_HOST": "127.0.0.1", "KINDI_PORT": str(port),
+                "KINDI_STATE_DIR": str(state_dir), "KINDI_MODEL_NAME": SERVE_MODEL})
+    command = [python, "-m", "kindi", "--pack", str(pack), "serve",
+               "--host", "127.0.0.1", "--port", str(port)]
+    result = {"model": model, "mode": mode, "status": "error",
+              "log": log_path.relative_to(out_dir).as_posix(),
+              "config": mode_env(mode, cards), "command": command}
+    procs: list = []
+
+    def boot() -> tuple[bool, float]:
+        t0 = time.monotonic()
+        proc = subprocess.Popen(command, cwd=ROOT, env=env,
+                                stdout=open(log_path, "ab"), stderr=subprocess.STDOUT)
+        procs.append(proc)
+        if not _wait_health(port, proc, timeout):
+            _stop(proc)
+            return False, time.monotonic() - t0
+        return True, time.monotonic() - t0
+
+    started = time.monotonic()
+    try:
+        ok, result["boot_s"] = boot()
+        if not ok:
+            result["summary"] = "server never became healthy"
+            return result
+        seq: list[tuple[str, int]] = []
+        for _ in range(2):
+            status, resp = _complete(port, timeout)
+            if status != 200:
+                result["summary"] = "completion %d returned %d" % (len(seq) + 1, status)
+                return result
+            seq.append((resp["choices"][0]["message"]["content"], _cached_tokens(resp)))
+        status, _ = _http(port, "/v1/chat/completions", {"model": SERVE_MODEL}, timeout)
+        result["invalid_status"] = status
+        status, resp = _complete(port, timeout)
+        if status != 200:
+            result["summary"] = "completion after the invalid request returned %d" % status
+            return result
+        seq.append((resp["choices"][0]["message"]["content"], _cached_tokens(resp)))
+        _stop(procs[-1])
+        ok, result["reboot_s"] = boot()
+        if not ok:
+            result["summary"] = "server never became healthy after the restart"
+            return result
+        status, resp = _complete(port, timeout)
+        if status != 200:
+            result["summary"] = "completion after the restart returned %d" % status
+            return result
+        seq.append((resp["choices"][0]["message"]["content"], _cached_tokens(resp)))
+        result["cached_tokens"] = [c for _, c in seq]
+        result["contents_identical"] = all(text == seq[0][0] for text, _ in seq)
+        result["duration_s"] = time.monotonic() - started
+        if result["invalid_status"] != 400:
+            result["summary"] = "invalid request returned %s, expected 400" % result["invalid_status"]
+        elif not all(c > 0 for c in result["cached_tokens"][1:]):
+            result["summary"] = "a repeat request was not a cache hit (%s)" % result["cached_tokens"]
+        elif not result["contents_identical"]:
+            result["summary"] = "replies were not bit-identical (%s)" % result["cached_tokens"]
+        else:
+            result["status"] = "pass"
+            result["summary"] = "cached %s across repeats, invalid request and restart" % result["cached_tokens"]
+        return result
+    finally:
+        for proc in procs:
+            _stop(proc)
+
+
+def run_bench_row(model: str, mode: str, pack: Path, out_dir: Path, cards: int,
+                   timeout: float, python: str = sys.executable) -> dict:
+    """Criterion 5: one measured bench row (`kindi bench --json`) for the model."""
+    log_path = out_dir / "logs" / ("bench-%s-%s.log" % (model, mode))
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    bench_json = out_dir / ("bench-%s-%s.json" % (model, mode))
+    command = [python, "-m", "kindi", "--pack", str(pack), "bench", "--json", str(bench_json)]
+    env = child_env(mode, cards)
+    started = time.monotonic()
+    exit_code: int | None = None
+    try:
+        proc = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True,
+                              encoding="utf-8", errors="replace", timeout=timeout, check=False)
+        exit_code = proc.returncode
+        output = proc.stdout + proc.stderr
+    except subprocess.TimeoutExpired as exc:
+        exit_code = 124
+        output = "TIMEOUT after %.1f s\n" % timeout
+    except OSError as exc:
+        exit_code = 127
+        output = "script error: %s\n" % exc
+    log_path.write_text(output, encoding="utf-8", newline="\n")
+    data: dict = {}
+    try:
+        data = json.loads(bench_json.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = {}
+    ok = exit_code == 0 and bool(data)
+    return {"model": model, "mode": mode, "status": "pass" if ok else "error",
+            "exit_code": exit_code, "duration_s": time.monotonic() - started,
+            "log": log_path.relative_to(out_dir).as_posix(), "config": mode_env(mode, cards),
+            "command": command, "bench": data,
+            "summary": "gen %s tok/s at ctx %s" % (data.get("gen_tok_s", {}).get("exact:8000", "?"),
+                                             data.get("ctx", "?"))}
+
+
 def run_cell(
     model: str,
     mode: str,
@@ -375,7 +591,8 @@ def _describe_environment(record: dict) -> str:
 
 
 def _write_results(out_dir: Path, rows: list[dict], args: argparse.Namespace,
-                   packs: list[Path] | None = None) -> tuple[Path, Path]:
+                   packs: list[Path] | None = None, bench: dict | None = None,
+                   serve: dict | None = None, offered_map: dict | None = None) -> tuple[Path, Path]:
     csv_path = out_dir / "results.csv"
     json_path = out_dir / "results.json"
     with csv_path.open("w", encoding="utf-8", newline="") as f:
@@ -406,6 +623,9 @@ def _write_results(out_dir: Path, rows: list[dict], args: argparse.Namespace,
         "timeout_s": args.timeout,
         "environment": environment(packs or []),
         "results": rows,
+        "bench": bench or {},
+        "serve": serve or {},
+        "offered": offered_map or {},
     }
     json_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="\n")
     return csv_path, json_path
@@ -672,6 +892,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="fail when throughput drops by more than this percentage (needs --baseline)")
     ap.add_argument("--dry-run", action="store_true",
                     help="print the commands and exit without running or writing")
+    ap.add_argument("--serve", action=argparse.BooleanOptionalAction, default=True,
+                    help="also run the server/cache cycle per model (criterion 4; default on)")
+    ap.add_argument("--bench", action=argparse.BooleanOptionalAction, default=True,
+                    help="also record a measured bench row per model (criterion 5; default on)")
     args = ap.parse_args(argv)
 
     if args.cards < 1:
@@ -706,6 +930,10 @@ def main(argv: list[str] | None = None) -> int:
                 prefix = "would run" if (pack / "kindi_pack.json").is_file() else "missing pack"
                 print("%s: %s %s %s" % (prefix, model, mode, env_text))
                 print("  " + shlex.join(command))
+            if args.serve:
+                print("would serve: %s %s (server/cache cycle)" % (model, modes[0]))
+            if args.bench:
+                print("would bench: %s %s (measured row)" % (model, modes[0]))
         return 0
 
     baseline_payload = load_baseline(args.baseline) if args.baseline is not None else None
@@ -729,7 +957,29 @@ def main(argv: list[str] | None = None) -> int:
                 print("[%d/%d] %s %s: %s" % (index, total, model, mode, row["status"]), flush=True)
             rows.append(row)
 
-    csv_path, json_path = _write_results(args.out, rows, args, packs_used)
+    bench, serve, offered_map = {}, {}, {}
+    if not args.dry_run:
+        gpus = _gpus()
+        mibs = [g.get("memory_mib") for g in gpus if g.get("memory_mib")]
+        vram = max(mibs) if mibs else None
+        extras_mode = modes[0]
+        for model in models:
+            offered_map[model] = offered(model, vram)
+            pack = pack_for(model, args.pack_dir, args.pack_27b)
+            if not (pack / "kindi_pack.json").is_file():
+                continue
+            if args.bench:
+                print("bench %s %s: measuring..." % (model, extras_mode), flush=True)
+                brow = run_bench_row(model, extras_mode, pack, args.out, args.cards, args.timeout)
+                bench[model] = brow
+                print("bench %s %s: %s (%s)" % (model, extras_mode, brow["status"], brow["summary"]), flush=True)
+            if args.serve:
+                print("serve %s %s: cycling..." % (model, extras_mode), flush=True)
+                srow = run_serve_cycle(model, extras_mode, pack, args.out, args.cards, args.timeout)
+                serve[model] = srow
+                print("serve %s %s: %s (%s)" % (model, extras_mode, srow["status"], srow.get("summary", "")), flush=True)
+    csv_path, json_path = _write_results(args.out, rows, args, packs_used,
+                                         bench=bench, serve=serve, offered_map=offered_map)
     _print_table(rows)
     print("recorded: %s" % _describe_environment(json.loads(json_path.read_text(encoding="utf-8"))["environment"]))
     regressions: list[str] = []

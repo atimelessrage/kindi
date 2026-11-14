@@ -345,3 +345,177 @@ def test_results_json_records_the_environment(tmp_path, monkeypatch, capsys):
     assert payload["environment"]["gpus"][0]["name"] == "Quadro M4000"
     assert payload["environment"]["packs"][0]["source_sha256"] == "def456"
     assert "recorded: Quadro M4000 sm 5.2" in capsys.readouterr().out
+
+
+def test_offered_uses_the_catalog_fit():
+    mod = load()
+    assert mod.offered("2b", 900) is True
+    assert mod.offered("2b", 899) is False
+    assert mod.offered("27b", 8000) is True
+    assert mod.offered("27b", 7000) is False
+    assert mod.offered("2b", None) is None
+    assert mod.offered("nope", 10**9) is None
+
+
+def test_cached_tokens_reads_the_usage_details():
+    mod = load()
+    resp = {"usage": {"prompt_tokens_details": {"cached_tokens": 867}}}
+    assert mod._cached_tokens(resp) == 867
+    assert mod._cached_tokens({}) == 0
+    assert mod._cached_tokens({"usage": {}}) == 0
+
+
+class _FakeProc:
+    def __init__(self):
+        self.terminated = False
+
+    def poll(self):
+        return None
+
+    def terminate(self):
+        self.terminated = True
+
+    def wait(self, timeout=None):
+        return 0
+
+    def kill(self):
+        pass
+
+
+def test_serve_cycle_passes_on_repeats_invalid_and_restart(tmp_path, monkeypatch):
+    mod = load()
+    contents = ["reply"] * 4
+    procs = []
+    cached = [0, 400, 400, 400]
+
+    class FakePopen:
+        def __new__(cls, *a, **k):
+            p = _FakeProc()
+            procs.append(p)
+            return p
+
+    state = {"i": 0}
+
+    def fake_http(port, path, body, timeout):
+        if path == "/health":
+            return 200, {}
+        if body is not None and "messages" not in body:
+            return 400, {}
+        n = cached[state["i"]]
+        text = contents[state["i"]]
+        state["i"] += 1
+        return 200, {"choices": [{"message": {"content": text}}],
+                     "usage": {"prompt_tokens_details": {"cached_tokens": n}}}
+
+    monkeypatch.setattr(mod.subprocess, "Popen", FakePopen)
+    monkeypatch.setattr(mod, "_http", fake_http)
+    row = mod.run_serve_cycle("2b", "plain", tmp_path / "bonsai-2b", tmp_path, 1, 5.0)
+    assert row["status"] == "pass", row
+    assert row["cached_tokens"] == [0, 400, 400, 400]
+    assert row["invalid_status"] == 400
+    assert row["contents_identical"] is True
+    assert len(procs) == 2 and all(p.terminated for p in procs)
+
+
+def test_serve_cycle_fails_without_a_cache_hit(tmp_path, monkeypatch):
+    mod = load()
+    cached = [0, 0, 0, 0]
+
+    class FakePopen:
+        def __new__(cls, *a, **k):
+            return _FakeProc()
+
+    state = {"i": 0}
+
+    def fake_http(port, path, body, timeout):
+        if path == "/health":
+            return 200, {}
+        if body is not None and "messages" not in body:
+            return 400, {}
+        n = cached[state["i"]]
+        state["i"] += 1
+        return 200, {"choices": [{"message": {"content": "same"}}],
+                     "usage": {"prompt_tokens_details": {"cached_tokens": n}}}
+
+    monkeypatch.setattr(mod.subprocess, "Popen", FakePopen)
+    monkeypatch.setattr(mod, "_http", fake_http)
+    row = mod.run_serve_cycle("2b", "plain", tmp_path / "bonsai-2b", tmp_path, 1, 5.0)
+    assert row["status"] == "error"
+    assert "not a cache hit" in row["summary"]
+
+
+def test_serve_cycle_fails_on_divergent_replies(tmp_path, monkeypatch):
+    mod = load()
+    cached = [0, 400, 400, 400]
+    texts = ["one", "two", "one", "one"]
+
+    class FakePopen:
+        def __new__(cls, *a, **k):
+            return _FakeProc()
+
+    state = {"i": 0}
+
+    def fake_http(port, path, body, timeout):
+        if path == "/health":
+            return 200, {}
+        if body is not None and "messages" not in body:
+            return 400, {}
+        n = cached[state["i"]]
+        text = texts[state["i"]]
+        state["i"] += 1
+        return 200, {"choices": [{"message": {"content": text}}],
+                     "usage": {"prompt_tokens_details": {"cached_tokens": n}}}
+
+    monkeypatch.setattr(mod.subprocess, "Popen", FakePopen)
+    monkeypatch.setattr(mod, "_http", fake_http)
+    row = mod.run_serve_cycle("2b", "plain", tmp_path / "bonsai-2b", tmp_path, 1, 5.0)
+    assert row["status"] == "error"
+    assert "not bit-identical" in row["summary"]
+
+
+def test_bench_row_records_the_json(tmp_path, monkeypatch):
+    mod = load()
+    data = {"read_tok_s": 42.5, "gen_tok_s": {"exact:8000": 37.6}, "ctx": 24576, "ctx_reduced": False}
+
+    class Done:
+        returncode = 0
+        stdout = "bench ok"
+        stderr = ""
+
+    def fake_run(command, **kwargs):
+        dest = command[command.index("--json") + 1]
+        import json as _json
+        Path(dest).write_text(_json.dumps(data), encoding="utf-8")
+        return Done()
+
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+    row = mod.run_bench_row("2b", "plain", tmp_path / "bonsai-2b", tmp_path, 1, 5.0)
+    assert row["status"] == "pass"
+    assert row["bench"]["gen_tok_s"]["exact:8000"] == 37.6
+
+
+def test_bench_row_fails_without_json(tmp_path, monkeypatch):
+    mod = load()
+
+    class Done:
+        returncode = 1
+        stdout = "boom"
+        stderr = ""
+
+    monkeypatch.setattr(mod.subprocess, "run", lambda *a, **k: Done())
+    row = mod.run_bench_row("2b", "plain", tmp_path / "bonsai-2b", tmp_path, 1, 5.0)
+    assert row["status"] == "error"
+
+
+def test_dry_run_lists_serve_and_bench(tmp_path, capsys):
+    mod = load()
+    rc = mod.main(["--dry-run", "--models", "2b", "--modes", "plain",
+                   "--pack-dir", str(tmp_path / "packs"), "--out", str(tmp_path / "results")])
+    assert rc == 0
+    text = capsys.readouterr().out
+    assert "would serve" in text and "would bench" in text
+    rc = mod.main(["--dry-run", "--models", "2b", "--modes", "plain", "--no-serve", "--no-bench",
+                   "--pack-dir", str(tmp_path / "packs"), "--out", str(tmp_path / "results")])
+    assert rc == 0
+    text = capsys.readouterr().out
+    assert "would serve" not in text and "would bench" not in text

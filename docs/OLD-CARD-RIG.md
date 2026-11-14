@@ -49,17 +49,21 @@ nvidia-smi --query-gpu=index,name,driver_version,memory.total,compute_cap,pcie.l
     --format=csv
 python -m kindi info                      # engine choice, VRAM, pack
 
-# the recorded matrix: plain and tc, 2B/4B/9B (add 27b when the pack is on disk)
+# one command covers the whole support contract (docs/CARD-SUPPORT.md): the
+# verify cells, a `kindi bench --json` measured row per model, and a server/cache
+# cycle per model (boot, two requests with the repeat a cache hit, an invalid
+# 400 that must not clear the cache, restart, cache hit again, bit-identical
+# replies). The catalog offer (criterion 1) is recorded from the card's VRAM.
 python tools/verify_matrix.py --pack-dir ~/.kindi/packs --models 2b,4b,9b \
     --modes plain,tc --cards 1 --out bench-logs/verify-matrix-<card>
 
-# memory and speed at the contexts that matter, one file per card
+# memory and speed at the contexts that matter, one file per card (the measured
+# row above covers the contract; this adds the sampled-peak capture)
 python -m kindi --pack ~/.kindi/packs/bonsai-2b bench --sample-vram --json bench-logs/<card>-2b.json
 python -m kindi --pack ~/.kindi/packs/bonsai-9b bench --sample-vram --json bench-logs/<card>-9b.json
 ```
 
-Then the serving check from [CARDS.md](CARDS.md) (start, two requests, restart, second request must
-be a cache hit). For the 8 GB cards also try the 27B:
+For the 8 GB cards also try the 27B:
 
 ```bash
 python tools/verify_matrix.py --models 27b --modes plain --cards 1 \
@@ -98,8 +102,10 @@ Anything quoted in a tracked page has to be copied into `docs/benchmarks/<date>-
 ## What makes it a support row
 
 The contract in [CARD-SUPPORT.md](CARD-SUPPORT.md#what-supported-means-here), unchanged: an installer
-offer, a loading model, a passing `kindi verify`, a serving/cache check, and a measured row. The
-matrix alone gives the third; the bench and serving runs give the fifth.
+offer (the catalog fit against the card's VRAM), a loading model and a serving/cache check (the
+server cycle: boot, repeat, invalid, restart), a passing `kindi verify` (the cells) and a measured
+row (`kindi bench --json`). The one command above covers all five; its statuses land in `results.json`
+under `offered`, `serve`, `bench` and `results` respectively.
 
 ## Expected outcomes (to confirm, not to assume)
 
