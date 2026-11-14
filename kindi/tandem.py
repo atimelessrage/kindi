@@ -10,9 +10,9 @@ Two placements are supported:
 The hidden state is handed over once per token, between two complete residual streams.  Each
 backend keeps its own GDN state and K/V cache, so no per-layer synchronisation is needed inside a
 token.  The CPU engine is the existing AVX2/FMA/F16C backend (with AVX2/F16C no-FMA and AVX-only
-fallbacks).  The GPU side is either the plain engine (``Engine(layers=...)``, fp16 K/V) or - the
+fallbacks).  The GPU side is either the plain engine (``Engine(layers=..., kv="q8_0")``) or - the
 default - the plan engine (``TPEngine(layers=...)``, q8_0 K/V): both load only the layers in their
-range and allocate K/V only for the attention layers they own, so an offloaded layer really frees
+range and allocate q8_0 K/V only for the attention layers they own, so an offloaded layer really frees
 VRAM instead of being loaded and ignored.  ``--tandem-gpu auto|plan|plain`` picks the owner
 (``KINDI_TANDEM_GPU`` sets a default); a plan owner is one card, which is the only case it cannot
 serve.
@@ -81,11 +81,12 @@ def _pick_owner(kind, log=None):
     """-> 'plan' or 'plain' for the GPU side of a split.
 
     ``auto`` takes the plan engine whenever it can run: it is the default engine for every model it
-    supports (the 2B/4B/9B are 1.5-2.5x faster there, and the 27B's kernels only exist there), its q8_0
-    K/V is half the size of the plain engine's fp16 K/V, and it loads only the tensors of the layers it
-    owns - which is what makes an offloaded layer free real VRAM. ``plain`` stays available for an A/B
-    comparison and for the one case the plan engine cannot serve: a split across two GPU cards (a tandem
-    GPU owner is one card).
+    supports (the 2B/4B/9B are 1.5-2.5x faster there, and the 27B's kernels only exist there), it loads
+    only the tensors of the layers it owns, and it reads the f32 file per tensor instead of uploading
+    it whole. ``plain`` stays available for an A/B comparison and for the one case the plan engine
+    cannot serve: a split across two GPU cards (a tandem GPU owner is one card). Both owners keep
+    q8_0 K/V (the plain owner is constructed with ``kv="q8_0"``), so an offloaded layer frees its
+    weights and its K/V under either owner.
     """
     kind = str(kind or "auto").strip().lower()
     if kind not in GPU_OWNERS:
@@ -157,7 +158,7 @@ def gpu_estimate(dims, sizes, ctx, cpu_layers=(), owner="plain"):
     """Device bytes the GPU owner needs when it owns every layer except ``cpu_layers``.
 
     ``plain``: the whole f32 file (it is uploaded as one file), the output head, the embedding unless the
-    CPU owns layer 0, each remaining layer's tensors, the fp16 K/V of each remaining attention layer and
+    CPU owns layer 0, each remaining layer's tensors, the q8_0 K/V of each remaining attention layer and
     the measured plain scratch.
 
     ``plan``: the same weights, but the f32 file only for the owned layers (the plan engine reads tensor by
@@ -187,7 +188,7 @@ def gpu_estimate(dims, sizes, ctx, cpu_layers=(), owner="plain"):
     for il in gpu:
         total += sizes["layers"].get(il, 0)
         if (il + 1) % interval == 0:
-            total += kv_bytes(dims, ctx)
+            total += kv_bytes(dims, ctx, "q8_0")
     return total
 
 
@@ -408,7 +409,7 @@ class TandemEngine(object):
                             embed=0 in self.gpu_range, head=self._gpu_head)
         else:
             self.gpu = GPUEngine(pack, ctx=ctx, log=log, layers=self.gpu_range,
-                                 embed=0 in self.gpu_range, head=self._gpu_head)
+                                 embed=0 in self.gpu_range, head=self._gpu_head, kv="q8_0")
         self.ctx = min(int(self.cpu.ctx), int(self.gpu.ctx))
         self.D = int(self.cpu.D)
         if int(self.gpu.D) != self.D:

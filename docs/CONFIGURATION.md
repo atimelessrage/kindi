@@ -50,6 +50,7 @@ Relative path values are resolved against the server process's current working d
 Notes:
 
 - `ctx`: GPU memory is ~12 KiB per token for the fp16 K/V cache, on top of ~570 MB for weights and buffers.
+- `KINDI_KV=q8_0` (environment, not a config key): the plain engine keeps its K/V cache in q8_0 instead of fp16 (~half the per-token memory, the plan engine's kernels and arithmetic). The prompt is then fed one token per call (the chunked prompt path needs the fp16 cache), and the cache is lossy against the fp16 references, so a q8 run does not reproduce a fp16 `kindi verify`. The tandem's plain GPU owner always uses q8_0, so an offloaded layer frees its K/V as well as its weights.
 - `ctx`: 24,576 leaves ~115 MB of the K420's 980 MB free. Lower it if something else needs the card.
 - `fast_clusters`: 128 clusters found the full head's top token 98.1 % of the time, 256 clusters 99.4 %.
 

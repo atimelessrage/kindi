@@ -4,7 +4,9 @@ Per token: embedding row -> hybrid GDN/attention blocks with SwiGLU FFNs -> outp
 Every matrix product is a ternary GEMV (k_g4, lookup tables, see docs/HOW-IT-WORKS.md); the activations entering it
 are Hadamard-folded (the transform Prism ML folded into the weights), fused into the preceding norm.
 Arithmetic follows llama.cpp's reference for this model (fp64 norm sums, fp16 K/V cache), so greedy output matches
-it token for token (kindi verify)."""
+it token for token (kindi verify). The K/V cache can also be q8_0 (KINDI_KV=q8_0, or kv="q8_0", which the
+tandem's plain GPU owner uses): the same kernels and arithmetic as the plan engine's q8_0 cache (k_store_q8,
+k_q8row, k_attn_sq8t, k_attn_vq8w), half the memory, and a different - lossy - cache than the fp16 reference,"""
 import json
 import os
 import time
@@ -64,6 +66,23 @@ KERNELS = ("k_g4", "k_g4l", "k_fold_fwht", "k_rmsfold", "k_smfold", "k_l2w", "k_
 
 
 
+def _kv_mode(kv=None):
+    """The plain engine's K/V cache format: fp16 by default, q8_0 on request. See Engine.__init__."""
+    if kv is not None:
+        if kv not in ("f16", "q8_0"):
+            raise SystemExit("kindi: kv must be f16 or q8_0 (got %r)" % (kv,))
+        return kv
+    env = os.environ.get("KINDI_KV", "").strip().lower()
+    if env in ("q8", "q8_0"):
+        return "q8_0"
+    if env in ("k8v4", "k8_v4"):
+        raise SystemExit("kindi: KINDI_KV=k8v4 is not supported by the plain engine; use the plan "
+                         "engine (KINDI_TP=1) or KINDI_KV=q8_0")
+    if env not in ("", "f16", "fp16"):
+        raise SystemExit("kindi: KINDI_KV must be f16 or q8_0 for the plain engine (got %r)" % env)
+    return "f16"
+
+
 def _no_thp():
     """ROCm: no khugepaged collapses in this process (they evict the GPU queues mid-kernel; see AMD-NOTES.md)"""
     if cp is None or not getattr(cp.cuda.runtime, "is_hip", False) or os.environ.get("KINDI_THP", "0") == "1":
@@ -114,7 +133,7 @@ class Engine(object):
     """One sequence at a time. step(tok, pos) -> next token (greedy) with the logits left in self.ylog;
     feed(tok, pos) processes a prompt token without the output head."""
 
-    def __init__(self, pack, ctx=4096, clusters=None, log=print, layers=None, embed=True, head=True):
+    def __init__(self, pack, ctx=4096, clusters=None, log=print, layers=None, embed=True, head=True, kv=None):
         t0 = time.time()
         self.log = log
         self.ctx = int(ctx)
@@ -130,6 +149,13 @@ class Engine(object):
         self.NV = self.dims["gdn_inner"] // self.HK
         self.CONV_CH = 2 * self.NK * self.HK + self.NV * self.HK
         self.NATT = self.NL // self.dims["full_attention_interval"]
+        # the K/V cache format: fp16 by default (the 2B/4B/9B references are fp16, so a q8 cache would not
+        # reproduce them); KINDI_KV=q8_0 opts in, and the tandem's plain GPU owner passes kv="q8_0" so a
+        # split frees the offloaded layers' K/V as well as their weights. k8v4 is not served here.
+        kv = _kv_mode(kv)
+        if kv == "q8_0" and self.HD != 256:
+            raise SystemExit("kindi: the q8_0 K/V cache needs a head size of 256 (this pack has %d)" % self.HD)
+        self.kv = kv
         if self.NV % self.NK:
             raise SystemExit("kindi: unsupported grouped head dimensions")
         self.G = self._gqa_groups(self.NH, self.NHKV, self.HD)
@@ -253,18 +279,27 @@ class Engine(object):
         self.fo, self.fo6 = z(self.NH * self.HD), z(self.NFF)
         self.outgdn, self.att, self.ffg, self.ffu = z(self.NV * self.HK), z(self.NH * self.HD), z(self.NFF), z(self.NFF)
         self.gb, self.gg, self.gout = z(self.NV), z(self.NV), z(self.NV * self.HK)
+        if self.kv == "q8_0":
+            self.qq, self.qd = cp.zeros(self.NH * self.HD, dtype=cp.int8), z(self.NH * self.HD // 32)
         # fit the context into the memory that is left (a 9B on a 4 GB card, a 2B on a 1 GB card): bytes per position
         # = K/V cache (fp16) + attention scores + attention partials + RoPE tables
         from . import chunk1 as _chunk1
-        if self._full_layers:
+        if self._full_layers and self.kv != "q8_0":
             _chunk1.reserve(self)                  # the chunked prompt path's buffers, before the context fit
+        elif self.kv == "q8_0":
+            # the chunked prompt path (chunk1) writes an fp16 cache; with q8 the prompt is fed one token
+            # per call through attn() (correct, at the decode rate), exactly as a tandem partial engine is
+            self.chunk_ok, self.chunk, self.batch_max = False, {}, 1
         else:
             self.batch_max = 1                     # a tandem engine feeds one token per backend call
         # Only the attention layers this engine owns hold K/V here. A tandem's GPU owner loads a subset, so
         # charging it for every layer of the model reduced the context more than the memory actually allowed
         # (the 27B at 24,576 with 8 CPU layers was cut to 17,664 tokens that way).
         owned_attn = self.NATT if self._full_layers else sum(1 for il in self.layers if il in self._kvi)
-        per_pos = (owned_attn * 2 * self.NHKV * self.HD * 2 + self.NH * 4 + (self.NH * self.HD * 4) // 256
+        # q8_0: one int8 per value plus one fp16 scale per 32 values, for K and V (the plan engine's bytes)
+        kv_per_pos = owned_attn * 2 * self.NHKV * (self.HD + self.HD // 32 * 2) if self.kv == "q8_0" \
+            else owned_attn * 2 * self.NHKV * self.HD * 2
+        per_pos = (kv_per_pos + self.NH * 4 + (self.NH * self.HD * 4) // 256
                    + self.dims["rope_dim"] * 4)
         free = cp.cuda.runtime.memGetInfo()[0] + cp.get_default_memory_pool().free_bytes()
         budget = free - int(os.environ.get("KINDI_MEM_RESERVE_MB", "96")) * 2 ** 20
@@ -290,10 +325,26 @@ class Engine(object):
             self.conv[il] = z(3 * self.CONV_CH)
         self.Kc = [None] * self.NATT
         self.Vc = [None] * self.NATT
-        for il in self.layers:
-            if il in self._kvi:
-                self.Kc[self._kvi[il]] = cp.zeros((self.ctx, self.NHKV, self.HD), dtype=cp.float16)
-                self.Vc[self._kvi[il]] = cp.zeros((self.ctx, self.NHKV, self.HD), dtype=cp.float16)
+        self.Kq = self.Kd = self.Vq = self.Vd = None
+        if self.kv == "q8_0":
+            from .tp import Dist
+            self.Kq, self.Kd, self.Vq, self.Vd = [None] * self.NATT, [None] * self.NATT, [None] * self.NATT, [None] * self.NATT
+            for il in self.layers:
+                if il in self._kvi:
+                    kvi = self._kvi[il]
+                    self.Kq[kvi] = cp.zeros((self.ctx, self.NHKV, self.HD), dtype=cp.int8)
+                    self.Kd[kvi] = cp.zeros((self.ctx, self.NHKV, self.HD // 32), dtype=cp.float16)
+                    self.Vq[kvi] = cp.zeros((self.ctx, self.NHKV, self.HD), dtype=cp.int8)
+                    self.Vd[kvi] = cp.zeros((self.ctx, self.NHKV, self.HD // 32), dtype=cp.float16)
+                    # the cache copies K/V as one byte stream per layer (checkpoints, parked conversations):
+                    # a Dist over the quantised row and its scales, as the plan engine exposes them
+                    self.Kc[kvi] = Dist([(cp.cuda.Device().id, self.Kq[kvi]), (cp.cuda.Device().id, self.Kd[kvi])], rows=True)
+                    self.Vc[kvi] = Dist([(cp.cuda.Device().id, self.Vq[kvi]), (cp.cuda.Device().id, self.Vd[kvi])], rows=True)
+        else:
+            for il in self.layers:
+                if il in self._kvi:
+                    self.Kc[self._kvi[il]] = cp.zeros((self.ctx, self.NHKV, self.HD), dtype=cp.float16)
+                    self.Vc[self._kvi[il]] = cp.zeros((self.ctx, self.NHKV, self.HD), dtype=cp.float16)
         self.shortlist = 0                 # > 0: fast head over this many clusters
         if self.hsl is not None:
             m = self.hsl
@@ -390,7 +441,12 @@ class Engine(object):
         return out
 
     def reset(self):
-        for a in self.M + self.conv + self.Kc + self.Vc:
+        state = self.M + self.conv
+        if self.kv == "q8_0":
+            state += self.Kq + self.Kd + self.Vq + self.Vd
+        else:
+            state += self.Kc + self.Vc
+        for a in state:
             if a is not None:
                 a.fill(0)
 
@@ -439,10 +495,17 @@ class Engine(object):
         cs, sn = self.cos_t[pos], self.sin_t[pos]
         self.k.k_rope((self.NH,), (256,), (q, cs, sn, self.qr, np.int32(self.HD)))
         self.k.k_rope((self.NHKV,), (256,), (Kn, cs, sn, self.kro, np.int32(self.HD)))
-        self.Kc[kvi][pos] = self.kro.reshape(self.NHKV, self.HD)
-        self.Vc[kvi][pos] = self.qkvbuf.reshape(self.NHKV, self.HD)
         n = pos + 1
-        self._attn_core(self.Kc[kvi][:n], self.Vc[kvi][:n], n, (n + 255) // 256)
+        if self.kv == "q8_0":
+            nblk = self.NHKV * self.HD // 32
+            self.k.k_store_q8(((64 * nblk + 1023) // 1024,), (min(1024, 64 * nblk),),
+                              (self.kro, self.qkvbuf, self.Kq[kvi][pos], self.Kd[kvi][pos],
+                               self.Vq[kvi][pos], self.Vd[kvi][pos], np.int32(nblk)))
+        else:
+            self.Kc[kvi][pos] = self.kro.reshape(self.NHKV, self.HD)
+            self.Vc[kvi][pos] = self.qkvbuf.reshape(self.NHKV, self.HD)
+        self._attn_core(self.Kc[kvi][:n] if self.kv != "q8_0" else None,
+                        self.Vc[kvi][:n] if self.kv != "q8_0" else None, n, (n + 255) // 256, kvi)
         grid, hb = self.fold_args(self.NH * self.HD)
         self.k.k_fold_fwht(grid, (512,), (self.att, self.sA, self.xp, hb))
         self.fold_hi(self.xp, self.NH * self.HD)
@@ -450,9 +513,22 @@ class Engine(object):
         self.pending = npart
         return h
 
-    def _attn_core(self, Kall, Vall, n, nch):
+    def _attn_core(self, Kall, Vall, n, nch, kvi=None):
         """Scores, softmax, values and the gated output of one attention layer into self.att. The 4:1 models use the
         fast kernels; the generic GQA kernels run one warp per position (8 positions per block)."""
+        if getattr(self, "kv", "f16") == "q8_0":
+            # the plan engine's q8_0 decode attention (k_attn_sq8t + k_attn_vq8w + k_attn_combn), for every G
+            self.k.k_q8row(((self.NH * self.HD + 1023) // 1024,), (1024,),
+                           (self.qr, self.qq, self.qd, np.int32(self.NH * self.HD // 32)))
+            self.k.k_attn_sq8t((self.NHKV, (self.ctx + 255) // 256), (256,),
+                               (self.Kq[kvi], self.Kd[kvi], self.qq, self.qd, self.sbuf,
+                                np.int32(n), np.int32(self.NHKV), np.int32(self.G)))
+            self.k.k_softmax_rows((self.NH,), (256,), (self.sbuf, np.int32(n)))
+            self.k.k_attn_vq8w((self.NHKV, 1, nch), (128,),
+                               (self.sbuf, self.Vq[kvi], self.Vd[kvi], self.apart,
+                                np.int32(n), np.int32(self.NH), np.int32(self.NHKV), np.int32(self.G)))
+            self.k.k_attn_combn((self.NH,), (256,), (self.apart, self.qn, self.att, np.int32(n), np.int32(self.NH)))
+            return
         if self.G == 4:
             self.k.k_attn_s4w((self.NHKV, min(32, (n + 31) // 32)), (256,),
                               (Kall, self.qr, self.sbuf, np.int32(n), np.int32(self.NHKV)))

@@ -31,7 +31,7 @@ between them per token.
 - **`gdn:N`** — the first `N` gated-delta (non-attention) layers, ascending. Attention layers stay on the
   GPU. This is the placement to prefer; see [where to put the CPU layers](#where-to-put-the-cpu-layers);
 - **`auto`** (or **`auto:MiB`** to also leave that much room) — the smallest `gdn:`-style set that makes
-  the requested context fit, computed from the pack's own tensor sizes, the fp16 K/V per attention layer
+  the requested context fit, computed from the pack's own tensor sizes, the q8_0 K/V per attention layer
   at that context, the head, the f32 file and a measured scratch allowance. It **refuses instead of
   splitting** when the model already fits, and refuses with the missing amount when no split can fit.
   `KINDI_TANDEM_RESERVE_MB` (default 512) sets the free memory it leaves behind.
@@ -40,9 +40,9 @@ between them per token.
 default). `auto` — the default — takes the plan engine (`kindi/tp.py`) whenever one card is visible and
 `KINDI_TP` is not `0`. It is the better owner because it loads only the GPU-owned tensors, keeps the
 q8_0 K/V cache (half of fp16) for the attention layers it owns, reads the f32 file per tensor instead of
-uploading it whole, and keeps the embedding in pinned host memory. `plain` keeps the fp16-K/V engine and
-stays available for an A/B comparison; it is also the only owner for a split across two GPU cards, which
-a plan owner cannot do. See [the GPU owner](#the-gpu-owner-plan-engine-not-plain) for the measurements.
+uploading it whole, and keeps the embedding in pinned host memory. `plain` is the same q8_0 cache in
+`kindi/engine.py` (`Engine(..., kv="q8_0")`) and stays available for an A/B comparison; it is also the
+only owner for a split across two GPU cards, which a plan owner cannot do. See [the GPU owner](#the-gpu-owner-plan-engine-not-plain) for the measurements.
 
 `kindi bench --json` records the resolved `cpu_range`/`gpu_range` of a run, so a recorded split is
 unambiguous.
@@ -237,7 +237,7 @@ owner's peaks are 1.7 GiB lower at the same placement (see the next section).
 
 Hand-picking a layer count is easy to get wrong in both directions, so `--tandem-cpu-layers auto`
 computes the minimum set. It uses the pack's real tensor sizes (`kindi/tandem.py:pack_bytes`: bcodes
-plus one fp16 scale per 128-column group, or 4 bytes per f32 value), the fp16 K/V of each attention
+plus one fp16 scale per 128-column group, or 4 bytes per f32 value), the q8_0 K/V of each attention
 layer the GPU keeps, the output head, the whole f32 file and a 192 MiB scratch allowance, checked
 against the free VRAM before the model loads. The estimate is accurate: on this 27B at 24,576 it
 predicts 7,778 MiB against a measured plan-engine peak of 7,783 MiB.
@@ -255,8 +255,8 @@ the 512 MiB reserve by default (`KINDI_TANDEM_RESERVE_MB`).
 it splits even when the model would fit unsplit. Measured on the 9B at 8,192: 14 GDN layers on the CPU,
 5,523 MiB free after load, read 17.5 and 8K decode 16.9 tok/s — useful when something else needs the
 card, not a throughput choice. The freed number the planner reports is against the **plain** engine's
-allocation, which is ~600 MiB above the plan engine's row at 8K (q8_0 K/V vs fp16), so do not compare
-it with a full-GPU row taken on the plan engine.
+allocation (the whole f32 file and the device embedding copy), which sits above the plan engine's row at
+the same placement, so do not compare it with a full-GPU row taken on the plan engine.
 
 ### The GPU owner: plan engine, not plain (2026-11-14)
 
@@ -291,9 +291,21 @@ The full record (commands, medians, ranges and the exactness runs) is
 [benchmarks/2026-11-14-i7-8086k-rtx4060ti-plan-owner/RESULTS.md](benchmarks/2026-11-14-i7-8086k-rtx4060ti-plan-owner/RESULTS.md).
 
 The estimate follows the owner: `gpu_estimate(..., owner=...)` charges the plain engine the whole f32
-file, the device copy of the embedding and fp16 K/V, and the plan engine the owned layers' f32 slices,
+file, the device copy of the embedding and q8_0 K/V, and the plan engine the owned layers' f32 slices,
 no embedding and q8_0 K/V. On the 27B at 24K the plan estimate predicts 6,548 MiB and the run peaked at
 6,444-6,756 MiB, so `auto` keeps the 512 MiB reserve it promises.
+
+**Plain-engine q8_0 (2026-11-14, re-measured).** The plain engine gained the same q8_0 cache
+(`KINDI_KV=q8_0`, decode-only: the chunked prompt path writes an fp16 cache, so prompts feed one token
+per call), and the tandem's plain owner now always uses it. It is token-exact against the fp16
+references at verify length on the 2B, 9B and 27B, and its K/V copies round-trip through the prompt
+cache byte-exactly (same `Dist` view as the plan engine). On the 27B at 24K `gdn:16` its sampled peak
+falls from 7,721 MiB (fp16) to ~7,110 MiB (995 MiB free after load, delta over idle ~6,150 MiB against
+~6,770 MiB before; byte accounting expects ~225 MiB of that, the rest is day-to-day device baseline),
+read 8.0-8.7 and decode 6.7-8.4 tok/s. The plan owner, re-run the same day, peaks at 6,091 MiB (1,985
+MiB free) — still ~1 GiB below the plain owner, because it reads the f32 file per tensor and keeps the
+embedding in pinned host memory. Full record:
+[benchmarks/2026-11-14-i7-8086k-rtx4060ti-plain-q8/RESULTS.md](benchmarks/2026-11-14-i7-8086k-rtx4060ti-plain-q8/RESULTS.md).
 
 What the freed memory buys is context, not rate: asked for 49,152 tokens, the unsplit plan engine reduces
 the context to **30,976** (122 MiB free), while the plan-owner split keeps all **49,152** (1,074 MiB

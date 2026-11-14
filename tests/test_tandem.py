@@ -18,7 +18,8 @@ from kindi.engine import Engine
 class FakeEngine(object):
     D = 4
 
-    def __init__(self, pack, ctx=4096, log=None, layers=None, embed=True, head=True):
+    def __init__(self, pack, ctx=4096, log=None, layers=None, embed=True, head=True, kv=None):
+        self.kv = kv or "f16"
         self.ctx = int(ctx)
         self.layers = None if layers is None else tuple(layers)
         self.embed_owned, self.head_owned = bool(embed), bool(head)
@@ -109,8 +110,8 @@ def fake_pack(tmp_path):
 class FakeCPUEngine(FakeEngine):
     """The CPU backend keeps compact per-owner state lists (it only loads its layers)."""
 
-    def __init__(self, pack, ctx=4096, log=None, layers=None, embed=True, head=True):
-        super().__init__(pack, ctx=ctx, log=log, layers=layers, embed=embed, head=head)
+    def __init__(self, pack, ctx=4096, log=None, layers=None, embed=True, head=True, kv=None):
+        super().__init__(pack, ctx=ctx, log=log, layers=layers, embed=embed, head=head, kv=kv)
         if self.layers is not None:
             self.M, self.conv, self.Kc, self.Vc = [], [], [], []
             for il in self.layers:
@@ -242,8 +243,9 @@ def test_pack_bytes_counts_the_engine_allocation(tmp_path):
 def test_gpu_estimate_charges_kv_only_for_attention_layers_it_keeps():
     dims = {"layers": 8, "full_attention_interval": 4, "kv_heads": 2, "head_dim": 16}
     sizes = {"layers": {il: 1000 for il in range(8)}, "embed": 500, "head": 500, "f32": 100}
-    kv = tandem.kv_bytes(dims, 1024)
-    assert kv == 1024 * 2 * 16 * 2 * 2
+    # the plain GPU owner keeps q8_0 K/V (one int8 per value plus one fp16 scale per 32 values)
+    kv = tandem.kv_bytes(dims, 1024, "q8_0")
+    assert kv == int(1024 * 2 * 2 * 16 * tandem.Q8_0)
     scratch = tandem.SCRATCH_MIB * 2 ** 20
     full = tandem.gpu_estimate(dims, sizes, 1024)
     assert full == scratch + 100 + 500 + 500 + 8000 + 2 * kv      # attention layers 3 and 7
@@ -456,14 +458,16 @@ def test_the_plan_owner_gets_only_the_gpu_layers_and_the_head(fake_pack, fake_ba
                                 log=lambda *a: None, gpu="plain")
     assert plain.cache_fingerprint()["gpu_owner"] == "plain"
     assert plain.cache_fingerprint() != eng.cache_fingerprint()
+    # the plain owner is constructed with q8_0 K/V, so offloaded layers free their K/V too
+    assert plain.gpu.kv == "q8_0"
 
 
 def test_a_plan_owner_frees_the_weights_and_half_the_kv_of_an_offloaded_layer():
     """Requirement: an offloaded layer frees VRAM under both owners, but the plan owner frees more.
 
-    The plan engine reads the f32 file per tensor (only owned layers), keeps q8_0 K/V (half of fp16)
-    and keeps the embedding in pinned host memory; the plain engine uploads the whole f32 file, the
-    embedding and fp16 K/V. Compare the two estimates for the 27B geometry.
+    Both owners keep q8_0 K/V; the plan engine additionally reads the f32 file per tensor (only owned
+    layers) and keeps the embedding in pinned host memory, while the plain engine uploads the whole f32
+    file and the embedding. Compare the two estimates for the 27B geometry.
     """
     dims = {"layers": 64, "heads": 24, "kv_heads": 4, "head_dim": 256, "state_size": 128,
             "groups": 16, "gdn_inner": 6144, "ffn": 17408, "full_attention_interval": 4}
@@ -476,10 +480,14 @@ def test_a_plan_owner_frees_the_weights_and_half_the_kv_of_an_offloaded_layer():
     plan_full = tandem.gpu_estimate(dims, sizes, ctx, (), owner="plan")
     plain_full = tandem.gpu_estimate(dims, sizes, ctx, (), owner="plain")
     assert plan_full < plain_full
-    # the fp16 K/V of 16 attention layers is 2x the q8_0 K/V (the plain engine's dominant overhead)
+    # q8_0 K/V is about half of fp16 (the plain engine's old cache)
     fp16 = 16 * tandem.kv_bytes(dims, ctx)
     q8 = 16 * tandem.kv_bytes(dims, ctx, "q8_0")
     assert q8 == pytest.approx(fp16 / 2, rel=0.07)
+    # and it is also what the plain owner is now charged, to the byte (not the fp16 size)
+    manual = (tandem.SCRATCH_MIB * 2 ** 20 + 100 * 2 ** 20 + 130 * 2 ** 20 + 130 * 2 ** 20
+              + 64 * layer + 16 * tandem.kv_bytes(dims, ctx, "q8_0"))
+    assert plain_full == manual
     freed = {}
     off = tuple(range(4, 36, 4))                        # eight GDN layers, layer 0 stays on the GPU
     for owner in ("plan", "plain"):

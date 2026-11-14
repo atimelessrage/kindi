@@ -137,14 +137,14 @@ is where it is read, which is where the full description lives.
 | `KINDI_G5_PINS` | (empty) | `kindi/tp.py:135` |
 | `KINDI_G5_TUNE` | `1` | `kindi/tp.py:149` |
 | `KINDI_G5_TUNELOG` | (unset) | `kindi/tp.py:256` |
-| `KINDI_GEMV_BLOCKS` | (unset) | `kindi/engine.py:171` |
+| `KINDI_GEMV_BLOCKS` | (unset) | `kindi/engine.py:197` |
 | `KINDI_HIP_LIB` | `libamdhip64.so` | `kindi/gpudrv.py:28` |
 | `KINDI_HOST_RAM_CHECK` | `1` | `kindi/hostram.py:23` |
 | `KINDI_KEXPF` | (empty) | `kindi/spec.py:153` |
-| `KINDI_KV` | `q8_0` | `kindi/tp.py:48` |
+| `KINDI_KV` | (empty) or `q8_0` | `kindi/engine.py:75` (+1 more) |
 | `KINDI_KV_EXPERIMENTAL` | `0` | `kindi/tp.py:52` |
 | `KINDI_LLVM` | (unset) | `kindi/cpu.py:91` |
-| `KINDI_MEM_RESERVE_MB` | `96` or `32` | `kindi/engine.py:270` (+2 more) |
+| `KINDI_MEM_RESERVE_MB` | `96` or `32` | `kindi/engine.py:305` (+2 more) |
 | `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:634` |
 | `KINDI_NB_CPUF` | `0.55` | `kindi/nanbeige.py:33` |
 | `KINDI_NB_EMBD_HOST` | `"1" if kepler(cp, devices[0]) else "0"` | `kindi/nanbeige.py:266` |
@@ -190,9 +190,9 @@ is where it is read, which is where the full description lives.
 | `KINDI_SPEC_PACK` | (unset) | `kindi/spec.py:1765` (+1 more) |
 | `KINDI_SPEC_SAMPLE` | `1` | `kindi/spec.py:1225` |
 | `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1770` |
-| `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:167` |
-| `KINDI_TANDEM_GPU` | `auto` | `kindi/tandem.py:329` |
-| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/tandem.py:368` |
+| `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:193` |
+| `KINDI_TANDEM_GPU` | `auto` | `kindi/tandem.py:330` |
+| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/tandem.py:369` |
 | `KINDI_TC` | `0` | `kindi/spec.py:80` (+2 more) |
 | `KINDI_TC_B2` | (empty) | `kindi/tc.py:51` |
 | `KINDI_TC_DP4A` | `0` | `kindi/tc.py:74` |
@@ -207,6 +207,6 @@ is where it is read, which is where the full description lives.
 | `KINDI_TC_TMAX` | `8` | `kindi/spec.py:45` |
 | `KINDI_TC_TUNE` | `0` | `kindi/spec.py:429` (+1 more) |
 | `KINDI_TESTED_CC` | (empty) | `kindi/tc.py:39` |
-| `KINDI_THP` | `0` | `kindi/engine.py:69` |
-| `KINDI_TP` | (empty) | `kindi/engine.py:637` (+1 more) |
+| `KINDI_THP` | `0` | `kindi/engine.py:88` |
+| `KINDI_TP` | (empty) | `kindi/engine.py:713` (+1 more) |
 | `KINDI_TP_SPLIT` | `equal` | `kindi/tp.py:967` |

@@ -234,7 +234,7 @@ def _tandem_args(s):
     s.add_argument("--tandem-gpu", choices=("auto", "plan", "plain"), default=None,
                    help="engine that owns the GPU side of a tandem split: auto (the plan engine, "
                         "which loads only the GPU-owned layers and uses q8_0 K/V), plan or plain "
-                        "(the fp16-K/V engine; the only owner for a two-card split)")
+                        "(also q8_0 K/V; the only owner for a two-card split)")
 
 
 def main(argv=None):
