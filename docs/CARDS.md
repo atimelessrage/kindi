@@ -359,12 +359,34 @@ option `amdgpu.cwsr_enable=0`. [AMD.md](AMD.md) gives the settings.
 
 | item | value |
 |---|---|
-| models | 2B, 4B or 9B (`/data/pack`, `/data/pack4b`, `/data/pack9b`) |
+| silicon | GM204, 28 nm, 1,664 CUDA cores, 1,500 MHz boost, about 4.99 TFLOPS FP32 |
+| memory | 8 GB GDDR5, 256-bit, 256 GB/s, on-die ECC; PCIe 3.0 x16, 120 W |
+| installer class | `maxwell` (sm_52 has no `pascal8` branch; the class is Maxwell by compute capability, not by size) |
+| models | 2B, 4B or 9B (`/data/pack`, `/data/pack4b`, `/data/pack9b`); 27B is not offered |
 | variables | `KINDI_CTX=24576`, `KINDI_BLOCKING_SYNC=0` |
+| tensor cores | none. `KINDI_TC=1` refuses on sm_52 by design (`tc.supported()` requires sm_60+); that refusal is the expected record, not a failure |
+| pairs | M4000 + P4000 is offered with `KINDI_G5=0` (both cards drop to the 2-bit path) |
 | generation | not yet measured; expect Maxwell-class speed |
+| page | [M4000.md](M4000.md); session script [OLD-CARD-RIG.md](OLD-CARD-RIG.md) |
 
 - 8 GB of memory. The 27B can be tried manually with `KINDI_PACK=/data/pack27b`; the engine fits the context to the free memory. It is not offered by default.
 - The rig session script (commands, evidence, fallbacks) is [OLD-CARD-RIG.md](OLD-CARD-RIG.md); `KINDI_TC=1` on sm_52 refuses by design and that refusal is the expected record.
+
+## Quadro P4000, 8 GB (Pascal, sm_61)
+
+| item | value |
+|---|---|
+| silicon | GP104, 16 nm, 1,792 CUDA cores, 1,505/1,709 MHz, about 5.48 TFLOPS FP32 |
+| memory | 8 GB GDDR5, 256-bit, 256 GB/s, on-die ECC; PCIe 3.0 x16 half-height, 105 W, four DisplayPort 1.3 |
+| installer class | `pascal8` (sm_61 with 8,192 MiB clears the 7,500 MiB gate) |
+| models | 27B, 9B, 4B, 2B in that order - one of only three classes that offers the 27B on one card; the 8 GB fit is unverified |
+| variables | `KINDI_CTX=24576`, `KINDI_BLOCKING_SYNC=0`, `KINDI_CHUNK_Q8` on by default on sm_61 |
+| tensor cores | none; the dp4a Pascal kernels exist (`tc.pascal()` accepts major 6) but `pascal8` does not enable `KINDI_TC=1`, so forcing it is the interesting experiment |
+| pairs | P4000 + P106 is offered without `KINDI_G5=0` (both cards 5-trit); M4000 + P4000 with `KINDI_G5=0` |
+| generation | not yet measured; the GTX 1080 (same sm_61 family) is 4/4 token-exact on the 27B, but the P4000 still needs its own run |
+| page | [P4000.md](P4000.md); session script [OLD-CARD-RIG.md](OLD-CARD-RIG.md) |
+
+- The 27B weights are about 6.7 GB, so a few hundred MiB is left for the K/V; `kindi bench --sample-vram` records the peak and the context reduction, which is the number that decides the support row.
 
 ## GeForce 940M, 2 GB (Maxwell 1.0, sm_50)
 
