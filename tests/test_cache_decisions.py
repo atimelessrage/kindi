@@ -250,3 +250,94 @@ def test_runner_metrics_count_parked_drops():
     m = r.metrics()
     assert m["parked"] == 0 and m["parked_dropped"] == 1
     assert m["evicted_bytes"] == 100 + 30
+
+
+# ---------- shared parked K/V blocks ----------
+
+def _share_runner(n_tok=2000, prefix=1536):
+    """A Runner whose engine's K/V hold fixed row values, so parked rows are verifiable."""
+    r = bare_runner()
+    eng = SimpleNamespace(ctx=8192, M=[], conv=[])
+    eng.Kc = [np.full((n_tok, 2, 2), 3, dtype=np.float16)]
+    eng.Vc = [np.full((n_tok, 2, 2), 4, dtype=np.float16)]
+    r.eng = eng
+    r.tokens = list(range(prefix)) + list(range(100000, 100000 + n_tok - prefix))
+    r.prefix_min, r.park_max, r.session = 1, 10, None
+    r.slot = None
+    r.state_bytes = 10
+    r.budget = 1 << 62
+    r.kv_tok = 16
+    r.ckpt, r.parked, r.keep_pos = {}, [], []
+    r._kv_blocks = {}
+    r.log = lambda *a, **k: None
+    return r
+
+
+def test_parked_conversations_share_their_prefix_blocks():
+    r1 = _share_runner()
+    r1._park()
+    one = len(r1._kv_blocks)
+    assert one == 1                                     # 1536 tokens = one full 1024 block + a tail
+    assert r1._kv_blocks[r1.parked[0]["block_keys"][0]]["refs"] == 1
+
+    # a second conversation with the same 1536-token prefix parks: the shared blocks are
+    # referenced again, not copied (one new block set for the tail not shared is impossible here:
+    # only the tail differs, and the tail is per-entry, not in the block store).
+    r2 = _share_runner()
+    r2.tokens = list(range(1536)) + list(range(200000, 200000 + 2000 - 1536))
+    r2._kv_blocks = r1._kv_blocks
+    r2._park()
+    # the second park adds exactly ONE reference per shared block, no new block
+    assert len(r2._kv_blocks) == one
+    for k in r2.parked[0]["block_keys"]:
+        assert r2._kv_blocks[k]["refs"] == 2
+    # the tail is relative to the block floor (1024), not the prefix: 2000 - 1024 = 976 rows per entry,
+    # and it lives in the entry, not in the block store
+    assert len(r2.parked[0]["tail"][0][1]) == 1 and r2.parked[0]["tail"][0][1][0].shape[0] == 976
+
+
+def test_shared_blocks_restore_the_same_rows():
+    r = _share_runner()
+    r._park()
+    P = r.parked[0]
+    Ks, Vs = r._parked_kv(P)
+    n = len(P["tokens"])
+    assert np.array_equal(Ks[0], np.full((n, 2, 2), 3, dtype=np.float16))
+    assert np.array_equal(Vs[0], np.full((n, 2, 2), 4, dtype=np.float16))
+    # after a positional slice restore (what _unpark does) the prefix still matches
+    pos = 1200
+    assert np.array_equal(Ks[0][:pos], np.full((pos, 2, 2), 3, dtype=np.float16))
+
+
+def test_drop_releases_the_shared_blocks():
+    r = _share_runner()
+    r._park()
+    assert r._kv_blocks
+    r._drop_parked()
+    assert not r.parked and r._kv_blocks == {}      # refcount hit zero: blocks dropped with the entry
+
+
+def test_three_parked_sessions_share_their_opening_blocks():
+    """Prior-art #6 mechanism: parked sessions sharing a prefix store its K/V blocks once.
+
+    (Not asserted: the original <=1.2x host-RAM gate. It is unsatisfiable in this architecture:
+    the 90% dedupe rule only lets sibling sessions coexist if each has >=456 post-opening tokens,
+    and the per-conversation end state is not shared; see docs/ROADMAP.md.)
+    """
+    r = _share_runner(n_tok=4596, prefix=4096)
+    r.eng.Kc = [np.full((4596, 2, 2), 1, dtype=np.float16)]
+    r.eng.Vc = [np.full((4596, 2, 2), 1, dtype=np.float16)]
+    r.tokens = list(range(4096)) + list(range(50000, 50500))   # one shared 4K opening, 500-token tail
+    r._park()
+    for i, start in enumerate((100000, 200000)):
+        r.tokens = list(range(4096)) + list(range(start, start + 500))
+        r.eng.Kc = [np.full((4596, 2, 2), i + 2, dtype=np.float16)]
+        r.eng.Vc = [np.full((4596, 2, 2), i + 2, dtype=np.float16)]
+        r._park()
+    assert len(r.parked) == 3
+    assert len(r._kv_blocks) == 4                         # four 1024-blocks, referenced 3 times each
+    assert all(b["refs"] == 3 for b in r._kv_blocks.values())
+    # per-block K held the distinct host values of the conversation that stored it (i==0 => 1)
+    assert np.all(r._kv_blocks[r.parked[0]["block_keys"][0]]["K"][0] == 1)
+    # and the shared blocks cost exactly one session's worth of K/V (not three)
+    assert len(r._kv_blocks) * 1024 * r.kv_tok == 4096 * r.kv_tok

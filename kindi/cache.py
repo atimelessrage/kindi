@@ -6,7 +6,9 @@ Bonsai's Gated-DeltaNet layers carry a recurrent state that cannot be rewound, s
     position-indexed and stays valid for any prefix);
   * parked conversations: when a request is unrelated to the active conversation (shares < 50 % of it), the active
     one - tokens, checkpoints, end state and K/V - is moved to host RAM (`park_max` kept) and resumed when its next
-    turn arrives (agents alternate between their main prompt and side prompts);
+    turn arrives (agents alternate between their main prompt and side prompts). The shared-prefix rows of parked
+    conversations are parked as content-keyed blocks stored once and refcounted: sessions that share a long opening
+    hold its K/V ~once, not once each;
   * saved openings: when two requests share >= `prefix_min` tokens and then differ, the full state at that checkpoint
     is written to disk (`prefix_max` kept, least recently used dropped), so the next session that starts the same way
     (same system prompt and tools) loads it in a fraction of a second, also after a restart;
@@ -304,6 +306,20 @@ class Openings(object):
         return p, Ms, Cs
 
 
+def _kv_block_keys(T, B=1024):
+    """The key of every full K/V block of a conversation: the hash of all tokens up to the block's end.
+
+    A K/V row depends on every earlier token, so two conversations whose tokens agree on a block
+    hold identical rows there - the blocks are shareable, refcounted, and never copied twice.
+    """
+    T = np.asarray(T, dtype=np.int32)
+    h, out = hashlib.sha1(), []
+    for i in range(len(T) // B):
+        h.update(T[i * B:(i + 1) * B].tobytes())
+        out.append(h.copy().hexdigest()[:24])
+    return out
+
+
 def _host_rows(a, lo, hi):
     """host copy of rows [lo, hi) of a K/V cache array. A multi-card cache (tp.Dist) gives only [:hi]: copy that
     and cut it on the host."""
@@ -377,11 +393,7 @@ class Turns(object):
         return hashlib.sha1(np.asarray(tokens, dtype=np.int32).tobytes()).hexdigest()[:20]
 
     def _block_keys(self, T):
-        h, out = hashlib.sha1(), []
-        for i in range(len(T) // self.B):
-            h.update(T[i * self.B:(i + 1) * self.B].tobytes())
-            out.append(h.copy().hexdigest()[:24])
-        return out
+        return _kv_block_keys(T, self.B)
 
     # ---- the engine thread
     def capture(self, tokens, state=None):
@@ -743,6 +755,9 @@ class Runner(object):
         self.peak_bytes = 0                           # eviction telemetry for /metrics (mirrors gemma4_cache)
         self.evictions = self.evicted_bytes = self.checkpoints_dropped = self.parked_dropped = 0
         self.tokens, self.ckpt, self.parked = [], {}, []
+        # share parked K/V blocks between conversations (see `_park`): identical prefixes are stored once,
+        # refcounted, so N sessions sharing a long opening hold its rows ~once, not N times.
+        self._kv_blocks = {}
         self.fingerprint = engine_fingerprint(eng, cfg)
         log("engine fingerprint %s: %s" % (self.fingerprint[0], json.dumps({k: v for k, v in self.fingerprint[1].items()
                                                                            if k != "code"})))
@@ -799,8 +814,16 @@ class Runner(object):
                 if id(v) not in seen:
                     seen.add(id(v))
                     tot += self.state_bytes
+        blocks = getattr(self, "_kv_blocks", None) or {}
+        kv_tok = getattr(self, "kv_tok", None)
+        if blocks and kv_tok is not None:
+            tot += len(blocks) * Turns.B * kv_tok     # shared K/V blocks, once each
         for P in self.parked:
-            tot += self.state_bytes + P["kv_bytes"]
+            tot += self.state_bytes
+            if "block_keys" in P and kv_tok is not None:
+                tot += max(0, len(P["tokens"]) - len(P["block_keys"]) * Turns.B) * kv_tok
+            else:
+                tot += P.get("kv_bytes", 0)          # pre-sharing entries (and bare test doubles)
         return tot
 
     def _enforce(self):
@@ -858,7 +881,21 @@ class Runner(object):
     def _drop_parked(self):
         P = self.parked.pop(self._victim())
         self.parked_dropped = getattr(self, "parked_dropped", 0) + 1
+        self._release_blocks(P)
         self.evicted_bytes = getattr(self, "evicted_bytes", 0) + self.state_bytes + P.get("kv_bytes", 0)
+
+    def _release_blocks(self, P):
+        """Drop one parked entry's references to the shared K/V block store."""
+        blocks = getattr(self, "_kv_blocks", None)
+        if blocks is None:
+            return
+        for k in P.get("block_keys", ()):
+            blk = blocks.get(k)
+            if blk is None:
+                continue
+            blk["refs"] -= 1
+            if blk["refs"] <= 0:
+                del blocks[k]
 
     def metrics(self):
         """eviction telemetry for /metrics and tests"""
@@ -898,9 +935,24 @@ class Runner(object):
         self.parked = [P for P in self.parked if _lcp(P["tokens"], toks) < 0.9 * len(P["tokens"])]
         while len(self.parked) > self.park_max - 1:         # make room first: never two parked K/V copies at once
             self._drop_parked()
+        # the K/V rows of the shared prefix are not copied per conversation: every full block is
+        # stored once in the shared block store (same keys as Turns' disk blocks) and refcounted;
+        # only the sub-block tail and the end state are this conversation's own.
+        B = Turns.B
+        keys = _kv_block_keys(toks, B)
+        for i, k in enumerate(keys):
+            lo, hi = i * B, (i + 1) * B
+            blk = self._kv_blocks.get(k)
+            if blk is None:
+                blk = {"K": [_host(a[lo:hi]) if lo else _host(a[:hi]) for a in self.eng.Kc],
+                       "V": [_host(v[lo:hi]) if lo else _host(v[:hi]) for v in self.eng.Vc], "refs": 0}
+                self._kv_blocks[k] = blk
+            blk["refs"] += 1
+        lo = len(keys) * B
+        tail = ("K", [_host(a[lo:n]) for a in self.eng.Kc]), ("V", [_host(v[lo:n]) for v in self.eng.Vc])
         P = {"tokens": toks, "ckpt": dict(self.ckpt), "kv_bytes": kvb, "session": self.session,
              "end": ([_host(m) for m in self.eng.M], [_host(c) for c in self.eng.conv]),
-             "K": [_host(k[:n]) for k in self.eng.Kc], "V": [_host(v[:n]) for v in self.eng.Vc]}
+             "block_keys": keys, "tail": tail}
         self.parked.insert(0, P)
         del self.parked[self.park_max:]
         # no _enforce() here: the active dict still holds the same checkpoint copies, so nothing could be freed and
@@ -921,12 +973,32 @@ class Runner(object):
         share = (pos < len(self.parked[i]["tokens"]) and os.environ.get("KINDI_PARK_BRANCH", _PARK_DEFAULT) == "1"
                  and os.environ.get("KINDI_PARK_SHARE", "1") == "1")
         P = self.parked[i] if share else self.parked.pop(i)
+        if not share:
+            self._release_blocks(P)
         self._restore(P["end"] if pos == len(P["tokens"]) else P["ckpt"][pos])
+        Ks, Vs = self._parked_kv(P)
         for l in range(len(self.eng.Kc)):
-            _to_dev(self.eng.Kc[l], pos, P["K"][l])
-            _to_dev(self.eng.Vc[l], pos, P["V"][l])
+            _to_dev(self.eng.Kc[l], pos, Ks[l])
+            _to_dev(self.eng.Vc[l], pos, Vs[l])
         self.tokens = P["tokens"][:pos]
         self.ckpt = {p: v for p, v in P["ckpt"].items() if p <= pos}
+
+    def _parked_kv(self, P):
+        """Rebuild a parked entry's host K/V rows from the shared block store plus its own tail."""
+        keys = P.get("block_keys", ())
+        blocks = getattr(self, "_kv_blocks", None) or {}
+        tail = P.get("tail") or ((("K", []), ("V", [])))
+        Ks, Vs = [], []
+        for l in range(len(self.eng.Kc)):
+            krows = [blocks[k]["K"][l] for k in keys]
+            if tail[0][1]:
+                krows.append(tail[0][1][l])
+            Ks.append(np.concatenate(krows) if len(krows) > 1 else (krows[0].copy() if krows else np.empty((0,) + tuple(self.eng.Kc[l].shape[1:]), self.eng.Kc[l].dtype)))
+            vrows = [blocks[k]["V"][l] for k in keys]
+            if tail[1][1]:
+                vrows.append(tail[1][1][l])
+            Vs.append(np.concatenate(vrows) if len(vrows) > 1 else (vrows[0].copy() if vrows else np.empty((0,) + tuple(self.eng.Vc[l].shape[1:]), self.eng.Vc[l].dtype)))
+        return Ks, Vs
 
     # ---- the request path
     def prepare(self, T, boundary, opening_end=None, cancel=None, session=None):
