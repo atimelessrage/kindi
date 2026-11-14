@@ -15,7 +15,7 @@ is at `/data/<pack>`. The examples serve on `127.0.0.1:8093`.
 ```
 docker run -d --name kindi --restart unless-stopped --gpus all -u $(id -u):$(id -g) \
   -p 127.0.0.1:8093:8093 -v $HOME/.kindi:/data -e HOME=/tmp \
-  -e KINDI_PACK=/data/pack -e KINDI_STATE_DIR=/data/state ... kindi:0.5.0
+  -e KINDI_PACK=/data/pack -e KINDI_STATE_DIR=/data/state ... kindi:0.6.0
 ```
 
 Replace `...` with the variables in the section for your card. To use one card of two, set `--gpus device=N`.
@@ -98,6 +98,9 @@ Replace `...` with the variables in the section for your card. To use one card o
   memory, so an 8 GB card gets a smaller context. A GTX 1070 with no monitor connected got 43,008 tokens for the 27B.
   `KINDI_MEM_RESERVE_MB` sets the memory that the fit keeps free. A smaller value gives more context, but the
   risk of an out-of-memory error is higher.
+- The 43,008-token limit comes from the WDDM driver, not from Kindi or the card. On the same GTX 1070 in TCC mode
+  (a driver change that Kindi does not need or support), the 27B got 66,560 tokens. `kindi verify` passed in both
+  modes, and the write speed was the same (22.0 to 22.9 tokens/s). Report: epscheel (GitHub), issue #33.
 
 ## GeForce RTX 3080, 10 GB (Ampere, sm_86)
 
@@ -107,11 +110,6 @@ Replace `...` with the variables in the section for your card. To use one card o
 | variables | `KINDI_PACK=/data/pack27b`, `KINDI_CARDS=1`, `KINDI_CTX=131072`, `KINDI_MEM_RESERVE_MB=128`, `KINDI_HEAD=exact`, `KINDI_CHECKPOINT_BUDGET_MB=1024`, `KINDI_PARK_MAX=1`, `KINDI_REPEAT_STOP=1` |
 | docker | `--memory 14g` (the first load needs it) |
 | context | 110,592 tokens (the fit to the free memory) |
-| generation | 47-49 tokens/s at a short context, 29 at 64K |
-| prompt reading | 491 tokens/s at 512 tokens, 381 at 22K |
-
-These figures are from kindi-rel, 10-21, not the 0.2.0 build.
-
 Tensor cores and speculative decoding (sm_80 and later). This is the profile of the RTX 3080 cluster servers, and
 the installer uses it:
 
@@ -142,7 +140,7 @@ reading 1,093 tokens/s at 512 to 855 at 22K.
 
 ## Tesla P100, 16 GB (Pascal, sm_60)
 
-The Tesla P100 has been supported since Kindi 0.4.0. A used card costs $78 to $160. It has 16 GB of HBM2 memory with a
+The Tesla P100 is a supported card in Kindi 0.4.0. A Tesla P100 costs $78 to $160. It has 16 GB of HBM2 memory with a
 bandwidth of 732 GB/s. Photo: GP100 chip of a Tesla P100, by Fritzchens Fritz, Wikimedia Commons (CC0).
 
 | item | value |
@@ -158,14 +156,46 @@ bandwidth of 732 GB/s. Photo: GP100 chip of a Tesla P100, by Fritzchens Fritz, W
 - On the same P100, Kindi writes the 27B 1.9 to 2.7 times as fast as llama.cpp (one card, SXM2 box: 1.9; PCIe box: 2.0
   on one card and 2.5 to 2.7 on two cards).
 - The fp16 prompt path is on by default for sm_60 (`KINDI_P100_FP16_PROMPT=0` turns it off). With it, Kindi reads a
-  prompt 14% (512 tokens) and 12% (8K) faster than llama.cpp on the same card. Without it, the read speed is below
-  llama.cpp.
+  prompt 14% (512 tokens) and 12% (8K) faster than llama.cpp on the same card.
 - Two P100 cards (PCIe, 200 W) hold the full 262,144-token context of the 27B, with 8.6 GB free on each card. Kindi reads a prompt of 262,016 tokens at 67.6 tokens/s and writes 15.8 tokens/s at that depth. Two cards also run the 33B.
 - Speculative decoding is off on the P100. On this card, a verify pass over several tokens costs about as much as the
   same number of single steps, so a draft cannot save time.
 - `kindi verify` passes on one P100 for the 2B, 4B and 27B (token-exact), and on two P100 cards for the 33B.
 - The numbers come from two rented machines (SXM2 with NVLink, and PCIe). The per-row setup notes are internal
   and are not part of this release.
+- `KINDI_CHUNK_Q8` stays off on the P100, and setting it to 1 does not turn it on. The int8 prompt path uses the
+  `dp4a` instruction, which starts at sm_61. The fp16 prompt path above replaces it on sm_60.
+- A user report (Kindi 0.3.0, one P100-PCIE-16GB at 125 W): the 9B fitted 426,752 tokens of context and wrote
+  41.3 tokens/s at that context; two 9B servers on one card gave 65.8 tokens/s in total (1.64 times one server).
+  Report: scuderiapk (GitHub), issue #22.
+
+## Tesla V100S, 32 GB (Volta, sm_70): user report
+
+| item | value |
+|---|---|
+| models | 2B, 27B (Kindi 0.3.0, the stock Docker image, `KINDI_BLOCKING_SYNC=0`, exact head, context 24,576) |
+| generation, 27B | 58.5 tokens/s at a short context, 52.0 at 16K, 48.2 at 24K; 56.6 over 512-token replies |
+| prompt reading, 27B | 282 tokens/s on a 1,732-token prompt |
+| generation, 2B | about 160 to 170 tokens/s at all depths to 16K |
+
+- `kindi verify` passed. The card was capped at 185 W (its default is 250 W).
+- Report: vntgeai (GitHub), issue #25. We did not measure this card ourselves.
+
+## Quadro M5000, 8 GB (Maxwell, sm_52): user report
+
+| item | value |
+|---|---|
+| models | 2B, 4B, 9B, 27B, Nemotron (Kindi 0.4.0, the packs of a K4000 reused without conversion) |
+| generation | 2B 139, 4B 72, 9B 50, 27B 17.8 tokens/s at 512 tokens |
+| prompt reading | 2B 695, 4B 264, 9B 142, 27B 39.0 tokens/s at 512 tokens |
+| context | Nemotron at its full 131,072 tokens; the 27B at 24K to 28K |
+
+- `kindi verify` passed on the 2B, 4B, 9B and 27B.
+- With the NVIDIA 580 driver, set `KINDI_BLOCKING_SYNC=0`: the default (blocking sync) cost 5 to 15% of the write
+  speed there (2B: 117 instead of 137 tokens/s). The 470 driver did not show this.
+- The 580 driver also uses 29 MiB more card memory, so the 27B at 28,672 tokens was fitted down to 27,904.
+- Report: rojecas (GitHub), issue #30. Installers before 0.6.0 showed this card as sm_50 on the 470 driver; it is
+  sm_52.
 
 ## NVIDIA CMP 170HX, 40 GB (GA100, sm_80)
 
@@ -206,11 +236,11 @@ use the 2-bit path. Kepler stays single-card. No mixed-card execution has been r
 
 | card | what we measured |
 |---|---|
-| RTX 3080 (190 W) | 27B: 62.3 tokens/s at 512 tokens. With the 2B draft model: 91.1 (1.46 times) at 512 tokens, 103.2 (1.68 times) at 8K with k=2, and 111.5 (1.82 times) at 8K with k=3. The same output as without the draft model. Against llama.cpp: see [BENCHMARKS.md](BENCHMARKS.md) |
+| RTX 3080 (190 W) | 27B: 62.3 tokens/s at 512 tokens. With the 2B draft model: 91.1 (1.46 times) at 512 tokens, 103.2 (1.68 times) at 8K with k=2, and 111.5 (1.82 times) at 8K with k=3. The same output as without the draft model. With DSpine: 115.5 tokens/s at 32K ([DSPINE.md](DSPINE.md)). Against llama.cpp: see [BENCHMARKS.md](BENCHMARKS.md) |
 | RTX 3060 12 GB | 27B: 41.1 tokens/s at 512 tokens; with the 2B draft model 60.6 (1.48 times), 73.5 (1.82 times) at 8K, 66.7 (1.81 times) at 24K |
 | RTX 4060 Ti 8 GB | tc plan (2026-11-11 one-pass matrix): 2B 4/4 token-exact, 370.2 tokens/s; 4B 3 exact + 1 tie (FD fallback); 9B 4/4 with `KINDI_TC_HP=1` (122.7 tokens/s; HB-4096 packs now get that exact setting automatically, 3/4 without it); 27B passes (3 exact + 1 tie; 38.9 one-pass, **38.1 median of 3**); 27B 24K benchmark 33.9 tokens/s at position 24,000 and server/cache pass. Plain 4B/9B 4/4. Details below |
 | RTX 5060 Ti 16 GB | installer classifies it as `tc` (sm_80+), but there is no Kindi exactness or speed run on Blackwell yet; this is not a support claim. See [CARD-SUPPORT.md](CARD-SUPPORT.md) |
-| other RTX 20 and 40 cards | supported on the plain engine; `kindi verify` passes. We give no speed numbers. RTX 50/Blackwell is unverified (see the 5060 Ti row) |
+| other RTX 20, 40 and 50 cards | supported on the plain engine; `kindi verify` passes. We give no speed numbers. RTX 50/Blackwell is unverified (see the 5060 Ti row) |
 
 ### RTX 4060 Ti 8 GB (Ada, sm_89)
 
@@ -288,6 +318,37 @@ tokens and 3.56 at 8,160 tokens, and llama.cpp (the same card, 10 layers on the 
 
 An agent tool such as opencode can use the 27B and the 33B together, because both run on Kindi's OpenAI-compatible
 server. Use the 27B for fast steps and the 33B for harder coding steps.
+
+## Nemotron 3.5 Lightning 30B-A3B (ternary)
+
+| item | value |
+|---|---|
+| model | Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf (`kindi use lightning-30b`): Nota AI's ternary version of NVIDIA Nemotron 3.5 Lightning 30B-A3B, as GGUF by boro64; model card: https://huggingface.co/boro64/Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF |
+| licence | the weights are not part of Kindi; their licence is OpenMDW 1.1 (https://openmdw.ai/license/1-1/) |
+| cards | one card with 10 GB or more holds the full model. On cards with 6 GB or 8 GB, the least used experts stay in host memory |
+| variables | `KINDI_CTX` (0: the largest context that fits; 60,416 positions on an RTX 3080 10 GB) |
+| RTX 3080 (190 W) | write: 310 tokens/s at 512 tokens, 299 at 8K, 277 at 32K. Read: 4,260 tokens/s at 512, 3,780 at 32K |
+| RTX 3090 (220 W) | write: 341 tokens/s at 512 tokens, 326 at 8K, 295 at 32K. Read: 4,790 tokens/s at 512, 4,010 at 32K |
+| RTX 2060 12 GB | write: 164 tokens/s at 512 tokens, 155 at 8K, 135 at 32K. Read: 1,950 tokens/s at 512, 1,730 at 32K |
+| RTX 2060, 6 GB held back | 60 of 128 experts per layer on the card. Write after a text prompt: 53 tokens/s at 512 tokens, 57 at 32K. Read: 1,415 tokens/s |
+| GTX 1080 8 GB | 95 of 128 experts per layer on the card. Write after a text prompt: 75 tokens/s at 512 tokens, 89 at 8K, 74 at 32K. Read: 745 tokens/s at 512, 536 at 32K |
+| Tesla P100 16 GB | write: 155 tokens/s at 512 tokens, 145 at 8K, 118 at 32K. Read: 654 tokens/s at 512, 605 at 32K |
+| Quadro K6000 | write: 61.9 tokens/s at 512 tokens, 48.3 at 8K, 32.8 at 32K. Read: 206 tokens/s at 512, 192 at 8K |
+
+The model has 52 layers: Mamba-2 layers, mixture-of-experts layers (128 experts, 6 for each token) and attention
+layers. The engine reads the weights from the GGUF file. `kindi convert` writes only a small manifest. The
+products use int8 activations in runs of 32, as llama.cpp does. `kindi verify` compares the output with llama.cpp.
+Where the output is different, verify shows that llama.cpp's top two tokens were almost equal there.
+
+Prompt reuse: the Mamba state cannot go back to an earlier position. So the server keeps a copy of the state at
+the start of the last assistant turn of each prompt. The next turn of the same chat starts from that copy.
+
+The Nemotron 3.5 Lightning backend was started by the work of slavalevski-tech
+([github.com/slavalevski-tech/kindi](https://github.com/slavalevski-tech/kindi)). slavalevski-tech first ran this model on Kindi
+and shared that backend under the Kindi CLA 1.1. The Kindi code is a new implementation. Thank you.
+
+Tool calls use the XML form of the chat template. After a tool result, the model often calls the same tool again.
+llama.cpp does the same with the same file. This is the behaviour of the model.
 
 ## AMD Radeon 780M (RDNA3, gfx1103)
 

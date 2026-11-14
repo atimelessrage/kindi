@@ -54,6 +54,15 @@ class _FakeKindi(object):
     def head_active(self):
         return "exact"
 
+    def after_turn(self, locked=False):
+        return None
+
+    def drafting(self):
+        return {"enabled": False, "method": None, "drafter": None, "last": None}
+
+    def progress(self):
+        return None
+
     def generate(self, req, cancel=None):
         # This is the old failure path: a malformed request reached the engine and raised a TypeError.
         if not isinstance(req.get("messages"), list):

@@ -45,6 +45,12 @@ def run(cfg, log=print):
             return 2
         from .nanbeige_cli import bench
         return bench(cfg, man, log=log)
+    if man.get("backend") == "kindi_lightning":
+        if cp is None:
+            log("kindi bench: the Lightning backend runs only on an NVIDIA GPU (KINDI_DEVICE=cpu is set or CuPy is missing)")
+            return 2
+        from .lightning_cli import bench
+        return bench(cfg, man, log=log)
     from .vram import VramMonitor
     # sample the card the engine will run on (the cupy device ordinal), not unconditionally GPU 0
     dev = 0

@@ -26,6 +26,7 @@ From `kindi/catalog.py`; card memory is the catalog's own fit estimate.
 | `bonsai-27b` | Ternary-Bonsai-2 27B (ternary weights) | `Ternary-Bonsai-2-27B-PTQ1_0.gguf` | 5.9 | 7600 MiB | 3800 MiB |
 | `nemotron-e4b` | NVIDIA Nemotron 3.5 Bolt E4B (Gemma 4), UD-Q3_K_XL | `NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q3_K_XL.gguf` | 4.2 | 3300 MiB | 2400 MiB |
 | `nanbeige-33b` | AH-Nanbeige4.3-33B, IQ3_XXS | `AH-Nanbeige4.3-33B-IQ3_XXS.gguf` | 13.1 | 16200 MiB | no split |
+| `lightning-30b` | Nemotron 3.5 Lightning 30B-A3B, ternary (Nota AI), Q2_0 | `Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf` | 9.5 | 5800 MiB | no split |
 
 ## Pack formats
 
@@ -66,6 +67,7 @@ feature is behind its explicit experimental switch.
 | `bonsai-27b` | 3 exact + tie, 4060 Ti tc | not supported | not converted | n/a |
 | `nemotron-e4b` | separate backend | n/a | n/a | n/a |
 | `nanbeige-33b` | separate backend | n/a | n/a | n/a |
+| `lightning-30b` | separate backend | n/a | n/a | n/a |
 
 ## Cards
 

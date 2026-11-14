@@ -47,6 +47,7 @@ STATUS = {
     "bonsai-27b": ["3 exact + tie, 4060 Ti tc", "not supported", "not converted", "n/a"],
     "nemotron-e4b": ["separate backend", "n/a", "n/a", "n/a"],
     "nanbeige-33b": ["separate backend", "n/a", "n/a", "n/a"],
+    "lightning-30b": ["separate backend", "n/a", "n/a", "n/a"],
 }
 
 EVIDENCE = [

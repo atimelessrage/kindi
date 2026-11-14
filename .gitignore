@@ -46,3 +46,6 @@ id_rsa*
 *.ppk
 *.kdbx
 *.ovpn
+
+# receipts and logs of tools/ship_images.sh
+ship-images/

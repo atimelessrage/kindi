@@ -58,9 +58,14 @@ Each key can also be set from the environment as `KINDI_<KEY>` (for example `KIN
 | `prefix_min` | int | `512` | smallest opening worth saving (tokens) |
 | `park_max` | int | `3` | other conversations kept in host RAM |
 | `checkpoint_budget_mb` | int | `0` | host RAM for checkpoints and parked conversations (0: 20% of the RAM) |
+| `turn_save` | int | `1` | 1: save the state at the end of each turn to disk, in the background |
+| `turn_keep` | int | `4` | saved turns: conversations kept on disk (the newest turn of each) |
+| `turn_disk_mb` | int | `4096` | saved turns: disk space they may use |
+| `turn_min` | int | `64` | saved turns: shortest conversation worth saving (tokens) |
 | `repeat_stop` | int | `0` | 1: stop a reply caught in a repeating loop (close it while thinking) |
 | `lookup` | int | `5` | Nanbeige: prompt-lookup drafting, up to this many tokens per check (0: off) |
 | `mtp_head` | string | (empty) | Nanbeige: an MTP head file, a second draft source (empty: none) |
+| `kv_cache` | string | `auto` | Nanbeige: the K/V cache, auto, f16 or q8_0 (auto: f16 when it fits, else q8_0) |
 | `reasoning_effort` | string | (empty) | 27B template: xhigh \| medium \| low (empty: the template default, xhigh) |
 
 ### generation defaults (a request's own values win)
@@ -84,32 +89,56 @@ is where it is read, which is where the full description lives.
 
 | variable | default | read in |
 |---|---|---|
-| `KINDI_ATT_TC` | `0` | `kindi/chunk.py:429` (+1 more) |
-| `KINDI_BATCH` | `4` | `kindi/spec.py:1798` (+1 more) |
-| `KINDI_BLOCKING_SYNC` | `1` | `kindi/chunk.py:461` (+7 more) |
-| `KINDI_CACHE_TIMING` | (unset) | `kindi/cache.py:743` |
-| `KINDI_CARDS` | (unset) | `kindi/spec.py:1818` (+4 more) |
+| `KINDI_ATT_TC` | `0` | `kindi/chunk.py:440` (+1 more) |
+| `KINDI_BATCH` | `4` | `kindi/spec.py:1827` (+1 more) |
+| `KINDI_BENCH_ATTN` | (unset) | `kindi/dsv41.py:1157` |
+| `KINDI_BLOCKING_SYNC` | `1` | `kindi/chunk.py:472` (+7 more) |
+| `KINDI_CACHE_TIMING` | (unset) | `kindi/cache.py:1051` |
+| `KINDI_CARDS` | (unset) | `kindi/spec.py:1851` (+4 more) |
 | `KINDI_CC` | `clang` or `"clang" if os.name == "nt" else "gcc"` or `"gcc" if os.name != "nt" else "clang"` | `kindi/cpu.py:108` (+3 more) |
 | `KINDI_CHUNK` | `256` or `"512" if all(f16_prompt(s.card) for s in eng.cards) else "256"` or `"256" if major >= 5 else "128"` | `kindi/chunk.py:158` (+2 more) |
-| `KINDI_CHUNK_ATT` | `flash` | `kindi/chunk.py:425` |
-| `KINDI_CHUNK_MIN` | `32` | `kindi/chunk.py:487` (+1 more) |
-| `KINDI_CHUNK_Q8` | `1` | `kindi/chunk.py:189` |
-| `KINDI_CHUNK_SPLIT` | `4` | `kindi/chunk.py:427` (+1 more) |
+| `KINDI_CHUNK_ATT` | `flash` | `kindi/chunk.py:436` |
+| `KINDI_CHUNK_MIN` | `32` | `kindi/chunk.py:498` (+1 more) |
+| `KINDI_CHUNK_Q8` | `1` | `kindi/chunk.py:194` |
+| `KINDI_CHUNK_SPLIT` | `4` | `kindi/chunk.py:438` (+1 more) |
 | `KINDI_CHUNK_TILE` | (empty) | `kindi/chunk.py:184` (+3 more) |
-| `KINDI_CHUNK_TS` | `64` | `kindi/chunk.py:441` |
-| `KINDI_CKPT_PINNED` | `"1" if os.path.exists("/dev/dxg") else "0"` | `kindi/cache.py:34` |
-| `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:572` |
-| `KINDI_CONFIG` | (unset) | `kindi/config.py:114` (+1 more) |
-| `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:211` (+2 more) |
+| `KINDI_CHUNK_TS` | `64` | `kindi/chunk.py:452` |
+| `KINDI_CKPT_PINNED` | `"1" if _WDDM else "0"` | `kindi/cache.py:40` |
+| `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:581` |
+| `KINDI_CONFIG` | (unset) | `kindi/config.py:120` (+1 more) |
+| `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:211` (+4 more) |
 | `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:180` (+1 more) |
-| `KINDI_D1` | `0` | `kindi/spec.py:713` |
-| `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:482` |
+| `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:46` |
+| `KINDI_D1` | `0` | `kindi/spec.py:722` |
+| `KINDI_DATA` | `/data` | `kindi/container.py:243` |
+| `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:733` |
 | `KINDI_DEVICE` | `gpu` | `kindi/bench.py:15` (+4 more) |
+| `KINDI_DOWNLOAD` | `1` | `kindi/container.py:108` |
 | `KINDI_DP4A` | `"1" if rt.is_hip else "0"` | `kindi/tp.py:425` |
-| `KINDI_FD` | `0` | `kindi/spec.py:581` (+3 more) |
-| `KINDI_FD_CH` | (empty) | `kindi/spec.py:132` |
-| `KINDI_FF` | (empty) or `1` | `kindi/spec.py:172` (+1 more) |
-| `KINDI_FOLD_SPLIT` | `1` | `kindi/spec.py:633` |
+| `KINDI_DSPINE` | (unset) | `kindi/dspine.py:41` (+1 more) |
+| `KINDI_DSPINE_K` | `str(_dsp.BLOCK - 1)` | `kindi/spec.py:1256` |
+| `KINDI_DSPINE_MB` | `1400` | `kindi/dspine.py:52` |
+| `KINDI_DSPINE_NARROW` | (unset) | `kindi/dspine.py:160` |
+| `KINDI_DSV_CPUS0` | (unset) | `kindi/dsv41.py:348` |
+| `KINDI_DSV_CPUS1` | (unset) | `kindi/dsv41.py:349` |
+| `KINDI_DSV_ENCODING` | (unset) | `kindi/dsv41_server.py:194` |
+| `KINDI_DSV_GATE` | `os.path.expanduser("~/.cache/kindi/dsv41-gate")` | `kindi/dsv41.py:823` |
+| `KINDI_DSV_GPU` | `0` | `kindi/dsv41.py:164` (+1 more) |
+| `KINDI_DSV_GPU2` | `1` | `kindi/dsv41.py:166` |
+| `KINDI_DSV_GPU2_DEVS` | (unset) | `kindi/dsv41.py:87` (+1 more) |
+| `KINDI_DSV_GPU2_LIBS` | (unset) | `kindi/dsv41.py:167` (+1 more) |
+| `KINDI_DSV_GPU_LIB` | (unset) | `kindi/dsv41.py:164` (+1 more) |
+| `KINDI_DSV_PLACE` | `same` | `kindi/dsv41.py:345` |
+| `KINDI_DSV_SHARE0` | `0.667` | `kindi/dsv41.py:351` |
+| `KINDI_DSV_SNAP_DIR` | `/dev/shm/kindi-dsv41` | `kindi/dsv41.py:408` |
+| `KINDI_DS_LOG` | (unset) | `kindi/dsv41.py:1033` (+1 more) |
+| `KINDI_DS_NGRAM` | (unset) | `kindi/dsv41.py:598` |
+| `KINDI_DS_STATS` | `0` | `kindi/dsv41.py:599` (+1 more) |
+| `KINDI_DS_UNION` | `1` | `kindi/dsv41.py:586` |
+| `KINDI_FD` | `0` | `kindi/spec.py:171` (+4 more) |
+| `KINDI_FD_CH` | (empty) | `kindi/spec.py:133` |
+| `KINDI_FF` | (empty) or `1` | `kindi/spec.py:179` (+1 more) |
+| `KINDI_FOLD_SPLIT` | `1` | `kindi/spec.py:642` |
 | `KINDI_G4_CKPT_MAX` | `16` | `kindi/gemma4_cache.py:34` |
 | `KINDI_G4_DP4A` | `"1" if cc=="hip" or int(cc)>=61 else "0"` | `kindi/gemma4.py:84` |
 | `KINDI_G4_FP8` | `1` | `kindi/gemma4.py:118` |
@@ -121,12 +150,12 @@ is where it is read, which is where the full description lives.
 | `KINDI_G4_PAD` | `1` | `kindi/gemma4.py:599` |
 | `KINDI_G4_PARK_MAX` | `4` | `kindi/gemma4_cache.py:35` |
 | `KINDI_G4_PLE_HOST` | `auto` | `kindi/gemma4.py:482` |
-| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:512` |
+| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:542` |
 | `KINDI_G4_PROMPT_CACHE` | `1` | `kindi/gemma4_cache.py:33` |
 | `KINDI_G4_Q5_DP4A` | `1` | `kindi/gemma4.py:80` |
 | `KINDI_G4_RESERVE_MB` | `1024` | `kindi/gemma4.py:543` |
 | `KINDI_G4_TC` | `1` | `kindi/gemma4.py:88` (+3 more) |
-| `KINDI_G4_TP` | `auto` | `kindi/server.py:356` |
+| `KINDI_G4_TP` | `auto` | `kindi/server.py:381` |
 | `KINDI_G4_WARPS` | `2560` | `kindi/gemma4.py:123` |
 | `KINDI_G5` | (empty) | `kindi/tp.py:421` |
 | `KINDI_G5L` | `"0" if rt.is_hip and os.environ.get("KINDI_TC", "0") != "1" else "1"` | `kindi/tp.py:424` |
@@ -139,75 +168,103 @@ is where it is read, which is where the full description lives.
 | `KINDI_G5_TUNELOG` | (unset) | `kindi/tp.py:256` |
 | `KINDI_GEMV_BLOCKS` | (unset) | `kindi/engine.py:197` |
 | `KINDI_HIP_LIB` | `libamdhip64.so` | `kindi/gpudrv.py:28` |
-| `KINDI_HOST_RAM_CHECK` | `1` | `kindi/hostram.py:23` |
-| `KINDI_KEXPF` | (empty) | `kindi/spec.py:153` |
+| `KINDI_HOST_RAM_CHECK` | `1` | `kindi/hostram.py:56` |
+| `KINDI_KEEPALIVE_S` | `10` | `kindi/dsv41_server.py:69` (+1 more) |
+| `KINDI_KEXPF` | (empty) | `kindi/spec.py:154` |
 | `KINDI_KV` | (empty) or `q8_0` | `kindi/engine.py:75` (+1 more) |
 | `KINDI_KV_EXPERIMENTAL` | `0` | `kindi/tp.py:52` |
 | `KINDI_LLVM` | (unset) | `kindi/cpu.py:91` |
-| `KINDI_MEM_RESERVE_MB` | `96` or `32` | `kindi/engine.py:305` (+2 more) |
-| `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:634` |
-| `KINDI_NB_CPUF` | `0.55` | `kindi/nanbeige.py:33` |
-| `KINDI_NB_EMBD_HOST` | `"1" if kepler(cp, devices[0]) else "0"` | `kindi/nanbeige.py:266` |
-| `KINDI_NB_FA` | `1` | `kindi/nanbeige.py:897` |
-| `KINDI_NB_FASTMATH` | `1` | `kindi/nanbeige.py:54` |
+| `KINDI_LOG_RAW` | (unset) | `kindi/lightning_gen.py:322` (+2 more) |
+| `KINDI_LT_CHUNK` | (unset) | `kindi/lightning.py:144` |
+| `KINDI_LT_DCACHE` | `10` | `kindi/lightning.py:43` |
+| `KINDI_LT_DGRP` | `mvdg` | `kindi/lightning.py:764` |
+| `KINDI_LT_GRAPH` | `1` | `kindi/lightning.py:870` |
+| `KINDI_LT_K35` | (unset) | `kindi/lightning.py:115` |
+| `KINDI_LT_K35_EXACT` | (unset) | `kindi/lightning.py:37` |
+| `KINDI_LT_KBLAS` | `1` | `kindi/lightning.py:35` |
+| `KINDI_LT_KGRP` | `mmk32` or `mvkg` | `kindi/lightning.py:533` (+1 more) |
+| `KINDI_LT_NSPLIT` | `32` | `kindi/lightning.py:26` |
+| `KINDI_LT_NSPLIT_TC` | `64` | `kindi/lightning.py:27` |
+| `KINDI_LT_PRE6` | `"1" if self.cc >= 60 else "0"` | `kindi/lightning.py:129` |
+| `KINDI_LT_RESERVE_MB` | `350` | `kindi/lightning.py:247` |
+| `KINDI_LT_SELFCHECK` | `1` | `kindi/lightning_gen.py:180` |
+| `KINDI_LT_SM75` | (unset) | `kindi/lightning.py:132` |
+| `KINDI_LT_TC` | `1` | `kindi/lightning.py:127` |
+| `KINDI_MEM_RESERVE_MB` | `96` or `32` | `kindi/engine.py:305` (+3 more) |
+| `KINDI_MODEL` | (empty) | `kindi/container.py:240` |
+| `KINDI_MOE_COPY` | `0` | `kindi/dsv41.py:356` |
+| `KINDI_MOE_CPUS0` | `0-19` | `kindi/dsv41.py:124` (+2 more) |
+| `KINDI_MOE_CPUS1` | `20-23,32-39` | `kindi/dsv41.py:124` (+2 more) |
+| `KINDI_MOE_DROP_CACHE` | `1` | `kindi/dsv41.py:362` |
+| `KINDI_MOE_SHARE0` | `0.667` | `kindi/dsv41.py:350` (+2 more) |
+| `KINDI_MOE_WEIGHTED` | `1` | `kindi/lightning.py:256` (+1 more) |
+| `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:665` |
+| `KINDI_NB_CPUF` | `0.55` | `kindi/nanbeige.py:34` |
+| `KINDI_NB_EMBD_HOST` | `"1" if kepler(cp, devices[0]) else "0"` | `kindi/nanbeige.py:272` |
+| `KINDI_NB_FA` | `1` | `kindi/nanbeige.py:944` |
+| `KINDI_NB_FASTMATH` | `1` | `kindi/nanbeige.py:58` |
 | `KINDI_NB_FUSED_QKV` | `1` | `kindi/nanbeige.py:16` |
-| `KINDI_NB_HOST` | `1` | `kindi/nanbeige.py:359` |
-| `KINDI_NB_KBLAS` | `1` | `kindi/nanbeige.py:29` |
-| `KINDI_NB_KDQ_MB` | `128` | `kindi/nanbeige.py:30` |
-| `KINDI_NB_KFAST` | `1` | `kindi/nanbeige.py:201` |
-| `KINDI_NB_KINT` | (unset) | `kindi/nanbeige.py:202` |
-| `KINDI_NB_KROWS` | `0` | `kindi/nanbeige.py:922` |
-| `KINDI_NB_KWARPS` | `2560` | `kindi/nanbeige.py:625` |
-| `KINDI_NB_LOGREQ` | (unset) | `kindi/nanbeige_gen.py:209` (+1 more) |
-| `KINDI_NB_PCHUNK` | `"256" if len(ids) <= 4096 and not self.k35 else "512"` | `kindi/nanbeige.py:928` |
-| `KINDI_NB_REP` | (empty) | `kindi/nanbeige.py:208` |
-| `KINDI_NB_RESERVE_MB` | `300` | `kindi/nanbeige.py:257` |
-| `KINDI_NB_SELFCHECK` | `1` | `kindi/nanbeige_gen.py:127` |
-| `KINDI_NB_SLOTS` | `2` | `kindi/nanbeige.py:34` |
-| `KINDI_NB_TC` | `1` | `kindi/nanbeige.py:274` |
-| `KINDI_NB_TSPLIT` | `0` | `kindi/nanbeige.py:1020` |
-| `KINDI_NB_TWARPS` | `24` | `kindi/nanbeige.py:1019` |
+| `KINDI_NB_HOST` | `1` | `kindi/nanbeige.py:384` |
+| `KINDI_NB_KBLAS` | `1` | `kindi/nanbeige.py:30` |
+| `KINDI_NB_KDQ_MB` | `128` | `kindi/nanbeige.py:31` |
+| `KINDI_NB_KFAST` | `1` | `kindi/nanbeige.py:205` |
+| `KINDI_NB_KINT` | (unset) | `kindi/nanbeige.py:206` |
+| `KINDI_NB_KROWS` | `0` | `kindi/nanbeige.py:969` |
+| `KINDI_NB_KWARPS` | `2560` | `kindi/nanbeige.py:656` |
+| `KINDI_NB_LOGREQ` | (unset) | `kindi/nanbeige_gen.py:236` (+1 more) |
+| `KINDI_NB_PCHUNK` | `"256" if len(ids) <= 4096 and not self.k35 else "512"` | `kindi/nanbeige.py:975` |
+| `KINDI_NB_REP` | (empty) | `kindi/nanbeige.py:212` |
+| `KINDI_NB_RESERVE_MB` | `300` | `kindi/nanbeige.py:263` |
+| `KINDI_NB_SELFCHECK` | `1` | `kindi/nanbeige_gen.py:153` |
+| `KINDI_NB_SLOTS` | `2` | `kindi/nanbeige.py:35` |
+| `KINDI_NB_TC` | `1` | `kindi/nanbeige.py:293` |
+| `KINDI_NB_TSPLIT` | `0` | `kindi/nanbeige.py:1067` |
+| `KINDI_NB_TWARPS` | `24` | `kindi/nanbeige.py:1066` |
+| `KINDI_NVCC` | `/usr/local/cuda/bin/nvcc` | `kindi/dsv41.py:52` |
+| `KINDI_NVCC2` | `/usr/local/cuda-12.4/bin/nvcc` | `kindi/dsv41.py:92` |
 | `KINDI_P100_FP16_PROMPT` | (empty) | `kindi/chunk.py:95` |
-| `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:614` (+1 more) |
-| `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:615` |
-| `KINDI_PROMPT_CACHE` | `1` | `kindi/cache.py:639` |
-| `KINDI_Q8X2` | `1` | `kindi/chunk.py:265` |
+| `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:903` (+1 more) |
+| `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:904` |
+| `KINDI_PIPE` | `1` | `kindi/dsv41.py:443` |
+| `KINDI_PROMPT_CACHE` | `1` | `kindi/cache.py:749` (+1 more) |
+| `KINDI_Q8X2` | `1` | `kindi/chunk.py:270` |
 | `KINDI_SAMPLER_ORDER` | `llama` | `kindi/sampling.py:19` |
-| `KINDI_SM2` | (empty) | `kindi/spec.py:732` |
-| `KINDI_SPEC` | `0` | `kindi/spec.py:1201` (+4 more) |
-| `KINDI_SPEC_B0_K2_MAX` | `1024` | `kindi/spec.py:57` |
-| `KINDI_SPEC_B2_MAX` | `0` | `kindi/spec.py:58` |
-| `KINDI_SPEC_CTX` | (unset) | `kindi/spec.py:1821` |
-| `KINDI_SPEC_DRAFT_HEAD` | (unset) | `kindi/spec.py:1764` (+2 more) |
-| `KINDI_SPEC_GUARD` | `1` | `kindi/spec.py:1107` |
-| `KINDI_SPEC_GUARD_BOUND` | `2.5` | `kindi/spec.py:984` |
-| `KINDI_SPEC_GUARD_BOUND_DEPTH` | `8192` | `kindi/spec.py:986` |
-| `KINDI_SPEC_GUARD_FROM` | `32768` | `kindi/spec.py:61` |
-| `KINDI_SPEC_GUARD_LOG` | (unset) | `kindi/spec.py:1021` |
-| `KINDI_SPEC_K` | `4` | `kindi/spec.py:1219` (+1 more) |
-| `KINDI_SPEC_KNOWN` | `1` | `kindi/cache.py:711` |
-| `KINDI_SPEC_MTP_K2_MAX` | `8192` | `kindi/spec.py:56` |
-| `KINDI_SPEC_PACK` | (unset) | `kindi/spec.py:1816` (+2 more) |
-| `KINDI_SPEC_SAMPLE` | `1` | `kindi/spec.py:1225` |
-| `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1821` |
+| `KINDI_SM2` | (empty) | `kindi/spec.py:741` |
+| `KINDI_SPEC` | `0` | `kindi/dspine.py:41` (+7 more) |
+| `KINDI_SPEC_B0_K2_MAX` | `1024` | `kindi/spec.py:58` |
+| `KINDI_SPEC_B2_MAX` | `0` | `kindi/spec.py:59` |
+| `KINDI_SPEC_CTX` | (unset) | `kindi/spec.py:1854` |
+| `KINDI_SPEC_DRAFT_HEAD` | (unset) | `kindi/spec.py:1788` (+2 more) |
+| `KINDI_SPEC_GUARD` | `1` | `kindi/spec.py:1128` |
+| `KINDI_SPEC_GUARD_BOUND` | `2.5` | `kindi/spec.py:1005` |
+| `KINDI_SPEC_GUARD_BOUND_DEPTH` | `8192` | `kindi/spec.py:1007` |
+| `KINDI_SPEC_GUARD_FROM` | `32768` | `kindi/spec.py:62` |
+| `KINDI_SPEC_GUARD_LOG` | (unset) | `kindi/spec.py:1042` |
+| `KINDI_SPEC_K` | `4` | `kindi/spec.py:1252` (+1 more) |
+| `KINDI_SPEC_KNOWN` | `1` | `kindi/cache.py:1018` |
+| `KINDI_SPEC_MTP_K2_MAX` | `8192` | `kindi/spec.py:57` |
+| `KINDI_SPEC_PACK` | (unset) | `kindi/spec.py:1849` (+2 more) |
+| `KINDI_SPEC_SAMPLE` | `1` | `kindi/spec.py:1260` |
+| `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1854` |
 | `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:193` |
 | `KINDI_TANDEM_GPU` | `auto` | `kindi/tandem.py:480` |
 | `KINDI_TANDEM_RATIO` | (unset) | `kindi/tandem.py:267` |
 | `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/tandem.py:523` (+1 more) |
-| `KINDI_TC` | `0` | `kindi/spec.py:80` (+2 more) |
+| `KINDI_TC` | `0` | `kindi/spec.py:81` (+3 more) |
 | `KINDI_TC_B2` | (empty) | `kindi/tc.py:51` |
 | `KINDI_TC_DP4A` | `0` | `kindi/tc.py:74` |
-| `KINDI_TC_DUAL` | `1` | `kindi/spec.py:347` |
-| `KINDI_TC_GRAPHS` | `0` | `kindi/spec.py:325` |
+| `KINDI_TC_DUAL` | `1` | `kindi/spec.py:354` |
+| `KINDI_TC_GRAPHS` | `0` | `kindi/spec.py:332` |
 | `KINDI_TC_HP` | `0` | `kindi/engine.py:754` (+1 more) |
-| `KINDI_TC_INC` | (empty) | `kindi/spec.py:172` |
+| `KINDI_TC_INC` | (empty) | `kindi/spec.py:179` |
 | `KINDI_TC_LANE` | (empty) | `kindi/tc.py:83` |
-| `KINDI_TC_MM` | `2` | `kindi/chunk.py:295` |
-| `KINDI_TC_MM_NB` | `8` | `kindi/chunk.py:299` |
-| `KINDI_TC_NW` | (empty) | `kindi/spec.py:399` |
-| `KINDI_TC_TMAX` | `8` | `kindi/spec.py:45` |
-| `KINDI_TC_TUNE` | `0` | `kindi/spec.py:429` (+1 more) |
+| `KINDI_TC_MM` | `2` | `kindi/chunk.py:300` |
+| `KINDI_TC_MM_NB` | `8` | `kindi/chunk.py:304` |
+| `KINDI_TC_NW` | (empty) | `kindi/spec.py:406` |
+| `KINDI_TC_TMAX` | `8` | `kindi/spec.py:46` |
+| `KINDI_TC_TUNE` | `0` | `kindi/spec.py:436` (+1 more) |
 | `KINDI_TESTED_CC` | (empty) | `kindi/tc.py:39` |
 | `KINDI_THP` | `0` | `kindi/engine.py:88` |
 | `KINDI_TP` | (empty) | `kindi/engine.py:736` (+1 more) |
 | `KINDI_TP_SPLIT` | `equal` | `kindi/tp.py:967` |
+| `KINDI_VERIFY_ON_START` | (unset) | `kindi/container.py:245` |

@@ -1,9 +1,9 @@
 # Why Kindi
 
-*Current release: Kindi 0.5.0. The K420 table and chart below are the 0.2.0 measurements that established the card; [docs/BENCHMARKS.md](docs/BENCHMARKS.md) has the release tables.*
+*Current release: Kindi 0.6.0. The K420 table and chart below are the 0.2.0 measurements that established the card; [docs/BENCHMARKS.md](docs/BENCHMARKS.md) has the release tables.*
 
-**A modern 2-billion-parameter language model that runs at 22.9 tokens per second on a ten-year-old, 1 GB,
-entry-level graphics card.**
+**A modern 2-billion-parameter language model that runs at 22.9 tokens per second on a 1 GB Quadro K420,
+an inexpensive graphics card.**
 
 The NVIDIA Quadro K420 is a 2014 workstation card. It has one Kepler multiprocessor, 192 CUDA cores, 1 GB of DDR3
 and about 24 GB/s of usable memory bandwidth. Modern inference stacks have left it behind. Recent CUDA releases
@@ -63,7 +63,7 @@ commercial license (see [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md)).
 
 ## Who it is for
 
-Kindi is for anyone with an old workstation, a thin client or a small server with a K420 in it. It is also for anyone
+Kindi is for anyone with a workstation, a thin client or a small server with a K420 in it. It is also for anyone
 who wants proof that careful engineering can make up for small hardware.
 
 *[Amir Husain](https://www.amirhusain.com) - project page: [amirhusain.com/kindi](https://amirhusain.com/kindi/), launch video: [YouTube](https://youtu.be/ddAnghj8HpE). The model is

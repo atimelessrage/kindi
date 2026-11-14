@@ -27,7 +27,8 @@ PATTERNS = [
     ("Slack token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")),
     ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
     ("JWT", re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")),
-    ("local home path", re.compile(r"(?i)(?:[A-Z]:[\\/]Users[\\/][^\\/\s\"'<>]+|/home/(?![\[(])[^/\s\"'<>]+)")),
+    # /home/kindi is the fixed non-root container user the Dockerfiles create, not a person's home directory
+    ("local home path", re.compile(r"(?i)(?:[A-Z]:[\\/]Users[\\/][^\\/\s\"'<>]+|/home/(?![\[(]|kindi\b)[^/\s\"'<>]+)")),
     ("email address", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
 ]
 

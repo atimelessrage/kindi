@@ -36,6 +36,10 @@ park_max = 3
 # host RAM for checkpoints and parked conversations (0: 20% of the RAM)
 checkpoint_budget_mb = 0
 
+# --- Nanbeige K/V cache
+# the K/V cache: auto, f16 or q8_0 (auto: f16 when it fits, else q8_0)
+kv_cache = auto
+
 # --- Nanbeige drafting
 # prompt-lookup drafting, up to this many tokens per check (0: off)
 lookup = 5
@@ -43,6 +47,12 @@ lookup = 5
 mtp_head =
 # 27B template: xhigh, medium or low (empty: the template default, xhigh)
 reasoning_effort =
+# saved turns: the state at the end of each turn is written to disk in the background, so that a restart resumes
+# a conversation where it ended (turn_save = 0: off)
+turn_save = 1
+turn_keep = 4
+turn_disk_mb = 4096
+turn_min = 64
 
 # --- generation defaults (a request's own values win)
 max_tokens = 1024

@@ -278,7 +278,7 @@ def test_legacy_dual_profile_has_no_tensor_cores():
     assert "KINDI_TC=1" not in info["env"], info
 
 
-def test_single_8gb_ada_uses_the_tc_profile_without_the_2b_drafter():
+def test_single_8gb_ada_uses_the_tc_profile_with_speculation():
     info = fields(["NVIDIA GeForce RTX 4060 Ti"], [8188], ["8.9"], """
 SV_B=(cuda); SV_M=(27b); SV_C=("0")
 CTX=auto; MEMORY=""; THREADS=""; CORES=16; RAM_MB=65536
@@ -294,7 +294,10 @@ echo "env=${ENV[*]}"
         return
     assert info["profile"] == "tc" and info["ctx"] == "24576", info
     assert "KINDI_TC=1" in info["env"], info
-    assert "KINDI_SPEC" not in info["env"], info      # no room for the 2B drafter next to the 27B
+    # 0.6: the tc 27B profile always drafts (DSpine when its files are present, else the 2B drafter
+    # with TMAX=4); this harness has no dspine files, so the 2B drafter env must be set
+    assert "KINDI_SPEC=auto" in info["env"], info
+    assert "KINDI_SPEC_K=3" in info["env"] and "KINDI_TC_TMAX=4" in info["env"], info
 
 
 if __name__ == "__main__":
