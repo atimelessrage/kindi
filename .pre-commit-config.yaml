@@ -3,6 +3,14 @@
 # Keep this hook aligned with CI: do not exclude text extensions such as .md, .json or .log.
 # Those are common places for a pasted key, and detect-secrets should inspect them.
 repos:
+  # Cheap checks that cannot rewrite a file or fight Windows line endings. ShellCheck stays in CI:
+  # on a CRLF checkout it reports the whole installer as a defect, so a local hook would train
+  # people to pass --no-verify. (2026-11-14 audit, N7.)
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: check-merge-conflict
+      - id: check-case-conflict
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:

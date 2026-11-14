@@ -112,3 +112,38 @@ charged explicitly). Plan owner: estimate 6,142 MiB vs ~5,250 MiB used. Both run
 raw `peak_used_mib`, and say which baseline the number is relative to. The same distinction decides
 whether `--sample-vram` is measuring the right card at all: it now selects the engine's device rather
 than GPU 0, because on a two-card host a bare first row is another card's number.
+
+## L-0008: A guard that passes may be checking nothing
+
+**Observation:** `tests/test_docs_links.py` skipped any path with a part in
+`{".git", ".freebuff", "bench-logs", ...}`. This project is developed in a worktree under
+`~/.freebuff/worktrees/`, so *every* file's absolute path contained `.freebuff`: the guard collected
+**0 of 92** Markdown files and passed in 0.48 s. It had been green for the whole audit-fix session
+while the repository had real broken links.
+
+**Evidence, 2026-11-14:** after comparing `path.relative_to(ROOT).parts` instead of `path.parts`,
+the same test failed on six link labels that named `bench-logs/...` while opening `benchmarks/...`,
+and on seven broken relative links in two pages promoted out of `bench-logs/` (`dory-d0`: four
+evidence files that were never copied; `raon-r0`: `../../docs/...` one directory too deep after the
+move). All were fixed, the missing evidence was promoted, and the suite now scans 92 files.
+
+**Practice:** a guard that walks the filesystem and skips directories must (a) compare against the
+path *inside* the project, and (b) assert a plausible population (a minimum file count, or a count
+that the test derives twice) so that "skipped everything" fails instead of passing. A test whose
+only evidence of work is a green line is not evidence.
+
+## L-0009: An audit's "missing evidence" is not always evidence
+
+**Observation:** the 2026-11-14 review reports listed nine citations to absent `bench-logs/` paths
+as the project's doc-hygiene defect. Checked one by one, they were three different things: example
+*commands* whose `--out` directory the reader creates (`docs/CARDS.md`, `CARD-SUPPORT.md`, `P106.md`,
+`FP8-BF16.md`, `RAON-1-MINI-R0.md` reproduction blocks), genuine label/target mismatches left by
+the 2026-11-14 promotion, and references to files that only exist on the interrupted WIP branch
+(`docs/MIXED-CARD-ROADMAP.md` -> `docs/PAIR-SETUPS.md`, already described as "WIP" in the sentence).
+
+**Evidence:** `grep -n` over the five pages shows the paths inside fenced example commands; the
+label test (L-0008) caught the six real mismatches on its first honest run.
+
+**Practice:** before promoting files to satisfy an audit, open the citing line and classify it —
+command example, stale label, or WIP-branch reference. Two of the three need an edit to the
+sentence, not a new file; the third needs a clarification line saying the file is not in this tree.

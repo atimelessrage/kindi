@@ -69,9 +69,9 @@ request. That is the larger-than-VRAM case the tandem existed for, and it is 10-
 
 ```sh
 python -m kindi --pack ~/.kindi/packs/bonsai-2b verify --tandem cpu-first --tandem-cpu-layers 8 --tandem-gpu plan
-python -m kindi --pack D:/kindi-27b/packs/bonsai-27b --ctx 24576 bench \
+python -m kindi --pack $HOME/.kindi/packs/bonsai-27b --ctx 24576 bench \
   --tandem cpu-first --tandem-cpu-layers gdn:16 --tandem-gpu plan --sample-vram
-python -m kindi --pack D:/kindi-27b/packs/bonsai-27b --ctx 49152 bench \
+python -m kindi --pack $HOME/.kindi/packs/bonsai-27b --ctx 49152 bench \
   --tandem cpu-first --tandem-cpu-layers auto --tandem-gpu plan --sample-vram
 ```
 

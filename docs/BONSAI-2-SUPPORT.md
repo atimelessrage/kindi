@@ -1,5 +1,9 @@
 # Bonsai 2 family: support matrix, optimization plan, and projection
 
+Where this sits: [CARDS.md](CARDS.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md) are authoritative
+for what a card can run today; this page is research and projection for the family, and
+[README.md](README.md) is the index.
+
 Status: research and planning, 2026-11-09. This document does not change engine code and is not a
 support claim for anything marked **No** or **Untested** below.
 

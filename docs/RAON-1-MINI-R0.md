@@ -8,7 +8,7 @@ base checkpoint.
 
 This page resolves the R0 questions in [RAON-1-MINI.md](RAON-1-MINI.md) and the M0 questions in
 [MOE-TANDEM.md](MOE-TANDEM.md). Full machine-readable evidence is in
-[`bench-logs/raon-r0/`](benchmarks/raon-r0/README.md).
+[`benchmarks/raon-r0/`](benchmarks/raon-r0/README.md).
 
 ## 1. Sources and pins
 
@@ -354,4 +354,4 @@ gate.
 - It does not claim a router tie rule that the released code does not specify.
 
 Related: [RAON-1-MINI.md](RAON-1-MINI.md), [MOE-TANDEM.md](MOE-TANDEM.md),
-[ROADMAP.md](ROADMAP.md), [`bench-logs/raon-r0/README.md`](benchmarks/raon-r0/README.md).
+[ROADMAP.md](ROADMAP.md), [`benchmarks/raon-r0/README.md`](benchmarks/raon-r0/README.md).

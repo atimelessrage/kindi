@@ -27,7 +27,7 @@ stores K/V. The 9B pack passed the same check separately; see [RESULTS-9B.md](RE
 The harness is `bench-logs/tandem-cache/run_check.py`. The exact command was:
 
 ```sh
-python bench-logs/tandem-cache/run_check.py \
+python docs/benchmarks/tandem-cache/run_check.py \
   --pack "$HOME/.kindi/packs/bonsai-2b" --ctx 512 --cpu-layers 6 --tokens 8 \
   --out bench-logs/tandem-cache/results.json
 ```

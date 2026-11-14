@@ -25,7 +25,7 @@ is covered by [RESULTS.md](RESULTS.md).
 Command:
 
 ```sh
-python bench-logs/tandem-cache/measure_prefix.py \
+python docs/benchmarks/tandem-cache/measure_prefix.py \
   --pack "$HOME/.kindi/packs/bonsai-2b" --ctx 512 --cpu-layers 6 --reps 5 \
   --out bench-logs/tandem-cache/prefix-results.json
 ```
@@ -34,16 +34,16 @@ The checkpoint-only follow-up uses the same pack and CPU split, with the prompt 
 positions aligned to the longer contexts:
 
 ```sh
-python bench-logs/tandem-cache/measure_prefix.py \
+python docs/benchmarks/tandem-cache/measure_prefix.py \
   --ctx 4096 --cpu-layers 6 --reps 5 --t1-tokens 4080 --branch-at 3072 \
   --checkpoint-only --out bench-logs/tandem-cache/checkpoint-cost-4k.json
 
-python bench-logs/tandem-cache/measure_prefix.py \
+python docs/benchmarks/tandem-cache/measure_prefix.py \
   --ctx 8192 --cpu-layers 6 --reps 5 --t1-tokens 8176 --branch-at 6144 \
   --checkpoint-only --modes cpu-first \
   --out bench-logs/tandem-cache/checkpoint-cost-8k-cpu.json
 
-python bench-logs/tandem-cache/measure_prefix.py \
+python docs/benchmarks/tandem-cache/measure_prefix.py \
   --ctx 8192 --cpu-layers 6 --reps 5 --t1-tokens 8176 --branch-at 6144 \
   --checkpoint-only --modes gpu-first \
   --out bench-logs/tandem-cache/checkpoint-cost-8k-gpu.json

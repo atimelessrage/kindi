@@ -7,7 +7,9 @@ claim.**
 
 This page reviews the interrupted WIP's pairing and asymmetric-TP design against the current
 tree. It replaces the mixed-architecture section of the WIP's
-`docs/PAIR-SETUPS.md` as the working plan. The WIP snapshot and backup remain evidence only.
+`docs/PAIR-SETUPS.md` as the working plan. That file exists only on the WIP branch
+(`wip/main-interrupted-snapshot-20261109-045352`), never in this tree, so there is nothing here to
+open. The WIP snapshot and backup remain evidence only.
 
 ## 1. What the WIP proposed
 

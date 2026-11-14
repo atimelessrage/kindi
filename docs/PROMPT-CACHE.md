@@ -99,7 +99,7 @@ with 1,024- and 2,048-token checkpoints, reusing 4,080/8,176 tokens for extensio
 6 CPU layers: extension 320, branch and saved opening 256, all exact; see
 [RESULTS-9B.md](benchmarks/tandem-cache/RESULTS-9B.md). This run also fixed the CuPy K/V restore
 in `Openings.load` (it now uses the existing `_to_dev` copy instead of a plain assignment). See
-[bench-logs/tandem-cache/RESULTS.md](benchmarks/tandem-cache/RESULTS.md) and
+[benchmarks/tandem-cache/RESULTS.md](benchmarks/tandem-cache/RESULTS.md) and
 [LONG-CONTEXT-RESULTS.md](benchmarks/tandem-cache/LONG-CONTEXT-RESULTS.md).
 
 ## Invariants

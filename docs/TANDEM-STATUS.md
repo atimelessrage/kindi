@@ -1,5 +1,9 @@
 # Tandem/CPU recovery status
 
+Where this sits: [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md) is authoritative for the runtime behaviour
+and its measured rows; this page is the dated recovery snapshot and
+[CPU_GPU_TANDEM_DESIGN.md](CPU_GPU_TANDEM_DESIGN.md) the design.
+
 Status: **dense runtime implemented and token-exact on the 2B and 9B, 2026-11-12; real joint-cache
 checks pass in both placements, including saved-opening reloads. The CPU engine's
 per-layer entry point is wired to a partial GPU engine in both dense placements; the MoE

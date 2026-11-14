@@ -1,5 +1,10 @@
 # Long-term card support: single and dual GPUs
 
+Where this sits: [CARDS.md](CARDS.md) carries the per-card settings and measured speeds and
+[SUPPORT-MATRIX.md](SUPPORT-MATRIX.md) the generated per-card rows; this page is the long-term
+support contract behind them, and [README.md](README.md) is the index that names the winner of any
+overlap.
+
 Status: **P0 implemented 2026-11-10; heterogeneous pairing added 2026-11-11; not a support claim yet.**
 `install.sh` classifies every sm_80 card as `tc` from its compute capability, pairs any two cards from the
 pair-supported classes (Maxwell, Pascal, Turing, tensor-core or P100) with at least 3,800 MiB each, and gives

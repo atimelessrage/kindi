@@ -42,25 +42,25 @@ complete prompt. The cached and cache-off output token IDs were compared.
 Commands:
 
 ```sh
-python bench-logs/tandem-cache/run_check.py \
+python docs/benchmarks/tandem-cache/run_check.py \
   --pack "$HOME/.kindi/packs/bonsai-2b" --ctx 4096 --cpu-layers 6 --tokens 8 \
   --t1-tokens 4080 --branch-at 3072 --checkpoint-every 1024 \
   --prefix-max 0 --skip-saved --modes cpu-first \
   --out bench-logs/tandem-cache/context-4k-cpu.json
 
-python bench-logs/tandem-cache/run_check.py \
+python docs/benchmarks/tandem-cache/run_check.py \
   --pack "$HOME/.kindi/packs/bonsai-2b" --ctx 4096 --cpu-layers 6 --tokens 8 \
   --t1-tokens 4080 --branch-at 3072 --checkpoint-every 1024 \
   --prefix-max 0 --skip-saved --modes gpu-first \
   --out bench-logs/tandem-cache/context-4k-gpu.json
 
-python bench-logs/tandem-cache/run_check.py \
+python docs/benchmarks/tandem-cache/run_check.py \
   --pack "$HOME/.kindi/packs/bonsai-2b" --ctx 8192 --cpu-layers 6 --tokens 8 \
   --t1-tokens 8176 --branch-at 6144 --checkpoint-every 2048 \
   --prefix-max 0 --skip-saved --modes cpu-first \
   --out bench-logs/tandem-cache/context-8k-cpu.json
 
-python bench-logs/tandem-cache/run_check.py \
+python docs/benchmarks/tandem-cache/run_check.py \
   --pack "$HOME/.kindi/packs/bonsai-2b" --ctx 8192 --cpu-layers 6 --tokens 8 \
   --t1-tokens 8176 --branch-at 6144 --checkpoint-every 2048 \
   --prefix-max 0 --skip-saved --modes gpu-first \

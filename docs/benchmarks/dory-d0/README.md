@@ -69,7 +69,9 @@ decoded text as JSON. It is not part of Kindi.
 
 ## GGUF inventory
 
-Full metadata and the 507-tensor manifest: [`tensor-inventory.json`](tensor-inventory.json)
+Full metadata and the 507-tensor manifest: `tensor-inventory.json` in the local raw run directory
+(`bench-logs/dory-d0/`, gitignored, 1.3 MB) - it is a dump of the GGUF, not a tracked deliverable; the
+pinned hashes and the goldens that the rows above cite are tracked next to this page.
 (1,280,464 bytes). Generated with:
 
 ```text

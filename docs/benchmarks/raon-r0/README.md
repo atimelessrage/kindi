@@ -3,8 +3,8 @@
 Status: **header/manifest audit complete, 2026-11-11. No full checkpoint was downloaded and no
 reference generation was run. This is not a Kindi model support claim.**
 
-The design record is [`docs/RAON-1-MINI-R0.md`](../../docs/RAON-1-MINI-R0.md); the broader goal is
-[`docs/RAON-1-MINI.md`](../../docs/RAON-1-MINI.md).
+The design record is [`docs/RAON-1-MINI-R0.md`](../../RAON-1-MINI-R0.md); the broader goal is
+[`docs/RAON-1-MINI.md`](../../RAON-1-MINI.md).
 
 ## What was fetched
 

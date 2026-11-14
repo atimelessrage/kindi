@@ -28,6 +28,25 @@ the AVX2/FMA/F16C tier and runs `test_cpu_build.py`, `test_cpu_threads.py` and `
 test loads the library and checks the ctypes ABI without a model pack. The manual
 self-hosted GPU lane is described in [docs/CI.md](../docs/CI.md); it is not run by hosted CI.
 
+## Coverage: where the 27% floor comes from
+
+Measured on 2026-11-14 (Windows, 538 passed, 10 skipped, line+branch): **31% total**. The floor in CI
+is 27%, not 31%, because the number moves a few points with the platform and a gate that fails on a
+fresh Linux checkout is worse than a loose gate. The distribution is what matters: the CPU suite
+covers the modules it can reach, and the heavy GPU modules are covered by `kindi verify` and
+`kindi bench` on hardware, not by pytest.
+
+| module | cover | who checks it |
+|---|---|---|
+| `tandem.py`, `vram.py`, `expert_cache.py` | 90%, 89%, 88% | the CPU suite (byte accounting, device mapping, cache state machine) |
+| `bench.py`, `cache.py`, `server.py` | 67%, 56%, 46% | the CPU suite plus the HTTP boundary tests |
+| `engine.py`, `spec.py`, `tp.py`, `small mtp.py` | 18%, 15%, 12%, 14% | `kindi verify` (token-exact against llama.cpp) and the perf gate; pytest only reaches the loaders and guards |
+| `convert.py`, `gemma4_tp.py` | 18%, 0% | `kindi convert` plus the mixer/support tests; the CUDA half needs a card |
+
+The 27% figure is guarded by `tests/test_agents_handoff.py`-adjacent CI, not by a per-module
+threshold: adding one for `engine.py`/`tp.py` would need GPU coverage first. Do not read "31%" as
+"the engine is half-tested"; read the table.
+
 ## Turing reference suite (optional)
 
 These tests check the Turing (`sm_75`) tensor-core backend without a Turing GPU. The full verification

@@ -1,5 +1,9 @@
 # Long-term CPU support
 
+Where this sits: this page is the CPU support contract; [CARDS.md](CARDS.md) and
+[SUPPORT-MATRIX.md](SUPPORT-MATRIX.md) cover the cards it runs next to, and [README.md](README.md)
+is the index.
+
 Status: **roadmap and acceptance contract, updated 2026-11-12. The i7-8086K engine and native CPU
 server chat path on the 2B/4B/9B are verified. The AVX-only fallback and the AVX2/F16C no-FMA
 fallback are implemented; a forced AVX-only build passes the 2B `kindi verify` 4/4 token-exact on

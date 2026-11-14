@@ -40,11 +40,11 @@ total). The cached branch writes a 256-token disk opening; a new `TandemRunner` 
 Commands:
 
 ```sh
-python bench-logs/tandem-cache/run_check.py \
+python docs/benchmarks/tandem-cache/run_check.py \
   --pack "$HOME/.kindi/packs/bonsai-9b" --ctx 512 --cpu-layers 6 --tokens 8 \
   --modes cpu-first --out bench-logs/tandem-cache/results-9b-cpu.json
 
-python bench-logs/tandem-cache/run_check.py \
+python docs/benchmarks/tandem-cache/run_check.py \
   --pack "$HOME/.kindi/packs/bonsai-9b" --ctx 512 --cpu-layers 6 --tokens 8 \
   --modes gpu-first --out bench-logs/tandem-cache/results-9b-gpu.json
 ```
@@ -100,7 +100,7 @@ owner in 6.7-14.7 s during these runs; the server starts dominate wall time.
 Command:
 
 ```sh
-python bench-logs/tandem-cache/run_server_check.py \
+python docs/benchmarks/tandem-cache/run_server_check.py \
   --pack "$HOME/.kindi/packs/bonsai-9b" --ctx 512 --cpu-layers 6 \
   --modes cpu-first,gpu-first \
   --run-dir bench-logs/tandem-cache/server-runs-9b \
@@ -129,7 +129,7 @@ the baseline includes the desktop and other processes.
 Command:
 
 ```sh
-python bench-logs/tandem-cache/measure_prefix.py \
+python docs/benchmarks/tandem-cache/measure_prefix.py \
   --pack "$HOME/.kindi/packs/bonsai-9b" --ctx 512 --cpu-layers 6 \
   --reps 5 --t1-tokens 320 --branch-at 256 \
   --checkpoint-only --vram --vram-sample-s 0.5 \
@@ -167,13 +167,13 @@ one-run prepare/generation timings, not a throughput or long-context scaling cla
 Commands:
 
 ```sh
-python bench-logs/tandem-cache/run_check.py \
+python docs/benchmarks/tandem-cache/run_check.py \
   --pack "$HOME/.kindi/packs/bonsai-9b" --ctx 4096 --cpu-layers 6 --tokens 8 \
   --t1-tokens 4080 --branch-at 3072 --checkpoint-every 1024 \
   --prefix-max 0 --skip-saved --modes cpu-first,gpu-first \
   --out bench-logs/tandem-cache/context-9b-4k.json
 
-python bench-logs/tandem-cache/run_check.py \
+python docs/benchmarks/tandem-cache/run_check.py \
   --pack "$HOME/.kindi/packs/bonsai-9b" --ctx 8192 --cpu-layers 6 --tokens 8 \
   --t1-tokens 8176 --branch-at 6144 --checkpoint-every 2048 \
   --prefix-max 0 --skip-saved --modes cpu-first,gpu-first \
