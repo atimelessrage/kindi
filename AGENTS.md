@@ -10,7 +10,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `989dd4a` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean;
+- **HEAD:** `56bc351` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean;
   guarded by `tests/test_agents_handoff.py`). Full suite last measured there:
   516 passed, 19 skipped, 1 warning; the 27% line-and-branch coverage floor is unchanged.
 - **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
@@ -56,8 +56,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `989dd4a` | main checkout; clean; best-of main |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `989dd4a` | this session; best-of main (identical to `main`) |
+| `T:/kindi` | `main` | `56bc351` | main checkout; clean; best-of main |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `56bc351` | this session; best-of main (identical to `main`) |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
@@ -80,6 +80,10 @@ Read it before editing a shared file.
    worktree you do not own. Do not use `git add -A`; commit only the task's files.
 5. Re-read the file immediately before writing and after another agent's commit. Git is the source
    of truth; a chat message is not a lock.
+5a. Every commit that touches `AGENTS.md` refreshes the worktree table hashes (to HEAD after the
+   commit, i.e. the commit's own parent) in the same commit. A bump commit cannot name itself, so the
+   parent is the value; a content commit must not leave the table older than its parent.
+   `tests/test_agents_handoff.py` enforces both the table value and the bump in the diff.
 6. At handoff: commit the task, record its branch, HEAD and remaining files here, and leave the
    worktree clean or explicitly listed. Do not delete another worktree's files.
 
@@ -101,6 +105,7 @@ the next agent needs in front of them; when a task finishes, move its row to the
 
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
+| Review finding fixes (2026-11-14 third audit) | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/vram.py`, `kindi/bench.py`, `kindi/tandem.py`, `kindi/convert.py`, `tests/test_agents_handoff.py`, `tests/test_vram_monitor.py`, `tests/test_tandem.py`, `tests/test_bench_json.py`, `docs/TANDEM-RUNTIME.md`, `docs/BENCHMARKS.md`, `AGENTS.md` | done. CONFIRMED and fixed: (1) handoff guard excused a stale table - the parent rule let be6e3a9 (a content commit) keep its parent's hash, so the test now also requires every commit that touches `AGENTS.md` to refresh the hashes (protocol rule 5a); (2) `--sample-vram` read GPU 0 only - it now parses the index column and maps the engine's ordinal through `CUDA_VISIBLE_DEVICES` (`vram.visible_device`); (3) the estimate charged the head even in gpu-first (322 MiB over-count) and hid the per-layer GDN state in a flat scratch allowance - `state_bytes()` now charges ~3.1 MiB per owned GDN layer and the head only when the GPU owns the last layer (27B 24K `gdn:16` plain estimate 6,208 MiB vs ~6,240 measured, was ~100 MiB under); (4) `gdn:` with no count is a `SystemExit`, not a `ValueError` traceback; (5) `ctx_reduced` lost its 47-token fudge (any `eng.ctx < ctx_requested` is a reduction); (6) `convert.py` closes its four multi-GB files through an `ExitStack` on a mid-convert error. REJECTED as a measurement error: "the plan-owner peak exceeds its estimate by 208 MiB" compares device-wide `peak_used` (which includes the ~950 MiB the desktop holds) with an engine-bytes estimate; against `peak_delta` the plan estimate is ~890 MiB conservative. STALE: the problems report is not tracked in either worktree (`git ls-files` is empty) and the audit files are already ignored (`.gitignore:34-35`). SKIPPED with reason: the 34 `json.load(open(...))` sites are short-lived pack reads (closed at GC, no locked files observed in convert/install); a sweep would touch 13 modules for no measured failure. |
 | Old-card tandem measurement on the roadmap | this worktree | `freebuff/tandem-cpu-recovery` | `docs/ROADMAP.md`, `AGENTS.md` | done; Cards bullet + open gates: measure whether (and which placement of) the CPU+GPU tandem helps Pascal/M4000 cards, cells defined |
 | Plain-engine q8_0 K/V + 27B split re-measure | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/engine.py`, `kindi/tandem.py`, `kindi/__main__.py`, `tests/test_tandem.py`, `tests/test_plain_kv.py`, `docs/TANDEM-RUNTIME.md`, `docs/CONFIGURATION.md`, `docs/CONFIGURATION-REFERENCE.md`, `docs/ROADMAP.md`, `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plain-q8/`, `docs/development/requirements/REQ-0013.md`, `CURRENT-VS-KINDI-0.5.md`, `AGENTS.md` | done; plain engine `KINDI_KV=q8_0`/`kv=` reuses the plan kernels (`k_store_q8`/`k_q8row`/`k_attn_sq8t`/`k_attn_vq8w`/`k_attn_combn`), chunked prompt path off in q8 mode, K/V exposed as `tp.Dist` views (cache round-trip exact); standalone stays fp16; tandem plain owner always q8. Exact: 2B/9B/27B verify 4/4 (standalone q8 and tandem). 27B 24K `gdn:16`: plain-q8 peak ~7,110 MiB (995 free) vs 7,721 fp16, plan re-run 6,091 (1,985 free). Evidence: `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plain-q8/RESULTS.md`; 529 passed, 10 skipped |
 | External consultation, safe subset | this worktree | `freebuff/tandem-cpu-recovery` | `.gitignore`, `docs/README.md`, `docs/GOALS.md`, `docs/ROADMAP.md`, `docs/CI.md`, `docs/FP8-BF16.md`, `docs/PROMPT-CACHE.md`, `docs/RAON-1-MINI-R0.md`, `docs/TANDEM-RUNTIME.md`, `docs/TANDEM-STATUS.md`, `docs/benchmarks/{blackwell-fp8-ada-refusal-20261112,blackwell-fp8-dispatch-20261112,dory-d0,raon-r0,tandem-cache}/`, `README.md`, `AGENTS.md` | done (P0-1 root cleanup, losslessly): `*_ReviewAudit_*.txt`/`*_ProblemsOnly_*.txt` replace the per-model ignore patterns and `git rm --cached` untracked the tracked problems report (blob stays in history; file stays on disk, ignored). NOT done and why: `optimizing-mixed-gpu-rig.json` (3.1 MB, already ignored, sole copy of the mixed-gpu measurement — deleting it loses knowledge) and moving `CURRENT-VS-KINDI-0.5.md` (breaks ~20 links and user workflow). Doc consolidation reduced to an index (`docs/README.md`, names the authoritative page per subject; linking from root README) plus `docs/GOALS.md` (pointers only, no duplicated claims); no page was moved or demoted, and `docs/AGENTS.md` was not renamed (many links and lease rows cite it). P0-2 fixed by promotion, not by deletion: the 13 evidence files docs linked to from the gitignored `bench-logs/` are copied into `docs/benchmarks/<same subdir>/` (originals untouched) and all current-doc links re-pointed; `docs/development/AGENTS-HISTORY.md` is append-only so its citations keep the original local locations, and this row records the new locations. ROADMAP gains the CPU+RAM tandem scheduler goal with the >=25% gate (P1-3) and MoE marked design-only (P2-5 was otherwise already recorded). Skipped: GPU CI + the four-card benchmarks + AVX-512/Blackwell (need a registered runner or hardware), pre-commit shellcheck (CRLF false positives on Windows; CI already runs it), coverage floor raise (would redden CI — per-module numbers not raised). |

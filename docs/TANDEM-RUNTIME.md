@@ -190,7 +190,9 @@ and leaving attention on the GPU is what keeps a split's decode rate flat with p
 
 All rows below are `kindi bench --sample-vram`, exact head, one fresh process per run, medians of three
 runs in one session on the i7-8086K + RTX 4060 Ti 8 GB. The 27B `0-15` control is one run (the earlier
-recorded row reproduced to within 5%).
+recorded row reproduced to within 5%). `--sample-vram` reads the card the engine runs on (its CuPy
+device ordinal, mapped through `CUDA_VISIBLE_DEVICES`), so on a multi-GPU host the peak belongs to the
+split's GPU rather than always to GPU 0.
 
 ### 9B, 24,576-token context
 
@@ -292,8 +294,19 @@ The full record (commands, medians, ranges and the exactness runs) is
 
 The estimate follows the owner: `gpu_estimate(..., owner=...)` charges the plain engine the whole f32
 file, the device copy of the embedding and q8_0 K/V, and the plan engine the owned layers' f32 slices,
-no embedding and q8_0 K/V. On the 27B at 24K the plan estimate predicts 6,548 MiB and the run peaked at
-6,444-6,756 MiB, so `auto` keeps the 512 MiB reserve it promises.
+no embedding and q8_0 K/V. Both owners are also charged the per-layer recurrent state
+(`state_bytes`: the fp32 delta matrix plus the three conv channels, ~3.1 MiB per GDN layer on the 27B)
+and the output head **only when the GPU owns the last layer** — in `gpu-first` the CPU owns the head, so
+charging it was an over-count of the head's 322 MiB. On the 27B at 24K the plan estimate predicts 6,548
+MiB and the run peaked at 6,444-6,756 MiB.
+
+The estimate is a target, not a promise: the 512 MiB reserve (`KINDI_TANDEM_RESERVE_MB`) exists to absorb
+its error, and the measured accuracy differs by owner. At 24K with `gdn:16` the plain owner now predicts
+6,208 MiB against ~6,240 MiB actually used (34 MiB under), the plan owner 6,142 MiB against ~5,250 MiB
+(a conservative ~890 MiB: it charges the global f32 slice and scratch it does not fully use). Before the
+recurrent state was charged explicitly the plain estimate ran ~100 MiB under its measured peak; that gap
+was the hidden per-layer state, not pool noise. Treat a fit that lands within ~100 MiB of the budget as
+"tight" rather than "guaranteed".
 
 **Plain-engine q8_0 (2026-11-14, re-measured).** The plain engine gained the same q8_0 cache
 (`KINDI_KV=q8_0`, decode-only: the chunked prompt path writes an fp16 cache, so prompts feed one token

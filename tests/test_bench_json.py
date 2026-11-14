@@ -73,6 +73,25 @@ def test_bench_json_records_the_actual_ctx_when_reduced(tmp_path, monkeypatch):
     assert got["ctx_reduced"] is True
 
 
+def test_bench_json_flags_even_a_small_reduction(tmp_path, monkeypatch):
+    """A small shortfall is still a reduction (no tolerance): the loader only lowers the context
+    when it does not fit, so any eng.ctx below the request is a real reduction."""
+    monkeypatch.setenv("KINDI_DEVICE", "cpu")
+    dest = str(tmp_path / "b.json")
+
+    class SlightlyReduced(FakeEngine):
+        def __init__(self, pack, ctx=None, clusters=None, tandem=None, cpu_layers=None, **_):
+            super().__init__(pack, ctx=ctx, clusters=clusters, tandem=tandem, cpu_layers=cpu_layers)
+            self.ctx = 24500
+
+    monkeypatch.setattr("kindi.engine.make_engine", SlightlyReduced)
+    rc = bench.run({"pack": str(tmp_path), "ctx": 24576, "fast_clusters": 256, "json": dest},
+                   log=lambda *a, **k: None)
+    assert rc == 0
+    got = json.loads(open(dest, encoding="utf-8").read())
+    assert got["ctx_reduced"] is True
+
+
 def test_bench_json_records_tandem_placement(tmp_path, monkeypatch):
     monkeypatch.setenv("KINDI_DEVICE", "cpu")
     dest = str(tmp_path / "b.json")

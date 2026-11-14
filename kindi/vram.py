@@ -3,28 +3,64 @@
 Device-wide `memory.used` from nvidia-smi (so the peak includes every
 allocation, not just the CuPy pool), sampled on a background thread while
 the benchmark runs. Free-after-load numbers alone cannot prove a
-larger-than-VRAM split fits; a sampled peak can.
+larger-than-VRAM split fits; a sampled peak can. The row read is the one
+for the device index the engine runs on: nvidia-smi lists every GPU on the
+host, so the bare first row can be the wrong card on a multi-GPU machine
+(the installer gives each server its own CUDA_VISIBLE_DEVICES).
 """
+import os
 import subprocess
 import threading
 import time
 
-SMI_CMD = ["nvidia-smi", "--query-gpu=memory.used,memory.total,memory.free",
+SMI_CMD = ["nvidia-smi", "--query-gpu=index,memory.used,memory.total,memory.free",
            "--format=csv,noheader,nounits"]
 
 
-def parse_smi(text):
-    """Parse one nvidia-smi csv row `used, total, free` (MiB) or return None."""
-    try:
-        row = str(text).strip().splitlines()[0]
-        used, total, free = [int(x.strip()) for x in row.split(",")[:3]]
-    except (ValueError, IndexError):
-        return None
-    return {"used_mib": used, "total_mib": total, "free_mib": free}
+def parse_smi(text, device=0):
+    """Parse the `index, used, total, free` row for `device` from nvidia-smi csv output.
+
+    Legacy rows without an index column (one GPU) are accepted as device 0."""
+    rows = []
+    for ln in str(text).splitlines():
+        parts = [x.strip() for x in ln.split(",")]
+        if len(parts) < 3:
+            continue
+        try:
+            vals = [int(x) for x in parts]
+        except ValueError:
+            continue
+        rows.append(vals)
+    for vals in rows:
+        if len(vals) == 4:
+            idx, used, total, free = vals
+            if idx == device:
+                return {"used_mib": used, "total_mib": total, "free_mib": free}
+        elif len(vals) >= 3 and device == 0:
+            used, total, free = vals[:3]
+            return {"used_mib": used, "total_mib": total, "free_mib": free}
+    return None
 
 
-def gpu_memory(runner=None):
-    """Device-wide VRAM from nvidia-smi, or None when it cannot be read."""
+def visible_device(device):
+    """Map a CuPy device ordinal to the physical nvidia-smi index.
+
+    CUDA_VISIBLE_DEVICES lists the physical cards the process sees, in order;
+    without it the ordinal is the physical index."""
+    vis = os.environ.get("CUDA_VISIBLE_DEVICES", "").strip()
+    if not vis:
+        return device
+    cards = [x.strip() for x in vis.split(",") if x.strip() not in ("", "Void")]
+    if 0 <= device < len(cards):
+        try:
+            return int(cards[device])
+        except ValueError:
+            return device
+    return device
+
+
+def gpu_memory(runner=None, device=0):
+    """Device-wide VRAM of one GPU from nvidia-smi, or None when it cannot be read."""
     try:
         if runner is not None:
             out = runner(SMI_CMD)
@@ -33,7 +69,7 @@ def gpu_memory(runner=None):
             out = out.stdout if out.returncode == 0 else None
     except (OSError, ValueError, subprocess.SubprocessError):
         return None
-    return parse_smi(out) if out is not None else None
+    return parse_smi(out, device=visible_device(device)) if out is not None else None
 
 
 class VramMonitor(object):
@@ -42,9 +78,10 @@ class VramMonitor(object):
     `sampler` is injectable so tests can drive the monitor without a GPU.
     """
 
-    def __init__(self, interval=0.5, sampler=None):
+    def __init__(self, interval=0.5, sampler=None, device=0):
         self.interval = max(0.05, float(interval))
-        self.sampler = sampler or gpu_memory
+        self.device = int(device)
+        self.sampler = sampler or (lambda: gpu_memory(device=self.device))
         self.samples = []
         self.phase = "startup"
         self.baseline = None
@@ -90,7 +127,7 @@ class VramMonitor(object):
         base = self.baseline or self.samples[0]
         return {
             "available": True,
-            "source": "nvidia-smi memory.used (device-wide)",
+            "source": "nvidia-smi memory.used (device-wide, GPU %d)" % self.device,
             "interval_s": self.interval,
             "baseline_used_mib": base["used_mib"],
             "peak_used_mib": peak["used_mib"],

@@ -251,8 +251,8 @@ def test_gpu_estimate_charges_kv_only_for_attention_layers_it_keeps():
     assert full == scratch + 100 + 500 + 500 + 8000 + 2 * kv      # attention layers 3 and 7
     # the CPU owns the embedding once layer 0 is off the GPU
     assert tandem.gpu_estimate(dims, sizes, 1024, (0,)) == full - 1000 - 500
-    # offloading an attention layer also removes its K/V
-    assert tandem.gpu_estimate(dims, sizes, 1024, (7,)) == full - 1000 - kv
+    # offloading the last attention layer removes its K/V, and (layer 7 is the last layer) the head
+    assert tandem.gpu_estimate(dims, sizes, 1024, (7,)) == full - 1000 - kv - 500
 
 
 def test_auto_planner_prefers_gdn_layers_and_respects_the_budget():
@@ -281,6 +281,33 @@ def test_auto_target_frees_at_least_the_requested_headroom():
     assert full - tandem.gpu_estimate(dims, sizes, 8192, cpu) >= 1024 * mb
     # a target of 0 is a no-op
     assert tandem.plan_cpu_layers(dims, sizes, 8192, 64 << 30, reserve_mib=0, target_mib=0) == ()
+
+
+def test_gpu_estimate_charges_the_head_only_when_the_gpu_owns_the_last_layer():
+    """In gpu-first the CPU owns the final layers and the output head; charging the head
+    to the GPU over-counts the estimate by the head's size (322 MiB on the 27B)."""
+    dims = {"layers": 8, "full_attention_interval": 4, "kv_heads": 2, "head_dim": 16}
+    sizes = {"layers": {il: 1000 for il in range(8)}, "embed": 500, "head": 7777, "f32": 100}
+    cpu_first = tandem.gpu_estimate(dims, sizes, 1024, tuple(range(4)))      # head on GPU, no embed
+    gpu_first = tandem.gpu_estimate(dims, sizes, 1024, tuple(range(4, 8)))    # head on CPU, embed on GPU
+    assert cpu_first - gpu_first == 7777 - 500
+
+
+def test_state_bytes_charges_the_recurrent_state_per_gdn_layer():
+    """The delta matrix (NV x HK x HK fp32) plus three conv channels: ~3.1 MiB per layer on the
+    27B and invisible in the old fixed scratch allowance."""
+    dims = {"state_size": 128, "gdn_inner": 6144, "groups": 16}
+    nv, hk, conv = 48, 128, 2 * 16 * 128 + 48 * 128
+    assert tandem.state_bytes(dims) == nv * hk * hk * 4 + 3 * conv * 4
+    assert 3 * 2 ** 20 < tandem.state_bytes(dims) < 4 * 2 ** 20
+    assert tandem.state_bytes({}) == 0                  # unknown geometry: no charge, no crash
+
+
+def test_gdn_without_a_count_is_a_clean_error():
+    dims = {"layers": 8, "full_attention_interval": 4}
+    for bad in ("", "x", None):
+        with pytest.raises(SystemExit, match="gdn: needs a layer count"):
+            tandem.gdn_first(dims, bad)
 
 
 def test_auto_planner_refuses_when_nothing_can_fit():
@@ -484,10 +511,13 @@ def test_a_plan_owner_frees_the_weights_and_half_the_kv_of_an_offloaded_layer():
     fp16 = 16 * tandem.kv_bytes(dims, ctx)
     q8 = 16 * tandem.kv_bytes(dims, ctx, "q8_0")
     assert q8 == pytest.approx(fp16 / 2, rel=0.07)
-    # and it is also what the plain owner is now charged, to the byte (not the fp16 size)
+    # and it is also what the plain owner is now charged, to the byte (not the fp16 size),
+    # including the recurrent state of the 48 gated-delta layers
     manual = (tandem.SCRATCH_MIB * 2 ** 20 + 100 * 2 ** 20 + 130 * 2 ** 20 + 130 * 2 ** 20
-              + 64 * layer + 16 * tandem.kv_bytes(dims, ctx, "q8_0"))
+              + 64 * layer + 16 * tandem.kv_bytes(dims, ctx, "q8_0")
+              + 48 * tandem.state_bytes(dims))
     assert plain_full == manual
+    assert tandem.state_bytes(dims) > 3 * 2 ** 20        # ~3.1 MiB per GDN layer on this geometry
     freed = {}
     off = tuple(range(4, 36, 4))                        # eight GDN layers, layer 0 stays on the GPU
     for owner in ("plan", "plain"):

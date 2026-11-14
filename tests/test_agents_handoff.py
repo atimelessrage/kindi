@@ -1,7 +1,13 @@
 """The AGENTS.md worktree table is the handoff source of truth: its HEAD cells must
-match the actual HEAD (or its parent, when the table bump is the HEAD commit itself),
+name the actual HEAD (or its parent, when the table bump is the HEAD commit itself),
 or the next agent starts from a stale snapshot (this bit twice already: 8c1ac16,
 then 1f2c682). Skips when git history is unavailable.
+
+A commit that touches AGENTS.md must also refresh the hash cells (added lines naming
+HEAD or its parent), otherwise the parent rule would excuse a content commit that
+leaves the table stale - the third-audit finding of 2026-11-14 (be6e3a9 edited the
+file and kept its parent's hash). The fix is the protocol rule 5a in AGENTS.md: bump
+in the same commit, naming the commit's own parent.
 
 The second test keeps the 2026-11-14 split in place: AGENTS.md stays a live handoff of a few
 hundred lines and keeps pointing at `docs/development/AGENTS-HISTORY.md`.
@@ -23,6 +29,18 @@ def _rev(spec):
         return ""
 
 
+def test_a_rewritten_table_row_must_name_head_or_its_parent():
+    """The rule the HEAD check applies to a commit's added table rows, as a pure function:
+    a stale hash in a rewrite is rejected, the parent (the only hash a bump can know) passes."""
+    head, parent = "be6e3a9" + "0" * 33, "df851a3" + "0" * 33
+
+    def ok(row_hash):
+        return head.startswith(row_hash) or parent.startswith(row_hash)
+
+    assert not ok("56bc351")               # an older hash: the stale-table bug
+    assert ok(parent[:7]) and ok(head[:7])
+
+
 def test_agents_is_a_live_handoff_and_links_its_history():
     """AGENTS.md is the handoff the next agent reads first; the dated record belongs in
     docs/development/AGENTS-HISTORY.md. It had grown to 1,057 lines of history before the
@@ -37,6 +55,17 @@ def test_agents_is_a_live_handoff_and_links_its_history():
         "AGENTS.md no longer points at the dated history file")
     assert (ROOT / "docs" / "development" / "AGENTS-HISTORY.md").is_file(), (
         "AGENTS.md links docs/development/AGENTS-HISTORY.md but the file is missing")
+
+
+def _changed_agents_lines():
+    """Added lines in the HEAD commit's AGENTS.md diff, or None if HEAD did not touch it."""
+    out = subprocess.run(
+        ["git", "show", "--format=", "--unified=0", "HEAD", "--", "AGENTS.md"],
+        cwd=str(ROOT), capture_output=True, text=True, timeout=10, check=False)
+    if out.returncode != 0:
+        return None
+    adds = [ln[1:] for ln in out.stdout.splitlines() if ln.startswith("+") and not ln.startswith("+++")]
+    return adds if adds else None
 
 
 def test_agents_worktree_table_names_current_head():
@@ -55,3 +84,14 @@ def test_agents_worktree_table_names_current_head():
         ok = head.startswith(h) or (bool(parent) and parent.startswith(h))
         assert ok, ("AGENTS.md worktree table says %s but HEAD is %s; bump the "
                     "table in the same commit" % (h, head))
+    adds = _changed_agents_lines() or []
+    # A commit that touches AGENTS.md must also carry the hash refresh: its added lines have to
+    # name HEAD or its parent (a bump cannot name itself, so the parent is the intended value).
+    # Without this, a content commit that forgets the bump leaves the table stale and the parent
+    # rule of the check above silently excuses it - which is exactly how this bit before.
+    named = re.findall(r"`([0-9a-f]{7,40})`", "\n".join(adds))
+    if adds:
+        ok = any(head.startswith(h) or (bool(parent) and parent.startswith(h)) for h in named)
+        assert ok, ("the HEAD commit touched AGENTS.md but did not refresh the worktree table "
+                    "(no hash of HEAD %s or its parent %s in the added lines)"
+                    % (head[:7], parent[:7]))

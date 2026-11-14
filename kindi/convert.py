@@ -12,6 +12,7 @@ Vocabulary and BPE merges come from the GGUF tokenizer metadata.
 
 Pack files: bcodes.bin, dpm.bin, f32.bin, signs_2048.f32, signs_6144.f32, vocab.json, merges.txt, index.json,
 bcodes_index.json, kindi_pack.json."""
+import contextlib
 import hashlib
 import json
 import os
@@ -162,10 +163,12 @@ def convert(gguf_path, out_dir, log=print):
     index = {"tensors": {}, "base": g.data_start,
              "hadamard": {"tied_output": bool(hd.get("tied_output")), "sign_widths": [int(x) for x in hd["sign_widths"]]}}
     bindex = {"tensors": {}}
-    fb = open(os.path.join(out_dir, "bcodes.bin"), "wb")
-    fd = open(os.path.join(out_dir, "dpm.bin"), "wb")
-    ff = open(os.path.join(out_dir, "f32.bin"), "wb")
-    src = open(gguf_path, "rb")
+    # the ExitStack closes the four multi-GB files even when a bad tensor raises mid-conversion
+    stack = contextlib.ExitStack()
+    fb = stack.enter_context(open(os.path.join(out_dir, "bcodes.bin"), "wb"))
+    fd = stack.enter_context(open(os.path.join(out_dir, "dpm.bin"), "wb"))
+    ff = stack.enter_context(open(os.path.join(out_dir, "f32.bin"), "wb"))
+    src = stack.enter_context(open(gguf_path, "rb"))
     bc_off = dpm_off = f32_off = 0
     n_t = 0
     for name, ne, ty, toff in g.tensors:
@@ -220,8 +223,7 @@ def convert(gguf_path, out_dir, log=print):
         n_t += 1
         if n_t % 40 == 0:
             log("  %d / %d tensors" % (n_t, len(g.tensors)))
-    for h in (fb, fd, ff, src):
-        h.close()
+    stack.close()
     with open(os.path.join(out_dir, "index.json"), "w") as f:
         json.dump(index, f)
     with open(os.path.join(out_dir, "bcodes_index.json"), "w") as f:

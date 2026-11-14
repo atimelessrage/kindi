@@ -43,7 +43,14 @@ def run(cfg, log=print):
         from .nanbeige_cli import bench
         return bench(cfg, man, log=log)
     from .vram import VramMonitor
-    vram = VramMonitor(cfg.get("vram_sample_s", 0.5)) if cfg.get("sample_vram") else None
+    # sample the card the engine will run on (the cupy device ordinal), not unconditionally GPU 0
+    dev = 0
+    if cp is not None:
+        try:
+            dev = int(cp.cuda.Device().id)
+        except Exception:                                              # noqa: BLE001 - no usable device: GPU 0
+            dev = 0
+    vram = VramMonitor(cfg.get("vram_sample_s", 0.5), device=dev) if cfg.get("sample_vram") else None
     if vram is not None:
         vram.start()
     cl = os.path.join(pack, "head_clusters.npz")
@@ -55,7 +62,9 @@ def run(cfg, log=print):
     # eng.ctx is the *actual* context (the loader reduces it to fit); the requested one is
     # recorded separately so a reduced run is never mistaken for the requested context.
     result = {"pack": pack, "model": man.get("model"), "ctx": eng.ctx,
-              "ctx_reduced": cfg["ctx"] > eng.ctx + 47, "ctx_requested": cfg["ctx"],
+              # exact: eng.ctx is the requested context unless the loader reduced it to fit (the
+              # 256-token rounding is inside the fit, so any shortfall is a real reduction)
+              "ctx_reduced": cfg["ctx"] > eng.ctx, "ctx_requested": cfg["ctx"],
               "tandem": cfg.get("tandem", "off"), "cpu_layers": cfg.get("tandem_cpu_layers"),
               "device": "gpu" if cp is not None else "cpu", "read_tok_s": None, "gen_tok_s": {}}
     if hasattr(eng, "cpu_range"):

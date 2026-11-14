@@ -146,6 +146,25 @@ def pack_bytes(pack, man=None):
             "f32_global": max(0, f32 - sum(f32_layers.values()))}
 
 
+def state_bytes(dims):
+    """Recurrent state of one gated-delta layer on the device: the fp32 delta matrix (NV x HK x HK)
+    plus the three conv channels (3 x CONV_CH).
+
+    This is a per-layer cost that does not depend on the context, and on the 27B it is ~3.2 MiB per
+    layer - 133 MiB over the 43 GDN layers a `gdn:16` split leaves on the GPU, which used to be
+    hidden inside a fixed scratch allowance (the reason the plain estimate ran ~100 MiB under its
+    measured peak). Zero when the geometry is unknown, so an estimate built from partial dims still
+    works.
+    """
+    try:
+        hk = int(dims["state_size"])
+        nv = int(dims["gdn_inner"]) // hk
+        conv = 2 * int(dims["groups"]) * hk + nv * hk
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
+        return 0
+    return nv * hk * hk * 4 + 3 * conv * 4
+
+
 def kv_bytes(dims, ctx, mode="f16"):
     """K and V bytes for one attention layer at this context: fp16 (plain) or q8_0 (plan)."""
     values = int(ctx) * int(dims["kv_heads"]) * int(dims["head_dim"]) * 2      # K and V
@@ -158,8 +177,8 @@ def gpu_estimate(dims, sizes, ctx, cpu_layers=(), owner="plain"):
     """Device bytes the GPU owner needs when it owns every layer except ``cpu_layers``.
 
     ``plain``: the whole f32 file (it is uploaded as one file), the output head, the embedding unless the
-    CPU owns layer 0, each remaining layer's tensors, the q8_0 K/V of each remaining attention layer and
-    the measured plain scratch.
+    CPU owns layer 0, each remaining layer's tensors and recurrent state, the q8_0 K/V of each remaining
+    attention layer and the measured plain scratch.
 
     ``plan``: the same weights, but the f32 file only for the owned layers (the plan engine reads tensor by
     tensor), q8_0 K/V (half of fp16), no device copy of the embedding (it lives in pinned host memory) and
@@ -171,24 +190,26 @@ def gpu_estimate(dims, sizes, ctx, cpu_layers=(), owner="plain"):
     cpu = frozenset(int(x) for x in cpu_layers)
     gpu = [il for il in range(NL) if il not in cpu]
     f32l = sizes.get("f32_layers") or {}
+    st = state_bytes(dims)          # recurrent state of one GDN layer, charged per owned GDN layer
+    # the output head lives on the GPU only when the GPU owns the last layer (cpu-first; in
+    # gpu-first the CPU owns it, so charging it here would over-count by the head's size)
+    head_on_gpu = bool(gpu) and (NL - 1) in gpu
     if owner == "plan":
         total = int(sizes.get("f32_global", 0)) + PLAN_SCRATCH_MIB * 2 ** 20
-        if gpu:
+        if head_on_gpu:
             total += sizes["head"]
         for il in gpu:
             total += sizes["layers"].get(il, 0) + int(f32l.get(il, 0))
-            if (il + 1) % interval == 0:
-                total += kv_bytes(dims, ctx, "q8_0")
+            total += kv_bytes(dims, ctx, "q8_0") if (il + 1) % interval == 0 else st
         return total
     total = sizes["f32"] + SCRATCH_MIB * 2 ** 20
-    if gpu:
+    if head_on_gpu:
         total += sizes["head"]
     if 0 not in cpu:                                     # the CPU embeds when it owns layer 0
         total += sizes["embed"]
     for il in gpu:
         total += sizes["layers"].get(il, 0)
-        if (il + 1) % interval == 0:
-            total += kv_bytes(dims, ctx, "q8_0")
+        total += kv_bytes(dims, ctx, "q8_0") if (il + 1) % interval == 0 else st
     return total
 
 
@@ -245,7 +266,10 @@ def gdn_first(dims, count):
     layers = int(dims.get("layers", 24))
     interval = max(1, int(dims.get("full_attention_interval", 4)))
     gdn = [il for il in range(layers) if (il + 1) % interval]
-    count = int(count)
+    try:
+        count = int(count)
+    except (TypeError, ValueError):
+        raise SystemExit("kindi: gdn: needs a layer count, e.g. gdn:8 (got %r)" % (count,))
     if not 1 <= count < len(gdn):
         raise SystemExit("kindi: gdn:%d needs between 1 and %d CPU layers (the model has %d GDN layers)"
                          % (count, len(gdn) - 1, len(gdn)))
