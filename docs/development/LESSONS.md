@@ -65,3 +65,31 @@ content was correct.
 **Practice:** After editing an existing Markdown file on Windows, run `git diff --check`
 and inspect the byte-level line endings if the diff is unexpectedly large. New files should
 use LF; do not normalize unrelated lines.
+
+## L-0006: An audit report describes the commit it was written at, not HEAD
+
+**Observation:** The 2026-11-14 audit (`Buffy_ReviewAudit_202611140044.txt`, taken at `4bf6617`)
+reported three findings that were no longer true ten commits later, and one that was true but
+already documented. Re-checking each claim at HEAD before acting was what separated the work from
+the noise.
+
+**Evidence, checked at `b9a270b`:**
+
+- "Asymmetric TP is still engine-blocked; `tp.py` splits `ffn_down` columns exactly in half" — stale.
+  `kindi/tp.py:847 tp_split_mode()` + `vram_share()` + `plan_split()` implement the opt-in
+  proportional layout (`KINDI_TP_SPLIT=auto`), and `docs/MIXED-CARD-ROADMAP.md` already says so;
+  `equal` is only the default.
+- "The version line in the Snapshot still says 0.4.0" — already labelled `(Historical, 2026-11-08)`
+  in `AGENTS.md`. The one live stale tag was the `docker build -t kindi:0.4.0` example, now 0.5.0.
+- "Verify the published installer hash matches the file on `main`" — the published asset *is*
+  correct: it hashes to `43766d8b…` (65,112 B), exactly the value `docs/INSTALL.md` quotes. The
+  source-checkout `install.sh` legitimately differs, which that page already said.
+- "27 broad `except Exception` sites" — true, and every one carries a `# noqa` rationale
+  (`grep "except Exception" kindi/*.py | grep -v noqa` is empty).
+- "`AGENTS.md` is ~1050 lines" — true (1,057). This one was fixed by moving the dated history to
+  `docs/development/AGENTS-HISTORY.md`; the live handoff is now ~215 lines.
+
+**Practice:** Triage an audit against the tree you are about to change, not against the tree the
+report names. For each finding, cite the file and function at HEAD and state the verdict (real,
+stale, already documented); only then fix. Record the verdict in project memory so the next agent
+does not re-open a settled question — and never "fix" a stale finding by rewriting correct code.

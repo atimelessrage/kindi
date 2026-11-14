@@ -11,6 +11,7 @@ It complements the user-facing documentation in `docs/` and the handoff notes in
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | Current components, data flow, boundaries and invariants. |
 | [`DECISIONS.md`](DECISIONS.md) | Append-only design decisions with context and consequences. |
 | [`LESSONS.md`](LESSONS.md) | Verified surprises and mistakes worth not repeating. |
+| [`AGENTS-HISTORY.md`](AGENTS-HISTORY.md) | The dated history moved out of `AGENTS.md` on 2026-11-14: the full task lease table, the 2026-11-08 snapshot, the handoff notes, the old plan and the resume protocol. |
 | [`KNOWLEDGE.md`](KNOWLEDGE.md) | Operational facts, commands and support caveats. |
 | [`../../.agents/skills/project-memory/SKILL.md`](../../.agents/skills/project-memory/SKILL.md) | The project-local workflow skill. |
 
