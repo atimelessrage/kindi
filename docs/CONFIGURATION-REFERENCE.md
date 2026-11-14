@@ -97,7 +97,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_BATCH` | `4` | `kindi/spec.py:1838` (+1 more) |
 | `KINDI_BENCH_ATTN` | (unset) | `kindi/dsv41.py:1157` |
 | `KINDI_BLOCKING_SYNC` | `1` | `kindi/chunk.py:472` (+7 more) |
-| `KINDI_CACHE_TIMING` | (unset) | `kindi/cache.py:1069` |
+| `KINDI_CACHE_TIMING` | (unset) | `kindi/cache.py:1141` |
 | `KINDI_CALIB_DIR` | (unset) | `kindi/calib.py:31` |
 | `KINDI_CARDS` | (unset) | `kindi/spec.py:1862` (+4 more) |
 | `KINDI_CC` | `clang` or `"clang" if os.name == "nt" else "gcc"` or `"gcc" if os.name != "nt" else "clang"` | `kindi/cpu.py:108` (+3 more) |
@@ -108,7 +108,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_CHUNK_SPLIT` | `4` | `kindi/chunk.py:438` (+1 more) |
 | `KINDI_CHUNK_TILE` | (empty) | `kindi/chunk.py:184` (+3 more) |
 | `KINDI_CHUNK_TS` | `64` | `kindi/chunk.py:452` |
-| `KINDI_CKPT_PINNED` | `"1" if _WDDM else "0"` | `kindi/cache.py:40` |
+| `KINDI_CKPT_PINNED` | `"1" if _WDDM else "0"` | `kindi/cache.py:42` |
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:581` |
 | `KINDI_CONFIG` | (unset) | `kindi/config.py:120` (+1 more) |
 | `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:211` (+4 more) |
@@ -116,7 +116,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:46` |
 | `KINDI_D1` | `0` | `kindi/spec.py:722` |
 | `KINDI_DATA` | `/data` | `kindi/container.py:243` |
-| `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:733` |
+| `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:745` |
 | `KINDI_DEVICE` | `gpu` | `kindi/bench.py:15` (+4 more) |
 | `KINDI_DOWNLOAD` | `1` | `kindi/container.py:108` |
 | `KINDI_DP4A` | `"1" if rt.is_hip else "0"` | `kindi/tp.py:450` |
@@ -229,10 +229,10 @@ variables, and are therefore not listed twice here.
 | `KINDI_NVCC` | `/usr/local/cuda/bin/nvcc` | `kindi/dsv41.py:52` |
 | `KINDI_NVCC2` | `/usr/local/cuda-12.4/bin/nvcc` | `kindi/dsv41.py:92` |
 | `KINDI_P100_FP16_PROMPT` | (empty) | `kindi/chunk.py:95` |
-| `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:921` (+1 more) |
-| `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:922` |
+| `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:973` (+1 more) |
+| `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:974` |
 | `KINDI_PIPE` | `1` | `kindi/dsv41.py:443` |
-| `KINDI_PROMPT_CACHE` | `1` | `kindi/cache.py:751` (+1 more) |
+| `KINDI_PROMPT_CACHE` | `1` | `kindi/cache.py:766` (+1 more) |
 | `KINDI_Q8X2` | `1` | `kindi/chunk.py:270` |
 | `KINDI_SAMPLER_ORDER` | `llama` | `kindi/sampling.py:19` |
 | `KINDI_SM2` | (empty) | `kindi/spec.py:741` |
@@ -247,7 +247,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_SPEC_GUARD_FROM` | `32768` | `kindi/spec.py:62` |
 | `KINDI_SPEC_GUARD_LOG` | (unset) | `kindi/spec.py:1042` |
 | `KINDI_SPEC_K` | `4` | `kindi/calibrate.py:69` (+2 more) |
-| `KINDI_SPEC_KNOWN` | `1` | `kindi/cache.py:1036` |
+| `KINDI_SPEC_KNOWN` | `1` | `kindi/cache.py:1108` |
 | `KINDI_SPEC_MTP_K2_MAX` | `8192` | `kindi/spec.py:57` |
 | `KINDI_SPEC_PACK` | (unset) | `kindi/spec.py:1860` (+2 more) |
 | `KINDI_SPEC_SAMPLE` | `1` | `kindi/spec.py:1260` |
