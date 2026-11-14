@@ -29,6 +29,10 @@ CARD_RESULTS = os.path.join(ROOT, "docs", "benchmarks", "card-results.json")
 # and the measured ones stay together so the matrix shows measured and unmeasured alike.
 CARDS = {
     # slug: (display name, architecture, installer class, name aliases)
+    "rtx-4060-ti": ("NVIDIA RTX 4060 Ti", "Ada 8.9", "tc",
+                    ("rtx 4060 ti", "4060 ti", "4060ti", "4060")),
+    "gtx-1080": ("NVIDIA GTX 1080", "Pascal 6.1", "pascal8", ("gtx 1080", "1080")),
+    "k1200": ("Quadro K1200", "Maxwell 5.0", "maxwell", ("k1200", "quadro k1200")),
     "p106-100": ("NVIDIA P106-100", "Pascal 6.1", "maxwell", ("p106",)),
     "p4000": ("Quadro P4000", "Pascal 6.1", "pascal8", ("p4000", "quadro p4000")),
     "m4000": ("Quadro M4000", "Maxwell 5.2", "maxwell", ("m4000", "quadro m4000")),
@@ -388,6 +392,9 @@ def render(models=None, fmts=None, kv=None, isa=None, card_results=None):
               "",
               "A card without a record shows `not measured`. A refusal is a measured result, not a",
               "failure: on sm_52 the `tc` cell records the by-design refusal.",
+              "", "The GTX 1080 and the Quadro K1200 rows have speed benchmarks (MoE vs llama.cpp,",
+              "2026-10) in [BENCHMARKS.md](BENCHMARKS.md), but no `verify_matrix` run yet, so their",
+              "cells render `not measured` until one is folded.",
               "", "| card | arch | class | " + " | ".join(short.upper() for short in CARD_MODELS)
               + " | evidence |",
               "|---|---|---|" + "---|" * (len(CARD_MODELS) + 1)]

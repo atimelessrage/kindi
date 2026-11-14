@@ -1,0 +1,348 @@
+{
+  "started_utc": "2026-11-10T16:40:16Z",
+  "git_revision": "22ac35e",
+  "python": "3.13.6",
+  "packs_dir": "~/.kindi/packs",
+  "cards": 1,
+  "timeout_s": 900.0,
+  "results": [
+    {
+      "model": "2b",
+      "mode": "plain",
+      "status": "pass",
+      "prompts": [
+        {
+          "index": 1,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 2,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 3,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 4,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        }
+      ],
+      "prompts_pass": 4,
+      "prompts_tie": 0,
+      "prompts_fail": 0,
+      "tokens_per_second": 193.4,
+      "exit_code": 0,
+      "duration_s": 4.266929099976551,
+      "first_diff_token": null,
+      "first_diff_gap": null,
+      "summary": "[kindi 17:40:21] ALL PASS: token-exact with llama.cpp - 193.4 tokens/s over the run",
+      "log": "logs/2b-plain.log",
+      "config": {
+        "KINDI_DEVICE": "gpu",
+        "KINDI_HEAD": "exact",
+        "KINDI_KV": "q8_0",
+        "KINDI_SPEC": "0",
+        "KINDI_TP": "0",
+        "KINDI_TC": "0",
+        "KINDI_FD": "0",
+        "KINDI_ATT_TC": "0",
+        "KINDI_CARDS": "1"
+      },
+      "command": [
+        "C:\\Users\\ICH\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "-m",
+        "kindi",
+        "--pack",
+        "~/.kindi/packs/bonsai-2b",
+        "verify"
+      ]
+    },
+    {
+      "model": "2b",
+      "mode": "tc",
+      "status": "pass",
+      "prompts": [
+        {
+          "index": 1,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 2,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 3,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 4,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        }
+      ],
+      "prompts_pass": 4,
+      "prompts_tie": 0,
+      "prompts_fail": 0,
+      "tokens_per_second": 382.7,
+      "exit_code": 0,
+      "duration_s": 3.217491799965501,
+      "first_diff_token": null,
+      "first_diff_gap": null,
+      "summary": "[kindi 17:40:24] ALL PASS: token-exact with llama.cpp - 382.7 tokens/s over the run",
+      "log": "logs/2b-tc.log",
+      "config": {
+        "KINDI_DEVICE": "gpu",
+        "KINDI_HEAD": "exact",
+        "KINDI_KV": "q8_0",
+        "KINDI_SPEC": "0",
+        "KINDI_TP": "1",
+        "KINDI_TC": "1",
+        "KINDI_FD": "1",
+        "KINDI_ATT_TC": "1",
+        "KINDI_TC_TMAX": "4",
+        "KINDI_CARDS": "1"
+      },
+      "command": [
+        "C:\\Users\\ICH\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "-m",
+        "kindi",
+        "--pack",
+        "~/.kindi/packs/bonsai-2b",
+        "verify"
+      ]
+    },
+    {
+      "model": "4b",
+      "mode": "plain",
+      "status": "pass",
+      "prompts": [
+        {
+          "index": 1,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 2,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 3,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 4,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        }
+      ],
+      "prompts_pass": 4,
+      "prompts_tie": 0,
+      "prompts_fail": 0,
+      "tokens_per_second": 123.1,
+      "exit_code": 0,
+      "duration_s": 6.404131299990695,
+      "first_diff_token": null,
+      "first_diff_gap": null,
+      "summary": "[kindi 17:40:30] ALL PASS: token-exact with llama.cpp - 123.1 tokens/s over the run",
+      "log": "logs/4b-plain.log",
+      "config": {
+        "KINDI_DEVICE": "gpu",
+        "KINDI_HEAD": "exact",
+        "KINDI_KV": "q8_0",
+        "KINDI_SPEC": "0",
+        "KINDI_TP": "0",
+        "KINDI_TC": "0",
+        "KINDI_FD": "0",
+        "KINDI_ATT_TC": "0",
+        "KINDI_CARDS": "1"
+      },
+      "command": [
+        "C:\\Users\\ICH\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "-m",
+        "kindi",
+        "--pack",
+        "~/.kindi/packs/bonsai-4b",
+        "verify"
+      ]
+    },
+    {
+      "model": "4b",
+      "mode": "tc",
+      "status": "fail",
+      "prompts": [
+        {
+          "index": 1,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 2,
+          "state": "FAIL",
+          "matched": 6,
+          "total": 40
+        },
+        {
+          "index": 3,
+          "state": "FAIL",
+          "matched": 37,
+          "total": 40
+        },
+        {
+          "index": 4,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        }
+      ],
+      "prompts_pass": 2,
+      "prompts_tie": 0,
+      "prompts_fail": 2,
+      "tokens_per_second": 189.1,
+      "exit_code": 1,
+      "duration_s": 4.205734499963,
+      "first_diff_token": 6,
+      "first_diff_gap": 0.0447,
+      "summary": "[kindi 17:40:34] FAIL - 189.1 tokens/s over the run",
+      "log": "logs/4b-tc.log",
+      "config": {
+        "KINDI_DEVICE": "gpu",
+        "KINDI_HEAD": "exact",
+        "KINDI_KV": "q8_0",
+        "KINDI_SPEC": "0",
+        "KINDI_TP": "1",
+        "KINDI_TC": "1",
+        "KINDI_FD": "1",
+        "KINDI_ATT_TC": "1",
+        "KINDI_TC_TMAX": "4",
+        "KINDI_CARDS": "1"
+      },
+      "command": [
+        "C:\\Users\\ICH\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "-m",
+        "kindi",
+        "--pack",
+        "~/.kindi/packs/bonsai-4b",
+        "verify"
+      ]
+    },
+    {
+      "model": "9b",
+      "mode": "plain",
+      "status": "pass",
+      "prompts": [
+        {
+          "index": 1,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 2,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 3,
+          "state": "PASS",
+          "matched": 13,
+          "total": 13
+        },
+        {
+          "index": 4,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        }
+      ],
+      "prompts_pass": 4,
+      "prompts_tie": 0,
+      "prompts_fail": 0,
+      "tokens_per_second": 79.4,
+      "exit_code": 0,
+      "duration_s": 11.189518099999987,
+      "first_diff_token": null,
+      "first_diff_gap": null,
+      "summary": "[kindi 17:40:46] ALL PASS: token-exact with llama.cpp - 79.4 tokens/s over the run",
+      "log": "logs/9b-plain.log",
+      "config": {
+        "KINDI_DEVICE": "gpu",
+        "KINDI_HEAD": "exact",
+        "KINDI_KV": "q8_0",
+        "KINDI_SPEC": "0",
+        "KINDI_TP": "0",
+        "KINDI_TC": "0",
+        "KINDI_FD": "0",
+        "KINDI_ATT_TC": "0",
+        "KINDI_CARDS": "1"
+      },
+      "command": [
+        "C:\\Users\\ICH\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "-m",
+        "kindi",
+        "--pack",
+        "~/.kindi/packs/bonsai-9b",
+        "verify"
+      ]
+    },
+    {
+      "model": "9b",
+      "mode": "tc",
+      "status": "refused",
+      "prompts": [],
+      "prompts_pass": 0,
+      "prompts_tie": 0,
+      "prompts_fail": 0,
+      "tokens_per_second": null,
+      "exit_code": 1,
+      "duration_s": 3.973746200033929,
+      "first_diff_token": null,
+      "first_diff_gap": null,
+      "summary": "kindi: the tensor-core plan engine supports Hadamard blocks of 512 and 1024 (this pack has 4096); use the plain engine (KINDI_TP=0)",
+      "log": "logs/9b-tc.log",
+      "config": {
+        "KINDI_DEVICE": "gpu",
+        "KINDI_HEAD": "exact",
+        "KINDI_KV": "q8_0",
+        "KINDI_SPEC": "0",
+        "KINDI_TP": "1",
+        "KINDI_TC": "1",
+        "KINDI_FD": "1",
+        "KINDI_ATT_TC": "1",
+        "KINDI_TC_TMAX": "4",
+        "KINDI_CARDS": "1"
+      },
+      "command": [
+        "C:\\Users\\ICH\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "-m",
+        "kindi",
+        "--pack",
+        "~/.kindi/packs/bonsai-9b",
+        "verify"
+      ]
+    }
+  ]
+}

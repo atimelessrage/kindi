@@ -99,8 +99,15 @@ python -m kindi.support_matrix --from-verify docs/benchmarks/<date>-<card>/resul
 A card without a record shows `not measured`. A refusal is a measured result, not a
 failure: on sm_52 the `tc` cell records the by-design refusal.
 
+The GTX 1080 and the Quadro K1200 rows have speed benchmarks (MoE vs llama.cpp,
+2026-10) in [BENCHMARKS.md](BENCHMARKS.md), but no `verify_matrix` run yet, so their
+cells render `not measured` until one is folded.
+
 | card | arch | class | 2B | 4B | 9B | 27B | evidence |
 |---|---|---|---|---|---|---|---|
+| NVIDIA RTX 4060 Ti | Ada 8.9 | tc | plain 4/4 @ 193.4 tok/s · tc 4/4 @ 382.7 tok/s | plain 4/4 @ 123.1 tok/s · tc failed (first diff 6) | plain 4/4 @ 79.4 tok/s · tc refused | not run | measured 2026-11-10 · [results](benchmarks/2026-11-10-i7-8086k-rtx4060ti/results.json) |
+| NVIDIA GTX 1080 | Pascal 6.1 | pascal8 | not measured | not measured | not measured | not measured | not measured |
+| Quadro K1200 | Maxwell 5.0 | maxwell | not measured | not measured | not measured | not measured | not measured |
 | NVIDIA P106-100 | Pascal 6.1 | maxwell | not measured | not measured | not measured | not measured | not measured |
 | Quadro P4000 | Pascal 6.1 | pascal8 | not measured | not measured | not measured | not measured | not measured |
 | Quadro M4000 | Maxwell 5.2 | maxwell | not measured | not measured | not measured | not measured | not measured |

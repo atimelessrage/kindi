@@ -76,6 +76,17 @@ def test_the_cards_section_lists_the_rig_cards():
     assert "| Quadro M4000 | Maxwell 5.2 | maxwell | not measured | not measured | not measured | not measured | not measured |" in text
 
 
+def test_the_cards_section_lists_the_measured_cards():
+    # the already-measured cards are registered alongside the rig cards: the 4060 Ti from its
+    # folded verify_matrix run, the GTX 1080 / K1200 with honest not-measured verify cells (only
+    # speed benchmarks exist for them, linked from the section note)
+    text = matrix_text()
+    assert "| NVIDIA RTX 4060 Ti | Ada 8.9 | tc | plain 4/4 @ 193.4 tok/s" in text
+    assert "measured 2026-11-10" in text and "2026-11-10-i7-8086k-rtx4060ti/results.json" in text
+    assert "| NVIDIA GTX 1080 | Pascal 6.1 | pascal8 | not measured | not measured | not measured | not measured | not measured |" in text
+    assert "| Quadro K1200 | Maxwell 5.0 | maxwell | not measured | not measured | not measured | not measured | not measured |" in text
+
+
 def _payload(card_name="Quadro P4000", gpus=None):
     if gpus is None:
         gpus = [{"name": card_name, "driver": "535.104.05", "memory_mib": 8192, "compute_capability": "6.1"}]

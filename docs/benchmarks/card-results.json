@@ -1,1 +1,15 @@
-{"cards": {}}
+{
+  "cards": {
+    "rtx-4060-ti": {
+      "cells": {
+        "27b": "not run",
+        "2b": "plain 4/4 @ 193.4 tok/s \u00b7 tc 4/4 @ 382.7 tok/s",
+        "4b": "plain 4/4 @ 123.1 tok/s \u00b7 tc failed (first diff 6)",
+        "9b": "plain 4/4 @ 79.4 tok/s \u00b7 tc refused"
+      },
+      "evidence": "benchmarks/2026-11-10-i7-8086k-rtx4060ti/results.json",
+      "git": "22ac35e",
+      "measured": "2026-11-10T16:40:16Z"
+    }
+  }
+}
