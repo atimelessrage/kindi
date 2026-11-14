@@ -742,3 +742,12 @@ Also measured the missing 27B matrix cell: `gpu-first` at 24,576 context reads 8
 7.4/6.2/4.5/3.3/2.7 tok/s at 100/2K/8K/16K/24K, with a sampled peak of 7,339 MiB (633 MiB free
 after load). The 27B table in `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md`
 and `docs/TANDEM-RUNTIME.md` is now complete in both placements at both contexts.
+
+## 16. The verify matrix can run the 9B exact cell (`tc-hp`) (2026-11-13)
+
+`tools/verify_matrix.py` only had `plain` and `tc` modes, so after §14 the 9B tc cell could only
+ever record `refused`, even though {0cd58bc} showed the run is exact with `KINDI_TC_HP=1`. A
+`tc-hp` mode is now part of the matrix (tc plus `KINDI_TC_HP=1`, and `tests/test_verify_matrix.py`
+pins that it adds only that flag). Measured: 9B tc-hp PASS 4/4 at 123.9 tok/s
+(`bench-logs/verify-matrix-9b-tc-hp/`); the same run's 2B/4B tc cells are 4/4 and 3 exact + 1 tie
+unchanged.

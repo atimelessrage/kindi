@@ -35,6 +35,16 @@ def test_mode_env_is_explicit_and_complete():
     assert "KINDI_TC_TMAX" not in plain
 
 
+def test_tc_hp_mode_adds_only_the_high_precision_flag():
+    mod = load()
+    tc = mod.mode_env("tc", cards=1)
+    tc_hp = mod.mode_env("tc-hp", cards=1)
+    assert "KINDI_TC_HP" not in tc
+    assert tc_hp["KINDI_TC_HP"] == "1"
+    assert {k: v for k, v in tc_hp.items() if k != "KINDI_TC_HP"} == tc
+    assert "tc-hp" in mod.MODES
+
+
 def test_27b_pack_override_and_default():
     mod = load()
     assert "27b" in mod.MODELS

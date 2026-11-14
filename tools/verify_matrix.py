@@ -41,7 +41,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODELS = ("2b", "4b", "9b", "27b")
-MODES = ("plain", "tc")
+# "tc-hp" is the tc mode plus KINDI_TC_HP=1: the 9B (Hadamard 4096) is refused
+# by default and only exact with the high-precision activations.
+MODES = ("plain", "tc", "tc-hp")
 PACK_NAMES = {"2b": "bonsai-2b", "4b": "bonsai-4b", "9b": "bonsai-9b", "27b": "bonsai-27b"}
 
 # Keep these explicit: the script must not inherit a KINDI_* switch from the caller.
@@ -66,6 +68,15 @@ MODE_ENV = {
         "KINDI_FD": "1",
         "KINDI_ATT_TC": "1",
         "KINDI_TC_TMAX": "4",
+    },
+    "tc-hp": {
+        **COMMON_ENV,
+        "KINDI_TP": "1",
+        "KINDI_TC": "1",
+        "KINDI_FD": "1",
+        "KINDI_ATT_TC": "1",
+        "KINDI_TC_TMAX": "4",
+        "KINDI_TC_HP": "1",
     },
 }
 
