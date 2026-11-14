@@ -6,10 +6,12 @@ Audit date: **2026-11-12**
 > Sections 8–11 record the post-audit improvements, the 2026-11-12 evening 27B
 > tandem implementation/gate, the later requirement/structural-coverage work, and
 > the 2026-11-13 measurement rounds (sampled-peak VRAM, the 27B rate/peak and
-> checkpoint-cost rows, the 2B CPU-layer sweep). **Section 11 is the current
-> "what is better / what is worse" list; sections 10 and earlier are kept as the
-> history at their own dates.** The best-of branch is merged into `main`: both
-> `main` and `freebuff/tandem-cpu-recovery` are at `0cd58bcd223bf1afba2d8319601e64b014a97082`. The installer source
+> checkpoint-cost rows, the 2B CPU-layer sweep). Sections 12–18 add the median-of-three
+> tandem rows, the 27B capacity ladder and layer sweeps, the 9B tensor-core HP finding,
+> the `tc`/`tc-hp` matrix rows, the plan-engine default dispatch and the 27B 8K boundary
+> sweep. **Section 19 is the current "what is better / what is worse" list; sections
+> 18 and earlier are kept as the history at their own dates.** The best-of branch is merged
+> into `main`: both `main` and `freebuff/tandem-cpu-recovery` are at `5618126`. The installer source
 > pin and the `0.5.0` version identity remain a release-owner publication step, not
 > a code-complete claim.
 
@@ -22,10 +24,10 @@ everything described here has been re-run on current hardware.
 
 | | Stock “normal” Kindi 0.5 | Clean local 0.5 snapshot | Current worktree |
 |---|---|---|---|
-| Ref | `v0.5.0` tag, `1c4cc3e01732f0fada4ab7030ccf4f7651e01053` | `clean/kindi-0.5`, `1b0cbf780b57d464cdb3e5e9acf75ed49256d622` | `main` and `freebuff/tandem-cpu-recovery`, `0cd58bcd223bf1afba2d8319601e64b014a97082` |
+| Ref | `v0.5.0` tag, `1c4cc3e01732f0fada4ab7030ccf4f7651e01053` | `clean/kindi-0.5`, `1b0cbf780b57d464cdb3e5e9acf75ed49256d622` | `main` and `freebuff/tandem-cpu-recovery`, `5618126` |
 | Date | 2026-11-09 | clean snapshot of local 0.5 work | 2026-11-13 (merged state) |
 | Tracked files | 102 | 216 | 342 |
-| Test modules | **0** (`tests/` does not exist) | 25 | 53 tracked test modules |
+| Test modules | **0** (`tests/` does not exist) | 25 | 55 tracked test modules |
 | Docs files | 12 | 84 | 139 tracked paths under `docs/` |
 | Git state | release tag | clean | `main` fast-forwarded to the best-of branch at `0cd58bcd223bf1afba2d8319601e64b014a97082`; generated coverage artifacts are ignored; `bench-logs/` is ignored local evidence |
 
@@ -35,7 +37,7 @@ narrower comparison, not the stock release. Relative to that clean snapshot, the
 with +19,091/−630 lines**.
 
 Relative to the stock tag, the committed branch (`v0.5.0..HEAD`) changes **288 tracked
-files with +33,439/−372 lines**. The generated `.coverage`/`coverage.json` artifacts
+files with +33,578/−375 lines**. The generated `.coverage`/`coverage.json` artifacts
 are now ignored; `bench-logs/` remains ignored local evidence.
 
 Evidence labels used below:
@@ -53,10 +55,14 @@ Evidence labels used below:
 The current worktree is a substantial functional expansion over stock 0.5, not a clean
 replacement release.
 
-**Genuinely better:**
+**Genuinely better (current state, `5618126`):**
 
-- A real dense CPU+GPU tandem runtime that is token-exact on the 2B and 9B in both
-  placements, with a joint prompt cache and saved-opening reload.
+- A real dense CPU+GPU tandem runtime that is token-exact on the 2B, 9B and 27B in both
+  placements, with a joint prompt cache and saved-opening reload, and a measured
+  CPU-layer boundary at 8K (flat exchange, §18) and 24K (capacity threshold at 16 layers, §13).
+- The **plan engine is the default** for every model it supports (§17), and it is the
+  measured winner: `tc` rows lead GPU-only 1.5-1.9x at every depth on this card (§15),
+  with `tc-hp` making the 9B plan exact (§16).
 - A portably built CPU engine with five ISA tiers, an AVX-only fallback, native Windows
   compilation, and exactness runs on 2B/4B/9B.
 - A much more operationally complete server: bounded queue, 429 responses, optional
@@ -746,7 +752,7 @@ and `docs/TANDEM-RUNTIME.md` is now complete in both placements at both contexts
 ## 16. The verify matrix can run the 9B exact cell (`tc-hp`) (2026-11-13)
 
 `tools/verify_matrix.py` only had `plain` and `tc` modes, so after §14 the 9B tc cell could only
-ever record `refused`, even though {0cd58bc} showed the run is exact with `KINDI_TC_HP=1`. A
+ever record `refused`, even though §14 showed the run is exact with `KINDI_TC_HP=1`. A
 `tc-hp` mode is now part of the matrix (tc plus `KINDI_TC_HP=1`, and `tests/test_verify_matrix.py`
 pins that it adds only that flag). Measured: 9B tc-hp PASS 4/4 at 123.9 tok/s
 (`bench-logs/verify-matrix-9b-tc-hp/`); the same run's 2B/4B tc cells are 4/4 and 3 exact + 1 tie
@@ -791,3 +797,58 @@ boundary is the capacity threshold instead: 8 layers are auto-reduced to 17,664 
 free (cannot serve 24K), while 16 layers keep 24,576 with 687 MiB free. Evidence:
 `bench-logs/tandem-cache/boundary-27b-l{8,12,16,20,24,28}-8k.{json,log}`; table in
 `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md`.
+
+## 19. Current state vs stock 0.5, refreshed (`5618126`, 2026-11-13)
+
+This section supersedes the §2 bottom line and the §11.2 worse list. Numbers are from
+the recorded evidence in §§12–18; the focused gates in §7 and the suite count below
+were verified on or near this tree (full suite: **500 passed, 19 skipped**).
+
+### 19.1 What is new or better
+
+- **Default engine is the plan engine** (§17). `make_engine` uses the plan engine for
+  every model it supports (`KINDI_TP=0` keeps plain). A default 2B `kindi verify` is
+  4/4 via the plan engine at 253.4 tok/s (was 194.9 plain). The 9B engine log now states
+  the HB-4096 + HP requirement in the run, not just in docs.
+- **Tensor-core rows are a full matrix mode** (§15): `tc` medians of three at 24K —
+  2B read 471.7, 4B 214.1, 9B 133.9 tok/s, 1.5-1.9x GPU-only — with 12 perf-baseline
+  cells guarding them in CI, plus a `tc-hp` mode that makes the 9B cell runnable exact
+  (4/4 at 123.9 tok/s, §16).
+- **27B tandem is fully measured in both placements at 8K and 24K**, including the
+  8K CPU-layer boundary sweep (§18: 428-432 MiB peak saved per 4-layer step for 15-37%
+  decode cost, no knee) and the 24K capacity threshold (§13: 16 layers keeps 24,576;
+  8 layers reduce to 17,664).
+- **`kindi bench --json` records the actual context**: `ctx` (actual), `ctx_requested`,
+  `ctx_reduced`, so a reduced cell cannot be read as the requested size (§17). Tandem
+  matrix rows are medians of three, not single runs (§12).
+- **Repo hygiene fixed in this round:** `MuseEmber_ReviewAudit_*.txt` audit reports are now
+  covered by `.gitignore` (previously they showed as untracked dirt and could be committed
+  by accident); a stray `{0cd58bc}` template placeholder in §16 is replaced; §1/§2
+  numbers are refreshed to this tree.
+
+### 19.2 What is worse, or no longer works
+
+These are measured or verified on this tree, not speculation. **Bold** are the ones that
+are worse than stock 0.5 or than the first audit's promises; the rest are new features
+that remain partial.
+
+| Item | Status vs stock 0.5 | Fixable now? |
+|---|---|---|
+| **Installer pin stale** — `install.sh` still pins `SOURCE_COMMIT=fd54148` (stock-0.5-era) with `KINDI_VERSION=0.5.0`; the published installer delivers stock code without tandem, the plan-engine default, or the server hardening | Worse than the tree's contents claim | No — release-owner publication step: needs a published artifact + retargeted `SOURCE_COMMIT`/`SOURCE_SHA256`, then a push. Documented in `docs/RELEASE-CHECKLIST.md` |
+| **Version identity stale** — `kindi/__init__.py`, README, CHANGELOG and the installer image still say `0.5.0`; a user cannot distinguish this tree from a stock 0.5 install | Worse (identity) | No — bump only with the release publication above; `tests/test_version_consistency.py` ties pin, package and installer together |
+| **`/health` breaking change** — stock 0.5 returned busy/uptime/stats/GPU memory unauthenticated; the current server returns only `ok/kindi/commit/model/ctx` without a key | Deliberately worse for unauthenticated monitors; a security fix | No — intended; restoring the fields would reopen the leak. Add a documented opt-in if monitors need it |
+| Tandem never beats GPU-only — 27B 7.2-8.4 vs 34.8-34.9 tok/s at position 100; every 2B/4B/9B tandem row also trails GPU-only; and the split buys headroom, not context (full-GPU 27B caps at ~37K tokens, the 16-layer tandem at ~30K, §13) | New feature below its own promise | No — hardware-path rate work; the beat gate is open |
+| 4B default-activations tensor-core exactness — 3 exact + 1 accepted tie (forced-FD 2/4); only the plain engine and `tc-hp` are 4/4 | New feature partial | Hardware-path; documented in `docs/CARDS.md` / `docs/CARD-SUPPORT.md` |
+| 9B tensor-core plan without HP — refused (Hadamard block 4096) unless `KINDI_TC_HP=1`; the exact path exists but is opt-in | New feature partial | Hardware-path; the refusal message and engine log now name the requirement |
+| k8v4 cache — 2B 2/4, 9B unavailable; lossy path | New feature partial | Quarantined experimentally; not default |
+| Blackwell FP8/BF16 + real FP8/BF16 models, MoE/Gemma-4 26B backend, mixed-card/P106/5060 Ti/Turing/Arc hardware, native Sandy Bridge/no-FMA, Dory D1, Raon goldens, PQ2_0/Q2_0 4B/9B/27B downloads | Described as targets, not support | Hardware/downloads-blocked; GPU CI lane has no runner registered (`docs/CI.md`) |
+| Rate limiting stays process-local per source address (shared behind a proxy) | Same as stock, now documented | By design; a proxy-side limiter is the fix |
+
+### 19.3 What was fixed in this round rather than only listed
+
+| was | now |
+|---|---|
+| `MuseEmber_ReviewAudit_*.txt` untracked reports could be committed accidentally | `.gitignore` covers them; `git status` is clean apart from the report |
+| §16 contained a stray `{0cd58bc}` placeholder | replaced with the §14 reference |
+| §1/§2 headline numbers stale (HEAD, module count, diff stat, §2 predating §§15–18) | refreshed to `5618126`; §19 supersedes §2 |
+| Everything else in §19.2 | verified real and still present; not fixable without GPU/hardware, a published release, or the user's GitHub runner step — so reported, not claimed fixed |

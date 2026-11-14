@@ -32,6 +32,7 @@ coverage.json
 bench-logs/
 optimizing-mixed-gpu-rig.json
 Buffy_ReviewAudit_*.txt
+MuseEmber_ReviewAudit_*.txt
 ConsultProposals*.txt
 manual_help_needed.txt
 # key material
