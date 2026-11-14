@@ -1,12 +1,21 @@
 # Tandem overlap scheduler — design draft
 
-Status: **draft, not implemented** (2026-11-14). Targets the ROADMAP goal "Kindi tandem scheduler
-(tandem.cpp-grade overlap)": beat the 27B at 24K tandem row (**7.9 tok/s at the same CPU layer
-budget**) by **>=25%** with token-exact **4/4** (`kindi verify`: `KINDI_TC=0` vs tandem vs full GPU,
-for every tuning change). The memory half of that goal is done (plan-engine owner, gate 1's measured
-split rule); this doc designs the speed half. Evidence conventions follow
-[TANDEM-RUNTIME.md](TANDEM-RUNTIME.md); the original system sketch is
+Status: **draft, not implemented; step 0 landed 2026-11-14** (the decomposition probe and the
+re-recorded gate baseline — see [RESULTS](benchmarks/2026-11-14-i7-8086k-rtx4060ti-tandem-overlap/RESULTS.md)).
+Targets the ROADMAP goal "Kindi tandem scheduler (tandem.cpp-grade overlap)": beat the 27B at 24K
+tandem row by **>=25%** with token-exact **4/4** (`kindi verify`: `KINDI_TC=0` vs tandem vs full GPU,
+for every tuning change). The gate row is the **re-recorded 9.9 tok/s** at the 24K position (the old
+7.9 row predates the plan-engine owner), so the target is ≥12.4 tok/s. The memory half of that goal
+is done (plan-engine owner, gate 1's measured split rule); this doc designs the speed half. Evidence
+conventions follow [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md); the original system sketch is
 [CPU_GPU_TANDEM_DESIGN.md](CPU_GPU_TANDEM_DESIGN.md) (its worker-thread sketch is where this starts).
+
+**Step 0's result changes the premise below.** At 24K with the plan owner the CPU run is already at
+the raw kernel rate (5.18 ms/layer, vs the 8K effective 11.7 ms), so the "~6 ms dispatch gap" this
+design targets is not there at the gate row; the head (14.2 ms) and 7 boundary transfers (2.85 ms,
+0.41 ms each) are the next serial costs. §3's worker thread must be re-justified against the stepped
+decomposition before it is built; double-buffered staging and head-side work come first on those
+numbers.
 
 ## 1. What the measurement says (and what must be re-measured first)
 
@@ -26,11 +35,14 @@ opportunity is *removing per-layer dispatch cost*, not hiding PCIe latency.
 sweep at 8K while the gate row is at 24K. Required before any tuning change is believed:
 
 1. `kindi bench --tandem cpu-first --tandem-cpu-layers gdn:12 --sample-vram --json` at 24K (the gate
-   row: 7.9 tok/s, ~6,151 MiB sampled peak, plan owner, `rate` pick).
+   row: now 9.9 tok/s at the 24K position, 5,949 MiB sampled peak, plan owner, `rate` pick —
+   re-recorded 2026-11-14, in the RESULTS link above).
 2. A per-run timing probe (env-gated, off by default) that records, per token, the wall time in each
    CPU run, each GPU run, and each hidden transfer — so the serial chain is split into named parts.
-   The gate math uses these numbers: after the work below, the CPU-run figure must match the raw
-   kernel figure (±15%) instead of 2× it.
+   Landed 2026-11-14 as `KINDI_TANDEM_DEBUG_TIMING`: `TandemEngine.timing_summary()` plus the
+   `tandem_timing` bench field. The gate math uses these numbers: after the work below, the CPU-run
+   figure must match the raw kernel figure (±15%) instead of 2× it. (It already does at 24K;
+   the 2× figure was an 8K measurement, which is why the premise is now in question.)
 
 ## 2. The bottleneck, in order
 

@@ -110,6 +110,14 @@ def run(cfg, log=print):
             result["gen_tok_s"]["%s:%d" % (name, p)] = round(1000 / ms, 1)
             log("generation (%s head) at position %5d: %5.1f tokens/s" % (name, p, 1000 / ms))
     eng.shortlist = 0
+    timing = eng.timing_summary() if hasattr(eng, "timing_summary") else None
+    if timing is not None:
+        result["tandem_timing"] = timing
+        log("tandem timing/token: cpu %.1f ms (%d layers) + gpu %.1f ms (%d) + transfer %.2f ms "
+            "(%0.1f/token) + head %.1f ms = %.1f ms over %d tokens"
+            % (timing["cpu_ms_per_token"], timing["cpu_layers"], timing["gpu_ms_per_token"],
+               timing["gpu_layers"], timing["transfer_ms_per_token"], timing["transfers_per_token"],
+               timing["head_ms_per_token"], timing["total_ms_per_token"], timing["tokens"]))
     if vram is not None:
         vram.stop()
         s = vram.summary()

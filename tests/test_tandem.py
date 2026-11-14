@@ -648,3 +648,36 @@ def test_pack_bytes_splits_the_f32_file_per_layer(tmp_path):
     # 4 rows x 128 cols: 128 bcodes bytes + 4 dpm bytes, plus the layer's own f32 norm (16 bytes)
     assert sizes["layers"][0] == 4 * 32 + 4 * 2 + 16
     assert sizes["f32_layers"][0] == 16
+
+
+def test_timing_probe_off_by_default(fake_pack, fake_backends, monkeypatch):
+    monkeypatch.delenv("KINDI_TANDEM_DEBUG_TIMING", raising=False)
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first", log=lambda *a: None)
+    assert eng._probe is False
+    assert eng.timing_summary() is None
+    assert eng.step(10, 0) == 77
+    assert eng.timing["tokens"] == 0       # untouched while off: today's _run, no bookkeeping
+
+
+def test_timing_probe_splits_one_token(fake_pack, fake_backends, monkeypatch):
+    monkeypatch.setenv("KINDI_TANDEM_DEBUG_TIMING", "1")
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first", log=lambda *a: None)
+    assert eng._probe is True
+    for i in range(5):
+        assert eng.step(10 + i, i) == 77   # probe output matches the unprobed path, token for token
+    s = eng.timing_summary()
+    assert s["tokens"] == 5
+    assert s["cpu_layers"] == 10 and s["gpu_layers"] == 10       # 2 + 2 layers per token
+    assert s["transfers_per_token"] == 1.0                        # one boundary switch, cpu-first
+    assert s["cpu_ms_per_layer"] > 0 and s["gpu_ms_per_layer"] > 0
+    total = s["cpu_ms_per_token"] + s["gpu_ms_per_token"] + s["transfer_ms_per_token"] + s["head_ms_per_token"]
+    assert abs(total - s["total_ms_per_token"]) < 0.01
+    assert s["head_ms_per_token"] > 0
+
+
+def test_timing_probe_counts_feed_without_the_head(fake_pack, fake_backends, monkeypatch):
+    monkeypatch.setenv("KINDI_TANDEM_DEBUG_TIMING", "1")
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first", log=lambda *a: None)
+    eng.feed(7, 0)
+    s = eng.timing_summary()
+    assert s["tokens"] == 1 and s["head_ms_per_token"] == 0.0

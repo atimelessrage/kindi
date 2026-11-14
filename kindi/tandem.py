@@ -24,6 +24,7 @@ expert-cache policy has nothing to cache.  The MoE approach is a separate design
 import hashlib
 import json
 import os
+import time
 
 import numpy as np
 
@@ -577,6 +578,12 @@ class TandemEngine(object):
         self.vocab = self.cpu.vocab
         self.hsl = None                    # the fast head is not used by a tandem split
         self.shortlist = 0
+        # The overlap design's step-0 decomposition probe (env-gated; off = today's _run
+        # unchanged): per token, milliseconds split into CPU runs, GPU runs, boundary
+        # transfers and the output head, so the CPU-dispatch term is measured, not guessed.
+        self._probe = os.environ.get("KINDI_TANDEM_DEBUG_TIMING", "0") not in ("0", "", "off")
+        self.timing = {"cpu_s": 0.0, "gpu_s": 0.0, "transfer_s": 0.0, "head_s": 0.0,
+                       "cpu_layers": 0, "gpu_layers": 0, "transfers": 0, "tokens": 0}
         if self._gpu_head:
             # Sampler uses the same GPU-kernel path as the normal engine: the logits and aout live on the card.
             self.k = self.gpu.k
@@ -619,19 +626,64 @@ class TandemEngine(object):
         cpu_set = frozenset(self.cpu_range)
         cur = self.cpu if 0 in cpu_set else self.gpu
         cur.begin(tok)
+        t = self.timing
         for il in range(self.NL):
             want = self.cpu if il in cpu_set else self.gpu
             if want is not cur:
-                want.set_hidden(cur.get_hidden())
+                if self._probe:
+                    t0 = time.perf_counter()
+                    want.set_hidden(cur.get_hidden())
+                    t["transfer_s"] += time.perf_counter() - t0
+                    t["transfers"] += 1
+                else:
+                    want.set_hidden(cur.get_hidden())
                 cur = want
-            cur.layer(il, pos)
+            if self._probe:
+                t0 = time.perf_counter()
+                cur.layer(il, pos)
+                dt = time.perf_counter() - t0
+                if cur is self.cpu:
+                    t["cpu_s"] += dt
+                    t["cpu_layers"] += 1
+                else:
+                    t["gpu_s"] += dt
+                    t["gpu_layers"] += 1
+            else:
+                cur.layer(il, pos)
         if not head:
             if cur is self.gpu:
                 self.gpu.flush()
+            if self._probe:
+                t["tokens"] += 1
             return None
+        t0 = time.perf_counter() if self._probe else None
         out = self.gpu.finish() if self._gpu_head else self.cpu.head()
+        if self._probe:
+            t["head_s"] += time.perf_counter() - t0
+            t["tokens"] += 1
         self._sync_logits()
         return int(out)
+
+    def timing_summary(self):
+        """The probe's accumulated per-token split, as a JSON-ready dict (or None when off)."""
+        if not self._probe:
+            return None
+        t = self.timing
+        n = max(1, t["tokens"])
+        layers = max(1, t["cpu_layers"] + t["gpu_layers"])
+        return {
+            "tokens": t["tokens"],
+            "cpu_ms_per_token": round(1000 * t["cpu_s"] / n, 3),
+            "gpu_ms_per_token": round(1000 * t["gpu_s"] / n, 3),
+            "transfer_ms_per_token": round(1000 * t["transfer_s"] / n, 3),
+            "head_ms_per_token": round(1000 * t["head_s"] / n, 3),
+            "cpu_ms_per_layer": round(1000 * t["cpu_s"] / max(1, t["cpu_layers"]), 3),
+            "gpu_ms_per_layer": round(1000 * t["gpu_s"] / max(1, t["gpu_layers"]), 3),
+            "transfers_per_token": t["transfers"] / n,
+            "cpu_layers": t["cpu_layers"], "gpu_layers": t["gpu_layers"],
+            "total_ms_per_token": round(1000 * (t["cpu_s"] + t["gpu_s"] + t["transfer_s"]
+                                                + t["head_s"]) / n, 3),
+        }
 
     def reset(self):
         self.cpu.reset()

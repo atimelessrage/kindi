@@ -276,6 +276,7 @@ def main(argv=None):
     s = sub.add_parser("verify", help="check against llama.cpp's reference output")
     _tandem_args(s)
     s = sub.add_parser("bench", help="measure speed")
+    _tandem_args(s)
     s.add_argument("--json", default=None, metavar="FILE", help="also record the numbers in a machine-readable JSON file")
     s.add_argument("--sample-vram", action="store_true", help="sample device-wide VRAM and log the peak during the run")
     s = sub.add_parser("kld", help="teacher-forced KLD quality gate for lossy K/V caches against fp16")

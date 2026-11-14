@@ -123,3 +123,13 @@ def test_bench_json_helper_writes_parseable_file(tmp_path):
     bench.bench_json(result, out)
     assert json.loads(open(out, encoding="utf-8").read()) == result
     assert os.path.getsize(out) > 0
+
+
+def test_bench_help_accepts_tandem_flags():
+    """The module docstring promises verify/bench/serve/chat all accept --tandem; bench used not to."""
+    from kindi import __main__ as m
+    import subprocess, sys
+    out = subprocess.run([sys.executable, "-m", "kindi", "bench", "--help"],
+                         capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0
+    assert "--tandem" in out.stdout and "--tandem-cpu-layers" in out.stdout

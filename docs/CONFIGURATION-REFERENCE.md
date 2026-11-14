@@ -252,9 +252,10 @@ variables, and are therefore not listed twice here.
 | `KINDI_SPEC_SAMPLE` | `1` | `kindi/spec.py:1260` |
 | `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1867` |
 | `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:193` |
-| `KINDI_TANDEM_GPU` | `auto` | `kindi/tandem.py:480` |
-| `KINDI_TANDEM_RATIO` | (unset) | `kindi/tandem.py:267` |
-| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/tandem.py:523` (+1 more) |
+| `KINDI_TANDEM_DEBUG_TIMING` | `0` | `kindi/tandem.py:584` |
+| `KINDI_TANDEM_GPU` | `auto` | `kindi/tandem.py:481` |
+| `KINDI_TANDEM_RATIO` | (unset) | `kindi/tandem.py:268` |
+| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/tandem.py:524` (+1 more) |
 | `KINDI_TC` | `0` | `kindi/spec.py:81` (+3 more) |
 | `KINDI_TC_B2` | (empty) | `kindi/tc.py:51` |
 | `KINDI_TC_DP4A` | `0` | `kindi/tc.py:74` |
