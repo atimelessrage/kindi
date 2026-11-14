@@ -1,12 +1,13 @@
 # Tandem CPU+GPU runtime
 
-Status: **dense runtime implemented and token-exact on the 2B and 9B, 2026-11-12. Prefix reuse
-checkpoints both owners jointly, and the real 2B and 9B joint-cache checks pass in both placements,
-including saved-opening reloads. The MoE expert-cache path has a model-free state-machine prototype
-and a Gemma 4 26B backend adaptation in [MOE-TANDEM.md](MOE-TANDEM.md) and
-[GEMMA4-26B-MOE.md](GEMMA4-26B-MOE.md), but no MoE backend or integration. The 27B `cpu-first`
-split is token-exact at 8,192 context and peaked below the full-GPU baseline (7,005 vs 7,238 MiB;
-2026-11-12).**
+Status: **dense runtime implemented and token-exact on the 2B, 9B and 27B, with a joint prompt cache.
+Placement matters more than layer count: moving gated-delta layers and leaving attention on the GPU
+keeps long-context decode flat (9B at 24K: 23.6 vs 11.0 tok/s; 27B at 24K: 7.9 vs 2.9; medians of
+three, 2026-11-14).** Prefix-reuse checkpoints cover both owners jointly, and the real 2B and 9B
+joint-cache checks pass in both placements, including saved-opening reloads. The MoE expert-cache path
+is a model-free state-machine prototype with a Gemma 4 26B backend adaptation in
+[MOE-TANDEM.md](MOE-TANDEM.md) and [GEMMA4-26B-MOE.md](GEMMA4-26B-MOE.md); there is no MoE backend or
+integration. Every split is still slower than GPU-only on this card.
 The runtime is `kindi/tandem.py`, with the per-layer GPU API in `kindi/engine.py`. The recovery
 history and the cleanup gate for the interrupted branch are in [TANDEM-STATUS.md](TANDEM-STATUS.md);
 the original design is [CPU_GPU_TANDEM_DESIGN.md](CPU_GPU_TANDEM_DESIGN.md).
@@ -22,7 +23,15 @@ between them per token.
 | `cpu-first` | CPU | CPU prefix `0..n-1`, GPU suffix `n..NL-1` | GPU | a small GPU that can hold the expensive suffix and the LM head |
 | `gpu-first` | GPU | GPU prefix `0..NL-n-1`, CPU suffix `NL-n..NL-1` | CPU | keeping the embedding and early layers on the GPU while the last layers and LM head stay off it |
 
-`n` is `--tandem-cpu-layers` (default: a quarter of the layers).
+`--tandem-cpu-layers` takes one of three forms (default: a quarter of the layers):
+
+- a **count** — `6`: a contiguous CPU prefix (`cpu-first`) or suffix (`gpu-first`), the original behavior;
+- an **explicit layer set** — `0,1,2,4,5,6` or `0-2,4-6`: any sorted subset, so the two backends can interleave;
+- **`gdn:N`** — the first `N` gated-delta (non-attention) layers, ascending. Attention layers stay on the
+  GPU. This is the placement to prefer; see [where to put the CPU layers](#where-to-put-the-cpu-layers).
+
+`kindi bench --json` records the resolved `cpu_range`/`gpu_range` of a run, so a recorded split is
+unambiguous.
 
 The GPU engine now accepts a layer range and uploads only the tensors for that range
 (`Engine(layers=..., embed=..., head=...)`). This is a real VRAM reduction: unselected layer
@@ -157,6 +166,76 @@ Every cached continuation produced the same token IDs as its cache-off control, 
 opening was written by the branch and then loaded into a fresh runner. Evidence:
 `bench-logs/tandem-cache/saved-9b-4k.json` and `saved-9b-8k.json`.
 
+## Where to put the CPU layers (2026-11-14)
+
+Not every layer costs the same on the CPU. A **full-attention** layer on the CPU is the worst choice
+available: its per-token cost grows with the context (it scans the whole K/V cache on the CPU) and the
+K/V it would have held is exactly the memory a split is trying to free. A **gated-delta (GDN)** layer is
+the opposite: O(1) work per token regardless of position and a device state of ~1 MiB. Moving GDN layers
+and leaving attention on the GPU is what keeps a split's decode rate flat with position.
+
+All rows below are `kindi bench --sample-vram`, exact head, one fresh process per run, medians of three
+runs in one session on the i7-8086K + RTX 4060 Ti 8 GB. The 27B `0-15` control is one run (the earlier
+recorded row reproduced to within 5%).
+
+### 9B, 24,576-token context
+
+| placement | read | 100 | 2K | 8K | 16K | 24K | sampled peak |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| full GPU (plan engine) | 99.6 | 87.1 | 86.5 | 81.1 | 76.7 | 73.2 | 3,276 MiB |
+| `cpu-first` 0..5 (has attention layer 3) | 27.9 | 24.4 | 23.7 | 18.7 | 14.4 | **11.0** | 3,452 MiB |
+| `gdn:6` (0,1,2,4,5,6, attention on the GPU) | 23.2 | 23.3 | 27.1 | 22.6 | 25.5 | **23.6** | 3,543 MiB |
+
+The contiguous split loses 55% of its decode rate between 2K and 24K; the GDN-first split loses 13%.
+At 24K `gdn:6` is **2.1x** the contiguous split's rate for the same number of CPU layers, and 1.55x the
+9B tandem row previously recorded in [CROSS-MODE.md](benchmarks/CROSS-MODE.md) (15.2 tok/s at 24K). At
+8K the same effect is smaller (23.1 vs 17.9 tok/s at position 8K, medians of three), which is why the
+contiguous split looked acceptable while it was only measured at short context.
+
+### 9B, the split costs more than it saves
+
+| placement | read | 100 | 2K | 8K | peak | CPU layers |
+|---|---:|---:|---:|---:|---:|---:|
+| full GPU | 106.0 | 88.5 | 87.9 | 83.9 | 3,098 MiB | 0 |
+| `cpu-first` 0..5 | 24.4 | 25.2 | 21.5 | 17.9 | 3,072 MiB | 6 |
+| `gdn:6` | 23.8 | 19.8 | 24.6 | 23.1 | 3,092 MiB | 6 |
+| `gdn:3` (0,1,2) | 36.5 | 35.6 | 35.6 | 32.5 | 3,201 MiB | 3 |
+
+At 8,192 context the 9B leaves ~5 GiB free on this card, and the split's peak is **not lower** than the
+full-GPU peak. A 9B-ternary pack is 2.3 GiB, so there is nothing to win here: on a card this size the
+right placement for the 9B is **no split at all**. The split only becomes interesting when the model is
+genuinely larger than the card, which is the 27B case below.
+
+### 27B, 24,576-token context
+
+| placement | read | 100 | 2K | 8K | 16K | 24K | sampled peak |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| full GPU (plan engine) | 37.4 | 34.9 | 34.2 | 33.0 | 31.6 | 30.2 | 7,783 MiB |
+| `cpu-first` 0-15 (attention layers 3,7,11,15 on the CPU) | 9.9 | 8.4 | 7.2 | 5.3 | 3.7 | **2.9** | 7,434 MiB |
+| `gdn:16` (0,1,2,4,...,20) | 9.2 | 8.4 | 6.7 | 6.4 | 7.7 | **7.9** | 7,744 MiB |
+
+Same layer count off the GPU, same short-context rate, and **2.7x** the 24K decode rate. The GDN-first
+placement keeps 384 MiB more K/V on the card at 24K (the 4 attention layers it does not offload), which
+is the price of the flat curve.
+
+### The split frees much less VRAM than the layer count suggests
+
+Offloading 16 of 64 layers does not free 16/64 of the pack on the 27B: the measured peak only fell from
+7,783 to 7,434 MiB. The reason is that a tandem's GPU owner is the **plain** engine, and on the 27B the
+plain engine is much heavier per layer than the plan engine: `KINDI_TP=0` cannot load the full 27B at
+24,576 context at all (`not enough GPU memory for this model: 0 MiB free after the weights`), while the
+plan engine loads it with 7,783 MiB peak and runs it at 30 tok/s. The plan engine's 27B plan also uses
+the q8_0 K/V cache, which halves K/V bytes; the plain engine has no K/V mode and is always fp16.
+
+So the tandem's VRAM saving is real but small on this card, and its rate cost is large. The two ways to
+make the split pay off are engineering, not tuning:
+
+1. **Give the tandem a plan-engine GPU owner.** `kindi/tp.py:TPEngine` has no per-layer API; it fuses
+   layers into a plan. Extending its plan to start at an arbitrary layer is the change that would make an
+offloaded layer free what it should.
+2. **A q8_0 K/V cache in the plain engine.** At 24K the 27B's 16 attention layers hold 1.5 GiB of fp16
+   K/V; q8_0 would return ~0.75 GiB without touching a single weight.
+
 ## Current limits
 
 - **Dense Bonsai only.** The manifest check accepts a Bonsai pack and rejects the Gemma 4 /
@@ -287,8 +366,13 @@ usable context here; it trades throughput for headroom. Full table: [27B-8K.md](
    reloads pass at 4K/8K on the 9B and 27B, and the 27B joint checkpoint costs 54.5-61.5 ms to save
    and 27.0-28.5 ms to restore in both placements.
 4. **Tuning:** the 2B boundary is measured (knee at 4-6 layers) and the 27B boundary is too
-   (24K needs at least 16 CPU layers here; 24-32 layers buy memory at a steep rate cost). Prompt
-   reading on the target small card and any faster split remain open; every split is below
-   GPU-only on this card.
-5. **MoE:** design in [MOE-TANDEM.md](MOE-TANDEM.md); implementation only after a real MoE backend
+   (24K needs at least 16 CPU layers here; 24-32 layers buy memory at a steep rate cost). The
+   placement is now measured as well: `gdn:N` keeps attention on the GPU and flattens the
+   long-context decay (2026-11-14). Every split is still below GPU-only on this card, and the split's
+   VRAM saving is limited by the plain engine's footprint, so the next real step is a plan-engine
+   owner or a q8_0 K/V cache rather than more layer sweeps.
+5. **Context fit on a split:** fixed 2026-11-14. The GPU owner's context estimate charged it for every
+   attention layer of the model instead of the ones it loads, so a split reduced context too eagerly
+   (the 27B with 8 CPU layers at 24,576 requested now holds 19,712 tokens instead of 17,664).
+6. **MoE:** design in [MOE-TANDEM.md](MOE-TANDEM.md); implementation only after a real MoE backend
    with per-expert tensors and router logits exists.

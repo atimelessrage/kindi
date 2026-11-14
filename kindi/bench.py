@@ -57,6 +57,9 @@ def run(cfg, log=print):
               "ctx_reduced": cfg["ctx"] > eng.ctx + 47, "ctx_requested": cfg["ctx"],
               "tandem": cfg.get("tandem", "off"), "cpu_layers": cfg.get("tandem_cpu_layers"),
               "device": "gpu" if cp is not None else "cpu", "read_tok_s": None, "gen_tok_s": {}}
+    if hasattr(eng, "cpu_range"):
+        result["cpu_range"] = list(eng.cpu_range)
+        result["gpu_range"] = list(eng.gpu_range)
     if cp is not None:
         free, total = cp.cuda.runtime.memGetInfo()
         log("GPU memory: %.0f MiB free of %.0f with a %d-token context" % (free / 2 ** 20, total / 2 ** 20, eng.ctx))

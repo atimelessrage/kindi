@@ -35,6 +35,47 @@ def _normalise_mode(mode):
     return str(mode or "off").strip().lower().replace("_", "-")
 
 
+def _parse_layers(text):
+    """-> an int count, a tuple of layer numbers, or a ``gdn:N`` spec (returned as a string)."""
+    text = str(text).strip()
+    try:
+        return int(text)
+    except ValueError:
+        pass
+    if text.lower().startswith("gdn:"):
+        return text.lower()
+    parts = [p.strip() for p in text.replace(";", ",").split(",") for p in p.split() if p.strip()]
+    flat = []
+    for part in parts:
+        # a-b or a:b both mean the inclusive contiguous block
+        if "-" in part[1:] or ":" in part:
+            sep = "-" if "-" in part[1:] else ":"
+            lo, hi = part.split(sep, 1)
+            flat.extend(range(int(lo), int(hi) + 1))
+        else:
+            flat.append(int(part))
+    return tuple(flat)
+
+
+def gdn_first(dims, count):
+    """The first ``count`` layers that are not full-attention, ascending.
+
+    A full-attention layer on the CPU is the worst thing a split can do to decode rate: its
+    cost grows with the context and its K/V would otherwise have lived in VRAM, which is the
+    memory a split is trying to save. A gated-delta (GDN) layer is the opposite: its per-token
+    CPU cost is context-independent and its device state is tiny, so it is the layer to move.
+    Attention layers stay on the GPU; that keeps the split's rate flat with position.
+    """
+    layers = int(dims.get("layers", 24))
+    interval = max(1, int(dims.get("full_attention_interval", 4)))
+    gdn = [il for il in range(layers) if (il + 1) % interval]
+    count = int(count)
+    if not 1 <= count < len(gdn):
+        raise SystemExit("kindi: gdn:%d needs between 1 and %d CPU layers (the model has %d GDN layers)"
+                         % (count, len(gdn) - 1, len(gdn)))
+    return tuple(gdn[:count])
+
+
 class _TandemCacheView(object):
     """The two owners' state in the shape ``cache.Runner`` expects.
 
@@ -121,18 +162,36 @@ class TandemEngine(object):
             raise SystemExit("kindi: tandem mode must be cpu-first or gpu-first, not %r" % mode)
         if cpu_layers is None:
             cpu_layers = max(1, self.NL // 4)
-        cpu_layers = int(cpu_layers)
-        if not 1 <= cpu_layers < self.NL:
-            raise SystemExit("kindi: tandem cpu layers must be between 1 and %d (got %d)"
-                             % (self.NL - 1, cpu_layers))
-        self.cpu_layers = cpu_layers
-        self.cpu_first = self.mode == "cpu-first"
-        if self.cpu_first:
-            self.cpu_range = tuple(range(0, cpu_layers))
-            self.gpu_range = tuple(range(cpu_layers, self.NL))
+        if isinstance(cpu_layers, str):
+            cpu_layers = _parse_layers(cpu_layers)
+            if isinstance(cpu_layers, str):
+                cpu_layers = gdn_first(dims, cpu_layers.split(":", 1)[1])
+        cpu_first = self.mode == "cpu-first"
+        if isinstance(cpu_layers, (list, tuple)):
+            explicit = tuple(int(x) for x in cpu_layers)
+            if (not explicit or len(set(explicit)) != len(explicit)
+                    or explicit != tuple(sorted(explicit))
+                    or explicit[0] < 0 or explicit[-1] >= self.NL
+                    or len(explicit) >= self.NL):
+                raise SystemExit("kindi: tandem cpu layers %r must be a non-empty sorted subset of "
+                                 "0..%d with at least one GPU layer" % (cpu_layers, self.NL - 1))
+            self.cpu_layers = list(explicit)
+            self.cpu_range = explicit
+            gpu = tuple(il for il in range(self.NL) if il not in frozenset(explicit))
+            self.gpu_range = gpu
         else:
-            self.gpu_range = tuple(range(0, self.NL - cpu_layers))
-            self.cpu_range = tuple(range(self.NL - cpu_layers, self.NL))
+            cpu_layers = int(cpu_layers)
+            if not 1 <= cpu_layers < self.NL:
+                raise SystemExit("kindi: tandem cpu layers must be between 1 and %d (got %d)"
+                                 % (self.NL - 1, cpu_layers))
+            self.cpu_layers = cpu_layers
+            if cpu_first:
+                self.cpu_range = tuple(range(0, cpu_layers))
+                self.gpu_range = tuple(range(cpu_layers, self.NL))
+            else:
+                self.gpu_range = tuple(range(0, self.NL - cpu_layers))
+                self.cpu_range = tuple(range(self.NL - cpu_layers, self.NL))
+        self.cpu_first = cpu_first
         self._gpu_head = self.NL - 1 in self.gpu_range
         self.ctx = int(ctx)
 
@@ -154,8 +213,11 @@ class TandemEngine(object):
             self.k = self.gpu.k
             self.aout = self.gpu.aout
         self._sync_logits()
-        self.log("tandem %s: CPU layers %d..%d, GPU layers %d..%d, %d-token context, %s head"
-                 % (self.mode, self.cpu_range[0], self.cpu_range[-1], self.gpu_range[0], self.gpu_range[-1],
+        def _rng(rng):
+            full = rng == tuple(range(rng[0], rng[-1] + 1))
+            return "%d..%d" % (rng[0], rng[-1]) if full else ",".join(str(x) for x in rng)
+        self.log("tandem %s: CPU layers %s, GPU layers %s, %d-token context, %s head"
+                 % (self.mode, _rng(self.cpu_range), _rng(self.gpu_range),
                     self.ctx, "GPU" if self._gpu_head else "CPU"))
 
     def _sync_logits(self):
@@ -184,27 +246,20 @@ class TandemEngine(object):
     def _run(self, tok, pos, head):
         """Run one token through both backends; return the head token when head is true."""
         pos = self._check_pos(pos)
-        if self.cpu_first:
-            self.cpu.begin(tok)
-            for il in self.cpu_range:
-                self.cpu.layer(il, pos)
-            self.gpu.set_hidden(self.cpu.get_hidden())
-            for il in self.gpu_range:
-                self.gpu.layer(il, pos)
-            if not head:
+        cpu_set = frozenset(self.cpu_range)
+        cur = self.cpu if 0 in cpu_set else self.gpu
+        cur.begin(tok)
+        for il in range(self.NL):
+            want = self.cpu if il in cpu_set else self.gpu
+            if want is not cur:
+                want.set_hidden(cur.get_hidden())
+                cur = want
+            cur.layer(il, pos)
+        if not head:
+            if cur is self.gpu:
                 self.gpu.flush()
-                return None
-            out = self.gpu.finish()
-        else:
-            self.gpu.begin(tok)
-            for il in self.gpu_range:
-                self.gpu.layer(il, pos)
-            self.cpu.set_hidden(self.gpu.get_hidden())
-            for il in self.cpu_range:
-                self.cpu.layer(il, pos)
-            if not head:
-                return None
-            out = self.cpu.head()
+            return None
+        out = self.gpu.finish() if self._gpu_head else self.cpu.head()
         self._sync_logits()
         return int(out)
 

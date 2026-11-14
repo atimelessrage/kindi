@@ -101,7 +101,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:572` |
 | `KINDI_CONFIG` | (unset) | `kindi/config.py:114` (+1 more) |
 | `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:211` (+2 more) |
-| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:177` (+1 more) |
+| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:179` (+1 more) |
 | `KINDI_D1` | `0` | `kindi/spec.py:713` |
 | `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:482` |
 | `KINDI_DEVICE` | `gpu` | `kindi/bench.py:15` (+4 more) |
@@ -144,7 +144,7 @@ is where it is read, which is where the full description lives.
 | `KINDI_KV` | `q8_0` | `kindi/tp.py:48` |
 | `KINDI_KV_EXPERIMENTAL` | `0` | `kindi/tp.py:52` |
 | `KINDI_LLVM` | (unset) | `kindi/cpu.py:91` |
-| `KINDI_MEM_RESERVE_MB` | `96` or `32` | `kindi/engine.py:266` (+2 more) |
+| `KINDI_MEM_RESERVE_MB` | `96` or `32` | `kindi/engine.py:270` (+2 more) |
 | `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:634` |
 | `KINDI_NB_CPUF` | `0.55` | `kindi/nanbeige.py:33` |
 | `KINDI_NB_EMBD_HOST` | `"1" if kepler(cp, devices[0]) else "0"` | `kindi/nanbeige.py:266` |
@@ -206,5 +206,5 @@ is where it is read, which is where the full description lives.
 | `KINDI_TC_TUNE` | `0` | `kindi/spec.py:429` (+1 more) |
 | `KINDI_TESTED_CC` | (empty) | `kindi/tc.py:39` |
 | `KINDI_THP` | `0` | `kindi/engine.py:69` |
-| `KINDI_TP` | (empty) | `kindi/engine.py:633` |
+| `KINDI_TP` | (empty) | `kindi/engine.py:637` |
 | `KINDI_TP_SPLIT` | `equal` | `kindi/tp.py:850` |

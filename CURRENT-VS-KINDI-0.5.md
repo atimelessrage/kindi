@@ -852,3 +852,47 @@ that remain partial.
 | §16 contained a stray `{0cd58bc}` placeholder | replaced with the §14 reference |
 | §1/§2 headline numbers stale (HEAD, module count, diff stat, §2 predating §§15–18) | refreshed to `5618126`; §19 supersedes §2 |
 | Everything else in §19.2 | verified real and still present; not fixable without GPU/hardware, a published release, or the user's GitHub runner step — so reported, not claimed fixed |
+
+## 20. Tandem placement: the CPU layer set matters more than the layer count (2026-11-14)
+
+One improvement to the tandem runtime itself, measured on this card. `--tandem-cpu-layers` used to be a
+count of a contiguous block, which mixed the two layer types a Bonsai pack has. A **full-attention**
+layer on the CPU is the worst thing a split can do: its per-token cost grows with the context and its
+K/V is exactly what a split is supposed to move off the card. A **gated-delta (GDN)** layer has O(1)
+per-token CPU work and ~1 MiB of device state.
+
+So the flag now also takes an explicit layer set (`0,1,2,4,5,6`, `0-2,4-6`) and `gdn:N`, which moves the
+first N GDN layers and leaves every attention layer on the GPU. `kindi bench --json` records the
+resolved `cpu_range`/`gpu_range`.
+
+| model @ 24,576 ctx | placement | read | 100 | 2K | 8K | 16K | 24K | peak |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 9B | full GPU | 99.6 | 87.1 | 86.5 | 81.1 | 76.7 | 73.2 | 3,276 MiB |
+| 9B | `cpu-first` 0..5 | 27.9 | 24.4 | 23.7 | 18.7 | 14.4 | 11.0 | 3,452 MiB |
+| 9B | `gdn:6` | 23.2 | 23.3 | 27.1 | 22.6 | 25.5 | **23.6** | 3,543 MiB |
+| 27B | full GPU | 37.4 | 34.9 | 34.2 | 33.0 | 31.6 | 30.2 | 7,783 MiB |
+| 27B | `cpu-first` 0-15 | 9.9 | 8.4 | 7.2 | 5.3 | 3.7 | 2.9 | 7,434 MiB |
+| 27B | `gdn:16` | 9.2 | 8.4 | 6.7 | 6.4 | 7.7 | **7.9** | 7,744 MiB |
+
+Medians of three fresh-process runs (24K 27B `0-15` is one control run); both 9B and 27B splits are
+token-exact on the 2B/9B/27B (2B re-verified with both the integer and `gdn:` forms, 4/4). The GDN-first
+placement gives **2.1x** the 9B and **2.7x** the 27B 24K decode rate for the same number of CPU layers,
+because the contiguous split loses 55% of its rate between 2K and 24K while GDN-first loses 13%.
+
+Two honest limits came out of the same runs, and both are now documented rather than implied:
+
+- **The 9B split is pointless on this card.** The 9B-ternary pack is 2.3 GiB and the card has ~5 GiB
+  free at 8K, so the split's sampled peak (3,072-3,092 MiB) is the same as full GPU (3,098) while it
+  runs 3-4x slower. "No split" is the correct 9B placement here.
+- **A split frees much less VRAM than its layer count implies.** Offloading 16 of the 27B's 64 layers
+  cut the sampled peak only from 7,783 to 7,434 MiB. The tandem's GPU owner is the **plain** engine,
+  and `KINDI_TP=0` cannot load the full 27B at 24K at all (`0 MiB free after the weights`) while the plan
+  engine loads it at 7,783 MiB. The plan engine also runs a q8_0 K/V cache (half the bytes); the plain
+  engine has no K/V mode. Making the split pay off is therefore a plan-engine owner or a q8_0 cache in
+  the plain engine — not another layer sweep.
+
+One bug fixed on the way: the partial-range engine's context fit charged the GPU owner for **every**
+attention layer of the model instead of the ones it loads, so a split reduced context more than the
+memory allowed. The 27B with 8 CPU layers at 24,576 requested now holds **19,712** tokens instead of
+17,664 (+11.6%), same split, same card. Evidence: `bench-logs/tandem-improve/` (JSON + logs per run,
+with the resolved layer sets).

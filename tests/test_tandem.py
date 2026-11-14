@@ -181,6 +181,38 @@ def test_reset_clears_both_backends(fake_pack, fake_backends):
     assert ("reset",) in eng.cpu.calls and ("reset",) in eng.gpu.calls
 
 
+def test_explicit_layer_list_routes_each_layer_to_its_owner(fake_pack, fake_backends):
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers="0,2", mode="cpu-first", log=lambda *a: None)
+    assert eng.cpu_range == (0, 2) and eng.gpu_range == (1, 3)
+    assert eng.cpu_layers == [0, 2]
+    assert eng.step(5, 0) == 77
+    # CPU embeds, layer 0 runs on the CPU, hidden crosses, layer 1 runs on the GPU,
+    # hidden crosses back, layer 2 runs on the CPU, hidden crosses, layer 3 + head on the GPU
+    assert [c for c in eng.cpu.calls if c[0] == "layer"] == [("layer", 0, 0), ("layer", 2, 0)]
+    assert [c for c in eng.gpu.calls if c[0] == "layer"] == [("layer", 1, 0), ("layer", 3, 0)]
+    assert eng.cpu.calls[0] == ("begin", 5)
+    # every ownership switch must hand the hidden state over (3 switches for 0,2)
+    switches = sum(1 for c in eng.cpu.calls + eng.gpu.calls if c[0] == "set_hidden")
+    assert switches == 3
+
+
+def test_placement_specs_parse_to_layer_sets():
+    assert tandem._parse_layers("6") == 6
+    assert tandem._parse_layers("0,1,2") == (0, 1, 2)
+    assert tandem._parse_layers("0-2,4-6") == (0, 1, 2, 4, 5, 6)
+    assert tandem._parse_layers("gdn:6") == "gdn:6"
+
+
+def test_gdn_first_keeps_attention_layers_on_the_gpu():
+    dims = {"layers": 32, "full_attention_interval": 4}
+    layers = tandem.gdn_first(dims, 6)
+    assert layers == (0, 1, 2, 4, 5, 6)
+    assert not any((il + 1) % 4 == 0 for il in layers)      # no attention layer on the CPU
+    assert len(tandem.gdn_first(dims, 23)) == 23            # every GDN layer is allowed
+    with pytest.raises(SystemExit, match="between 1 and 23"):
+        tandem.gdn_first(dims, 24)                          # the 24th layer would be attention
+
+
 def test_invalid_split_is_rejected_before_a_backend_is_built(fake_pack, fake_backends):
     with pytest.raises(SystemExit, match="between 1 and 3"):
         tandem.TandemEngine(fake_pack, cpu_layers=0, mode="cpu-first", log=lambda *a: None)
