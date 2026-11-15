@@ -21,7 +21,11 @@ The five cards are the last ones with routing in `install.sh` and no GPU run beh
   the Kepler rejections. `python -m pytest -q tests/test_installer_cards.py` runs anywhere.
 - Host toolchain: `docker/Dockerfile` is the CUDA 10.2.89 + CuPy 9.6 image (the last one that targets
   sm_52 and sm_61). The host driver has to be at least 440.33 for that toolkit; a 535 branch driver
-  covers Maxwell and Pascal.
+  covers Maxwell and Pascal. There is also an upper bound: **R580 is the last NVIDIA driver branch
+  that supports Maxwell, Pascal and Volta** (support is dropped in R590), so a 617.x host driver
+  defeats this path regardless of what the card names itself — pin a <=580 branch before the session.
+  CUDA 13 dropped offline compilation below sm_75, so pre-Turing cards need a CUDA <= 12.x toolkit
+  (CUDA 12.4 builds sm_50+); the 10.2 image above is one such.
 - Evidence capture: `tools/verify_matrix.py` now writes an `environment` block into `results.json` -
   card name, compute capability, driver, VRAM, CuPy and CUDA runtime version, and for each pack its
   `source_sha256`, fold and size. On a host without `nvidia-smi` it records `"no card detected"`

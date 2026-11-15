@@ -619,6 +619,10 @@ not load the 2B as a draft model for the 27B: the two files have different Hadam
 The K420 has compute capability 3.0 (sm_30). CUDA 11 and later cannot compile code for it, and current llama.cpp
 does not build with CUDA 10.2, the last toolkit for this card. The Vulkan backend runs on it with all layers on the
 GPU, so the Vulkan build is the fair comparison. On the K1200 (sm_50) host, only the Vulkan build was available.
+One more compile floor applies to every CUDA build, including the PrismML ternary fork: CUDA 13 dropped
+offline compilation below sm_75, so a CUDA 13.3 build is Turing and later only; Maxwell/Pascal baselines need a
+CUDA 12.4 build (which targets `50-virtual`/`61-virtual` and up) or the Vulkan build. R580 is also the last
+driver branch for Maxwell/Pascal/Volta — see [OLD-CARD-RIG.md](OLD-CARD-RIG.md).
 
 ## Other published results
 
