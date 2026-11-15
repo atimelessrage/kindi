@@ -50,8 +50,12 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
 
 ## Live work
 
-- **Formats:** `PQ2_0`/`Q2_0` import (2B done, byte-identical packs); 4B/9B/27B conversion and
-  verification are open because those files were never downloaded. The native FP8 (E4M3/E5M2)
+- **Formats:** `PQ2_0`/`Q2_0` import (2B done, byte-identical packs); 4B PTQ1_0 conversion
+  provenance-verified 2026-11-15 (reconvert from the downloaded GGUF → byte-identical weights,
+  converted pack verifies 3+tie exactly like the existing pack; `bench-logs/convert-4b-verify/RESULTS.md`);
+  9B/27B pack verify re-run the same day (9B 4/4, 27B 4/4 token-exact). Remaining: the 4B/9B/27B
+  `PQ2_0`/`Q2_0` files were never downloaded and Hugging Face is unreachable from this host, so the
+  142/42 import claim stays 2B-only. The native FP8 (E4M3/E5M2)
   prompt GEMM is implemented and synthetic-tested on Ada; a manual Blackwell sm_100/sm_120
   verification lane exists; the local gate returned `unsupported` on the Ada-only host and the
   workflow has not been dispatched, so a real FP8 model, a Blackwell result and a Blackwell

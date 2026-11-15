@@ -91,7 +91,11 @@ Since 2026-11-10 the 2B `PQ2_0` and `Q2_0` files convert to packs that are byte-
 PTQ1_0 pack for every stream (`bcodes.bin`, `dpm.bin`, `f32.bin`, both sign files, the tokenizer and
 both indexes); only `index.json`'s recorded source type and `kindi_pack.json`'s `source_format`
 differ. Because the pack is identical, the memory footprint and every benchmark number are the
-PTQ1_0 numbers: converting `PQ2_0`/`Q2_0` buys download compatibility, not speed.
+PTQ1_0 numbers: converting `PQ2_0`/`Q2_0` buys download compatibility, not speed. 2026-11-15:
+the 4B pack on this host is also reproducible byte-for-byte from its downloaded `PTQ1_0` GGUF
+(weights identical, converted pack verifies 3+tie exactly like the reference; `bench-logs/convert-4b-verify/RESULTS.md`).
+The 4B/9B/27B `PQ2_0`/`Q2_0` **files** themselves remain undownloaded here (Hugging Face unreachable
+from this host), so the type-142/42 import claim stays verified for the 2B only.
 
 ## 3. Current Kindi support
 
@@ -100,7 +104,7 @@ Verified in the code and docs on this branch:
 | Capability | 2B | 4B | 9B | 27B | Evidence / caveat |
 |---|---|---|---|---|---|
 | Text, PTQ1_0 | Yes | Yes | Yes | Yes | Four profiles in `kindi/convert.py`; references and verifies exist |
-| Text, PQ2_0/Q2_0 | Yes | Not tested | Not tested | Not tested | Types 142/42/143 in `kindi/convert.py`; the 2B pack is byte-identical to the PTQ1_0 pack and `kindi verify` passes 4/4 (`bench-logs/pq2-q2-2b/RESULTS.md`) |
+| Text, PQ2_0/Q2_0 | Yes | Not tested | Not tested | Not tested | Types 142/42/143 in `kindi/convert.py`; the 2B pack is byte-identical to the PTQ1_0 pack and `kindi verify` passes 4/4 (`bench-logs/pq2-q2-2b/RESULTS.md`). The 4B PTQ1_0 conversion is provenance-verified (reconvert → byte-identical weights, verify 3+tie meeting the reference pack; `bench-logs/convert-4b-verify/RESULTS.md`), but the 4B PQ2_0/Q2_0 **files** were never downloaded here (HF unreachable from this host), so the 142/42 claim for 4B stays untested |
 | Image input | No | No | No | No | No mmproj loader; `chat.content_of()` takes only `text` parts |
 | Image part rejected without vision weights | Yes (400) | Yes (400) | Yes (400) | Yes (400) | `kindi/server.py` checks `image_url`/`image`/`input_image` parts and Ollama `images`; a pack with `vision` or `mmproj` in `kindi_pack.json` is allowed through |
 | 262,144 context | Untested | Untested | Untested | Yes, 2x P100 | `docs/BENCHMARKS.md` full-context 27B run; `docs/CARDS.md` shows 110,592 tokens on a 10 GB RTX 3080 |

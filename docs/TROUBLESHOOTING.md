@@ -8,8 +8,9 @@ session uses a few MB, which is fine; another CUDA or Vulkan program is not). Fr
 
 **`needs the PTQ1_0 GGUF`.** Kindi reads the PTQ1_0 files of Ternary-Bonsai-2-2B, -4B, -9B and -27B, and since
 2026-11-10 it also converts the `PQ2_0` (type 142) and `Q2_0` (type 42) files of the 2B to a byte-identical pack
-(`kindi convert` records `source_format` in `kindi_pack.json`). Only the 2B was converted and verified; the
-4B/9B/27B `PQ2_0`/`Q2_0` files use the same types but were not downloaded here.
+(`kindi convert` records `source_format` in `kindi_pack.json`). Only the 2B PQ2_0/Q2_0 import was converted and verified; the
+4B pack's PTQ1_0 conversion is also byte-verified (2026-11-15, `bench-logs/convert-4b-verify/RESULTS.md`). The
+4B/9B/27B `PQ2_0`/`Q2_0` files use the same types but were not downloaded here (Hugging Face unreachable from this host).
 
 **CUDA errors such as `no kernel image is available` or `CUDA driver version is insufficient`.** Use the NVIDIA 470
 driver and the CUDA 10.2 stack in the Docker image.
