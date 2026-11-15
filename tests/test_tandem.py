@@ -438,6 +438,17 @@ def test_load_ratio_ignores_a_corrupt_file(tmp_path):
     assert tandem.load_ratio(pack_sha="SHAME", path=str(p)) is None
 
 
+def test_owner_table_matches_the_placement(fake_pack, fake_backends):
+    # the dispatch table is resolved once at construction; pin that it routes every layer the way
+    # the old per-token set lookup did, including an interleaved placement (the GDN shape)
+    for spec, cpu_layers in (("0,2", (0, 2)), (2, (0, 1))):
+        eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=spec, mode="cpu-first",
+                                  log=lambda *a: None)
+        assert tuple(i for i, o in enumerate(eng._owners) if o is eng.cpu) == cpu_layers
+        assert eng._owners[0] is eng.cpu     # the embedding owner starts the token
+        assert all((o is eng.cpu) == (il in cpu_layers) for il, o in enumerate(eng._owners))
+
+
 def test_auto_placement_resolves_before_the_backends_are_built(fake_pack, fake_backends, monkeypatch):
     dims = {"layers": 4, "full_attention_interval": 2, "kv_heads": 1, "head_dim": 8}
     (Path(fake_pack) / "kindi_pack.json").write_text(json.dumps({"dimensions": dims}), encoding="utf-8")

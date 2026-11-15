@@ -591,7 +591,12 @@ class TandemEngine(object):
             # Sampler uses the same GPU-kernel path as the normal engine: the logits and aout live on the card.
             self.k = self.gpu.k
             self.aout = self.gpu.aout
+        # the per-layer owner table, resolved once: `_run` must not re-derive the owner of every
+        # layer on every token (it built a frozenset and did a set lookup per layer per token)
+        cpu_set = frozenset(self.cpu_range)
+        self._owners = tuple(self.cpu if il in cpu_set else self.gpu for il in range(self.NL))
         self._sync_logits()
+
         def _rng(rng):
             full = rng == tuple(range(rng[0], rng[-1] + 1))
             return "%d..%d" % (rng[0], rng[-1]) if full else ",".join(str(x) for x in rng)
@@ -626,12 +631,12 @@ class TandemEngine(object):
     def _run(self, tok, pos, head):
         """Run one token through both backends; return the head token when head is true."""
         pos = self._check_pos(pos)
-        cpu_set = frozenset(self.cpu_range)
-        cur = self.cpu if 0 in cpu_set else self.gpu
+        owners = self._owners
+        cur = owners[0]
         cur.begin(tok)
         t = self.timing
         for il in range(self.NL):
-            want = self.cpu if il in cpu_set else self.gpu
+            want = owners[il]
             if want is not cur:
                 if self._probe:
                     t0 = time.perf_counter()
