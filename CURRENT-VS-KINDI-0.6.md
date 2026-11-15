@@ -15,13 +15,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `d4aff7e`:
+HEAD `9938553`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 307 commits
-git diff --shortstat v0.6.0..HEAD          # 398 files, +53,292/-995
+git log --oneline v0.6.0..HEAD | wc -l     # 311 commits
+git diff --shortstat v0.6.0..HEAD          # 398 files, +53,420/-998
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -223,6 +223,25 @@ arbitrary-draft-GGUF harness stays a separate gate.
   store + CLI + triage + tags + raw-markdown export/import +
   server-side `/sessions` endpoints + resume + retention.
 - Diff vs `v0.6.0` grew 398 files (+53,181 → +53,292 insertions);
+  still zero file deletions.
+- §17: stop-sequence O(n²) fix + CPU profile baseline.
+
+## 17. What changed in the 2026-11-15 performance deepen round 2
+
+- **Fix:** the generation loop scanned the whole accumulated reply for
+  stop strings every token (O(n²) over a generation). It now scans only
+  the not-yet-checked tail via a `stop_from` cursor (O(window) per
+  token), proved correct by induction (new matches can only appear in
+  the tail; thinking freezes the cursor so pre-think matches are still
+  found). Isolated check at 20K tokens: 0.088 s → 0.018 s (4.8×);
+  spanning and thinking cases pinned by tests driving the real loop
+  (`549ac52`).
+- **Measured and recorded:** the CPU engine's Python overhead is
+  0.000 s over 1.027 s of feeds (all inside the `kc_step` C call;
+  27.8 ms/feed on the 2B at 512 ctx, i7-8086K). The CPU path is
+  kernel-bound; deeper CPU speed now means `kcpu.c` kernel work
+  measured against this baseline (`docs/BENCHMARKS.md`).
+- Diff vs `v0.6.0` grew 398 files (+53,292 → +53,420 insertions);
   still zero file deletions.
 
 ## 11. What changed in the 2026-11-15 second audit triage
