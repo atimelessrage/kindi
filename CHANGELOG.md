@@ -4,6 +4,20 @@
 
 ### Fixed
 
+- **Sessions mutations are serialized.** Each `/sessions` request builds
+  its own `SessionStore`, so concurrent status/tag posts raced their
+  read-modify-write and one update could silently win; the routes now
+  share one lock, `_save` writes unique tmp files, and `list()` closes its
+  file handles.
+- **Validation errors now name the field.** `RequestError` carries an
+  optional `param` and the handlers surface it, so the `n`,
+  `response_format` and `logprobs` 400s return the field in the envelope
+  instead of `null`.
+- **Tandem `rate` log no longer prints a fake prediction.** When the
+  split-ratio calibration has no row for the picked layer count, the log
+  now says the pick is fit-only instead of `predicted ~0.0 tok/s`.
+- **Config reference also scans `os.getenv` reads**, so a future spelling
+  cannot silently drop an env var from the reference.
 - **Config reference now scans subpackages.** `kindi/config_reference.py`
   `env_vars()` only read `kindi/*.py`, so `KINDI_BACKEND_MODULES` (read in
   `kindi/backends/registry.py`) was missing from the generated

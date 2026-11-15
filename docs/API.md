@@ -23,7 +23,9 @@ Every error response has the OpenAI shape:
   client libraries recognise a context-window error and shorten the
   conversation instead of retrying the same request.
 - `param` names the request field at fault when the server knows it
-  (for example `messages` on a context overflow), else `null`.
+  (for example `messages` on a context overflow, `n` or `response_format`
+  on an unsupported value, `id`/`status`/`tag` on the sessions routes),
+  else `null`.
 - Unknown routes (404) and wrong methods (405) and unhandled failures (500)
   return the same envelope. Internal errors do not leak stack traces.
 
@@ -73,6 +75,10 @@ other id (including path-shaped input) is a 400, never a file read.
 | `GET /sessions/<id>/export` | the raw markdown export (`text/markdown`), exact message text verbatim |
 | `POST /sessions/<id>/status` | `{"status": ...}` moves the session through triage; returns the summary |
 | `POST /sessions/<id>/tags` | `{"tag": "..."}` adds a (slugified, deduped) tag; returns the summary |
+
+Concurrent mutations are serialized: each request gets its own store
+instance, so the routes share one lock around the read-modify-write, and a
+simultaneous tag post and status post cannot overwrite each other.
 
 ## Streaming and queueing
 

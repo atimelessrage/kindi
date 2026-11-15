@@ -86,8 +86,8 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
 - **Agent API hardening (REQ-0018, proposed):** the next layer over the 0.6.0 base (token
   counting, sessions, priorities, progress comments): (0) unsupported
   `n > 1` and structured-output `response_format` are now rejected with an
-  enveloped 400 instead of silently ignored (**landed 2026-11-15**, decision
-  D2) — constrained decoding itself remains open; (1) grammar / JSON-schema constrained
+  enveloped 400 (naming the field in `param`) instead of silently ignored
+  (**landed 2026-11-15**, decision D2) — constrained decoding itself remains open; (1) grammar / JSON-schema constrained
   decoding — nothing exists beyond the Gemma 4 tool-call `CallGrammar` precedent, and the
   Gemma grammar is the starting point for a general constrained sampler; (2) a per-model
   tool-call conformance suite — **landed 2026-11-15**
@@ -199,7 +199,8 @@ Tracked as [REQ-0016](development/requirements/REQ-0016.md) (experimental).
 **2026-11-15: the server-side `/sessions` endpoint landed** (list with
 status/tag filters, full record, raw-markdown export, triage status and tags
 over HTTP, auth-gated, host-only), pinned by `tests/test_server_sessions.py`.
-Still open: resume in the chat loop.
+Concurrent mutations are serialized (one lock around the read-modify-write;
+what used to race and lose updates). Still open: resume in the chat loop.
 
 ## External suggestions review (2026-11-14)
 
