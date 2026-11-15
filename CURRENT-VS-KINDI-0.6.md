@@ -15,13 +15,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `48d3ab0`:
+HEAD `1363e7f`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 337 commits
-git diff --shortstat v0.6.0..HEAD          # 401 files, +53,986/-1020
+git log --oneline v0.6.0..HEAD | wc -l     # 344 commits
+git diff --shortstat v0.6.0..HEAD          # 401 files, +54,055/-1020
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -269,6 +269,22 @@ arbitrary-draft-GGUF harness stays a separate gate.
 - Diff vs `v0.6.0` grew 400 files (+53,480 → +53,567 insertions);
   still zero file deletions.
 - §20: tandem split timings on `/metrics`.
+
+## 25. What changed in the 2026-11-15 full-suite fix + CPU parity round
+
+A full-suite run (783 passed, 20 skipped, 1 failure, 2 fixture
+errors) found: the generated configuration reference was stale
+after the sessions edits → regenerated (191 reads); and
+`test_server_cpu` errored rather than skipped on hosts without a
+compiler → it now skips when the libkcpu cache is cold and no
+gcc/clang is present (pass case re-verified with clang). New
+cross-ISA parity property test: all five tier libraries built and
+loaded run a fixed decode on the 2B — greedy tokens identical
+across tiers; hidden states within ~3e-4 summation-order
+tolerance (byte-identical hidden is false by construction).
+
+- Diff vs `v0.6.0` grew 401 files (+53,986 → +54,055 insertions);
+  still zero file deletions.
 
 ## 24. What changed in the 2026-11-15 sessions protection round
 
