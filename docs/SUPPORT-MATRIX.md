@@ -113,6 +113,9 @@ cells render `not measured` until one is folded.
 | Quadro M4000 | Maxwell 5.2 | maxwell | not measured | not measured | not measured | not measured | not measured |
 | Quadro M5000 | Maxwell 5.2 | maxwell | not measured | not measured | not measured | not measured | not measured |
 | Quadro RTX 4000 | Turing 7.5 | turing | not measured | not measured | not measured | not measured | not measured |
+| NVIDIA RTX 5060 Ti 16 GB | Blackwell 12.0 | tc | not measured | not measured | not measured | not measured | not measured |
+| NVIDIA GeForce 940M 2 GB | Maxwell 5.0 | maxwell | not measured | not measured | not measured | not measured | not measured |
+| NVIDIA GT 1030 2 GB (passive) | Pascal 6.1 | maxwell | not measured | not measured | not measured | not measured | not measured |
 | Intel Arc A770 16 GB | Alchemist (DG2) | intel | not measured | not measured | not measured | not measured | not measured |
 | Intel Iris Xe (integrated) | Xe-LP (Gen12) | intel-igpu | not measured | not measured | not measured | not measured | not measured |
 | Intel built-in Arc (integrated) | Xe2-LPG | intel-igpu | not measured | not measured | not measured | not measured | not measured |

@@ -402,6 +402,34 @@ if [ "$IS_WSL" = 1 ]; then
 fi
 
 # GPUs: index, name, memory (MiB), compute capability
+cc_from_name() {   # GPU name -> compute capability, for drivers that do not report it (Kepler's 470, older RTX)
+  case "$1" in
+    *"GTX TITAN X"*) echo 5.2 ;;                                                      # GM200 (Maxwell): before "GTX TITAN"
+    # data-centre parts first: "SXM4" in a name would match the Maxwell M[0-9] pattern below
+    *"Tesla P100"*|*"Quadro GP100"*) echo 6.0 ;;                                       # GP100: no dp4a
+    *V100*|*"TITAN V"*|*"Quadro GV100"*) echo 7.0 ;;                                   # GV100
+    *A100*|*A30*|*"CMP 170HX"*) echo 8.0 ;;                                            # GA100: before A[0-9]
+    *H100*|*H200*|*GH200*) echo 9.0 ;;
+    # the K20 and K40 patterns must not match the K2000 and the K4000: a digit after "K20" or "K40" is another card
+    *K6000*|*K5200*|*K40[!0-9]*|*K40|*K20[!0-9]*|*K20|*"GTX TITAN"*|*"GTX 780"*) echo 3.5 ;;   # GK110
+    *K80*) echo 3.7 ;;                                                                # GK210
+    *K420*|*K600*|*K2000*|*K4000*|*K4200*|*K5000*|*K520*|*K10[!0-9]*|*K10|*"GTX 6"*|*"GTX 7"[0-4]*|*"GT 7"*) echo 3.0 ;;   # GK104, GK106, GK107
+    # Maxwell 2 (GM200, GM204, GM206) is sm_52: before the M[0-9] line below (issue #30: the M5000 showed sm_50)
+    *"Quadro M2000"|*"Quadro M4000"|*"Quadro M5000"|*"Quadro M6000"*|*"Quadro M3000M"*|*"Quadro M4000M"*|*"Quadro M5000M"*|*"Tesla M4"|*"Tesla M40"*|*"Tesla M6"|*"Tesla M60"*|*"GTX 950"|*"GTX 960"|*"GTX 970"*|*"GTX 980"*|*"GTX 965M"*) echo 5.2 ;;
+    *K620*|*K1200*|*K2200*|*"GTX 75"*|*"GTX 9"*|*"940M"*|*"930M"*|*M[0-9]*) echo 5.0 ;;
+    *Tesla\ P100*|*GP100*) echo 6.0 ;;                        # GP100, HBM2: sm_60 (no dp4a), the p100 class
+    *"GTX 10"*|*"Quadro P"*|*"TITAN X"*|*Tesla\ P*) echo 6.1 ;;   # GP10x: GTX 10, P106/P104/P102, Quadro P, P40/P4
+    *"GT 1030"*|*"GT 10"*|*"P106"*) echo 6.1 ;;               # GT 1030 (GP108), GT 1010, P106-100
+    *"RTX 20"*|*"GTX 16"*|*"Quadro RTX"*|*"TITAN RTX"*|*"Quadro T"*|*CMP\ 30HX*|*CMP\ 40HX*|*T4*) echo 7.5 ;;
+    *"RTX 30"*|*A[0-9]*) echo 8.6 ;;
+    *"RTX 4000 Ada"*) echo 8.9 ;;       # NVIDIA RTX 4000 Ada Generation (Ada), before the Turing RTX 4000 below
+    *"RTX 4000"*) echo 7.5 ;;           # Turing TU104: before "RTX 40" (4060/4070), which contains it as a prefix
+    *"RTX 40"*|*L4*) echo 8.9 ;;
+    *"RTX 50"*) echo 12.0 ;;                                   # Blackwell, sm_120: before the "RTX 5" laptop names
+    *"GT 430"*|*"GT 420"*|*"GT 520"*|*"GT 210"*|*"GT 220"*|*"GT 240"*|*"GT 330"*) echo 2.1 ;;   # Fermi / pre-Kepler
+    *) echo 6.1 ;;
+  esac
+}
 GIDX=(); GNAME=(); GMEM=(); GCC=()
 DRIVER=""
 if command -v nvidia-smi >/dev/null && nvidia-smi >/dev/null 2>&1; then
@@ -411,29 +439,7 @@ if command -v nvidia-smi >/dev/null && nvidia-smi >/dev/null 2>&1; then
   while IFS=',' read -r i n m c; do
     n=$(echo "$n" | sed 's/^ *//; s/ *$//'); c=$(echo "$c" | tr -d ' ')
     if [ "$c" = "?" ] || [ -z "$c" ]; then   # older drivers (Kepler's 470) do not report it: from the name
-      case "$n" in
-        *"GTX TITAN X"*) c=5.2 ;;                                                      # GM200 (Maxwell): before "GTX TITAN"
-        # data-centre parts first: "SXM4" in a name would match the Maxwell M[0-9] pattern below
-        *"Tesla P100"*|*"Quadro GP100"*) c=6.0 ;;                                       # GP100: no dp4a
-        *V100*|*"TITAN V"*|*"Quadro GV100"*) c=7.0 ;;                                   # GV100
-        *A100*|*A30*|*"CMP 170HX"*) c=8.0 ;;                                            # GA100: before A[0-9]
-        *H100*|*H200*|*GH200*) c=9.0 ;;
-        # the K20 and K40 patterns must not match the K2000 and the K4000: a digit after "K20" or "K40" is another card
-        *K6000*|*K5200*|*K40[!0-9]*|*K40|*K20[!0-9]*|*K20|*"GTX TITAN"*|*"GTX 780"*) c=3.5 ;;   # GK110
-        *K80*) c=3.7 ;;                                                                # GK210
-        *K420*|*K600*|*K2000*|*K4000*|*K4200*|*K5000*|*K520*|*K10[!0-9]*|*K10|*"GTX 6"*|*"GTX 7"[0-4]*|*"GT 7"*) c=3.0 ;;   # GK104, GK106, GK107
-        # Maxwell 2 (GM200, GM204, GM206) is sm_52: before the M[0-9] line below (issue #30: the M5000 showed sm_50)
-        *"Quadro M2000"|*"Quadro M4000"|*"Quadro M5000"|*"Quadro M6000"*|*"Quadro M3000M"*|*"Quadro M4000M"*|*"Quadro M5000M"*|*"Tesla M4"|*"Tesla M40"*|*"Tesla M6"|*"Tesla M60"*|*"GTX 950"|*"GTX 960"|*"GTX 970"*|*"GTX 980"*|*"GTX 965M"*) c=5.2 ;;
-        *K620*|*K1200*|*K2200*|*"GTX 75"*|*"GTX 9"*|*"940M"*|*"930M"*|*M[0-9]*) c=5.0 ;;
-        *Tesla\ P100*|*GP100*) c=6.0 ;;                        # GP100, HBM2: sm_60 (no dp4a), the p100 class
-        *"GTX 10"*|*"Quadro P"*|*"TITAN X"*|*Tesla\ P*) c=6.1 ;;   # GP10x: GTX 10, P106/P104/P102, Quadro P, P40/P4
-        *"GT 1030"*|*"GT 10"*|*"P106"*) c=6.1 ;;               # GT 1030 (GP108), GT 1010, P106-100
-        *"RTX 20"*|*"GTX 16"*|*"Quadro RTX"*|*"TITAN RTX"*|*"Quadro T"*|*CMP\ 30HX*|*CMP\ 40HX*|*T4*) c=7.5 ;;
-        *"RTX 30"*|*A[0-9]*) c=8.6 ;;
-        *"RTX 40"*|*L4*) c=8.9 ;;
-        *"GT 430"*|*"GT 420"*|*"GT 520"*|*"GT 210"*|*"GT 220"*|*"GT 240"*|*"GT 330"*) c=2.1 ;;   # Fermi / pre-Kepler
-        *) c=6.1 ;;
-      esac
+      c=$(cc_from_name "$n")
     fi
     GIDX+=("$(echo "$i" | tr -d ' ')"); GNAME+=("$n"); GMEM+=("$(echo "$m" | tr -d ' ')"); GCC+=("$c")
   done <<< "$out"

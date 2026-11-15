@@ -2,8 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Installer name fallback: RTX 50 (Blackwell) and RTX 4000 (Turing)** — computed capability now derived from the card name when the driver does not report it (`cc_from_name()` in `install.sh`). RTX 50 series maps to 12.0 (Blackwell sm_120); previously it fell through to the 6.1 default. The existing `RTX 40` rule also matched `RTX 4000` and reported Turing's sm_75 card as Ada 8.9; the separate `RTX 4000` rule now wins.
+
 ### Added
 
+- **Support-matrix slugs for the 5060 Ti, GeForce 940M and GT 1030** — rendered as not measured (no fabricated rows); the Fermi GT 430 stays unsupported (below the installer’s sm_30 floor, the CUDA 10.2 image cannot run it).
+- **Fake-GPU tests for the full ten-card rig list** in `tests/test_installer_cards.py` — classification and model offers for every card, plus the name-fallback cases.
 - **Tandem split timings on `/metrics`** (`kindi_tandem_*` gauges: cpu,
   gpu, transfer, head and total ms/token plus tokens and handoffs per
   token) — visible whenever the `KINDI_TANDEM_DEBUG_TIMING` probe ran.

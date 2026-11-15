@@ -38,6 +38,18 @@ CARDS = {
     "m4000": ("Quadro M4000", "Maxwell 5.2", "maxwell", ("m4000", "quadro m4000")),
     "m5000": ("Quadro M5000", "Maxwell 5.2", "maxwell", ("m5000", "quadro m5000")),
     "rtx4000": ("Quadro RTX 4000", "Turing 7.5", "turing", ("rtx 4000", "quadro rtx 4000")),
+    # Blackwell consumer (16 GB): the installer classifies it `tc` (sm_80+), but there is no
+    # Kindi exactness or speed run on Blackwell yet. No support claim until measured;
+    # see docs/CARDS.md. (RTX 5060 Ti is sm_120 / CC 12.0, not "sm_128".)
+    "rtx-5060-ti": ("NVIDIA RTX 5060 Ti 16 GB", "Blackwell 12.0", "tc",
+                    ("rtx 5060 ti", "5060 ti", "5060ti")),
+    # The 2 GB cards. The installer classifies a small Pascal card as `maxwell` (pascal8 needs
+    # 7.5 GB or more); the catalog's own size gates keep 9B off them. Not measured;
+    # see docs/CARDS.md (GeForce 940M is fixed in the ASUS F555U laptop).
+    "geforce-940m": ("NVIDIA GeForce 940M 2 GB", "Maxwell 5.0", "maxwell",
+                     ("940m", "geforce 940m")),
+    "gt-1030": ("NVIDIA GT 1030 2 GB (passive)", "Pascal 6.1", "maxwell",
+                ("gt 1030", "gt1030")),
     # Purchased 2026-11-15, in transit, not installed: registered so a future rig run has a slug to
     # fold into later. No Intel backend exists and the installer does not offer this card; the
     # matrix renders it not measured. See docs/INTEL-ARC.md and REQ-0020.

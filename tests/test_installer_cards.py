@@ -19,7 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = Path(os.environ.get("KINDI_INSTALLER", ROOT / "install.sh"))
-FUNCS = ("card_tc", "card_class", "pair_ok", "pair_fits", "card_models", "card_k", "profile_of")
+FUNCS = ("cc_from_name", "card_tc", "card_class", "pair_ok", "pair_fits", "card_models", "card_k", "profile_of")
 
 
 def installer_text():
@@ -429,6 +429,56 @@ def test_pair_fits_offers_nemotron_but_not_27b_on_smaller_pairs():
         return
     assert info["pair"] == "yes", info
     assert info["27b"] == "no" and info["nemotron"] == "yes", info
+
+
+def test_the_ten_card_rig_each_classifies_as_documented():
+    # the user's rig list, each card on its own: RTX 5060 Ti 16 GB (Blackwell 12.0), RTX 4060 Ti,
+    # RTX 4000, P4000, P106-100, M4000, 940M 2 GB, GT 1030 2 GB, GT 430 1 GB (Fermi). The Arc A770
+    # has no NVIDIA entry (no backend: see docs/INTEL-ARC.md), so it is not in this table.
+    names = ["NVIDIA GeForce RTX 5060 Ti", "NVIDIA GeForce RTX 4060 Ti", "NVIDIA GeForce RTX 4000",
+             "Quadro P4000", "NVIDIA P106-100", "Quadro M4000", "NVIDIA GeForce 940M",
+             "NVIDIA GeForce GT 1030", "NVIDIA GeForce GT 430"]
+    mems = [16384, 8188, 8192, 8192, 6144, 8192, 2048, 2048, 1024]
+    ccs = ["12.0", "8.9", "7.5", "6.1", "6.1", "5.2", "5.0", "6.1", "2.1"]
+    body = "\n".join('echo "class%d=$(card_class %d)"\necho "models%d=$(card_models %d)"' % (i, i, i, i) for i in range(len(names)))
+    info = fields(names, mems, ccs, body)
+    if info is None:
+        return
+    want = ["tc", "tc", "turing", "pascal8", "maxwell", "maxwell", "maxwell", "maxwell", "unsupported"]
+    got = [info["class%d" % i] for i in range(len(names))]
+    assert got == want, (got, info)
+    # the Fermi GT 430 is refused outright (below Kepler, sm_30; CUDA dropped it before v0.4)
+    assert info["models8"] == "", info
+    # the 2 GB cards get the small-context maxwell profile with the catalog's own size gates
+    assert info["models6"] == info["models7"] == "4b 2b", info
+    # 16 GB Blackwell takes everything the 8 GB Ada does (class tc is memory-gated only in profile_of)
+    assert info["models0"] == "27b lightning nemotron 9b 4b 2b", info
+    # 6 GB P106-100 (Pascal below the 7.5 GB pascal8 gate) takes the shared 6 GB list
+    assert info["models4"] == "9b nemotron 4b 2b", info
+
+
+def test_cc_from_name_falls_back_correctly_for_every_card():
+    # drivers that do not report compute_cap (Kepler's 470, older RTX) classify from the name;
+    # the cards of the rig list must all land on their real architecture
+    cases = {
+        "NVIDIA GeForce RTX 5060 Ti": "12.0",   # Blackwell sm_120 (not sm_128: no such CC exists)
+        "NVIDIA GeForce RTX 4060 Ti": "8.9",
+        "NVIDIA GeForce RTX 4000": "7.5",
+        "Quadro P4000": "6.1",
+        "NVIDIA P106-100": "6.1",
+        "Quadro M4000": "5.2",
+        "NVIDIA GeForce 940M": "5.0",
+        "NVIDIA GeForce GT 1030": "6.1",
+        "NVIDIA GeForce GT 430": "2.1",
+    }
+    body = "\n".join('echo "%s=$(cc_from_name "%s")"' % (i, n) for i, n in enumerate(cases))
+    got = run_case(body + "\n")
+    if got is None:
+        return
+    rc, out, _ = got
+    assert rc == 0, out
+    lines = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
+    assert [lines[str(i)] for i in range(len(cases))] == list(cases.values()), (lines, cases)
 
 
 if __name__ == "__main__":
