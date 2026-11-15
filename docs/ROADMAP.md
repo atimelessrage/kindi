@@ -63,7 +63,22 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   the Xeon W-2133/i9-13900K plus a repeat timing run are open.
 - **Plan engine:** 2B T=4 token-exact; 9B is 4/4 token-exact with `KINDI_TC_HP=1` (122.7 tok/s vs 76.3–80.0 plain) — the kernels already dispatched the 4096 folds, so `make_engine` now selects HP for HB-4096 packs (`KINDI_TC_HP=0` still refuses; with the default int8 activations one prompt flips at token 36, 3/4: isolated to activation precision by toggling fold-split/FF/FD/ATT_TC/TMAX, all unchanged). The plan engine now has `tc` rows in the cross-mode matrix (medians of three at 24K: 2B read 471.7, 4B 214.1, 9B 133.9; generation at 24K 299.2/127.8/97.0 tok/s, 1.5–1.9x the GPU-only engine) and its cells are guarded by the perf gate. The verify matrix gained a `tc-hp` mode (2026-11-13; `tools/verify_matrix.py`) so the 9B exact cell is reproducible (PASS 4/4 at 123.9 tok/s). `make_engine` now uses the plan engine by default for every model it supports (2026-11-13; verified: 2B default verify is 4/4 at 253.4 tok/s via the plan engine); `KINDI_TP=0` keeps the plain engine. `bench --json` also records `ctx_requested` and `ctx_reduced` so a reduced run is never recorded as the requested context.
 - **Serving:** bounded queue with 429, optional per-source `KINDI_RATE_LIMIT_PER_MIN`, `/metrics`,
-  Ollama-compatible endpoints; multi-GPU replicas need `kindi/tp.py` work.
+  JSON access log, Ollama-compatible endpoints; multi-GPU replicas need `kindi/tp.py` work.
+- **Agent API hardening (REQ-0018, proposed):** the next layer over the 0.6.0 base (token
+  counting, sessions, priorities, progress comments): (1) grammar / JSON-schema constrained
+  decoding — nothing exists beyond the Gemma 4 tool-call `CallGrammar` precedent, and the
+  Gemma grammar is the starting point for a general constrained sampler; (2) a per-model
+  tool-call conformance suite — today only the Bonsai XML parser is tested
+  (`tests/test_tool_calls.py`); Gemma 4, DeepSeek DSML and Nemotron XML formats have no
+  conformance coverage, and the DeepSeek cut-off fix (no raw markup in the reply) is the
+  motivating case; (3) real concurrent request handling — the server serves one active
+  request under a bounded queue (REQ-0005), the continuous-batching design is NO-GO at its
+  Phase-0 spike gate (0.69x, see [CONTINUOUS-BATCHING.md](CONTINUOUS-BATCHING.md)), and no
+  concurrency claim ships until a new spike passes; (4) metrics are already shipped
+  (`/metrics`, access log) and must grow with each new path. The gate is in REQ-0018: no
+  drop-in-for-agent-frameworks claim until the conformance suite and a schema-constrained
+  reply both pass. The goal is a backend an agent framework can rely on, not just a fast
+  chat endpoint.
 - **Cards:** single/dual card support targets are in [CARD-SUPPORT.md](CARD-SUPPORT.md). The P106-100
   single-card (2B/4B/9B) and two-card (27B) offers are installer-tested but not measured on hardware.
   Whether the CPU+GPU tandem helps pre-tensor-core cards — Pascal (GTX 1080, P106-100) and the
