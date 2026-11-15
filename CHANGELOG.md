@@ -4,6 +4,12 @@
 
 ### New
 
+- **Server-side `/sessions` endpoints** ([REQ-0016](docs/development/requirements/REQ-0016.md)).
+  `GET /sessions` (status/tag filters), `GET /sessions/<id>`,
+  `GET /sessions/<id>/export` (raw markdown), `POST /sessions/<id>/status`
+  and `POST /sessions/<id>/tags` expose the chat session history the CLI
+  already records, over HTTP. Host-only (no engine, cache or GPU), behind
+  the API key when one is set, with enveloped errors and a strict id check.
 - **Backend plugin interface, foundations (Feature 4, T4.1)** ([docs/BACKENDS.md](docs/BACKENDS.md),
   [REQ-0019](docs/development/requirements/REQ-0019.md)). `kindi/backends/` defines the
   backend contract (capabilities, sampling params, generation events, cancellation), a

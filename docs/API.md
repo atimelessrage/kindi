@@ -57,6 +57,22 @@ Proposed (decision D2, **not implemented**): reject `n` greater than 1 and a
 instead of silently ignoring them, until they are supported. Purely cosmetic
 fields keep being ignored.
 
+## Sessions (REQ-0016)
+
+The server also exposes the chat session history that `kindi chat` records
+(host-only; these routes never touch the engine, the GPU or the prompt
+cache). All of them require the API key when one is set (401 otherwise) and
+use the same error envelope; session ids are the store's 12-hex ids, and any
+other id (including path-shaped input) is a 400, never a file read.
+
+| route | returns |
+|---|---|
+| `GET /sessions?status=&tag=` | `{"sessions": [...]}` — summaries (id, title, status, tags, created, updated, message_count), newest first; `status` must be `open`, `needs-review` or `resolved` (400 otherwise) |
+| `GET /sessions/<id>` | the full record, messages included; 404 (`not_found`) when there is no such session |
+| `GET /sessions/<id>/export` | the raw markdown export (`text/markdown`), exact message text verbatim |
+| `POST /sessions/<id>/status` | `{"status": ...}` moves the session through triage; returns the summary |
+| `POST /sessions/<id>/tags` | `{"tag": "..."}` adds a (slugified, deduped) tag; returns the summary |
+
 ## Streaming and queueing
 
 - `stream=true` yields `chat.completion.chunk` objects terminated by

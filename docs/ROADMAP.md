@@ -87,10 +87,10 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   counting, sessions, priorities, progress comments): (1) grammar / JSON-schema constrained
   decoding — nothing exists beyond the Gemma 4 tool-call `CallGrammar` precedent, and the
   Gemma grammar is the starting point for a general constrained sampler; (2) a per-model
-  tool-call conformance suite — today only the Bonsai XML parser is tested
-  (`tests/test_tool_calls.py`); Gemma 4, DeepSeek DSML and Nemotron XML formats have no
-  conformance coverage, and the DeepSeek cut-off fix (no raw markup in the reply) is the
-  motivating case; (3) real concurrent request handling — the server serves one active
+  tool-call conformance suite — **landed 2026-11-15**
+  (`tests/test_tool_call_conformance.py`: Gemma 4 native, Nanbeige/Lightning XML+JSON,
+  DeepSeek DSML truncated blocks; all parsers hold the contract, no leak bugs found);
+  (3) real concurrent request handling — the server serves one active
   request under a bounded queue (REQ-0005), the continuous-batching design is NO-GO at its
   Phase-0 spike gate (0.69x, see [CONTINUOUS-BATCHING.md](CONTINUOUS-BATCHING.md)), and no
   concurrency claim ships until a new spike passes; (4) metrics are already shipped
@@ -193,8 +193,10 @@ record/append, triage statuses (`open` → `needs-review` → `resolved`), tags
 message text verbatim, round-tripped through `kindi sessions
 list|show|export|triage|tag|status|import` (host-only; no pack or GPU).
 Tracked as [REQ-0016](development/requirements/REQ-0016.md) (experimental).
-Next step if this grows: a server-side `/sessions` endpoint and resume in
-the chat loop.
+**2026-11-15: the server-side `/sessions` endpoint landed** (list with
+status/tag filters, full record, raw-markdown export, triage status and tags
+over HTTP, auth-gated, host-only), pinned by `tests/test_server_sessions.py`.
+Still open: resume in the chat loop.
 
 ## External suggestions review (2026-11-14)
 

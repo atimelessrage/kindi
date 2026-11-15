@@ -10,6 +10,10 @@
   POST /api/generate           a raw prompt, Ollama style
   GET  /api/tags               the served model, Ollama style
   GET  /metrics                Prometheus text: requests, tokens, speculative stats, queue, uptime
+  GET  /sessions               chat sessions from state_dir/sessions (?status=&tag= filters); host-only, no engine
+  GET  /sessions/<id>          one session with its messages; /sessions/<id>/export is the raw markdown (text/markdown)
+  POST /sessions/<id>/status   move a session through triage ({"status": "open"|"needs-review"|"resolved"})
+  POST /sessions/<id>/tags     add a tag ({"tag": "..."})
 
 A prompt that does not fit is an HTTP 400 (code context_length_exceeded, OpenAI's wording) before the request waits
 for the engine. A stream gets an SSE comment ": kindi progress {...}" every KINDI_KEEPALIVE_S (10) seconds while
@@ -32,6 +36,7 @@ import hmac
 import json
 import math
 import os
+import re
 import threading
 import time
 import uuid
@@ -1447,6 +1452,94 @@ def create_app(cfg, log=print):
     app.add_api_route("/v1/tokenize", _tokenize, methods=["POST"])
     app.add_api_route("/detokenize", _detokenize, methods=["POST"])
     app.add_api_route("/v1/detokenize", _detokenize, methods=["POST"])
+
+    # Chat sessions (REQ-0016): the same host-only store `kindi chat` records and the `kindi sessions` CLI reads.
+    # These routes never touch the engine, the GPU or the prompt cache.
+    from .sessions import STATUSES as SESSION_STATUSES
+    from .sessions import SessionStore
+
+    def _session_store():
+        return SessionStore(os.path.join(cfg.get("state_dir") or os.path.join(os.getcwd(), ".kindi"), "sessions"))
+
+    def _session_summary(rec):
+        return {"id": rec.get("id"), "title": rec.get("title"), "status": rec.get("status"),
+                "tags": rec.get("tags") or [], "created": rec.get("created"), "updated": rec.get("updated"),
+                "message_count": len(rec.get("messages") or [])}
+
+    _SID_RE = re.compile(r"^[0-9a-f]{12}$")
+
+    def _session_or_none(sid):
+        """The record for sid, or an error response. Ids are the store's own 12-hex ids, so a path-shaped id is
+        refused here rather than becoming a file outside the sessions directory."""
+        if not _SID_RE.match(sid or ""):
+            return None, _err(400, "invalid session id", "invalid_request_error", param="id")
+        try:
+            return _session_store().get(sid), None
+        except KeyError:
+            return None, _err(404, "no session %r" % sid, "not_found", param="id")
+
+    @app.get("/sessions")
+    def sessions_list(request: Request, status: str = None, tag: str = None):
+        if not _auth(request):
+            return _err(401, "invalid API key", "authentication_error")
+        if status is not None and status not in SESSION_STATUSES:
+            return _err(400, "status must be one of %s (got %r)" % (list(SESSION_STATUSES), status),
+                        "invalid_request_error", param="status")
+        rows = _session_store().list(status=status, tag=tag)
+        return {"sessions": [_session_summary(r) for r in rows]}
+
+    @app.get("/sessions/{sid}")
+    def sessions_show(request: Request, sid: str):
+        if not _auth(request):
+            return _err(401, "invalid API key", "authentication_error")
+        rec, err = _session_or_none(sid)
+        if err is not None:
+            return err
+        return rec
+
+    @app.get("/sessions/{sid}/export")
+    def sessions_export(request: Request, sid: str):
+        if not _auth(request):
+            return _err(401, "invalid API key", "authentication_error")
+        rec, err = _session_or_none(sid)
+        if err is not None:
+            return err
+        return Response(_session_store().export_markdown(rec), media_type="text/markdown; charset=utf-8")
+
+    async def _sessions_post(request: Request, sid: str, action):
+        if not _auth(request):
+            return _err(401, "invalid API key", "authentication_error")
+        try:
+            body = await _read_json_body(request)
+        except RequestTooLarge as e:
+            return _err(413, str(e), "request_too_large")
+        except RequestError as e:
+            return _err(400, str(e))
+        if not isinstance(body, dict):
+            return _err(400, "the body must be a JSON object")
+        rec, err = _session_or_none(sid)
+        if err is not None:
+            return err
+        store = _session_store()
+        if action == "status":
+            status = body.get("status")
+            if status not in SESSION_STATUSES:
+                return _err(400, "status must be one of %s (got %r)" % (list(SESSION_STATUSES), status),
+                            "invalid_request_error", param="status")
+            return _session_summary(store.set_status(rec["id"], status))
+        tag = body.get("tag")
+        if not isinstance(tag, str) or not tag.strip():
+            return _err(400, "tag must be a non-empty string", "invalid_request_error", param="tag")
+        return _session_summary(store.add_tag(rec["id"], tag))
+
+    async def _sessions_status(request: Request, sid: str):
+        return await _sessions_post(request, sid, "status")
+
+    async def _sessions_tags(request: Request, sid: str):
+        return await _sessions_post(request, sid, "tags")
+
+    app.add_api_route("/sessions/{sid}/status", _sessions_status, methods=["POST"])
+    app.add_api_route("/sessions/{sid}/tags", _sessions_tags, methods=["POST"])
 
     @app.get("/metrics")
     def metrics(request: Request):

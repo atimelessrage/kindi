@@ -27,6 +27,10 @@ Besides `/v1`, Kindi serves what an agent host needs to observe and to connect a
   without an OpenAI shim. `stream` defaults to true and the body is NDJSON; `options.num_predict` maps to
   `max_tokens`; `options.keep_alive`, `num_ctx`, `num_thread` and `format` are ignored. The API key applies here
   too.
+- `GET /sessions`, `GET /sessions/<id>`, `GET /sessions/<id>/export`, `POST /sessions/<id>/status`,
+  `POST /sessions/<id>/tags` - the chat session history `kindi chat` records (list with status/tag filters,
+  full record, raw-markdown export, triage status, tags). Host-only; the API key applies here too. See
+  [API.md](API.md) for the shapes.
 - `GET /health` is a liveness probe: it always returns `ok`, `kindi`, `commit`, `model` and `ctx`. When
   `api_key` is set, the detailed view - `queue.waiting`, `queue.max`, `queue.rejected`, `busy`, `stats`,
   `uptime_s` and GPU free/total MiB - requires `Authorization: Bearer <api_key>`. With no key, the detailed
