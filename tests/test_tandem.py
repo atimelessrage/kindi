@@ -370,6 +370,19 @@ def test_rate_planner_refuses_a_floor_no_fitting_split_can_keep():
                                     rate_floor=0.95, owner="plain", ratio=_fake_ratio())
 
 
+def test_rate_planner_says_fit_only_when_the_calibration_lacks_the_count():
+    # the calibration exists but has no row for the picked count: never print a made-up 0.0 tok/s
+    dims, sizes, total, fitted = _rate_fixture()
+    partial = _fake_ratio()
+    partial["predicted_tok_s"] = {"8k": {}, "24k": {}}
+    logs = []
+    pick = tandem.plan_cpu_layers_rate(dims, sizes, 8192, total - 600 * 2 ** 20, reserve_mib=0,
+                                       owner="plain", ratio=partial, log=logs.append)
+    assert pick == fitted
+    assert any("fit only" in line and "no predicted rate" in line for line in logs)
+    assert not any("0.0 tok/s" in line for line in logs)
+
+
 def test_rate_planner_without_a_calibration_behaves_as_the_fit_only_pick(tmp_path, monkeypatch):
     dims, sizes, total, fitted = _rate_fixture()
     monkeypatch.setattr(tandem, "load_ratio", lambda **kw: None)

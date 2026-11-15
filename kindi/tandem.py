@@ -366,18 +366,21 @@ def plan_cpu_layers_rate(dims, sizes, ctx, free_bytes, reserve_mib=512, rate_flo
     else:
         count = viable[0]
         rate = _predicted_rate(ratio, count, ctx) if ratio else None
-        if rate is None:
-            rate = 0
     layers = gdn_first(dims, count)
     est = gpu_estimate(dims, sizes, ctx, layers, owner=owner)
-    log("tandem rate: %d CPU layer%s (%s) by %s takes the %s GPU side to ~%d MiB "
-        "(predicted ~%.1f tok/s at %d tokens%s)"
+    if floor_rate is not None:
+        by = "the measured ratio at a rate floor of %.0f%% of full-GPU" % (100 * rate_floor)
+    elif rate is not None:
+        by = "the fastest fitting split (calibrated)"
+    else:
+        by = "the fastest fitting split (fit only: the calibration has no row for it)"
+    predicted = (" (predicted ~%.1f tok/s at %d tokens%s)" % (rate, int(ctx),
+                 " (full GPU predicted %.1f)" % full_rate if full_rate else "")
+                 if rate is not None else " (no predicted rate for this count)")
+    log("tandem rate: %d CPU layer%s (%s) by %s takes the %s GPU side to ~%d MiB%s"
         % (len(layers), "" if len(layers) == 1 else "s",
-           ",".join(str(x) for x in layers),
-           "the measured ratio at a rate floor of %.0f%% of full-GPU" % (100 * rate_floor)
-           if floor_rate is not None else "the fastest fitting split (calibrated)",
-           owner, est // 2 ** 20, rate, int(ctx),
-           " (full GPU predicted %.1f)" % full_rate if full_rate else ""))
+           ",".join(str(x) for x in layers), by,
+           owner, est // 2 ** 20, predicted))
     return tuple(layers)
 
 
