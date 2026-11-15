@@ -3,8 +3,8 @@
 Report date: **2026-11-15** (refresh of the 2026-11-14 report; §7 records
 what changed since, §8 the 2026-11-15 sessions-endpoint round, §9 the
 2026-11-15 unsupported-field rejection round, §10 the 2026-11-15 audit
-triage round, and §11 the 2026-11-15 second audit triage). This file is the
-successor to
+triage round, §11 the 2026-11-15 second audit triage, and §12 the
+2026-11-15 improve-and-fix round). This file is the successor to
 `CURRENT-VS-KINDI-0.5.md` §25: that file's §§1–24 are the history against
 0.5.0 and §25 is the first evaluation against 0.6.0; this file carries the
 current one. It separates verified behavior from recorded evidence,
@@ -15,13 +15,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `ec31c76`:
+HEAD `0a26518`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 278 commits
-git diff --shortstat v0.6.0..HEAD          # 398 files, +52,813/-993
+git log --oneline v0.6.0..HEAD | wc -l     # 286 commits
+git diff --shortstat v0.6.0..HEAD          # 398 files, +52,946/-993
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -141,6 +141,24 @@ arbitrary-draft-GGUF harness stays a separate gate.
   `docs/MIXED-CARD-ROADMAP.md` for the per-item gates.
 - GPU evidence (gitignored bench-logs): `bench-logs/req0015-gate-27b/`
   (draft-policy 27B gate), `bench-logs/convert-4b-verify/` (4B provenance).
+
+## 12. What changed in the 2026-11-15 improve-and-fix round
+
+- Sessions endpoints: concurrent status/tag mutations are serialized
+  (a shared lock around the read-modify-write), writes use unique tmp
+  files, and `list()` closes its handles (`08a954c`).
+- D2 validation: 400s now name the field in the envelope `param`
+  (`n`, `response_format`, `logprobs`) instead of `null` (`1b6177e`).
+- Tandem `rate` planner: the log no longer prints a fake
+  `predicted ~0.0 tok/s` when the calibration lacks the picked count
+  (`8f1587f`).
+- Config reference: the scanner also reads `os.getenv(...)` forms;
+  recursive scan + subpackage sites were landed in the prior round
+  (`ed6a2d9`).
+- Docs updated alongside: `docs/API.md`, REQ-0016/REQ-0018 evidence,
+  ROADMAP bullets, CHANGELOG.
+- Diff vs `v0.6.0` grew 398 files (+52,813 → +52,946 insertions);
+  still zero file deletions.
 
 ## 11. What changed in the 2026-11-15 second audit triage
 
