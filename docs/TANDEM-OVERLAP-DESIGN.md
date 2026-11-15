@@ -1,7 +1,13 @@
 # Tandem overlap scheduler — design draft
 
-Status: **draft, not implemented; step 0 landed 2026-11-14** (the decomposition probe and the
-re-recorded gate baseline — see [RESULTS](benchmarks/2026-11-14-i7-8086k-rtx4060ti-tandem-overlap/RESULTS.md)).
+Status: **draft, not implemented; step 0 landed 2026-11-14 and was re-measured 2026-11-15** (the
+decomposition probe and the re-recorded gate baseline — see
+[RESULTS](benchmarks/2026-11-14-i7-8086k-rtx4060ti-tandem-overlap/RESULTS.md) and the fresh
+[2026-11-15 re-measurement](benchmarks/2026-11-15-i7-8086k-rtx4060ti-tandem-overlap/RESULTS.md)).
+**Decision (2026-11-15): the §3 worker thread is not justified and should not be built** — the
+CPU run is at the raw-kernel rate in both measurements (5.18 and 6.2 ms/layer), so there is no
+~6 ms/layer dispatch gap for it to remove. Head work (17.6 ms/token) and double-buffered
+staging (3.09 ms/token) come first if the >=25% gate is pursued.
 Targets the ROADMAP goal "Kindi tandem scheduler (tandem.cpp-grade overlap)": beat the 27B at 24K
 tandem row by **>=25%** with token-exact **4/4** (`kindi verify`: `KINDI_TC=0` vs tandem vs full GPU,
 for every tuning change). The gate row is the **re-recorded 9.9 tok/s** at the 24K position (the old
