@@ -113,7 +113,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:581` |
 | `KINDI_CONFIG` | (unset) | `kindi/config.py:120` (+1 more) |
 | `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:211` (+4 more) |
-| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:303` (+1 more) |
+| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:385` (+1 more) |
 | `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:46` |
 | `KINDI_D1` | `1` or `0` | `kindi/spec.py:723` (+1 more) |
 | `KINDI_DATA` | `/data` | `kindi/container.py:243` |
@@ -157,12 +157,12 @@ variables, and are therefore not listed twice here.
 | `KINDI_G4_PAD` | `1` | `kindi/gemma4.py:599` |
 | `KINDI_G4_PARK_MAX` | `4` | `kindi/gemma4_cache.py:35` |
 | `KINDI_G4_PLE_HOST` | `auto` | `kindi/gemma4.py:482` |
-| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:572` |
+| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:574` |
 | `KINDI_G4_PROMPT_CACHE` | `1` | `kindi/gemma4_cache.py:33` |
 | `KINDI_G4_Q5_DP4A` | `1` | `kindi/gemma4.py:80` |
 | `KINDI_G4_RESERVE_MB` | `1024` | `kindi/gemma4.py:543` |
 | `KINDI_G4_TC` | `1` | `kindi/gemma4.py:88` (+3 more) |
-| `KINDI_G4_TP` | `auto` | `kindi/server.py:409` |
+| `KINDI_G4_TP` | `auto` | `kindi/server.py:410` |
 | `KINDI_G4_WARPS` | `2560` | `kindi/gemma4.py:123` |
 | `KINDI_G5` | (empty) | `kindi/tp.py:459` |
 | `KINDI_G5L` | `"0" if rt.is_hip and os.environ.get("KINDI_TC", "0") != "1" else "1"` | `kindi/tp.py:462` |
@@ -181,7 +181,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_KV` | (empty) or `q8_0` | `kindi/engine.py:76` (+6 more) |
 | `KINDI_KV_EXPERIMENTAL` | `0` | `kindi/kld.py:92` (+5 more) |
 | `KINDI_LLVM` | (unset) | `kindi/cpu.py:91` |
-| `KINDI_LOG_RAW` | (unset) | `kindi/lightning_gen.py:322` (+2 more) |
+| `KINDI_LOG_RAW` | (unset) | `kindi/lightning_gen.py:325` (+2 more) |
 | `KINDI_LT_CHUNK` | (unset) | `kindi/lightning.py:144` |
 | `KINDI_LT_DCACHE` | `10` | `kindi/lightning.py:43` (+2 more) |
 | `KINDI_LT_DGRP` | `mvdg` | `kindi/lightning.py:764` |
@@ -220,7 +220,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_NB_KINT` | (unset) | `kindi/nanbeige.py:206` |
 | `KINDI_NB_KROWS` | `0` | `kindi/nanbeige.py:969` |
 | `KINDI_NB_KWARPS` | `2560` | `kindi/nanbeige.py:656` |
-| `KINDI_NB_LOGREQ` | (unset) | `kindi/nanbeige_gen.py:236` (+1 more) |
+| `KINDI_NB_LOGREQ` | (unset) | `kindi/nanbeige_gen.py:239` (+1 more) |
 | `KINDI_NB_PCHUNK` | `"256" if len(ids) <= 4096 and not self.k35 else "512"` | `kindi/nanbeige.py:975` |
 | `KINDI_NB_REP` | (empty) | `kindi/nanbeige.py:212` |
 | `KINDI_NB_RESERVE_MB` | `300` | `kindi/nanbeige.py:263` |
