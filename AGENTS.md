@@ -10,7 +10,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `6093070` on `freebuff/tandem-cpu-recovery` (`main` receives the parent-of-this-commit bump and FF at handoff; guarded by `tests/test_agents_handoff.py`). Full suite last measured at `24b4a2f`: 779 passed, 11 skipped (clang 18.1.8 on PATH); the T4.2 focused set (tests/backends + test_backends_cli + test_config_reference) was 30 passed, 1 skipped at `9b70327`. Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset (402 files, +54,482/−1,021, no deletions); comparison report in `CURRENT-VS-KINDI-0.6.md`.
+- **HEAD:** `f891319` on `freebuff/tandem-cpu-recovery` (`main` receives the parent-of-this-commit bump and FF at handoff; guarded by `tests/test_agents_handoff.py`). Full suite last measured at `24b4a2f`: 779 passed, 11 skipped (clang 18.1.8 on PATH); the T4.2 focused set (tests/backends + test_backends_cli + test_config_reference) was 30 passed, 1 skipped at `9b70327`. Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset (402 files, +54,482/−1,021, no deletions); comparison report in `CURRENT-VS-KINDI-0.6.md`.
 - **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
   512/4K/8K; 2B CPU-layer sweep; joint checkpoint 149.6 MiB on the 27B at 54.5-61.5 ms
   save), owned-slice CPU load, `kindi bench --sample-vram` sampled-peak VRAM, multi-ISA CPU
@@ -56,8 +56,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `6093070` | main checkout; clean |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `6093070` | this session; identical to `main` |
+| `T:/kindi` | `main` | `f891319` | main checkout; clean |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `f891319` | this session; identical to `main` |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
