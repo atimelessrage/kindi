@@ -25,6 +25,16 @@ anti-regression floor, not a quality claim: most CUDA, CuPy, model-loading and v
 uncovered because hosted CI has no GPU or model pack. Raise the floor only with measured coverage,
 and do not exclude hardware modules merely to make the number look better.
 
+On top of the total floor, the CPU job runs `tools/check_coverage.py` against
+`tests/coverage_floors.json` (audit M4): a per-module floor for every module the CPU suite
+can actually reach (server, cache, bench, tandem, vram, expert_cache, tokenizer, config,
+hostram, catalog, sched, sampling, spm, lookup, profiles, gpudrv). A total floor alone lets a
+CPU-exercised module rot while the total holds; the per-module floors pin the modules the
+requirement tests cover. The heavy CUDA modules (`engine.py`, `spec.py`, `tp.py`) are
+deliberately excluded — they are verified by `kindi verify` on hardware, and a floor for them
+needs GPU coverage first (the GPU lane above). Floors sit ~15 points below the measured value
+so platform variance does not make CI noisy; re-record with `--update` only after a measured run.
+
 The performance half of the roadmap gate is `tools/check_perf_baseline.py`: it compares the
 recorded `docs/benchmarks/CROSS-MODE.csv` against `docs/benchmarks/perf-baseline.json` and fails
 when a measured cell disappears or regresses by more than 15%. The CPU CI job runs this gate, so

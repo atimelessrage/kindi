@@ -5,6 +5,7 @@ and the user-visible contracts in the docs, not against private implementation d
 They cover the open review findings for config path semantics, saved-opening
 invalidation, and cache-failure metrics.
 """
+import configparser
 import json
 import os
 import threading
@@ -13,7 +14,7 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
-from kindi import cache, config, server
+from kindi import cache, catalog, config, hostram, sched, server
 
 
 @pytest.fixture(autouse=True)
@@ -177,3 +178,81 @@ def test_metrics_exposes_saved_opening_save_failures(monkeypatch):
     with TestClient(app) as client:
         body = client.get("/metrics").text
     assert "kindi_opening_save_failures_total 3" in body
+
+
+# --- Host-RAM preflight (REQ-0005: the serving boundary is bounded) -----------
+
+def test_host_ram_refusal_names_the_load_and_the_remedy(monkeypatch):
+    """A load that cannot fit stops at once, saying what to do (no minutes-long stall)."""
+    monkeypatch.delenv("KINDI_HOST_RAM_CHECK", raising=False)
+    logged = []
+    with pytest.raises(SystemExit, match="about .* GB of free host RAM") as exc:
+        hostram.check(16 * 2 ** 30, "the 27B weights", log=logged.append, avail=2 * 2 ** 30)
+    message = str(exc.value)
+    assert "stop the other model servers" in message
+    assert "KINDI_HOST_RAM_CHECK=0" in message
+    assert logged and "needed" in logged[0]
+
+
+def test_host_ram_check_passes_when_the_load_fits(monkeypatch):
+    monkeypatch.delenv("KINDI_HOST_RAM_CHECK", raising=False)
+    logged = []
+    hostram.check(2 * 2 ** 30, "the 2B weights", log=logged.append, avail=64 * 2 ** 30)
+    assert logged  # the preflight line is still printed
+
+
+def test_host_ram_check_opt_out_loads_anyway(monkeypatch):
+    """KINDI_HOST_RAM_CHECK=0 is the documented escape hatch, even with ~no RAM free."""
+    monkeypatch.setenv("KINDI_HOST_RAM_CHECK", "0")
+    logged = []
+    hostram.check(64 * 2 ** 30, "the 27B weights", log=logged.append, avail=0)  # must not raise
+    assert logged == []
+
+
+def test_host_ram_check_unknown_free_ram_does_not_block(monkeypatch):
+    """When free RAM cannot be determined, the preflight must not invent a refusal."""
+    monkeypatch.delenv("KINDI_HOST_RAM_CHECK", raising=False)
+    monkeypatch.setattr(hostram, "available", lambda: None)
+    hostram.check(64 * 2 ** 30, "the 27B weights")  # must not raise
+
+
+# --- Model catalog fit and selection (REQ-0008: installer classifies safely) ---
+
+def test_uneven_pair_fits_when_the_second_card_holds_its_half():
+    """REQ-0017 / REQ-0008: the 27B split needs 3.8 GiB on *each* card, so a
+    6 GB + 8 GB pair (or any pair where neither card alone fits) runs as a split."""
+    m = catalog.MODELS["bonsai-27b"]  # one=7600, two=3800
+    assert catalog.fits(m, [("6gb", 6144), ("8gb", 8192)]) == "one card"  # the 8 GB card alone fits
+    assert catalog.fits(m, [("6gb", 6144), ("7gb", 7168)]) == "two cards"  # neither alone; both hold a half
+    assert catalog.fits(m, [("7gb", 7168), ("6gb", 6144)]) == "two cards"  # order independent
+    assert catalog.fits(m, [("6gb", 6144), ("tiny", 3000)]) == ""
+
+
+def test_select_writes_the_pack_and_keeps_the_other_keys(tmp_path):
+    """`kindi use` edits the config in place and never drops unrelated settings."""
+    conf = tmp_path / "kindi.conf"
+    conf.write_text("[kindi]\nctx = 4096\ntemperature = 0.25\n", encoding="utf-8")
+    logged = []
+    catalog._select({"source": str(conf)}, "/x/packs/bonsai-2b", log=logged.append)
+    c = configparser.ConfigParser()
+    c.read(str(conf))
+    assert c["kindi"]["pack"] == "/x/packs/bonsai-2b"
+    assert c["kindi"]["ctx"] == "4096" and c["kindi"]["temperature"] == "0.25"
+    assert any("selected:" in line for line in logged)
+
+
+# --- Blocking sync default (REQ-0005': bounded host behaviour) ----------------
+
+def test_blocking_sync_keeps_the_driver_default_when_the_driver_fails(monkeypatch):
+    """With no usable CUDA driver the default-on sync must log and continue, not raise."""
+    import kindi.gpudrv as gpudrv
+    sched._done[0] = False
+    monkeypatch.delenv("KINDI_BLOCKING_SYNC", raising=False)
+    monkeypatch.setattr(gpudrv, "HIP", False)
+    def _boom():
+        raise OSError("no driver")
+    monkeypatch.setattr(gpudrv, "driver", _boom)
+    logged = []
+    sched.blocking_sync(log=logged.append)  # must not raise
+    assert any("driver default kept" in line for line in logged)
+    assert sched._done[0] is True  # the once-per-process slot is consumed

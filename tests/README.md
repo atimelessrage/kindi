@@ -11,7 +11,8 @@ Run from the repository root:
 python -m compileall -q kindi
 python -m pytest tests/ -q
 # Optional local coverage gate (matches the CPU CI job):
-python -m pytest tests/ -q --cov=kindi --cov-report=term --cov-fail-under=27
+python -m pytest tests/ -q --cov=kindi --cov-branch --cov-report=term --cov-report=json:coverage.json --cov-fail-under=27
+python tools/check_coverage.py
 bash -n install.sh
 ```
 
@@ -43,9 +44,13 @@ covers the modules it can reach, and the heavy GPU modules are covered by `kindi
 | `engine.py`, `spec.py`, `tp.py`, `small mtp.py` | 18%, 15%, 12%, 14% | `kindi verify` (token-exact against llama.cpp) and the perf gate; pytest only reaches the loaders and guards |
 | `convert.py`, `gemma4_tp.py` | 18%, 0% | `kindi convert` plus the mixer/support tests; the CUDA half needs a card |
 
-The 27% figure is guarded by `tests/test_agents_handoff.py`-adjacent CI, not by a per-module
-threshold: adding one for `engine.py`/`tp.py` would need GPU coverage first. Do not read "31%" as
-"the engine is half-tested"; read the table.
+The 27% total floor is the noisy-gate guard. On top of it, `tests/coverage_floors.json`
+pins a per-module floor for every module the CPU suite can actually reach (audit M4);
+`tools/check_coverage.py` fails when one of those modules drops below its floor, so a
+CPU-exercised module cannot rot while the total holds. Floors sit ~15 points below the
+measured value for platform variance. A per-module floor for `engine.py`/`tp.py` still needs
+GPU coverage first, so those stay out of the floors file. Do not read "31%" as "the engine is
+half-tested"; read the table.
 
 ## Turing reference suite (optional)
 

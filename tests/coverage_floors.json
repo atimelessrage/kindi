@@ -1,0 +1,18 @@
+{
+  "kindi/bench.py": 50,
+  "kindi/cache.py": 40,
+  "kindi/catalog.py": 10,
+  "kindi/config.py": 45,
+  "kindi/expert_cache.py": 75,
+  "kindi/gpudrv.py": 25,
+  "kindi/hostram.py": 30,
+  "kindi/lookup.py": 85,
+  "kindi/profiles.py": 90,
+  "kindi/sampling.py": 35,
+  "kindi/sched.py": 15,
+  "kindi/server.py": 35,
+  "kindi/spm.py": 75,
+  "kindi/tandem.py": 75,
+  "kindi/tokenizer.py": 75,
+  "kindi/vram.py": 75
+}
