@@ -12,6 +12,7 @@
   kindi sessions                list, triage, tag and export chat sessions as raw markdown
   kindi head exact|fast         choose the output head of a running server (next request, no restart)
   kindi info                    show the configuration, the pack and the GPU
+  kindi backends                list backend plugins registered in the plugin registry
 Global options: --config FILE, --pack DIR, --state-dir DIR, --ctx N.
 Tandem: verify/bench/serve/chat accept --tandem cpu-first|gpu-first --tandem-cpu-layers N|LIST|gdn:N
         and --tandem-gpu auto|plan|plain (the plan engine owner frees the offloaded layers' VRAM),
@@ -267,6 +268,26 @@ def cmd_use(cfg, a):
     return use(cfg, a.model, gguf=a.gguf, log=log)
 
 
+def cmd_backends(cfg, a):
+    """List the backend plugin registry (host-only; no pack or GPU touched)."""
+    from .backends import list_backends, load_configured_backends
+    load_configured_backends()
+    rows = list_backends()
+    if getattr(a, "json", False):
+        print(json.dumps(rows, indent=2, sort_keys=True))
+        return 0
+    if not rows:
+        log("no backend plugins registered")
+        return 0
+    for row in rows:
+        log("%-16s devices=%-10s architectures=%-20s model_ids=%s" % (
+            row.get("name", ""),
+            ",".join(row.get("devices") or []) or "-",
+            ",".join(row.get("architectures") or []) or "-",
+            ",".join(row.get("model_ids") or []) or "-"))
+    return 0
+
+
 def cmd_info(cfg, a):
     print("Kindi %s" % __version__)
     from . import cpu as cpu_backend
@@ -401,6 +422,8 @@ def main(argv=None):
     s = sub.add_parser("head", help="exact or fast output head for a running server")
     s.add_argument("mode", choices=("exact", "fast"))
     sub.add_parser("info", help="show configuration, pack and GPU")
+    s = sub.add_parser("backends", help="list registered backend plugins")
+    s.add_argument("--json", action="store_true", help="print registered backends as JSON")
     sub.add_parser("models", help="list the models and what fits this machine")
     s = sub.add_parser("use", help="download a model, build its pack and select it")
     s.add_argument("model")
@@ -425,7 +448,7 @@ def main(argv=None):
         cfg["vram_sample_s"] = a.vram_sample_s
     return {"convert": cmd_convert, "fast-head": cmd_fast_head, "verify": cmd_verify, "bench": cmd_bench, "kld": cmd_kld, "calibrate": cmd_calibrate,
             "plan": cmd_plan, "serve": cmd_serve, "chat": cmd_chat, "head": cmd_head, "info": cmd_info,
-            "models": cmd_models, "use": cmd_use, "sessions": cmd_sessions}[a.cmd](cfg, a)
+            "backends": cmd_backends, "models": cmd_models, "use": cmd_use, "sessions": cmd_sessions}[a.cmd](cfg, a)
 
 
 if __name__ == "__main__":

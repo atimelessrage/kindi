@@ -71,9 +71,13 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
 - **Backend plugin interface ([REQ-0019](development/requirements/REQ-0019.md), experimental):**
   T4.1 landed 2026-11-15 — the contract (`kindi/backends/base.py`), the registry
   (resolve by model id and by GGUF `general.architecture`, external backends via
-  `KINDI_BACKEND_MODULES`) and a deterministic `FakeBackend` for CPU-only tests, with
-  the repo map in [docs/dev/REPO-MAP.md](dev/REPO-MAP.md). The existing engines are
+  `KINDI_BACKEND_MODULES`) and a deterministic `  FakeBackend` for CPU-only tests, with
+  the repo map in [docs/dev/REPO-MAP.md](dev/REPO-MAP.md). T4.3 landed 2026-11-15:
+  `kindi backends [--json]` lists registered backends (including external ones from
+  `KINDI_BACKEND_MODULES`) and [docs/BACKENDS.md](BACKENDS.md) is the authoring guide.
+  The existing engines are
   not adapters yet (T4.2), so there is still no arbitrary-GGUF claim; the generic
+
   fallback stays decision-gated (llama.cpp proxy recommended, native generic
   backend design-only). The OpenAI error envelope and the conformance suite
   (`kindi/api/errors.py`, `tests/api/`) also landed as the T5.1 foundation for

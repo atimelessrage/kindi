@@ -11,6 +11,10 @@
   loads external backends through `KINDI_BACKEND_MODULES`, and a deterministic
   `FakeBackend` for CPU-only tests. No existing engine is an adapter yet (T4.2), so
   there is no arbitrary-GGUF claim; serving behavior is unchanged.
+- **`kindi backends` listing (Feature 4, T4.3)** ([docs/BACKENDS.md](docs/BACKENDS.md),
+  [REQ-0019](docs/development/requirements/REQ-0019.md)). `kindi backends` lists the
+  registry without touching a pack or GPU, and `--json` emits the registry rows for
+  scripting. External backends loaded through `KINDI_BACKEND_MODULES` appear too.
 - **Agent-grade API foundations (Feature 5, T5.1)** ([docs/API.md](docs/API.md),
   [REQ-0018](docs/development/requirements/REQ-0018.md)). Every error the server
   returns now uses the OpenAI envelope (`message`, `type`, `param`, `code`), including

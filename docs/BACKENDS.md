@@ -58,14 +58,32 @@ no GPU, no weights and no tokenizer files, so the API surface can be tested
 on a CPU-only host. The contract tests (`tests/backends/test_contract.py`)
 run over the fake backend and auto-extend to every registered backend.
 
+## Inspecting registered backends
+
+`kindi backends` prints one line per registered backend, including external
+backends loaded from `KINDI_BACKEND_MODULES`; it is host-only and does not
+load a pack or touch the GPU. `kindi backends --json` prints the same registry
+rows as JSON for scripting.
+
+## Authoring a backend
+
+1. Subclass `kindi.backends.Backend` and set `capabilities`.
+2. Implement lifecycle, text primitives, `generate` and `cache_stats`.
+3. Call `register_backend` when the module is imported.
+4. Add a contract test and verify with `kindi backends --json`.
+
+This page is the authoring guide for the contract; the shipped engines are not
+adapters yet (T4.2), so a third-party backend should declare the model ids or
+GGUF architectures it serves instead of relying on the built-in engine paths.
+
 ## Status and next steps
 
 - T4.1 (this page): contract, registry, FakeBackend. Done.
 - T4.2: port the existing engines (Bonsai, Nanbeige, Nemotron Lightning,
   DeepSeek V4.1) behind the contract as thin adapters, with
   `KINDI_LEGACY_ENGINE_PATH=1` as the safety valve for one release. Not done.
-- T4.3: this page becomes the full authoring guide; `kindi backends` lists
-  registered backends. Not done.
+- T4.3: `kindi backends` listing and this authoring guide. Done 2026-11-15;
+  the shipped-engine adapters are still T4.2.
 - T4.4: generic fallback as a llama.cpp proxy backend. Needs the maintainer
   decision on positioning (REQ-0019). Not done.
 - T4.5: native generic backend. Design document only. Not done.
