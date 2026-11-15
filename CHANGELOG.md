@@ -9,6 +9,8 @@
   record on exit (`SessionStore.append_messages`).
 - **`kindi sessions prune --days N [--all] [--dry-run]`** retention:
   deletes sessions not updated for N days (resolved-only by default).
+- **`kindi sessions stats [--json]`** reports sessions by status,
+  message totals, bytes on disk, and oldest/newest updates.
 
 ### Changed
 

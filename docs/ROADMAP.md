@@ -194,7 +194,7 @@ model, RAM and card. See [MOE-TANDEM.md](MOE-TANDEM.md) and [EXTERNAL-ENGINES.md
 record/append, triage statuses (`open` → `needs-review` → `resolved`), tags
 (slugified, deduped, filterable), and raw-markdown export/​import: the exact
 message text verbatim, round-tripped through `kindi sessions
-list|show|export|triage|tag|status|import` (host-only; no pack or GPU).
+list|show|export|triage|tag|status|import|prune|stats` (host-only; no pack or GPU).
 Tracked as [REQ-0016](development/requirements/REQ-0016.md) (experimental).
 **2026-11-15: the server-side `/sessions` endpoint landed** (list with
 status/tag filters, full record, raw-markdown export, triage status and tags
