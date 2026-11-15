@@ -55,6 +55,11 @@ def test_lifecycle_info_and_cache_stats(backend_cls):
 
 @pytest.mark.parametrize("backend_cls", backend_classes() or [FakeBackend])
 def test_text_primitives_round_trip(backend_cls):
+    if getattr(backend_cls, "REQUIRES_PACK", False):
+        pytest.skip(
+            "%s needs a model pack to tokenize; its text primitives are verified "
+            "through the kindi verify/bench gate, not this harness" % backend_cls.__name__
+        )
     backend = _instantiate(backend_cls)
     backend.load({})
     try:

@@ -72,8 +72,9 @@ rows as JSON for scripting.
 3. Call `register_backend` when the module is imported.
 4. Add a contract test and verify with `kindi backends --json`.
 
-This page is the authoring guide for the contract; the shipped engines are not
-adapters yet (T4.2), so a third-party backend should declare the model ids or
+This page is the authoring guide for the contract. The Bonsai engine ships as
+an adapter (T4.2, first family); the other engine families are not ported yet,
+so a third-party backend serving one of those should declare the model ids or
 GGUF architectures it serves instead of relying on the built-in engine paths.
 
 ## Status and next steps
@@ -81,7 +82,13 @@ GGUF architectures it serves instead of relying on the built-in engine paths.
 - T4.1 (this page): contract, registry, FakeBackend. Done.
 - T4.2: port the existing engines (Bonsai, Nanbeige, Nemotron Lightning,
   DeepSeek V4.1) behind the contract as thin adapters, with
-  `KINDI_LEGACY_ENGINE_PATH=1` as the safety valve for one release. Not done.
+  `KINDI_LEGACY_ENGINE_PATH=1` as the safety valve for one release. The Bonsai
+  adapter (`kindi/backends/bonsai.py`) is done: dense Bonsai packs resolve
+  through the registry in `kindi.engine.make_engine` (valve-gated), and
+  `kindi verify` 2B on the RTX 4060 Ti is 4/4 on both the adapter path and
+  the valve path. Nanbeige, Nemotron Lightning and DeepSeek V4.1 are not
+  ported yet (no packs on the verification host), so their packs still take
+  the legacy path.
 - T4.3: `kindi backends` listing and this authoring guide. Done 2026-11-15;
   the shipped-engine adapters are still T4.2.
 - T4.4: generic fallback as a llama.cpp proxy backend. Needs the maintainer

@@ -715,9 +715,47 @@ def tc_hp_for(man):
 
 
 def make_engine(pack, ctx=4096, clusters=None, log=print, tandem="off", cpu_layers=None, gpu=None):
-    """Engine on one GPU, or the two-card tensor parallel engine (kindi.tp) when the weights do not fit one card and
-    two GPUs are present. KINDI_TP=1 / 0 forces the choice. tandem="cpu-first" or "gpu-first" splits the dense model
-    between the CPU engine and one GPU engine."""
+    """Engine on one GPU (or the tandem engine): the T4.2 gateway.
+
+    Dense Bonsai packs resolve through the backend registry (the ``bonsai`` adapter
+    in ``kindi.backends.bonsai``) unless ``KINDI_LEGACY_ENGINE_PATH=1`` is set; the
+    adapter builds the same engine via ``make_engine_legacy``, so serve/verify/bench
+    numbers do not change. Non-Bonsai packs keep using the legacy builder.
+    """
+    if os.environ.get("KINDI_LEGACY_ENGINE_PATH") != "1":
+        man = None
+        try:
+            with open(os.path.join(pack, "kindi_pack.json")) as f:
+                man = json.load(f)
+        except Exception:  # noqa: BLE001 - leave broken packs to the legacy builder's error
+            man = None
+        if isinstance(man, dict):
+            from .backends.bonsai import model_id_for_manifest
+
+            model_id = model_id_for_manifest(man)
+            if model_id:
+                from .backends import resolve
+
+                backend = resolve(
+                    model_id,
+                    config=dict(
+                        pack=pack, ctx=ctx, clusters=clusters, log=log, tandem=tandem,
+                        cpu_layers=cpu_layers, gpu=gpu,
+                    ),
+                )
+                return backend.engine
+    return make_engine_legacy(
+        pack, ctx=ctx, clusters=clusters, log=log, tandem=tandem,
+        cpu_layers=cpu_layers, gpu=gpu,
+    )
+
+
+def make_engine_legacy(pack, ctx=4096, clusters=None, log=print, tandem="off", cpu_layers=None, gpu=None):
+    """The pre-T4.2 engine builder (the ``KINDI_LEGACY_ENGINE_PATH=1`` path, and what the
+    backend adapters delegate to): an engine on one GPU, or the two-card tensor parallel
+    engine (kindi.tp) when the weights do not fit one card and two GPUs are present.
+    KINDI_TP=1 / 0 forces the choice. tandem="cpu-first" or "gpu-first" splits the dense
+    model between the CPU engine and one GPU engine."""
     if os.environ.get("KINDI_DEVICE", "gpu") == "intel":
         # Intel integrated/discrete graphics (REQ-0020/REQ-0021): discovery, eligibility and the
         # shared-memory budget exist (kindi/intel.py, the G0 slice), but the SYCL kernel backend

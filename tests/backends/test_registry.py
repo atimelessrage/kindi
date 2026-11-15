@@ -96,7 +96,7 @@ def test_resolve_unknown_names_what_is_registered():
     message = str(excinfo.value)
     assert "no-such-model" in message
     assert "fake" in message
-    assert "T4.2" in message
+    assert "bonsai" in message
 
 
 def test_resolve_respects_device_filter():
@@ -141,3 +141,27 @@ def test_external_module_failure_is_named(tmp_path, monkeypatch):
 def test_fake_backend_is_resolvable():
     backend = registry.resolve("fake")
     assert isinstance(backend, FakeBackend)
+
+
+def test_bonsai_resolves_by_model_id_unloaded():
+    from kindi.backends.bonsai import BonsaiBackend
+
+    for model_id in ("bonsai2-2b", "bonsai2-4b", "bonsai2-9b", "bonsai2-27b"):
+        backend = registry.resolve(model_id)
+        assert isinstance(backend, BonsaiBackend)
+        assert backend.loaded is False
+
+
+def test_bonsai_load_rejects_a_missing_pack_directory():
+    with pytest.raises(registry.BackendUnavailable, match="pack directory"):
+        registry.resolve("bonsai2-2b", config={"pack": "no-such-pack-dir"})
+
+
+def test_bonsai_model_id_for_manifest():
+    from kindi.backends.bonsai import model_id_for_manifest
+
+    assert model_id_for_manifest({"model": "Ternary-Bonsai-2-2B"}) == "bonsai2-2b"
+    assert model_id_for_manifest({"model": "Ternary-Bonsai-2-27B"}) == "bonsai2-27b"
+    assert model_id_for_manifest({"model": "Ternary-Bonsai-2-XL"}) is None
+    assert model_id_for_manifest({"model": "Other-Model"}) is None
+    assert model_id_for_manifest({}) is None

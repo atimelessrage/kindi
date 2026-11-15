@@ -75,8 +75,11 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   the repo map in [docs/dev/REPO-MAP.md](dev/REPO-MAP.md). T4.3 landed 2026-11-15:
   `kindi backends [--json]` lists registered backends (including external ones from
   `KINDI_BACKEND_MODULES`) and [docs/BACKENDS.md](BACKENDS.md) is the authoring guide.
-  The existing engines are
-  not adapters yet (T4.2), so there is still no arbitrary-GGUF claim; the generic
+  The Bonsai engine is a registered adapter since the T4.2-bonsai slice landed
+  2026-11-15 (dense Bonsai packs resolve through the registry in `make_engine`,
+  valve-gated by `KINDI_LEGACY_ENGINE_PATH=1`; `kindi verify` 2B is 4/4 on both paths
+  on the RTX 4060 Ti). The other engine families (Nanbeige, Lightning, Gemma4) are
+  not adapters yet, so there is still no arbitrary-GGUF claim; the generic
 
   fallback stays decision-gated (llama.cpp proxy recommended, native generic
   backend design-only). The OpenAI error envelope and the conformance suite

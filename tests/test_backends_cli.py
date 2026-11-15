@@ -64,9 +64,11 @@ def test_backends_lists_registered_fake_backend(capsys):
 def test_backends_json_is_machine_readable(capsys):
     assert cli.cmd_backends({}, _args(json_output=True)) == 0
     rows = json.loads(capsys.readouterr().out)
-    assert [row["name"] for row in rows] == ["fake"]
+    assert [row["name"] for row in rows] == ["fake", "bonsai"]
     assert rows[0]["devices"] == ["cpu"]
     assert rows[0]["factory"] == "FakeBackend"
+    assert "bonsai2-2b" in rows[1]["model_ids"]
+    assert "qwen35" in rows[1]["architectures"]
 
 
 def test_backends_loads_configured_external_modules(monkeypatch, capsys):
