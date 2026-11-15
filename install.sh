@@ -579,7 +579,14 @@ restart_docker() {
 }
 
 GPU_MODE=none
-if [ "$NG" -gt 0 ] && [ "$GPU" != cpu ]; then
+# The legacy Fermi path keeps pre-Kepler cards out of GPU setup entirely: Kindi needs Kepler
+# (sm_30) or later for CUDA, and the installer offers the CPU engine when no supported card remains.
+NG_SUPPORTED=0
+for _c in "${GCC[@]}"; do [ "${_c/./}" -ge 30 ] && NG_SUPPORTED=$((NG_SUPPORTED + 1)); done
+if [ "$NG" -gt 0 ] && [ "$NG_SUPPORTED" -eq 0 ] && [ "$GPU" != cpu ]; then
+  info "Fermi / pre-Kepler NVIDIA cards are not Kindi compute engines; the installer leaves them unused and offers the CPU path"
+fi
+if [ "$NG_SUPPORTED" -gt 0 ] && [ "$GPU" != cpu ]; then
   if [ "$IS_WSL" = 1 ] && [ "$DRY" = 0 ] && $DOCKER info -f '{{.OperatingSystem}}' 2>/dev/null | grep -q 'Docker Desktop'; then
     GPU_MODE=toolkit; ok "Docker Desktop (WSL2): the container gets the GPUs with --gpus"
   elif $DOCKER info 2>/dev/null | grep -i 'runtimes.*nvidia' >/dev/null || command -v nvidia-ctk >/dev/null || command -v nvidia-container-toolkit >/dev/null; then
@@ -700,9 +707,9 @@ card_tc() {       # NVIDIA card position -> 0 when the Turing card has tensor co
     *) return 0 ;;
   esac
 }
-card_class() {    # NVIDIA card position -> tc | turing | pascal8 | p100 | maxwell | kepler | unsupported
+card_class() {    # NVIDIA card position -> tc | turing | pascal8 | p100 | maxwell | kepler | fermi
   local V=${GMEM[$1]} c=${GCC[$1]/./}
-  if [ "$c" -lt 30 ]; then echo unsupported
+  if [ "$c" -lt 30 ]; then echo fermi
   elif [ "$c" -ge 80 ]; then echo tc                 # tensor cores: the memory class is chosen in profile_of
   elif [ "$c" -eq 75 ] && [ "$V" -ge 7500 ] && card_tc "$1"; then echo turing
   elif [ "$c" -ge 61 ] && [ "$V" -ge 7500 ]; then echo pascal8
@@ -726,7 +733,7 @@ nb_cards() {      # NVIDIA card positions (candidates) -> the fewest of them, la
 card_models() {   # NVIDIA card position -> the models that run on it, the best first
   local V=${GMEM[$1]}
   case "$(card_class "$1")" in
-    unsupported) echo "" ;;
+    fermi) echo "" ;;
     tc|turing|pascal8) if [ "$V" -ge 5800 ]; then echo "27b lightning nemotron 9b 4b 2b"; else echo "27b nemotron 9b 4b 2b"; fi ;;
     p100) echo "27b lightning 9b 4b 2b" ;;
     # Kepler: Lightning on the 12 GB cards (Quadro K6000); no Nemotron Bolt
@@ -737,7 +744,7 @@ card_models() {   # NVIDIA card position -> the models that run on it, the best 
   esac
 }
 for k in $(seq 0 $((NG - 1))); do
-  if [ "$(card_class "$k")" = unsupported ]; then
+  if [ "$(card_class "$k")" = fermi ]; then
     warn "GPU ${GIDX[$k]} (${GNAME[$k]}, sm_${GCC[$k]/./}) is below Kepler (sm_30): Kindi will not use it; use the CPU engine or remove the card"
   fi
 done

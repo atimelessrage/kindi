@@ -515,9 +515,9 @@ a GTX 16-series card is a no-op: the backend is not selected.
 
 | card | reason |
 |---|---|
-| GeForce GT 430 and other Fermi / pre-Kepler cards (below sm_30) | Kindi needs Kepler (sm_30) or later; the CUDA 10.2 image does not support these cards |
+| GeForce GT 430 and other Fermi / pre-Kepler cards (below sm_30) | Kindi needs Kepler (sm_30) or later; no code path compiles a kernel for sm_21 and the card is ignored as a compute device |
 
-- Use the CPU engine (`KINDI_DEVICE=cpu`) on these machines, or remove the card.
+- **Legacy Fermi path:** on a machine whose only NVIDIA card is Fermi, the installer leaves the card unused and offers the CPU engine (`KINDI_DEVICE=cpu`) when the CPU supports AVX. Removing the card is not required; CUDA only rejects it when a CUDA engine is selected, so the legacy path is a graceful-degradation route, not GPU support.
 
 ## AMD Radeon 840M (RDNA 3.5, gfx1152)
 

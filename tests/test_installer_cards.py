@@ -431,10 +431,21 @@ def test_pair_fits_offers_nemotron_but_not_27b_on_smaller_pairs():
     assert info["27b"] == "no" and info["nemotron"] == "yes", info
 
 
+def test_legacy_fermi_path_is_never_offered_or_paired():
+    # Fermi is a named legacy class, not an installable accelerator: no model on the card, no
+    # pair with either supported card, and no tensor-parallel fit attempt for the pairing.
+    info = pair("NVIDIA GeForce GT 430", 1024, "2.1", "NVIDIA GeForce RTX 4060 Ti", 8188, "8.9")
+    if info is None:
+        return
+    assert info["class0"] == "fermi", info
+    assert info["pair"] == "no" and info["27b"] == "no" and info["nemotron"] == "no", info
+
+
 def test_the_ten_card_rig_each_classifies_as_documented():
     # the user's rig list, each card on its own: RTX 5060 Ti 16 GB (Blackwell 12.0), RTX 4060 Ti,
-    # RTX 4000, P4000, P106-100, M4000, 940M 2 GB, GT 1030 2 GB, GT 430 1 GB (Fermi). The Arc A770
-    # has no NVIDIA entry (no backend: see docs/INTEL-ARC.md), so it is not in this table.
+    # RTX 4000, P4000, P106-100, M4000, 940M 2 GB, GT 1030 2 GB, GT 430 1 GB (Fermi, the legacy
+    # path). The Arc A770 has no NVIDIA entry (no backend: see docs/INTEL-ARC.md), so it is not
+    # in this table.
     names = ["NVIDIA GeForce RTX 5060 Ti", "NVIDIA GeForce RTX 4060 Ti", "NVIDIA GeForce RTX 4000",
              "Quadro P4000", "NVIDIA P106-100", "Quadro M4000", "NVIDIA GeForce 940M",
              "NVIDIA GeForce GT 1030", "NVIDIA GeForce GT 430"]
@@ -444,10 +455,11 @@ def test_the_ten_card_rig_each_classifies_as_documented():
     info = fields(names, mems, ccs, body)
     if info is None:
         return
-    want = ["tc", "tc", "turing", "pascal8", "maxwell", "maxwell", "maxwell", "maxwell", "unsupported"]
+    want = ["tc", "tc", "turing", "pascal8", "maxwell", "maxwell", "maxwell", "maxwell", "fermi"]
     got = [info["class%d" % i] for i in range(len(names))]
     assert got == want, (got, info)
-    # the Fermi GT 430 is refused outright (below Kepler, sm_30; CUDA dropped it before v0.4)
+    # the legacy Fermi path: below Kepler (sm_30); the card contributes no GPU setup, only the
+    # installer's CPU fallback. No CUDA support is claimed.
     assert info["models8"] == "", info
     # the 2 GB cards get the small-context maxwell profile with the catalog's own size gates
     assert info["models6"] == info["models7"] == "4b 2b", info
