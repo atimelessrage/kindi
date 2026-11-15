@@ -7,6 +7,8 @@
 - **`kindi chat --resume SESSION_ID`** continues a saved session: the REPL
   is seeded with the stored turns and new turns append back to the same
   record on exit (`SessionStore.append_messages`).
+- **`kindi sessions prune --days N [--all] [--dry-run]`** retention:
+  deletes sessions not updated for N days (resolved-only by default).
 
 ### Changed
 
