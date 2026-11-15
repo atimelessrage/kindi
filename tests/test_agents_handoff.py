@@ -91,6 +91,7 @@ def test_agents_worktree_table_names_current_head():
         return
     parent = _rev("HEAD^")
     main_head = _rev("main")  # the `main` branch's own HEAD, from the same object database
+    main_parent = _rev("main^")  # a bump commit on `main` can only name its parent (rule 5a)
     text = (ROOT / "AGENTS.md").read_text(encoding="utf-8", errors="replace")
     rows = [ln for ln in text.splitlines()
             if ln.startswith("| `T:/kindi`") or ln.startswith("| `<worktree>`")]
@@ -101,8 +102,11 @@ def test_agents_worktree_table_names_current_head():
         h = m.group(1)
         if row.startswith("| `T:/kindi`"):
             # `main` may legitimately lag (or lead) this session branch, but its row must name
-            # `main`'s own HEAD, not this worktree's -- that is what the next agent reads first.
-            ok = bool(main_head) and main_head.startswith(h)
+            # `main`'s own HEAD -- or the parent of a bump commit on `main`, which by rule 5a
+            # can only name the commit it bumps from (a commit cannot name itself). A row naming
+            # anything older is still rejected, which is what the check exists for.
+            ok = bool(main_head) and (main_head.startswith(h)
+                                      or (bool(main_parent) and main_parent.startswith(h)))
         else:
             ok = head.startswith(h) or (bool(parent) and parent.startswith(h))
         assert ok, ("AGENTS.md worktree table says %s but %s; bump the "
