@@ -286,6 +286,9 @@ class LightningBackend(object):
         stop = req.get("stop") or []
         if isinstance(stop, str):
             stop = [stop]
+        stop_seq = [x for x in stop if x]   # the stop check scans only the not-yet-checked tail (O(1) per token)
+        stop_win = max((len(x) for x in stop_seq), default=0)
+        stop_from = 0
         # on unless the configuration sets it (the Kindi default 0 is for the Bonsai models)
         repeat_stop = True if str(cfg.get("repeat_stop")) == DEFAULTS.get("repeat_stop")             else bool(int(cfg["repeat_stop"]))
         budget = req.get("thinking_budget_tokens") or req.get("thinking_budget") or cfg.get("thinking_budget") or 0
@@ -341,7 +344,17 @@ class LightningBackend(object):
                     self.cached.append(token)
                 piece = decoder.decode(self.tok.decode_bytes(token))
                 text += piece
-                if next((x for x in stop if x and x in text), None):
+                _hit = False
+                if stop_seq:
+                    _base = max(0, stop_from - (stop_win - 1))
+                    _tail = text[_base:]
+                    for x in stop_seq:
+                        if _tail.find(x) >= 0:
+                            _hit = True
+                            break
+                    if not _hit:
+                        stop_from = len(text)
+                if _hit:
                     finish = "stop"
                     break
                 for kind, part in sorter.feed(piece):

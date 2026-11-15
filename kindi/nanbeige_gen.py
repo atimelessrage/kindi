@@ -221,6 +221,9 @@ class NanbeigeBackend(object):
         stop = req.get("stop") or []
         if isinstance(stop, str):
             stop = [stop]
+        stop_seq = [x for x in stop if x]   # the stop check scans only the not-yet-checked tail (O(1) per token)
+        stop_win = max((len(x) for x in stop_seq), default=0)
+        stop_from = 0
         repeat_stop = bool(cfg.get("repeat_stop"))
         from .server import _looping, THINK_CLOSE
         budget = req.get("thinking_budget_tokens") or req.get("thinking_budget") or cfg.get("thinking_budget") or 0
@@ -347,7 +350,17 @@ class NanbeigeBackend(object):
                     pending = True
                 piece = decoder.decode(self.tok.piece(token))
                 text += piece
-                if next((x for x in stop if x and x in text), None):
+                _hit = False
+                if stop_seq:
+                    _base = max(0, stop_from - (stop_win - 1))
+                    _tail = text[_base:]
+                    for x in stop_seq:
+                        if _tail.find(x) >= 0:
+                            _hit = True
+                            break
+                    if not _hit:
+                        stop_from = len(text)
+                if _hit:
                     finish = "stop"
                     break
                 for kind, part in sorter.feed(piece):

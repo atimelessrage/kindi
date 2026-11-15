@@ -563,6 +563,7 @@ class Kindi(object):
         rng=np.random.RandomState(seed if seed is not None else int(time.time()*1000)%2**31)
         stop=req.get("stop") or []
         if isinstance(stop,str): stop=[stop]
+        stop_seq=[x for x in stop if x]; stop_win=max((len(x) for x in stop_seq), default=0); stop_from=0
         self.eng.reset()
         started=time.time()
         self.busy.update(active=True,phase="prompt",prompt_tokens=len(ids),cached=0,read=0,generated=0,started=started)
@@ -629,9 +630,17 @@ class Kindi(object):
                     logits=self.eng.forward(token,len(ids)+n); self.g4cache.append(token)
                 piece=decoder.decode(self.tok.decode_bytes(token))
                 text+=piece
-                hit=next((x for x in stop if x and x in text),None)
+                hit=None
+                if stop_seq:
+                    _base=max(0,stop_from-(stop_win-1)); _tail=text[_base:]
+                    for x in stop_seq:
+                        _i=_tail.find(x)
+                        if _i>=0:
+                            hit=x; hit_at=_base+_i; break
+                    if hit is None:
+                        stop_from=len(text)
                 if hit:
-                    text=text[:text.index(hit)]; finish="stop"; break
+                    text=text[:hit_at]; finish="stop"; break
                 if piece:
                     content.append(piece)
                     for kind,part in sorter.feed(piece):
