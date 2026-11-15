@@ -174,5 +174,17 @@ The dense placement and handoff are done. The next steps are:
 5. Build `hostram` pinned/mmap primitives and a layer-contiguous pack format if the measurements
    justify them.
 
+## Decode dispatch cost (2026-11-15)
+
+`TandemEngine._run` now iterates a per-layer owner table resolved once at
+construction, instead of rebuilding a `frozenset` and re-resolving the owner of
+every layer on every token. Routing is unchanged (the fake-backend call-order
+tests and the probe-parity test pin it). Dispatch overhead measured on the
+fake backends (Python overhead only, no GPU claim): 19.34 µs → 17.57 µs per
+token (×0.91). Against the measured real-engine budget (27B @ 24K: CPU
+74.7 ms + GPU 8.1 + transfer 3.09 + head 17.6 ms/token) the saving is noise;
+the decode cost is the kernels, and the step-0 verdict (CPU already at the
+raw-kernel rate) still stands.
+
 The design is restored at [CPU_GPU_TANDEM_DESIGN.md](CPU_GPU_TANDEM_DESIGN.md). The current CPU
 roadmap remains [CPU-SUPPORT.md](CPU-SUPPORT.md).

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+
+- **Tandem decode dispatch resolved once.** `TandemEngine` now iterates a
+  per-layer owner table built at construction instead of rebuilding a
+  `frozenset` and re-resolving the owner per layer per token. Same
+  routing; dispatch overhead measured on the fake backends at 19.34 µs →
+  17.57 µs per token (×0.91, Python overhead only — no GPU claim).
+
 ### Fixed
 
 - **Sessions export carries its filename.** `GET /sessions/<id>/export`
