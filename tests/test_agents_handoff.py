@@ -61,7 +61,7 @@ def _changed_agents_lines():
     """Added lines in the HEAD commit's AGENTS.md diff, or None if HEAD did not touch it."""
     out = subprocess.run(
         ["git", "show", "--format=", "--unified=0", "HEAD", "--", "AGENTS.md"],
-        cwd=str(ROOT), capture_output=True, text=True, timeout=10, check=False)
+        cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=10, check=False)
     if out.returncode != 0:
         return None
     adds = [ln[1:] for ln in out.stdout.splitlines() if ln.startswith("+") and not ln.startswith("+++")]

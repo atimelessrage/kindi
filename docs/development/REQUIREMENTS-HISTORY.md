@@ -26,7 +26,7 @@ the state at that commit.
 | [REQ-0014](requirements/REQ-0014.md) | FP8 E4M3 K/V cache, decided by the KLD gate | experimental | `9e50c538f003` | `9e50c538f003` |
 | [REQ-0015](requirements/REQ-0015.md) | Adaptive draft length from measured acceptance and confidence | experimental | `870425ef81d5` | `ed52db1e56ac` |
 | [REQ-0016](requirements/REQ-0016.md) | Chat session history with triage, tags, and raw-markdown export | experimental | `e9b46936da57` | `e9b46936da57` |
-| [REQ-0017](requirements/REQ-0017.md) | Uneven tensor splits for unequal-capacity GPUs | experimental | uncommitted | uncommitted |
+| [REQ-0017](requirements/REQ-0017.md) | Uneven tensor splits for unequal-capacity GPUs | experimental | `74ee40d79aa7` | `74ee40d79aa7` |
 
 `uncommitted` means the requirement file is not in `HEAD` yet. Commit the requirement
 and run the generator again to record its real added/last-modified hashes.
