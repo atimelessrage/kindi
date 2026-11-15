@@ -90,9 +90,12 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   counting, sessions, priorities, progress comments): (0) unsupported
   `n > 1` and structured-output `response_format` are now rejected with an
   enveloped 400 (naming the field in `param`) instead of silently ignored
-  (**landed 2026-11-15**, decision D2) — constrained decoding itself remains open; (1) grammar / JSON-schema constrained
-  decoding — nothing exists beyond the Gemma 4 tool-call `CallGrammar` precedent, and the
-  Gemma grammar is the starting point for a general constrained sampler; (2) a per-model
+  (**landed 2026-11-15**, decision D2); (1) grammar / JSON-schema constrained
+  decoding — **landed 2026-11-15** for the dense path: a schema-ordered JSON automaton
+  (`kindi/jsongrammar.py`) narrows the sampler's candidate set to schema-legal tokens
+  (`kindi/sampling.py` `allowed`), so `json_object`/`json_schema` replies parse against
+  the schema by construction; the Gemma 4 path keeps its tool-call `CallGrammar` and
+  arbitrary GBNF grammars stay to a later slice; (2) a per-model
   tool-call conformance suite — **landed 2026-11-15**
   (`tests/test_tool_call_conformance.py`: Gemma 4 native, Nanbeige/Lightning XML+JSON,
   DeepSeek DSML truncated blocks; all parsers hold the contract, no leak bugs found);

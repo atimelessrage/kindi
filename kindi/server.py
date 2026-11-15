@@ -82,6 +82,33 @@ def _request_error(msg, param=None):
     raise RequestError(msg, param=param)
 
 
+def _response_format_schema(response_format):
+    """The JSON schema inside a json_schema response_format, or None (REQ-0018).
+
+    Accepts the OpenAI shape {"type": "json_schema", "json_schema": {"name": ...,
+    "schema": {...}}} and the bare {"schema": {...}} shape; a json_schema payload
+    that IS the schema (its only keys are not "schema"/"name") is taken as the
+    schema itself when it does not look like the wrapper.
+    """
+    js = response_format.get("json_schema")
+    if not isinstance(js, dict):
+        return None
+    if isinstance(js.get("schema"), dict):
+        return js["schema"]
+    if set(js) <= {"schema", "name", "strict"}:
+        return None
+    return js
+
+
+def _response_format_grammar(response_format):
+    """Build the decode grammar for a response_format (assumes `_validate_request` passed)."""
+    from .jsongrammar import grammar_from_schema, json_object_grammar
+
+    if response_format.get("type") == "json_object":
+        return json_object_grammar()
+    return grammar_from_schema(_response_format_schema(response_format))
+
+
 def _finite_number(value):
     """JSON numbers only; bool is an int in Python, and NaN/Infinity are not valid JSON numbers."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -317,9 +344,25 @@ def _validate_request(req, has_vision=False):
         rtype = response_format.get("type")
         if not isinstance(rtype, str):
             _request_error("response_format.type must be a string", param="response_format")
-        if rtype != "text":
+        if rtype not in ("text", "json_object", "json_schema"):
             _request_error("structured output (response_format type %r) is not supported" % rtype,
                            param="response_format")
+        if rtype in ("json_object", "json_schema"):
+            if req.get("tools"):
+                _request_error("tools are not supported together with structured output",
+                               param="response_format")
+            if rtype == "json_schema":
+                schema = _response_format_schema(response_format)
+                if schema is None:
+                    _request_error(
+                        "json_schema must be an object with a \"schema\" object",
+                        param="response_format")
+                from .jsongrammar import grammar_from_schema
+
+                try:
+                    grammar_from_schema(schema)
+                except ValueError as e:
+                    _request_error("invalid JSON schema: %s" % e, param="response_format")
     if req.get("stream") is not None and not isinstance(req["stream"], bool):
         _request_error("stream must be true or false")
     if req.get("logprobs") is not None and not isinstance(req["logprobs"], bool):
@@ -508,13 +551,15 @@ class Kindi(object):
             return "exact"
         return m
 
-    def _pick(self, nxt, temperature, top_p, top_k, rng, min_p=0.0, penalty=None, presence=None):
+    def _pick(self, nxt, temperature, top_p, top_k, rng, min_p=0.0, penalty=None, presence=None,
+              allowed=None):
         """the next token: already drawn by speculative sampling, or sampled now"""
         ps = getattr(self.eng, "spec_presampled", None)
         if ps is not None:
             self.eng.spec_presampled = None
             return ps
-        return self.sample(nxt, temperature, top_p, top_k, rng, min_p, penalty, presence)
+        return self.sample(nxt, temperature, top_p, top_k, rng, min_p, penalty, presence,
+                           allowed=allowed)
 
     def _g4_text(self,token):
         return self.tok.decode_bytes(token).decode("utf-8","replace")
@@ -754,6 +799,14 @@ class Kindi(object):
             return (yield from self.nanbeige.generate(self, req, cancel))
         if self.native:
             return (yield from self._generate_gemma(req, cancel))
+        grammar = None
+        rf = req.get("response_format")
+        if isinstance(rf, dict) and rf.get("type") in ("json_object", "json_schema"):
+            grammar = _response_format_grammar(rf)
+            gstate = grammar.start()
+            if not hasattr(self, "_grammar_texts"):
+                self._grammar_texts = [self.tok.decode_bytes(i).decode("utf-8", "replace")
+                                        for i in range(len(self.tok.vocab))]
         cfg = self.cfg
         messages = req.get("messages") or []
         tools = req.get("tools") or None
@@ -824,7 +877,7 @@ class Kindi(object):
         self.busy["phase"] = "generating"
         pen = rp != 1.0 and rlast != 0
         if hasattr(self.eng, "spec_begin"):
-            if pen or pp or (min_p > 0 and temperature > 0):  # the speculative paths do not apply these: no drafts
+            if pen or pp or grammar is not None or (min_p > 0 and temperature > 0):  # the speculative paths do not apply these: no drafts
                 self.eng.spec_begin(False)
             else:                                              # speculative decoding (KINDI_SPEC), min-p included
                 self.eng.spec_begin(temperature <= 0, temperature, top_p, top_k, rng, min_p)
@@ -866,7 +919,12 @@ class Kindi(object):
             mask[np.asarray(T + gen, dtype=np.int64)] = True
             return pp, mask
 
-        tok = self.sample(nxt, temperature, top_p, top_k, rng, min_p, recent(), presence())
+        allowed = None
+        if grammar is not None:
+            allowed = grammar.vocab_allowed(gstate, self._grammar_texts)
+            if grammar.done(gstate):
+                allowed = np.concatenate([allowed, np.array(EOS, dtype=np.int64)])
+        tok = self.sample(nxt, temperature, top_p, top_k, rng, min_p, recent(), presence(), allowed=allowed)
         try:
             while True:
                 if cancel is not None and cancel.is_set():
@@ -879,6 +937,12 @@ class Kindi(object):
                 self.busy["generated"] = len(gen)
                 piece = dec.decode(self.tok.decode_bytes(tok))
                 text += piece
+                if grammar is not None:
+                    advanced = grammar.advance(gstate, piece)
+                    if advanced is None:
+                        raise RuntimeError(
+                            "constrained grammar rejected token %r it had allowed" % piece)
+                    gstate = advanced
                 # the stop check scans only the not-yet-checked tail (a match verified earlier cannot
                 # reappear), instead of the whole reply every token, which made generation O(n^2).
                 hit = None
@@ -919,7 +983,13 @@ class Kindi(object):
                         for item in route(piece):
                             yield item
                         nxt = self.runner.step(ft)
-                tok = self._pick(nxt, temperature, top_p, top_k, rng, min_p, recent(), presence())
+                allowed = None
+                if grammar is not None:
+                    allowed = grammar.vocab_allowed(gstate, self._grammar_texts)
+                    if grammar.done(gstate):
+                        allowed = np.concatenate([allowed, np.array(EOS, dtype=np.int64)])
+                tok = self._pick(nxt, temperature, top_p, top_k, rng, min_p, recent(), presence(),
+                                 allowed=allowed)
         finally:
             sp = self.eng.spec_end() if hasattr(self.eng, "spec_end") else None
             self.busy["active"] = False

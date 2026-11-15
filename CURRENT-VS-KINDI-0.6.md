@@ -292,6 +292,31 @@ agreed-cards (P4000/M4000/RTX4000) verify gate stays hardware-bound.
 - Diff vs `v0.6.0` grew 402 files (+54,055 → +54,482 insertions),
   348 commits (344 → 348); still zero file deletions.
 
+## 27. What changed in the 2026-11-15 JSON-schema constrained decoding round
+
+`response_format` `json_object` and `json_schema` now constrain the dense
+decode instead of being rejected (REQ-0018; decision D2's rejection round
+made JSON structured output a 400 until this landed). New
+`kindi/jsongrammar.py`: a schema-ordered deterministic automaton
+(properties in schema order, `required` enforced, strict
+`additionalProperties`, canonical integers, prefix-language number
+rejection, enum/const primitives) with a per-state full-vocabulary allowed
+set (the 248K enumeration is ~0.6 s, cached per state). `kindi/sampling.py`
+gains the `allowed` intersection and `kindi/server.py` accepts the two
+structured formats (malformed schemas, `grammar` and unknown types, and
+`tools` with structured output stay enveloped 400). The GPU gate found
+real dead automaton states on the first 2B run (empty allowed sets) —
+`otail`-comma with no properties left, number-prefix dead corners, and
+required-prefix key buffers — all fixed and pinned by
+`tests/test_jsongrammar.py` (23). Verified on the RTX 4060 Ti,
+2026-11-15: 2B `{"name": "Alex", "age": 28}` and `json_object`
+`{"city": "New York"}`, 9B with an array property — all parse against
+the schema with keys in schema order and `finish: stop`. Gemma 4 and
+Lightning/Nanbeige decode paths are untouched.
+
+- Diff vs `v0.6.0`: 402 files (+54,482 → +54,512 insertions),
+  354 commits (348 → 354); still zero file deletions.
+
 ## 25. What changed in the 2026-11-15 full-suite fix + CPU parity round
 
 A full-suite run (783 passed, 20 skipped, 1 failure, 2 fixture

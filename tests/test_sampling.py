@@ -91,3 +91,35 @@ def test_presence_penalty_changes_a_greedy_choice():
 def test_greedy_bypasses_sampling():
     # a minimal engine object: Sampler takes the host path, and temperature 0 returns the argmax
     assert Sampler(object())(7, 0.0, 1.0, 0, None) == 7
+
+
+class _ConstrainedHostEngine(object):
+    def __init__(self):
+        self.ylog = np.array([2.0, 1.0, 0.0])
+        self.ylog_n = 3
+        self.ylog_map = None
+
+
+def test_allowed_set_overrides_greedy():
+    # a grammar that accepts only token 1: greedy picks 1, not the argmax 0
+    assert Sampler(_ConstrainedHostEngine())(0, 0.0, 1.0, 0, None, allowed=[1]) == 1
+
+
+def test_allowed_set_with_temperature_stays_inside():
+    rng = RecordingRng()
+    out = Sampler(_ConstrainedHostEngine())(0, 1.0, 1.0, 0, rng, allowed=[1, 2])
+    assert set(rng.idx) == {1, 2}
+    assert out in (1, 2)
+
+
+def test_allowed_none_leaves_uncostrained_behaviour():
+    assert Sampler(_ConstrainedHostEngine())(0, 0.0, 1.0, 0, None, allowed=None) == 0
+
+
+def test_allowed_empty_intersection_is_a_loud_error():
+    try:
+        Sampler(_ConstrainedHostEngine())(0, 0.0, 1.0, 0, None, allowed=[])
+    except ValueError as e:
+        assert "no allowed token" in str(e)
+    else:
+        raise AssertionError("an empty allowed set must raise, not silently free-pick")

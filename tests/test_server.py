@@ -116,8 +116,10 @@ MALFORMED = [
     {"messages": [{"role": "user", "content": "hello"}], "n": 2},
     {"messages": [{"role": "user", "content": "hello"}], "n": "2"},
     {"messages": [{"role": "user", "content": "hello"}], "n": 0},
+    {"messages": [{"role": "user", "content": "hello"}], "response_format": {"type": "grammar"}},
     {"messages": [{"role": "user", "content": "hello"}], "response_format": {"type": "json_schema"}},
-    {"messages": [{"role": "user", "content": "hello"}], "response_format": {"type": "json_object"}},
+    {"messages": [{"role": "user", "content": "hello"}], "response_format": {"type": "json_schema", "json_schema": {"schema": "x"}}},
+    {"messages": [{"role": "user", "content": "hello"}], "tools": [{"type": "function", "function": {"name": "f"}}], "response_format": {"type": "json_object"}},
     {"messages": [{"role": "user", "content": "hello"}], "response_format": "json_object"},
 ]
 
@@ -127,8 +129,13 @@ def test_unsupported_fields_name_their_param(app_client):
     base = {"messages": [{"role": "user", "content": "hello"}]}
     for payload, param in (
             (dict(base, n=2), "n"),
+            (dict(base, response_format={"type": "grammar"}), "response_format"),
             (dict(base, response_format={"type": "json_schema"}), "response_format"),
-            (dict(base, response_format={"type": "json_object"}), "response_format")):
+            (dict(base, response_format={"type": "json_schema",
+                                        "json_schema": {"schema": {"type": "frob"}}}),
+             "response_format"),
+            (dict(base, response_format={"type": "json_object"}, tools=[{"type": "function", "function": {"name": "f"}}]),
+             "response_format")):
         r = client.post("/v1/chat/completions", json=payload)
         assert r.status_code == 400, r.text
         assert r.json()["error"]["param"] == param, r.text
@@ -136,6 +143,8 @@ def test_unsupported_fields_name_their_param(app_client):
 
 class _StopTok(object):
     """A character codec for driving the real generate() loop without a model."""
+
+    vocab = ["v%d" % i for i in range(256)]
 
     def encode(self, s):
         return [ord(c) % 256 for c in str(s)] or [1]
@@ -210,6 +219,76 @@ def test_stop_seen_while_thinking_still_stops_after_think_closes():
     script = [ord(c) for piece in pieces for c in piece]
     done, items = _drive_stop(script, req_extra={"stop": ["STOP"]}, think=True)
     assert done["finish"] == "stop"
+
+
+def test_json_schema_and_object_response_formats_are_accepted(app_client):
+    client, _ = app_client
+    for rf in ({"type": "json_object"},
+               {"type": "json_schema", "json_schema": {"name": "x", "schema": {
+                   "type": "object", "properties": {"a": {"type": "string"}},
+                   "required": ["a"]}}}):
+        r = client.post("/v1/chat/completions", json={
+            "messages": [{"role": "user", "content": "hello"}],
+            "response_format": rf,
+        })
+        assert r.status_code == 200, r.text
+
+
+def _drive_constrained(script, schema):
+    """Drive the real `Kindi.generate` loop with a JSON-schema grammar: every scripted
+    pick must be inside the pick's allowed set, so a stray token would raise here."""
+    K = object.__new__(server.Kindi)
+    K.cfg = {"model_name": "fake", "temperature": 0.0, "top_p": 1.0, "top_k": 0,
+             "max_tokens": 512, "repeat_stop": False, "fast_clusters": 0}
+    K.native = False
+    K.nanbeige = None
+    K.variant = None
+    K.tok = _StopTok()
+    K.eng = _StopEngine()
+    K.runner = _StopRunner()
+    K.busy = {"active": False, "phase": "", "prompt_tokens": 0, "cached": 0,
+              "read": 0, "generated": 0, "started": 0.0}
+    K.stats = {"requests": 0, "prompt_tokens": 0, "cached_tokens": 0, "completion_tokens": 0,
+               "gen_seconds": 0.0, "spec_passes": 0, "spec_drafted": 0, "spec_accepted": 0}
+    K.log = lambda *a: None
+    K.head_mode = lambda: "exact"
+
+    def pick(*a, **k):
+        allowed = set(k.get("allowed").tolist()) if k.get("allowed") is not None else None
+        for i, t in enumerate(script):
+            if allowed is None or t in allowed:
+                script.pop(i)
+                return t
+        raise AssertionError("no scripted token fits the grammar")
+
+    K.sample = pick
+    K._pick = pick
+    req = {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 512,
+           "temperature": 0.0, "top_p": 1.0, "top_k": 0,
+           "response_format": {"type": "json_schema", "json_schema": {"schema": schema}}}
+    items = list(K.generate(req))
+    done = next(v for kind, v in items if kind == "done")
+    return done
+
+
+def test_constrained_generate_produces_schema_valid_json():
+    schema = {"type": "object",
+              "properties": {"name": {"type": "string"}, "age": {"type": "integer"}},
+              "required": ["name", "age"]}
+    doc = '{"name": "Ada", "age": 36}'
+    script = [ord(c) for c in doc] + [248046]  # 248046 = <|im_end|>
+    done = _drive_constrained(list(script), schema)
+    assert done["finish"] == "stop"
+    assert json.loads(done["content"]) == {"name": "Ada", "age": 36}
+
+
+def test_constrained_generate_rejects_a_grammar_escape():
+    # without the constraint these would pass the sampler; under it, 'x' for a string
+    # start can never be picked (the pick helper would find nothing fitting)
+    schema = {"type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"]}
+    script = [ord('{'), ord('x')]  # a value-start 'x' is not grammar-legal inside an object
+    with pytest.raises(AssertionError):
+        _drive_constrained(script, schema)
 
 
 def test_default_n_and_text_response_format_are_accepted(app_client):
