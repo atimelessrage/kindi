@@ -424,6 +424,20 @@ def test_load_ratio_matches_the_pack_hash(tmp_path, monkeypatch):
     assert tandem.load_ratio(pack_sha=None, path=str(tmp_path / "a.json")) is not None
 
 
+def test_load_ratio_ignores_a_file_of_the_wrong_kind(tmp_path):
+    payload = {"kind": "kindi-split-ratio/9", "pack": {"source_sha256": "SHAME"},
+               "predicted_tok_s": {"24k": {"12": 5.8}}}
+    p = tmp_path / "ratio.json"
+    p.write_text(json.dumps(payload), encoding="utf-8")
+    assert tandem.load_ratio(pack_sha="SHAME", path=str(p)) is None
+
+
+def test_load_ratio_ignores_a_corrupt_file(tmp_path):
+    p = tmp_path / "ratio.json"
+    p.write_text("{not json at all", encoding="utf-8")
+    assert tandem.load_ratio(pack_sha="SHAME", path=str(p)) is None
+
+
 def test_auto_placement_resolves_before_the_backends_are_built(fake_pack, fake_backends, monkeypatch):
     dims = {"layers": 4, "full_attention_interval": 2, "kv_heads": 1, "head_dim": 8}
     (Path(fake_pack) / "kindi_pack.json").write_text(json.dumps({"dimensions": dims}), encoding="utf-8")
