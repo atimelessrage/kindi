@@ -28,6 +28,7 @@ the state at that commit.
 | [REQ-0016](requirements/REQ-0016.md) | Chat session history with triage, tags, and raw-markdown export | experimental | `e9b46936da57` | `e9b46936da57` |
 | [REQ-0017](requirements/REQ-0017.md) | Uneven tensor splits for unequal-capacity GPUs | experimental | `74ee40d79aa7` | `74ee40d79aa7` |
 | [REQ-0018](requirements/REQ-0018.md) | Agent-grade API: structured output, tool-call conformance, concurrency | proposed | `f9eff6db05f0` | `f9eff6db05f0` |
+| [REQ-0019](requirements/REQ-0019.md) | Backend plugin interface (contract, registry, adapters) | experimental | `a40269e2ce91` | `a40269e2ce91` |
 
 `uncommitted` means the requirement file is not in `HEAD` yet. Commit the requirement
 and run the generator again to record its real added/last-modified hashes.
