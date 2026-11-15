@@ -151,6 +151,8 @@ def kv_plan(tp):
     (tp.py refuses k8v4 otherwise). The q8 kernels and buffers are the same objects they always were."""
     if getattr(tp, "kv", "q8_0") == "k8v4":
         return "k_store_k8v4_T", "k_att_flash4_T", "k_att_pv4_T", 2
+    if getattr(tp, "kv", "q8_0") == "fp8":
+        raise SystemExit("kindi: KINDI_KV=fp8 uses decode attention only; the chunked prompt attention is q8-only")
     return "k_store_q8_T", "k_att_flash_T", "k_att_pv_T", 1
 
 

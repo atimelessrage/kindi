@@ -331,7 +331,7 @@ def test_kv_mode_defaults_to_q8_0(spec_tp, monkeypatch):
 
 
 @pytest.mark.parametrize("value, want", [("q8", "q8_0"), ("Q8_0", "q8_0"), ("k8v4", "k8v4"),
-                                         ("K8_V4", "k8v4")])
+                                         ("K8_V4", "k8v4"), ("fp8", "fp8"), ("f8_e4m3", "fp8")])
 def test_kv_mode_accepts_the_cache_names(spec_tp, monkeypatch, value, want):
     _, tp = spec_tp
     monkeypatch.setenv("KINDI_KV", value)
@@ -342,7 +342,7 @@ def test_kv_mode_accepts_the_cache_names(spec_tp, monkeypatch, value, want):
 def test_kv_mode_rejects_an_unknown_cache(spec_tp, monkeypatch):
     _, tp = spec_tp
     monkeypatch.setenv("KINDI_KV", "q4_0")
-    with pytest.raises(SystemExit, match="KINDI_KV must be q8_0 or k8v4"):
+    with pytest.raises(SystemExit, match="KINDI_KV must be q8_0, k8v4 or fp8"):
         tp.kv_mode()
 
 

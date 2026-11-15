@@ -13,6 +13,7 @@ Variants measured in one run (all against the same reference pass):
   plain-q8   the plain engine with kv="q8_0"  (cache drift, same engine)
   tp-q8      the plan engine with the q8_0 cache  (engine + cache, the control)
   tp-k8v4    the plan engine with the experimental 4-bit V cache
+  tp-fp8     the plan engine with the experimental FP8 E4M3 cache (REQ-0014)
 
 `tp-k8v4`'s quarantine is then re-derived from the numbers: its excess over the plan engine's
 own q8_0 row is the loss the 4-bit V itself adds. Like `kindi bench`, this times the exact head;
@@ -29,7 +30,7 @@ import numpy as np
 WARMUP = 64                                   # positions are scored only after this many tokens
 CONTEXTS = (2048, 8192)
 PROMPT = "The quick brown fox jumps over the lazy dog. " * 400   # ~4K tokens at 2B tokenization
-VARIANTS = ("plain-q8", "tp-q8", "tp-k8v4")
+VARIANTS = ("plain-q8", "tp-q8", "tp-k8v4", "tp-fp8")
 
 
 def softmax(logits):
@@ -90,9 +91,15 @@ def _engine(pack, ctx, kind, log, cp):
     old_kv = os.environ.get("KINDI_KV")
     old_exp = os.environ.get("KINDI_KV_EXPERIMENTAL")
     try:
-        os.environ["KINDI_KV"] = "k8v4" if kind == "tp-k8v4" else "q8_0"
         if kind == "tp-k8v4":
+            os.environ["KINDI_KV"] = "k8v4"
             os.environ["KINDI_KV_EXPERIMENTAL"] = "1"
+        elif kind == "tp-fp8":
+            os.environ["KINDI_KV"] = "fp8"
+            os.environ["KINDI_KV_EXPERIMENTAL"] = "1"
+        else:
+            os.environ["KINDI_KV"] = "q8_0"
+            os.environ.pop("KINDI_KV_EXPERIMENTAL", None)
         return TPEngine(pack, ctx=ctx, log=log)
     finally:
         if old_kv is None:

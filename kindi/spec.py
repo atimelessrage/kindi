@@ -619,6 +619,8 @@ def kv_plan(tp):
     either format; tp.py refuses k8v4 on other head sizes instead of reading the wrong bytes."""
     if getattr(tp, "kv", "q8_0") == "k8v4":
         return "k_store_k8v4_T", "k_attn_vq4w", "k_attn_vq4w_m", 2
+    if getattr(tp, "kv", "q8_0") == "fp8":
+        raise SystemExit("kindi: KINDI_KV=fp8 uses decode attention only; the tensor-core verify attention is q8-only")
     return "k_store_q8_T", "k_attn_vq8w", "k_attn_vq8w_m", 1
 
 
@@ -1792,6 +1794,12 @@ def install(log=print):
 
     def _load(self):
         backend = _tc_backend(self.card)
+        if getattr(self.tp, "kv", "q8_0") == "fp8":
+            self.tc_layout = False
+            self.log("card %d: the FP8 cache uses decode attention only (the tensor-core verify "
+                     "attention is q8-only); no tc layout" % self.card)
+            o_load(self)
+            return None
         if self.HB == 4096 and not HP:          # measured on the 4060 Ti: refuse before the repack, not after
             raise SystemExit("kindi: the tensor-core plan engine refuses Hadamard blocks of 4096 unless "
                              "KINDI_TC_HP=1 (measured: 4/4 at 122 tok/s, 3/4 with the default activations); "

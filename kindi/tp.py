@@ -47,7 +47,12 @@ def kv_mode():
     2 of 4 prompts, first difference at tokens 35-36; `kindi kld` measures its teacher-forced drift at
     1.3e-04/2.3e-04 nats at 2K/8K, ~500-1000x q8_0's ~2e-7 and growing with context, so the quarantine
     stands on the measurement), so it is refused unless KINDI_KV_EXPERIMENTAL=1.
-    The gate lives here because this is the only place the format is selected, before any pack is read."""
+
+    fp8 (E4M3) is experimental and is decided by the KLD gate (REQ-0014): it is refused unless
+    KINDI_KV_EXPERIMENTAL=1, and its decode path is deliberately narrower than q8_0's (no
+    chunked prompt path, no tensor-core verify plans, no batch prompt path), so a lossy candidate
+    cannot silently become the default. The gate lives here because this is the only place the
+    format is selected, before any pack is read."""
     value = os.environ.get("KINDI_KV", "q8_0").strip().lower()
     if value in ("q8", "q8_0"):
         return "q8_0"
@@ -59,7 +64,15 @@ def kv_mode():
                 "`kindi kld`: 1.3e-04/2.3e-04 nats at 2K/8K vs q8_0's ~2e-07). "
                 "Set KINDI_KV_EXPERIMENTAL=1 to use it; q8_0 is the supported default.")
         return "k8v4"
-    raise SystemExit("kindi: KINDI_KV must be q8_0 or k8v4 (got %r)" % value)
+    if value in ("fp8", "f8_e4m3", "f8_e4m3fn"):
+        if os.environ.get("KINDI_KV_EXPERIMENTAL", "0") != "1":
+            raise SystemExit(
+                "kindi: KINDI_KV=fp8 is an experimental E4M3 cache whose quality is decided by the KLD gate "
+                "(REQ-0014): it must prove KLD no worse than q8_0 at 2K/8K, 4/4 exactness against the fp16 "
+                "reference at verify length on Ada, and a measured peak against q8_0 before it can be called "
+                "distribution-lossless. Set KINDI_KV_EXPERIMENTAL=1 to use it; q8_0 is the supported default.")
+        return "fp8"
+    raise SystemExit("kindi: KINDI_KV must be q8_0, k8v4 or fp8 (got %r)" % value)
 
 
 POW5 = np.array([1, 3, 9, 27, 81], dtype=np.uint16)
@@ -737,8 +750,8 @@ class Shard(object):
         if HB != 1024 and not (HB in (512, 4096) and getattr(tp, "W", None) == 1):   # one card: the 2B / 4B / 9B folds work as well
             raise SystemExit("kindi: the tensor parallel engine needs Hadamard blocks of 1024")
         st = {"h": s.hA, "h2": s.hB, "pending": 0}
-        store_kv = K.k_store_k8v4 if tp.kv == "k8v4" else K.k_store_q8
-        attn_v = K.k_attn_vq4w if tp.kv == "k8v4" else K.k_attn_vq8w
+        store_kv = K.k_store_k8v4 if tp.kv == "k8v4" else K.k_store_fp8 if tp.kv == "fp8" else K.k_store_q8
+        attn_v = K.k_attn_vq4w if tp.kv == "k8v4" else K.k_attn_vf8w if tp.kv == "fp8" else K.k_attn_vq8w
 
         def fold(P, kern, width, args, out):
             """a fold kernel over `width` values: Hadamard blocks of 512 / 1024 in one launch; larger blocks (the 9B's
@@ -885,7 +898,8 @@ class Shard(object):
                                                      Dyn("pos", s.Vd[kvi].data.ptr, nblk * 2, ptr=True), i32(nblk)))
             P.add(K.k_q8row, ((NH * HD + 1023) // 1024,), (1024,), (s.qr, s.qq, s.qd, i32(NH * HD // 32)))
             n = lambda: Dyn("pos", 1, 1)  # noqa: E731
-            P.add(K.k_attn_sq8d if s.dp4a else K.k_attn_sq8t, (NHKV, (s.ctx + 255) // 256), (256,), (s.Kq[kvi], s.Kd[kvi], s.qq, s.qd, s.sbuf, n(), i32(NHKV), i32(s.G)))
+            attn_s = K.k_attn_sf8t if tp.kv == "fp8" else K.k_attn_sq8d if s.dp4a else K.k_attn_sq8t
+            P.add(attn_s, (NHKV, (s.ctx + 255) // 256), (256,), (s.Kq[kvi], s.Kd[kvi], s.qq, s.qd, s.sbuf, n(), i32(NHKV), i32(s.G)))
             P.add(K.k_softmax_rows, (NH,), (256,), (s.sbuf, n()))
             P.add(attn_v, (NHKV, 1, (s.ctx + 255) // 256), (128,), (s.sbuf, s.Vq[kvi], s.Vd[kvi], s.apart, n(),
                                                                      i32(NH), i32(NHKV), i32(s.G)))
@@ -1161,6 +1175,11 @@ class TPEngine(object):
                 log("kindi: KINDI_KV=k8v4 keeps the V4 flash chunk attention (the tensor-core prompt attention is q8-only)")
             if os.environ.get("KINDI_FD", "0") == "1":
                 log("kindi: KINDI_KV=k8v4 keeps the per-query verify attention (the split flash-decode path is q8-only)")
+        if self.kv == "fp8":
+            log("kindi: KINDI_KV=fp8 uses E4M3 decode attention only (no chunk prompt path, no tensor-core "
+                "verify plans, no batch prompt path); prompts are fed one token at a time")
+            if os.environ.get("KINDI_FD", "0") == "1":
+                os.environ["KINDI_FD"] = "0"
         self.NKg, self.HK = self.dims["groups"], self.dims["state_size"]
         self.NVg = self.dims["gdn_inner"] // self.HK
         self.NFFg = self.dims["ffn"]
@@ -1263,7 +1282,13 @@ class TPEngine(object):
         self.NB = int(os.environ.get("KINDI_BATCH", "4"))          # prompt tokens per batch (1: off; at most 6)
         self.batch_ok = False
         self.chunk, self.chunk_ok = {}, False
-        if self.partial:
+        if self.kv == "fp8":
+            log("kindi: KINDI_KV=fp8 disables the batched/chunked prompt paths (their kernels are q8-only); "
+                "prompts are fed one token at a time")
+            self.batch_ok = False
+            self.chunk_ok = False
+            self.NB = 1
+        elif self.partial:
             # a tandem owner is stepped one block per token by the other backend; the batched prompt
             # path and the chunked prompt path both replay the full model and cannot apply
             self.NB = 1
@@ -1272,7 +1297,7 @@ class TPEngine(object):
                 with cp.cuda.Device(s.card):        # kernel handles belong to the device that is current
                     s.plan_batch = build_batch_plan(s, self.NB)
             self.batch_ok = True
-        if not self.partial:
+        if not self.partial and self.kv != "fp8":
             _chunk.build(self)
         self.ylog_n, self.ylog_map = VOCAB, None
         self._state_views()
