@@ -12,6 +12,12 @@
 
 ### Changed
 
+- **Stop-sequence checks are O(1) per token.** The generation loop
+  scanned the whole accumulated reply for stop strings every token
+  (O(n²) over a generation); it now scans only the not-yet-checked tail
+  via a `stop_from` cursor. Same truncation semantics, including stops
+  that accumulated during thinking. Isolated check at 20K tokens:
+  0.088 s → 0.018 s (4.8×).
 - **Tandem decode dispatch resolved once.** `TandemEngine` now iterates a
   per-layer owner table built at construction instead of rebuilding a
   `frozenset` and re-resolving the owner per layer per token. Same

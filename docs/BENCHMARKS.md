@@ -325,6 +325,17 @@ cells now feed the cross-mode table above; the GPU cells are still the 2026-11-0
 and the two blocks were not interleaved. Full method, build command and raw logs:
 [benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md](benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md).
 
+## 2026-11-15: CPU engine Python overhead profile · Intel Core i7-8086K
+
+i7-8086K, native Windows, clang 18.1.8, 2B pack, 512-token context. `cProfile` over 40 `feed()`
+calls: **1.027 s total, all inside the single `kc_step` C call (25.6 ms/feed); Python overhead
+0.000 s** (the only Python call visible is `ctypes.byref`). Wall-clock check: 100 feeds in
+2.78 s (27.8 ms/feed), consistent with the profile. Conclusion: the CPU engine is kernel-bound;
+there is no Python-side performance left in this path, so the tandem step-0 verdict (CPU already
+at the raw-kernel rate) stands, and deeper CPU speed now means kernel work in `kcpu.c`, measured
+against this baseline. The per-token stop-sequence check in the server had O(n²) behaviour instead;
+that one is fixed (windowed tail scan, ~4.8× on a 20K-token reply, growing with length).
+
 ## Kindi 0.4.0: Tesla P100 (sm_60)
 
 Two rented machines gave the numbers. Do not mix them. Box A: 2x Tesla P100-SXM2-16GB (NVLink, 300 W), driver 535.230.02,
