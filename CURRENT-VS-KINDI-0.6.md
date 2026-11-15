@@ -15,13 +15,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `1363e7f`:
+HEAD `5b8330b`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 344 commits
-git diff --shortstat v0.6.0..HEAD          # 401 files, +54,055/-1020
+git log --oneline v0.6.0..HEAD | wc -l     # 348 commits
+git diff --shortstat v0.6.0..HEAD          # 402 files, +54,482/-1021
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -269,6 +269,28 @@ arbitrary-draft-GGUF harness stays a separate gate.
 - Diff vs `v0.6.0` grew 400 files (+53,480 → +53,567 insertions);
   still zero file deletions.
 - §20: tandem split timings on `/metrics`.
+
+## 26. What changed in the 2026-11-15 T4.2 bonsai adapter round
+
+The dense Ternary-Bonsai-2 engine now lives behind the backend contract as
+the first T4.2 family adapter (`kindi/backends/bonsai.py`, registered as
+`bonsai`; REQ-0019 T4.2 partial). `kindi.engine.make_engine` resolves
+dense Bonsai packs through the registry by default and routes to the
+pre-port factory as `make_engine_legacy` when `KINDI_LEGACY_ENGINE_PATH=1`
+is set — the adapter builds the same engine object the legacy path built,
+so serve/verify/bench numbers are unchanged by construction. The contract
+harness skips the text-primitives test for backends that declare
+`REQUIRES_PACK` (lifecycle/info still run packless); `kindi backends` and
+the registry not-found message now list the bonsai adapter. Verified on
+the RTX 4060 Ti, 2026-11-15: `kindi verify` 2B is 4/4 on the adapter path
+(103.0 tok/s) and the valve path (103.2 tok/s, timing jitter); `kindi bench`
+2B through the adapter reads 97.3/91.5/86.3/81.3 tok/s at 2K/8K/16K/24K
+positions (exact head). Nanbeige, Nemotron Lightning and DeepSeek V4.1
+remain on the legacy path until packs exist to verify against; the
+agreed-cards (P4000/M4000/RTX4000) verify gate stays hardware-bound.
+
+- Diff vs `v0.6.0` grew 402 files (+54,055 → +54,482 insertions),
+  348 commits (344 → 348); still zero file deletions.
 
 ## 25. What changed in the 2026-11-15 full-suite fix + CPU parity round
 
