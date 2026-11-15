@@ -15,13 +15,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `94bd1d9`:
+HEAD `c78d23f`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 324 commits
-git diff --shortstat v0.6.0..HEAD          # 400 files, +53,616/-1002
+git log --oneline v0.6.0..HEAD | wc -l     # 328 commits
+git diff --shortstat v0.6.0..HEAD          # 400 files, +53,722/-1019
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -269,6 +269,22 @@ arbitrary-draft-GGUF harness stays a separate gate.
 - Diff vs `v0.6.0` grew 400 files (+53,480 → +53,567 insertions);
   still zero file deletions.
 - §20: tandem split timings on `/metrics`.
+
+## 21. What changed in the 2026-11-15 ten-card rig support pass
+
+Two installer name-fallback fixes (old drivers that do not report
+compute capability), found by extending the fake-GPU tests to the
+full rig list: RTX 50 (Blackwell) had no rule and fell through to
+6.1 — now 12.0; the pre-existing `RTX 40` rule reported the Turing
+RTX 4000 as Ada 8.9 — now a dedicated RTX 4000 → 7.5 rule wins
+before it. Support-matrix slugs added for the 5060 Ti, 940M and
+GT 1030 (rendered not measured; no new measured rows because only
+the 4060 Ti is present on this host). The Fermi GT 430 stays
+unsupported (below the installer's sm_30 floor; the CUDA 10.2
+image cannot run it).
+
+- Diff vs `v0.6.0` grew 400 files (+53,616 → +53,722 insertions);
+  still zero file deletions.
 
 ## 20. What changed in the 2026-11-15 tandem observability round
 
