@@ -43,6 +43,12 @@ CARDS = {
     # matrix renders it not measured. See docs/INTEL-ARC.md and REQ-0020.
     "arc-a770": ("Intel Arc A770 16 GB", "Alchemist (DG2)", "intel",
                  ("a770", "arc a770", "intel arc a770")),
+    # Integrated Intel graphics (Xe-LP / Xe2-LPG, shared system memory): investigation only,
+    # no backend yet. See docs/INTEL-IGPU-TANDEM.md and REQ-0021.
+    "intel-iris-xe": ("Intel Iris Xe (integrated)", "Xe-LP (Gen12)", "intel-igpu",
+                      ("iris xe", "intel iris xe", "uhd 770", "uhd 730")),
+    "intel-arc-igpu": ("Intel built-in Arc (integrated)", "Xe2-LPG", "intel-igpu",
+                       ("arc 130v", "arc 140v", "arc 140t", "built-in arc")),
 }
 
 CARD_MODELS = ("2b", "4b", "9b", "27b")     # short names, in render order

@@ -111,8 +111,14 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   SYCL/oneAPI backend is planned for one card, two cards and CPU+Arc tandem; the goal, gates and
   milestones are in [INTEL-ARC.md](INTEL-ARC.md). M0 (architecture audit) is done. **One A770 16 GB
   was purchased 2026-11-15 and is in transit (not installed)**, so M1 (hardware qualification) is
-  unblocked on arrival — the arrival checklist is in INTEL-ARC.md. The card is registered in the
-  support matrix as `not measured` and is not offered by the installer. This is not a support claim.
+  unblocked on arrival — the arrival checklist is in INTEL-ARC.md. The   card is registered in the support matrix as `not measured` and is not offered by the installer. This is not a support claim.
+- **CPU + Intel integrated graphics ([REQ-0021](development/requirements/REQ-0021.md), proposed):**
+  investigation in [INTEL-IGPU-TANDEM.md](INTEL-IGPU-TANDEM.md). The iGPU route is a retarget
+  of the REQ-0020 SYCL backend (Xe-LP/Xe2-LPG, shared system memory, no PCIe boundary — the
+  tandem transfer term becomes ~0 by construction), with gates G0-G3 and a ≥1.15x CPU-only
+  decode gate for the tandem (a decode loss is a documented no-go). First target is built-in
+  Arc; UHD/Iris Xe is the second tier; pre-11th-gen (incl. this host's UHD 630) is excluded.
+  No backend code; matrix rows are `not measured`.
 
 ## Long-term model goals
 

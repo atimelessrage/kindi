@@ -31,7 +31,7 @@ run.
 | two Arc A770 16 GB | second target, two independent cards; this is not SLI/CrossFire |
 | CPU + one A770 | tandem layer split; first for the models the CPU engine already supports |
 | CPU + two A770 | last target; more exchange and scheduling surface |
-| Arc A770 8 GB, A750, integrated Arc | not in the first support claim; measure before adding |
+| Arc A770 8 GB, A750, integrated Arc | not in the first support claim; integrated graphics are a separate investigation ([INTEL-IGPU-TANDEM.md](INTEL-IGPU-TANDEM.md), [REQ-0021](development/requirements/REQ-0021.md)), sharing this SYCL backend as a retarget |
 | Windows | not the first target; the installer, Docker images and current GPU stack are Linux-first |
 | mixed Arc + NVIDIA/AMD | not supported; the two-card path requires two identical Arc devices |
 
