@@ -90,6 +90,7 @@ def test_agents_worktree_table_names_current_head():
     if not head:
         return
     parent = _rev("HEAD^")
+    main_head = _rev("main")  # the `main` branch's own HEAD, from the same object database
     text = (ROOT / "AGENTS.md").read_text(encoding="utf-8", errors="replace")
     rows = [ln for ln in text.splitlines()
             if ln.startswith("| `T:/kindi`") or ln.startswith("| `<worktree>`")]
@@ -99,10 +100,14 @@ def test_agents_worktree_table_names_current_head():
         assert m, "HEAD cell not found in row: %s" % row[:60]
         h = m.group(1)
         if row.startswith("| `T:/kindi`"):
-            continue  # `main` may legitimately lag this session branch; its row must be a hash
-        ok = head.startswith(h) or (bool(parent) and parent.startswith(h))
-        assert ok, ("AGENTS.md worktree table says %s but HEAD is %s; bump the "
-                    "table in the same commit" % (h, head))
+            # `main` may legitimately lag (or lead) this session branch, but its row must name
+            # `main`'s own HEAD, not this worktree's -- that is what the next agent reads first.
+            ok = bool(main_head) and main_head.startswith(h)
+        else:
+            ok = head.startswith(h) or (bool(parent) and parent.startswith(h))
+        assert ok, ("AGENTS.md worktree table says %s but %s; bump the "
+                    "table in the same commit" % (h, ("main is %s" % main_head[:7]) if row.startswith("| `T:/kindi`")
+                    else ("HEAD is %s" % head[:7])))
     adds = _changed_agents_lines() or []
     # A commit that touches AGENTS.md must also carry the hash refresh: its added lines have to
     # name HEAD or its parent (a bump cannot name itself, so the parent is the intended value).

@@ -51,6 +51,17 @@ class DraftPolicy(object):
     def cost(self, k):
         return float(self.costs.get(k, 99.0))
 
+    def limit_k(self, base_k):
+        """Clamp an engine-chosen base draft length to what this controller proposes now.
+
+        The engine keeps its own hand-tuned base (per card/mode); the controller may only shorten
+        it, never lengthen it. Returns min(base_k, propose()), floored at 0. A controller with no
+        observations at all has no evidence, so the base passes through unchanged.
+        """
+        if not self.tries:
+            return int(base_k)
+        return max(0, min(int(base_k), int(self.propose())))
+
     def observe(self, kept, drafted, confidence=None):
         """A verify pass kept `kept` of `drafted` drafted tokens."""
         self.acc = self.decay * self.acc + kept

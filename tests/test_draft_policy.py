@@ -52,3 +52,20 @@ def test_unknown_cost_falls_back_to_never_drafting_past_it():
     for _ in range(20):
         p.observe(1, 1)
     assert p.propose() == 1
+
+
+def test_limit_k_only_shortens_the_base():
+    p = DraftPolicy("x", kmax=3, costs=COSTS)
+    for _ in range(5):
+        p.observe(3, 3)                      # everything is kept: longest draft is worth it
+    assert p.limit_k(7) == 3                 # clamped by kmax=3
+    assert p.limit_k(2) == 2                 # the smaller base passes through
+    for _ in range(60):
+        p.observe(0, 3)                      # nothing is kept: drafting costs more than it earns
+    assert p.limit_k(4) == 0                 # drafts stop entirely
+
+
+def test_limit_k_passes_the_base_through_with_no_history():
+    p = DraftPolicy("x", kmax=3, costs=COSTS)
+    p.acc = p.tries = 0.0                    # no history at all: propose() would be 0
+    assert p.limit_k(4) == 4                 # ... but the controller must not kill the first drafts
