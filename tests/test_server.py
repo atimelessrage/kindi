@@ -11,6 +11,7 @@ import sys
 import threading
 from pathlib import Path
 
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
@@ -289,6 +290,132 @@ def test_constrained_generate_rejects_a_grammar_escape():
     script = [ord('{'), ord('x')]  # a value-start 'x' is not grammar-legal inside an object
     with pytest.raises(AssertionError):
         _drive_constrained(script, schema)
+
+
+class _G4Tok(object):
+    """A Gemma-style tokenizer stand-in: decoding is token text, stop set has one EOS."""
+
+    def __init__(self, texts, eos):
+        self.tokens = list(texts)
+        self.stop_ids = {eos}
+        self.ids = {}
+        self.eos = eos
+
+    def encode(self, s):
+        return [1]
+
+    def decode_bytes(self, i):
+        return self.tokens[int(i)].encode("utf-8")
+
+
+class _G4Engine(object):
+    ctx = 4096
+    shortlist = 0
+    fast_centroids = None
+
+    def __init__(self, script):
+        self.script = list(script)
+
+    def reset(self):
+        pass
+
+    def forward_batch(self, ids, pos):
+        pass
+
+    def forward(self, tok, pos, logits=False):
+        return self.script.pop(0)
+
+
+class _G4Cache(object):
+    def prepare(self, ids):
+        return 0
+
+    def advanced(self, ids, checkpoint=False):
+        pass
+
+    def append(self, tok):
+        pass
+
+
+class _Np(object):
+    """Small cupy stand-in: _generate_gemma only touches these numpy-backed calls."""
+
+    asnumpy = staticmethod(np.asarray)
+    float32 = np.float32
+
+    def __getattr__(self, name):
+        return getattr(np, name)
+
+
+def _drive_gemma(monkeypatch, logits_script, texts, eos, req_extra=None):
+    """Drive the real `_generate_gemma` loop without a GPU or a Gemma pack."""
+    from kindi import gemma4_chat
+
+    monkeypatch.setattr(gemma4_chat, "render", lambda *a, **k: "prompt")
+    K = object.__new__(server.Kindi)
+    K.cfg = {"model_name": "fake-gemma", "temperature": 0.0, "top_p": 1.0, "top_k": 0,
+             "max_tokens": 64, "fast_clusters": 0, "head": "exact"}
+    K.native = True
+    K.variant = "gemma4"
+    K.tok = _G4Tok(texts, eos)
+    K.eng = _G4Engine(logits_script)
+    K.g4cache = _G4Cache()
+    K.busy = {"active": False, "phase": "", "prompt_tokens": 0, "cached": 0,
+              "read": 0, "generated": 0, "started": 0.0}
+    K.stats = {"requests": 0, "prompt_tokens": 0, "cached_tokens": 0, "completion_tokens": 0,
+               "gen_seconds": 0.0, "last_tok_s": 0.0}
+    K.log = lambda *a: None
+    K.cp = _Np()
+    K.head_mode = lambda: "exact"
+    K.model_path = ""
+    req = {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 64,
+           "temperature": 0.0, "top_p": 1.0, "top_k": 0}
+    if req_extra:
+        req.update(req_extra)
+    items = list(K._generate_gemma(req))
+    done = next(v for kind, v in items if kind == "done")
+    return done
+
+
+def _logits(n, peak, second=None):
+    z = np.full(n, -10.0)
+    z[peak] = 100.0
+    if second is not None:
+        z[second] = 50.0
+    return z
+
+
+def test_gemma_json_schema_is_constrained(monkeypatch):
+    # the top logit is always on '<' (never grammar-legal); the pick must skip it
+    texts = ["{", '"ok"', ":", "true", "}", "<", "!", "<eos>"]
+    script = [_logits(8, 5, 0), _logits(8, 5, 1), _logits(8, 5, 2),
+              _logits(8, 5, 3), _logits(8, 5, 4), _logits(8, 7)]
+    done = _drive_gemma(monkeypatch, script, texts, eos=7, req_extra={
+        "response_format": {"type": "json_schema", "json_schema": {"schema": {
+            "type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]}}},
+    })
+    assert done["finish"] == "stop"
+    assert json.loads(done["content"]) == {"ok": True}
+
+
+def test_gemma_without_response_format_is_unconstrained(monkeypatch):
+    # the same logits with no response_format: the illegal top pick goes through verbatim
+    texts = ["{", '"ok"', ":", "true", "}", "<", "!", "<eos>"]
+    done = _drive_gemma(monkeypatch, [_logits(8, 5), _logits(8, 7)], texts, eos=7)
+    assert done["content"] == "<"
+
+
+def test_structured_output_rejected_on_unsupported_backend(app_client):
+    client, K = app_client
+    K.supports_json_grammar = False
+    K.variant = "lightning"
+    r = client.post("/v1/chat/completions", json={
+        "messages": [{"role": "user", "content": "hello"}],
+        "response_format": {"type": "json_schema", "json_schema": {"schema": {
+            "type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"]}}},
+    })
+    assert r.status_code == 400, r.text
+    assert r.json()["error"]["param"] == "response_format"
 
 
 def test_default_n_and_text_response_format_are_accepted(app_client):

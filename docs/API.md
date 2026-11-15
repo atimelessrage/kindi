@@ -51,7 +51,7 @@ Implemented in `kindi/api/errors.py`, wired into `kindi/server.py` (T5.1).
 | `logprobs`, `top_logprobs` | supported on Gemma 4 only | **rejected** (400) on other backends |
 | `enable_thinking`, `chat_template_kwargs`, `reasoning_effort`, `thinking_budget_tokens` | supported | Kindi thinking controls |
 | `n` | supported only as 1 | **rejected** (400) when any other value is given; multiple completions are not generated |
-| `response_format` | `{"type": "text"}`, `{"type": "json_object"}`, `{"type": "json_schema", "json_schema": {"name": ..., "schema": {...}}}` | decode-side constraint (REQ-0018): every token is restricted to a JSON-schema automaton, so the content parses against the schema. `grammar` and unknown types are **rejected** (400, `param: response_format`); `tools` is rejected together with structured output |
+| `response_format` | `{"type": "text"}`, `{"type": "json_object"}`, `{"type": "json_schema", "json_schema": {"name": ..., "schema": {...}}}` | decode-side constraint (REQ-0018): every token is restricted to a JSON-schema automaton, so the content parses against the schema. `grammar` and unknown types are **rejected** (400, `param: response_format`); `tools` is rejected together with structured output; on the Lightning and Nanbeige backends structured output is **rejected loudly** (400, `param: response_format`) instead of silently unconstrained |
 | `frequency_penalty`, `logit_bias`, `user`, `modalities` and other OpenAI-only fields | ignored | accepted and not read |
 
 Implemented 2026-11-15 (decision D2, REQ-0018): `n` greater than 1 and a
@@ -60,12 +60,19 @@ naming the parameter instead of being silently ignored; constrained decoding
 landed as the JSON-schema/json_object slice (T5.4, REQ-0018): the dense path
 restricts the sampler to the ids the schema automaton accepts
 (`kindi/jsongrammar.py`), so `json_object`/`json_schema` replies parse by
-construction. `n = 1` and `response_format: {"type": "text"}` are
-accepted, `grammar` stays rejected, and purely cosmetic fields keep being
-ignored. The grammar is schema-ordered (`kindi/jsongrammar.py`): properties
-are emitted in schema order, `required` must be present, `additionalProperties`
-behaves like OpenAI strict mode (only schema properties), `integer` is
-canonical decimal, and `enum`/`const` accept primitives only.
+construction. The Gemma 4 native path gained the same constraint later the
+same day (`Kindi._generate_gemma` + `_g4_json_token`): structured output takes
+over the reply — a thinking channel is not entered, the rest of the reply is
+the JSON document, and stop tokens are admitted only once the automaton is
+done. The `supports_json_grammar` flag gates the two supported backends at
+the HTTP boundary, so a Lightning/Nanbeige request gets a 400 naming the
+backend rather than an unconstrained reply. `n = 1` and
+`response_format: {"type": "text"}` are accepted, `grammar` stays rejected,
+and purely cosmetic fields keep being ignored. The grammar is schema-ordered
+(`kindi/jsongrammar.py`): properties are emitted in schema order, `required`
+must be present, `additionalProperties` behaves like OpenAI strict mode
+(only schema properties), `integer` is canonical decimal, and `enum`/`const`
+accept primitives only.
 
 ## Sessions (REQ-0016)
 

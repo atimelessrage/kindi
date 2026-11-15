@@ -317,6 +317,27 @@ Lightning/Nanbeige decode paths are untouched.
 - Diff vs `v0.6.0`: 402 files (+54,482 → +54,512 insertions),
   354 commits (348 → 354); still zero file deletions.
 
+## 28. What changed in the 2026-11-15 Gemma4 constrained-decoding round
+
+The structured-output constraint from §27 now also covers the second served
+family: `_generate_gemma` wires the same JSON automaton (`Kindi._g4_json_token`
+— the best grammar-legal token from the full Gemma vocabulary, greedy or
+tempered; EOS/stop tokens are admitted only once the automaton is done),
+and structured output takes over the whole reply (no thought channel is
+entered). `supports_json_grammar` names the two constrained backends
+(dense + Gemma 4) at the HTTP boundary, so a Lightning/Nanbeige
+structured-output request is rejected loudly (400, `param:
+response_format`, naming the backend) instead of silently unconstrained —
+before this round the validator accepted it globally and the two `*_gen`
+loops just ignored it. CPU end-to-end: a scripted illegal top logit is
+skipped and the reply parses as `{"ok": true}`. **No Gemma GPU gate was
+run** (no Gemma pack on the host); the dense 2B/9B gate in §27 is the
+measured one. `jinja2` (a real Gemma runtime dep) was missing in the cloud
+env and installed to run the new test.
+
+- Diff vs `v0.6.0`: 404 files (+54,512 → +55,343 insertions),
+  357 commits (354 → 357); still zero file deletions.
+
 ## 25. What changed in the 2026-11-15 full-suite fix + CPU parity round
 
 A full-suite run (783 passed, 20 skipped, 1 failure, 2 fixture

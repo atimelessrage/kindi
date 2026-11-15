@@ -528,6 +528,7 @@ class Kindi(object):
                 self.runner = Runner(self.eng, cfg, self.pack_id, log, progress=self.busy)
             self.sample = Sampler(self.eng)
         self.supports_logprobs = self.variant == "gemma4"
+        self.supports_json_grammar = self.variant in ("qwen35", "bonsai27", "gemma4")   # dense paths + Gemma 4 carry the JSON automaton
         self.lock = threading.RLock()        # reentrant: a background request runs waiting chat requests inside its own turn
         self.stats = {"requests": 0, "prompt_tokens": 0, "cached_tokens": 0, "completion_tokens": 0,
                       "spec_passes": 0, "spec_drafted": 0, "spec_accepted": 0,
@@ -580,6 +581,20 @@ class Kindi(object):
                 return Sampler._pick(cand,sc,temperature,top_p,top_k,rng)
         return int(self.cp.argmax(logits).item())
 
+    def _g4_json_token(self,logits,grammar,gstate,temperature,top_p,top_k,rng):
+        """the next token inside a structured-output reply: the best grammar-legal one, from the full vocabulary,
+        so the finished reply parses against the schema by construction (same allowed-set rule as the dense path)."""
+        if not hasattr(self,"_grammar_texts"):
+            self._grammar_texts=[self.tok.decode_bytes(i).decode("utf-8","replace") for i in range(len(self.tok.tokens))]
+        allowed=grammar.vocab_allowed(gstate,self._grammar_texts)
+        if grammar.done(gstate):
+            allowed=np.concatenate([allowed,np.array(sorted(self.tok.stop_ids),dtype=np.int64)])
+        if allowed.size==0:
+            raise RuntimeError("structured-output grammar allowed no token")
+        scores=self.cp.asnumpy(logits)[allowed]
+        if temperature<=0: return int(allowed[int(np.argmax(scores))])
+        return Sampler._pick(allowed,scores.astype(np.float64),temperature,top_p,top_k,rng)
+
     def _generate_gemma(self,req,cancel=None):
         from .gemma4_chat import render as render_gemma
         from . import gemma4_tools
@@ -590,7 +605,13 @@ class Kindi(object):
         kw["enable_thinking"]=bool(kw.get("enable_thinking",req.get("enable_thinking",False)))
         kw["conversational_mode"]=bool(kw.get("conversational_mode",False))
         prompt=render_gemma(self.model_path,messages,tools,kw,True)
-        thinking_open=prompt.endswith(gemma4_tools.THINK_OPEN+"thought\n")   # after a tool response, thinking on
+        jgrammar=jstate=None
+        rf=req.get("response_format") or {}
+        if rf.get("type") in ("json_object","json_schema"):
+            jgrammar=_response_format_grammar(rf); jstate=jgrammar.start()
+            thinking_open=False     # a structured reply is the whole reply: it never enters a thought channel
+        else:
+            thinking_open=prompt.endswith(gemma4_tools.THINK_OPEN+"thought\n")   # after a tool response, thinking on
         sorter=gemma4_tools.Stream(thinking_open)
         ids=self.tok.encode(prompt)
         if not ids: raise ValueError("Gemma 4 chat template produced an empty prompt")
@@ -647,7 +668,9 @@ class Kindi(object):
             for n in range(max_new):
                 if cancel is not None and cancel.is_set():
                     finish="stop"; break
-                if gst is not None:
+                if jgrammar is not None:
+                    token=self._g4_json_token(logits,jgrammar,jstate,temperature,top_p,top_k,rng)
+                elif gst is not None:
                     token=self._g4_call_token(logits,grammar,gst,temperature,top_p,top_k,rng)
                 elif temperature<=0:
                     token=int(self.cp.argmax(logits).item())
@@ -676,6 +699,11 @@ class Kindi(object):
                     logits=self.eng.forward(token,len(ids)+n); self.g4cache.append(token)
                 piece=decoder.decode(self.tok.decode_bytes(token))
                 text+=piece
+                if jgrammar is not None:
+                    advanced=jgrammar.advance(jstate,self._g4_text(token))
+                    if advanced is None:
+                        raise RuntimeError("structured-output grammar rejected a token it had allowed")
+                    jstate=advanced
                 hit=None
                 if stop_seq:
                     _base=max(0,stop_from-(stop_win-1)); _tail=text[_base:]
@@ -1824,6 +1852,10 @@ def create_app(cfg, log=print):
         if req.get("logprobs") and not getattr(K, "supports_logprobs", False):
             return _err(400, "logprobs are not supported by this backend; remove logprobs or use a Gemma 4 pack",
                         "invalid_request_error", param="logprobs")
+        rf = req.get("response_format") or {}
+        if rf.get("type") in ("json_object", "json_schema") and not getattr(K, "supports_json_grammar", True):
+            return _err(400, "structured output (response_format) is not supported by the %s backend" % getattr(K, "variant", ""),
+                        "invalid_request_error", param="response_format")
         cid, created = "chatcmpl-" + uuid.uuid4().hex[:24], int(time.time())
         # every request is counted before it waits for the engine: a prompt that does not fit gets its HTTP 400 at
         # once (a queued request used to wait for the request ahead of it, then fail), and a dry run ends here
