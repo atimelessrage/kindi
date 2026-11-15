@@ -15,13 +15,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `28ff801`:
+HEAD `b8068a4`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 315 commits
-git diff --shortstat v0.6.0..HEAD          # 400 files, +53,480/-1002
+git log --oneline v0.6.0..HEAD | wc -l     # 320 commits
+git diff --shortstat v0.6.0..HEAD          # 400 files, +53,567/-1002
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -257,6 +257,16 @@ arbitrary-draft-GGUF harness stays a separate gate.
 - `dsv41_server.py`'s `Stream` already searches incrementally in a
   leftover buffer and was verified not affected.
 - Diff vs `v0.6.0` grew 400 files (+53,420 → +53,480 insertions);
+  still zero file deletions.
+- §19: sessions stats for ops visibility before retention pruning.
+
+## 19. What changed in the 2026-11-15 roadmap round (sessions stats)
+
+- `SessionStore.stats()` + `kindi sessions stats [--json]`: sessions by
+  status, message totals, bytes on disk, oldest/newest last update —
+  the visibility needed before pruning (`9c59e2b`). Store and CLI tests
+  pin the empty store, the counts, and the JSON shape.
+- Diff vs `v0.6.0` grew 400 files (+53,480 → +53,567 insertions);
   still zero file deletions.
 
 ## 11. What changed in the 2026-11-15 second audit triage
