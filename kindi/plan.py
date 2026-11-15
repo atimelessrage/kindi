@@ -41,6 +41,19 @@ def _free_vram_gib():
 
 
 def _physical_ram_gib():
+    """The RAM budget Kindi should plan against, in GiB.
+
+    Uses `hostram.total()`, which caps the host's physical RAM at the process's cgroup limit so a
+    container's placement follows its actual budget rather than the host's. Returns (total, free);
+    free may be None."""
+    try:
+        from . import hostram
+
+        total = hostram.total()
+        if total:
+            return total / 2 ** 30, None
+    except Exception:
+        pass
     try:
         if os.name == "nt":
             import ctypes
