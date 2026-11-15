@@ -48,14 +48,15 @@ Implemented in `kindi/api/errors.py`, wired into `kindi/server.py` (T5.1).
 | `parallel_tool_calls` | supported | honored on Gemma 4; parsed per family elsewhere |
 | `logprobs`, `top_logprobs` | supported on Gemma 4 only | **rejected** (400) on other backends |
 | `enable_thinking`, `chat_template_kwargs`, `reasoning_effort`, `thinking_budget_tokens` | supported | Kindi thinking controls |
-| `n` | ignored | today; multiple completions are not generated |
-| `response_format` | ignored | today; structured output is T5.4 (REQ-0018) |
+| `n` | supported only as 1 | **rejected** (400) when any other value is given; multiple completions are not generated |
+| `response_format` | supported only as `{"type": "text"}` | **rejected** (400) for `json_schema`, `json_object` or any other structured-output type until constrained decoding lands (T5.4, REQ-0018) |
 | `frequency_penalty`, `logit_bias`, `user`, `modalities` and other OpenAI-only fields | ignored | accepted and not read |
 
-Proposed (decision D2, **not implemented**): reject `n` greater than 1 and a
-`response_format` naming `json_schema` with a clear 400 naming the parameter,
-instead of silently ignoring them, until they are supported. Purely cosmetic
-fields keep being ignored.
+Implemented 2026-11-15 (decision D2, REQ-0018): `n` greater than 1 and a
+`response_format` naming structured output are rejected with a clear 400
+naming the parameter instead of being silently ignored, until constrained
+decoding exists. `n = 1` and `response_format: {"type": "text"}` are
+accepted, and purely cosmetic fields keep being ignored.
 
 ## Sessions (REQ-0016)
 

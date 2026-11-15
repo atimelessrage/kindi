@@ -4,6 +4,12 @@
 
 ### New
 
+- **Loud rejection of unsupported `n` and `response_format`**
+  ([REQ-0018](docs/development/requirements/REQ-0018.md), decision D2).
+  `n` values other than 1 and structured-output `response_format` types
+  (`json_schema`, `json_object`) now return an enveloped 400 before the
+  engine or prompt cache is touched, instead of being silently ignored.
+  `n = 1` and `response_format: {"type": "text"}` are accepted.
 - **Server-side `/sessions` endpoints** ([REQ-0016](docs/development/requirements/REQ-0016.md)).
   `GET /sessions` (status/tag filters), `GET /sessions/<id>`,
   `GET /sessions/<id>/export` (raw markdown), `POST /sessions/<id>/status`

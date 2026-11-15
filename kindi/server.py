@@ -297,6 +297,23 @@ def _validate_request(req, has_vision=False):
 
     if "tool_choice" in req and req["tool_choice"] is not None and not isinstance(req["tool_choice"], (str, dict)):
         _request_error("tool_choice must be a string or an object")
+    n = req.get("n")
+    if n is not None:
+        if isinstance(n, bool) or not isinstance(n, int):
+            _request_error("n must be an integer")
+        if n < 1:
+            _request_error("n must be at least 1")
+        if n > 1:
+            _request_error("multiple completions (n > 1) are not supported")
+    response_format = req.get("response_format")
+    if response_format is not None:
+        if not isinstance(response_format, dict):
+            _request_error("response_format must be an object")
+        rtype = response_format.get("type")
+        if not isinstance(rtype, str):
+            _request_error("response_format.type must be a string")
+        if rtype != "text":
+            _request_error("structured output (response_format type %r) is not supported" % rtype)
     if req.get("stream") is not None and not isinstance(req["stream"], bool):
         _request_error("stream must be true or false")
     if req.get("logprobs") is not None and not isinstance(req["logprobs"], bool):

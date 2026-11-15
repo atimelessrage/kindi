@@ -113,7 +113,23 @@ MALFORMED = [
     {"messages": [{"role": "user", "content": "hello"}], "presence_penalty": 2.5},
     {"messages": [{"role": "user", "content": "hello"}], "presence_penalty": -2.5},
     {"messages": [{"role": "user", "content": "hello"}], "presence_penalty": "1"},
+    {"messages": [{"role": "user", "content": "hello"}], "n": 2},
+    {"messages": [{"role": "user", "content": "hello"}], "n": "2"},
+    {"messages": [{"role": "user", "content": "hello"}], "n": 0},
+    {"messages": [{"role": "user", "content": "hello"}], "response_format": {"type": "json_schema"}},
+    {"messages": [{"role": "user", "content": "hello"}], "response_format": {"type": "json_object"}},
+    {"messages": [{"role": "user", "content": "hello"}], "response_format": "json_object"},
 ]
+
+
+def test_default_n_and_text_response_format_are_accepted(app_client):
+    client, _ = app_client
+    r = client.post("/v1/chat/completions", json={
+        "messages": [{"role": "user", "content": "hello"}],
+        "n": 1,
+        "response_format": {"type": "text"},
+    })
+    assert r.status_code == 200, r.text
 
 
 @pytest.mark.parametrize("payload", MALFORMED)

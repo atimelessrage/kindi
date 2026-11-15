@@ -84,7 +84,10 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   REQ-0018; the per-family tool-call parsers, scheduler, metrics T5.5 and
   structured output (T5.4) remain planned.
 - **Agent API hardening (REQ-0018, proposed):** the next layer over the 0.6.0 base (token
-  counting, sessions, priorities, progress comments): (1) grammar / JSON-schema constrained
+  counting, sessions, priorities, progress comments): (0) unsupported
+  `n > 1` and structured-output `response_format` are now rejected with an
+  enveloped 400 instead of silently ignored (**landed 2026-11-15**, decision
+  D2) — constrained decoding itself remains open; (1) grammar / JSON-schema constrained
   decoding — nothing exists beyond the Gemma 4 tool-call `CallGrammar` precedent, and the
   Gemma grammar is the starting point for a general constrained sampler; (2) a per-model
   tool-call conformance suite — **landed 2026-11-15**
