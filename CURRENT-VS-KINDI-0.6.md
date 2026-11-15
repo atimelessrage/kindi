@@ -15,13 +15,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `ddba17a`:
+HEAD `ea1b120`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 293 commits
-git diff --shortstat v0.6.0..HEAD          # 398 files, +53,008/-993
+git log --oneline v0.6.0..HEAD | wc -l     # 297 commits
+git diff --shortstat v0.6.0..HEAD          # 398 files, +53,062/-993
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -175,6 +175,23 @@ arbitrary-draft-GGUF harness stays a separate gate.
 - Docs updated alongside: `docs/API.md` (export row), REQ-0016
   evidence, CHANGELOG.
 - Diff vs `v0.6.0` grew 398 files (+52,946 → +53,008 insertions);
+  still zero file deletions.
+- §14: the performance deepen round — tandem owner-table dispatch.
+
+## 14. What changed in the 2026-11-15 performance deepen round
+
+- Tandem decode: the per-layer owner table is resolved once at
+  construction instead of per layer per token (`frozenset` rebuild +
+  set lookup removed); routing behavior identical, pinned by the
+  fake-backend call-order tests, the probe-parity test, and a new
+  `_owners` invariant test (`f720a5d`).
+- Dispatch overhead measured on the fake backends (Python overhead
+  only): 19.34 µs → 17.57 µs per token (×0.91); against the measured
+  27B @ 24K budget (~103 ms/token) the saving is noise — kernels
+  dominate, and the step-0 verdict (CPU at the raw-kernel rate, no
+  dispatch gap) stands. Recorded in `docs/TANDEM-STATUS.md` and the
+  CHANGELOG.
+- Diff vs `v0.6.0` grew 398 files (+53,008 → +53,062 insertions);
   still zero file deletions.
 
 ## 11. What changed in the 2026-11-15 second audit triage
