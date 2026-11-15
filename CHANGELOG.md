@@ -4,6 +4,15 @@
 
 ### Fixed
 
+- **Sessions export carries its filename.** `GET /sessions/<id>/export`
+  returns a `Content-Disposition` filename (`<date>-<slug>.md`, matching
+  the CLI export convention).
+- **Config reference also scans `os.environ.setdefault` reads**, so a var
+  introduced only via setdefault cannot silently vanish from the
+  reference.
+- **Tandem `load_ratio` robustness pinned by tests**: wrong-kind and
+  corrupt calibration files return `None` (fit-only fallback) instead
+  of raising or being priced.
 - **Sessions mutations are serialized.** Each `/sessions` request builds
   its own `SessionStore`, so concurrent status/tag posts raced their
   read-modify-write and one update could silently win; the routes now
