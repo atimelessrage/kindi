@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+### New
+
+- **Backend plugin interface, foundations (Feature 4, T4.1)** ([docs/BACKENDS.md](docs/BACKENDS.md),
+  [REQ-0019](docs/development/requirements/REQ-0019.md)). `kindi/backends/` defines the
+  backend contract (capabilities, sampling params, generation events, cancellation), a
+  registry that resolves by model id and by GGUF `general.architecture` metadata and
+  loads external backends through `KINDI_BACKEND_MODULES`, and a deterministic
+  `FakeBackend` for CPU-only tests. No existing engine is an adapter yet (T4.2), so
+  there is no arbitrary-GGUF claim; serving behavior is unchanged.
+- **Agent-grade API foundations (Feature 5, T5.1)** ([docs/API.md](docs/API.md),
+  [REQ-0018](docs/development/requirements/REQ-0018.md)). Every error the server
+  returns now uses the OpenAI envelope (`message`, `type`, `param`, `code`), including
+  404/405 and unhandled failures; `context_length_exceeded` keeps its promised code.
+  `tests/api/` is a conformance suite that drives the real app with the official
+  `openai` Python client (non-streaming, streaming, usage, models listing, error
+  shapes); it runs GPU-free against a stub engine and can be pointed at a real
+  server with `KINDI_API_URL`. No request behavior changes: `n` and `response_format`
+  are still ignored (decision D2 pending), and the queue default is unchanged.
+- **Repo map for the delegation plans** ([docs/dev/REPO-MAP.md](docs/dev/REPO-MAP.md)):
+  every module by role with the FROZEN list, the `/v1/chat/completions` request trace,
+  per-family chat-template and tool-call locations, and the resolution of every
+  `[LOCATE]` in the Feature 4/5 plans.
+
 ## 0.6.0 (2026-11-12)
 
 ### New

@@ -64,6 +64,17 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
 - **Plan engine:** 2B T=4 token-exact; 9B is 4/4 token-exact with `KINDI_TC_HP=1` (122.7 tok/s vs 76.3–80.0 plain) — the kernels already dispatched the 4096 folds, so `make_engine` now selects HP for HB-4096 packs (`KINDI_TC_HP=0` still refuses; with the default int8 activations one prompt flips at token 36, 3/4: isolated to activation precision by toggling fold-split/FF/FD/ATT_TC/TMAX, all unchanged). The plan engine now has `tc` rows in the cross-mode matrix (medians of three at 24K: 2B read 471.7, 4B 214.1, 9B 133.9; generation at 24K 299.2/127.8/97.0 tok/s, 1.5–1.9x the GPU-only engine) and its cells are guarded by the perf gate. The verify matrix gained a `tc-hp` mode (2026-11-13; `tools/verify_matrix.py`) so the 9B exact cell is reproducible (PASS 4/4 at 123.9 tok/s). `make_engine` now uses the plan engine by default for every model it supports (2026-11-13; verified: 2B default verify is 4/4 at 253.4 tok/s via the plan engine); `KINDI_TP=0` keeps the plain engine. `bench --json` also records `ctx_requested` and `ctx_reduced` so a reduced run is never recorded as the requested context.
 - **Serving:** bounded queue with 429, optional per-source `KINDI_RATE_LIMIT_PER_MIN`, `/metrics`,
   JSON access log, Ollama-compatible endpoints; multi-GPU replicas need `kindi/tp.py` work.
+- **Backend plugin interface ([REQ-0019](development/requirements/REQ-0019.md), experimental):**
+  T4.1 landed 2026-11-15 — the contract (`kindi/backends/base.py`), the registry
+  (resolve by model id and by GGUF `general.architecture`, external backends via
+  `KINDI_BACKEND_MODULES`) and a deterministic `FakeBackend` for CPU-only tests, with
+  the repo map in [docs/dev/REPO-MAP.md](dev/REPO-MAP.md). The existing engines are
+  not adapters yet (T4.2), so there is still no arbitrary-GGUF claim; the generic
+  fallback stays decision-gated (llama.cpp proxy recommended, native generic
+  backend design-only). The OpenAI error envelope and the conformance suite
+  (`kindi/api/errors.py`, `tests/api/`) also landed as the T5.1 foundation for
+  REQ-0018; the per-family tool-call parsers, scheduler, metrics T5.5 and
+  structured output (T5.4) remain planned.
 - **Agent API hardening (REQ-0018, proposed):** the next layer over the 0.6.0 base (token
   counting, sessions, priorities, progress comments): (1) grammar / JSON-schema constrained
   decoding — nothing exists beyond the Gemma 4 tool-call `CallGrammar` precedent, and the

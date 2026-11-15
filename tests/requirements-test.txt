@@ -8,3 +8,6 @@ fastapi>=0.100,<1
 pydantic>=2,<3
 httpx>=0.23,<1
 numpy>=1.19,<3
+# tests/api drives the real app over HTTP with the official OpenAI client (T5.1).
+openai>=1.0,<2
+uvicorn>=0.16,<1
