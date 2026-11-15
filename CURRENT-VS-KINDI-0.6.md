@@ -1,8 +1,9 @@
 # Current worktree vs stock Kindi 0.6.0
 
 Report date: **2026-11-15** (refresh of the 2026-11-14 report; §7 records
-what changed since, §8 the 2026-11-15 sessions-endpoint round, and §9 the
-2026-11-15 unsupported-field rejection round). This file is the successor to
+what changed since, §8 the 2026-11-15 sessions-endpoint round, §9 the
+2026-11-15 unsupported-field rejection round, and §10 the 2026-11-15 audit
+triage round). This file is the successor to
 `CURRENT-VS-KINDI-0.5.md` §25: that file's §§1–24 are the history against
 0.5.0 and §25 is the first evaluation against 0.6.0; this file carries the
 current one. It separates verified behavior from recorded evidence,
@@ -13,13 +14,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `04518f0`:
+HEAD `517a635`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 271 commits
-git diff --shortstat v0.6.0..HEAD          # 398 files, +52,755/-993
+git log --oneline v0.6.0..HEAD | wc -l     # 274 commits
+git diff --shortstat v0.6.0..HEAD          # 398 files, +52,794/-993
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -73,6 +74,7 @@ not a code bug — the two tests pass with clang present).
 | Requirement-based coverage + per-module floors | `tools/check_coverage.py` + `tests/coverage_floors.json` in CPU CI (audit M4); requirement-traceable CPU tests |
 | **Server-side `/sessions` endpoints** (`kindi/server.py`, REQ-0016) | 2026-11-15: `GET /sessions` (status/tag filters), `GET /sessions/<id>`, `GET /sessions/<id>/export` (raw markdown), `POST /sessions/<id>/status`, `POST /sessions/<id>/tags` over the existing `SessionStore` — host-only (no engine/cache/GPU), API-key gated, enveloped 400/404, strict 12-hex id check so path-shaped ids never reach a file read. Pinned by `tests/test_server_sessions.py` (stub engine, no GPU) |
 | **Loud rejection of unsupported `n` / `response_format`** (`kindi/server.py`, REQ-0018 decision D2) | 2026-11-15: `n` values other than 1 and any structured-output `response_format` type (`json_schema`, `json_object`) return an enveloped 400 before the engine or prompt cache is touched, instead of being silently ignored. `n = 1` and `{"type": "text"}` remain accepted. Pinned by malformed-request and default-acceptance tests in `tests/test_server.py` (stub engine, no GPU). Constrained decoding itself is still open (T5.4) |
+| **Config reference scans subpackages** (`kindi/config_reference.py`) | 2026-11-15: `env_vars()` scans `kindi/**/*.py`, so env vars read in subpackages (`KINDI_BACKEND_MODULES` in `kindi/backends/`) appear in the generated reference with subpackage site paths. Audit triage of `Buffy_ReviewAudit_202611141517.txt`: the rest of its findings (N1-N6, D1/D3/D4, M3/M4) were verified fixed on the current tree; M1/M2 stay hardware-bound |
 | Audit dispositions (2026-11-15) | the 202611150853 audit verified item-by-item on the current tree: handoff-guard findings already fixed, coverage floors already landed, hardware items already recorded unverified; hash-bump hook declined by design, fork gap unfixable (push 403) |
 | Audit fixes: optional-accelerator degradation, `kindi_cache_*` telemetry, reference-config section | 2026-11-14 audit round (N1/N3–N5/D3/D4) |
 
@@ -138,6 +140,20 @@ arbitrary-draft-GGUF harness stays a separate gate.
   `docs/MIXED-CARD-ROADMAP.md` for the per-item gates.
 - GPU evidence (gitignored bench-logs): `bench-logs/req0015-gate-27b/`
   (draft-policy 27B gate), `bench-logs/convert-4b-verify/` (4B provenance).
+
+## 10. What changed in the 2026-11-15 audit triage round
+
+- Triaged `Buffy_ReviewAudit_202611141517.txt` (audited HEAD `549c030`)
+  against the current tree: N1-N6, D1/D3/D4, M3 and M4 are verified fixed;
+  M1 (GPU CI runner) and M2 (P106/P4000/M4000/RTX4000 rows) remain
+  hardware/process-bound and are already recorded as such in `docs/CI.md`
+  and the support matrix.
+- One still-open instance of the audit's N2/N3 class was real and fixed:
+  the config-reference scanner missed subpackage reads. Reference
+  regenerated (+`KINDI_BACKEND_MODULES`, 190 env reads), regression test
+  added, CHANGELOG entry added.
+- Diff vs `v0.6.0` grew 398 files (+52,755 → +52,794 insertions);
+  still zero file deletions.
 
 ## 9. What changed in the 2026-11-15 unsupported-field rejection round
 
