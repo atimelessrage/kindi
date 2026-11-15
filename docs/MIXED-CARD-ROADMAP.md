@@ -1,9 +1,9 @@
 # Mixed-card pairing and asymmetric tensor parallel: corrected roadmap
 
-Status: **proposal plus implemented engine path, 2026-11-12. The opt-in `KINDI_TP_SPLIT=auto`
-layout is in `kindi/tp.py`; `equal` remains the default. There is no mixed-card GPU record and
-no `mixedx2` installer profile. Current mixed-card offers remain experimental, not a support
-claim.**
+Status: **implemented installer + engine path, 2026-11-15. `KINDI_TP_SPLIT=auto` is the complete
+per-card layout in `kindi/tp.py`, and the installer now sets it for a pair of unequal-capacity cards
+(equal-capacity pairs retain the historical `equal` layout). There is no mixedx2 profile and no
+mixed-card GPU record. Current mixed-card offers remain experimental, not a support claim.**
 
 This page reviews the interrupted WIP's pairing and asymmetric-TP design against the current
 tree. It replaces the mixed-architecture section of the WIP's
@@ -38,9 +38,9 @@ state of the other paths.
 | area | current behaviour | consequence |
 |---|---|---|
 | `pair_ok()` | any two cards from `maxwell`, `pascal8`, `turing`, `tc` or `p100`, each at least 3,800 MiB; Kepler, 2 GB and unsupported cards excluded | mixed-generation offers exist: P106+P4000, M4000+P4000, RTX 4000+4060 Ti and others; no total-memory or per-card shard check |
-| `profile_of()` | two sm_80+ cards get `tc2`; all other pairs get `k1200x2` | mixed pairs use the plain two-card engine; there is no `mixedx2` profile |
+| `profile_of()` | two sm_80+ cards get `tc2`; all other pairs get `k1200x2` | mixed pairs use the plain two-card engine; there is no `mixedx2` profile. Pairs of unequal capacity add `KINDI_TP_SPLIT=auto`; equal-capacity pairs keep `equal` |
 | mixed weight path | a pre-6.0 + 6.0-or-newer pair adds `KINDI_G5=0` | both shards use the 2-bit path. `kindi/tp.py` reads this global override in each `Shard`; the path is real, but its token exactness on mixed cards is unmeasured |
-| `kindi/tp.py` | **equal** is the default two-card split: `NKg`, `NVg`, `NHKVg` and `NHg` divided by `W`; FFN rows in whole Hadamard blocks; FFN columns half; output head half. Opt-in `KINDI_TP_SPLIT=auto` (section 4.5) uses free-VRAM shares and complete per-component ranges | equal remains the compatible path. Auto gives the larger card more FFN blocks and output rows; on the 27B the GDN/attention ranges stay equal because of HB alignment. No mixed-card run exists |
+| `kindi/tp.py` | **equal** is the default two-card split: `NKg`, `NVg`, `NHKVg` and `NHg` divided by `W`; FFN rows in whole Hadamard blocks; FFN columns half; output head half. Opt-in `KINDI_TP_SPLIT=auto` (section 4.5) uses free-VRAM shares and complete per-component ranges | equal remains the compatible path. Auto gives the larger card more FFN blocks and output rows; on the 27B the GDN/attention ranges stay equal because of HB alignment. The installer sets `auto` for unequal-capacity pairs (for example a 6 GB card plus an 8 GB card) and keeps `equal` when capacities match. No mixed-card run exists |
 | `kindi/spec.py` | `KINDI_TC=1` installs one global tensor-core path; `_tc_backend(card)` can select `tc` or `tc_turing` per card, but the Turing backend rejects `W=2` | mixed `tc+turing` cannot use tensor cores on both cards; the installer therefore leaves such pairs on the plain path |
 | tests | `tests/test_installer_cards.py` has 19 fake-table cases | routing is tested; no mixed-card engine, verify or server run exists |
 
@@ -151,17 +151,18 @@ The design must state the alignment constraints and the exactness argument befor
 existing equal-split path remains the reference. A valid result must be token-exact against the
 full-GPU reference and the equal-split pair where both fit, and must record peak VRAM.
 
-Only then may a `mixedx2` profile be added. `KINDI_TP_SPLIT=auto` is already available as an
-engine opt-in; it does not create an installer offer or a support claim. The public name should
-describe the mode, not claim a general “mixed architecture” support.
+The installer now selects `KINDI_TP_SPLIT=auto` for unequal-capacity pairs, but this is routing
+and an engine opt-in, not a support claim. A `mixedx2` profile may only be added after the
+token-exact and peak-VRAM gates. The public name should describe the mode, not claim a general
+“mixed architecture” support.
 
 ### 4.5 Implemented layout (2026-11-12; unverified)
 
 `kindi/tp.py` now has the complete per-card layout described above. `KINDI_TP_SPLIT=auto`
-(opt-in; `equal` remains the default) computes the first card's share from free VRAM after a
-512 MiB reserve, rounds every component to its alignment unit, and uses `equal` when the usable
-shares are within 10 percentage points of each other. `KINDI_TP_SPLIT=equal` keeps the
-historical path. The layout covers:
+(the installer's choice for unequal-capacity pairs; `equal` remains the engine default) computes
+the first card's share from free VRAM after a 512 MiB reserve, rounds every component to its
+alignment unit, and uses `equal` when the usable shares are within 10 percentage points of each
+other. `KINDI_TP_SPLIT=equal` keeps the historical path. The layout covers:
 
 - GDN q/k groups with their tiled v heads (`NV * HK` is HB-aligned);
 - attention q and KV heads (`NH * HD` is HB-aligned);
@@ -190,8 +191,8 @@ the automatic path is opt-in because `equal` remains the default.
 | P1 | per-card feasibility and `KINDI_G5=0` test | fake-table and plan tests reject impossible offers; both shard paths checked | **partial 2026-11-14**: `pair_fits()` gates each pair setup by the model's per-card TP requirement (27B 3,800 MiB, Nemotron 2,400 MiB from `kindi/catalog.py`'s `two` field), and `pair_ok`'s floor dropped to 2,400 so Nemotron can be offered on smaller pairs; fake-table tests cover the P4000 (pascal8) + M4000 (maxwell) + RTX 4000 (turing) rig — all three pairings pair, M4000+P4000 forces `KINDI_G5=0`, Turing+Pascal keeps the 5-trit path. A full per-card K/V-at-context accounting is still pending; no mixed-card GPU run exists. |
 | P2 | equal-split mixed hardware validation | 27B verify plus server/cache on at least one mixed pair | pending |
 | P3 | Turing/TC mixed path | `tc_turing` `W=2` verify, or an explicit plain-path decision | pending |
-| P4 | asymmetric layout design and implementation | token-exact equal/full-GPU comparison; peak VRAM | **partial 2026-11-12**: complete layout, `KINDI_TP_SPLIT=auto|equal`, aligned fallbacks, cache/fingerprint coverage and CPU-only tests; no mixed-card run |
-| P5 | installer/config `KINDI_TP_SPLIT` + `mixedx2` | generated config docs and fake-table tests | **partial 2026-11-12**: environment variable and generated docs; no `mixedx2` profile or installer fake-table change |
+| P4 | asymmetric layout design and implementation | token-exact equal/full-GPU comparison; peak VRAM | **partial 2026-11-15**: complete layout, `KINDI_TP_SPLIT=auto|equal`, aligned fallbacks, cache/fingerprint coverage, CPU-only engine tests, and the installer now selects `auto` for unequal pairs (a fake-table test covers the 6 GB + 8 GB offer); no mixed-card run |
+| P5 | installer/config `KINDI_TP_SPLIT` + `mixedx2` | generated config docs and fake-table tests | **partial 2026-11-15**: generated config docs and fake-table tests pin the 6 GB + 8 GB offer and the `KINDI_TP_SPLIT=auto` environment; a `mixedx2` profile is still blocked on the P4 hardware gates |
 | P6 | performance, 24K+ and 33B/Nanbeige separation | measured, not a support claim until all gates pass | pending |
 
 The order matters. P2 gives a usable mixed-card result without inventing a new split. P4 is a

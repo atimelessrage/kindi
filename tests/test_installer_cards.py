@@ -322,6 +322,21 @@ profile_of 0
     assert "at most two cards" in err, err
 
 
+def test_unequal_pair_uses_the_proportional_tensor_split():
+    # 6 GB + 8 GB: the pair is offered, and the installer switches the engine to the uneven
+    # proportional layout instead of the historical equal split.
+    info = pair("NVIDIA P106-100", 6077, "6.1", "Quadro P4000", 8192, "6.1")
+    if info is None:
+        return
+    assert info["pair"] == "yes" and info["27b"] == "yes", info
+    prof = profile(["NVIDIA P106-100", "Quadro P4000"], [6077, 8192], ["6.1", "6.1"])
+    assert prof["profile"] == "k1200x2", prof
+    assert "KINDI_TP_SPLIT=auto" in prof["env"], prof
+    # Equal-capacity pairs do not opt in to the proportional layout.
+    same = profile(["NVIDIA GeForce RTX 4060 Ti"] * 2, [8188, 8188], ["8.9", "8.9"])
+    assert "KINDI_TP_SPLIT=auto" not in same["env"], same
+
+
 def test_tc2_profile_for_two_8gb_ada_cards():
     info = profile(["NVIDIA GeForce RTX 4060 Ti"] * 2, [8188, 8188], ["8.9", "8.9"])
     if info is None:

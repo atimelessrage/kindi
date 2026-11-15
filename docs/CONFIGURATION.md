@@ -128,7 +128,7 @@ and the rest).
 | `KINDI_DEVICE` | `gpu` | `cpu` = the CPU engine (2B, 4B, 9B). Kindi also uses the CPU engine when CuPy is not installed |
 | `KINDI_CPU_CACHE` | `~/.cache/kindi` | the folder for the built CPU library; the file is keyed by host CPU and compiler (`libkcpu-<key>.so`) |
 | `KINDI_TP` | (auto) | `1` = the plan engine (the default for every model it supports: 1.5-1.9x the single-card engine on the measured card), `0` = the single-card engine |
-| `KINDI_TP_SPLIT` | `equal` | two-card plan: `auto` gives each card a share of GDN groups, attention heads, FFN blocks and output-head rows from its free VRAM (after a 512 MiB reserve; aligned to the pack's Hadamard block, so on the 27B the GDN and attention splits stay equal while FFN and head move). `equal` keeps the historical 50/50 layout. The 10% deadband keeps equal-capacity cards equal under `auto` |
+| `KINDI_TP_SPLIT` | `equal` | Two-card plan: `auto` gives each card a share of GDN groups, attention heads, FFN blocks and output-head rows from its free VRAM (after a 512 MiB reserve; aligned to the pack's Hadamard block, so on the 27B the GDN and attention splits stay equal while FFN and head move). `equal` keeps the historical 50/50 layout. The 10% deadband keeps equal-capacity cards equal under `auto`. The installer selects `auto` for a pair of unequal-capacity cards (for example 6 GB + 8 GB), while equal-capacity pairs retain `equal` |
 | `KINDI_CARDS` | (all, at most 2) | the number of cards for the plan engine |
 | `KINDI_CHUNK` | `256` | prompt tokens per chunk; `0` = one token at a time. The default is `128` on Kepler (sm_30) |
 | `KINDI_CHUNK_MIN` | `32` | the smallest part of a prompt that goes through a chunk |

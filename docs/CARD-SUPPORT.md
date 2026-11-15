@@ -7,9 +7,12 @@ overlap.
 
 Status: **P0 implemented 2026-11-10; heterogeneous pairing added 2026-11-11; not a support claim yet.**
 `install.sh` classifies every sm_80 card as `tc` from its compute capability, pairs any two cards from the
-pair-supported classes (Maxwell, Pascal, Turing, tensor-core or P100) with at least 3,800 MiB each, and gives
-two sm_80 cards the `tc2` profile; mixed-generation pairs use the plain `k1200x2` split. `tests/test_installer_cards.py` runs the installer's own card functions against a fake
-nvidia-smi table. The first GPU verify is recorded on the RTX 4060 Ti: the 2B tc plan is 4/4
+pair-supported classes (Maxwell, Pascal, Turing, tensor-core or P100) with at least 2,400 MiB each
+(the smallest per-card tensor-parallel requirement; model-specific `pair_fits()` gates the 27B at 3,800 MiB
+per card), and gives two sm_80 cards the `tc2` profile; mixed-generation pairs use the plain `k1200x2`
+split. A pair of unequal-capacity cards (for example 6 GB + 8 GB) gets `KINDI_TP_SPLIT=auto` in its
+profile, while equal-capacity pairs retain the equal split. `tests/test_installer_cards.py` runs the
+installer's own card functions against a fake nvidia-smi table. The first GPU verify is recorded on the RTX 4060 Ti: the 2B tc plan is 4/4
 token-exact, the 4B tc plan is 3 exact + 1 tie (FD fallback), the 9B tc plan is 4/4 with `KINDI_TC_HP=1`, which HB-4096 packs now select automatically (the default activations flip one token), the 27B tc plan passes
 (3 exact + 1 llama.cpp tie at token 14, 38.9 tok/s in the 2026-11-11 one-pass matrix), and the plain 4B/9B paths are 4/4. The P106-100 single-card 2B/4B/9B offer and the two-card 27B offer are now covered by
 `tests/test_installer_cards.py`, but no P106 has been measured. The dense Bonsai
@@ -72,8 +75,8 @@ matrix table is in [CARDS.md](CARDS.md#verify-matrix-rtx-4060-ti).
 | gate | current behaviour | consequence for this goal |
 |---|---|---|
 | install.sh `card_class()` | `tc` for every compute capability 8.0 and later; `turing` for sm_75 with tensor cores; `pascal8` for 61–79 at 7,500 MiB or more; `p100` for sm_60 at 12,000 MiB or more; below 50 is `kepler`; everything else is `maxwell` | **The RTX 4060 Ti 8 GB is now `tc`**, so the tensor-core profile is offered; `profile_of()` picks a 24,576-token context for an 8 GB tc card instead of the 131,072-token 10 GB+ default. |
-| install.sh `pair_ok()` | any two cards from maxwell, pascal8, turing, tc or p100 with at least 3,800 MiB each; Kepler, 2 GB and unsupported cards stay out; mixed generations use the plain split | **Dual P106/P4000, M4000/P4000, RTX 4000/4060 Ti and other mixed pairs are now offered.** The 2 GB GT 1030 pair, Kepler pairs and unsupported cards are rejected. No mixed-card GPU run has been recorded. |
-| install.sh `profile_of()` dual branch | two sm_80+ cards get `tc2`: `KINDI_CARDS=2`, `KINDI_TC=1`, `KINDI_FD=1`, `KINDI_ATT_TC=1`, `KINDI_TC_TMAX=4`, a 512 MiB exchange reserve, and a context from the smaller card (24,576 below 9.5 GB, 65,536 above); speculative decoding is off | Two Ada/Blackwell cards now use the tensor-core plan path. Spec remains off until the P1 two-card verify passes. Legacy and mixed pairs keep `k1200x2`; a pre-6.0 + 6.0-or-newer pair adds `KINDI_G5=0` so both cards use 2-bit weights. |
+| install.sh `pair_ok()` | any two cards from maxwell, pascal8, turing, tc or p100 with at least 2,400 MiB each (the smallest per-card tensor-parallel requirement; model-specific `pair_fits()` gates the 27B at 3,800 MiB per card); Kepler, 2 GB and unsupported cards stay out; mixed generations use the plain split | **Dual P106/P4000, M4000/P4000, RTX 4000/4060 Ti and other mixed pairs are now offered.** The 2 GB GT 1030 pair, Kepler pairs and unsupported cards are rejected. No mixed-card GPU run has been recorded. |
+| install.sh `profile_of()` dual branch | two sm_80+ cards get `tc2`: `KINDI_CARDS=2`, `KINDI_TC=1`, `KINDI_FD=1`, `KINDI_ATT_TC=1`, `KINDI_TC_TMAX=4`, a 512 MiB exchange reserve, and a context from the smaller card (24,576 below 9.5 GB, 65,536 above); speculative decoding is off. Pairs of unequal capacity additionally get `KINDI_TP_SPLIT=auto`, so the larger card takes the larger aligned share | Two Ada/Blackwell cards now use the tensor-core plan path. Spec remains off until the P1 two-card verify passes. Legacy and mixed pairs keep `k1200x2`; a pre-6.0 + 6.0-or-newer pair adds `KINDI_G5=0` so both cards use 2-bit weights. |
 | install.sh `card_models()` | `pascal8` offers 27B; `maxwell` offers 9B/Nemotron/4B/2B; `tc` offers 27B/Nemotron/9B/4B/2B | A 6 GB P106 is offered up to 9B alone and 27B as a pair. A 2 GB GT 1030 is offered 4B/2B and does not pair. |
 | `kindi/tc.py` | compiles for compute_75 PTX, raises the PTX header to 7.1/sm_8x, lets the driver JIT; `supported()` accepts major >= 8 or major == 6 | Ada and Blackwell depend on this PTX patch; it is exactly the fragile path that needs a real test on the 4060 Ti and 5060 Ti. |
 | `kindi/engine.py` | `_cupy_arch_fix()` caps CuPy 9.6’s NVRTC target to the toolkit maximum | Necessary for Blackwell with the CUDA 10.2 image, but it means the image is not a native sm_89/sm_120 toolchain. |

@@ -809,9 +809,13 @@ if [ "$GPU" != cpu ]; then
     PAIR=""
     if [ "$TRIPLE_MULTI" = 0 ] && [ -n "$pa" ] && pair_ok "$pa" "$pb"; then
       PAIR="${GIDX[$pa]},${GIDX[$pb]}"
+      # A pair of unequal-capacity cards gets the proportional (uneven) tensor split; pairs with
+      # the same capacity keep the historical equal layout.
+      PAIR_LABEL="split over both cards"
+      [ "${GMEM[$pa]}" != "${GMEM[$pb]}" ] && PAIR_LABEL="uneven split over both cards"
       # per model: offer the split only when each card can hold its weight share (pair_fits)
-      want 27b && pair_fits "$pa" "$pb" 27b && add_cfg "cuda|27b|$PAIR" "$(model_label 27b) on GPUs ${PAIR}, split over both cards"
-      want nemotron && pair_fits "$pa" "$pb" nemotron && add_cfg "cuda|nemotron|$PAIR" "$(model_label nemotron) on GPUs ${PAIR}, split over both cards"
+      want 27b && pair_fits "$pa" "$pb" 27b && add_cfg "cuda|27b|$PAIR" "$(model_label 27b) on GPUs ${PAIR}, ${PAIR_LABEL}"
+      want nemotron && pair_fits "$pa" "$pb" nemotron && add_cfg "cuda|nemotron|$PAIR" "$(model_label nemotron) on GPUs ${PAIR}, ${PAIR_LABEL}"
     elif [ "$TRIPLE_MULTI" = 0 ] && [[ "$GPU" == *,* ]] && ! { want nanbeige && nb_cards "$pa" "$pb" >/dev/null; }; then die "GPUs ${GPU} cannot run one model together (two supported cards with at least 4 GB each, such as a P106 and a P4000, can; Nanbeige 33B needs sm_80 cards or Tesla P100s with 16.2 GB in total, plus 0.7 GB for each more card)"
     fi
     if { [[ "$GPU" != *,* ]] || [ "$TRIPLE_MULTI" = 1 ]; } && [[ "$GPU" != amd* ]]; then
@@ -975,9 +979,15 @@ profile_of() {
         ENV+=(-e KINDI_CARDS=2 -e KINDI_TC=1 -e KINDI_FD=1 -e KINDI_ATT_TC=1 -e KINDI_TC_TMAX=4
               -e KINDI_CKPT_VRAM=1 -e KINDI_MEM_RESERVE_MB=512 -e KINDI_SPEC=0
               -e KINDI_REPEAT_STOP=1 -e KINDI_CHECKPOINT_BUDGET_MB=4096)
+        # Uneven cards get an uneven tensor split: the engine gives the larger card the larger
+        # aligned share from its free VRAM. Equal-capacity pairs keep the historical equal layout.
+        [ "${GMEM[$k]}" != "${GMEM[$k2]}" ] && ENV+=(-e KINDI_TP_SPLIT=auto)
       else
         PROFILE=k1200x2; C=${CTX/auto/24576}; MEM=12g
         ENV+=(-e KINDI_CARDS=2 -e KINDI_REPEAT_STOP=1 -e KINDI_CHECKPOINT_BUDGET_MB=4096)
+        # Uneven cards get an uneven tensor split: the engine gives the larger card the larger
+        # aligned share from its free VRAM. Equal-capacity pairs keep the historical equal layout.
+        [ "${GMEM[$k]}" != "${GMEM[$k2]}" ] && ENV+=(-e KINDI_TP_SPLIT=auto)
         # Maxwell cards (major < 6) use the 2-bit decode; Pascal and newer use the 5-trit path.
         # A mixed pair forces the 2-bit path on both so one plan is valid on each card.
         g5a=0; if [ "${GCC[$k]/./}" -ge 60 ]; then g5a=1; fi

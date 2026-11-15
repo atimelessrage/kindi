@@ -232,7 +232,9 @@ including the 8 GB RTX 4060 Ti, whose default context is 24,576 tokens. Any two 
 classes (Maxwell, Pascal, Turing, tensor-core or P100) with at least 4 GB each can be paired. Two sm_80 cards
 get the `tc2` profile (tensor cores on, speculative decoding off until the two-card verify is recorded); mixed
 generations use the plain `k1200x2` split, and a pre-6.0 + 6.0-or-newer pair adds `KINDI_G5=0` so both cards
-use the 2-bit path. Kepler stays single-card. No mixed-card execution has been recorded yet.
+use the 2-bit path. A pair of unequal-capacity cards (for example a 6 GB card with an 8 GB card) selects
+`KINDI_TP_SPLIT=auto`, so the larger card receives the larger aligned share; equal-capacity pairs retain the
+historical equal split. Kepler stays single-card. No mixed-card execution has been recorded yet.
 
 | card | what we measured |
 |---|---|
