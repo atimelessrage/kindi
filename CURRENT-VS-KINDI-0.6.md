@@ -15,13 +15,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `4e0f17f`:
+HEAD `48d3ab0`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 334 commits
-git diff --shortstat v0.6.0..HEAD          # 401 files, +53,830/-1020
+git log --oneline v0.6.0..HEAD | wc -l     # 337 commits
+git diff --shortstat v0.6.0..HEAD          # 401 files, +53,986/-1020
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -269,6 +269,20 @@ arbitrary-draft-GGUF harness stays a separate gate.
 - Diff vs `v0.6.0` grew 400 files (+53,480 → +53,567 insertions);
   still zero file deletions.
 - §20: tandem split timings on `/metrics`.
+
+## 24. What changed in the 2026-11-15 sessions protection round
+
+Sessions records now carry `protected` and `unread` flags.
+`unread` is raised by record/append/import and cleared by
+`kindi sessions show` or `POST /sessions/<id>/read`; `protected`
+is set by `kindi sessions protect SESSION_ID [--off]` and makes
+prune keep the record (flagged in dry runs and in `stats`).
+List/triage show `[unread]`/`[protected]` markers; the server
+summaries and both rounds of API docs carry the flags. This
+closes the REQ-0016 queued `unread` + ownership items.
+
+- Diff vs `v0.6.0` grew 401 files (+53,830 → +53,986 insertions);
+  still zero file deletions.
 
 ## 23. What changed in the 2026-11-15 ReBAR 9B measurement
 
