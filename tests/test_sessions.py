@@ -96,6 +96,53 @@ def test_chat_resume_seed_and_append_round_trip(tmp_path, monkeypatch):
         cli._resume_chat(cfg, "0" * 12)
 
 
+def _backdate(st, sid, days):
+    import datetime
+    import json as _json
+    rec_path = st.path(sid)
+    data = _json.loads(open(rec_path, encoding="utf-8").read())
+    when = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days)
+    data["updated"] = when.isoformat(timespec="seconds")
+    open(rec_path, "w", encoding="utf-8").write(_json.dumps(data, indent=2, sort_keys=True) + "\n")
+
+
+def test_prune_only_removes_old_resolved_by_default(tmp_path):
+    st = SessionStore(str(tmp_path))
+    old_resolved = st.create(title="old resolved")
+    st.set_status(old_resolved["id"], "resolved")
+    _backdate(st, old_resolved["id"], 60)
+    old_open = st.create(title="old open")
+    _backdate(st, old_open["id"], 60)
+    fresh = st.create(title="fresh")
+
+    would = st.prune(older_than_days=30, dry_run=True)
+    assert [r["id"] for r in would] == [old_resolved["id"]]
+    assert st.get(old_resolved["id"]) is not None         # dry run deletes nothing
+    gone = st.prune(older_than_days=30)
+    assert [r["id"] for r in gone] == [old_resolved["id"]]
+    assert sorted(r["id"] for r in st.list()) == sorted([old_open["id"], fresh["id"]])
+    # --all widens the scope to every status once its file is old enough
+    gone_all = st.prune(older_than_days=30, statuses=None)
+    assert [r["id"] for r in gone_all] == [old_open["id"]]
+    with pytest.raises(ValueError, match="non-negative"):
+        st.prune(older_than_days=-1)
+
+
+def test_sessions_prune_cli(tmp_path, capsys):
+    from kindi.__main__ import main
+    root = str(tmp_path)
+    st = SessionStore(root + "/sessions")
+    rec = st.create(title="old resolved")
+    st.set_status(rec["id"], "resolved")
+    _backdate(st, rec["id"], 60)
+    assert main(["--state-dir", root, "sessions", "prune", "--days", "30", "--dry-run"]) == 0
+    out = capsys.readouterr().out
+    assert "would prune 1 session(s)" in out and rec["id"] in out
+    assert main(["--state-dir", root, "sessions", "prune", "--days", "30"]) == 0
+    assert "pruned 1 session(s)" in capsys.readouterr().out
+    assert st.list() == []
+
+
 def test_slug_and_hash(tmp_path):
     assert slug("  Hello, World!  ") == "hello-world"
     assert slug("") == "session"

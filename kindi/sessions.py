@@ -73,6 +73,32 @@ class SessionStore(object):
         self._save(rec)
         return rec
 
+    # ---- retention ----
+    def prune(self, older_than_days=30, statuses=("resolved",), dry_run=False):
+        """Delete (or list) sessions whose last update is older than the cutoff.
+
+        By default only ``resolved`` sessions go; pass ``statuses`` to widen
+        the scope (``None`` means any status). Returns the pruned client-side
+        records (id, title, status, updated) either way.
+        """
+        if older_than_days is None or int(older_than_days) < 0:
+            raise ValueError("older_than_days must be a non-negative number")
+        cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=int(older_than_days))
+        out = []
+        for rec in self.list():
+            if statuses is not None and rec.get("status") not in statuses:
+                continue
+            try:
+                when = datetime.datetime.fromisoformat(str(rec.get("updated") or ""))
+            except ValueError:
+                continue          # an unparseable timestamp is not evidence it is old
+            if when < cutoff:
+                out.append({"id": rec["id"], "title": rec.get("title", "untitled"),
+                            "status": rec.get("status"), "updated": rec.get("updated")})
+                if not dry_run:
+                    os.remove(self.path(rec["id"]))
+        return out
+
     # ---- triage and tags ----
     def set_status(self, rec_or_id, status):
         if status not in STATUSES:

@@ -93,6 +93,16 @@ def cmd_sessions(cfg, a):
         rec = st.import_markdown(text)
         log("imported %s (%d msgs)" % (rec["id"], len(rec["messages"])))
         return 0
+    if a.action == "prune":
+        rows = st.prune(older_than_days=a.days, statuses=None if a.all else ("resolved",),
+                        dry_run=bool(a.dry_run))
+        if not rows:
+            log("no sessions older than %d days" % a.days)
+            return 0
+        for r in rows:
+            log("%s  %-24s %-13s updated %s" % (r["id"], r["title"][:24], r["status"], r["updated"]))
+        log("%s %d session(s)" % ("would prune" if a.dry_run else "pruned", len(rows)))
+        return 0
     raise SystemExit("kindi sessions: unknown action")
 
 
@@ -454,11 +464,14 @@ def main(argv=None):
     s.add_argument("--resume", metavar="SESSION_ID", help="continue a saved session (kindi sessions list) instead of starting a new one; new turns append back to it")
     _tandem_args(s)
     s = sub.add_parser("sessions", help="list, triage, tag and export chat sessions (state_dir/sessions)")
-    s.add_argument("action", choices=("list", "show", "export", "triage", "tag", "status", "import"))
+    s.add_argument("action", choices=("list", "show", "export", "triage", "tag", "status", "import", "prune"))
     s.add_argument("id", nargs="*", help="session id (show/export/tag/status) or file (import, - for stdin)")
     s.add_argument("--out", help="export directory (default: current directory)")
     s.add_argument("--tag", help="tag filter (list) or tag to add (tag)")
     s.add_argument("--status", help="status filter (list) or new status (status)")
+    s.add_argument("--days", type=int, default=30, help="prune: delete sessions not updated for this many days")
+    s.add_argument("--all", action="store_true", help="prune: delete sessions of any status (default: resolved only)")
+    s.add_argument("--dry-run", action="store_true", help="prune: list what would be deleted without deleting")
     s = sub.add_parser("head", help="exact or fast output head for a running server")
     s.add_argument("mode", choices=("exact", "fast"))
     sub.add_parser("info", help="show configuration, pack and GPU")
