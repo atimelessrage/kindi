@@ -106,7 +106,8 @@ class SessionStore(object):
             if not name.endswith(".json"):
                 continue
             try:
-                rec = json.load(open(os.path.join(self.root, name), encoding="utf-8"))
+                with open(os.path.join(self.root, name), encoding="utf-8") as f:
+                    rec = json.load(f)
             except (OSError, ValueError):
                 continue
             if status is not None and rec.get("status") != status:
@@ -167,7 +168,9 @@ class SessionStore(object):
 
     # ---- internals ----
     def _save(self, rec):
-        tmp = self.path(rec["id"]) + ".tmp"
+        # a unique tmp per write: two writers must never share one path, or one
+        # truncating it mid-write leaves a torn file behind that reads as nothing
+        tmp = "%s.%s.tmp" % (self.path(rec["id"]), uuid.uuid4().hex[:8])
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(rec, f, indent=2, sort_keys=True)
             f.write("\n")

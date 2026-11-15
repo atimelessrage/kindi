@@ -1475,6 +1475,11 @@ def create_app(cfg, log=print):
     from .sessions import STATUSES as SESSION_STATUSES
     from .sessions import SessionStore
 
+    # Each request gets its own store (so list/show see the latest files), so the lock must live here,
+    # not on the store: two concurrent status/tag posts would otherwise race their read-modify-write
+    # and one update would silently overwrite the other.
+    _SESSIONS_LOCK = threading.Lock()
+
     def _session_store():
         return SessionStore(os.path.join(cfg.get("state_dir") or os.path.join(os.getcwd(), ".kindi"), "sessions"))
 
@@ -1502,14 +1507,16 @@ def create_app(cfg, log=print):
         if status is not None and status not in SESSION_STATUSES:
             return _err(400, "status must be one of %s (got %r)" % (list(SESSION_STATUSES), status),
                         "invalid_request_error", param="status")
-        rows = _session_store().list(status=status, tag=tag)
+        with _SESSIONS_LOCK:
+            rows = _session_store().list(status=status, tag=tag)
         return {"sessions": [_session_summary(r) for r in rows]}
 
     @app.get("/sessions/{sid}")
     def sessions_show(request: Request, sid: str):
         if not _auth(request):
             return _err(401, "invalid API key", "authentication_error")
-        rec, err = _session_or_none(sid)
+        with _SESSIONS_LOCK:
+            rec, err = _session_or_none(sid)
         if err is not None:
             return err
         return rec
@@ -1518,10 +1525,12 @@ def create_app(cfg, log=print):
     def sessions_export(request: Request, sid: str):
         if not _auth(request):
             return _err(401, "invalid API key", "authentication_error")
-        rec, err = _session_or_none(sid)
-        if err is not None:
-            return err
-        return Response(_session_store().export_markdown(rec), media_type="text/markdown; charset=utf-8")
+        with _SESSIONS_LOCK:
+            rec, err = _session_or_none(sid)
+            if err is not None:
+                return err
+            text = _session_store().export_markdown(rec)
+        return Response(text, media_type="text/markdown; charset=utf-8")
 
     async def _sessions_post(request: Request, sid: str, action):
         if not _auth(request):
@@ -1534,20 +1543,23 @@ def create_app(cfg, log=print):
             return _err(400, str(e))
         if not isinstance(body, dict):
             return _err(400, "the body must be a JSON object")
-        rec, err = _session_or_none(sid)
-        if err is not None:
-            return err
-        store = _session_store()
         if action == "status":
             status = body.get("status")
             if status not in SESSION_STATUSES:
                 return _err(400, "status must be one of %s (got %r)" % (list(SESSION_STATUSES), status),
                             "invalid_request_error", param="status")
-            return _session_summary(store.set_status(rec["id"], status))
-        tag = body.get("tag")
-        if not isinstance(tag, str) or not tag.strip():
-            return _err(400, "tag must be a non-empty string", "invalid_request_error", param="tag")
-        return _session_summary(store.add_tag(rec["id"], tag))
+        else:
+            tag = body.get("tag")
+            if not isinstance(tag, str) or not tag.strip():
+                return _err(400, "tag must be a non-empty string", "invalid_request_error", param="tag")
+        with _SESSIONS_LOCK:
+            rec, err = _session_or_none(sid)
+            if err is not None:
+                return err
+            store = _session_store()
+            if action == "status":
+                return _session_summary(store.set_status(rec["id"], body.get("status")))
+            return _session_summary(store.add_tag(rec["id"], body.get("tag")))
 
     async def _sessions_status(request: Request, sid: str):
         return await _sessions_post(request, sid, "status")

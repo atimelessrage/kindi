@@ -144,6 +144,36 @@ def test_sessions_missing_and_traversal_ids(client):
         assert r.status_code in (400, 404), (sid, r.text)
 
 
+def test_sessions_concurrent_mutations_do_not_lose_updates(client):
+    """Each request builds its own store, so without the shared lock two
+    concurrent posts would race their read-modify-write and one update would
+    silently win. Both must survive."""
+    import threading
+
+    c, _, store = client
+    sid = store.create(title="race")["id"]
+    errors = []
+
+    def post(path, payload):
+        try:
+            for _ in range(5):
+                r = c.post(path, json=payload)
+                assert r.status_code == 200, r.text
+        except Exception as e:  # noqa: BLE001
+            errors.append(e)
+
+    t1 = threading.Thread(target=post, args=("/sessions/%s/tags" % sid, {"tag": "concurrent"}))
+    t2 = threading.Thread(target=post, args=("/sessions/%s/status" % sid, {"status": "resolved"}))
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
+    assert not errors
+    rec = store.get(sid)
+    assert rec["status"] == "resolved"
+    assert "concurrent" in rec["tags"]
+
+
 def test_sessions_require_the_api_key(auth_client):
     c = auth_client
     assert c.get("/sessions").status_code == 401
