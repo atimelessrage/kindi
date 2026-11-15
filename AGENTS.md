@@ -10,7 +10,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `339b29e` on `freebuff/tandem-cpu-recovery` (`main` at `339b29e`; guarded by `tests/test_agents_handoff.py`). Full suite last measured at 49952e6: 627 passed, 20 skipped, 2 setup errors (clang). Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset (360 files, +47,505/−454, no deletions); comparison report in `CURRENT-VS-KINDI-0.6.md`.
+- **HEAD:** `74de8b3` on `freebuff/tandem-cpu-recovery` (`main` at `74de8b3`; guarded by `tests/test_agents_handoff.py`). Full suite last measured at 49952e6: 627 passed, 20 skipped, 2 setup errors (clang). Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset (360 files, +47,505/−454, no deletions); comparison report in `CURRENT-VS-KINDI-0.6.md`.
 - **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
   512/4K/8K; 2B CPU-layer sweep; joint checkpoint 149.6 MiB on the 27B at 54.5-61.5 ms
   save), owned-slice CPU load, `kindi bench --sample-vram` sampled-peak VRAM, multi-ISA CPU
@@ -56,8 +56,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `339b29e` | main checkout; clean |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `339b29e` | this session; identical to `main` |
+| `T:/kindi` | `main` | `74de8b3` | main checkout; clean |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `74de8b3` | this session; identical to `main` |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
