@@ -15,13 +15,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `d3e23a5`:
+HEAD `4e0f17f`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 331 commits
-git diff --shortstat v0.6.0..HEAD          # 400 files, +53,760/-1020
+git log --oneline v0.6.0..HEAD | wc -l     # 334 commits
+git diff --shortstat v0.6.0..HEAD          # 401 files, +53,830/-1020
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -269,6 +269,20 @@ arbitrary-draft-GGUF harness stays a separate gate.
 - Diff vs `v0.6.0` grew 400 files (+53,480 → +53,567 insertions);
   still zero file deletions.
 - §20: tandem split timings on `/metrics`.
+
+## 23. What changed in the 2026-11-15 ReBAR 9B measurement
+
+ReBAR is on (BAR1 8192 MiB, PCIe Gen3 x8 slot, driver 617.42).
+9B verify matrix: plain 4/4 @ 73.1 tok/s (bench 61.4 @ ctx 24576),
+tc 4/4 @ 114.7 tok/s. The tc pass is the Hadamard-4096 HP path
+landing, not ReBAR; plain is −7.9% cross-day vs the pre-ReBAR
+2026-11-10 cell (79.4) — no resident-compute gain, as expected for
+a fully resident 2 GB model. A BIOS-toggle A/B is documented as
+the follow-up; the 27B spill paths are where ReBAR should show.
+Evidence: `docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-rebar-9b/`.
+
+- Diff vs `v0.6.0` grew 401 files (+53,760 → +53,830 insertions);
+  still zero file deletions.
 
 ## 22. What changed in the 2026-11-15 legacy Fermi path
 
