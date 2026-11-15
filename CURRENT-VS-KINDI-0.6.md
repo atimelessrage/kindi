@@ -1,7 +1,8 @@
 # Current worktree vs stock Kindi 0.6.0
 
 Report date: **2026-11-15** (refresh of the 2026-11-14 report; §7 records
-what changed since, and §8 the 2026-11-15 sessions-endpoint round). This file is the successor to
+what changed since, §8 the 2026-11-15 sessions-endpoint round, and §9 the
+2026-11-15 unsupported-field rejection round). This file is the successor to
 `CURRENT-VS-KINDI-0.5.md` §25: that file's §§1–24 are the history against
 0.5.0 and §25 is the first evaluation against 0.6.0; this file carries the
 current one. It separates verified behavior from recorded evidence,
@@ -12,13 +13,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `982f7ed`:
+HEAD `04518f0`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 266 commits
-git diff --shortstat v0.6.0..HEAD          # 398 files, +52,691/-993
+git log --oneline v0.6.0..HEAD | wc -l     # 271 commits
+git diff --shortstat v0.6.0..HEAD          # 398 files, +52,755/-993
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -71,6 +72,7 @@ not a code bug — the two tests pass with clang present).
 | **4B conversion provenance** | fresh `kindi convert` of the downloaded PTQ1_0 GGUF reproduces the 4B pack byte-identically (sha256); converted pack verifies 3+tie like the reference; 9B/27B pack verify re-run 4/4 (2026-11-15) |
 | Requirement-based coverage + per-module floors | `tools/check_coverage.py` + `tests/coverage_floors.json` in CPU CI (audit M4); requirement-traceable CPU tests |
 | **Server-side `/sessions` endpoints** (`kindi/server.py`, REQ-0016) | 2026-11-15: `GET /sessions` (status/tag filters), `GET /sessions/<id>`, `GET /sessions/<id>/export` (raw markdown), `POST /sessions/<id>/status`, `POST /sessions/<id>/tags` over the existing `SessionStore` — host-only (no engine/cache/GPU), API-key gated, enveloped 400/404, strict 12-hex id check so path-shaped ids never reach a file read. Pinned by `tests/test_server_sessions.py` (stub engine, no GPU) |
+| **Loud rejection of unsupported `n` / `response_format`** (`kindi/server.py`, REQ-0018 decision D2) | 2026-11-15: `n` values other than 1 and any structured-output `response_format` type (`json_schema`, `json_object`) return an enveloped 400 before the engine or prompt cache is touched, instead of being silently ignored. `n = 1` and `{"type": "text"}` remain accepted. Pinned by malformed-request and default-acceptance tests in `tests/test_server.py` (stub engine, no GPU). Constrained decoding itself is still open (T5.4) |
 | Audit dispositions (2026-11-15) | the 202611150853 audit verified item-by-item on the current tree: handoff-guard findings already fixed, coverage floors already landed, hardware items already recorded unverified; hash-bump hook declined by design, fork gap unfixable (push 403) |
 | Audit fixes: optional-accelerator degradation, `kindi_cache_*` telemetry, reference-config section | 2026-11-14 audit round (N1/N3–N5/D3/D4) |
 
@@ -136,6 +138,17 @@ arbitrary-draft-GGUF harness stays a separate gate.
   `docs/MIXED-CARD-ROADMAP.md` for the per-item gates.
 - GPU evidence (gitignored bench-logs): `bench-logs/req0015-gate-27b/`
   (draft-policy 27B gate), `bench-logs/convert-4b-verify/` (4B provenance).
+
+## 9. What changed in the 2026-11-15 unsupported-field rejection round
+
+- New beyond-0.6 behavior: `n > 1` and structured-output
+  `response_format` are rejected with an enveloped 400 (REQ-0018, decision
+  D2); previously both were silently ignored. No generation, sampler or
+  kernel code changed.
+- Documentation updated alongside: `docs/API.md` request-field table and
+  D2 status, REQ-0018 evidence, ROADMAP agent-API bullet, CHANGELOG.
+- Diff vs `v0.6.0` grew 398 files (+52,691 → +52,755 insertions);
+  still zero file deletions.
 
 ## 8. What changed in the 2026-11-15 sessions round
 
