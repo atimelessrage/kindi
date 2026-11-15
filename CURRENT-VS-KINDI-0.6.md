@@ -15,13 +15,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `9938553`:
+HEAD `28ff801`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 311 commits
-git diff --shortstat v0.6.0..HEAD          # 398 files, +53,420/-998
+git log --oneline v0.6.0..HEAD | wc -l     # 315 commits
+git diff --shortstat v0.6.0..HEAD          # 400 files, +53,480/-1002
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -242,6 +242,21 @@ arbitrary-draft-GGUF harness stays a separate gate.
   kernel-bound; deeper CPU speed now means `kcpu.c` kernel work
   measured against this baseline (`docs/BENCHMARKS.md`).
 - Diff vs `v0.6.0` grew 398 files (+53,292 → +53,420 insertions);
+  still zero file deletions.
+- §18: the stop fix extended to the Gemma, Lightning and Nanbeige
+  generation loops; `dsv41` is already incremental.
+
+## 18. What changed in the 2026-11-15 generation-loop stop fix (round 2)
+
+- The `stop_from` cursor fix from §17 is now applied to the three
+  remaining generation loops that had the identical whole-text scan:
+  the Gemma path in `kindi/server.py` (with the same
+  first-in-configured-order + first-occurrence truncation), and the
+  Lightning (`kindi/lightning_gen.py`) and Nanbeige
+  (`kindi/nanbeige_gen.py`) loops (boolean check).
+- `dsv41_server.py`'s `Stream` already searches incrementally in a
+  leftover buffer and was verified not affected.
+- Diff vs `v0.6.0` grew 400 files (+53,420 → +53,480 insertions);
   still zero file deletions.
 
 ## 11. What changed in the 2026-11-15 second audit triage
