@@ -24,10 +24,10 @@ the state at that commit.
 | [REQ-0012](requirements/REQ-0012.md) | K8/V4 is experimental and quarantined | experimental | `f25509f9ba89` | `f25509f9ba89` |
 | [REQ-0013](requirements/REQ-0013.md) | A tandem's GPU owner frees the layers it does not run | active | `0d1d5fd349b5` | `374992175443` |
 | [REQ-0014](requirements/REQ-0014.md) | FP8 E4M3 K/V cache, decided by the KLD gate | experimental | `9e50c538f003` | `8c9c56d7c394` |
-| [REQ-0015](requirements/REQ-0015.md) | Adaptive draft length from measured acceptance and confidence | experimental | `870425ef81d5` | `ed52db1e56ac` |
+| [REQ-0015](requirements/REQ-0015.md) | Adaptive draft length from measured acceptance and confidence | experimental | `870425ef81d5` | `03aff6fede1f` |
 | [REQ-0016](requirements/REQ-0016.md) | Chat session history with triage, tags, and raw-markdown export | experimental | `e9b46936da57` | `e9b46936da57` |
 | [REQ-0017](requirements/REQ-0017.md) | Uneven tensor splits for unequal-capacity GPUs | experimental | `74ee40d79aa7` | `74ee40d79aa7` |
-| [REQ-0018](requirements/REQ-0018.md) | Agent-grade API: structured output, tool-call conformance, concurrency | proposed | `f9eff6db05f0` | `f9eff6db05f0` |
+| [REQ-0018](requirements/REQ-0018.md) | Agent-grade API: structured output, tool-call conformance, concurrency | proposed | `f9eff6db05f0` | `03aff6fede1f` |
 | [REQ-0019](requirements/REQ-0019.md) | Backend plugin interface (contract, registry, adapters) | experimental | `a40269e2ce91` | `a40269e2ce91` |
 | [REQ-0020](requirements/REQ-0020.md) | Intel Arc A770 (Alchemist/DG2) support via a SYCL/oneAPI backend | proposed | `147e3dc61f78` | `147e3dc61f78` |
 | [REQ-0021](requirements/REQ-0021.md) | CPU + Intel integrated-graphics tandem (SYCL/Level Zero) | proposed | `ac0c767005ba` | `eec5bc790a66` |
