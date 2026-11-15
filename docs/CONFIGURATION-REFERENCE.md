@@ -157,12 +157,12 @@ variables, and are therefore not listed twice here.
 | `KINDI_G4_PAD` | `1` | `kindi/gemma4.py:599` |
 | `KINDI_G4_PARK_MAX` | `4` | `kindi/gemma4_cache.py:35` |
 | `KINDI_G4_PLE_HOST` | `auto` | `kindi/gemma4.py:482` |
-| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:567` |
+| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:572` |
 | `KINDI_G4_PROMPT_CACHE` | `1` | `kindi/gemma4_cache.py:33` |
 | `KINDI_G4_Q5_DP4A` | `1` | `kindi/gemma4.py:80` |
 | `KINDI_G4_RESERVE_MB` | `1024` | `kindi/gemma4.py:543` |
 | `KINDI_G4_TC` | `1` | `kindi/gemma4.py:88` (+3 more) |
-| `KINDI_G4_TP` | `auto` | `kindi/server.py:404` |
+| `KINDI_G4_TP` | `auto` | `kindi/server.py:409` |
 | `KINDI_G4_WARPS` | `2560` | `kindi/gemma4.py:123` |
 | `KINDI_G5` | (empty) | `kindi/tp.py:459` |
 | `KINDI_G5L` | `"0" if rt.is_hip and os.environ.get("KINDI_TC", "0") != "1" else "1"` | `kindi/tp.py:462` |
@@ -255,7 +255,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_SPEC_SAMPLE` | `1` | `kindi/spec.py:1283` |
 | `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1896` |
 | `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:194` |
-| `KINDI_TANDEM_DEBUG_TIMING` | `0` | `kindi/tandem.py:584` |
+| `KINDI_TANDEM_DEBUG_TIMING` | `0` | `kindi/tandem.py:587` |
 | `KINDI_TANDEM_GPU` | `auto` | `kindi/plan.py:165` (+2 more) |
 | `KINDI_TANDEM_RATIO` | (unset) | `kindi/tandem.py:268` |
 | `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/plan.py:397` (+2 more) |

@@ -120,6 +120,12 @@ def _environ(node):
             and isinstance(node.value, ast.Name) and node.value.id == "os")
 
 
+def _getenv(node):
+    """``os.getenv``: the same read as ``os.environ.get``, spelled differently."""
+    return (isinstance(node, ast.Attribute) and node.attr == "getenv"
+            and isinstance(node.value, ast.Name) and node.value.id == "os")
+
+
 def _default_text(node, src):
     """a literal string's value, or the default expression as it is written"""
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
@@ -143,9 +149,9 @@ def env_vars(paths=None):
         for node in ast.walk(ast.parse(src)):
             name = default = None
             if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-                    and node.func.attr == "get" and _environ(node.func.value)
                     and node.args and isinstance(node.args[0], ast.Constant)
-                    and isinstance(node.args[0].value, str)):
+                    and isinstance(node.args[0].value, str)
+                    and ((_environ(node.func.value) and node.func.attr == "get") or _getenv(node.func))):
                 name = node.args[0].value
                 if len(node.args) > 1:
                     default = _default_text(node.args[1], src)
