@@ -1,11 +1,20 @@
 # CPU + Intel integrated-graphics tandem: investigation
 
-Status: **investigation, 2026-11-15.** No Intel backend exists in Kindi yet (the A770 route in
-[INTEL-ARC.md](INTEL-ARC.md) / [REQ-0020](development/requirements/REQ-0020.md) is the discrete-card
-plan). This page investigates the adjacent question: **tandem (CPU + iGPU layer split) using the
-integrated Intel graphics that ship in a large installed base of CPUs**, and records the route
-decision. Tracked as [REQ-0021](development/requirements/REQ-0021.md) (proposed). **Not a support
-claim.**
+Status: **investigation 2026-11-15; G0 slice implemented 2026-11-15, no kernel yet.** No Intel backend
+exists in Kindi yet (the A770 route in [INTEL-ARC.md](INTEL-ARC.md) /
+[REQ-0020](development/requirements/REQ-0020.md) is the discrete-card plan). This page investigates
+the adjacent question: **tandem (CPU + iGPU layer split) using the integrated Intel graphics that
+ship in a large installed base of CPUs**, and records the route decision. Tracked as
+[REQ-0021](development/requirements/REQ-0021.md) (proposed). **Not a support claim.**
+
+**Implemented (G0 slice, CPU-testable):** `kindi/intel.py` — device discovery from Linux DRM
+sysfs/render nodes, eligibility against the oneAPI floor (unknown PCI ids refused, not assumed),
+the shared-memory budget model (half-RAM cap; Core Ultra 2+ override), pack fit with reserve, and
+the tandem GPU-side contract (`get_hidden`/`set_hidden`/`D`/`vocab`) a future SYCL engine must
+expose. `KINDI_DEVICE=intel` refuses loudly from `kindi/engine.py` naming REQ-0020/0021. Covered
+by `tests/test_intel.py`. The SYCL kernels themselves (G1+) need a supported iGPU to compile and
+verify token-exactness — this host has neither oneAPI nor a 11th-gen+ iGPU, so they are not
+started. The code changes below describe that remaining half.
 
 ## Why this is interesting for Kindi
 

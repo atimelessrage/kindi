@@ -24,6 +24,13 @@
   every module by role with the FROZEN list, the `/v1/chat/completions` request trace,
   per-family chat-template and tool-call locations, and the resolution of every
   `[LOCATE]` in the Feature 4/5 plans.
+- **Intel integrated-graphics G0 slice** ([docs/INTEL-IGPU-TANDEM.md](docs/INTEL-IGPU-TANDEM.md),
+  [REQ-0021](docs/development/requirements/REQ-0021.md)). `kindi/intel.py` discovers iGPUs from
+  Linux DRM sysfs, checks them against the oneAPI floor (unknown PCI ids refused), models the
+  shared-memory budget (half of RAM; Core Ultra override), and checks the tandem GPU-side
+  contract a future SYCL engine must expose. `KINDI_DEVICE=intel` now refuses loudly naming
+  REQ-0020/0021 instead of silently running the CPU engine. No SYCL kernel exists yet — that
+  needs a 11th-gen+ iGPU to compile and verify token-exactness — so this is not a support claim.
 - **Intel Arc A770 purchased** ([docs/INTEL-ARC.md](docs/INTEL-ARC.md),
   [REQ-0020](docs/development/requirements/REQ-0020.md)). One A770 16 GB is in transit
   (not installed); the SYCL/oneAPI route is planned (M0 audit done) and M1 hardware

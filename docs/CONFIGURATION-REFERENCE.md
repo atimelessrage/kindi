@@ -117,7 +117,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_D1` | `0` | `kindi/spec.py:724` |
 | `KINDI_DATA` | `/data` | `kindi/container.py:243` |
 | `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:745` |
-| `KINDI_DEVICE` | `gpu` | `kindi/bench.py:15` (+4 more) |
+| `KINDI_DEVICE` | `gpu` | `kindi/bench.py:15` (+5 more) |
 | `KINDI_DOWNLOAD` | `1` | `kindi/container.py:108` |
 | `KINDI_DP4A` | `"1" if rt.is_hip else "0"` | `kindi/tp.py:463` |
 | `KINDI_DRAFT_POLICY` | `0` | `kindi/spec.py:1109` |
@@ -156,12 +156,12 @@ variables, and are therefore not listed twice here.
 | `KINDI_G4_PAD` | `1` | `kindi/gemma4.py:599` |
 | `KINDI_G4_PARK_MAX` | `4` | `kindi/gemma4_cache.py:35` |
 | `KINDI_G4_PLE_HOST` | `auto` | `kindi/gemma4.py:482` |
-| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:544` |
+| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:545` |
 | `KINDI_G4_PROMPT_CACHE` | `1` | `kindi/gemma4_cache.py:33` |
 | `KINDI_G4_Q5_DP4A` | `1` | `kindi/gemma4.py:80` |
 | `KINDI_G4_RESERVE_MB` | `1024` | `kindi/gemma4.py:543` |
 | `KINDI_G4_TC` | `1` | `kindi/gemma4.py:88` (+3 more) |
-| `KINDI_G4_TP` | `auto` | `kindi/server.py:381` |
+| `KINDI_G4_TP` | `auto` | `kindi/server.py:382` |
 | `KINDI_G4_WARPS` | `2560` | `kindi/gemma4.py:123` |
 | `KINDI_G5` | (empty) | `kindi/tp.py:459` |
 | `KINDI_G5L` | `"0" if rt.is_hip and os.environ.get("KINDI_TC", "0") != "1" else "1"` | `kindi/tp.py:462` |
@@ -263,7 +263,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_TC_DP4A` | `0` | `kindi/tc.py:74` |
 | `KINDI_TC_DUAL` | `1` | `kindi/spec.py:354` |
 | `KINDI_TC_GRAPHS` | `0` | `kindi/spec.py:332` |
-| `KINDI_TC_HP` | `0` | `kindi/engine.py:755` (+1 more) |
+| `KINDI_TC_HP` | `0` | `kindi/engine.py:762` (+1 more) |
 | `KINDI_TC_INC` | (empty) | `kindi/spec.py:179` |
 | `KINDI_TC_LANE` | (empty) | `kindi/tc.py:83` |
 | `KINDI_TC_MM` | `2` | `kindi/chunk.py:302` |
@@ -273,6 +273,6 @@ variables, and are therefore not listed twice here.
 | `KINDI_TC_TUNE` | `0` | `kindi/spec.py:436` (+1 more) |
 | `KINDI_TESTED_CC` | (empty) | `kindi/tc.py:39` |
 | `KINDI_THP` | `0` | `kindi/engine.py:89` |
-| `KINDI_TP` | (empty) | `kindi/engine.py:737` (+2 more) |
+| `KINDI_TP` | (empty) | `kindi/engine.py:744` (+2 more) |
 | `KINDI_TP_SPLIT` | `equal` | `kindi/tp.py:1006` |
 | `KINDI_VERIFY_ON_START` | (unset) | `kindi/container.py:245` |
