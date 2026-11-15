@@ -15,13 +15,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `c78d23f`:
+HEAD `d3e23a5`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 328 commits
-git diff --shortstat v0.6.0..HEAD          # 400 files, +53,722/-1019
+git log --oneline v0.6.0..HEAD | wc -l     # 331 commits
+git diff --shortstat v0.6.0..HEAD          # 400 files, +53,760/-1020
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -269,6 +269,18 @@ arbitrary-draft-GGUF harness stays a separate gate.
 - Diff vs `v0.6.0` grew 400 files (+53,480 → +53,567 insertions);
   still zero file deletions.
 - §20: tandem split timings on `/metrics`.
+
+## 22. What changed in the 2026-11-15 legacy Fermi path
+
+Fermi / pre-Kepler cards now classify as `fermi` in the installer
+rather than the old `unsupported` bucket. They offer no GPU models
+or pairs, skip the NVIDIA container toolkit setup when they are
+the only GPUs, and the installer offers the CPU engine on an AVX
+CPU. This is a graceful-degradation path: no kernel compiles for
+sm_21, so no CUDA support is claimed.
+
+- Diff vs `v0.6.0` grew 400 files (+53,722 → +53,760 insertions);
+  still zero file deletions.
 
 ## 21. What changed in the 2026-11-15 ten-card rig support pass
 
