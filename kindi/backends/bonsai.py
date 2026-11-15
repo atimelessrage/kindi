@@ -128,7 +128,11 @@ class BonsaiBackend(Backend):
             out["engine"] = type(self.engine).__name__
             out["pack"] = self.pack
             out["model"] = str((self.man or {}).get("model") or "")
-            out["vocab"] = int(getattr(self.engine, "vocab", 0) or 0)
+            vocab = getattr(self.engine, "vocab", None)
+            try:
+                out["vocab"] = len(vocab)
+            except TypeError:
+                out["vocab"] = 0
             out["ctx"] = self.ctx
             out["tandem"] = str((self.config or {}).get("tandem") or "off")
         return out
@@ -155,12 +159,15 @@ class BonsaiBackend(Backend):
     def apply_chat_template(self, messages, tools=None, enable_thinking=False):
         from .. import chat
 
-        return chat.render(
+        rendered = chat.render(
             messages,
             tools=tools,
             enable_thinking=enable_thinking,
             variant=self.variant,
         )
+        if isinstance(rendered, tuple):
+            return "".join(rendered)
+        return rendered
 
     # generation ---------------------------------------------------------
 
