@@ -72,9 +72,13 @@ class ContextOverflow(OverflowError):
 class RequestError(ValueError):
     """A malformed client request. It is a 400 and must never touch the prompt cache."""
 
+    def __init__(self, msg, param=None):
+        super().__init__(msg)
+        self.param = param          # the request field at fault, named in the error envelope
 
-def _request_error(msg):
-    raise RequestError(msg)
+
+def _request_error(msg, param=None):
+    raise RequestError(msg, param=param)
 
 
 def _finite_number(value):
@@ -300,20 +304,21 @@ def _validate_request(req, has_vision=False):
     n = req.get("n")
     if n is not None:
         if isinstance(n, bool) or not isinstance(n, int):
-            _request_error("n must be an integer")
+            _request_error("n must be an integer", param="n")
         if n < 1:
-            _request_error("n must be at least 1")
+            _request_error("n must be at least 1", param="n")
         if n > 1:
-            _request_error("multiple completions (n > 1) are not supported")
+            _request_error("multiple completions (n > 1) are not supported", param="n")
     response_format = req.get("response_format")
     if response_format is not None:
         if not isinstance(response_format, dict):
-            _request_error("response_format must be an object")
+            _request_error("response_format must be an object", param="response_format")
         rtype = response_format.get("type")
         if not isinstance(rtype, str):
-            _request_error("response_format.type must be a string")
+            _request_error("response_format.type must be a string", param="response_format")
         if rtype != "text":
-            _request_error("structured output (response_format type %r) is not supported" % rtype)
+            _request_error("structured output (response_format type %r) is not supported" % rtype,
+                           param="response_format")
     if req.get("stream") is not None and not isinstance(req["stream"], bool):
         _request_error("stream must be true or false")
     if req.get("logprobs") is not None and not isinstance(req["logprobs"], bool):
@@ -1310,11 +1315,11 @@ def create_app(cfg, log=print):
         except RequestTooLarge as e:
             return _err(413, str(e), "request_too_large")
         except RequestError as e:
-            return _err(400, str(e))
+            return _err(400, str(e), param=getattr(e, "param", None))
         try:
             req, stream = _ollama_req(body, prompt_mode, has_vision)
         except RequestError as e:
-            return _err(400, str(e))
+            return _err(400, str(e), param=getattr(e, "param", None))
         try:
             gate.enter()
         except QueueFull as e:
@@ -1540,7 +1545,7 @@ def create_app(cfg, log=print):
         except RequestTooLarge as e:
             return _err(413, str(e), "request_too_large")
         except RequestError as e:
-            return _err(400, str(e))
+            return _err(400, str(e), param=getattr(e, "param", None))
         if not isinstance(body, dict):
             return _err(400, "the body must be a JSON object")
         if action == "status":
@@ -1688,14 +1693,14 @@ def create_app(cfg, log=print):
         except RequestTooLarge as e:
             return _err(413, str(e), "request_too_large")
         except RequestError as e:
-            return _err(400, str(e))
+            return _err(400, str(e), param=getattr(e, "param", None))
         try:
             _validate_request(req, has_vision)
         except RequestError as e:
-            return _err(400, str(e))
+            return _err(400, str(e), param=getattr(e, "param", None))
         if req.get("logprobs") and not getattr(K, "supports_logprobs", False):
             return _err(400, "logprobs are not supported by this backend; remove logprobs or use a Gemma 4 pack",
-                        "invalid_request_error")
+                        "invalid_request_error", param="logprobs")
         cid, created = "chatcmpl-" + uuid.uuid4().hex[:24], int(time.time())
         # every request is counted before it waits for the engine: a prompt that does not fit gets its HTTP 400 at
         # once (a queued request used to wait for the request ahead of it, then fail), and a dry run ends here

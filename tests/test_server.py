@@ -122,6 +122,18 @@ MALFORMED = [
 ]
 
 
+def test_unsupported_fields_name_their_param(app_client):
+    client, _ = app_client
+    base = {"messages": [{"role": "user", "content": "hello"}]}
+    for payload, param in (
+            (dict(base, n=2), "n"),
+            (dict(base, response_format={"type": "json_schema"}), "response_format"),
+            (dict(base, response_format={"type": "json_object"}), "response_format")):
+        r = client.post("/v1/chat/completions", json=payload)
+        assert r.status_code == 400, r.text
+        assert r.json()["error"]["param"] == param, r.text
+
+
 def test_default_n_and_text_response_format_are_accepted(app_client):
     client, _ = app_client
     r = client.post("/v1/chat/completions", json={
