@@ -10,7 +10,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `d5a8ba0` on `freebuff/tandem-cpu-recovery` (`main` fast-forwarded separately to `49952e6`; guarded by `tests/test_agents_handoff.py`). Full suite last measured at 07e0640: 618 passed, 11 skipped, 1 warning. Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset (349 files, +45,950/−438, no deletions); comparison report re-baselined vs 0.6.0 in `CURRENT-VS-KINDI-0.5.md` §25.
+- **HEAD:** `05f34de` on both `main` and `freebuff/tandem-cpu-recovery` (identical, clean; guarded by `tests/test_agents_handoff.py`). Full suite last measured at 49952e6: 627 passed, 20 skipped, 2 setup errors (clang). Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset (360 files, +47,505/−454, no deletions); comparison report in `CURRENT-VS-KINDI-0.6.md`.
 - **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
   512/4K/8K; 2B CPU-layer sweep; joint checkpoint 149.6 MiB on the 27B at 54.5-61.5 ms
   save), owned-slice CPU load, `kindi bench --sample-vram` sampled-peak VRAM, multi-ISA CPU
@@ -56,8 +56,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `49952e6` | main checkout; clean; fast-forwarded to the legacy-card commit |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `d5a8ba0` | this session; 0.6.0 comparison report (8 commits past `main`) |
+| `T:/kindi` | `main` | `05f34de` | main checkout; clean; best-of merge of the session branch |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `05f34de` | this session; identical to `main` (best-of merge) |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
@@ -105,6 +105,7 @@ the next agent needs in front of them; when a task finishes, move its row to the
 
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
+| Chief-developer best-of merge to main (2026-11-14) | this worktree | `main` + `freebuff/tandem-cpu-recovery` | `AGENTS.md` | done. Inspected both worktrees (both clean, `main` at `49952e6` a strict ancestor of `05f34de`, 11 commits / 26 files / +1,384 lines ahead: small-MoE, Cascade 2, rig notes, small-MoE table + gate hardening, FP8 codec REQ-0014, draft policy REQ-0015, 0.6.0 report). Fast-forwarded `T:/kindi` `main` to `05f34de` (`git merge --ff-only`, no conflicts, no other agent work to preserve — no staged/uncommitted changes existed in either worktree). Bumped the handoff hashes to the merged HEAD. Checks: project_memory, handoff/docs-links/project-memory tests, compileall, install.sh syntax, diff-check pass. Not pushed (house rule). |
 | CURRENT-VS-KINDI-0.6.md report (2026-11-14) | this worktree | `freebuff/tandem-cpu-recovery` | `CURRENT-VS-KINDI-0.6.md`, `AGENTS.md` | done. Standalone comparison vs stock Kindi 0.6.0 (`179710c`) + `origin/main` (`dce89df`), both ancestors of HEAD. Verifies the strict superset (360 files, +47,505/-454, zero deletions) and records fork-better / worse / unverified items, small-MoE status, legacy-card status, FP8 and draft-policy groundwork. Checks: cascade + draft-policy + dtypes + docs-links 23 passed; superset verified (360 files, zero deletions). |
 | External-suggestions review + adaptive draft policy (2026-11-14) | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/draft_policy.py`, `tests/test_draft_policy.py`, `docs/ROADMAP.md`, `docs/development/requirements/REQ-0015.md`, `AGENTS.md` | done. Review of four outside suggestions: (1) standard llama/qwen dense as a long-term goal, (2) vendor-mixing deferred behind the same-vendor mixed-card phases, (3) Intel Arc already planned in INTEL-ARC.md, (4) generalize drafter harness — start with a pure-python acceptance + entropy draft-length controller (`kindi/draft_policy.py`) so `spec.py` can adopt it after a GPU gate. Review recorded in `docs/ROADMAP.md` 'External suggestions review'; REQ-0015 records the adoption gate. Checks: draft-policy 6 passed; project-memory check passes after history regeneration. |
 | FP8 E4M3/E5M2 host encode (roadmap #8 groundwork) (2026-11-14) | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/dtypes.py`, `tests/test_dtypes.py`, `docs/development/requirements/REQ-0014.md`, `docs/ROADMAP.md`, `AGENTS.md` | done. `kindi/dtypes.py` had the FP8 decode but no encode; `f32_to_fp8` now encodes E4M3/E5M2 round-to-nearest ties-to-even (saturate E4M3 at 448, E5M2 infinities, NaN patterns) with all-pattern round-trip tests. REQ-0014 records the `KINDI_KV=fp8` gate (KLD must beat the q8_0 row; no support claim until a real run). ROADMAP #8 points at it. Checks: 34 focused tests pass; project-memory check passes after history regeneration; hardware KLD run still pending. |
