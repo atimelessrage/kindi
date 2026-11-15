@@ -135,7 +135,10 @@ def env_vars(paths=None):
     for path in (paths if paths is not None else
                  sorted(glob.glob(os.path.join(HERE, "**", "*.py"), recursive=True))):
         src = _read(path)
-        rel = os.path.relpath(path, HERE).replace("\\", "/")
+        try:
+            rel = os.path.relpath(path, HERE).replace("\\", "/")
+        except ValueError:      # a different drive (Windows): show the bare file
+            rel = os.path.basename(path)
         site_file = rel if not rel.startswith("..") else os.path.basename(path)
         for node in ast.walk(ast.parse(src)):
             name = default = None
