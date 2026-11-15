@@ -107,9 +107,12 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   genuinely larger-than-VRAM case is open (2B/4B/9B/27B `cpu-first` throughput is recorded). The MoE
   path has a model-free cache prototype but no backend
   ([MOE-TANDEM.md](MOE-TANDEM.md), [P106.md](P106.md)).
-- **Intel Arc A770:** a separate SYCL/oneAPI backend is planned for one card, two cards and CPU+Arc
-  tandem; the goal, gates and milestones are in [INTEL-ARC.md](INTEL-ARC.md). M0 (architecture audit)
-  is done; M1 is blocked on Arc hardware. This is not a support claim.
+- **Intel Arc A770 ([REQ-0020](development/requirements/REQ-0020.md), proposed):** a separate
+  SYCL/oneAPI backend is planned for one card, two cards and CPU+Arc tandem; the goal, gates and
+  milestones are in [INTEL-ARC.md](INTEL-ARC.md). M0 (architecture audit) is done. **One A770 16 GB
+  was purchased 2026-11-15 and is in transit (not installed)**, so M1 (hardware qualification) is
+  unblocked on arrival — the arrival checklist is in INTEL-ARC.md. The card is registered in the
+  support matrix as `not measured` and is not offered by the installer. This is not a support claim.
 
 ## Long-term model goals
 
@@ -188,7 +191,7 @@ already exist; one is a real new direction; one is a long-term goal.
 |---|---|---|
 | 1. Broader native architecture support (standard llama/qwen attention, sub-2-bit/ternary variants of any family, no custom conversion) | **Long-term goal, partly already in flight.** Kindi converts only `qwen35` (ternary Bonsai), `gemma4`, `llama` K/I-quant (Nanbeige profile), and `nemotron_h_moe`; a dense standard-attention llama/qwen GGUF is refused. The MoE half of this is the small-MoE table above (Cascade 2 first); dense standard attention needs a non-GDN attention engine, which is a new backend, not a loader flag. First gate: recognition-only refusal for `llama`/`qwen3` dense files naming the missing engine, then a host reference that is 4/4 greedy-exact against a pinned llama.cpp for one dense size. | Long-term goals table; no REQ yet (the MoE REQs cover the sparse half) |
 | 2. Multi-vendor heterogeneous scaling (NVIDIA + AMD in one TP ring, arbitrary PCIe tiers, dynamic load balance) | **Same-vendor half already planned; vendor mixing deferred.** [MIXED-CARD-ROADMAP.md](MIXED-CARD-ROADMAP.md) P1–P6 covers mixed-generation same-vendor pairs (feasibility, equal-split validation, `KINDI_TP_SPLIT=auto` layout done but GPU-unverified). Mixing NVIDIA and AMD in one tensor-parallel ring needs a cross-vendor exchange path (CUDA graphs do not cross), so it is a later phase behind P2, not a reopening of P1. | [MIXED-CARD-ROADMAP.md](MIXED-CARD-ROADMAP.md) phases P1–P6 |
-| 3. Native Intel Arc (oneAPI/SYCL) backend | **Already fully planned; blocked on hardware.** [INTEL-ARC.md](INTEL-ARC.md) M0 (audit) is done, M1 (one A770 16 GB) needs a card this host does not have. Nothing new to add: no code until M1. | [INTEL-ARC.md](INTEL-ARC.md); roadmap Live work |
+| 3. Native Intel Arc (oneAPI/SYCL) backend | **Already fully planned; hardware purchased, in transit.** [INTEL-ARC.md](INTEL-ARC.md) M0 (audit) is done; one A770 16 GB was purchased 2026-11-15 and is on its way, so M1 (hardware qualification) can start on arrival. No code until M1. | [INTEL-ARC.md](INTEL-ARC.md); roadmap Live work; [REQ-0020](development/requirements/REQ-0020.md) |
 | 4. Speculative decoding with arbitrary draft families, acceptance monitors, adaptive draft length | **New and feasible; 2B gate passed.** `kindi/draft_policy.py` (pure-python controller, `limit_k` clamp tested) adopted in `kindi/spec.py` behind `KINDI_DRAFT_POLICY=1`: it may only shorten the hand-tuned base k (never lengthen it), so the engine's per-card tuning stays primary. Measured on the RTX 4060 Ti, 2B `draft2b`, ctx 1024: policy-on 4/4 PASS at 368.4 tok/s vs fixed-k 318.2 tok/s (+15.8%, no regression). The 27B row is pending (no pack/second card on this host). The generalized arbitrary-draft-GGUF harness stays a separate gate (a second draft engine, same exactness + speedup gate). | [REQ-0015](development/requirements/REQ-0015.md) (experimental) |
 
 ## Review follow-ups (2026-11-11)

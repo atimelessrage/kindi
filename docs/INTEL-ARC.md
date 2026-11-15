@@ -1,9 +1,10 @@
 # Intel Arc A770 support: goal and implementation plan
 
-Status: **planning and architecture audit, 2026-11-10.** There is no Intel backend in Kindi yet. The
-test computer has only an NVIDIA RTX 4060 Ti; no Arc GPU is visible, `sycl-ls` and `clinfo` are not
-installed, and no Intel result has been measured. This page is a goal and a plan, **not a support
-claim**.
+Status: **planning and architecture audit, 2026-11-10; updated 2026-11-15.** There is no Intel backend
+in Kindi yet. The test computer has only an NVIDIA RTX 4060 Ti; no Arc GPU is visible, `sycl-ls` and
+`clinfo` are not installed, and no Intel result has been measured. **One A770 16 GB has been purchased
+and is in transit (not installed yet)** — that unblocks M1 the day it arrives, but until then this page
+is a goal and a plan, **not a support claim** (tracked as [REQ-0020](development/requirements/REQ-0020.md)).
 
 ## Goal
 
@@ -198,8 +199,36 @@ arithmetic path: no `KINDI_TC`, `KINDI_SPEC`, `KINDI_FD`, fast head or `k8v4` in
 | **M7** CPU + Arc tandem | per-layer CPU API, scheduler, 1/2 Arc | exact; at least 1.15x Arc-only, or it enables a model/context that Arc-only cannot fit |
 | **M8** Installer and support claim | Intel container, detection, docs, CI/manual matrix | installed setup passes the same checks as the NVIDIA rows; no hidden environment override |
 
-M1 is currently **blocked on hardware**: there is no Arc A770 on the test computer. No Arc code has
-been executed, so M2 onward are not started.
+M1 is **unblocked in transit**: an A770 16 GB is on its way (purchased 2026-11-15, not installed yet).
+No Arc code has been executed anywhere, so M2 onward are not started. The day the card lands, run the
+arrival checklist below and record the run in `docs/benchmarks/<date>-<host>-arc-a770/`.
+
+### Arrival checklist (M1, run when the card is installed)
+
+Host assumptions: Linux x86-64, UEFI with Resizable BAR / Above 4G Decoding enabled, the card in a
+PCIe x16 slot. Record the output of every step; do not skip the ReBAR/PCIe state — a no-ReBAR result
+is functionally possible but is not a performance-supported configuration.
+
+```sh
+# 1. Device visible with the kernel driver loaded
+ls -l /dev/dri/
+lspci -k | grep -A3 -i vga        # driver in use, link width/generation
+
+# 2. Toolchain: pin oneAPI/SYCL/Level Zero + Intel compute runtime (Open Decision 1);
+#    verify against Intel's current oneAPI system-requirements matrix, not the CUDA image.
+sycl-ls
+clinfo
+
+# 3. CPU baseline (same host, same packs): the 2B/4B/9B CPU verify rows.
+KINDI_DEVICE=cpu python -m kindi --pack <pack> verify
+
+# 4. llama.cpp SYCL baseline (same model, context, token count) — a reference, never a
+#    substitute for a Kindi result.
+#    (record build commit + backend flags alongside the numbers)
+```
+
+M1 passes when: the device is visible with 16 GB, the ReBAR state is recorded, and both baselines
+run. Only then does M2 (backend smoke test) start.
 
 ## Acceptance matrix
 

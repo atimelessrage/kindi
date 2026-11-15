@@ -24,6 +24,12 @@
   every module by role with the FROZEN list, the `/v1/chat/completions` request trace,
   per-family chat-template and tool-call locations, and the resolution of every
   `[LOCATE]` in the Feature 4/5 plans.
+- **Intel Arc A770 purchased** ([docs/INTEL-ARC.md](docs/INTEL-ARC.md),
+  [REQ-0020](docs/development/requirements/REQ-0020.md)). One A770 16 GB is in transit
+  (not installed); the SYCL/oneAPI route is planned (M0 audit done) and M1 hardware
+  qualification can start on arrival, with an arrival checklist in INTEL-ARC.md. The
+  card is registered in the support matrix as not measured; no backend exists and
+  this is not a support claim.
 
 ## 0.6.0 (2026-11-12)
 

@@ -48,7 +48,7 @@ See [CPU-SUPPORT.md](CPU-SUPPORT.md) for the per-CPU matrix and gates.
 
 ## K/V cache modes
 
-From `kindi/tp.py:kv_mode()`. Default: `q8_0`; accepted: `k8v4`, `q8_0`.
+From `kindi/tp.py:kv_mode()`. Default: `q8_0`; accepted: `fp8`, `k8v4`, `q8_0`.
 
 `k8v4` is experimental and lossy: its 4-bit V is not token-exact with the fp16
 reference (2B `kindi verify`: 2 of 4 prompts; `kindi kld` teacher-forced KLD 1.3e-04/2.3e-04
@@ -113,6 +113,7 @@ cells render `not measured` until one is folded.
 | Quadro M4000 | Maxwell 5.2 | maxwell | not measured | not measured | not measured | not measured | not measured |
 | Quadro M5000 | Maxwell 5.2 | maxwell | not measured | not measured | not measured | not measured | not measured |
 | Quadro RTX 4000 | Turing 7.5 | turing | not measured | not measured | not measured | not measured | not measured |
+| Intel Arc A770 16 GB | Alchemist (DG2) | intel | not measured | not measured | not measured | not measured | not measured |
 
 ## Evidence
 

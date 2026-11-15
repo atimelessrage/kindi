@@ -550,6 +550,21 @@ image for it.
   wait).
 - The AH-Nanbeige4.3-33B backend of Kindi needs CUDA. It does not run on AMD graphics.
 
+## Intel Arc A770 16 GB (Alchemist, DG2): purchased, in transit, not supported
+
+One A770 16 GB was purchased 2026-11-15 and is on its way to us; it is not installed yet. Kindi has
+no Intel backend, so nothing is measured and the installer does not offer this card. The plan is a
+SYCL/oneAPI backend (Linux-first; milestones, gates and the M1 arrival checklist are in
+[INTEL-ARC.md](INTEL-ARC.md), tracked as [REQ-0020](development/requirements/REQ-0020.md)). The card
+is registered in the support matrix as `not measured` under the `arc-a770` slug, ready for a rig run
+to fold into when it lands.
+
+| item | value |
+|---|---|
+| memory | 16 GB GDDR6, 256-bit |
+| models | not yet measured |
+| variables | none (no backend) |
+
 ## CPU (x86-64 with AVX; AVX2/FMA/F16C fast path)
 
 | item | value |

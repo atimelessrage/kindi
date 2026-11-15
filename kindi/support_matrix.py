@@ -38,6 +38,11 @@ CARDS = {
     "m4000": ("Quadro M4000", "Maxwell 5.2", "maxwell", ("m4000", "quadro m4000")),
     "m5000": ("Quadro M5000", "Maxwell 5.2", "maxwell", ("m5000", "quadro m5000")),
     "rtx4000": ("Quadro RTX 4000", "Turing 7.5", "turing", ("rtx 4000", "quadro rtx 4000")),
+    # Purchased 2026-11-15, in transit, not installed: registered so a future rig run has a slug to
+    # fold into later. No Intel backend exists and the installer does not offer this card; the
+    # matrix renders it not measured. See docs/INTEL-ARC.md and REQ-0020.
+    "arc-a770": ("Intel Arc A770 16 GB", "Alchemist (DG2)", "intel",
+                 ("a770", "arc a770", "intel arc a770")),
 }
 
 CARD_MODELS = ("2b", "4b", "9b", "27b")     # short names, in render order
