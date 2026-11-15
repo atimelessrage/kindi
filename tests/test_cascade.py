@@ -181,10 +181,19 @@ def test_inspect_cascade_refuses_lightning_and_unknown_types():
 
 def test_reference_gate_requires_a_pinned_matching_file(tmp_path, monkeypatch):
     man = {"source_sha256": "abc123"}
-    rp = cascade.reference_path()
-    assert not cascade.check_reference(man, log=lambda *a: None) if not os.path.exists(rp) else True
-    # write a synthetic pinned reference next to the module when no real one is present
-    if not os.path.exists(rp):
-        pytest.skip("no pinned reference file present; gate behavior with a file is covered by the schema checks")
-    ref = json.load(open(rp, encoding="utf-8"))
-    assert ref.get("llama_cpp_commit")
+    rp = tmp_path / "reference.json"
+    monkeypatch.setattr(cascade, "reference_path", lambda: str(rp))
+    logs = []
+    assert cascade.check_reference(man, log=logs.append) is False  # missing file
+    rp.write_text(json.dumps({"source_sha256": "other", "llama_cpp_commit": "deadbeef",
+                              "prompts": [{"prompt": "hi", "ids": [1], "expected": [2], "gap": [None]}]}))
+    assert cascade.check_reference(man, log=logs.append) is False  # sha mismatch
+    rp.write_text(json.dumps({"source_sha256": "abc123",
+                              "prompts": [{"prompt": "hi", "ids": [1], "expected": [2]}]}))
+    assert cascade.check_reference(man, log=logs.append) is False  # no commit pin
+    rp.write_text(json.dumps({"source_sha256": "abc123", "llama_cpp_commit": "deadbeef",
+                              "prompts": [{"prompt": "hi", "ids": [1]}]}))
+    assert cascade.check_reference(man, log=logs.append) is False  # unusable prompt
+    rp.write_text(json.dumps({"source_sha256": "abc123", "llama_cpp_commit": "deadbeef",
+                              "prompts": [{"prompt": "hi", "ids": [1, 2], "expected": [3, 4], "gap": [0.1, None]}]}))
+    assert cascade.check_reference(man, log=logs.append) is True

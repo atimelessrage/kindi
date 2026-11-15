@@ -82,6 +82,10 @@ MoE metadata from a GGUF is not a backend.
 > [FP8-BF16.md](FP8-BF16.md). It still needs a separate 26B backend and a reference. The historical
 > Nemotron MoE row in [CPU_GPU_TANDEM_DESIGN.md](CPU_GPU_TANDEM_DESIGN.md) has no engine either.
 
+The six small MoEs Kindi recognizes (Cascade 2 converter/validator, Gemma 4 26B, Qwen3-Coder,
+Qwen3.6, North Mini Code, Recursive Flint) and the milestone each is missing are tabulated in
+the small-MoE compatibility section of [ROADMAP.md](ROADMAP.md).
+
 ## 3. Architecture
 
 ```

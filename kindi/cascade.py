@@ -311,8 +311,19 @@ def check_reference(man, log=print):
         log("reference %s has no llama_cpp_commit pin" % os.path.basename(rp))
         return False
     prompts = ref.get("prompts") or []
-    if not prompts or any("ids" not in p or "expected" not in p for p in prompts):
-        log("reference %s has no usable prompts" % os.path.basename(rp))
+    def _ids_ok(v):
+        return isinstance(v, list) and v and all(isinstance(t, int) and not isinstance(t, bool) for t in v)
+    usable = (
+        isinstance(prompts, list) and prompts and all(
+            isinstance(p, dict) and isinstance(p.get("prompt"), str) and p["prompt"]
+            and _ids_ok(p.get("ids")) and _ids_ok(p.get("expected"))
+            and (p.get("gap") is None or (
+                isinstance(p["gap"], list) and len(p["gap"]) == len(p["expected"])
+                and all(g is None or isinstance(g, (int, float)) for g in p["gap"])))
+            for p in prompts))
+    if not usable:
+        log("reference %s has no usable prompts (each needs prompt, token ids, expected ids, "
+            "and a gap list matching expected)" % os.path.basename(rp))
         return False
     log("pinned llama.cpp reference: %s (%d prompts, llama.cpp %s)"
         % (os.path.basename(rp), len(prompts), ref.get("llama_cpp_commit")))
