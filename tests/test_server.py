@@ -537,6 +537,28 @@ def test_metrics_endpoint_reports_the_model_and_queue(app_client):
     assert "kindi_cache_errors_total 0" in body
 
 
+def test_metrics_reports_the_tandem_probe_when_it_is_on(app_client):
+    _, K = app_client
+    K.eng.timing_summary = lambda: {"tokens": 128, "cpu_ms_per_token": 74.7, "gpu_ms_per_token": 8.1,
+                                    "transfer_ms_per_token": 3.09, "head_ms_per_token": 17.6,
+                                    "total_ms_per_token": 103.4, "transfers_per_token": 7.0}
+    body = app_client[0].get("/metrics").text
+    assert "kindi_tandem_tokens_total 128" in body
+    assert "kindi_tandem_cpu_ms_per_token 74.700" in body
+    assert "kindi_tandem_gpu_ms_per_token 8.100" in body
+    assert "kindi_tandem_transfer_ms_per_token 3.090" in body
+    assert "kindi_tandem_head_ms_per_token 17.600" in body
+    assert "kindi_tandem_total_ms_per_token 103.400" in body
+    assert "kindi_tandem_transfers_per_token 7.000" in body
+
+
+def test_metrics_omits_the_tandem_probe_when_it_is_off(app_client):
+    client, _ = app_client
+    body = client.get("/metrics").text
+    assert "kindi_tandem_tokens_total" not in body
+    assert "kindi_tandem_total_ms_per_token" not in body
+
+
 def test_metrics_reports_the_prompt_cache_telemetry(app_client):
     # the main prompt cache exposes the same telemetry shape as the Gemma 4 cache (D3)
     _, K = app_client

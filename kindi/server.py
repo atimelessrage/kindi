@@ -1660,6 +1660,19 @@ def create_app(cfg, log=print):
                     ("kindi_cache_checkpoints_dropped_total", "counter", "host prompt-cache checkpoints dropped", "checkpoints_dropped"),
                     ("kindi_cache_parked_dropped_total", "counter", "host prompt-cache parked conversations dropped", "parked_dropped")):
                 metric(name, typ, help_text, "%s %d" % (name, m[key]))
+        tandem_timing = getattr(K.eng, "timing_summary", None)
+        if callable(tandem_timing):
+            t = tandem_timing()
+            if t is not None:
+                metric("kindi_tandem_tokens_total", "counter", "tokens timed by the CPU/GPU split probe", "kindi_tandem_tokens_total %d" % t["tokens"])
+                for name, help_text, key in (
+                        ("kindi_tandem_cpu_ms_per_token", "tandem probe: milliseconds per token on the CPU layers", "cpu_ms_per_token"),
+                        ("kindi_tandem_gpu_ms_per_token", "tandem probe: milliseconds per token on the GPU layers", "gpu_ms_per_token"),
+                        ("kindi_tandem_transfer_ms_per_token", "tandem probe: milliseconds per token on layer handoffs", "transfer_ms_per_token"),
+                        ("kindi_tandem_head_ms_per_token", "tandem probe: milliseconds per token on the output head", "head_ms_per_token"),
+                        ("kindi_tandem_total_ms_per_token", "tandem probe: milliseconds per token summed over the split", "total_ms_per_token"),
+                        ("kindi_tandem_transfers_per_token", "tandem probe: layer handoffs per token", "transfers_per_token")):
+                    metric(name, "gauge", help_text, "%s %.3f" % (name, t[key]))
         g4 = getattr(K, "g4cache", None)
         if g4 is not None:
             m = g4.metrics()
