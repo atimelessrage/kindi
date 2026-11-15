@@ -200,7 +200,10 @@ Tracked as [REQ-0016](development/requirements/REQ-0016.md) (experimental).
 status/tag filters, full record, raw-markdown export, triage status and tags
 over HTTP, auth-gated, host-only), pinned by `tests/test_server_sessions.py`.
 Concurrent mutations are serialized (one lock around the read-modify-write;
-what used to race and lose updates). Still open: resume in the chat loop.
+what used to race and lose updates). **Resume in the chat loop landed
+2026-11-15:** `kindi chat --resume SESSION_ID` seeds the REPL with the
+stored turns and appends new turns back to the same record on exit
+(`SessionStore.append_messages`, pinned by `tests/test_sessions.py`).
 
 ## External suggestions review (2026-11-14)
 

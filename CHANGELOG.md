@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- **`kindi chat --resume SESSION_ID`** continues a saved session: the REPL
+  is seeded with the stored turns and new turns append back to the same
+  record on exit (`SessionStore.append_messages`).
+
 ### Changed
 
 - **Tandem decode dispatch resolved once.** `TandemEngine` now iterates a
