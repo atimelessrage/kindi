@@ -77,7 +77,13 @@ one run per tier):
 
 All five forced tiers now have an end-to-end 2B verify pass. The two software-F16C tiers are slower
 than the hardware-F16C paths (31.9 and 29.1 tok/s against 43.6 and 43.9), as expected. These are
-forced-tier runs on an AVX2 host, not native Sandy Bridge or no-F16C measurements. The AVX-only
+forced-tier runs on an AVX2 host, not native Sandy Bridge or no-F16C measurements.
+Cross-tier parity is pinned by `test_cpu_isa_tiers_agree_on_tokens_and_hidden_close`
+(`tests/test_cpu_layers.py`): the five tier libraries are built and loaded and run the same
+fixed decode sequence on the 2B. Greedy token picks are identical across all five tiers; the
+hidden states agree to ~3e-4, which is summation-order fp32 rounding (byte-identical hidden
+states are not the claim — structurally different accumulation orders cannot be bitwise equal).
+The AVX-only
 build is about 5x slower on the 2B and 4.9x/5.5x slower on the 4B/9B, so it remains a compatibility
 path. No native CPU without F16C hardware was available. The 4B/9B rows below provide the same
 end-to-end coverage for those models. Evidence for the two new runs is in

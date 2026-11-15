@@ -6,8 +6,14 @@
 
 - **Installer name fallback: RTX 50 (Blackwell) and RTX 4000 (Turing)** — computed capability now derived from the card name when the driver does not report it (`cc_from_name()` in `install.sh`). RTX 50 series maps to 12.0 (Blackwell sm_120); previously it fell through to the 6.1 default. The existing `RTX 40` rule also matched `RTX 4000` and reported Turing's sm_75 card as Ada 8.9; the separate `RTX 4000` rule now wins.
 
+### Fixed
+
+- **Config reference regenerated** after the sessions round shifted source lines (191 env reads, same content).
+- **`test_server_cpu` skips instead of erroring** when the libkcpu cache is cold and no gcc/clang is available.
+
 ### Added
 
+- **Cross-ISA parity test** — all five tier libraries run a fixed decode: greedy tokens identical across tiers, hidden states within summation-order tolerance (measured ~3e-4 max diff).
 - **Sessions protection + unread flags** — records carry `protected` (prune keeps, `kindi sessions protect SESSION_ID [--off]` sets) and `unread` (raised by record/append/import, cleared by `show` or `POST /sessions/<id>/read`). `list`/`triage` show `[unread]`/`[protected]` markers, `stats` counts both, and server summaries expose both.
 - **Legacy Fermi path** — Fermi / pre-Kepler NVIDIA cards now classify as `fermi` in `install.sh`; they offer no GPU models or pairs, skip the NVIDIA container toolkit setup, and the installer offers the CPU engine on an AVX CPU. No CUDA support is claimed (no code path compiles for sm_21).
 - **Support-matrix slugs for the 5060 Ti, GeForce 940M and GT 1030** — rendered as not measured (no fabricated rows); the Fermi GT 430 stays unsupported (below the installer’s sm_30 floor, the CUDA 10.2 image cannot run it).

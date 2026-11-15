@@ -79,6 +79,42 @@ def test_hidden_handoff_round_trips():
         eng.set_hidden([1.0])
 
 
+def _pack():
+    candidates = [os.environ.get("KINDI_CPU_PACK"),
+                  os.path.expanduser("~/.kindi/packs/bonsai-2b")]
+    for cand in candidates:
+        if cand and os.path.isfile(os.path.join(cand, "kindi_pack.json")):
+            return cand
+    return None
+
+
+@pytest.mark.skipif(_pack() is None,
+                    reason="no Bonsai 2B pack (set KINDI_CPU_PACK to one)")
+def test_cpu_isa_tiers_agree_on_tokens_and_hidden_close(monkeypatch, tmp_path):
+    """Cross-tier parity on the real engine: every ISA tier library, built and loaded, runs a
+    fixed decode sequence. Expected to hold: (a) greedy token picks are identical across tiers
+    (this is the user-visible exactness claim); (b) hidden states agree within summation-order
+    tolerance — accumulation order differs per tier, so byte-identical floats are NOT the claim,
+    but a wider atol than the fp32 length-2560 sum rounding (~1e-4 rel) is."""
+    from shutil import which
+    if not (which("gcc") or which("clang")):
+        pytest.skip("no gcc/clang to build the ISA tier libraries")
+    ids = [1, 2, 3, 4, 5, 6, 7, 8]
+    seen = {}
+    monkeypatch.setenv("KINDI_CPU_CACHE", str(tmp_path))
+    for tier in cpu.ISA_ORDER:
+        monkeypatch.setenv("KINDI_CPU_ISA", tier)
+        eng = cpu.Engine(_pack(), ctx=8, log=None)
+        assert eng.lib.kc_isa_name() == tier.encode("ascii")
+        eng.reset()
+        seen[tier] = ([eng.step(t, p) for p, t in enumerate(ids)],
+                      np.asarray(eng.get_hidden(), dtype=np.float32))
+    base_tokens, base_hidden = seen[cpu.ISA_ORDER[0]]
+    for tier, (tokens, hidden) in seen.items():
+        assert tokens == base_tokens, (tier, tokens, base_tokens)
+        np.testing.assert_allclose(hidden, base_hidden, rtol=1e-3, atol=1e-3)
+
+
 @pytest.mark.skipif(not os.environ.get("KINDI_CPU_PACK"),
                     reason="set KINDI_CPU_PACK to a Bonsai pack to run the real exactness check")
 def test_layerwise_matches_whole_model_step():
