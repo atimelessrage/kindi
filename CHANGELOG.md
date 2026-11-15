@@ -8,6 +8,7 @@
 
 ### Added
 
+- **Sessions protection + unread flags** — records carry `protected` (prune keeps, `kindi sessions protect SESSION_ID [--off]` sets) and `unread` (raised by record/append/import, cleared by `show` or `POST /sessions/<id>/read`). `list`/`triage` show `[unread]`/`[protected]` markers, `stats` counts both, and server summaries expose both.
 - **Legacy Fermi path** — Fermi / pre-Kepler NVIDIA cards now classify as `fermi` in `install.sh`; they offer no GPU models or pairs, skip the NVIDIA container toolkit setup, and the installer offers the CPU engine on an AVX CPU. No CUDA support is claimed (no code path compiles for sm_21).
 - **Support-matrix slugs for the 5060 Ti, GeForce 940M and GT 1030** — rendered as not measured (no fabricated rows); the Fermi GT 430 stays unsupported (below the installer’s sm_30 floor, the CUDA 10.2 image cannot run it).
 - **Fake-GPU tests for the full ten-card rig list** in `tests/test_installer_cards.py` — classification and model offers for every card, plus the name-fallback cases.

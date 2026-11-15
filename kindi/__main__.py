@@ -39,20 +39,29 @@ def cmd_sessions(cfg, a):
     """kindi sessions list|show|export|triage|tag|status|import (host-only; reads state_dir/sessions)."""
     from .sessions import SessionStore, STATUSES
     st = SessionStore(os.path.join(cfg["state_dir"], "sessions"))
+
+    def _flags(r):
+        out = ""
+        if r.get("unread"):
+            out += "  [unread]"
+        if r.get("protected"):
+            out += "  [protected]"
+        return out
     if a.action == "list":
         rows = st.list(status=a.status, tag=a.tag)
         if not rows:
             log("no sessions")
             return 0
         for r in rows:
-            log("%s  %-24s %-13s %d msgs  %s" % (r["id"], r["title"][:24], r["status"],
+            log("%s  %-24s %-13s %d msgs  %s%s" % (r["id"], r["title"][:24], r["status"],
                                                len(r.get("messages") or []),
-                                               ",".join(r.get("tags") or [])))
+                                               ",".join(r.get("tags") or []), _flags(r)))
         return 0
     if a.action == "show":
         if not a.id:
             raise SystemExit("kindi sessions show: give a session id")
         rec = st.get(a.id[0])
+        st.mark_read(a.id[0])
         sys.stdout.write(st.export_markdown(rec))
         return 0
     if a.action == "triage":
@@ -61,9 +70,15 @@ def cmd_sessions(cfg, a):
             log("triage queue is empty")
             return 0
         for r in rows:
-            log("%s  %-24s %-13s %d msgs  %s" % (r["id"], r["title"][:24], r["status"],
+            log("%s  %-24s %-13s %d msgs  %s%s" % (r["id"], r["title"][:24], r["status"],
                                                len(r.get("messages") or []),
-                                               ",".join(r.get("tags") or [])))
+                                               ",".join(r.get("tags") or []), _flags(r)))
+        return 0
+    if a.action == "protect":
+        if not a.id:
+            raise SystemExit("kindi sessions protect: give a session id")
+        rec = st.set_protected(a.id[0], on=not a.off)
+        log("session %s %sprotected" % (a.id[0], "un" if a.off else ""))
         return 0
     if a.action == "export":
         if not a.id:
@@ -99,9 +114,13 @@ def cmd_sessions(cfg, a):
         if not rows:
             log("no sessions older than %d days" % a.days)
             return 0
+        kept = sum(1 for r in rows if r.get("protected"))
         for r in rows:
-            log("%s  %-24s %-13s updated %s" % (r["id"], r["title"][:24], r["status"], r["updated"]))
-        log("%s %d session(s)" % ("would prune" if a.dry_run else "pruned", len(rows)))
+            log("%s  %-24s %-13s updated %s%s" % (r["id"], r["title"][:24], r["status"], r["updated"],
+                                                  "  (protected: kept)" if r.get("protected") else ""))
+        log("%s %d session(s)" % ("would prune" if a.dry_run else "pruned", len(rows) - kept))
+        if kept:
+            log("%d protected session(s) kept" % kept)
         return 0
     if a.action == "stats":
         stats = st.stats()
@@ -109,9 +128,10 @@ def cmd_sessions(cfg, a):
             import json as _json
             sys.stdout.write(_json.dumps(stats, indent=2) + "\n")
             return 0
-        log("sessions: %d (open %d, needs-review %d, resolved %d)" % (
+        log("sessions: %d (open %d, needs-review %d, resolved %d, unread %d, protected %d)" % (
             stats["sessions"], stats["by_status"]["open"],
-            stats["by_status"]["needs-review"], stats["by_status"]["resolved"]))
+            stats["by_status"]["needs-review"], stats["by_status"]["resolved"],
+            stats["unread"], stats["protected"]))
         log("messages: %d, stored bytes: %d" % (stats["messages"], stats["bytes"]))
         if stats["sessions"]:
             log("oldest updated %s, newest updated %s" % (stats["oldest_updated"], stats["newest_updated"]))
@@ -477,7 +497,8 @@ def main(argv=None):
     s.add_argument("--resume", metavar="SESSION_ID", help="continue a saved session (kindi sessions list) instead of starting a new one; new turns append back to it")
     _tandem_args(s)
     s = sub.add_parser("sessions", help="list, triage, tag and export chat sessions (state_dir/sessions)")
-    s.add_argument("action", choices=("list", "show", "export", "triage", "tag", "status", "import", "prune", "stats"))
+    s.add_argument("action", choices=("list", "show", "export", "triage", "tag", "status", "import", "prune", "stats", "protect"))
+    s.add_argument("--off", action="store_true", help="protect: clear the protection flag instead of setting it")
     s.add_argument("id", nargs="*", help="session id (show/export/tag/status) or file (import, - for stdin)")
     s.add_argument("--out", help="export directory (default: current directory)")
     s.add_argument("--tag", help="tag filter (list) or tag to add (tag)")

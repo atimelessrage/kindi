@@ -14,6 +14,7 @@
   GET  /sessions/<id>          one session with its messages; /sessions/<id>/export is the raw markdown (text/markdown)
   POST /sessions/<id>/status   move a session through triage ({"status": "open"|"needs-review"|"resolved"})
   POST /sessions/<id>/tags     add a tag ({"tag": "..."})
+  POST /sessions/<id>/read     clear the unread flag (no body fields needed)
 
 A prompt that does not fit is an HTTP 400 (code context_length_exceeded, OpenAI's wording) before the request waits
 for the engine. A stream gets an SSE comment ": kindi progress {...}" every KINDI_KEEPALIVE_S (10) seconds while
@@ -1516,6 +1517,7 @@ def create_app(cfg, log=print):
     def _session_summary(rec):
         return {"id": rec.get("id"), "title": rec.get("title"), "status": rec.get("status"),
                 "tags": rec.get("tags") or [], "created": rec.get("created"), "updated": rec.get("updated"),
+                "unread": bool(rec.get("unread")), "protected": bool(rec.get("protected")),
                 "message_count": len(rec.get("messages") or [])}
 
     _SID_RE = re.compile(r"^[0-9a-f]{12}$")
@@ -1567,6 +1569,13 @@ def create_app(cfg, log=print):
     async def _sessions_post(request: Request, sid: str, action):
         if not _auth(request):
             return _err(401, "invalid API key", "authentication_error")
+        if action == "read":
+            # clearing the unread flag needs no body fields (an empty request clears it)
+            with _SESSIONS_LOCK:
+                rec, err = _session_or_none(sid)
+                if err is not None:
+                    return err
+                return _session_summary(_session_store().mark_read(rec["id"]))
         try:
             body = await _read_json_body(request)
         except RequestTooLarge as e:
@@ -1599,8 +1608,12 @@ def create_app(cfg, log=print):
     async def _sessions_tags(request: Request, sid: str):
         return await _sessions_post(request, sid, "tags")
 
+    async def _sessions_read(request: Request, sid: str):
+        return await _sessions_post(request, sid, "read")
+
     app.add_api_route("/sessions/{sid}/status", _sessions_status, methods=["POST"])
     app.add_api_route("/sessions/{sid}/tags", _sessions_tags, methods=["POST"])
+    app.add_api_route("/sessions/{sid}/read", _sessions_read, methods=["POST"])
 
     @app.get("/metrics")
     def metrics(request: Request):

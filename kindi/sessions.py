@@ -40,13 +40,13 @@ class SessionStore(object):
         return os.path.join(self.root, str(sid) + ".json")
 
     # ---- creation and messages ----
-    def create(self, title="", messages=None, tags=None, status="open"):
+    def create(self, title="", messages=None, tags=None, status="open", protected=False):
         if status not in STATUSES:
             raise ValueError("status must be one of %s (got %r)" % (STATUSES, status))
         sid = uuid.uuid4().hex[:12]
         rec = {"id": sid, "title": str(title or "untitled"), "created": _now(),
                "updated": _now(), "messages": [], "tags": sorted({slug(t) for t in (tags or []) if slug(t) != "session"}),
-               "status": status}
+               "status": status, "protected": bool(protected), "unread": True}
         for role, content in (messages or []):
             self.add_message(rec, role, content)
         self._save(rec)
@@ -57,7 +57,23 @@ class SessionStore(object):
         if role not in ("system", "user", "assistant", "tool"):
             raise ValueError("unknown role %r" % role)
         rec["messages"].append({"role": role, "content": str(content), "ts": _now()})
+        rec["unread"] = True
         rec["updated"] = _now()
+        self._save(rec)
+        return rec
+
+    def mark_read(self, rec_or_id):
+        """Clear the unread flag (a session that was just shown)."""
+        rec = self._coerce(rec_or_id)
+        if rec.get("unread"):
+            rec["unread"] = False
+            self._save(rec)
+        return rec
+
+    def set_protected(self, rec_or_id, on=True):
+        """Protect a record from destructive ops (prune treats it like a delete-refusal)."""
+        rec = self._coerce(rec_or_id)
+        rec["protected"] = bool(on)
         self._save(rec)
         return rec
 
@@ -69,6 +85,7 @@ class SessionStore(object):
                 raise ValueError("unknown role %r" % role)
         for role, content in (messages or []):
             rec["messages"].append({"role": role, "content": str(content), "ts": _now()})
+        rec["unread"] = True
         rec["updated"] = _now()
         self._save(rec)
         return rec
@@ -89,6 +106,8 @@ class SessionStore(object):
         return {"sessions": len(rows), "by_status": by_status,
                 "messages": sum(len(r.get("messages") or []) for r in rows),
                 "bytes": total_bytes,
+                "unread": sum(1 for r in rows if r.get("unread")),
+                "protected": sum(1 for r in rows if r.get("protected")),
                 "oldest_updated": updates[0] if updates else None,
                 "newest_updated": updates[-1] if updates else None}
 
@@ -112,8 +131,15 @@ class SessionStore(object):
             except ValueError:
                 continue          # an unparseable timestamp is not evidence it is old
             if when < cutoff:
-                out.append({"id": rec["id"], "title": rec.get("title", "untitled"),
-                            "status": rec.get("status"), "updated": rec.get("updated")})
+                row = {"id": rec["id"], "title": rec.get("title", "untitled"),
+                       "status": rec.get("status"), "updated": rec.get("updated")}
+                if rec.get("protected"):
+                    # protected records survive pruning; the row still reports them so the
+                    # operator sees what was kept (and why)
+                    row["protected"] = True
+                    out.append(row)
+                    continue
+                out.append(row)
                 if not dry_run:
                     os.remove(self.path(rec["id"]))
         return out

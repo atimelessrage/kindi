@@ -168,11 +168,61 @@ def test_sessions_stats_cli_text_and_json(tmp_path, capsys):
     st.create(title="two")
     assert main(["--state-dir", root, "sessions", "stats"]) == 0
     out = capsys.readouterr().out
-    assert "sessions: 2 (open 2, needs-review 0, resolved 0)" in out
+    assert "sessions: 2 (open 2, needs-review 0, resolved 0, unread 2, protected 0)" in out
     assert "messages: 1" in out
     assert main(["--state-dir", root, "sessions", "stats", "--json"]) == 0
     payload = _json.loads(capsys.readouterr().out)
     assert payload["sessions"] == 2 and payload["messages"] == 1 and payload["bytes"] > 0
+
+
+def test_protected_records_survive_prune_and_the_protect_cli_toggles(tmp_path, capsys):
+    from kindi.__main__ import main
+    root = str(tmp_path)
+    st = SessionStore(root + "/sessions")
+    rec = st.create(title="precious", status="resolved")
+    _backdate(st, rec["id"], 60)
+    # protect first, then the pruner must keep it (and say so in the dry run)
+    assert main(["--state-dir", root, "sessions", "protect", rec["id"]]) == 0
+    assert "protected" in capsys.readouterr().out
+    assert st.get(rec["id"])["protected"] is True
+    would = st.prune(older_than_days=30, dry_run=True)
+    assert len(would) == 1 and would[0]["protected"] is True
+    gone = st.prune(older_than_days=30)
+    assert len(gone) == 1 and gone[0]["protected"] is True
+    assert st.get(rec["id"]) is not None       # kept
+    # --all is not a bypass: protection still wins
+    st.prune(older_than_days=30, statuses=None)
+    assert st.get(rec["id"]) is not None
+    # unprotect turns the record back into ordinary training data
+    assert main(["--state-dir", root, "sessions", "protect", rec["id"], "--off"]) == 0
+    assert st.get(rec["id"])["protected"] is False
+    st.prune(older_than_days=30)
+    with pytest.raises(KeyError):
+        st.get(rec["id"])
+
+
+def test_unread_flag_raised_by_new_turns_and_cleared_by_show(tmp_path, capsys):
+    from kindi.__main__ import main
+    root = str(tmp_path)
+    st = SessionStore(root + "/sessions")
+    rec = st.create(title="fresh", messages=[("user", "hi")])
+    assert rec["unread"] is True                       # new transcript: not yet read
+    st.mark_read(rec["id"])
+    assert st.get(rec["id"])["unread"] is False
+    st.append_messages(rec["id"], [("assistant", "reply")])
+    assert st.get(rec["id"])["unread"] is True        # new turns raise it again
+    stats = st.stats()
+    assert stats["unread"] == 1 and stats["protected"] == 0
+    # the CLI list shows the marker
+    assert main(["--state-dir", root, "sessions", "list"]) == 0
+    assert "[unread]" in capsys.readouterr().out
+    # show clears it
+    assert main(["--state-dir", root, "sessions", "show", rec["id"]]) == 0
+    assert st.get(rec["id"])["unread"] is False
+    # protected shows its own marker
+    st.set_protected(rec["id"], True)
+    assert main(["--state-dir", root, "sessions", "list"]) == 0
+    assert "[protected]" in capsys.readouterr().out
 
 
 def test_slug_and_hash(tmp_path):

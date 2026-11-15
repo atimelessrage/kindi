@@ -129,6 +129,28 @@ def test_sessions_status_and_tag_round_trip(client):
     assert store.get(sid)["status"] == "needs-review"
 
 
+def test_sessions_unread_and_protected_via_routes(client):
+    c, _, store = client
+    rec = store.create(title="flagged", messages=[("user", "hello")])
+    sid = rec["id"]
+    listing = c.get("/sessions").json()["sessions"]
+    assert listing[0]["unread"] is True and listing[0]["protected"] is False
+
+    # POST /read clears the flag; no body fields are needed
+    cleared = c.post("/sessions/%s/read" % sid)
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["unread"] is False
+    assert store.get(sid)["unread"] is False
+
+    # protection survives the summary route
+    store.set_protected(sid, True)
+    listing = c.get("/sessions").json()["sessions"]
+    assert listing[0]["protected"] is True
+
+    missing = c.post("/sessions/0123456789ab/read")
+    assert missing.status_code == 404, missing.text
+
+
 def test_sessions_missing_and_traversal_ids(client):
     c, _, _ = client
     missing = c.get("/sessions/0123456789ab")
