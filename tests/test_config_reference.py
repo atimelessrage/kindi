@@ -68,6 +68,7 @@ def test_the_scan_reads_environment_gets_and_subscripts(tmp_path):
         "A = os.environ.get('KINDI_FROM_GET', '7')\n"
         "B = os.getenv('KINDI_FROM_GETENV', '9')\n"
         "C = os.environ['KINDI_FROM_SUBSCRIPT']\n"
+        "D = os.environ.setdefault('KINDI_FROM_SETDEFAULT', '3')\n"
         "def f():\n"
         "    dynamic = os.environ.get('KINDI_' + 'X')\n",
         encoding="utf-8")
@@ -77,6 +78,8 @@ def test_the_scan_reads_environment_gets_and_subscripts(tmp_path):
     assert found["KINDI_FROM_GETENV"]["defaults"] == ["9"]
     assert found["KINDI_FROM_GETENV"]["sites"] == [("sample.py", 3)]
     assert "KINDI_FROM_SUBSCRIPT" in found
+    assert found["KINDI_FROM_SETDEFAULT"]["defaults"] == ["3"]
+    assert found["KINDI_FROM_SETDEFAULT"]["sites"] == [("sample.py", 5)]
     assert all(name != "KINDI_" for name in found)      # a built name is not a literal read
 
 

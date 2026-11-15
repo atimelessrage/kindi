@@ -115,7 +115,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:211` (+4 more) |
 | `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:303` (+1 more) |
 | `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:46` |
-| `KINDI_D1` | `0` | `kindi/spec.py:724` |
+| `KINDI_D1` | `1` or `0` | `kindi/spec.py:723` (+1 more) |
 | `KINDI_DATA` | `/data` | `kindi/container.py:243` |
 | `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:745` |
 | `KINDI_DEVICE` | `gpu` | `kindi/bench.py:15` (+5 more) |
@@ -143,7 +143,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_DS_STATS` | `0` | `kindi/dsv41.py:599` (+1 more) |
 | `KINDI_DS_UNION` | `1` | `kindi/dsv41.py:586` |
 | `KINDI_FD` | `0` | `kindi/spec.py:171` (+6 more) |
-| `KINDI_FD_CH` | (empty) | `kindi/spec.py:133` |
+| `KINDI_FD_CH` | (empty) or `str(FD_CH)` | `kindi/spec.py:133` (+1 more) |
 | `KINDI_FF` | (empty) or `1` | `kindi/spec.py:179` (+1 more) |
 | `KINDI_FOLD_SPLIT` | `1` | `kindi/spec.py:644` |
 | `KINDI_G4_CKPT_MAX` | `16` | `kindi/gemma4_cache.py:34` |
@@ -177,7 +177,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_HIP_LIB` | `libamdhip64.so` | `kindi/gpudrv.py:28` |
 | `KINDI_HOST_RAM_CHECK` | `1` | `kindi/hostram.py:93` |
 | `KINDI_KEEPALIVE_S` | `10` | `kindi/dsv41_server.py:69` (+1 more) |
-| `KINDI_KEXPF` | (empty) | `kindi/spec.py:154` |
+| `KINDI_KEXPF` | (empty) or `0` | `kindi/spec.py:154` (+1 more) |
 | `KINDI_KV` | (empty) or `q8_0` | `kindi/engine.py:76` (+6 more) |
 | `KINDI_KV_EXPERIMENTAL` | `0` | `kindi/kld.py:92` (+5 more) |
 | `KINDI_LLVM` | (unset) | `kindi/cpu.py:91` |
@@ -198,12 +198,13 @@ variables, and are therefore not listed twice here.
 | `KINDI_LT_SM75` | (unset) | `kindi/lightning.py:132` |
 | `KINDI_LT_TC` | `1` | `kindi/lightning.py:127` |
 | `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:341` |
-| `KINDI_MEM_RESERVE_MB` | `96` or `32` | `kindi/engine.py:306` (+3 more) |
+| `KINDI_MEM_RESERVE_MB` | `96` or `256` or `32` | `kindi/engine.py:306` (+4 more) |
 | `KINDI_MODEL` | (empty) | `kindi/container.py:240` |
 | `KINDI_MOE_COPY` | `0` | `kindi/dsv41.py:356` |
 | `KINDI_MOE_CPUS0` | `0-19` | `kindi/dsv41.py:124` (+2 more) |
 | `KINDI_MOE_CPUS1` | `20-23,32-39` | `kindi/dsv41.py:124` (+2 more) |
 | `KINDI_MOE_DROP_CACHE` | `1` | `kindi/dsv41.py:362` |
+| `KINDI_MOE_IDLE` | `1` | `kindi/dsv41.py:347` |
 | `KINDI_MOE_SHARE0` | `0.667` | `kindi/dsv41.py:350` (+2 more) |
 | `KINDI_MOE_WEIGHTED` | `1` | `kindi/lightning.py:256` (+2 more) |
 | `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:665` |

@@ -126,6 +126,13 @@ def _getenv(node):
             and isinstance(node.value, ast.Name) and node.value.id == "os")
 
 
+def _setdefault(node):
+    """``os.environ.setdefault``: sets a default only when the variable is absent, so it is also a read."""
+    return (isinstance(node, ast.Attribute) and node.attr == "setdefault"
+            and isinstance(node.value, ast.Attribute) and node.value.attr == "environ"
+            and isinstance(node.value.value, ast.Name) and node.value.value.id == "os")
+
+
 def _default_text(node, src):
     """a literal string's value, or the default expression as it is written"""
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
@@ -151,7 +158,8 @@ def env_vars(paths=None):
             if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
                     and node.args and isinstance(node.args[0], ast.Constant)
                     and isinstance(node.args[0].value, str)
-                    and ((_environ(node.func.value) and node.func.attr == "get") or _getenv(node.func))):
+                    and ((_environ(node.func.value) and node.func.attr == "get")
+                         or _getenv(node.func) or _setdefault(node.func))):
                 name = node.args[0].value
                 if len(node.args) > 1:
                     default = _default_text(node.args[1], src)
