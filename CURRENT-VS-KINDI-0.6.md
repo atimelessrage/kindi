@@ -15,13 +15,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `0a26518`:
+HEAD `ddba17a`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 286 commits
-git diff --shortstat v0.6.0..HEAD          # 398 files, +52,946/-993
+git log --oneline v0.6.0..HEAD | wc -l     # 293 commits
+git diff --shortstat v0.6.0..HEAD          # 398 files, +53,008/-993
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -158,6 +158,23 @@ arbitrary-draft-GGUF harness stays a separate gate.
 - Docs updated alongside: `docs/API.md`, REQ-0016/REQ-0018 evidence,
   ROADMAP bullets, CHANGELOG.
 - Diff vs `v0.6.0` grew 398 files (+52,813 → +52,946 insertions);
+  still zero file deletions.
+- §13: the second improve-and-fix pass — sessions export filename,
+  scanner `setdefault` coverage, `load_ratio` robustness tests.
+
+## 13. What changed in the 2026-11-15 improve-and-fix round 2
+
+- Sessions export: `Content-Disposition` filename (`<date>-<slug>.md`,
+  same convention as the CLI `write_export`) (`449f9f2`).
+- Config reference: the scanner also reads `os.environ.setdefault(...)`
+  (a var introduced only via setdefault would otherwise vanish);
+  reference regenerated at 191 environment reads (`54542ed`).
+- Tandem: `load_ratio` robustness pinned by tests — wrong-kind and
+  corrupt calibration files return `None` (fit-only fallback)
+  (`34647cd`).
+- Docs updated alongside: `docs/API.md` (export row), REQ-0016
+  evidence, CHANGELOG.
+- Diff vs `v0.6.0` grew 398 files (+52,946 → +53,008 insertions);
   still zero file deletions.
 
 ## 11. What changed in the 2026-11-15 second audit triage
