@@ -64,6 +64,38 @@ def test_sessions_cli_list_export_round_trip(tmp_path, capsys):
     assert list((tmp_path / "out").glob("*.md"))
 
 
+def test_append_messages_reuses_the_session(tmp_path):
+    st = SessionStore(str(tmp_path))
+    rec = st.create(title="Chat", messages=[("user", "first")])
+    before = st.get(rec["id"])                                                # noqa: E501
+    st.append_messages(rec["id"], [("assistant", "answer"), ("user", "follow-up")])
+    after = st.get(rec["id"])                                                # noqa: E501
+    assert [m["content"] for m in after["messages"]] == ["first", "answer", "follow-up"]
+    assert after["updated"] >= before["updated"]
+    with pytest.raises(ValueError, match="unknown role"):
+        st.append_messages(rec["id"], [("narrator", "boo")])
+
+
+def test_chat_resume_seed_and_append_round_trip(tmp_path, monkeypatch):
+    from kindi import __main__ as cli
+    cfg = {"state_dir": str(tmp_path / "state")}
+    st = SessionStore(str(tmp_path / "state" / "sessions"))
+    rec = st.create(title="Chat", messages=[("user", "first question"), ("assistant", "old answer")])
+    seeded_rec, msgs = cli._resume_chat(cfg, rec["id"])
+    assert seeded_rec["id"] == rec["id"]
+    assert msgs == [{"role": "user", "content": "first question"},
+                    {"role": "assistant", "content": "old answer"}]
+    msgs += [{"role": "user", "content": "next question"}, {"role": "assistant", "content": "new answer"}]
+    cli._append_chat(cfg, rec["id"], msgs[2:])
+    contents = [m["content"] for m in st.get(rec["id"])["messages"]]          # noqa: E501
+    assert contents == ["first question", "old answer", "next question", "new answer"]
+    # a malformed or unknown id refuses loudly instead of seeding an empty chat
+    with pytest.raises(SystemExit, match="12 hex characters"):
+        cli._resume_chat(cfg, "../etc/passwd")
+    with pytest.raises(SystemExit, match="no session"):
+        cli._resume_chat(cfg, "0" * 12)
+
+
 def test_slug_and_hash(tmp_path):
     assert slug("  Hello, World!  ") == "hello-world"
     assert slug("") == "session"

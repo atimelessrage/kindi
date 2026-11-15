@@ -8,7 +8,8 @@
   kindi calibrate               measure the per-machine tuning once (5-trit configs, placement, draft length)
   kindi plan                    dry-run placement report (no weights loaded; --assume-vram-gib tests a card's split)
   kindi serve                   run the OpenAI-compatible server
-  kindi chat                    chat in the terminal (no server needed; saves the session unless --no-record)
+  kindi chat                    chat in the terminal (no server needed; saves the session unless --no-record;
+                                --resume SESSION_ID continues a saved session in place)
   kindi sessions                list, triage, tag and export chat sessions as raw markdown
   kindi head exact|fast         choose the output head of a running server (next request, no restart)
   kindi info                    show the configuration, the pack and the GPU
@@ -21,6 +22,7 @@ where LIST is an explicit layer set (0,1,2,4 or 0-2,4-6) and gdn:N moves the fir
 import argparse
 import json
 import os
+import re
 import sys
 import time
 
@@ -103,6 +105,32 @@ def _record_chat(cfg, msgs):
     title = next((str(m["content"]).strip().splitlines()[0][:60] for m in convo if m["role"] == "user"), "chat")
     st = SessionStore(os.path.join(cfg["state_dir"], "sessions"))
     rec = st.create(title=title, messages=[(m["role"], m["content"]) for m in convo])
+    return rec["id"]
+
+
+def _resume_chat(cfg, sid):
+    """Load a stored session's turns as the chat seed; unknown or malformed ids refuse loudly."""
+    from .sessions import SessionStore
+    if not sid or not re.fullmatch(r"[0-9a-f]{12}", str(sid)):
+        raise SystemExit("kindi chat --resume: the session id must be 12 hex characters (got %r)" % sid)
+    st = SessionStore(os.path.join(cfg["state_dir"], "sessions"))
+    try:
+        rec = st.get(sid)
+    except KeyError:
+        raise SystemExit("kindi chat --resume: no session %s (kindi sessions list)" % sid)
+    return rec, [{"role": m["role"], "content": m["content"]}
+                  for m in rec.get("messages", [])
+                  if m.get("role") in ("system", "user", "assistant")]
+
+
+def _append_chat(cfg, sid, msgs):
+    """Append the new turns of a resumed chat back to its stored session."""
+    from .sessions import SessionStore
+    convo = [m for m in msgs if m.get("role") in ("user", "assistant") and str(m.get("content") or "").strip()]
+    if not convo:
+        return None
+    st = SessionStore(os.path.join(cfg["state_dir"], "sessions"))
+    rec = st.append_messages(sid, [(m["role"], m["content"]) for m in convo])
     return rec["id"]
 
 
@@ -213,8 +241,14 @@ def cmd_chat(cfg, a):
     _setup_gpu_env(cfg)
     from .server import Kindi
     K = Kindi(cfg, log=log)
-    msgs = []
-    if a.system:
+    msgs, seed_len = [], 0
+    if a.resume:
+        rec, seeded = _resume_chat(cfg, a.resume)
+        msgs = [{"role": "system", "content": a.system}] if a.system else []
+        msgs += seeded
+        seed_len = len(msgs)
+        print("resumed session %s (%d prior turns)" % (rec["id"], len(seeded)))
+    elif a.system:
         msgs.append({"role": "system", "content": a.system})
     print("Kindi %s - type a message, /reset to start over, /exit to quit." % __version__)
     while True:
@@ -242,9 +276,14 @@ def cmd_chat(cfg, a):
                 sys.stdout.write("\n  (%.1f tokens/s)" % val["timing"]["gen_tok_s"])
         msgs.append({"role": "assistant", "content": reply})
     if not a.no_record:
-        sid = _record_chat(cfg, msgs)
-        if sid:
-            print("\nsaved session %s (kindi sessions list)" % sid)
+        if a.resume:
+            sid = _append_chat(cfg, a.resume, msgs[seed_len:])
+            if sid:
+                print("\nappended to session %s (kindi sessions list)" % sid)
+        else:
+            sid = _record_chat(cfg, msgs)
+            if sid:
+                print("\nsaved session %s (kindi sessions list)" % sid)
 
 
 def cmd_head(cfg, a):
@@ -412,6 +451,7 @@ def main(argv=None):
     s.add_argument("--temperature", type=float, default=0.7)
     s.add_argument("--max-tokens", dest="max_tokens", type=int, default=1024)
     s.add_argument("--no-record", action="store_true", help="do not save this chat as a session (state_dir/sessions)")
+    s.add_argument("--resume", metavar="SESSION_ID", help="continue a saved session (kindi sessions list) instead of starting a new one; new turns append back to it")
     _tandem_args(s)
     s = sub.add_parser("sessions", help="list, triage, tag and export chat sessions (state_dir/sessions)")
     s.add_argument("action", choices=("list", "show", "export", "triage", "tag", "status", "import"))

@@ -61,6 +61,18 @@ class SessionStore(object):
         self._save(rec)
         return rec
 
+    def append_messages(self, rec_or_id, messages):
+        """Append new turns to a stored session and save once (`kindi chat --resume` reuses the id)."""
+        rec = self._coerce(rec_or_id)
+        for role, content in (messages or []):
+            if role not in ("system", "user", "assistant", "tool"):
+                raise ValueError("unknown role %r" % role)
+        for role, content in (messages or []):
+            rec["messages"].append({"role": role, "content": str(content), "ts": _now()})
+        rec["updated"] = _now()
+        self._save(rec)
+        return rec
+
     # ---- triage and tags ----
     def set_status(self, rec_or_id, status):
         if status not in STATUSES:
