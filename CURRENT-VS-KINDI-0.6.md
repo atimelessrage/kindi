@@ -15,13 +15,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `ea1b120`:
+HEAD `7d395fe`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 297 commits
-git diff --shortstat v0.6.0..HEAD          # 398 files, +53,062/-993
+git log --oneline v0.6.0..HEAD | wc -l     # 302 commits
+git diff --shortstat v0.6.0..HEAD          # 398 files, +53,181/-995
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -192,6 +192,23 @@ arbitrary-draft-GGUF harness stays a separate gate.
   dispatch gap) stands. Recorded in `docs/TANDEM-STATUS.md` and the
   CHANGELOG.
 - Diff vs `v0.6.0` grew 398 files (+53,008 → +53,062 insertions);
+  still zero file deletions.
+- §15: session resume in the chat loop (REQ-0016), plus a full-suite
+  re-measurement (779 passed, 11 skipped).
+
+## 15. What changed in the 2026-11-15 roadmap round (session resume)
+
+- `kindi chat --resume SESSION_ID` lands the last open REQ-0016 queued
+  item before storage growth: the REPL is seeded with the stored turns
+  and appends new turns back to the same record on exit
+  (`SessionStore.append_messages`, one save, bumps `updated`;
+  malformed/unknown ids refuse loudly); the seed/append round trip and
+  the refusals are pinned by tests (`2b36d19`).
+- Full suite re-measured at `24b4a2f` with clang on PATH:
+  **779 passed, 11 skipped, 0 failed** (one environment error without
+  clang, the documented case); AGENTS.md current-state updated.
+- Only REQ-0016 item left open: unbounded session storage growth.
+- Diff vs `v0.6.0` grew 398 files (+53,062 → +53,181 insertions);
   still zero file deletions.
 
 ## 11. What changed in the 2026-11-15 second audit triage
