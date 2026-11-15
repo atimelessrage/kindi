@@ -772,6 +772,9 @@ class Kindi(object):
         stops = req.get("stop") or []
         if isinstance(stops, str):
             stops = [stops]
+        stop_seq = [s for s in stops if s]
+        stop_win = max((len(s) for s in stop_seq), default=0)
+        stop_from = 0       # text[:stop_from] is known stop-free (the check runs every token unless thinking)
         seed = req.get("seed")
         rng = np.random.RandomState(seed if seed is not None else int(time.time() * 1000) % 2 ** 31)
         kw = req.get("chat_template_kwargs") or {}
@@ -866,9 +869,21 @@ class Kindi(object):
                 self.busy["generated"] = len(gen)
                 piece = dec.decode(self.tok.decode_bytes(tok))
                 text += piece
-                hit = None if st["think"] else next((s for s in stops if s and s in text), None)
-                if hit:
-                    text = text[:text.index(hit)]
+                # the stop check scans only the not-yet-checked tail (a match verified earlier cannot
+                # reappear), instead of the whole reply every token, which made generation O(n^2).
+                hit = None
+                if stop_seq and not st["think"]:
+                    base = max(0, stop_from - (stop_win - 1))
+                    tail = text[base:]
+                    for s in stop_seq:
+                        i = tail.find(s)
+                        if i >= 0:
+                            hit, hit_at = s, base + i
+                            break
+                    if hit is None:
+                        stop_from = len(text)
+                if hit is not None:
+                    text = text[:hit_at]
                     finish = "stop"
                     break
                 for item in route(piece):

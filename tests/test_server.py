@@ -134,6 +134,84 @@ def test_unsupported_fields_name_their_param(app_client):
         assert r.json()["error"]["param"] == param, r.text
 
 
+class _StopTok(object):
+    """A character codec for driving the real generate() loop without a model."""
+
+    def encode(self, s):
+        return [ord(c) % 256 for c in str(s)] or [1]
+
+    def decode_bytes(self, t):
+        return bytes([t % 256])
+
+
+class _StopEngine(object):
+    ctx = 4096
+    hsl = None
+    shortlist = 0
+
+
+class _StopRunner(object):
+    def prepare(self, *a, **k):
+        return None, 0
+
+    def step(self, tok):
+        return None
+
+    def idle(self):
+        return None
+
+
+def _drive_stop(script, req_extra=None, think=False):
+    """Run the real `Kindi.generate` loop with scripted tokens (characters as ords).
+
+    The loop's per-token work (stop detection, think routing, truncation) is the code under
+    test; only token generation itself is scripted.
+    """
+    K = object.__new__(server.Kindi)
+    K.cfg = {"model_name": "fake", "temperature": 0.0, "top_p": 1.0, "top_k": 0,
+             "max_tokens": 512, "repeat_stop": False, "fast_clusters": 0}
+    K.native = False
+    K.nanbeige = None
+    K.variant = None
+    K.tok = _StopTok()
+    K.eng = _StopEngine()
+    K.runner = _StopRunner()
+    K.busy = {"active": False, "phase": "", "prompt_tokens": 0, "cached": 0,
+              "read": 0, "generated": 0, "started": 0.0}
+    K.stats = {"requests": 0, "prompt_tokens": 0, "cached_tokens": 0, "completion_tokens": 0,
+               "gen_seconds": 0.0, "spec_passes": 0, "spec_drafted": 0, "spec_accepted": 0}
+    K.log = lambda *a: None
+    K.head_mode = lambda: "exact"
+    K.sample = lambda *a, **k: script.pop(0)
+    K._pick = lambda *a, **k: script.pop(0)
+    req = {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 30,
+           "temperature": 0.0, "top_p": 1.0, "top_k": 0}
+    if req_extra:
+        req.update(req_extra)
+    if think:
+        req["enable_thinking"] = True
+    items = list(K.generate(req))
+    done = next(v for kind, v in items if kind == "done")
+    return done, items
+
+
+def test_stop_spans_token_pieces_and_truncates():
+    pieces = ["ab", "cdef", "STOP", "ghij"]
+    script = [ord(c) for piece in pieces for c in piece]
+    done, items = _drive_stop(script, req_extra={"stop": ["cdefSTOP"]})
+    assert done["finish"] == "stop"
+    assert done["content"] == "ab"
+
+
+def test_stop_seen_while_thinking_still_stops_after_think_closes():
+    # the stop check is skipped while thinking; a match inside the thinking text must
+    # still be found by the first check after </think> closes (frozen stop_from)
+    pieces = ["STOP"] + ["<"] + ["/"] + ["t", "h", "i", "n", "k", ">"] + ["abc", "def"]
+    script = [ord(c) for piece in pieces for c in piece]
+    done, items = _drive_stop(script, req_extra={"stop": ["STOP"]}, think=True)
+    assert done["finish"] == "stop"
+
+
 def test_default_n_and_text_response_format_are_accepted(app_client):
     client, _ = app_client
     r = client.post("/v1/chat/completions", json={
