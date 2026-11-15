@@ -77,3 +77,13 @@ def test_the_scan_reads_environment_gets_and_subscripts(tmp_path):
     assert found["KINDI_NO_DEFAULT"]["defaults"] == []
     assert "KINDI_FROM_SUBSCRIPT" in found
     assert all(name != "KINDI_" for name in found)      # a built name is not a literal read
+
+
+def test_the_scan_covers_subpackages():
+    """`KINDI_BACKEND_MODULES` is read in `kindi/backends/`; a top-level-only
+    scan silently dropped it from the reference (the N2/N3 class again)."""
+    found = config_reference.env_vars()
+    assert "KINDI_BACKEND_MODULES" in found, "subpackage reads are not scanned"
+    sites = [s for s, _ in found["KINDI_BACKEND_MODULES"]["sites"]]
+    assert "backends/registry.py" in sites
+    assert "| `KINDI_BACKEND_MODULES` |" in reference_text()

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Config reference now scans subpackages.** `kindi/config_reference.py`
+  `env_vars()` only read `kindi/*.py`, so `KINDI_BACKEND_MODULES` (read in
+  `kindi/backends/registry.py`) was missing from the generated
+  `docs/CONFIGURATION-REFERENCE.md`. The scan is now recursive with
+  subpackage-aware site paths, the reference is regenerated, and
+  `test_the_scan_covers_subpackages` pins it.
+
 ### New
 
 - **Loud rejection of unsupported `n` and `response_format`**

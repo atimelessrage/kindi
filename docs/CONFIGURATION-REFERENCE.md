@@ -94,6 +94,7 @@ variables, and are therefore not listed twice here.
 | variable | default | read in |
 |---|---|---|
 | `KINDI_ATT_TC` | `0` | `kindi/chunk.py:442` (+1 more) |
+| `KINDI_BACKEND_MODULES` | (empty) | `kindi/backends/__init__.py:45` (+1 more) |
 | `KINDI_BATCH` | `4` | `kindi/spec.py:1867` (+1 more) |
 | `KINDI_BENCH_ATTN` | (unset) | `kindi/dsv41.py:1157` |
 | `KINDI_BLOCKING_SYNC` | `1` | `kindi/chunk.py:474` (+7 more) |

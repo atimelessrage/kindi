@@ -130,8 +130,13 @@ def _default_text(node, src):
 def env_vars(paths=None):
     """name -> {defaults: [...], sites: [...]} for every `KINDI_*` read under `kindi/`"""
     found = {}
-    for path in (paths if paths is not None else sorted(glob.glob(os.path.join(HERE, "*.py")))):
+    # every read under kindi/, including subpackages (`kindi/backends/` reads
+    # KINDI_BACKEND_MODULES); a top-level-only scan silently drops those
+    for path in (paths if paths is not None else
+                 sorted(glob.glob(os.path.join(HERE, "**", "*.py"), recursive=True))):
         src = _read(path)
+        rel = os.path.relpath(path, HERE).replace("\\", "/")
+        site_file = rel if not rel.startswith("..") else os.path.basename(path)
         for node in ast.walk(ast.parse(src)):
             name = default = None
             if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
@@ -147,7 +152,7 @@ def env_vars(paths=None):
             if not name or not ENV_NAME.match(name):
                 continue
             entry = found.setdefault(name, {"defaults": [], "sites": []})
-            site = (os.path.basename(path), node.lineno)
+            site = (site_file, node.lineno)
             if site not in entry["sites"]:
                 entry["sites"].append(site)
             if default is not None and default not in entry["defaults"]:
