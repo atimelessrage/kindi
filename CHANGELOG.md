@@ -4,6 +4,9 @@
 
 ### Added
 
+- **Tandem split timings on `/metrics`** (`kindi_tandem_*` gauges: cpu,
+  gpu, transfer, head and total ms/token plus tokens and handoffs per
+  token) — visible whenever the `KINDI_TANDEM_DEBUG_TIMING` probe ran.
 - **`kindi chat --resume SESSION_ID`** continues a saved session: the REPL
   is seeded with the stored turns and new turns append back to the same
   record on exit (`SessionStore.append_messages`).
