@@ -19,7 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = Path(os.environ.get("KINDI_INSTALLER", ROOT / "install.sh"))
-FUNCS = ("card_tc", "card_class", "pair_ok", "card_models", "card_k", "profile_of")
+FUNCS = ("card_tc", "card_class", "pair_ok", "pair_fits", "card_models", "card_k", "profile_of")
 
 
 def installer_text():
@@ -87,6 +87,7 @@ def pair(name_a, mem_a, cc_a, name_b, mem_b, cc_b):
 echo "class0=$(card_class 0)"
 echo "class1=$(card_class 1)"
 if pair_ok 0 1; then echo "pair=yes"; else echo "pair=no"; fi
+for m in 27b nemotron; do if pair_fits 0 1 "$m"; then echo "$m=yes"; else echo "$m=no"; fi; done
 """)
 
 
@@ -372,6 +373,47 @@ echo "env=${ENV[*]}"
     # with TMAX=4); this harness has no dspine files, so the 2B drafter env must be set
     assert "KINDI_SPEC=auto" in info["env"], info
     assert "KINDI_SPEC_K=3" in info["env"] and "KINDI_TC_TMAX=4" in info["env"], info
+
+
+def test_pascal_maxwell_turing_rig_classifies_every_card():
+    # the user's rig: Quadro P4000 (Pascal 6.1) + Quadro M4000 (Maxwell 5.2) + Quadro RTX 4000 (Turing 7.5)
+    names = ["Quadro P4000", "Quadro M4000", "Quadro RTX 4000"]
+    info = fields(names, [8192, 8192, 8192], ["6.1", "5.2", "7.5"], """
+echo "class0=$(card_class 0)"
+echo "class1=$(card_class 1)"
+echo "class2=$(card_class 2)"
+echo "models0=$(card_models 0)"
+echo "models1=$(card_models 1)"
+echo "models2=$(card_models 2)"
+for p in "0 1" "0 2" "1 2"; do set -- $p; if pair_ok "$1" "$2"; then echo "pair$1$2=yes"; else echo "pair$1$2=no"; fi; done
+""")
+    if info is None:
+        return
+    assert (info["class0"], info["class1"], info["class2"]) == ("pascal8", "maxwell", "turing"), info
+    assert info["pair01"] == info["pair02"] == info["pair12"] == "yes", info
+
+
+def test_the_rig_pair_setups_fit_and_the_profiles_match():
+    # every pairing of the rig fits a 27b split on 8 GB cards; the mixed Pascal/Maxwell pair
+    # forces KINDI_G5=0 (2-bit on both), while Turing+Pascal keeps the 5-trit path
+    info = pair("Quadro P4000", 8192, "6.1", "Quadro M4000", 8192, "5.2")
+    if info is None:
+        return
+    assert info["27b"] == "yes" and info["nemotron"] == "yes", info
+    prof = profile(["Quadro P4000", "Quadro M4000"], [8192, 8192], ["6.1", "5.2"])
+    assert prof["profile"] == "k1200x2" and "KINDI_G5=0" in prof["env"], prof
+    prof2 = profile(["Quadro RTX 4000", "Quadro P4000"], [8192, 8192], ["7.5", "6.1"])
+    assert prof2["profile"] == "k1200x2" and "KINDI_G5=0" not in prof2["env"], prof2
+
+
+# two sub-3.8GB cards: Nemotron (whose tensor-parallel requirement is 2,400 MiB per card) is offered,
+# the 27B (3,800 MiB) is not -- the smaller offer remains usable
+def test_pair_fits_offers_nemotron_but_not_27b_on_smaller_pairs():
+    info = pair("Quadro P1000", 2500, "6.1", "Quadro P1000", 2500, "6.1")
+    if info is None or info.get("class0") != "maxwell":
+        return
+    assert info["pair"] == "yes", info
+    assert info["27b"] == "no" and info["nemotron"] == "yes", info
 
 
 if __name__ == "__main__":

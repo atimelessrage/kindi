@@ -737,7 +737,9 @@ for k in $(seq 0 $((NG - 1))); do
 done
 pair_ok() {       # two NVIDIA card positions -> 0 if they run a model split over both (tensor parallel)
   local a=$1 b=$2 ca cb
-  [ "${GMEM[$a]}" -ge 3800 ] && [ "${GMEM[$b]}" -ge 3800 ] || return 1
+  # the floor is the smallest per-card tensor-parallel requirement (Nemotron 2,400 MiB; the 27B needs
+  # 3,800 and pair_fits keeps it off smaller pairs)
+  [ "${GMEM[$a]}" -ge 2400 ] && [ "${GMEM[$b]}" -ge 2400 ] || return 1
   ca=$(card_class "$a"); cb=$(card_class "$b")
   # Any two cards from a pair-supported class can use the plain two-card engine, including cards
   # from different generations. Two sm_80+ cards are upgraded to tc2 by profile_of; a mixed pair
@@ -746,6 +748,15 @@ pair_ok() {       # two NVIDIA card positions -> 0 if they run a model split ove
   # needs a K/V slice and the exchange on each card.
   case "$ca" in maxwell|pascal8|turing|tc|p100) ;; *) return 1 ;; esac
   case "$cb" in maxwell|pascal8|turing|tc|p100) ;; *) return 1 ;; esac
+}
+# Per-card feasibility for a split model: each card must meet the model's tensor-parallel per-card
+# requirement (the `two` field in kindi/catalog.py: 27b 3,800 MiB, nemotron 2,400 MiB). Without this
+# a pair of small cards is offered a model whose shard cannot fit (the engine can only reduce
+# context; it cannot shrink the weights).
+pair_fits() {      # two NVIDIA card positions + model -> 0 when each card meets that model's per-card requirement
+  local a=$1 b=$2 need
+  case "$3" in 27b) need=3800 ;; nemotron) need=2400 ;; *) return 1 ;; esac
+  [ "${GMEM[$a]}" -ge "$need" ] && [ "${GMEM[$b]}" -ge "$need" ]
 }
 amd_models() {    # AMD GPU position -> the models that run on it, the best first
   local V=${AMEM[$1]} m=""
@@ -798,8 +809,9 @@ if [ "$GPU" != cpu ]; then
     PAIR=""
     if [ "$TRIPLE_MULTI" = 0 ] && [ -n "$pa" ] && pair_ok "$pa" "$pb"; then
       PAIR="${GIDX[$pa]},${GIDX[$pb]}"
-      want 27b && add_cfg "cuda|27b|$PAIR" "$(model_label 27b) on GPUs ${PAIR}, split over both cards"
-      want nemotron && add_cfg "cuda|nemotron|$PAIR" "$(model_label nemotron) on GPUs ${PAIR}, split over both cards"
+      # per model: offer the split only when each card can hold its weight share (pair_fits)
+      want 27b && pair_fits "$pa" "$pb" 27b && add_cfg "cuda|27b|$PAIR" "$(model_label 27b) on GPUs ${PAIR}, split over both cards"
+      want nemotron && pair_fits "$pa" "$pb" nemotron && add_cfg "cuda|nemotron|$PAIR" "$(model_label nemotron) on GPUs ${PAIR}, split over both cards"
     elif [ "$TRIPLE_MULTI" = 0 ] && [[ "$GPU" == *,* ]] && ! { want nanbeige && nb_cards "$pa" "$pb" >/dev/null; }; then die "GPUs ${GPU} cannot run one model together (two supported cards with at least 4 GB each, such as a P106 and a P4000, can; Nanbeige 33B needs sm_80 cards or Tesla P100s with 16.2 GB in total, plus 0.7 GB for each more card)"
     fi
     if { [[ "$GPU" != *,* ]] || [ "$TRIPLE_MULTI" = 1 ]; } && [[ "$GPU" != amd* ]]; then

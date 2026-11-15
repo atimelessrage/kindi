@@ -187,7 +187,7 @@ the automatic path is opt-in because `equal` remains the default.
 | phase | work | gate | status |
 |---|---|---|---|
 | P0 | freeze claims; keep mixed offers experimental; link this proposal | current 19 installer tests pass; no mixed-card support claim | **done 2026-11-11** (proposal only) |
-| P1 | per-card feasibility and `KINDI_G5=0` test | fake-table and plan tests reject impossible offers; both shard paths checked | pending |
+| P1 | per-card feasibility and `KINDI_G5=0` test | fake-table and plan tests reject impossible offers; both shard paths checked | **partial 2026-11-14**: `pair_fits()` gates each pair setup by the model's per-card TP requirement (27B 3,800 MiB, Nemotron 2,400 MiB from `kindi/catalog.py`'s `two` field), and `pair_ok`'s floor dropped to 2,400 so Nemotron can be offered on smaller pairs; fake-table tests cover the P4000 (pascal8) + M4000 (maxwell) + RTX 4000 (turing) rig — all three pairings pair, M4000+P4000 forces `KINDI_G5=0`, Turing+Pascal keeps the 5-trit path. A full per-card K/V-at-context accounting is still pending; no mixed-card GPU run exists. |
 | P2 | equal-split mixed hardware validation | 27B verify plus server/cache on at least one mixed pair | pending |
 | P3 | Turing/TC mixed path | `tc_turing` `W=2` verify, or an explicit plain-path decision | pending |
 | P4 | asymmetric layout design and implementation | token-exact equal/full-GPU comparison; peak VRAM | **partial 2026-11-12**: complete layout, `KINDI_TP_SPLIT=auto|equal`, aligned fallbacks, cache/fingerprint coverage and CPU-only tests; no mixed-card run |
