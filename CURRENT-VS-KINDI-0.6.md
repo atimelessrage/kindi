@@ -15,13 +15,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `7d395fe`:
+HEAD `d4aff7e`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 302 commits
-git diff --shortstat v0.6.0..HEAD          # 398 files, +53,181/-995
+git log --oneline v0.6.0..HEAD | wc -l     # 307 commits
+git diff --shortstat v0.6.0..HEAD          # 398 files, +53,292/-995
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -209,6 +209,20 @@ arbitrary-draft-GGUF harness stays a separate gate.
   clang, the documented case); AGENTS.md current-state updated.
 - Only REQ-0016 item left open: unbounded session storage growth.
 - Diff vs `v0.6.0` grew 398 files (+53,062 → +53,181 insertions);
+  still zero file deletions.
+- §16: session retention pruning closes REQ-0016 completely.
+
+## 16. What changed in the 2026-11-15 roadmap round (session retention)
+
+- `SessionStore.prune` + `kindi sessions prune --days N [--all]
+  [--dry-run]`: by default deletes only `resolved` sessions not
+  updated for N days; `--all` widens the scope; `--dry-run` lists
+  without deleting; unparseable timestamps are never pruned; negative
+  days are refused. Pinned by store and CLI tests (`27590c1`).
+- REQ-0016 (chat sessions, experimental) is now fully implemented:
+  store + CLI + triage + tags + raw-markdown export/import +
+  server-side `/sessions` endpoints + resume + retention.
+- Diff vs `v0.6.0` grew 398 files (+53,181 → +53,292 insertions);
   still zero file deletions.
 
 ## 11. What changed in the 2026-11-15 second audit triage
