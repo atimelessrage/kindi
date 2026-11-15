@@ -2,8 +2,9 @@
 
 Report date: **2026-11-15** (refresh of the 2026-11-14 report; §7 records
 what changed since, §8 the 2026-11-15 sessions-endpoint round, §9 the
-2026-11-15 unsupported-field rejection round, and §10 the 2026-11-15 audit
-triage round). This file is the successor to
+2026-11-15 unsupported-field rejection round, §10 the 2026-11-15 audit
+triage round, and §11 the 2026-11-15 second audit triage). This file is the
+successor to
 `CURRENT-VS-KINDI-0.5.md` §25: that file's §§1–24 are the history against
 0.5.0 and §25 is the first evaluation against 0.6.0; this file carries the
 current one. It separates verified behavior from recorded evidence,
@@ -14,13 +15,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `517a635`:
+HEAD `ec31c76`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 274 commits
-git diff --shortstat v0.6.0..HEAD          # 398 files, +52,794/-993
+git log --oneline v0.6.0..HEAD | wc -l     # 278 commits
+git diff --shortstat v0.6.0..HEAD          # 398 files, +52,813/-993
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -140,6 +141,20 @@ arbitrary-draft-GGUF harness stays a separate gate.
   `docs/MIXED-CARD-ROADMAP.md` for the per-item gates.
 - GPU evidence (gitignored bench-logs): `bench-logs/req0015-gate-27b/`
   (draft-policy 27B gate), `bench-logs/convert-4b-verify/` (4B provenance).
+
+## 11. What changed in the 2026-11-15 second audit triage
+
+- Triaged `Buffy_ReviewAudit_202611151307.txt` (audited `f07d42b`): secrets
+  clean, prior dispositions verified. Remaining items are process/hardware:
+  fork lag (push 403, `myfork` 219 commits behind), GPU CI runner, T4.2
+  adapters, AVX-512, a real FP8/BF16 model, Windows installer.
+- One audit claim is stale: the engine no longer splits columns 50/50 — a
+  proportional `plan_split` with `KINDI_TP_SPLIT=auto` (installer sets it
+  for unequal pairs) is implemented and pinned by tests; only mixed-pair
+  GPU verification is hardware-bound.
+- Hygiene: `AGENTS.md` Current-state line refreshed — full suite 773 passed,
+  11 skipped (clang on PATH) at `ec31c76`; superset 398 files, +52,813/−993.
+- Diff vs `v0.6.0`: still 398 files, zero file deletions.
 
 ## 10. What changed in the 2026-11-15 audit triage round
 
