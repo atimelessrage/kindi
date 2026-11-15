@@ -73,6 +73,25 @@ class SessionStore(object):
         self._save(rec)
         return rec
 
+    def stats(self):
+        """Store-level visibility for retention decisions: counts by status, message totals,
+        bytes on disk, and the oldest/newest last-update (None when the store is empty)."""
+        rows = self.list()
+        by_status = {s: 0 for s in STATUSES}
+        for r in rows:
+            if r.get("status") in by_status:
+                by_status[r["status"]] += 1
+        try:
+            total_bytes = sum(os.path.getsize(self.path(r["id"])) for r in rows)
+        except OSError:
+            total_bytes = 0
+        updates = sorted(r.get("updated") for r in rows if r.get("updated"))
+        return {"sessions": len(rows), "by_status": by_status,
+                "messages": sum(len(r.get("messages") or []) for r in rows),
+                "bytes": total_bytes,
+                "oldest_updated": updates[0] if updates else None,
+                "newest_updated": updates[-1] if updates else None}
+
     # ---- retention ----
     def prune(self, older_than_days=30, statuses=("resolved",), dry_run=False):
         """Delete (or list) sessions whose last update is older than the cutoff.

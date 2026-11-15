@@ -143,6 +143,38 @@ def test_sessions_prune_cli(tmp_path, capsys):
     assert st.list() == []
 
 
+def test_store_stats(tmp_path):
+    st = SessionStore(str(tmp_path))
+    empty = st.stats()
+    assert empty["sessions"] == 0 and empty["messages"] == 0 and empty["bytes"] == 0
+    assert empty["oldest_updated"] is None and empty["newest_updated"] is None
+    a = st.create(title="a", messages=[("user", "x"), ("assistant", "y")])
+    b = st.create(title="b")
+    st.set_status(b["id"], "resolved")
+    got = st.stats()
+    assert got["sessions"] == 2
+    assert got["by_status"] == {"open": 1, "needs-review": 0, "resolved": 1}
+    assert got["messages"] == 2
+    assert got["bytes"] > 0
+    assert got["oldest_updated"] <= got["newest_updated"]
+
+
+def test_sessions_stats_cli_text_and_json(tmp_path, capsys):
+    from kindi.__main__ import main
+    import json as _json
+    root = str(tmp_path)
+    st = SessionStore(root + "/sessions")
+    st.create(title="one", messages=[("user", "hi")])
+    st.create(title="two")
+    assert main(["--state-dir", root, "sessions", "stats"]) == 0
+    out = capsys.readouterr().out
+    assert "sessions: 2 (open 2, needs-review 0, resolved 0)" in out
+    assert "messages: 1" in out
+    assert main(["--state-dir", root, "sessions", "stats", "--json"]) == 0
+    payload = _json.loads(capsys.readouterr().out)
+    assert payload["sessions"] == 2 and payload["messages"] == 1 and payload["bytes"] > 0
+
+
 def test_slug_and_hash(tmp_path):
     assert slug("  Hello, World!  ") == "hello-world"
     assert slug("") == "session"
