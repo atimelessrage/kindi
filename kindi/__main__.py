@@ -8,7 +8,8 @@
   kindi calibrate               measure the per-machine tuning once (5-trit configs, placement, draft length)
   kindi plan                    dry-run placement report (no weights loaded; --assume-vram-gib tests a card's split)
   kindi serve                   run the OpenAI-compatible server
-  kindi chat                    chat in the terminal (no server needed)
+  kindi chat                    chat in the terminal (no server needed; saves the session unless --no-record)
+  kindi sessions                list, triage, tag and export chat sessions as raw markdown
   kindi head exact|fast         choose the output head of a running server (next request, no restart)
   kindi info                    show the configuration, the pack and the GPU
 Global options: --config FILE, --pack DIR, --state-dir DIR, --ctx N.
@@ -29,6 +30,79 @@ from . import config as C
 def log(msg):
     sys.stdout.write("[kindi %s] %s\n" % (time.strftime("%H:%M:%S"), msg))
     sys.stdout.flush()
+
+
+def cmd_sessions(cfg, a):
+    """kindi sessions list|show|export|triage|tag|status|import (host-only; reads state_dir/sessions)."""
+    from .sessions import SessionStore, STATUSES
+    st = SessionStore(os.path.join(cfg["state_dir"], "sessions"))
+    if a.action == "list":
+        rows = st.list(status=a.status, tag=a.tag)
+        if not rows:
+            log("no sessions")
+            return 0
+        for r in rows:
+            log("%s  %-24s %-13s %d msgs  %s" % (r["id"], r["title"][:24], r["status"],
+                                               len(r.get("messages") or []),
+                                               ",".join(r.get("tags") or [])))
+        return 0
+    if a.action == "show":
+        if not a.id:
+            raise SystemExit("kindi sessions show: give a session id")
+        rec = st.get(a.id[0])
+        sys.stdout.write(st.export_markdown(rec))
+        return 0
+    if a.action == "triage":
+        rows = st.triage()
+        if not rows:
+            log("triage queue is empty")
+            return 0
+        for r in rows:
+            log("%s  %-24s %-13s %d msgs  %s" % (r["id"], r["title"][:24], r["status"],
+                                               len(r.get("messages") or []),
+                                               ",".join(r.get("tags") or [])))
+        return 0
+    if a.action == "export":
+        if not a.id:
+            raise SystemExit("kindi sessions export: give at least one session id")
+        for sid in a.id:
+            path = st.export_file(st.get(sid), a.out or os.getcwd())
+            log("exported %s -> %s" % (sid, path))
+        return 0
+    if a.action == "tag":
+        if not a.id or not a.tag:
+            raise SystemExit("kindi sessions tag: give a session id and --tag")
+        st.add_tag(a.id[0], a.tag)
+        log("tagged %s with %s" % (a.id[0], a.tag))
+        return 0
+    if a.action == "status":
+        if not a.id or not a.status:
+            raise SystemExit("kindi sessions status: give a session id and --status")
+        if a.status not in STATUSES:
+            raise SystemExit("kindi sessions: status must be one of %s (got %r)" % (STATUSES, a.status))
+        st.set_status(a.id[0], a.status)
+        log("session %s -> %s" % (a.id[0], a.status))
+        return 0
+    if a.action == "import":
+        if not a.id:
+            raise SystemExit("kindi sessions import: give a markdown file (or - for stdin)")
+        text = sys.stdin.read() if a.id[0] == "-" else open(a.id[0], encoding="utf-8").read()
+        rec = st.import_markdown(text)
+        log("imported %s (%d msgs)" % (rec["id"], len(rec["messages"])))
+        return 0
+    raise SystemExit("kindi sessions: unknown action")
+
+
+def _record_chat(cfg, msgs):
+    """Save a chat transcript as a session (host-only; no GPU touched)."""
+    from .sessions import SessionStore
+    convo = [m for m in msgs if m.get("role") in ("user", "assistant") and str(m.get("content") or "").strip()]
+    if not convo:
+        return None
+    title = next((str(m["content"]).strip().splitlines()[0][:60] for m in convo if m["role"] == "user"), "chat")
+    st = SessionStore(os.path.join(cfg["state_dir"], "sessions"))
+    rec = st.create(title=title, messages=[(m["role"], m["content"]) for m in convo])
+    return rec["id"]
 
 
 def _setup_gpu_env(cfg):
@@ -147,9 +221,9 @@ def cmd_chat(cfg, a):
             line = input("\nyou> ")
         except (EOFError, KeyboardInterrupt):
             print()
-            return 0
+            break
         if line.strip() in ("/exit", "/quit"):
-            return 0
+            break
         if line.strip() == "/reset":
             msgs = msgs[:1] if a.system else []
             continue
@@ -166,6 +240,10 @@ def cmd_chat(cfg, a):
             else:
                 sys.stdout.write("\n  (%.1f tokens/s)" % val["timing"]["gen_tok_s"])
         msgs.append({"role": "assistant", "content": reply})
+    if not a.no_record:
+        sid = _record_chat(cfg, msgs)
+        if sid:
+            print("\nsaved session %s (kindi sessions list)" % sid)
 
 
 def cmd_head(cfg, a):
@@ -312,7 +390,14 @@ def main(argv=None):
     s.add_argument("--system", default="")
     s.add_argument("--temperature", type=float, default=0.7)
     s.add_argument("--max-tokens", dest="max_tokens", type=int, default=1024)
+    s.add_argument("--no-record", action="store_true", help="do not save this chat as a session (state_dir/sessions)")
     _tandem_args(s)
+    s = sub.add_parser("sessions", help="list, triage, tag and export chat sessions (state_dir/sessions)")
+    s.add_argument("action", choices=("list", "show", "export", "triage", "tag", "status", "import"))
+    s.add_argument("id", nargs="*", help="session id (show/export/tag/status) or file (import, - for stdin)")
+    s.add_argument("--out", help="export directory (default: current directory)")
+    s.add_argument("--tag", help="tag filter (list) or tag to add (tag)")
+    s.add_argument("--status", help="status filter (list) or new status (status)")
     s = sub.add_parser("head", help="exact or fast output head for a running server")
     s.add_argument("mode", choices=("exact", "fast"))
     sub.add_parser("info", help="show configuration, pack and GPU")
@@ -340,7 +425,7 @@ def main(argv=None):
         cfg["vram_sample_s"] = a.vram_sample_s
     return {"convert": cmd_convert, "fast-head": cmd_fast_head, "verify": cmd_verify, "bench": cmd_bench, "kld": cmd_kld, "calibrate": cmd_calibrate,
             "plan": cmd_plan, "serve": cmd_serve, "chat": cmd_chat, "head": cmd_head, "info": cmd_info,
-            "models": cmd_models, "use": cmd_use}[a.cmd](cfg, a)
+            "models": cmd_models, "use": cmd_use, "sessions": cmd_sessions}[a.cmd](cfg, a)
 
 
 if __name__ == "__main__":

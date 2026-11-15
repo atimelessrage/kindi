@@ -141,6 +141,18 @@ llama.cpp's semantics — `moe_cache_size`, a CPU share for misses, LRFU/ClassLR
 missed experts computed on the CPU — and be compared against `-cmoe --moe-cache-mib auto` on the same
 model, RAM and card. See [MOE-TANDEM.md](MOE-TANDEM.md) and [EXTERNAL-ENGINES.md](EXTERNAL-ENGINES.md).
 
+## Chat session history (2026-11-14)
+
+`kindi chat` now records each run as a session under `state_dir/sessions/`
+(a `--no-record` flag opts out). The store (`kindi/sessions.py`) supports
+record/append, triage statuses (`open` → `needs-review` → `resolved`), tags
+(slugified, deduped, filterable), and raw-markdown export/​import: the exact
+message text verbatim, round-tripped through `kindi sessions
+list|show|export|triage|tag|status|import` (host-only; no pack or GPU).
+Tracked as [REQ-0016](development/requirements/REQ-0016.md) (experimental).
+Next step if this grows: a server-side `/sessions` endpoint and resume in
+the chat loop.
+
 ## External suggestions review (2026-11-14)
 
 Four outside suggestions were reviewed against the current tree. Two duplicate plans that
