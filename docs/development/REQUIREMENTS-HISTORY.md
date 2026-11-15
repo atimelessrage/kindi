@@ -29,6 +29,7 @@ the state at that commit.
 | [REQ-0017](requirements/REQ-0017.md) | Uneven tensor splits for unequal-capacity GPUs | experimental | `74ee40d79aa7` | `74ee40d79aa7` |
 | [REQ-0018](requirements/REQ-0018.md) | Agent-grade API: structured output, tool-call conformance, concurrency | proposed | `f9eff6db05f0` | `f9eff6db05f0` |
 | [REQ-0019](requirements/REQ-0019.md) | Backend plugin interface (contract, registry, adapters) | experimental | `a40269e2ce91` | `a40269e2ce91` |
+| [REQ-0020](requirements/REQ-0020.md) | Intel Arc A770 (Alchemist/DG2) support via a SYCL/oneAPI backend | proposed | `147e3dc61f78` | `147e3dc61f78` |
 
 `uncommitted` means the requirement file is not in `HEAD` yet. Commit the requirement
 and run the generator again to record its real added/last-modified hashes.
