@@ -1,7 +1,7 @@
 # Current worktree vs stock Kindi 0.6.0
 
 Report date: **2026-11-15** (refresh of the 2026-11-14 report; §7 records
-what changed since). This file is the successor to
+what changed since, and §8 the 2026-11-15 sessions-endpoint round). This file is the successor to
 `CURRENT-VS-KINDI-0.5.md` §25: that file's §§1–24 are the history against
 0.5.0 and §25 is the first evaluation against 0.6.0; this file carries the
 current one. It separates verified behavior from recorded evidence,
@@ -12,13 +12,13 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `dd605e3`:
+HEAD `982f7ed`:
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 261 commits
-git diff --shortstat v0.6.0..HEAD          # 397 files, +52,364/-993
+git log --oneline v0.6.0..HEAD | wc -l     # 266 commits
+git diff --shortstat v0.6.0..HEAD          # 398 files, +52,691/-993
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
 ```
 
@@ -70,6 +70,7 @@ not a code bug — the two tests pass with clang present).
 | **Tandem worker-thread verdict** | step-0 re-measured 2026-11-15 (27B/24K, RTX 4060 Ti + 8086K): CPU 74.7 ms/token (6.2 ms/layer) at raw-kernel rate; head 17.6 ms + transfer 3.09 ms come first. **Worker thread not justified, should not be built** |
 | **4B conversion provenance** | fresh `kindi convert` of the downloaded PTQ1_0 GGUF reproduces the 4B pack byte-identically (sha256); converted pack verifies 3+tie like the reference; 9B/27B pack verify re-run 4/4 (2026-11-15) |
 | Requirement-based coverage + per-module floors | `tools/check_coverage.py` + `tests/coverage_floors.json` in CPU CI (audit M4); requirement-traceable CPU tests |
+| **Server-side `/sessions` endpoints** (`kindi/server.py`, REQ-0016) | 2026-11-15: `GET /sessions` (status/tag filters), `GET /sessions/<id>`, `GET /sessions/<id>/export` (raw markdown), `POST /sessions/<id>/status`, `POST /sessions/<id>/tags` over the existing `SessionStore` — host-only (no engine/cache/GPU), API-key gated, enveloped 400/404, strict 12-hex id check so path-shaped ids never reach a file read. Pinned by `tests/test_server_sessions.py` (stub engine, no GPU) |
 | Audit dispositions (2026-11-15) | the 202611150853 audit verified item-by-item on the current tree: handoff-guard findings already fixed, coverage floors already landed, hardware items already recorded unverified; hash-bump hook declined by design, fork gap unfixable (push 403) |
 | Audit fixes: optional-accelerator degradation, `kindi_cache_*` telemetry, reference-config section | 2026-11-14 audit round (N1/N3–N5/D3/D4) |
 
@@ -135,6 +136,18 @@ arbitrary-draft-GGUF harness stays a separate gate.
   `docs/MIXED-CARD-ROADMAP.md` for the per-item gates.
 - GPU evidence (gitignored bench-logs): `bench-logs/req0015-gate-27b/`
   (draft-policy 27B gate), `bench-logs/convert-4b-verify/` (4B provenance).
+
+## 8. What changed in the 2026-11-15 sessions round
+
+- New beyond-0.6 feature: server-side `/sessions` endpoints (REQ-0016),
+  CPU-tested with a stub engine (55 tests with `test_server.py` +
+  `test_sessions.py`). No engine, sampler or kernel code changed.
+- Documentation updated alongside: `docs/API.md` (sessions contract),
+  `docs/AGENTS.md` (native endpoints), REQ-0016 evidence, ROADMAP
+  (chat-session section marked landed; stale agent-API conformance bullet
+  corrected), CHANGELOG.
+- Diff vs `v0.6.0` grew 397 → 398 files (+52,364 → +52,691 insertions);
+  still zero file deletions.
 
 ## 7. What changed since the 2026-11-14 report
 
