@@ -43,6 +43,12 @@ _CLEAR = ["KINDI_TC", "KINDI_TP", "KINDI_SPEC", "KINDI_MTP_HEAD", "KINDI_SPEC_PA
 
 @pytest.fixture(scope="module")
 def cpu_app(tmp_path_factory):
+    from kindi import cpu as _cpu
+    from shutil import which
+    # Booting the real engine builds libkcpu on a cold cache; without a compiler that is an
+    # environment gap, not a test failure — skip instead of erroring out of the fixture.
+    if not os.path.exists(_cpu._so_path(None, _cpu.select_isa())) and not (which("gcc") or which("clang")):
+        pytest.skip("no cached CPU library and no gcc/clang to build it")
     saved = {name: os.environ.get(name) for name in ["KINDI_DEVICE"] + _CLEAR}
     os.environ["KINDI_DEVICE"] = "cpu"
     for name in _CLEAR:
