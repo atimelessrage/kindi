@@ -1479,6 +1479,7 @@ def create_app(cfg, log=print):
     # These routes never touch the engine, the GPU or the prompt cache.
     from .sessions import STATUSES as SESSION_STATUSES
     from .sessions import SessionStore
+    from .sessions import slug as session_slug  # filename-safe title fragment, same as the CLI export
 
     # Each request gets its own store (so list/show see the latest files), so the lock must live here,
     # not on the store: two concurrent status/tag posts would otherwise race their read-modify-write
@@ -1535,7 +1536,9 @@ def create_app(cfg, log=print):
             if err is not None:
                 return err
             text = _session_store().export_markdown(rec)
-        return Response(text, media_type="text/markdown; charset=utf-8")
+            name = "%s-%s.md" % (rec["created"][:10], session_slug(rec["title"]) or rec["id"])
+        return Response(text, media_type="text/markdown; charset=utf-8",
+                        headers={"Content-Disposition": 'attachment; filename="%s"' % name})
 
     async def _sessions_post(request: Request, sid: str, action):
         if not _auth(request):

@@ -100,6 +100,8 @@ def test_sessions_list_get_filter_and_export(client):
     export = c.get("/sessions/%s/export" % rec["id"])
     assert export.status_code == 200, export.text
     assert export.headers["content-type"].startswith("text/markdown")
+    disp = export.headers.get("content-disposition", "")
+    assert disp.startswith("attachment;") and "filename=\"" in disp and disp.endswith(".md\"")
     assert "hello" in export.text and "hi there" in export.text
     assert export.text.startswith("# Demo chat")
 
