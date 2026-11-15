@@ -141,6 +141,18 @@ llama.cpp's semantics — `moe_cache_size`, a CPU share for misses, LRFU/ClassLR
 missed experts computed on the CPU — and be compared against `-cmoe --moe-cache-mib auto` on the same
 model, RAM and card. See [MOE-TANDEM.md](MOE-TANDEM.md) and [EXTERNAL-ENGINES.md](EXTERNAL-ENGINES.md).
 
+## External suggestions review (2026-11-14)
+
+Four outside suggestions were reviewed against the current tree. Two duplicate plans that
+already exist; one is a real new direction; one is a long-term goal.
+
+| suggestion | verdict | roadmap status |
+|---|---|---|
+| 1. Broader native architecture support (standard llama/qwen attention, sub-2-bit/ternary variants of any family, no custom conversion) | **Long-term goal, partly already in flight.** Kindi converts only `qwen35` (ternary Bonsai), `gemma4`, `llama` K/I-quant (Nanbeige profile), and `nemotron_h_moe`; a dense standard-attention llama/qwen GGUF is refused. The MoE half of this is the small-MoE table above (Cascade 2 first); dense standard attention needs a non-GDN attention engine, which is a new backend, not a loader flag. First gate: recognition-only refusal for `llama`/`qwen3` dense files naming the missing engine, then a host reference that is 4/4 greedy-exact against a pinned llama.cpp for one dense size. | Long-term goals table; no REQ yet (the MoE REQs cover the sparse half) |
+| 2. Multi-vendor heterogeneous scaling (NVIDIA + AMD in one TP ring, arbitrary PCIe tiers, dynamic load balance) | **Same-vendor half already planned; vendor mixing deferred.** [MIXED-CARD-ROADMAP.md](MIXED-CARD-ROADMAP.md) P1–P6 covers mixed-generation same-vendor pairs (feasibility, equal-split validation, `KINDI_TP_SPLIT=auto` layout done but GPU-unverified). Mixing NVIDIA and AMD in one tensor-parallel ring needs a cross-vendor exchange path (CUDA graphs do not cross), so it is a later phase behind P2, not a reopening of P1. | [MIXED-CARD-ROADMAP.md](MIXED-CARD-ROADMAP.md) phases P1–P6 |
+| 3. Native Intel Arc (oneAPI/SYCL) backend | **Already fully planned; blocked on hardware.** [INTEL-ARC.md](INTEL-ARC.md) M0 (audit) is done, M1 (one A770 16 GB) needs a card this host does not have. Nothing new to add: no code until M1. | [INTEL-ARC.md](INTEL-ARC.md); roadmap Live work |
+| 4. Speculative decoding with arbitrary draft families, acceptance monitors, adaptive draft length | **New and feasible; started.** The 2B drafter/MTP/DSpine paths bind draft length by hand (`KINDI_SPEC_K`, context thresholds). Step 1 lands here: `kindi/draft_policy.py` — a pure-python controller picking k in 0..kmax from decayed acceptance and step confidence against a measured verify-pass cost table, with no token change. The generalized arbitrary-draft-GGUF harness stays a separate gate (a second draft engine, same exactness + speedup gate). | [REQ-0015](development/requirements/REQ-0015.md) (experimental); step 2 is the `kindi/spec.py` adoption gate |
+
 ## Review follow-ups (2026-11-11)
 
 These are planned, not implemented. The review that produced them is an audit, not a support
