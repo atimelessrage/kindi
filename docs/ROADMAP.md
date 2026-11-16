@@ -81,7 +81,7 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   on the RTX 4060 Ti, and the gate was extended to 4B (3+tie both paths) and 9B
   (4/4 both paths) with adapter bench rows agreeing with the valve within ~1%
   — evidence `docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/RESULTS.md`;
-  the 27B gate closed 2026-11-16 (pack at `T:/kindi-packs/bonsai-27b`; its
+  the 27B gate closed 2026-11-16 (pack at `~/.kindi/packs/bonsai-27b`; its
   manifest `model` is the GGUF's placeholder "Hf", so resolution needed a
   `source_file` size fallback — verify 4/4 both paths, bench within ~1%,
   evidence `docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-t42-bonsai-27b/RESULTS.md`),
@@ -120,9 +120,10 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   (their `{x}_gen` loops now advance the same `JsonGrammar`, skip a scripted
   illegal top logit, and stop only once the automaton is done; CPU-only fake
   engines — no GPU gate claimed), and arbitrary GBNF grammars **landed 2026-11-16**
-  (`response_format` type `grammar`, `kindi/gbnf.py`; regular grammars only — a
-  recursive rule is refused at compile time, `json_schema` is the recursive-JSON
-  path); (2) a per-model
+  (`response_format` type `grammar`, `kindi/gbnf.py`; a recursive rule is refused at
+  compile time by default, and `KINDI_GBNF_MAX_DEPTH` opts into a bounded unroll whose
+  language is exact at the depths it allows — `json_schema` stays the unbounded
+  recursive-JSON path); (2) a per-model
   tool-call conformance suite — **landed 2026-11-15**
   (`tests/test_tool_call_conformance.py`: Gemma 4 native, Nanbeige/Lightning XML+JSON,
   DeepSeek DSML truncated blocks; all parsers hold the contract, no leak bugs found);
@@ -201,7 +202,7 @@ The small MoEs below are recognized by `kindi/moe_compat.py` (and, for Cascade 2
 `kindi/cascade.py`) so `kindi convert` can refuse each with its actual missing milestone.
 Recognition is not a backend: none of them enters the catalog, installer, or support matrix until
 `kindi verify` passes token-exact against a pinned llama.cpp reference. The four Ollama-fetched
-candidates below were inspected in the local `D:\ollamaModels` store (GGUF blobs linkable by
+candidates below were inspected in the local `~/.ollama/models` store (GGUF blobs linkable by
 `tools/ollama_links.ps1`): Gemma 4 26B-A4B and Qwen3-Coder 30B-A3B are already recognized;
 GLM-4.7-Flash is added as `glm4moelite`; Granite 4.1 30B is **not** an MoE (architecture
 `granite`, 64 dense layers, no expert tensors) and is listed as a generic dense long-context
@@ -231,7 +232,7 @@ converter with byte-level tests first.
 
 **Not an MoE (local Ollama candidate):** Granite 4.1 30B (`granite`, 64 blocks,
 131,072 context) is a dense 30B GGUF, so it is not part of the small-MoE recognition table.
-It is already on disk under `D:\ollamaModels` and can be linked with `tools/ollama_links.ps1`
+It is already on disk under `~/.ollama/models` and can be linked with `tools/ollama_links.ps1`
 for a future native/generic-engine evaluation, but it needs a Granite loader and pinned reference
 like any other dense architecture; Qwen3 30B (non-coder) shares the `qwen3moe` architecture and
 therefore follows the Qwen3-Coder row once a loader exists.

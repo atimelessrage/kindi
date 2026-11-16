@@ -4,7 +4,7 @@
   "git_revision": "cdfc1b2",
   "gpu": "NVIDIA GeForce RTX 4060 Ti",
   "pack": {
-    "path": "T:\\kindi-packs\\bonsai-27b",
+    "path": "~/.kindi/packs/bonsai-27b",
     "source_sha256": "53107f530aa52eb00912263ab1ee29bd199261c87cd7b4ad4ca1318c1fe33ee3"
   },
   "dimensions": {

@@ -13,7 +13,7 @@
     "exact:8000": 125.6
   },
   "model": "Ternary-Bonsai-2-4B",
-  "pack": "C:\\Users\\ICH\\.kindi\\packs\\bonsai-4b",
+  "pack": "~/.kindi/packs\\bonsai-4b",
   "read_tok_s": 161.0,
   "tandem": "off",
   "total_mib": 8188

@@ -1,7 +1,7 @@
 # 27B + 2B drafter at 24K on the 8 GB card (2026-11-14)
 
 Host: i7-8086K + RTX 4060 Ti (8,188 MiB), driver 617.42, tensor-core plans (`KINDI_TC=1`).
-Pack: `T:/kindi-packs/bonsai-27b` (source sha256 `53107f53...`, the pinned 27B), drafter pack
+Pack: `~/.kindi/packs/bonsai-27b` (source sha256 `53107f53...`, the pinned 27B), drafter pack
 `~/.kindi/packs/bonsai-2b`. One run per configuration (no repeats); `kindi bench` times the exact
 head only, so the fit comparison below comes from `bench` and the speed comparison from the server
 (requests: greedy, `max_tokens: 200`, prompt 5,012 tokens, second request after the prompt-cache

@@ -122,7 +122,7 @@ ids or GGUF architectures it serves instead of relying on an engine path.
   24576 agree with the valve within ~1% — evidence in
   `docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/RESULTS.md`.
   The gate was closed for the 27B the next day (2026-11-16): the pack
-  (at `T:/kindi-packs/bonsai-27b`) names itself "Hf" in the manifest, so
+  (at `~/.kindi/packs/bonsai-27b`) names itself "Hf" in the manifest, so
   resolution needed a `source_file` fallback — 27B verify is 4/4 on both
   paths and bench agrees within ~1% (see
   `docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-t42-bonsai-27b/RESULTS.md`).

@@ -26,7 +26,7 @@ reference; that is the documented loss.
 ## The 27B split at 24,576 tokens
 
 `kindi bench --tandem cpu-first --tandem-cpu-layers gdn:16 --tandem-gpu <owner> --sample-vram`,
-RTX 4060 Ti 8 GB, i7-8086K, three fresh processes per owner, pack `/t/kindi-packs/bonsai-27b`
+RTX 4060 Ti 8 GB, i7-8086K, three fresh processes per owner, pack `~/.kindi/packs/bonsai-27b`
 (`bench-logs/tandem-plain-q8/`):
 
 | owner | free after load | sampled peak used | peak over idle | read | decode 100 / 2K / 8K / 16K / 24K |

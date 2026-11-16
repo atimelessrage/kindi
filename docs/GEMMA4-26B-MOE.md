@@ -313,7 +313,7 @@ The cache state machine remains the model-free prototype described in
 ## 9. Evidence
 
 Local header and sizes were read from the Ollama model blob and manifest
-(`D:\ollamaModels\manifests\registry.ollama.ai\library\gemma4\26b`); the text layer digest and size
+(`~/.ollama/models\manifests\registry.ollama.ai\library\gemma4\26b`); the text layer digest and size
 are in section 1. The official router and decoder ordering are from the linked HF
 `modeling_gemma4.py`; the geometry, top-8 and context values are from the linked config and model
 card. The local Q4 file is the only 26B artifact on this host, so G1-G4 have no result yet.

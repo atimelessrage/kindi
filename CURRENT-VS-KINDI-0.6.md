@@ -408,7 +408,7 @@ Nanbeige packs and now returns the Nanbeige engine through the adapter.
 
 The Bonsai adapter's local gate is now complete for all four packs on this
 host. The earlier record said the 27B pack is not on this host; it is in fact
-at `T:/kindi-packs/bonsai-27b`, but its manifest's `model` is the 27B GGUF's
+at `~/.kindi/packs/bonsai-27b`, but its manifest's `model` is the 27B GGUF's
 placeholder `Hf`, so `backends/bonsai.model_id_for_manifest` returned `None`
 and the pack silently took the legacy path — the adapter already listed
 `27b` in `SIZES`/`model_ids`. Fixed: `model_id_for_manifest` now also reads

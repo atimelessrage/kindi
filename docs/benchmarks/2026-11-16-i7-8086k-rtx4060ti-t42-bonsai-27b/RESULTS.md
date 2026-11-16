@@ -2,7 +2,7 @@
 
 The Bonsai adapter (`kindi/backends/bonsai.py`) was verified on the 2B, 4B and
 9B packs; the 27B was left ungated because the project record said the pack
-is not on this host. It is in fact present at `T:/kindi-packs/bonsai-27b`
+is not on this host. It is in fact present at `~/.kindi/packs/bonsai-27b`
 (18 GB), but its `kindi_pack.json` carries `"model": "Hf"` (the 27B GGUF's
 `general.name`), so `model_id_for_manifest` returned `None` and the pack
 silently took the legacy path — even though the adapters `SIZES` and
@@ -14,7 +14,7 @@ Host: i7-8086K + RTX 4060 Ti 8 GB (8,188 MiB), ctx 1024 for verify and
 24,576 for bench, exact head. Adapter path = default
 (`KINDI_LEGACY_ENGINE_PATH` unset, registry resolution);
 valve path = `KINDI_LEGACY_ENGINE_PATH=1` (pre-port builder).
-Pack: `T:/kindi-packs/bonsai-27b` (source size 5,946,648,928 bytes).
+Pack: `~/.kindi/packs/bonsai-27b` (source size 5,946,648,928 bytes).
 
 ## Verify (token-exact vs llama.cpp)
 

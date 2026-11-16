@@ -13,7 +13,7 @@ is the next phase.
 - file: `NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf`
 - size: `3,673,288,864` bytes
 - SHA-256: `96080be49ffd67b916018b7bdef8c484762576fb52780e10ab98ac4978a660e0`
-- local storage used for this audit: `D:\kindi-dory-d0\model\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf`
+- local storage used for this audit: `~/dory-d0\model\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf`
   (not copied into the repository)
 
 The Hugging Face download metadata records revision `df53755...` and the same SHA-256. The

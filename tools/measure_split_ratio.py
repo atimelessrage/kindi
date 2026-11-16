@@ -213,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
         i = argv.index("--probe-one")
         return probe_one(argv[i + 1], int(argv[i + 2]), int(argv[i + 3]), int(argv[i + 4]))
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--pack", default="T:/kindi-packs/bonsai-27b")
+    ap.add_argument("--pack", default="~/.kindi/packs/bonsai-27b")
     ap.add_argument("--json", default=None, help="also write the calibration JSON here")
     ap.add_argument("--track", default=None, help="also write a tracked copy here")
     args = ap.parse_args(argv)

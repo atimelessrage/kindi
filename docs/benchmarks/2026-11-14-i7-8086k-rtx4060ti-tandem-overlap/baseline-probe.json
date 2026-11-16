@@ -81,7 +81,7 @@
     63
   ],
   "model": "Hf",
-  "pack": "T:\\kindi-packs\\bonsai-27b",
+  "pack": "~/.kindi/packs/bonsai-27b",
   "read_tok_s": 12.5,
   "tandem": "cpu-first",
   "tandem_timing": {

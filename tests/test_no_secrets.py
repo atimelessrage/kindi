@@ -30,6 +30,11 @@ PATTERNS = [
     ("JWT", re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")),
     # /home/kindi is the fixed non-root container user the Dockerfiles create, not a person's home directory
     ("local home path", re.compile(r"(?i)(?:[A-Z]:[\\/]Users[\\/][^\\/\s\"'<>]+|/home/(?![\[(]|kindi\b)[^/\s\"'<>]+)")),
+    # A backslash-form drive path is machine-local data (a pack dir, a model cache): the docs write
+    # repository paths as T:/kindi, so this shape is the machine-specific one. The 2026-11-16 audit
+    # found exactly that shape (a drive letter, then a backslash-separated pack directory) in
+    # tracked benchmark JSONs.
+    ("local drive path", re.compile(r"(?i)\b[A-Z]:\\+(?:[A-Za-z0-9_.$~-]+\\+)+")),
     ("email address", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
 ]
 
@@ -80,6 +85,16 @@ def findings():
             m = GENERIC.search(line)
             if m and not ALLOW.search(m.group(0)) and not HEX.match(m.group(2)):
                 yield rel, lineno, "secret assignment"
+
+
+def test_the_local_drive_path_rule_is_not_vacuous():
+    """A scanner rule that has never matched would have passed the drive-letter paths the audit
+    found, so the shape is pinned here: JSON-escaped and prose forms both match."""
+    drive = dict(PATTERNS)["local drive path"]
+    assert drive.search('"pack": "T:' + "\\\\" * 2 + 'kindi-packs' + "\\\\" * 2 + 'bonsai-27b"')
+    assert drive.search("pack is at " + "D:" + "\\" + "ollamaModels" + "\\" + "gemma4")
+    assert not drive.search("pack `~/.kindi/packs/bonsai-27b`")
+    assert not drive.search("the T:/kindi worktree")
 
 
 def test_no_credentials_or_home_paths_in_tracked_files():

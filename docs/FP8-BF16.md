@@ -110,14 +110,14 @@ replacement and there is no FP8 branch in the Bonsai tensor-core or plan engines
 
 The available local stores were checked before running the gate:
 
-- `D:\ollamaModels` contains `gemma4:26b`: Q4_K_M, 30 layers, width 2816, 128 routed experts
+- `~/.ollama/models` contains `gemma4:26b`: Q4_K_M, 30 layers, width 2816, 128 routed experts
   (top-8) plus a dense shared MLP, expert width 704; 658 tensors, 17,074,419,072 B. The routed expert
   weights are 14,479,917,056 B and the dense core is 2,578,661,496 B. Language tensor types are
   Q4_K/Q5_K/Q5_1/Q8_0/F32. It has no BF16 (type 30), E4M3 (43) or E5M2 (44) language tensors, and
   `kindi.gemma4.inspect_model` rejects it on the unsupported type 7 before reaching the E4B
   dimension check. The cache adaptation, slot sizes and gates are in
   [GEMMA4-26B-MOE.md](GEMMA4-26B-MOE.md).
-- `T:\strata\models\models` contains Qwen3.6-35B-A3B UD-Q4_K_XL (`qwen35moe`), not a Gemma 4 model.
+- `~/.cache/models\models` contains Qwen3.6-35B-A3B UD-Q4_K_XL (`qwen35moe`), not a Gemma 4 model.
 - There is no llama.cpp CLI in the workspace or on `PATH`, and no `reference-*.json` for a Gemma 4
   E4B model. `kindi/reference-nemotron-bolt-e4b.json` belongs to the Nemotron Bolt E4B and cannot
   stand in for another checkpoint.

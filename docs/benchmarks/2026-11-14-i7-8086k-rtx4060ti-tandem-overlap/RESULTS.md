@@ -4,7 +4,7 @@ Host: i7-8086K + RTX 4060 Ti (8,188 MiB), 2B/27B packs, `KINDI_TC=0`, ctx 24,576
 Command (step 1 of `docs/TANDEM-OVERLAP-DESIGN.md` §1):
 
 ```sh
-python -m kindi --pack T:/kindi-packs/bonsai-27b bench \
+python -m kindi --pack ~/.kindi/packs/bonsai-27b bench \
     --tandem cpu-first --tandem-cpu-layers gdn:12 --sample-vram --json <out>.json
 ```
 

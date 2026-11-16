@@ -11,7 +11,7 @@
     "exact:8000": 38.7
   },
   "model": "Hf",
-  "pack": "T:\\kindi-packs\\bonsai-27b",
+  "pack": "~/.kindi/packs/bonsai-27b",
   "read_tok_s": 42.8,
   "tandem": "off",
   "total_mib": 8187

@@ -1,12 +1,12 @@
 # Tandem overlap scheduler — step 0 re-measurement (2026-11-15)
 
-Host: i7-8086K + RTX 4060 Ti (8,188 MiB), 27B pack at `T:/kindi-packs/bonsai-27b`,
+Host: i7-8086K + RTX 4060 Ti (8,188 MiB), 27B pack at `~/.kindi/packs/bonsai-27b`,
 `KINDI_TC=0`, ctx 24,576, Windows native (`clang+llvm-18.1.8` added to PATH for the
 CPU library build; CPU tier `avx2-fma-f16c`, 6 threads). Same command and placement
 as [the 2026-11-14 step 0](../2026-11-14-i7-8086k-rtx4060ti-tandem-overlap/RESULTS.md):
 
 ```sh
-python -m kindi --pack T:/kindi-packs/bonsai-27b bench \
+python -m kindi --pack ~/.kindi/packs/bonsai-27b bench \
     --tandem cpu-first --tandem-cpu-layers gdn:12 --sample-vram --json <out>.json
 ```
 

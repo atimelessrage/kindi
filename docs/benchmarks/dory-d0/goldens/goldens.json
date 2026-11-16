@@ -14,7 +14,7 @@
   ],
   "runs": [
     {
-      "model": "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+      "model": "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
       "prompt": "The capital of France is",
       "k": 1,
       "n_predict": 32,
@@ -66,9 +66,9 @@
       "elapsed_s": 5.32,
       "stderr": "bench-logs/dory-d0/goldens\\k1-p1.stderr.log",
       "command": [
-        "D:\\kindi-dory-d0\\build-1c3c\\bin\\dory-golden.exe",
+        "~/dory-d0\\build-1c3c\\bin\\dory-golden.exe",
         "-m",
-        "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+        "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
         "-p",
         "The capital of France is",
         "-n",
@@ -82,7 +82,7 @@
       ]
     },
     {
-      "model": "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+      "model": "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
       "prompt": "Once upon a time, there was a",
       "k": 1,
       "n_predict": 32,
@@ -137,9 +137,9 @@
       "elapsed_s": 5.574,
       "stderr": "bench-logs/dory-d0/goldens\\k1-p2.stderr.log",
       "command": [
-        "D:\\kindi-dory-d0\\build-1c3c\\bin\\dory-golden.exe",
+        "~/dory-d0\\build-1c3c\\bin\\dory-golden.exe",
         "-m",
-        "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+        "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
         "-p",
         "Once upon a time, there was a",
         "-n",
@@ -153,7 +153,7 @@
       ]
     },
     {
-      "model": "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+      "model": "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
       "prompt": "def fibonacci(n):",
       "k": 1,
       "n_predict": 32,
@@ -205,9 +205,9 @@
       "elapsed_s": 5.206,
       "stderr": "bench-logs/dory-d0/goldens\\k1-p3.stderr.log",
       "command": [
-        "D:\\kindi-dory-d0\\build-1c3c\\bin\\dory-golden.exe",
+        "~/dory-d0\\build-1c3c\\bin\\dory-golden.exe",
         "-m",
-        "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+        "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
         "-p",
         "def fibonacci(n):",
         "-n",
@@ -221,7 +221,7 @@
       ]
     },
     {
-      "model": "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+      "model": "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
       "prompt": "The sky appears blue because",
       "k": 1,
       "n_predict": 32,
@@ -273,9 +273,9 @@
       "elapsed_s": 5.14,
       "stderr": "bench-logs/dory-d0/goldens\\k1-p4.stderr.log",
       "command": [
-        "D:\\kindi-dory-d0\\build-1c3c\\bin\\dory-golden.exe",
+        "~/dory-d0\\build-1c3c\\bin\\dory-golden.exe",
         "-m",
-        "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+        "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
         "-p",
         "The sky appears blue because",
         "-n",
@@ -289,7 +289,7 @@
       ]
     },
     {
-      "model": "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+      "model": "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
       "prompt": "The capital of France is",
       "k": 2,
       "n_predict": 32,
@@ -341,9 +341,9 @@
       "elapsed_s": 7.102,
       "stderr": "bench-logs/dory-d0/goldens\\k2-p1.stderr.log",
       "command": [
-        "D:\\kindi-dory-d0\\build-1c3c\\bin\\dory-golden.exe",
+        "~/dory-d0\\build-1c3c\\bin\\dory-golden.exe",
         "-m",
-        "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+        "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
         "-p",
         "The capital of France is",
         "-n",
@@ -357,7 +357,7 @@
       ]
     },
     {
-      "model": "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+      "model": "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
       "prompt": "Once upon a time, there was a",
       "k": 2,
       "n_predict": 32,
@@ -412,9 +412,9 @@
       "elapsed_s": 7.356,
       "stderr": "bench-logs/dory-d0/goldens\\k2-p2.stderr.log",
       "command": [
-        "D:\\kindi-dory-d0\\build-1c3c\\bin\\dory-golden.exe",
+        "~/dory-d0\\build-1c3c\\bin\\dory-golden.exe",
         "-m",
-        "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+        "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
         "-p",
         "Once upon a time, there was a",
         "-n",
@@ -428,7 +428,7 @@
       ]
     },
     {
-      "model": "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+      "model": "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
       "prompt": "def fibonacci(n):",
       "k": 2,
       "n_predict": 32,
@@ -480,9 +480,9 @@
       "elapsed_s": 6.944,
       "stderr": "bench-logs/dory-d0/goldens\\k2-p3.stderr.log",
       "command": [
-        "D:\\kindi-dory-d0\\build-1c3c\\bin\\dory-golden.exe",
+        "~/dory-d0\\build-1c3c\\bin\\dory-golden.exe",
         "-m",
-        "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+        "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
         "-p",
         "def fibonacci(n):",
         "-n",
@@ -496,7 +496,7 @@
       ]
     },
     {
-      "model": "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+      "model": "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
       "prompt": "The sky appears blue because",
       "k": 2,
       "n_predict": 32,
@@ -548,9 +548,9 @@
       "elapsed_s": 7.056,
       "stderr": "bench-logs/dory-d0/goldens\\k2-p4.stderr.log",
       "command": [
-        "D:\\kindi-dory-d0\\build-1c3c\\bin\\dory-golden.exe",
+        "~/dory-d0\\build-1c3c\\bin\\dory-golden.exe",
         "-m",
-        "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+        "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
         "-p",
         "The sky appears blue because",
         "-n",
@@ -564,7 +564,7 @@
       ]
     },
     {
-      "model": "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+      "model": "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
       "prompt": "The capital of France is",
       "k": 4,
       "n_predict": 32,
@@ -616,9 +616,9 @@
       "elapsed_s": 10.621,
       "stderr": "bench-logs/dory-d0/goldens\\k4-p1.stderr.log",
       "command": [
-        "D:\\kindi-dory-d0\\build-1c3c\\bin\\dory-golden.exe",
+        "~/dory-d0\\build-1c3c\\bin\\dory-golden.exe",
         "-m",
-        "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+        "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
         "-p",
         "The capital of France is",
         "-n",
@@ -632,7 +632,7 @@
       ]
     },
     {
-      "model": "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+      "model": "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
       "prompt": "Once upon a time, there was a",
       "k": 4,
       "n_predict": 32,
@@ -687,9 +687,9 @@
       "elapsed_s": 11.182,
       "stderr": "bench-logs/dory-d0/goldens\\k4-p2.stderr.log",
       "command": [
-        "D:\\kindi-dory-d0\\build-1c3c\\bin\\dory-golden.exe",
+        "~/dory-d0\\build-1c3c\\bin\\dory-golden.exe",
         "-m",
-        "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+        "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
         "-p",
         "Once upon a time, there was a",
         "-n",
@@ -703,7 +703,7 @@
       ]
     },
     {
-      "model": "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+      "model": "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
       "prompt": "def fibonacci(n):",
       "k": 4,
       "n_predict": 32,
@@ -755,9 +755,9 @@
       "elapsed_s": 10.553,
       "stderr": "bench-logs/dory-d0/goldens\\k4-p3.stderr.log",
       "command": [
-        "D:\\kindi-dory-d0\\build-1c3c\\bin\\dory-golden.exe",
+        "~/dory-d0\\build-1c3c\\bin\\dory-golden.exe",
         "-m",
-        "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+        "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
         "-p",
         "def fibonacci(n):",
         "-n",
@@ -771,7 +771,7 @@
       ]
     },
     {
-      "model": "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+      "model": "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
       "prompt": "The sky appears blue because",
       "k": 4,
       "n_predict": 32,
@@ -823,9 +823,9 @@
       "elapsed_s": 10.685,
       "stderr": "bench-logs/dory-d0/goldens\\k4-p4.stderr.log",
       "command": [
-        "D:\\kindi-dory-d0\\build-1c3c\\bin\\dory-golden.exe",
+        "~/dory-d0\\build-1c3c\\bin\\dory-golden.exe",
         "-m",
-        "D:\\kindi-dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
+        "~/dory-d0\\model\\NVIDIA-Nemotron-Labs-Dory1.0-4B-Q5_K_M.gguf",
         "-p",
         "The sky appears blue because",
         "-n",

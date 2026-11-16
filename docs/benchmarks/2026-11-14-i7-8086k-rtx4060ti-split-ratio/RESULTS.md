@@ -45,7 +45,7 @@ cost. At 24K: N=0 → 26.8/..., N=11 → 6.2, N=16 → 4.6. Predicted best-fit =
 
 ## The `rate` pick at 27B@24K and the gate verdict
 
-`python -m kindi --pack T:/kindi-packs/bonsai-27b --ctx 24576 bench --tandem cpu-first --tandem-cpu-layers rate --sample-vram` (2026-11-14, run at git `cdfc1b2`, log `bench-logs/split-ratio/27b-24k-rate.log` - gitignored evidence... the tracked bench JSON is `bench-logs/split-ratio/27b-24k-rate.json`):
+`python -m kindi --pack ~/.kindi/packs/bonsai-27b --ctx 24576 bench --tandem cpu-first --tandem-cpu-layers rate --sample-vram` (2026-11-14, run at git `cdfc1b2`, log `bench-logs/split-ratio/27b-24k-rate.log` - gitignored evidence... the tracked bench JSON is `bench-logs/split-ratio/27b-24k-rate.json`):
 
 12 CPU layers (`0,1,2,4,5,6,8,9,10,12,13,14`) by the fastest fitting split with the 512 MiB
 reserve (1,226 MiB free after load, 24,576 unreduced, plan owner). Read 8.4 tok/s; generation

@@ -7,11 +7,13 @@
 #
 # Examples:
 #   powershell -ExecutionPolicy Bypass -File tools\ollama_links.ps1
-#   powershell -ExecutionPolicy Bypass -File tools\ollama_links.ps1 -ModelsDir D:\ollamaModels -OutputDir T:\kindi-models\ollamaLinks
+#   powershell -ExecutionPolicy Bypass -File tools\ollama_links.ps1 -ModelsDir <ollama-models> -OutputDir <links-dir>
 
 param(
-    [string]$ModelsDir = $(if ($env:OLLAMA_MODELS) { $env:OLLAMA_MODELS } elseif (Test-Path -LiteralPath "D:\ollamaModels") { "D:\ollamaModels" } else { Join-Path $env:USERPROFILE ".ollama\models" }),
-    [string]$OutputDir = "T:\kindi-models\ollamaLinks"
+    # Replace these two with the directories you want; OLLAMA_MODELS wins when it is set. The
+    # fallbacks are deliberately portable so the script carries no machine layout of its own.
+    [string]$ModelsDir = $(if ($env:OLLAMA_MODELS) { $env:OLLAMA_MODELS } else { Join-Path $env:USERPROFILE ".ollama\models" }),
+    [string]$OutputDir = $(Join-Path $env:USERPROFILE ".kindi\models\ollamaLinks")
 )
 
 $ManifestsRoot = Join-Path $ModelsDir "manifests"
