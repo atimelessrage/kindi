@@ -486,6 +486,11 @@ def main(argv=None):
     s.add_argument("--usage", default=None, help="an MoE usage file (kindi.moe Usage JSON); defaults to the shipped lightning-experts.json")
     s.add_argument("--moe-cache-mib", type=int, default=None, help="cap the MoE experts' card budget (planner only; the engine derives it from free VRAM)")
     s.add_argument("--dcache", type=int, default=None, help="MoE decode LRU slots per layer (KINDI_LT_DCACHE; default 10)")
+    s.add_argument("--moe-chunk", type=int, default=None, metavar="TOKENS",
+                   help="also report what MoeTandem would do for a TOKENS-token sample prompt chunk "
+                        "(lane split, distinct copies, bytes); planner only, no bytes moved")
+    s.add_argument("--moe-lane", choices=("copy", "cpu"), default=None,
+                   help="the tandem lane the --moe-chunk report plans for (default copy)")
     s.add_argument("--json", default=None, metavar="FILE", help="also record the report in a machine-readable JSON file")
     s = sub.add_parser("serve", help="run the OpenAI-compatible server")
     s.add_argument("--host")

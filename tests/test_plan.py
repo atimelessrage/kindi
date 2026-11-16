@@ -248,3 +248,65 @@ def test_describe_moe_reports_the_measured_share_with_usage_counts(tmp_path):
     slots = next(r for c, r in rep["lines"] if c == "slots")
     assert "%" in slots and "measured picks" in slots
     assert "--dcache" in slots
+
+
+def _moe_pack_with_counts(tmp_path):
+    pack = make_lightning_pack(tmp_path)
+    usage = tmp_path / "usage.json"
+    usage.write_text(json.dumps({"counts": {str(il): [100 - e for e in range(32)]
+                                          for il in range(16)}}), encoding="utf-8")
+    return pack, usage
+
+
+def test_describe_moe_reports_the_tandem_chunk_split(tmp_path):
+    """`--moe-chunk` reports what MoeTandem would do for a sample prompt chunk: the lane split,
+    the deduped copy list and its bytes. It runs the scheduler's bookkeeping, not a copy."""
+    pack, usage = _moe_pack_with_counts(tmp_path)
+    rep = _plan.describe(str(pack), 2048, None, assume_vram_gib=0.5, assume_ram_gib=4,
+                         assume_cores=2, reserve_mib=0, usage_path=str(usage),
+                         moe_cache_mib=1, dcache=4, chunk_tokens=4)
+    chunk = rep["chunk"]
+    assert chunk["tokens"] == 4 and chunk["lane"] == "copy"
+    assert chunk["selections"] == chunk["tokens"] * chunk["layers"] * chunk["n_used"]
+    assert chunk["card_pairs"] + chunk["copy_pairs"] + chunk["cpu_pairs"] == chunk["selections"]
+    assert chunk["cpu_pairs"] == 0                     # the default lane is copy
+    assert chunk["copy_pairs"] > 0 and 0 < chunk["copies"] <= chunk["copy_pairs"]
+    assert chunk["copy_bytes"] == chunk["copies"] * 18432
+    assert chunk["saved_copies"] == chunk["copy_pairs"] - chunk["copies"]
+    choices = {c for c, _ in rep["lines"]}
+    assert {"chunk", "copies"} <= choices
+    copies = next(r for c, r in rep["lines"] if c == "copies")
+    assert "no bytes are moved" in copies
+
+
+def test_describe_moe_chunk_can_plan_the_cpu_lane(tmp_path):
+    pack, usage = _moe_pack_with_counts(tmp_path)
+    rep = _plan.describe(str(pack), 2048, None, assume_vram_gib=0.5, assume_ram_gib=4,
+                         assume_cores=2, reserve_mib=0, usage_path=str(usage),
+                         moe_cache_mib=1, dcache=4, chunk_tokens=2, chunk_lane="cpu")
+    chunk = rep["chunk"]
+    assert chunk["lane"] == "cpu" and chunk["cpu_pairs"] > 0
+    # every host expert is computed on the host, so this sample copies nothing
+    assert chunk["copy_pairs"] == 0 and chunk["copies"] == 0 and chunk["copy_bytes"] == 0
+
+
+def test_describe_moe_chunk_works_without_usage_counts(tmp_path):
+    """No counts: the sample takes cyclic ranks of the index order, so the report still shows the
+    dedupe a real chunk gets (adjacent tokens share experts)."""
+    pack = make_lightning_pack(tmp_path)
+    rep = _plan.describe(str(pack), 2048, None, assume_vram_gib=0.5, assume_ram_gib=4,
+                         assume_cores=2, reserve_mib=0, moe_cache_mib=1, dcache=4,
+                         chunk_tokens=4)
+    chunk = rep["chunk"]
+    assert chunk["selections"] == chunk["tokens"] * chunk["layers"] * chunk["n_used"]
+    assert chunk["copies"] < chunk["copy_pairs"]        # overlapping sample tokens share copies
+
+
+def test_run_prints_the_chunk_report_when_asked(tmp_path, capsys):
+    pack = make_lightning_pack(tmp_path)
+    args = _FakeArgs(assume_vram_gib=0.5, assume_ram_gib=4, assume_cores=2, reserve_mib=0,
+                     moe_cache_mib=1, dcache=4, moe_chunk=2, moe_lane="copy")
+    rc = _plan.run({"pack": str(pack), "ctx": 2048}, args)
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "chunk:" in out and "copies:" in out and "lane" in out

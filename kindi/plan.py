@@ -108,13 +108,15 @@ def _moe_free_bytes(assume_vram_gib):
 
 def describe(pack, ctx, spec, mode="cpu-first", gpu_kind=None,
              assume_vram_gib=None, assume_ram_gib=None, assume_cores=None, reserve_mib=512,
-             usage_path=None, moe_cache_mib=None, dcache=None):
+             usage_path=None, moe_cache_mib=None, dcache=None,
+             chunk_tokens=None, chunk_lane="copy"):
     """The placement report as a dict; no weight tensor is read, only indexes and the manifest."""
     man = _manifest(pack)
     if man.get("backend") == "kindi_lightning":
         return describe_moe(pack, ctx, _moe_free_bytes(assume_vram_gib),
                             usage_path=usage_path, moe_cache_mib=moe_cache_mib,
-                            dcache=dcache, reserve_mb=reserve_mib)
+                            dcache=dcache, reserve_mb=reserve_mib,
+                            chunk_tokens=chunk_tokens, chunk_lane=chunk_lane)
     dims = dict(man.get("dimensions") or {})
     lines = []          # (choice, reason) pairs, printed in order
     out = {"pack": pack, "model": man.get("model"), "backend": man.get("backend"),
@@ -280,7 +282,7 @@ def _lt_fit(s, free_bytes, dense, kv, state, buf_bytes, reserve, eb, moe_layers)
 
 
 def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
-                 dcache=None, reserve_mb=None):
+                 dcache=None, reserve_mb=None, chunk_tokens=None, chunk_lane="copy"):
     """The MoE strategy for a `kindi_lightning` pack: expert tiers (+ decode slots), not a layer split.
 
     Same arithmetic as `lightning._plan`; the weights are never read - the GGUF header, `Spec` and
@@ -406,10 +408,71 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
     lines.append(("placement", "~%.2f GiB on the card at ctx %d (%d MiB of %d MiB free); host experts are "
                   "read over PCIe through per-expert pointer tables" % (
                       est / 2 ** 30, int(ctx), est // 2 ** 20, int(free_bytes) // 2 ** 20)))
-    return {"pack": pack, "model": man.get("model"), "strategy": "moe-expert-tiers",
-            "lines": lines, "n_card": n_card, "n_exp": s.n_exp, "dcache": dcache, "fit": True,
-            "estimate_mib": est // 2 ** 20,
-            "command": "%s -m kindi --pack %s bench" % (sys.executable, pack)}
+    out = {"pack": pack, "model": man.get("model"), "strategy": "moe-expert-tiers",
+           "lines": lines, "n_card": n_card, "n_exp": s.n_exp, "dcache": dcache, "fit": True,
+           "estimate_mib": est // 2 ** 20,
+           "command": "%s -m kindi --pack %s bench" % (sys.executable, pack)}
+    if chunk_tokens:
+        chunk = _sample_tandem(spec, usage, placement, moe_layers, n_card, eb,
+                               int(chunk_tokens), chunk_lane)
+        if isinstance(chunk, dict) and "lines" in chunk:
+            lines.extend(chunk.pop("lines"))
+        out["chunk"] = chunk
+    return out
+
+
+def _sample_tandem(spec, usage, placement, moe_layers, n_card, eb, tokens, lane):
+    """What `MoeTandem` would do for a sample prefill chunk, from the placement and the usage file.
+
+    There is no router here: the sample spreads over each layer's measured order, token t starting
+    at rank (3t + 7il) mod n_exp and taking the next n_used ranks, so adjacent tokens share
+    experts (the dedupe a real chunk gets) and cold experts get picked too (the copy lane, which a
+    hottest-experts-only sample would never show). Only the scheduler's bookkeeping runs.
+    """
+    from .expert_cache import ExpertCache
+    from .moe import Placement
+    from .moe_tandem import MoeTandem
+
+    tiers = {}
+    for il in moe_layers:
+        tiers[il] = list(placement.tier[il]) if placement is not None else ["host"] * spec.n_exp
+        if placement is None:
+            for e in usage.order(il)[:n_card]:
+                tiers[il][e] = "card"
+    sample = Placement(spec, usage, tiers)
+    picks = []
+    for t in range(tokens):
+        keys = []
+        for li, il in enumerate(moe_layers):
+            order = usage.order(il)
+            start = (3 * t + 7 * li) % spec.n_exp
+            for k in range(spec.n_used):
+                keys.append((il, order[(start + k) % spec.n_exp]))
+        picks.append(keys)
+
+    host_keys = set(key for keys in picks for key in keys if tiers[key[0]][key[1]] != "card")
+    cache = ExpertCache(max(1, len(host_keys)), slot_bytes=eb)
+    try:
+        plan = MoeTandem(sample, cache, lane=lane).forward(list(enumerate(picks)))
+    except (ValueError, TypeError) as e:
+        return {"error": str(e)}
+    m = plan.metrics()
+    plan.release()
+    split = ("%d-token sample chunk: %d selection(s) over %d MoE layer(s) x %d routed expert(s); "
+             "lanes card %d, copy %d, cpu %d (spread starts of the measured order: rank 3t+7l per "
+             "token and layer, n_used consecutive ranks each)"
+             % (tokens, m["pairs"], len(moe_layers), spec.n_used, m["card_pairs"],
+                m["copy_pairs"], m["cpu_pairs"]))
+    copies = ("%d distinct expert(s) copied = %.2f MiB in the sample; %d selection(s) shared a copy "
+              "(%.1f%% of the copy lane). Planner output only: no bytes are moved."
+              % (m["distinct_copies"], m["copy_bytes"] / 2 ** 20, m["saved_copies"],
+                 100.0 * m["saved_copies"] / m["copy_pairs"] if m["copy_pairs"] else 0.0))
+    return {"tokens": tokens, "lane": lane, "layers": len(moe_layers), "n_used": spec.n_used,
+            "selections": m["pairs"],
+            "card_pairs": m["card_pairs"], "copy_pairs": m["copy_pairs"],
+            "cpu_pairs": m["cpu_pairs"], "copies": m["distinct_copies"],
+            "saved_copies": m["saved_copies"], "copy_bytes": m["copy_bytes"],
+            "hits": m["hits"], "lines": [("chunk", split), ("copies", copies)]}
 
 
 def run(cfg, a, log=print):
@@ -427,6 +490,8 @@ def run(cfg, a, log=print):
                    usage_path=getattr(a, "usage", None),
                    moe_cache_mib=getattr(a, "moe_cache_mib", None),
                    dcache=getattr(a, "dcache", None),
+                   chunk_tokens=getattr(a, "moe_chunk", None),
+                   chunk_lane=getattr(a, "moe_lane", None) or "copy",
                    reserve_mib=int(os.environ.get("KINDI_TANDEM_RESERVE_MB", "512")))
     for choice, reason in rep["lines"]:
         log("%-11s %s" % (choice + ":", reason))

@@ -6,7 +6,7 @@ adaptation recorded, 2026-11-12. **The MoE placement strategy has its first runn
 expert on the card, routed experts tiered card / pinned host / mmap, last-used decode slots) from
 the GGUF header and the engine's own fit arithmetic, with one reason per choice and the actual
 `bench`/`verify` commands for tenants who don't own the card (`--assume-vram-gib`, `--usage`,
-`--moe-cache-mib`, `--dcache`).** The first planned backend target is still Raon-1 mini;
+`--moe-cache-mib`, `--dcache`, `--moe-chunk`).** The first planned backend target is still Raon-1 mini;
 `kindi/expert_cache.py` implements the copy-only slot, pin, LRU, transient-slot and metrics state
 machine, and `tests/test_moe_cache.py` covers it with synthetic slots. `kindi/expert_chunk.py` plans
 a whole prefill chunk on top of it: an expert the router selects for several tokens is copied once,
@@ -63,6 +63,15 @@ once), and the combine order is the backend's reference order, kept separate fro
 It takes ints, an `ExpertCache` and a `Placement`, and returns a plan; it moves no bytes, runs no
 kernel and is used by no backend. None of that is new execution: the MoE backends below are still
 design and prototype.
+
+`kindi plan` can show that plan before a backend exists: on a `kindi_lightning` pack,
+`--moe-chunk N` (with `--usage`, `--moe-cache-mib` and `--dcache` as usual) builds the placement,
+feeds `MoeTandem` an N-token sample prompt chunk and reports the lane split, the deduped copy list
+and its bytes; `--moe-lane cpu` plans the host lane instead of the default copy lane. The sample
+has no router: token t starts at rank `(3t + 7l) mod n_exp` of each layer's measured order and
+takes the next `n_used` ranks, so adjacent tokens share experts (the dedupe a real chunk gets) and
+cold experts are picked too (the copy lane, which a hottest-experts-only sample would never show).
+It is arithmetic over the header and the usage file: no weights are read and no byte is moved.
 
 The first backend must answer three questions before any performance work:
 
@@ -356,6 +365,7 @@ Implemented, model-free:
 |---|---|
 | `kindi/expert_cache.py` | copy-only slot manager, pin-aware LRU, transient fallback and JSON-safe metrics; no tensors, GPU or engine wiring |
 | `kindi/moe_tandem.py` | one execution unit's expert split over the cache and a placement: `card` / `copy` / `cpu` lanes, opt-in CPU lane with a deterministic `cpu_share` throttle, router or expert-id combine order kept separate from scheduling, plan metrics; no tensors, copies or kernels |
+| `kindi/plan.py` | `kindi plan` on a `kindi_lightning` pack: expert tiers, the decode-slot trade, and with `--moe-chunk N` what `MoeTandem` would do for an N-token sample prompt chunk (lane split, distinct copies, copy bytes) from the header and `--usage`; no weights read, no bytes moved |
 | `kindi/expert_chunk.py` | multi-token prefill planner over the cache: deduped copy list in first-need order, hit/coalesced/miss report, chunk rollback when a token does not fit; no tensors or engine wiring |
 | `tests/test_moe_cache.py` | synthetic-slot tests for transitions, eviction, pinning, transient slots, failed copies and metrics |
 | `tests/test_moe_cache_properties.py` | 32 seeded randomized route/acquire traces; checks capacity, pin ownership, slot states, atomic rejects and metrics after every operation |
