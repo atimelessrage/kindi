@@ -177,6 +177,167 @@ def test_deepseek_cut_name_returns_no_call():
     assert truncated_tool_calls(_Enc(), block) == []
 
 
+JSON_SCHEMA = {"type": "json_schema", "json_schema": {"name": "x", "schema": {
+    "type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]}}}
+TOKENS = ["<eos>", "{", '"ok"', ":", "true", "}", "<", "!"]
+TYPES = [3, 1, 1, 1, 1, 1, 1, 1]
+SCRIPT = [1, 2, 3, 4, 5, 0]         # { "ok" : true } then EOS
+
+
+def _logits(legal):
+    import numpy as np
+    z = np.zeros(len(TOKENS))
+    z[6] = 100.0                     # '<' is always the model's favorite and never grammar-legal
+    z[legal] = 50.0
+    return z
+
+
+class _Cp(object):
+    asnumpy = staticmethod(lambda x: __import__("numpy").asarray(x))
+    flatnonzero = staticmethod(__import__("numpy").flatnonzero)
+
+    class cuda(object):
+        class Device(object):
+            def __init__(self, dev):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+
+def _fake_k():
+    from types import SimpleNamespace
+    from kindi.config import DEFAULTS
+    return SimpleNamespace(
+        cfg=dict(DEFAULTS, max_tokens=32, temperature=0.0, top_p=1.0, top_k=0),
+        busy={}, stats={"requests": 0, "prompt_tokens": 0, "cached_tokens": 0,
+                       "completion_tokens": 0})
+
+
+def test_nanbeige_structured_output_skips_the_illegal_top_token(monkeypatch):
+    import kindi.nanbeige_chat as chat
+    from kindi.nanbeige_gen import NanbeigeBackend
+    monkeypatch.setattr(chat, "render", lambda *a, **k: "")
+    monkeypatch.setattr(chat, "prompt_ids", lambda tok, text: [1])
+
+    class _Tok(object):
+        tokens = TOKENS
+        types = TYPES
+        eos = 0
+
+        def piece(self, i):
+            return TOKENS[i].encode()
+
+        def encode(self, s, add_bos=False):
+            return []
+
+    class _Card(object):
+        dev = 0
+        logits = _logits(SCRIPT[0])
+
+    class _Engine(object):
+        ctx = 4096
+        cp = _Cp
+        cards = [_Card()]
+        i = 0
+
+        def prefill_batch(self, ids, pos0=0):
+            return 0
+
+        def step(self, tok, pos):
+            return 0
+
+        def step_begin(self, tok, pos):
+            self.i += 1
+            self.cards[0].logits = _logits(SCRIPT[min(self.i, len(SCRIPT) - 1)])
+
+        def step_end(self):
+            return 0
+
+    backend = NanbeigeBackend.__new__(NanbeigeBackend)
+    backend.log = lambda *a: None
+    backend.tok = _Tok()
+    backend.stop_ids = {0}
+    backend.eng = _Engine()
+    backend.cached = []
+    backend.lookup = 0
+    backend.lk_stats = [0] * 6
+    backend.mtp = False
+    req = {"messages": [{"role": "user", "content": "hi"}],
+           "max_tokens": 16, "temperature": 0.0, "top_p": 1.0, "top_k": 0,
+           "response_format": JSON_SCHEMA}
+    items = list(backend.generate(_fake_k(), req))
+    done = next(v for kind, v in items if kind == "done")
+    assert json.loads(done["content"]) == {"ok": True}
+    assert done["finish"] == "stop"
+
+
+def test_lightning_structured_output_skips_the_illegal_top_token(monkeypatch):
+    import kindi.lightning_chat as chat
+    from kindi.lightning_gen import LightningBackend
+    monkeypatch.setattr(chat, "render", lambda *a, **k: "")
+
+    class _Tok(object):
+        vocab = TOKENS
+        types = TYPES
+        eos = 0
+        sid = {"<|im_start|>": 99}
+
+        def decode_bytes(self, i):
+            return TOKENS[i].encode()
+
+        def encode(self, text, **k):
+            return [1]
+
+    class _Engine(object):
+        ctx = 4096
+        cp = _Cp
+        pos = 0
+        i = 0
+
+        def __init__(self):
+            self.logits = _logits(SCRIPT[0])
+
+        def reset(self):
+            self.pos = 0
+
+        def prefill(self, ids, pos=None):
+            self.pos = (pos or 0) + len(ids)
+            return 0
+
+        def step(self, tok=None):
+            self.pos += 1
+            self.i += 1
+            self.logits = _logits(SCRIPT[min(self.i, len(SCRIPT) - 1)])
+            return 0
+
+        def snapshot(self):
+            pass
+
+        def restore(self):
+            pass
+
+    backend = LightningBackend.__new__(LightningBackend)
+    backend.log = lambda *a: None
+    backend.path = "x.gguf"
+    backend.tok = _Tok()
+    backend.stop_ids = {0}
+    backend.im_start = 99
+    backend.eng = _Engine()
+    backend.cached = []
+    backend.snap = []
+    req = {"messages": [{"role": "user", "content": "hi"}],
+           "max_tokens": 16, "temperature": 0.0, "top_p": 1.0, "top_k": 0,
+           "response_format": JSON_SCHEMA}
+    items = list(backend.generate(_fake_k(), req))
+    done = next(v for kind, v in items if kind == "done")
+    assert json.loads(done["content"]) == {"ok": True}
+    assert done["finish"] == "stop"
+
+
 def test_deepseek_no_markup_in_any_result():
     block = (_dsml("get_weather", {"city": ("Paris", True)})
              + _dsml("get_weather", {"city": ("Par", True)}, close=False))

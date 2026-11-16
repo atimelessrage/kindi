@@ -47,6 +47,7 @@ import numpy as np
 from . import COMMIT, __version__, chat
 from .api import errors as api_errors
 from .cache import Cancelled, Runner
+from .constrained import STRUCTURED_TYPES, is_structured
 from .engine import EOS
 from .sampling import Sampler
 
@@ -106,6 +107,10 @@ def _response_format_grammar(response_format):
 
     if response_format.get("type") == "json_object":
         return json_object_grammar()
+    if response_format.get("type") == "grammar":
+        from .gbnf import Grammar
+
+        return Grammar.from_string(response_format.get("grammar") or "")
     return grammar_from_schema(_response_format_schema(response_format))
 
 
@@ -344,13 +349,26 @@ def _validate_request(req, has_vision=False):
         rtype = response_format.get("type")
         if not isinstance(rtype, str):
             _request_error("response_format.type must be a string", param="response_format")
-        if rtype not in ("text", "json_object", "json_schema"):
-            _request_error("structured output (response_format type %r) is not supported" % rtype,
-                           param="response_format")
-        if rtype in ("json_object", "json_schema"):
+        if rtype != "text" and rtype not in STRUCTURED_TYPES:
+            _request_error(
+                "structured output (response_format type %r) is not supported; use text, "
+                "json_object, json_schema or grammar" % rtype, param="response_format")
+        if rtype in STRUCTURED_TYPES:
             if req.get("tools"):
                 _request_error("tools are not supported together with structured output",
                                param="response_format")
+            if rtype == "grammar":
+                grammar_text = response_format.get("grammar")
+                if not isinstance(grammar_text, str) or not grammar_text.strip():
+                    _request_error(
+                        "a grammar response_format needs a non-empty \"grammar\" string (GBNF)",
+                        param="response_format")
+                from .gbnf import Grammar
+
+                try:
+                    Grammar.from_string(grammar_text)
+                except ValueError as e:
+                    _request_error("invalid grammar: %s" % e, param="response_format")
             if rtype == "json_schema":
                 schema = _response_format_schema(response_format)
                 if schema is None:
@@ -448,20 +466,9 @@ def _is_loopback(host):
 
 
 def _two_cards():
-    """Gemma 4 in tensor parallel: KINDI_G4_TP=1 always, 0 never; auto (the default) when exactly two GPUs of the
-    same kind are visible"""
-    mode = os.environ.get("KINDI_G4_TP", "auto")
-    if mode in ("0", "1"):
-        return mode == "1"
-    try:
-        import cupy as cp
-        n = cp.cuda.runtime.getDeviceCount()
-        if n != 2:
-            return False
-        names = [cp.cuda.runtime.getDeviceProperties(i)["name"] for i in range(2)]
-        return names[0] == names[1]
-    except Exception:  # noqa: BLE001 - device probe: any failure means "not a matching pair"
-        return False
+    from .backends.gemma4 import two_cards
+    return two_cards()
+
 
 class Kindi(object):
     """Engine + tokenizer + cache + sampler, shared by the HTTP layer and `kindi chat`."""
@@ -528,7 +535,7 @@ class Kindi(object):
                 self.runner = Runner(self.eng, cfg, self.pack_id, log, progress=self.busy)
             self.sample = Sampler(self.eng)
         self.supports_logprobs = self.variant == "gemma4"
-        self.supports_json_grammar = self.variant in ("qwen35", "bonsai27", "gemma4")   # dense paths + Gemma 4 carry the JSON automaton
+        self.supports_json_grammar = self.variant in ("qwen35", "bonsai27", "gemma4", "nanbeige", "lightning")   # these paths carry the JSON automaton
         self.lock = threading.RLock()        # reentrant: a background request runs waiting chat requests inside its own turn
         self.stats = {"requests": 0, "prompt_tokens": 0, "cached_tokens": 0, "completion_tokens": 0,
                       "spec_passes": 0, "spec_drafted": 0, "spec_accepted": 0,
@@ -607,7 +614,7 @@ class Kindi(object):
         prompt=render_gemma(self.model_path,messages,tools,kw,True)
         jgrammar=jstate=None
         rf=req.get("response_format") or {}
-        if rf.get("type") in ("json_object","json_schema"):
+        if is_structured(rf):
             jgrammar=_response_format_grammar(rf); jstate=jgrammar.start()
             thinking_open=False     # a structured reply is the whole reply: it never enters a thought channel
         else:
@@ -829,7 +836,7 @@ class Kindi(object):
             return (yield from self._generate_gemma(req, cancel))
         grammar = None
         rf = req.get("response_format")
-        if isinstance(rf, dict) and rf.get("type") in ("json_object", "json_schema"):
+        if is_structured(rf):
             grammar = _response_format_grammar(rf)
             gstate = grammar.start()
             if not hasattr(self, "_grammar_texts"):
@@ -1853,7 +1860,7 @@ def create_app(cfg, log=print):
             return _err(400, "logprobs are not supported by this backend; remove logprobs or use a Gemma 4 pack",
                         "invalid_request_error", param="logprobs")
         rf = req.get("response_format") or {}
-        if rf.get("type") in ("json_object", "json_schema") and not getattr(K, "supports_json_grammar", True):
+        if is_structured(rf) and not getattr(K, "supports_json_grammar", True):
             return _err(400, "structured output (response_format) is not supported by the %s backend" % getattr(K, "variant", ""),
                         "invalid_request_error", param="response_format")
         cid, created = "chatcmpl-" + uuid.uuid4().hex[:24], int(time.time())

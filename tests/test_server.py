@@ -227,7 +227,8 @@ def test_json_schema_and_object_response_formats_are_accepted(app_client):
     for rf in ({"type": "json_object"},
                {"type": "json_schema", "json_schema": {"name": "x", "schema": {
                    "type": "object", "properties": {"a": {"type": "string"}},
-                   "required": ["a"]}}}):
+                   "required": ["a"]}}},
+               {"type": "grammar", "grammar": 'root ::= "ok" | "no"'}):
         r = client.post("/v1/chat/completions", json={
             "messages": [{"role": "user", "content": "hello"}],
             "response_format": rf,
@@ -235,7 +236,7 @@ def test_json_schema_and_object_response_formats_are_accepted(app_client):
         assert r.status_code == 200, r.text
 
 
-def _drive_constrained(script, schema):
+def _drive_constrained(script, schema=None, response_format=None):
     """Drive the real `Kindi.generate` loop with a JSON-schema grammar: every scripted
     pick must be inside the pick's allowed set, so a stray token would raise here."""
     K = object.__new__(server.Kindi)
@@ -266,7 +267,8 @@ def _drive_constrained(script, schema):
     K._pick = pick
     req = {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 512,
            "temperature": 0.0, "top_p": 1.0, "top_k": 0,
-           "response_format": {"type": "json_schema", "json_schema": {"schema": schema}}}
+           "response_format": response_format or {
+               "type": "json_schema", "json_schema": {"schema": schema}}}
     items = list(K.generate(req))
     done = next(v for kind, v in items if kind == "done")
     return done
@@ -281,6 +283,21 @@ def test_constrained_generate_produces_schema_valid_json():
     done = _drive_constrained(list(script), schema)
     assert done["finish"] == "stop"
     assert json.loads(done["content"]) == {"name": "Ada", "age": 36}
+
+
+def test_grammar_response_format_generates_inside_the_language():
+    """A GBNF response_format is decode-side constraint on the dense path too, not a
+    post-hoc check: `no` is in the language, `nope` cannot be produced."""
+    rf = {"type": "grammar", "grammar": 'root ::= "yes" | "no"'}
+    done = _drive_constrained([ord(c) for c in "no"] + [248046], response_format=rf)
+    assert done["finish"] == "stop"
+    assert done["content"] == "no"
+
+    # the out-of-language tail is never emitted: the script asks for 'p' next, the
+    # allowed set does not contain it, so the loop falls through to EOS and stops
+    done = _drive_constrained([ord(c) for c in "nope"] + [248046], response_format=rf)
+    assert done["finish"] == "stop"
+    assert done["content"] == "no"
 
 
 def test_constrained_generate_rejects_a_grammar_escape():
@@ -408,7 +425,7 @@ def test_gemma_without_response_format_is_unconstrained(monkeypatch):
 def test_structured_output_rejected_on_unsupported_backend(app_client):
     client, K = app_client
     K.supports_json_grammar = False
-    K.variant = "lightning"
+    K.variant = "dsv41"
     r = client.post("/v1/chat/completions", json={
         "messages": [{"role": "user", "content": "hello"}],
         "response_format": {"type": "json_schema", "json_schema": {"schema": {

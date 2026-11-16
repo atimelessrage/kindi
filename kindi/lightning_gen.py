@@ -161,6 +161,67 @@ class ThinkSorter(object):
             return out
 
 
+def _response_grammar(req):
+    """The decode grammar for a structured-output request, else None."""
+    from .constrained import is_structured
+    from .server import _response_format_grammar
+    rf = req.get("response_format")
+    if not is_structured(rf):
+        return None
+    return _response_format_grammar(rf)
+
+
+def pick_candidates(eng, greedy, temperature, top_p, top_k, rng, min_p=0.0, penalty=None, allowed=None, constrained=False):
+    """the next token from the engine's last step or prompt: the candidates within 16 temperatures of the best (at
+    most 256), llama.cpp's repeat penalty (penalty: (repeat_penalty, recent tokens)), top-k, top-p, min-p and the
+    temperature (sampling.Sampler._pick). ``allowed`` masks the candidate set to those ids before the 256 cap, so a
+    constrained call argmaxes over the surviving candidates. Greedy without a mask or an effective penalty on a
+    recent token: the engine's own token. The server backend and the T4.2 adapter share this (one copy of the
+    numbers)."""
+    if temperature <= 0 and allowed is None and (penalty is None or penalty[0] <= 1.0 or greedy not in penalty[1]):
+        return greedy
+    from .sampling import Sampler, penalize
+    if allowed is not None and constrained:
+        # grammar-constrained decoding reads the full logits at the allowed ids, never a
+        # top-256 window, so a legal token outside the highest scores is not lost
+        cand = np.asarray(sorted(int(t) for t in allowed), dtype=np.int64)
+        if not cand.size:
+            raise ValueError("constrained sampling: no allowed token in the model's candidates")
+        cp = eng.cp
+        sc = cp.asnumpy(eng.logits[cand]).astype(np.float64)
+        if sc.ndim == 0:
+            sc = np.asarray(sc).reshape(1)
+    else:
+        # the candidates within 16 temperatures of the best (relative probability under 1e-7 is never drawn); when
+        # more than 4096 qualify, a narrower window (the sampler keeps the 256 best in any case)
+        w = 16.0 * max(temperature, 0.1)
+        got = eng.candidates(w)
+        while got is None and w > 0.5:
+            w /= 2
+            got = eng.candidates(w)
+        if got is not None:
+            cand, sc = got
+        else:                                                  # (more than 4096 candidates: the whole vocabulary)
+            cp = eng.cp
+            z = eng.logits
+            idx = cp.flatnonzero(z >= z.max() - 30.0 * max(temperature, 0.1))
+            cand = cp.asnumpy(idx).astype(np.int64)
+            sc = cp.asnumpy(z[idx]).astype(np.float64)
+        if allowed is not None:
+            keep = np.array([int(t) in allowed for t in cand], dtype=bool)
+            cand, sc = cand[keep], sc[keep]
+            if not cand.size:
+                return greedy
+    if cand.size > 256:
+        keep = np.argpartition(sc, -256)[-256:]
+        cand, sc = cand[keep], sc[keep]
+    if penalty is not None and penalty[0] > 1.0:
+        sc = penalize(cand, sc, penalty[0], penalty[1])
+    if temperature <= 0:
+        return int(cand[int(np.argmax(sc))])
+    return Sampler._pick(cand, sc, temperature, top_p, top_k, rng, min_p)
+
+
 class LightningBackend(object):
     def __init__(self, man, cfg, log=print):
         from .gguf import GGUF
@@ -203,36 +264,9 @@ class LightningBackend(object):
         self.log("Lightning self-check: %s (token by token: %s)" % (
             repr(self.tok.decode(a))[:60], "the same" if c == a else "differs after a near tie"))
 
-    def _pick(self, greedy, temperature, top_p, top_k, rng, min_p=0.0, penalty=None):
-        """sample the next token from the card's logits: the candidates within 30 temperatures of the best (at most
-        256), llama.cpp's repeat penalty (penalty: (repeat_penalty, recent tokens)), then top-k, top-p, min-p and the
-        temperature (sampling.Sampler._pick). Greedy without a penalty on a recent token: the engine's token."""
-        if temperature <= 0 and (penalty is None or penalty[0] <= 1.0 or greedy not in penalty[1]):
-            return greedy
-        from .sampling import Sampler, penalize
-        # the candidates within 16 temperatures of the best (relative probability under 1e-7 is never drawn); when
-        # more than 4096 qualify, a narrower window (the sampler keeps the 256 best in any case)
-        w = 16.0 * max(temperature, 0.1)
-        got = self.eng.candidates(w)
-        while got is None and w > 0.5:
-            w /= 2
-            got = self.eng.candidates(w)
-        if got is not None:
-            cand, sc = got
-        else:                                              # (more than 4096 candidates: the whole vocabulary)
-            cp = self.eng.cp
-            z = self.eng.logits
-            idx = cp.flatnonzero(z >= z.max() - 30.0 * max(temperature, 0.1))
-            cand = cp.asnumpy(idx).astype(np.int64)
-            sc = cp.asnumpy(z[idx]).astype(np.float64)
-        if cand.size > 256:
-            keep = np.argpartition(sc, -256)[-256:]
-            cand, sc = cand[keep], sc[keep]
-        if penalty is not None and penalty[0] > 1.0:
-            sc = penalize(cand, sc, penalty[0], penalty[1])
-        if temperature <= 0:
-            return int(cand[int(np.argmax(sc))])
-        return Sampler._pick(cand, sc, temperature, top_p, top_k, rng, min_p)
+    def _pick(self, greedy, temperature, top_p, top_k, rng, min_p=0.0, penalty=None, allowed=None, constrained=False):
+        return pick_candidates(self.eng, greedy, temperature, top_p, top_k, rng, min_p, penalty, allowed,
+                               constrained=constrained)
 
     def _read(self, ids):
         """bring the engine to the end of ids, reusing what it holds; returns (greedy next token, reused tokens)"""
@@ -266,7 +300,17 @@ class LightningBackend(object):
         if req.get("tool_choice") == "none":
             tools = None
         kw = req.get("chat_template_kwargs") or {}
-        thinking = kw.get("enable_thinking", req.get("enable_thinking", True)) is not False
+        jgrammar = _response_grammar(req)
+        jstate = jgrammar.start() if jgrammar is not None else None
+        grammar_texts = None
+        if jgrammar is not None:
+            if not hasattr(self, "_grammar_texts"):
+                self._grammar_texts = [self.tok.decode_bytes(i).decode("utf-8", "replace")
+                                       for i in range(len(self.tok.vocab))]
+            grammar_texts = self._grammar_texts
+            thinking = False     # a structured reply is the whole reply: it never enters a thought channel
+        else:
+            thinking = kw.get("enable_thinking", req.get("enable_thinking", True)) is not False
         ids = self.tok.encode(render(self.path, req.get("messages") or [], tools=tools, enable_thinking=thinking))
         if len(ids) >= self.eng.ctx:
             raise OverflowError("the prompt has %d tokens; context is %d" % (len(ids), self.eng.ctx))
@@ -320,7 +364,16 @@ class LightningBackend(object):
                     finish = "stop"
                     break
                 pen = (rp, set((ids + generated)[-rlast:] if rlast > 0 else ids + generated)) if rp > 1.0 else None
-                token = queue.pop(0) if queue else self._pick(greedy, temperature, top_p, top_k, rng, min_p, pen)
+                allowed = None
+                if jgrammar is not None:
+                    allowed = jgrammar.vocab_allowed(jstate, grammar_texts)
+                    if jgrammar.done(jstate):
+                        allowed = np.concatenate([allowed, np.array(sorted(self.stop_ids), dtype=np.int64)])
+                    if allowed.size == 0:
+                        raise RuntimeError("structured-output grammar allowed no token")
+                token = queue.pop(0) if queue else self._pick(
+                    greedy, temperature, top_p, top_k, rng, min_p, pen, allowed,
+                    constrained=jgrammar is not None)
                 if token in self.stop_ids:
                     if os.environ.get("KINDI_LOG_RAW"):
                         self.log("Lightning: stop token %d %r" % (token, self.tok.decode_bytes(token)))
@@ -343,6 +396,11 @@ class LightningBackend(object):
                     greedy = self.eng.step(token)
                     self.cached.append(token)
                 piece = decoder.decode(self.tok.decode_bytes(token))
+                if jgrammar is not None:
+                    advanced = jgrammar.advance(jstate, piece)
+                    if advanced is None:
+                        raise RuntimeError("structured-output grammar rejected token %r it had allowed" % piece)
+                    jstate = advanced
                 text += piece
                 _hit = False
                 if stop_seq:
