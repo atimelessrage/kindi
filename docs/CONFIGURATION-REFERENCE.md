@@ -182,7 +182,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_KEXPF` | (empty) or `0` | `kindi/spec.py:154` (+1 more) |
 | `KINDI_KV` | (empty) or `q8_0` | `kindi/engine.py:76` (+6 more) |
 | `KINDI_KV_EXPERIMENTAL` | `0` | `kindi/kld.py:92` (+5 more) |
-| `KINDI_LEGACY_ENGINE_PATH` | (unset) | `kindi/engine.py:770` |
+| `KINDI_LEGACY_ENGINE_PATH` | (unset) | `kindi/engine.py:761` |
 | `KINDI_LLVM` | (unset) | `kindi/cpu.py:91` |
 | `KINDI_LOG_RAW` | (unset) | `kindi/lightning_gen.py:378` (+2 more) |
 | `KINDI_LT_CHUNK` | (unset) | `kindi/lightning.py:144` |
@@ -268,7 +268,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_TC_DP4A` | `0` | `kindi/tc.py:74` |
 | `KINDI_TC_DUAL` | `1` | `kindi/spec.py:354` |
 | `KINDI_TC_GRAPHS` | `0` | `kindi/spec.py:332` |
-| `KINDI_TC_HP` | `0` | `kindi/engine.py:871` (+1 more) |
+| `KINDI_TC_HP` | `0` | `kindi/engine.py:862` (+1 more) |
 | `KINDI_TC_INC` | (empty) | `kindi/spec.py:179` |
 | `KINDI_TC_LANE` | (empty) | `kindi/tc.py:83` |
 | `KINDI_TC_MM` | `2` | `kindi/chunk.py:302` |
@@ -278,6 +278,6 @@ variables, and are therefore not listed twice here.
 | `KINDI_TC_TUNE` | `0` | `kindi/spec.py:436` (+1 more) |
 | `KINDI_TESTED_CC` | (empty) | `kindi/tc.py:39` |
 | `KINDI_THP` | `0` | `kindi/engine.py:89` |
-| `KINDI_TP` | (empty) | `kindi/engine.py:853` (+2 more) |
+| `KINDI_TP` | (empty) | `kindi/engine.py:844` (+2 more) |
 | `KINDI_TP_SPLIT` | `equal` | `kindi/tp.py:1006` |
 | `KINDI_VERIFY_ON_START` | (unset) | `kindi/container.py:245` |
