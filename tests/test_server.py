@@ -15,6 +15,7 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
+from gbnf_fixtures import CANONICAL_JSON
 from kindi import server
 
 
@@ -237,6 +238,40 @@ def test_json_schema_and_object_response_formats_are_accepted(app_client):
             "response_format": rf,
         })
         assert r.status_code == 200, r.text
+
+
+RECURSIVE_GRAMMARS = [
+    'root ::= "[" root "]" | "x"',        # the smallest self-recursive grammar
+    CANONICAL_JSON,                        # llama.cpp's own json.gbnf, the one people send
+]
+
+
+def _grammar_request(grammar):
+    return {"messages": [{"role": "user", "content": "hello"}],
+            "response_format": {"type": "grammar", "grammar": grammar}}
+
+
+def test_the_recursion_opt_in_is_a_400_by_default_and_a_200_when_enabled(app_client, monkeypatch):
+    """The env switch end to end, through HTTP: the same recursive grammar is refused by the
+    validator (400, `response_format`, no engine call) until KINDI_GBNF_MAX_DEPTH is set, and
+    then the same request is accepted. The compiler tests prove the language; this proves the
+    operator's switch reaches it."""
+    client, K = app_client
+    monkeypatch.delenv("KINDI_GBNF_MAX_DEPTH", raising=False)
+    for grammar in RECURSIVE_GRAMMARS:
+        r = client.post("/v1/chat/completions", json=_grammar_request(grammar))
+        assert r.status_code == 400, r.text
+        error = r.json()["error"]
+        assert error["param"] == "response_format"
+        assert "recursive" in error["message"]
+    assert K.calls == 0                     # refused in validation, before the engine ran
+
+    monkeypatch.setenv("KINDI_GBNF_MAX_DEPTH", "3")
+    monkeypatch.setenv("KINDI_GBNF_MAX_STATES", "60000")   # depth 3 costs 21,252 states
+    for grammar in RECURSIVE_GRAMMARS:
+        r = client.post("/v1/chat/completions", json=_grammar_request(grammar))
+        assert r.status_code == 200, r.text
+    assert K.calls == len(RECURSIVE_GRAMMARS)
 
 
 def _drive_constrained(script, schema=None, response_format=None):
