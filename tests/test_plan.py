@@ -230,3 +230,21 @@ def test_describe_moe_without_the_gguf_is_an_error(tmp_path):
     (pack / "kindi_pack.json").write_text(json.dumps({"backend": "kindi_lightning"}))
     with __import__("pytest").raises(SystemExit):
         _plan.describe(str(pack), 2048, None, assume_vram_gib=1.0)
+
+
+def test_describe_moe_reports_the_measured_share_with_usage_counts(tmp_path):
+    """The slots line quotes measured picks when the usage file has counts, and the measured
+    share never contradicts a --moe-cache-mib cap (the weighted scan used to spend free VRAM
+    and report every expert on the card despite the cap)."""
+    pack = make_lightning_pack(tmp_path)
+    usage = tmp_path / "usage.json"
+    counts = {str(il): [100 - e for e in range(32)] for il in range(16)}
+    usage.write_text(json.dumps({"counts": counts}), encoding="utf-8")
+    rep = _plan.describe(str(pack), 2048, None, assume_vram_gib=0.5, assume_ram_gib=4,
+                         assume_cores=2, reserve_mib=0, usage_path=str(usage),
+                         moe_cache_mib=1, dcache=4)
+    # 1 MiB / (4 MoE layers x 18,432 B) = 14 experts per layer, and that is the ceiling
+    assert rep["n_card"] <= 14
+    slots = next(r for c, r in rep["lines"] if c == "slots")
+    assert "%" in slots and "measured picks" in slots
+    assert "--dcache" in slots

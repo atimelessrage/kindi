@@ -81,13 +81,16 @@ character classes, `.`, `* + ? {m} {m,} {m,n}`, rule references, comments).
 It is compiled before generation, so a syntax error, an unknown rule or a
 recursive rule is an enveloped 400 and never a half-constrained reply;
 recursion is refused because this slice is a regular automaton (use
-`json_schema` for recursive JSON). The same
+`json_schema` for recursive JSON). Compilation is bounded: `{m,n}` refuses a
+bound above 10,000 copies and the automaton above 20,000 states
+(`KINDI_GBNF_MAX_STATES`), both as a 400 rather than a memory request from the
+caller. The same
 `supports_json_grammar` capability flag gates it. The
 adapter contract carries the same flag on
 `BackendCapabilities`; a backend that sets it treats `token_filter` as the
 full allowed set for constrained decoding. `n = 1` and
-`response_format: {"type": "text"}` are accepted, `grammar` stays rejected,
-and purely cosmetic fields keep being ignored. The grammar is schema-ordered
+`response_format: {"type": "text"}` are accepted along with all three
+structured types above, and purely cosmetic fields keep being ignored. The grammar is schema-ordered
 (`kindi/jsongrammar.py`): properties are emitted in schema order, `required`
 must be present, `additionalProperties` behaves like OpenAI strict mode
 (only schema properties), `integer` is canonical decimal, and `enum`/`const`

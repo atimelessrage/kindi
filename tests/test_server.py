@@ -135,6 +135,9 @@ def test_unsupported_fields_name_their_param(app_client):
             (dict(base, response_format={"type": "json_schema",
                                         "json_schema": {"schema": {"type": "frob"}}}),
              "response_format"),
+            (dict(base, response_format={"type": "grammar",
+                                        "grammar": 'root ::= "a"{1,100000}'}),
+             "response_format"),                     # bounded compilation, not a memory request
             (dict(base, response_format={"type": "json_object"}, tools=[{"type": "function", "function": {"name": "f"}}]),
              "response_format")):
         r = client.post("/v1/chat/completions", json=payload)

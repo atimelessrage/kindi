@@ -99,3 +99,25 @@ def test_errors_name_the_problem():
         Grammar.from_string('root ::= "a"\nbogus')
     with pytest.raises(ValueError, match="unterminated"):
         Grammar.from_string('root ::= "a')
+
+
+def test_a_repetition_bound_that_would_explode_is_refused():
+    """A grammar is compiled to one state per literal character, so an unbounded bound is a
+    memory request from whoever sent it: refused at parse time, before the automaton is built."""
+    with pytest.raises(ValueError, match="expands to at most 10000 copies"):
+        Grammar.from_string('root ::= "a"{1,100000}')
+    with pytest.raises(ValueError, match="expands to at most 10000 copies"):
+        Grammar.from_string('root ::= "a"{20000}')
+
+
+def test_the_compiled_size_is_bounded_and_raiseable(monkeypatch):
+    monkeypatch.setenv("KINDI_GBNF_MAX_STATES", "8")
+    with pytest.raises(ValueError, match="grammar too large"):
+        Grammar.from_string('root ::= "abcdefghij"')      # ten literal states, limit eight
+    monkeypatch.setenv("KINDI_GBNF_MAX_STATES", "5000")
+    g = Grammar.from_string('root ::= "abcdefghij"')
+    assert g.done(g.advance(g.start(), "abcdefghij"))
+    # a bad override is not a request failure: the default limit still applies
+    monkeypatch.setenv("KINDI_GBNF_MAX_STATES", "not-a-number")
+    g = Grammar.from_string('root ::= "ok"')
+    assert g.done(g.advance(g.start(), "ok"))

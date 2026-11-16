@@ -21,6 +21,22 @@ can still reach the accepting state, so constrained decoding never paints itself
 a dead end that would leave the allowed set empty.
 """
 import collections
+import os
+
+# A grammar is compiled into one state per literal character, so an unbounded repetition or a
+# megabyte literal is a memory request from whoever sent the request. Both limits are refusals
+# (ValueError -> an enveloped 400), not silent truncation.
+MAX_REPEAT = 10000
+DEFAULT_MAX_STATES = 20000
+
+
+def _state_limit():
+    """KINDI_GBNF_MAX_STATES (read per grammar, so an operator can raise it without a restart of
+    the module's constants). A bad value falls back to the default rather than failing a request."""
+    try:
+        return max(1, int(os.environ.get("KINDI_GBNF_MAX_STATES", str(DEFAULT_MAX_STATES))))
+    except (TypeError, ValueError):
+        return DEFAULT_MAX_STATES
 
 
 # --- parsing ---------------------------------------------------------------
@@ -252,6 +268,11 @@ class _Parser(object):
         self.i += 1
         if hi is not None and hi < lo:
             self.error("{m,n} needs n >= m")
+        if hi is not None and hi > MAX_REPEAT:
+            self.error("{m,n} expands to at most %d copies (%d requested); narrower bounds or a "
+                       "rule reference with '*' is cheaper" % (MAX_REPEAT, hi))
+        if lo > MAX_REPEAT:
+            self.error("{m} expands to at most %d copies (%d requested)" % (MAX_REPEAT, lo))
         return lo, hi
 
 
@@ -260,14 +281,20 @@ class _Parser(object):
 class _NFA(object):
     """Thompson construction over labels ("ch", char) / ("range", ...) / ("any",)."""
 
-    def __init__(self, rules):
+    def __init__(self, rules, max_states=None):
         self.program = rules
         self.edges = {}
         self.count = 0
         self.built = {}
         self.active = []
+        self.max_states = _state_limit() if max_states is None else int(max_states)
 
     def state(self):
+        if self.count >= self.max_states:
+            raise ValueError(
+                "GBNF: grammar too large (%d automaton states, limit %d); shorten a literal or a "
+                "repetition count, or use response_format json_schema "
+                "(KINDI_GBNF_MAX_STATES raises the limit)" % (self.count, self.max_states))
         s = self.count
         self.count += 1
         self.edges[s] = []

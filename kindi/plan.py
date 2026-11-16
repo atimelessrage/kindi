@@ -321,8 +321,8 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
              ("reserve", "%d MiB kept free (the CUDA context, kernels and pool rounding; the engine "
               "adds more after a failed load)" % (reserve // 2 ** 20))]
     n_card = None
-    if moe_cache_mib is not None:
-        cap = int(moe_cache_mib) * 2 ** 20
+    cap = int(moe_cache_mib) * 2 ** 20 if moe_cache_mib is not None else None
+    if cap is not None:
         n_card = max(0, cap // (n_moe * eb))
         lines.append(("cache cap", "--moe-cache-mib caps the experts' card budget at %d MiB: %d of %d "
                       "experts per layer on the card" % (int(moe_cache_mib), n_card, s.n_exp)))
@@ -345,10 +345,13 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
     placement = None
     if usage.has_counts() and os.environ.get("KINDI_MOE_WEIGHTED", "1") != "0":
         room2 = free_bytes - dense - kv - state - _lt_buf_bytes(s, 512) - reserve
-        budget = room2 - 2 * (s.n_exp - n_card) * eb - n_moe * dcache * eb
         best = None
         for m in sorted(set(list(range(max(s.n_used, n_card - 64), n_card + 1, 4)) + [n_card])):
             b = room2 - 2 * (s.n_exp - m) * eb - n_moe * dcache * eb
+            if cap is not None:
+                # --moe-cache-mib is a cap on the experts' bytes: the weighted scan must not spend
+                # past it, or the report names more card experts than the flag allows
+                b = min(b, cap)
             if b < m * n_moe * eb:
                 continue
             try:
@@ -373,16 +376,27 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
     if n_card < s.n_exp:
         why = ("%d per MoE layer (%.2f GiB): the last-used host experts kept in device slots so the next "
                "use is not a PCIe read. Each slot displaces one expert per layer" % (dcache, slot_gib))
-        if moe_cache_mib is None:
-            why += "; the fit already leaves room for them, and as residency the same bytes would hold "
-            "%d experts per layer" % (n_card + dcache)
-        cov_slots = usage.coverage(n_card)
-        cov_resident = usage.coverage(n_card + dcache) if moe_cache_mib is None else None
-        if cov_slots is not None and cov_resident is not None:
-            why += (" - %.1f%% of the measured picks against %.1f%%"
-                    % (100 * cov_slots, 100 * cov_resident))
-        why += (" (no counts: run bench to measure use). --dcache or KINDI_LT_DCACHE moves the split"
-                if cov_slots is None else "; --dcache or KINDI_LT_DCACHE moves the split")
+        if placement is not None:
+            # The weighted plan already spent these bytes before it chose m, so the honest number
+            # is the share that placement serves, not the top-n share a uniform split would get.
+            share = placement.served("card")
+            if share is not None:
+                why += ("; the usage-weighted placement already leaves room for them and serves "
+                        "%.1f%% of the measured picks from the card" % (100 * share))
+            else:
+                why += "; the usage-weighted placement already leaves room for them"
+        else:
+            if moe_cache_mib is None:
+                why += ("; the fit already leaves room for them, and as residency the same bytes would "
+                        "hold %d experts per layer" % (n_card + dcache))
+            cov_slots = usage.coverage(n_card)
+            cov_resident = usage.coverage(n_card + dcache) if moe_cache_mib is None else None
+            if cov_slots is not None and cov_resident is not None:
+                why += (" - %.1f%% of the measured picks against %.1f%%"
+                        % (100 * cov_slots, 100 * cov_resident))
+            else:
+                why += " (no usage counts: run bench to measure use)"
+        why += "; --dcache or KINDI_LT_DCACHE moves the split"
         lines.append(("slots", why))
     else:
         lines.append(("slots", "%d per MoE layer (%.2f GiB) are reserved but unused: all %d experts per "
