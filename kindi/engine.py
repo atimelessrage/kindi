@@ -720,9 +720,9 @@ def make_engine(pack, ctx=4096, clusters=None, log=print, tandem="off", cpu_laye
     Dense Bonsai, Nanbeige (``kindi_nanbeige``) and Lightning
     (``kindi_lightning``) packs resolve through the backend registry (the
     ``bonsai``/``nanbeige``/``lightning`` adapters) unless
-    ``KINDI_LEGACY_ENGINE_PATH=1`` is set; the adapters build the same engine
-    as the legacy builders, so serve/verify/bench numbers do not change.
-    Other packs keep using the legacy builder.
+    ``KINDI_LEGACY_ENGINE_PATH=1`` is set. Each adapter builds the same
+    engine object its family's legacy builder built, so serve/verify/bench
+    numbers do not change. Other packs keep using the legacy builder.
     """
     if os.environ.get("KINDI_LEGACY_ENGINE_PATH") != "1":
         man = None

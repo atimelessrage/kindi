@@ -174,6 +174,56 @@ def test_nanbeige_model_id_for_manifest():
     assert model_id_for_manifest(None) is None
 
 
+class _FakeNanbeigeEngine(object):
+    """Records the (tok, pos) that generate() feeds, like Engine.generate does."""
+
+    def __init__(self):
+        self.calls = []
+
+    def prefill_batch(self, ids, pos0=0):
+        self.calls.append(("prefill", list(ids), pos0))
+        return 100                     # prediction for position len(ids)
+
+    def step(self, tok, pos):
+        self.calls.append(("step", int(tok), int(pos)))
+        return 101
+
+
+def test_nanbeige_generate_feeds_each_token_at_its_own_position():
+    """Regression: generate() must step the first generated token at len(prompt)
+    (like Engine.generate does) not at len(prompt) + 1 - every subsequent
+    token would then occupy a position one too high."""
+    from kindi.backends.base import SamplingParams
+    from kindi.backends.nanbeige import NanbeigeBackend
+
+    class _FakeTok(object):
+        bos = 1
+        tokens = ["", "a"]
+        types = [0, 0]
+        eos = None
+
+        def decode(self, ids):
+            return "?"
+
+    backend = NanbeigeBackend()
+    backend.loaded = True
+    backend.engine = _FakeNanbeigeEngine()
+    backend.tok = _FakeTok()
+    backend.stop_ids = set()
+
+    params = SamplingParams(max_tokens=3)
+    events = list(backend.generate([10, 11, 12], params))
+    tokens = [e.token_id for e in events if e.kind == "token"]
+    assert tokens == [100, 101, 101]
+    assert events[-1].kind == "done"
+    # prefill occupies 0..2; generated tokens are fed at 3, 4, 5
+    assert backend.engine.calls == [
+        ("prefill", [10, 11, 12], 0),
+        ("step", 100, 3),
+        ("step", 101, 4),
+    ]
+
+
 def test_lightning_resolves_by_model_id_unloaded():
     from kindi.backends.lightning import LightningBackend
 

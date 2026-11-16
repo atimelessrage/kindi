@@ -6,9 +6,10 @@ server backend and ``nanbeige_cli``'s verify/bench build from the GGUF the
 pack manifest points at) and adds the contract's text primitives (SPM
 tokenizer, Nanbeige chat template) plus a short generation loop for API
 consumers. ``kindi.engine.make_engine`` resolves ``kindi_nanbeige`` packs
-through this adapter by default; ``KINDI_LEGACY_ENGINE_PATH=1`` opts out.
-The adapter builds the same engine object the legacy path built, so
-serve/verify/bench keep their numbers.
+through this adapter by default; ``KINDI_LEGACY_ENGINE_PATH=1`` opts out
+to the legacy builder (which has no Nanbeige branch, so Nanbeige serve still
+needs the adapter to load anything at all). The engine object is the same
+class the legacy path built, so serve/verify/bench keep their numbers.
 
 A pack is optional at ``load`` time: without one the backend stays unloaded
 (no GPU touched), so the contract tests can exercise lifecycle/info without
@@ -208,8 +209,11 @@ class NanbeigeBackend(Backend):
             if len(generated) >= max_tokens:
                 finish = "length"
                 break
-            pos += 1
+            # pos tracks the token just generated's own position: the prompt
+            # occupies 0..len(ids)-1, so the first generated token is at
+            # len(ids). Mirrors Engine.generate's pos bookkeeping exactly.
             nxt = eng.step(int(nxt), pos)
+            pos += 1
         yield GenerationEvent(
             kind="done",
             finish_reason=finish,
@@ -222,9 +226,10 @@ class NanbeigeBackend(Backend):
         """Sample the next token from the last step's logits.
 
         Mirrors ``nanbeige_gen.NanbeigeBackend._pick``: candidates are the
-        tokens within 30 temperatures of the best (at most 256 of the best),
-        scored through ``sampling.Sampler._pick``. A token filter masks the
-        candidate set to the allowed ids (a masked argmax at temperature 0).
+        tokens within 30 temperatures of the best, scored through
+        ``sampling.Sampler._pick``. A token filter masks the candidate set
+        to the allowed ids (a masked argmax at temperature 0); the 256 cap
+        then keeps the best of the surviving (allowed) candidates.
         """
         import numpy as np
 
@@ -249,7 +254,7 @@ class NanbeigeBackend(Backend):
                 return greedy
         if temp <= 0:
             return int(cand[int(np.argmax(sc))])
-        if cand.size > 256:
+        if temp > 0 and cand.size > 256:
             keep = np.argpartition(sc, -256)[-256:]
             cand, sc = cand[keep], sc[keep]
         from ..sampling import Sampler
