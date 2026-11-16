@@ -142,3 +142,26 @@ def test_local_packs_resolve_to_the_adapter_they_declare():
                 "model name/source_file the Bonsai adapter reads" % (pack, man.get("model")))
         else:
             assert model_id is None, (pack, family)
+
+
+def test_tandem_on_a_moe_pack_is_explained_and_left_off(tmp_path, monkeypatch):
+    """A `--tandem` run on a MoE pack must not crash in, or silently build, the dense layer split:
+    the family's own split is its expert tiering, and the log says so."""
+    seen = _recording_resolve(monkeypatch)
+    monkeypatch.setattr(engine, "adapter_model_id", lambda man: "lightning-30b")
+    logged = []
+    pack = _pack(tmp_path, {"backend": "kindi_lightning", "model": "lightning-30b"})
+    assert engine.make_engine(pack, tandem="cpu-first", log=logged.append) == "the-engine"
+    assert seen[0][1]["tandem"] == "off"
+    assert any("mixture-of-experts" in line and "expert-tier" in line and "kindi plan" in line
+               for line in logged)
+
+
+def test_tandem_off_is_not_explained_on_a_moe_pack(tmp_path, monkeypatch):
+    seen = _recording_resolve(monkeypatch)
+    monkeypatch.setattr(engine, "adapter_model_id", lambda man: "lightning-30b")
+    logged = []
+    pack = _pack(tmp_path, {"backend": "kindi_lightning", "model": "lightning-30b"})
+    engine.make_engine(pack, log=logged.append)
+    assert seen[0][1]["tandem"] == "off"
+    assert not any("mixture-of-experts" in line for line in logged)

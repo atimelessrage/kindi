@@ -187,7 +187,11 @@ def test_describe_moe_uses_the_expert_tiers(tmp_path):
                          assume_cores=2, reserve_mib=0)
     assert rep["strategy"] == "moe-expert-tiers"
     choices = {c for c, _ in rep["lines"]}
-    assert {"strategy", "host ram", "reserve", "experts", "placement"} <= choices
+    assert {"strategy", "host ram", "reserve", "experts", "slots", "placement"} <= choices
+    # the decode-slot split is inspectable: it names the bytes, and that each slot costs one expert
+    slots = next(r for c, r in rep["lines"] if c == "slots")
+    assert "displace" in slots or "unused" in slots
+    assert rep["dcache"] >= 4
     strat = next(r for c, r in rep["lines"] if c == "strategy")
     assert "expert" in strat and "host" in strat
     assert rep["n_exp"] == 32 and rep["fit"] is True

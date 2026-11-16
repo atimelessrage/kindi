@@ -718,6 +718,9 @@ def tc_hp_for(man):
 # Gemma 4, Nanbeige, Lightning, Cascade and DeepSeek V4.1 converters/writers set the key, so an
 # absent/empty value is the dense family.
 DENSE_BACKENDS = (None, "")
+# families that route expert work instead of running every weight on every token. The dense tandem
+# layer split has no meaning for them: their CPU/GPU split is the expert tiering inside their engine.
+MOE_BACKENDS = ("kindi_lightning", "kindi_dsv41")
 
 
 def adapter_model_id(man):
@@ -776,6 +779,15 @@ def make_engine(pack, ctx=4096, clusters=None, log=print, tandem="off", cpu_laye
             pack, ctx=ctx, clusters=clusters, log=log, tandem=tandem,
             cpu_layers=cpu_layers, gpu=gpu,
         )
+    if str(tandem or "off").strip().lower().replace("_", "-") != "off" and family in MOE_BACKENDS:
+        # Not a no-op to hide: the flag asked for a split, and the family's split is its expert tiering.
+        log("kindi: %s is a mixture-of-experts pack (%s): the tandem runtime splits complete dense "
+            "layers, which does not apply. This family's CPU/GPU split is the expert-tier path inside "
+            "its own engine (dense core and shared expert on the card, routed experts host-resident "
+            "with last-used device slots). Tandem stays off; `kindi plan --pack %s` prints that "
+            "placement (`--dcache` sizes its report, KINDI_LT_DCACHE sizes the run)."
+            % (pack, family, pack))
+        tandem = "off"
     if isinstance(man, dict):
         model_id = adapter_model_id(man)
         if model_id:

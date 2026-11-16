@@ -719,3 +719,23 @@ def test_timing_probe_counts_feed_without_the_head(fake_pack, fake_backends, mon
     eng.feed(7, 0)
     s = eng.timing_summary()
     assert s["tokens"] == 1 and s["head_ms_per_token"] == 0.0
+
+
+def test_a_moe_pack_is_refused_before_the_dense_split_is_built(tmp_path):
+    """`--tandem` on a Lightning pack used to reach the dense GDN split with a MoE manifest: the
+    refusal names the pack's own split instead of splitting layers that do not exist."""
+    import json
+
+    (tmp_path / "kindi_pack.json").write_text(
+        json.dumps({"backend": "kindi_lightning", "dimensions": {"layers": 4}}), encoding="utf-8")
+    with pytest.raises(SystemExit, match="expert-tier"):
+        tandem.TandemEngine(str(tmp_path), ctx=64, cpu_layers=1, mode="cpu-first", log=lambda *a: None)
+
+
+def test_a_non_dense_family_is_refused_without_a_hint(tmp_path):
+    import json
+
+    (tmp_path / "kindi_pack.json").write_text(
+        json.dumps({"backend": "kindi_gemma4", "dimensions": {"layers": 4}}), encoding="utf-8")
+    with pytest.raises(SystemExit, match="dense Bonsai packs"):
+        tandem.TandemEngine(str(tmp_path), ctx=64, cpu_layers=1, mode="cpu-first", log=lambda *a: None)

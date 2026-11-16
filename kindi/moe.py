@@ -88,6 +88,19 @@ class Usage(object):
             return o + [e for e in range(self.spec.n_exp) if e not in set(o)]
         return list(range(self.spec.n_exp))
 
+    def coverage(self, n):
+        """the expected share of all routed picks that the n most-used experts of every layer take (None
+        without counts). Every token passes every MoE layer once, so the layers weigh the same."""
+        if not self.has_counts():
+            return None
+        n = max(0, int(n))
+        num = den = 0.0
+        for il in self.spec.layers:
+            c = self.counts[il]
+            num += sum(c[e] for e in self.order(il)[:n])
+            den += sum(c)
+        return num / den if den else None
+
     def has_counts(self):
         return all(il in self.counts and sum(self.counts[il]) > 0 for il in self.spec.layers)
 

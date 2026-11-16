@@ -30,7 +30,7 @@ import numpy as np
 
 from .cache import Runner
 from .cpu import Engine as CPUEngine
-from .engine import Engine as GPUEngine
+from .engine import Engine as GPUEngine, MOE_BACKENDS
 
 MODES = ("cpu-first", "gpu-first")
 PlanEngine = None          # kindi.tp.TPEngine, imported on first use (it needs CuPy at import time)
@@ -481,10 +481,19 @@ class TandemEngine(object):
         self.log = log or (lambda *a: None)
         manifest = os.path.join(pack, "kindi_pack.json")
         man = json.load(open(manifest))
+        # Before the GPU is inspected: an unsupported family is a manifest fact, and refusing here keeps
+        # the error the user sees about their model instead of about a missing card.
+        backend = man.get("backend")
+        if backend and backend != "kindi_bonsai":
+            hint = ""
+            if backend in MOE_BACKENDS:
+                hint = (": a mixture-of-experts pack routes each token to a few experts, so its CPU/GPU "
+                        "split is the expert-tier path in its own engine (dense core on the card, routed "
+                        "experts host-resident with device slots) - `kindi plan` prints that placement")
+            raise SystemExit("kindi: tandem splits the layers of the dense Bonsai packs; %r is not one%s"
+                             % (backend, hint))
         self.gpu_kind = _pick_owner(gpu if gpu is not None else os.environ.get("KINDI_TANDEM_GPU", "auto"),
                                     log=self.log)
-        if man.get("backend") in ("kindi_gemma4", "kindi_nanbeige"):
-            raise SystemExit("kindi: tandem currently supports the dense Bonsai packs only")
         dims = dict(man.get("dimensions") or {})
         self.NL = int(dims.get("layers", 24))
         if self.NL < 2:
