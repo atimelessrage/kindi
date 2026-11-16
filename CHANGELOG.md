@@ -5,6 +5,16 @@
 ### Fixed
 
 - **`--moe-cache-mib` was silently ignored by the usage-weighted plan** — with a usage file that has counts, `kindi plan`'s weighted scan spent free VRAM instead of the cap and reported every expert on the card (a 1 MiB cap printed "32 of 32 experts per layer"). The scan's budget is now bounded by the cap, so the report and the flag agree. The same line also stops quoting the top-n share a uniform split would get when a usage-weighted placement exists: it reports the share that placement actually serves. Tests: a capped plan with counts reports at most the cap's experts and still prints the measured share.
+- **A GBNF rule used twice lent its successors to the other use** — the compiler cached a
+  rule's NFA pair and every use attached its successors to the same end state, so the
+  epsilon closure after the first use reached a later use's successor and the automaton
+  accepted strings that skipped the symbols between them (a JSON grammar accepted
+  `{"a": }`, since `ws` is reused everywhere). Each reference now compiles its own copy;
+  the state limit bounds the duplication. Found by running llama.cpp's own `json.gbnf`.
+- **GBNF bodies may start on the next line and continue inside parentheses or after `|`** —
+  llama.cpp's documented layout, and the one its `grammars/json.gbnf` is written in, used
+  to fail with "expected a rule name or a reference" before any semantic check ran. A
+  newline anywhere else still ends the rule.
 - **A GBNF grammar is bounded before it is compiled** — the automaton is one state per literal character, so `root ::= "a"{1,100000}` (or a megabyte literal) was a memory request from whoever sent the request. `{m,n}` now refuses a bound above 10,000 copies, and the compiler refuses to exceed 20,000 states (`KINDI_GBNF_MAX_STATES`, read per grammar; a bad value falls back to the default). Both are `ValueError`s, so the server returns an enveloped 400 with `param: response_format` instead of failing the process. Tests: the bound, the state limit, the override and a bad override.
 - **`docs/API.md` still said `grammar` was rejected** — true before the GBNF slice landed, stale afterwards; the row now lists all three structured types as accepted and documents the compile bounds.
 - **The dense tandem no longer accepts a MoE pack** — `TandemEngine` only refused Gemma 4 and Nanbeige, so `--tandem cpu-first` on a `kindi_lightning` or `kindi_dsv41` pack reached the GDN layer split with a manifest that has no such layers (wrong dims, or a crash) while the flag looked honoured. It now refuses any `backend` outside the dense Bonsai family before the GPU is inspected, and for a MoE pack the message names the split that does apply (expert tiers, not layers). `make_engine` (the one gateway) turns a `--tandem` flag on a MoE family off and logs why, pointing at `kindi plan`, so a config that sets tandem globally gets the MoE engine rather than the wrong one. Tests: the MoE refusal, the non-dense refusal, the gateway log and the untouched `off` path.

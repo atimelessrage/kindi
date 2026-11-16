@@ -173,7 +173,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_G5_PINS` | (empty) | `kindi/tp.py:152` |
 | `KINDI_G5_TUNE` | `1` | `kindi/tp.py:178` |
 | `KINDI_G5_TUNELOG` | (unset) | `kindi/tp.py:292` |
-| `KINDI_GBNF_MAX_STATES` | `str(DEFAULT_MAX_STATES)` | `kindi/gbnf.py:37` |
+| `KINDI_GBNF_MAX_STATES` | `str(DEFAULT_MAX_STATES)` | `kindi/gbnf.py:40` |
 | `KINDI_GEMV_BLOCKS` | (unset) | `kindi/engine.py:198` |
 | `KINDI_HIP_LIB` | `libamdhip64.so` | `kindi/gpudrv.py:28` |
 | `KINDI_HOST_RAM_CHECK` | `1` | `kindi/hostram.py:93` |
@@ -199,7 +199,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_LT_SELFCHECK` | `1` | `kindi/lightning_gen.py:241` |
 | `KINDI_LT_SM75` | (unset) | `kindi/lightning.py:132` |
 | `KINDI_LT_TC` | `1` | `kindi/lightning.py:127` |
-| `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:341` |
+| `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:343` |
 | `KINDI_MEM_RESERVE_MB` | `96` or `256` or `32` | `kindi/engine.py:306` (+4 more) |
 | `KINDI_MODEL` | (empty) | `kindi/container.py:240` |
 | `KINDI_MOE_COPY` | `0` | `kindi/dsv41.py:356` |
@@ -259,9 +259,9 @@ variables, and are therefore not listed twice here.
 | `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1896` |
 | `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:194` |
 | `KINDI_TANDEM_DEBUG_TIMING` | `0` | `kindi/tandem.py:596` |
-| `KINDI_TANDEM_GPU` | `auto` | `kindi/plan.py:165` (+2 more) |
+| `KINDI_TANDEM_GPU` | `auto` | `kindi/plan.py:167` (+2 more) |
 | `KINDI_TANDEM_RATIO` | (unset) | `kindi/tandem.py:268` |
-| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/plan.py:430` (+2 more) |
+| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/plan.py:495` (+2 more) |
 | `KINDI_TC` | `0` | `kindi/spec.py:81` (+3 more) |
 | `KINDI_TC_B2` | (empty) | `kindi/tc.py:51` |
 | `KINDI_TC_DP4A` | `0` | `kindi/tc.py:74` |

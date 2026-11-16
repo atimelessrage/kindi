@@ -9,6 +9,9 @@ Supported: rules ``name ::= body`` (``root`` is the start rule), alternation ``|
 sequences, grouping ``(...)``, literals ``"..."`` with C-style escapes, character
 classes ``[a-z]`` / ``[^...]`` with ranges and escapes, ``.`` (any character),
 repetition ``* + ? {m} {m,} {m,n}``, rule references, comments ``#`` and blank lines.
+A body may start on the line after ``::=`` and continue across newlines inside
+parentheses or after ``|``, which is the form llama.cpp documents and writes its own
+``grammars/json.gbnf`` in; a newline anywhere else ends the rule.
 
 Not supported in this slice: a recursive rule (one that reaches itself). That is a
 pushdown language, not a regular one, so the parser refuses it with the cycle's name
@@ -54,6 +57,7 @@ class _Parser(object):
         self.n = len(self.s)
         self.rules = {}
         self.order = []
+        self.depth = 0                    # parenthesis nesting: newlines are whitespace inside
 
     def error(self, msg):
         line = self.s.count("\n", 0, self.i) + 1
@@ -92,6 +96,7 @@ class _Parser(object):
             if not self.s.startswith("::=", self.i):
                 self.error("expected '::=' after rule name %r" % name)
             self.i += 3
+            self.skip_lines()             # llama.cpp's json.gbnf starts a body on the next line
             body = self.alternation()
             self.skip_inline()
             if self.i < self.n and self.s[self.i] != "\n":
@@ -121,6 +126,7 @@ class _Parser(object):
         self.skip_inline()
         while self.i < self.n and self.s[self.i] == "|":
             self.i += 1
+            self.skip_lines()             # a newline after '|' continues the same rule
             branches.append(self.sequence())
             self.skip_inline()
         return branches
@@ -129,8 +135,13 @@ class _Parser(object):
         items = []
         while True:
             self.skip_inline()
-            if self.i >= self.n or self.s[self.i] in "|\n)":
+            if self.i >= self.n or self.s[self.i] in "|)":
                 return items
+            if self.s[self.i] == "\n":
+                if not self.depth:
+                    return items          # at the top level a newline ends the rule
+                self.i += 1               # inside parentheses newlines are whitespace
+                continue
             items.append(self.item())
 
     def item(self):
@@ -159,7 +170,11 @@ class _Parser(object):
         c = self.s[self.i]
         if c == "(":
             self.i += 1
-            alt = self.alternation()
+            self.depth += 1
+            try:
+                alt = self.alternation()
+            finally:
+                self.depth -= 1
             self.skip_inline()
             if self.i >= self.n or self.s[self.i] != ")":
                 self.error("expected ')'")
@@ -304,8 +319,14 @@ class _NFA(object):
         self.edges[a].append((label, b))
 
     def build_rule(self, name):
-        if name in self.built:
-            return self.built[name]
+        """Compile a rule. Each reference gets its own copy of the sub-automaton.
+
+        Sharing a built rule between two uses does not work in a plain NFA: the rule's entry
+        and exit states would be shared too, so the epsilon closure after the first use would
+        reach the second use's successor and the automaton would accept a string that skipped
+        the intervening symbols. Real grammars reuse rules constantly (``ws`` in every JSON
+        grammar), so the copy is what keeps the language exact. The state limit bounds it.
+        """
         if name in self.active:
             cycle = " -> ".join(self.active + [name])
             raise ValueError(
@@ -314,8 +335,10 @@ class _NFA(object):
         if name not in self.program:
             raise ValueError("GBNF: unknown rule %r" % name)
         self.active.append(name)
-        pair = self.build_alt(self.program[name])
-        self.active.pop()
+        try:
+            pair = self.build_alt(self.program[name])
+        finally:
+            self.active.pop()
         self.built[name] = pair
         return pair
 

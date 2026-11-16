@@ -3,7 +3,11 @@
 
 The automaton is tested on its own (no model, no GPU): the language it accepts, the
 dead-end rule that keeps the sampler's allowed set non-empty, and the parse errors the
-server turns into an enveloped 400.
+server turns into an enveloped 400. The last section runs the grammars people actually
+write - llama.cpp's own ``json.gbnf`` layout, a tool call, an enum and an ISO date - so
+the parser stays pinned to llama.cpp's documented GBNF rather than to a convenient
+subset. That file is recursive, which this slice still refuses by design: the test pins
+both the layout (it parses) and the refusal (it names the cycle).
 """
 import pytest
 
@@ -121,3 +125,126 @@ def test_the_compiled_size_is_bounded_and_raiseable(monkeypatch):
     monkeypatch.setenv("KINDI_GBNF_MAX_STATES", "not-a-number")
     g = Grammar.from_string('root ::= "ok"')
     assert g.done(g.advance(g.start(), "ok"))
+
+
+def test_a_reused_rule_cannot_lend_its_successors_to_another_use():
+    """A built rule used twice must not share its entry/exit states. Sharing them let the
+    epsilon closure after the first use jump straight to the second use's successor, so the
+    automaton accepted a string that skipped the symbols between the two uses. This shipped
+    before 2026-11-17 and hit every grammar that reuses a rule - `ws` in every JSON grammar -
+    which is why a realistic grammar accepted `{"a": }`."""
+    g = Grammar.from_string('root ::= a ":" a' + chr(10) + 'a ::= "x"')
+    assert _accepts(g, "x:x")
+    assert not _accepts(g, "x:") and not _accepts(g, ":")
+    triple = Grammar.from_string('root ::= ws "a" ws "b" ws' + chr(10) + 'ws ::= " "*')
+    assert _accepts(triple, " a b ")
+    assert not _accepts(triple, "b a")
+
+
+# ---------- the layouts people actually write ----------
+
+# llama.cpp/grammars/json.gbnf, verbatim. Its bodies start on the line after '::=' and
+# continue across newlines inside parentheses - the parser used to refuse both, so the
+# canonical file failed with "expected a rule name or a reference" before any recursion
+# check could run.
+CANONICAL_JSON = r'''root   ::= object
+value  ::= object | array | string | number | ("true" | "false" | "null") ws
+object ::=
+  "{" ws (
+            string ":" ws value
+    ("," ws string ":" ws value)*
+  )? "}" ws
+array  ::=
+  "[" ws (
+            value
+    ("," ws value)*
+  )? "]" ws
+string ::=
+  "\"" (
+    [^"\\\x7F\x00-\x1F] |
+    "\\" (["\\bfnrt] | "u" [0-9a-fA-F]{4}) # escapes
+  )* "\"" ws
+number ::= ("-"? ([0-9] | [1-9] [0-9]{0,15})) ("." [0-9]+)? ([eE] [-+]? [0-9] [1-9]{0,15})? ws
+# Optional space: by convention, applied in this grammar after literal chars when allowed
+ws ::= | " " | "\n" [ \t]{0,20}
+'''
+
+
+def test_llamacpp_multiline_bodies_parse():
+    """The canonical file parses; it never got this far before - the layout used to be the
+    first error. The grammar is recursive, so compiling it is refused (third test below)."""
+    rules = parse(CANONICAL_JSON)
+    assert set(rules) == {"root", "value", "object", "array", "string", "number", "ws"}
+    assert [ref[1] for ref in rules["object"][0] if ref[0] == "ref"] == ["ws", "ws"]
+
+
+def test_the_canonical_json_grammar_is_refused_for_its_recursion():
+    with pytest.raises(ValueError, match="recursive rule") as exc:
+        Grammar.from_string(CANONICAL_JSON)
+    message = str(exc.value)
+    assert "object" in message and "value" in message     # the cycle is named, not just "no"
+
+
+def test_multiline_bodies_parse_the_way_llamacpp_documents_them():
+    g = Grammar.from_string('root ::=\n  "{" "a" "}"\n')          # body on the next line
+    assert _accepts(g, "{a}")
+    g = Grammar.from_string('root ::= (\n  "a"\n  "b"\n)\n')       # newlines inside parentheses
+    assert _accepts(g, "ab") and not _accepts(g, "a")
+    g = Grammar.from_string('root ::= "x" |\n  "y"\n')             # '|' continues the rule
+    assert _accepts(g, "x") and _accepts(g, "y")
+    with pytest.raises(ValueError, match="expected a rule name"):
+        Grammar.from_string('root ::= "a"\n  "b"\n')               # a bare continuation line
+
+
+JSONISH = r'''root ::= object
+object ::= "{" ws ( string ":" ws values ("," ws string ":" ws values)* )? "}" ws
+values ::= scalar | array
+array ::= "[" ws ( scalar ("," ws scalar)* )? "]" ws
+scalar ::= ( string | number | "true" | "false" | "null" ) ws
+string ::= "\"" ( [^"\\\x00-\x1F] | "\\" (["\\bfnrt] | "u" [0-9a-fA-F]{4}) )* "\""
+number ::= "-"? ( "0" | [1-9] [0-9]* ) ("." [0-9]+)? ( [eE] [-+]? [0-9]+ )?
+ws ::= [ \t\n]*
+'''
+
+
+def test_a_regular_jsonish_grammar_is_accepted_and_matches_its_language():
+    g = Grammar.from_string(JSONISH)
+    for text in ['{}', '{"a": 1}', '{"a": "x\\ny"}', '{"a": [1, 2, 3]}',
+                 '{"a": -1.5e+3, "b": true}', '{\n  "a": null\n}', '{"a": {"b": 1}}']:
+        assert not _accepts(g, text) if text == '{"a": {"b": 1}}' else _accepts(g, text), text
+    for text in ['[]', '1', '{"a": }', '{"a": 1', '{"a": 1} junk', '{"a" 1}',
+                 '{"a": "bad\nbreak"}', '{"a": "\\q"}', '{"a": [,]}']:
+        assert not _accepts(g, text), text
+
+
+TOOL_CALL = r'''root ::= "{\"name\": \"" tool "\", \"arguments\": \"" arg "\"}"
+tool ::= "get_weather" | "search_docs"
+arg ::= [a-zA-Z0-9 ,._-]{1,64}
+'''
+
+
+def test_a_tool_call_grammar():
+    g = Grammar.from_string(TOOL_CALL)
+    assert _accepts(g, '{"name": "get_weather", "arguments": "Paris, FR"}')
+    assert _accepts(g, '{"name": "search_docs", "arguments": "a"}')
+    assert not _accepts(g, '{"name": "rm -rf", "arguments": "x"}')
+    assert not _accepts(g, '{"name": "get_weather", "arguments": "%s"}' % ("x" * 65))
+    assert not _accepts(g, '{"name": "get_weather", "arguments": "a\\"b"}')
+
+
+def test_enum_and_iso_date_grammars():
+    enum = Grammar.from_string(r'root ::= "\"" ("red" | "green" | "blue") "\""')
+    assert _accepts(enum, '"green"')
+    for bad in ['"purple"', '"Green"', "green", '"green']:
+        assert not _accepts(enum, bad), bad
+
+    date = Grammar.from_string(
+        'root ::= date "T" time "Z"\n'
+        'date ::= [0-9]{4} "-" month "-" day\n'
+        'month ::= "0" [1-9] | "1" [0-2]\n'
+        'day ::= "0" [1-9] | [12] [0-9] | "3" [01]\n'
+        'time ::= [01][0-9] ":" [0-5][0-9] ":" [0-5][0-9]\n')
+    assert _accepts(date, "2026-11-17T09:05:59Z")
+    for bad in ["2026-13-01T00:00:00Z", "2026-1-1T00:00:00Z", "2026-11-32T00:00:00Z",
+                "2026-11-17T24:00:00Z", "2026-11-17"]:
+        assert not _accepts(date, bad), bad
