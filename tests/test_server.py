@@ -274,9 +274,48 @@ def test_the_recursion_opt_in_is_a_400_by_default_and_a_200_when_enabled(app_cli
     assert K.calls == len(RECURSIVE_GRAMMARS)
 
 
-def _drive_constrained(script, schema=None, response_format=None):
-    """Drive the real `Kindi.generate` loop with a JSON-schema grammar: every scripted
-    pick must be inside the pick's allowed set, so a stray token would raise here."""
+def test_the_opt_in_reply_is_constrained_through_http(app_client, monkeypatch):
+    """The opt-in end to end: the same recursive grammar is an enveloped 400 by default, and
+    with KINDI_GBNF_MAX_DEPTH set the request is accepted *and the reply stays in the unrolled
+    language* - the script offers a byte the grammar forbids and it is never emitted."""
+    client, K = app_client
+    doc = '{"a": 1}'
+    # the script offers \x01 in the middle of a valid document. That byte is in no part of
+    # the canonical grammar (not ws, not a key, not a number), so it can never become legal
+    # later the way a skipped `}` could; if the constraint works the reply is exactly `doc`.
+    script = [ord(c) for c in doc[:6]] + [1] + [ord(c) for c in doc[6:]] + [248046]
+
+    def post(grammar=None):
+        K.generate = _constrained_kindi(list(script)).generate   # a fresh script per request
+        body = _grammar_request(grammar) if grammar else {
+            "messages": [{"role": "user", "content": "hello"}]}
+        return client.post("/v1/chat/completions", json=body)
+
+    monkeypatch.delenv("KINDI_GBNF_MAX_DEPTH", raising=False)
+    r = post(CANONICAL_JSON)
+    assert r.status_code == 400, r.text
+    assert r.json()["error"]["param"] == "response_format"
+
+    # the control: the same scripted tokens without a grammar do emit \x01, so the
+    # equality below is the constraint's doing and not the script's
+    content = post().json()["choices"][0]["message"]["content"]
+    assert "\x01" in content, repr(content)
+
+    monkeypatch.setenv("KINDI_GBNF_MAX_DEPTH", "3")
+    monkeypatch.setenv("KINDI_GBNF_MAX_STATES", "60000")
+    r = post(CANONICAL_JSON)
+    assert r.status_code == 200, r.text
+    content = r.json()["choices"][0]["message"]["content"]
+    assert content == doc, content          # the forbidden byte never reached the reply
+
+    from kindi.gbnf import Grammar
+    g = Grammar.from_string(CANONICAL_JSON)
+    assert g.done(g.advance(g.start(), content))     # and the reply is in the language
+
+
+def _constrained_kindi(script):
+    """A real `Kindi` whose tokens come from `script`: every pick must be inside the
+    sampler's allowed set, so a token the constraint forbids is never emitted."""
     K = object.__new__(server.Kindi)
     K.cfg = {"model_name": "fake", "temperature": 0.0, "top_p": 1.0, "top_k": 0,
              "max_tokens": 512, "repeat_stop": False, "fast_clusters": 0}
@@ -303,6 +342,13 @@ def _drive_constrained(script, schema=None, response_format=None):
 
     K.sample = pick
     K._pick = pick
+    return K
+
+
+def _drive_constrained(script, schema=None, response_format=None):
+    """Drive the real `Kindi.generate` loop with a grammar: every scripted pick must be
+    inside the pick's allowed set, so a stray token would raise here."""
+    K = _constrained_kindi(script)
     req = {"messages": [{"role": "user", "content": "hi"}], "max_tokens": 512,
            "temperature": 0.0, "top_p": 1.0, "top_k": 0,
            "response_format": response_format or {
