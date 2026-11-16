@@ -10,7 +10,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `84068d2` on `freebuff/tandem-cpu-recovery` (`main` receives the parent-of-this-commit bump and FF at handoff; guarded by `tests/test_agents_handoff.py`). Full suite last measured 2026-11-17 at `84068d2`: 986 passed, 28 skipped, 0 failed (103 s); GPU grammar/JSON-schema gate closed on the 2B (§39); recursive GBNF is now opt-in (`KINDI_GBNF_MAX_DEPTH`, bounded unroll cross-checked against an independent matcher - see the newest table row). Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset; comparison report in `CURRENT-VS-KINDI-0.6.md`. Owner actions pending: Nanbeige 33B GGUF replacement, Gemma 4 E4B pack, DeepSeek V4.1 shards/gate data, PQ2_0/Q2_0 quant downloads, a pinned llama-server, other-hardware test rigs, push/installer/CI publications, T4.4/T4.5 + D3/D5 decisions — `docs/MANUAL-HELP-NEEDED.md`.
+- **HEAD:** `8990d5f` on `freebuff/tandem-cpu-recovery` (`main` receives the parent-of-this-commit bump and FF at handoff; guarded by `tests/test_agents_handoff.py`). Full suite last measured 2026-11-17 at `84068d2`: 986 passed, 28 skipped, 0 failed (103 s); GPU grammar/JSON-schema gate closed on the 2B (§39); recursive GBNF is now opt-in (`KINDI_GBNF_MAX_DEPTH`, bounded unroll cross-checked against an independent matcher - see the newest table row). Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset; comparison report in `CURRENT-VS-KINDI-0.6.md`. Owner actions pending: Nanbeige 33B GGUF replacement, Gemma 4 E4B pack, DeepSeek V4.1 shards/gate data, PQ2_0/Q2_0 quant downloads, a pinned llama-server, other-hardware test rigs, push/installer/CI publications, T4.4/T4.5 + D3/D5 decisions — `docs/MANUAL-HELP-NEEDED.md`.
 - **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
   512/4K/8K; 2B CPU-layer sweep; joint checkpoint 149.6 MiB on the 27B at 54.5-61.5 ms
   save), owned-slice CPU load, `kindi bench --sample-vram` sampled-peak VRAM, multi-ISA CPU
@@ -58,8 +58,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `84068d2` | main checkout; clean |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `84068d2` | this session; ahead of `main` by the rounds below |
+| `T:/kindi` | `main` | `8990d5f` | main checkout; clean |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `8990d5f` | this session; ahead of `main` by the rounds below |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
@@ -99,14 +99,41 @@ The main worktree is clean now; `main` was fast-forwarded to this branch after i
 commits were merged. The corrupt tandem WIP was not merged into `main`; restart it from
 `docs/CPU_GPU_TANDEM_DESIGN.md` and the WIP branch if it is resumed.
 
+### Consolidation audit (2026-11-17)
+
+`main` and this worktree are the same commit and both clean, the local untracked comparison render is
+now gitignored, and every remote ref is already contained: `origin/main` (`dce89df`), `myfork/main`
+(`fd54148`) and `myfork/freebuff/tandem-cpu-recovery` (`437891e`) are ancestors of `main` (0 ahead,
+358-415 behind). Two branches stay outside `main` on purpose, audited rather than merged because
+merging either would import superseded or corrupt code:
+
+- `wip/main-interrupted-snapshot-20261109-045352` — and the stash-format
+  `wip/main-interrupted-backup-20261109-045352`, whose files are a subset of it — holds 40 paths that
+  exist nowhere else: a doorbell/async-copy `tandem_kernels.cu` plus a `tandem_new.py` placeholder, an
+  AVX-512/VNNI/AMX `cpuid` detection draft, the 2026-11-07/08 planning set (`GOALS.md`,
+  `IMPLEMENTATION_PLAN.md`, `docs/GPU_PROFILE_ANALYSIS.md`, `docs/PAIR-SETUPS.md`,
+  `researchAndComparisons.md`, `docs/dev/spec-measurement-plan-2026-11-08.md`) and one-off
+  `fix_*.py`, `update_*.py`, `test_brace*.sh`, `test_pair_ok.sh` scripts. The async design it
+  implements was measured unnecessary on 2026-11-15 (no dispatch gap; see
+  `docs/TANDEM-OVERLAP-DESIGN.md`), the ISA draft has no AVX-512 kernels behind it and AVX-512 is
+  already a named gate in `docs/ROADMAP.md`, the `pair_ok` bugs its analysis targets were fixed by
+  `pair_fits` on 2026-11-14, and the planning docs are 0.4.0-era drafts superseded by
+  `docs/ROADMAP.md`, `docs/GOALS.md`, `docs/CARDS.md`, `docs/MIXED-CARD-ROADMAP.md`,
+  `docs/OLD-CARD-RIG.md` and `docs/EXTERNAL-ENGINES.md`. Nothing was merged; both stay archival.
+- `clean/kindi-0.5` (1 commit, 418 behind) is the 0.5 comparison baseline, not a candidate.
+
+There is no TODO/FIXME or unfinished code path in `kindi/` or `tools/`; the open work is the
+owner/hardware-bound gate list above.
+
 ### Current leases
 
-The full dated lease table (one row per task since 2026-11-08, with its evidence, ~110 rows) is in
+The full dated lease table (one row per task since 2026-11-08, with its evidence, ~120 rows) is in
 [docs/development/AGENTS-HISTORY.md](docs/development/AGENTS-HISTORY.md). Keep this table to the handoffs
 the next agent needs in front of them; when a task finishes, move its row to the history file.
 
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
+| Repo consolidation: branches, worktrees and the tree's uncommitted state (2026-11-17) | this worktree | `freebuff/tandem-cpu-recovery` | `.gitignore`, `AGENTS.md` | done. Both worktrees are at `8990d5f` and clean; the untracked `current-vs-kindi-0.6-preview.html` is a generated render of the tracked report and is now gitignored. Every remote ref (`origin/main`, `myfork/main`, `myfork/freebuff/tandem-cpu-recovery`) is an ancestor of `main`, so nothing is missing from it. The two `wip/main-interrupted-*` branches and `clean/kindi-0.5` were audited file by file and are not mergeable: their unique content is the 2026-11-09 doorbell/async tandem WIP (measured unnecessary on 2026-11-15), an AVX-512 cpuid draft with no kernels, `pair_ok` bug analysis whose fixes landed as `pair_fits`, and 0.4.0-era planning docs main supersedes; they stay archival and the audit is recorded in the reconciliation section. No TODO/FIXME or unfinished code path exists in `kindi/` or `tools/`. Gate at `8990d5f`: full suite 986 passed / 28 skipped, `project_memory --check`, `config_reference --check`, `compileall`, `git diff --check` all clean. |
 | 9B tandem vs full GPU at comparable contexts (2026-11-17) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-tandem-9b/RESULTS.md` (new), `docs/TANDEM-RUNTIME.md`, `docs/TANDEM-STATUS.md`, `docs/ROADMAP.md`, `AGENTS.md` | done, measured. `kindi bench --sample-vram` on the RTX 4060 Ti with the 9B pack at requests 8,192/32,768/49,152/65,536/131,072, full GPU vs `--tandem cpu-first --tandem-cpu-layers gdn:8` (plus `gdn:16` at 8K/131K). **The full-GPU engine keeps every request** (131,072 at 5,149 MiB peak, 3,003 MiB free after load), so the split buys no context on this pack; it saves 486-488 MiB (`gdn:8`) at 2.8-3.0x decode cost or 872-874 MiB (`gdn:16`) at 4.5-4.6x, flat across the ladder, and prompt reading stays 3.2x behind (112 vs 31-37 tok/s). Verdict recorded in the page, TANDEM-RUNTIME (capacity section + next gate 2), TANDEM-STATUS and the ROADMAP tandem row: for a pack that fits, the gap vs a single card is throughput, not capacity; the 27B stays the only pack here that needs the split. Raw JSON gitignored in `bench-logs/tandem-9b/`; exactness not re-run (9B tandem exactness recorded 2026-11-12 and 2026-11-14). |
 | Requirement history after the F8 redaction, and the audit round's merge to `main` (2026-11-17) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/development/REQUIREMENTS-HISTORY.md`, `AGENTS.md` | done. `python tools/project_memory.py` regenerated the requirement history after `REQ-0019.md` was redacted (`--check` clean), the whole audit round is fast-forwarded to `main` (F1-F3/F6/F7/F10 code + tests, F13/F9 docs truth, F8 redaction + scanner rule, F4 regression test, DEC-0009 recording F11). Still open and recorded: F5 (a grammar is compiled twice per request), F11 migration (DEC-0009), F12 coverage floors/lint, F9 release republish (owner). |
 | Machine-path redaction + a scanner rule from the 2026-11-16 review, F8 (2026-11-17) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/benchmarks/**` (9 JSON + 6 RESULTS), `CURRENT-VS-KINDI-0.6.md`, `docs/BACKENDS.md`, `docs/ROADMAP.md`, `docs/FP8-BF16.md`, `docs/GEMMA4-26B-MOE.md`, `docs/development/requirements/REQ-0019.md`, `tools/measure_split_ratio.py`, `tools/ollama_links.ps1`, `tests/test_no_secrets.py`, `AGENTS.md` | done. Tracked benchmark evidence and docs carried this machine's layout (a home directory with a user name, an interpreter path, four model roots); every occurrence is now `~`-relative or `<python>/`, and the JSON evidence still parses. `tests/test_no_secrets.py` gained a `local drive path` rule (backslash-form drive paths; the docs' `T:/kindi` form stays allowed) with a non-vacuity test, and it immediately found 60 occurrences in 13 files, all redacted here. `tools/ollama_links.ps1` lost its hardcoded `D:` fallback and now derives both directories from `USERPROFILE`/`OLLAMA_MODELS`. 87 passed (docs links, bench JSON, installer, project memory, no-secrets). |
