@@ -38,6 +38,17 @@ not a prompt cache and it is not a layer split. The GPU owns the core and a byte
 expert weights; host RAM owns the whole expert set. A miss must fetch or compute the **complete**
 selected expert before the router-weighted sum is formed.
 
+**Where the dense tandem ends.** `kindi/tandem.py` splits *complete dense layers*, so it cannot run a
+routed layer: every token still needs every expert. As of 2026-11-17 that is enforced rather than
+implied. `TandemEngine` refuses any manifest whose `backend` is not the dense Bonsai family, and names a
+MoE pack's own split (expert tiers, not layers) instead of splitting the GDN recurrence of a model that
+does not have one; `make_engine` turns a `--tandem` flag on a `kindi_lightning`/`kindi_dsv41` pack off
+with a log line pointing at `kindi plan`, so a config that sets tandem globally cannot silently build
+the dense engine for a MoE. The equivalent split for a MoE is the one its own engine already runs, and
+`kindi plan` reports it, including the decode-slot trade (each slot displaces one expert per layer, and
+`Usage.coverage()` compares the measured picks the card serves with the slots against the same bytes as
+residency). None of that is new execution: the MoE backends below are still design and prototype.
+
 The first backend must answer three questions before any performance work:
 
 1. Is the router exactly the released router, including its normalization and tie rule?
@@ -489,7 +500,8 @@ The 16 GB row is a comparison, not a separate backend.
 - It does not add a converter, pack, catalog entry, installer offer or support-matrix row.
 - It does not claim a cache hit rate, tokens/s, VRAM figure or host-RAM figure.
 - It does not claim that CPU miss compute is exact; only the `copy` lane is the first exact design.
-- It does not change the dense `TandemEngine` or its joint prompt cache.
+- It does not change the dense `TandemEngine` or its joint prompt cache: the tandem only gained the
+  refusal described in §1, which rejects a non-dense manifest before any backend is built.
 
 Related records: [RAON-1-MINI.md](RAON-1-MINI.md), [RAON-1-MINI-R0.md](RAON-1-MINI-R0.md),
 [GEMMA4-26B-MOE.md](GEMMA4-26B-MOE.md), [GEMMA4-26B-COPY-COMBINE.md](GEMMA4-26B-COPY-COMBINE.md),

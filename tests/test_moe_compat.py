@@ -23,6 +23,7 @@ class FakeGGUF:
         ("qwen3moe", "Qwen3-Coder-30B-A3B"),
         ("qwen35moe", "Qwen3.6-35B-A3B"),
         ("cohere2moe", "North Mini Code 1.0"),
+        ("glm4moelite", "GLM-4.7-Flash"),
         ("flint", "Recursive Flint 40B/2.5B"),
     ],
 )

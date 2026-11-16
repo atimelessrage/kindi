@@ -25,6 +25,12 @@ _SMALL_MOE = {
         "Kindi has no cohere2moe converter or engine. Support needs a Cohere2-MoE loader, "
         "its chat template and tokenizer checks, and a pinned llama.cpp reference.",
     ),
+    "glm4moelite": (
+        "GLM-4.7-Flash",
+        "Kindi has no glm4moelite converter or engine. Support needs a GLM4-MoE-Lite loader, "
+        "the MLA/KV attention path, the routed-plus-shared expert path, and a pinned "
+        "llama.cpp reference.",
+    ),
     "flint": (
         "Recursive Flint 40B/2.5B",
         "Kindi has no flint converter or engine. Support needs that architecture's loader, "

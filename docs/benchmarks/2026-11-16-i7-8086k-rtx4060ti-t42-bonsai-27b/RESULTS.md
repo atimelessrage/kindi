@@ -41,8 +41,14 @@ This closes the Bonsai adapter's local gate for all four packs present on
 this host (2B/4B/9B/27B). It says nothing about the adapter for other
 families: Nanbeige's GPU gate stays blocked on a working GGUF
 (`docs/MANUAL-HELP-NEEDED.md`), and Nemotron Lightning / DeepSeek V4.1 /
-Gemma 4 have no adapters yet. No arbitrary-GGUF claim is made (T4.4/T4.5
-stay decision-gated).
+Gemma 4 had no adapters yet on this date. No arbitrary-GGUF claim is made
+(T4.4/T4.5 stay decision-gated).
+
+Note (2026-11-16, later the same day): those three adapters have since
+landed, and the Lightning gate has since closed with a clean catalog copy —
+see `docs/BACKENDS.md` and
+`docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-lightning-30b/RESULTS.md`.
+This record's scope is the Bonsai family only.
 
 Machine-readable bench output: `27b-adapter.json`, `27b-valve.json` in
 this directory.

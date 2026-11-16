@@ -3,12 +3,13 @@
 Kindi's inference backends sit behind one plugin contract, so adding a model is
 a contained change: one backend module plus docs, with no edits to the server
 or the CLI. This page covers the contract (T4.1). The adapter ports of the
-existing engines (T4.2) are in progress — the dense Bonsai adapter
-(`kindi/backends/bonsai.py`) is done and registered; the other families
-(Nanbeige, Nemotron Lightning, DeepSeek V4.1) still take the legacy path.
+existing engines (T4.2) are ported — the dense Bonsai, Nanbeige, Nemotron
+Lightning, Gemma 4 and DeepSeek V4.1 adapters (`kindi/backends/bonsai.py`,
+`nanbeige.py`, `lightning.py`, `gemma4.py`, `dsv41.py`) are registered. Cascade 2
+is converter/validator only.
 The authoring checklist and `kindi backends` listing (T4.3) and the generic
 fallback (T4.4) are tracked in [REQ-0019](development/requirements/REQ-0019.md).
-Today the registry resolves the fake backend, the bonsai adapter and
+Today the registry resolves the fake backend, those five adapters and
 externally registered backends, and `resolve` says so when asked for
 anything else. There is no generic-GGUF claim yet: an arbitrary GGUF cannot
 be served today.
@@ -20,11 +21,25 @@ be served today.
 - `BackendCapabilities`: name, model ids, GGUF architectures, devices,
   max context, thinking/tools support, the tool-call family key
   (`tool_format`, used by the tool-call parsers), speculation and
-  token-filter support, cache kind, max concurrent sequences, greedy
-  determinism.
+  token-filter and JSON-grammar support, cache kind, max concurrent sequences,
+  greedy determinism. A backend that sets `supports_json_grammar` must treat
+  `SamplingParams.token_filter` as the full constrained-decoding set: the
+  allowed ids are sampled/argmaxed in full, not masked from a top-K or
+  temperature-window candidate set that could lose a grammar-legal low-rank
+  token.
 - `SamplingParams`: max tokens, temperature, top-p/top-k, min-p, stop
   strings, seed, and an optional `token_filter` (constrained decoding; the
   field is in the contract now so it does not change twice).
+- `token_filter(state)` receives `{"prompt_ids": [...], "generated": [...]}`
+  with the **real** prompt ids: a filter may depend on what the prompt already
+  contains (a grammar seeded from it, a "do not stop inside a fenced block"
+  rule). All five adapters pass the prompt; three used to pass an empty list.
+- Stop strings are matched with `base.StopScanner`, which scans only the text
+  appended since the last check plus the longest stop's overlap. A stop that
+  straddles two decoded pieces is still found, and a 24K-token reply no longer
+  costs O(n^2) character comparisons. An over-context prompt raises
+  `BackendUnavailable` naming prompt and context; it does not return an empty
+  reply finished for length.
 - `GenerationEvent`: one yielded item — a token, a reasoning piece, or the
   final `done` event with finish reason, timing and speculation stats.
 - `CancelToken`: a flag polled during prompt processing and decode; a plain
@@ -46,8 +61,18 @@ the Python 3.6 CUDA image. No CuPy import happens at module import time.
   backend instance. A `.gguf` path is matched by its `general.architecture`
   metadata (read with the existing `kindi/gguf.py` reader); a model id is
   matched against declared model ids; `device` filters by declared device
-  names. When nothing matches it raises `BackendNotFound` naming what is
-  registered.
+  names. When nothing matches — or when two backends match equally well — it
+  raises `BackendNotFound` naming the candidates; registration order never
+  decides between them.
+- `kindi.engine.make_engine` (the engine gateway) asks each adapter's
+  `model_id_for_manifest` hook, resolves the pack through the registry and
+  logs the backend and model id it chose. It refuses instead of guessing when
+  a manifest is claimed by two adapters, when a pack names a family no adapter
+  serves (the dense legacy builder would build the wrong engine for it), or
+  when a manifest has neither a `backend` nor the dense weight fields. A dense
+  pack that no adapter claims — a placeholder `model`/`source_file`, the way
+  the 27B once hid from its own adapter — is the one fallback that stays valid,
+  and it is logged with the manifest field to check.
 - External backends load through `KINDI_BACKEND_MODULES=pkg.mod,pkg2.mod`.
   Importing the module registers the backend. Python entry points are
   deferred because `importlib.metadata` does not exist on Python 3.6.
@@ -75,17 +100,19 @@ rows as JSON for scripting.
 3. Call `register_backend` when the module is imported.
 4. Add a contract test and verify with `kindi backends --json`.
 
-This page is the authoring guide for the contract. The Bonsai engine ships as
-an adapter (T4.2, first family); the other engine families are not ported yet,
-so a third-party backend serving one of those should declare the model ids or
-GGUF architectures it serves instead of relying on the built-in engine paths.
+This page is the authoring guide for the contract. Every shipped engine family
+(Bonsai, Nanbeige, Lightning, Gemma 4, DeepSeek V4.1) ships as an adapter
+(T4.2); a third-party backend serving something else should declare the model
+ids or GGUF architectures it serves instead of relying on an engine path.
 
 ## Status and next steps
 
 - T4.1 (this page): contract, registry, FakeBackend. Done.
 - T4.2: port the existing engines (Bonsai, Nanbeige, Nemotron Lightning,
-  DeepSeek V4.1) behind the contract as thin adapters, with
-  `KINDI_LEGACY_ENGINE_PATH=1` as the safety valve for one release. The Bonsai
+  Gemma 4, DeepSeek V4.1) behind the contract as thin adapters, with
+  `KINDI_LEGACY_ENGINE_PATH=1` as the safety valve for one release (it forces
+  the dense builder, so it applies to the dense family; a pack that names a
+  family with no legacy builder is refused rather than mis-built). The Bonsai
   adapter (`kindi/backends/bonsai.py`) is done: dense Bonsai packs resolve
   through the registry in `kindi.engine.make_engine` (valve-gated), and
   `kindi verify` 2B on the RTX 4060 Ti is 4/4 on both the adapter path and
@@ -105,9 +132,20 @@ GGUF architectures it serves instead of relying on the built-in engine paths.
   no verify/bench parity is claimed; the owner action is in
   `docs/MANUAL-HELP-NEEDED.md`. The Lightning adapter
   (`kindi/backends/lightning.py`, registered `nemotron-lightning-30b`) is
-  ported 2026-11-16 and CPU-tested; its GPU gate is pending the catalog
-  GGUF download (no verify/bench parity claimed yet). DeepSeek V4.1 and
-  Gemma 4 are not ported yet, so their packs still take the legacy path.
+  ported 2026-11-16 and now GPU-gated on the RTX 4060 Ti with a clean
+  catalog download (size/SHA-256/GGUF all match, fresh pack): `kindi verify`
+  is 5 token-exact + 7 llama.cpp ties, 0 fail, and `kindi bench` at ctx 8192
+  measures read 788.3–821.3 tok/s and write 165.96–167.41 tok/s. Evidence:
+  `docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-lightning-30b/RESULTS.md`.
+  The Gemma 4 adapter
+  (`kindi/backends/gemma4.py`, registered `gemma4-e4b`) and the DeepSeek V4.1
+  adapter (`kindi/backends/dsv41.py`, registered `deepseek-v41-flash`) were
+  ported 2026-11-16 and are CPU-tested; both GPU gates are blocked because
+  neither model is on this host (no verify/bench parity claimed). A DeepSeek
+  V4.1 pack is written by hand — there is no converter: `kindi_pack.json` with
+  `backend: kindi_dsv41`, the first GGUF shard as `model_path`, and optionally
+  `encoding` pointing at the model release's `encoding.py` (the chat
+  template). Cascade 2 stays converter/validator only.
 - T4.3: `kindi backends` listing and this authoring guide. Done 2026-11-15.
 - T4.4: generic fallback as a llama.cpp proxy backend. Needs the maintainer
   decision on positioning (REQ-0019). Not done.

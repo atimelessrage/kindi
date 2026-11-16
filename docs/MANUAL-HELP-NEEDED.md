@@ -7,12 +7,14 @@ state line — tick it off when done.
 
 ## Automated tasks (no owner action)
 
-- The Lightning T4.2 GPU gate is **the agent's**, not the owner's: the catalog
-  GGUF (`boro64/Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf`, 9.5 GB)
-  is downloading to `L:/kindi-lightning/models/` on its own. When it lands,
-  the agent will convert, run `kindi verify`/`kindi bench` on both the
-  adapter and valve paths, and record the parity rows. Listed here only so
-  the state is visible; do nothing for it.
+- ~~The Lightning T4.2 GPU gate is **the agent's**, not the owner's: do not
+  use the old `L:/kindi-lightning/models/...` file whose three hashes
+  disagreed.~~ **Done 2026-11-16:** a clean re-download to
+  `L:/kindi-lightning-clean/models/Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf`
+  matches the catalog size/SHA-256/GGUF magic; a fresh pack was built and
+  `kindi verify` on the RTX 4060 Ti is 5 exact + 7 ties, 0 fail, with bench
+  read 788.3–821.3 tok/s and write 165.96–167.41 tok/s at ctx 8192.
+  Evidence in `docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-lightning-30b/RESULTS.md`.
 
 ## 1. Download the Nanbeige 4.3 33B GGUF and resume the T4.2 Nanbeige gate
 

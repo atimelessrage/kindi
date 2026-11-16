@@ -38,8 +38,11 @@ The adapter and valve rows agree within ~1% everywhere.
 This closes the Bonsai adapter's local gate for the three packs present on
 the host. The 27B pack is not on this host, so no 27B adapter row can be
 honestly claimed; Nanbeige, Nemotron Lightning, DeepSeek V4.1 and Gemma 4
-have no adapters yet (T4.2 remaining families), so they stay on the legacy
-path. No arbitrary-GGUF claim is made (T4.4/T4.5 stay decision-gated).
+had no adapters yet on this date (T4.2 remaining families). No
+arbitrary-GGUF claim is made (T4.4/T4.5 stay decision-gated).
+
+Note (2026-11-16): all four adapters have since landed; see
+`docs/BACKENDS.md`. This record's scope is the 4B/9B Bonsai cells.
 
 Machine-readable bench output: `4b-adapter.json`, `9b-adapter.json`,
 `9b-valve.json` in this directory.

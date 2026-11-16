@@ -55,12 +55,22 @@ Use this shape:
   without a separate exactness investigation.
 - Consequences: The 4B tc path has a conditional pass, not a claim that split decode is
   correct for that geometry. The guard is covered by a CPU-only regression test.
-- Re-measured 2026-11-16 (RTX 4060 Ti, current tree): with the guard bypassed,
-  `KINDI_TC=1 KINDI_FD=1 KINDI_ATT_TC=1` verify on the 4B is 2 exact, 2 fails —
-  prompt 2 diverges at token 6 (gap 0.0447, not a tie), prompt 3 at token 37,
-  exactly the 2026-11-11 points. Guard stays; no speed gain was recorded
-  (a gain on a diverging path is not shippable). Evidence:
-  `docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-fd-4b/RESULTS.md`.
+- Re-measured and bisected 2026-11-16 (RTX 4060 Ti, current tree): the gate is unchanged
+  (guard bypassed, `KINDI_TC=1 KINDI_FD=1 KINDI_ATT_TC=1`: 2 exact, 2 fails at the
+  2026-11-11 points — prompt 2 token 6 with llama.cpp's 0.0447 gap, prompt 3 token 37), and
+  the bisect corrected the *reason*, not the outcome. Split decode is arithmetically
+  equivalent to the standard decode attention on this geometry — ≤2e-6 on synthetic inputs,
+  on multi-query masking and on real model state at the failing step — so there is no
+  masking, head-group or chunk-merge defect. The divergence is float association: the
+  per-chunk softmax merge orders its additions differently, the residual stream amplifies
+  the ~6e-8 median difference to ~1e-1 in the logits, and that crosses the 0.0447 gap.
+  Failing needs FD in both the feed and the decode phase (either alone is 40/40).
+  `width % 1024` keys on a quantity the attention never reads, so it is not why the 4B
+  fails: the 4B and 9B share 16-head/4-KV/256 geometry, and the 9B passes because its
+  prompts are not on a 0.04-logit tie. Guard stays; no speed gain was recorded (a gain on a
+  diverging path is not shippable). Evidence:
+  `docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-fd-4b/FD-BISECT.md` (analysis) and
+  `…/RESULTS.md` (gate).
 
 ## DEC-0004: A streamed g5 cache must match the current tensor slices
 

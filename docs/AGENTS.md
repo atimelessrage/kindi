@@ -14,10 +14,12 @@ For tool calls, Kindi uses the standard `tools` / `tool_calls` fields.
 Send `response_format: {"type": "json_object"}` or
 `{"type": "json_schema", "json_schema": {"name": ..., "schema": {...}}}`
 and the reply is constrained at decode time so it parses against the
-schema — on the dense Bonsai and Gemma 4 backends. On Nanbeige and
-Lightning the same request is rejected with HTTP 400 (`param:
-response_format`) instead of a silently unconstrained reply. `grammar`
-and unknown types are also 400. See [API.md](API.md) for the contract.
+schema — on the dense Bonsai, Gemma 4, Nanbeige and Lightning backends.
+`{"type": "grammar", "grammar": "root ::= ..."}` takes llama.cpp GBNF
+instead (regular grammars: a recursive rule is refused with the cycle
+named). A grammar or schema that does not compile is a 400 with
+`param: response_format`; unknown types are 400 too. See [API.md](API.md)
+for the contract.
 
 ## Native endpoints
 

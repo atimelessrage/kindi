@@ -7,7 +7,9 @@ three, 2026-11-14).** Prefix-reuse checkpoints cover both owners jointly, and th
 joint-cache checks pass in both placements, including saved-opening reloads. The MoE expert-cache path
 is a model-free state-machine prototype with a Gemma 4 26B backend adaptation in
 [MOE-TANDEM.md](MOE-TANDEM.md) and [GEMMA4-26B-MOE.md](GEMMA4-26B-MOE.md); there is no MoE backend or
-integration. Every split is still slower than GPU-only on this card.
+integration. This runtime only splits dense layers, so a MoE manifest is refused by name (`TandemEngine`
+and, for a `--tandem` flag, a `make_engine` log line that leaves tandem off) and points at the expert-tier
+split its own engine runs — see [MOE-TANDEM.md §1](MOE-TANDEM.md). Every split is still slower than GPU-only on this card.
 The runtime is `kindi/tandem.py`, with the per-layer GPU API in `kindi/engine.py` (plain owner) and
 `kindi/tp.py:TPEngine(layers=...)` (plan owner, the default). The recovery
 history and the cleanup gate for the interrupted branch are in [TANDEM-STATUS.md](TANDEM-STATUS.md);

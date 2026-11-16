@@ -33,6 +33,22 @@ same depth. Kindi's numbers are for the default settings (exact head, no specula
 | 8,192 | 4,520 | 3,663 | 325.5 | 280.5 |
 | 32,768 | 4,014 | 3,390 | 295.1 | 261.4 |
 
+### GeForce RTX 4060 Ti, 8 GB (this rig, 2026-11-16)
+
+The 8 GB card runs the model through expert tiers: the dense core and the
+shared expert stay on the card, the least-used routed experts in host memory.
+Kindi only here — llama.cpp was not run on this rig for this model, so the
+llama.cpp columns are empty rather than estimated.
+
+| context | Kindi read | llama.cpp read | Kindi write | llama.cpp write |
+|---:|---:|---:|---:|---:|
+| 512 | 788.3–821.3 | not measured | 165.96–167.41 | not measured |
+
+Two consecutive runs at ctx 8192, with 70–106 of the 128 experts per layer on
+the card. `kindi verify` on the same pack is 5 token-exact + 7 llama.cpp ties,
+0 fail. Evidence:
+[benchmarks/2026-11-16-i7-8086k-rtx4060ti-lightning-30b/RESULTS.md](benchmarks/2026-11-16-i7-8086k-rtx4060ti-lightning-30b/RESULTS.md).
+
 Write test on cards with host-memory experts (the GTX 1080 and the RTX 2060 with 6 GB held back): the random prompt
 of `kindi bench` makes the next tokens use a small set of experts again and again, and that makes the decode slots
 look better than they are. So for these cards the write values come from a text: the first N tokens of a long text

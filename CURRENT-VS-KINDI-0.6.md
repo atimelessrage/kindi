@@ -1,10 +1,9 @@
 # Current worktree vs stock Kindi 0.6.0
 
-Report date: **2026-11-15** (refresh of the 2026-11-14 report; §7 records
-what changed since, §8 the 2026-11-15 sessions-endpoint round, §9 the
-2026-11-15 unsupported-field rejection round, §10 the 2026-11-15 audit
-triage round, §11 the 2026-11-15 second audit triage, and §12 the
-2026-11-15 improve-and-fix round). This file is the successor to
+Report date: **2026-11-16** (refresh of the 2026-11-15 report; §36–§37 record
+the T4.2 Gemma 4/DeepSeek port + engine-gateway audit, the Lightning gate
+block, Lightning/Nanbeige structured output, and the True-MoE roadmap
+labels). This file is the successor to
 `CURRENT-VS-KINDI-0.5.md` §25: that file's §§1–24 are the history against
 0.5.0 and §25 is the first evaluation against 0.6.0; this file carries the
 current one. It separates verified behavior from recorded evidence,
@@ -45,7 +44,7 @@ not a code bug — the two tests pass with clang present).
 |---|---|---|
 | MoE backend (`kindi/moe*.py`, `moe_cpu.c`) | present (merged) | **no GPU run in this session**; fork adds expert-tier *planning* (`kindi plan` MoE strategy, `kindi/moe.py plan()`); small-MoE generalization tracked in §5 |
 | DeepSeek-V4.1-Flash backend (`kindi/dsv41*`) | present (merged) | **GPU-unverified here** |
-| Nemotron Lightning (`kindi/lightning*`) | present (merged) | **GPU gate pending here**: the T4.2 adapter is ported (2026-11-16) and CPU-tested, and the catalog GGUF is downloading to `L:/kindi-lightning/`; no verify/bench parity claimed yet. `kindi plan` describes its tiering header-only |
+| Nemotron Lightning (`kindi/lightning*`) | present (merged) | **GPU-gated here 2026-11-16**: the T4.2 adapter is ported, and a clean catalog GGUF (size/SHA-256/GGUF verified, fresh pack) verifies 5 exact + 7 llama.cpp ties, 0 fail on the RTX 4060 Ti, with bench ctx 8192 read 788.3–821.3 and write 165.96–167.41 tok/s (§38). `kindi plan` describes its tiering header-only |
 | **DSpine drafter** (`kindi/dspine.py`, `kindi/dspine.cu`) | present (merged); `spec.py` hooks wired | **GPU-unverified here**; fork wraps the build in `spec._optional` so a broken DSpine degrades to no-speculation instead of aborting startup |
 | Container entrypoint + compose, Kindi Bridge, `install.ps1` | present (merged) | `install.ps1` **not run on Windows in this session** |
 | Turn-save cache (`turn_keep`, `turn_disk_mb`), priority scheduler, `/v1/tokenize` + `/detokenize`, `dry_run` | present (merged) | CPU-tested; no Windows install run |
@@ -66,7 +65,7 @@ not a code bug — the two tests pass with clang present).
 | **FP8 E4M3 K/V decode cache** (`KINDI_KV=fp8`, REQ-0014) | implemented decode-only 2026-11-15 and **measured lossy**: KLD 2.48e-06 (2K) / 2.80e-06 (8K), ~9–14× q8_0; verify 3/4; same cache size as q8_0 (8.5 bits/value). Experimental opt-in, not a default |
 | **Adaptive draft policy** (`kindi/draft_policy.py`, REQ-0015) | 2B GPU gate 2026-11-14: 368.4 vs 318.2 tok/s (+15.8%), exactness unchanged; **27B gate 2026-11-15: fixed-k median 40.1 vs policy-on 40.1 tok/s, identical exactness** (3 exact + same tie). Token stream is verify-only, so exactness cannot change by construction |
 | **Tool-call conformance suite** (`tests/test_tool_call_conformance.py`, REQ-0018) | 18 tests over Gemma 4 native, Nanbeige/Lightning XML+JSON and DeepSeek DSML truncated blocks (2026-11-15); all parsers hold the contract, no leak bugs found. 23 tool-call tests total pass |
-| **Backend plugin foundations** (`kindi/backends/`, REQ-0019) | T4.1 contract/registry/FakeBackend + T4.3 `kindi backends [--json]` listing (2026-11-15); CPU-only, importable on Python 3.6. No engine adapter yet (T4.2), so no arbitrary-GGUF claim |
+| **Backend plugin foundations** (`kindi/backends/`, REQ-0019) | T4.1 contract/registry/FakeBackend + T4.3 `kindi backends [--json]` listing (2026-11-15); CPU-only, importable on Python 3.6. T4.2 adapters for all five families landed 2026-11-16 (§36); Bonsai is GPU-gated on all four packs and Lightning for plain verify/bench on the 4060 Ti (§38); Nanbeige, Gemma 4 and DeepSeek V4.1 are CPU-tested with blocked GPU gates — so still no arbitrary-GGUF claim |
 | **OpenAI error envelope + API conformance harness** (`kindi/api/errors.py`, `tests/api/`) | T5.1 2026-11-15: every server error is the OpenAI envelope; harness drives the real app with the official `openai` client, GPU-free |
 | **Intel Arc A770 purchased** (REQ-0020) | one A770 16 GB bought 2026-11-15, in transit (not installed); M0 audit done, M1 arrival checklist ready, `arc-a770` registered as `not measured`. No backend code, no support claim |
 | **Intel iGPU G0 slice** (`kindi/intel.py`, REQ-0021) | 2026-11-15: DRM-sysfs discovery, oneAPI-floor eligibility, shared-memory budget, tandem GPU contract; `KINDI_DEVICE=intel` refuses loudly. G1+ SYCL kernels need an 11th-gen+ iGPU + oneAPI to compile/verify |
@@ -98,7 +97,7 @@ Still real and orderable against 0.6.0:
 - FP8 K/V (#8) is measured **lossy, not lossless** (KLD ~9–14× q8_0, verify 3/4) — an experimental opt-in, not a default; #9 (Windows unbuffered load) measured NOT met; #6's ≤1.2× clause recorded unsatisfiable with the dedupe rule.
 - Dense standard-attention llama/qwen GGUFs are refused (no engine): see §5.
 - Intel Arc: A770 purchased and in transit (M1 unblocked on arrival); no SYCL backend exists, and the iGPU route is G0-only until an 11th-gen+ iGPU + oneAPI toolchain exists to compile/verify kernels.
-- Backend plugin interface: T4.2 engine adapters, T4.4 llama.cpp proxy, REQ-0018 structured output (T5.4) and real concurrency remain planned; the conformance suite and error envelope are the landed foundations.
+- Backend plugin interface: T4.2 engine adapters are ported for all five families (Bonsai, Nanbeige, Lightning, Gemma 4, DeepSeek V4.1) with the Bonsai and Lightning gates measured and the other three GPU-gated by missing/corrupt weights; T4.4 llama.cpp proxy and real concurrency remain planned. REQ-0018 structured output is landed for dense, Gemma 4, Lightning and Nanbeige (CPU-tested on the last two, GPU gates unclaimed).
 - PQ2_0/Q2_0 (type 142/42) import stays verified for the 2B only — the 4B/9B/27B files were never downloaded (owner action, `docs/MANUAL-HELP-NEEDED.md` §2).
 
 ## 5. Model and hardware status
@@ -329,7 +328,8 @@ entered). `supports_json_grammar` names the two constrained backends
 structured-output request is rejected loudly (400, `param:
 response_format`, naming the backend) instead of silently unconstrained —
 before this round the validator accepted it globally and the two `*_gen`
-loops just ignored it. CPU end-to-end: a scripted illegal top logit is
+loops just ignored it. (2026-11-16: the two `*_gen` loops now advance the
+same `JsonGrammar`, so `supports_json_grammar` names all four; see REQ-0018.) CPU end-to-end: a scripted illegal top logit is
 skipped and the reply parses as `{"ok": true}`. **No Gemma GPU gate was
 run** (no Gemma pack on the host); the dense 2B/9B gate in §27 is the
 measured one. `jinja2` (a real Gemma runtime dep) was missing in the cloud
@@ -426,10 +426,10 @@ Evidence: `docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-t42-bonsai-27b/RESULTS.
 The T4.2 Lightning adapter (`kindi/backends/lightning.py`, registered
 `nemotron-lightning-30b`) is ported and CPU-tested (registry
 resolve/load-reject/manifest-id tests, CLI list updated, Python 3.6
-grammar) — 32 passed, 3 skipped. Its GPU gate is **pending**: the catalog
-GGUF (`boro64/Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf`,
-9,472,656,320 bytes) is downloading to `L:/kindi-lightning/`; **no
-verify/bench parity is claimed yet**. `make_engine` previously built a
+grammar) — 32 passed, 3 skipped. Its GPU gate was **pending** at write
+time (the catalog GGUF, 9,472,656,320 bytes, was still downloading);
+**superseded by §38**, which closes that gate with a clean, hash-checked
+copy. `make_engine` previously built a
 wrong dense engine for Lightning packs and now returns the Lightning
 engine through the adapter. The Bonsai-27B round's REQ-0019 change also
 got its missing REQUIREMENTS-HISTORY regen in a separate commit.
@@ -455,10 +455,115 @@ downloads (Nanbeige corrupt file, PQ2_0/Q2_0 quants, a pinned llama-server),
 other-hardware rigs (A770 M1, P106/P4000/M4000/RTX4000 pairs, Blackwell FP8,
 AVX-only CPUs, mixed cards), publications (push 403, installer refresh, GPU
 CI runner), and maintainer decisions (T4.4/T4.5, D3/D5). The Lightning T4.2
-gate remains the agent-side open item (GGUF downloading, ~2.3 MB/s).
+gate was still the agent-side open item at write time (GGUF downloading at
+~2.3 MB/s); §38 closes it later the same day.
 
 - Diff vs `v0.6.0`: 416 files (+56,478 → +56,909 insertions),
   384 commits (379 → 384); still zero file deletions.
+
+## 36. What changed in the 2026-11-16 T4.2 Gemma 4 + DeepSeek V4.1 + gateway rounds
+
+The last two T4.2 families are now ported (CPU-tested; **both GPU gates
+blocked**): Gemma 4 (`kindi/backends/gemma4.py`, registered
+`gemma4`/`gemma4-e4b`, architecture `gemma4`) wraps `gemma4.Engine` /
+`gemma4_tp.TPEngine`, the Gemma tokenizer's own stop ids, the GGUF chat
+template through `gemma4_chat`, batched prefill at the KV ring's 512, and
+greedy or sampled token selection from the full logits; DeepSeek V4.1
+(`kindi/backends/dsv41.py`, `deepseek-v41-flash`, architecture
+`deepseek41`, device `cpu`) wraps `kindi.dsv41.Model` from a hand-written
+pack (`backend: kindi_dsv41`, `model_path`, optional `encoding`) — there is
+no converter, so the DSpark drafter, RAM slots, prompt cache and turn saves
+stay in the standalone server. The one sampler chain for adapters is now
+`sampling.pick_from_logits` (top-k/top-p/min-p/temperature via
+`distribution`, masked argmax at 0), and the two-card rule lives in
+`backends.gemma4.two_cards()` with `server._two_cards` delegating.
+`kindi bench` / `kindi verify` name the Gemma 4 / DeepSeek families they
+cannot drive instead of falling into the dense loop or the llama.cpp
+matrix. **Gates, NOT run:** no Gemma 4 GGUF/pack on this host and no
+DeepSeek V4.1 shards or release gate data (`gate_prompts.jsonl` +
+`gate_ref.txt`) on this host; no verify/bench parity is claimed for either.
+
+The engine gateway was audited the same day and now refuses to build the
+wrong engine silently: a pack whose manifest names a family with no adapter
+(`kindi_cascade`, an unknown one) gets a `SystemExit` naming the pack, the
+family and the fact that the dense builder would be the wrong engine; a
+manifest claimed by two adapters is refused as contradictory; the registry
+refuses an equally-specific two-backend match as ambiguous instead of
+picking by registration order. The one legitimate fallback stays visible: a
+dense pack its own adapter does not claim (the placeholder-`model` "Hf"
+case) still uses the legacy builder but logs `no adapter claims it` and
+every adapter build logs `-> the <name> backend (<model id>)`. The
+`KINDI_LEGACY_ENGINE_PATH=1` valve now refuses a named non-dense family
+instead of handing it to the dense builder. The new
+`tests/test_engine_gateway.py` harness asserts every pack under
+`~/.kindi/packs` resolves to the adapter its manifest declares (5/5).
+Full suite after these rounds: **870 passed, 28 skipped** (no clang on
+PATH, so the libkcpu tests skip); 3.6 grammar OK; `project_memory
+--check`, `git diff --check` clean.
+
+- Diff vs `v0.6.0` (committed HEAD `f2e16eb`): 416 files,
+  +56,988/−1,023, 388 commits; still zero file deletions.
+
+## 38. What changed in the 2026-11-16 Lightning clean-run gate round
+
+The Lightning T4.2 gate is **closed on this host**, superseding §34, §35 and
+§37(1). A clean re-download to
+`L:/kindi-lightning-clean/models/Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf`
+matches the catalog exactly: 9,472,656,320 bytes, SHA-256
+`38854de649212dc2761006b75afbc41412e7531f763c3ff965bd31f969bb14f3`, valid
+GGUF magic, `nemotron_h_moe` with 401 tensors. A fresh pack was converted
+from that file and the RTX 4060 Ti ran the gate:
+
+- `plan --ctx 8192`: MoE expert tiers, ~5.57 GiB on the card, 70–106 of 128
+experts per layer on the card.
+- `verify`: **5 token-exact + 7 llama.cpp ties, 0 fail** over 12 prompts
+(74 s).
+- `bench --ctx 8192`: read 788.3–821.3 tok/s, write 165.96–167.41 tok/s.
+
+Evidence: `docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-lightning-30b/RESULTS.md`.
+This is a plain-generation gate (verify + bench); the Lightning
+structured-output path stays CPU-tested only, and no other context or
+mixed-card parity is claimed. The remaining T4.2 GPU gates are Nanbeige
+(corrupt upstream GGUF), Gemma 4 (no E4B pack on this host) and DeepSeek
+V4.1 (no shards or release gate data).
+
+## 37. What changed in the 2026-11-16 structured-output + Lightning-block + MoE-label rounds
+
+(1) **Lightning gate moved from "pending download" to blocked:** the local
+catalog GGUF (`boro64/Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf`,
+9,472,656,320 bytes) is not usable on the current host. The evidence chain
+disagrees three ways: catalog SHA-256 `38854de6…`, current local file
+`bc22bc…` (same size, first 1 MiB zero, rejected by the GGUF reader), and
+pack-manifest `source_sha256` `2ec6d074…`. The convert/verify attempt is
+therefore discarded as parity evidence and no verify/bench claim is made.
+This proves the present local copy is bad; it does not prove whether the
+upstream bytes or the local transfer/write are at fault. The T4.2 adapter
+stays CPU-tested; the next step is a clean re-download, a size/SHA/GGUF
+check against the catalog, and a fresh pack conversion from that file.
+**Superseded by §38:** that clean re-download matched the catalog hash and
+the fresh pack passed the 4060 Ti verify/bench gate.
+(2) **Structured output on Lightning/Nanbeige (REQ-0018):** both `{x}_gen`
+generation loops now advance the shared `JsonGrammar` — the whole reply is
+the document (no thought channel), Nanbeige drafting/speculation is
+disabled while structured output is active, and stop tokens are admitted
+only once the automaton is done. A scripted illegal top logit (`<`) is
+skipped in both loops and the reply parses as `{"ok": true}`;
+`supports_json_grammar` now names dense, Gemma 4, Lightning and Nanbeige.
+CPU-only evidence (fake engines/tokenizers); no GPU gate claimed.
+Checks for this round: tool-call conformance + server + backends +
+backends_cli **122 passed**; docs-links + project-memory + handoff
+**12 passed**; `project_memory --check`, `git diff --check` clean.
+(3) **True-MoE roadmap labels:** the Small-MoE table now names
+**Gemma 4 26B-A4B (MoE)** and **Qwen 3.6-35B-A3B (True MoE)** explicitly;
+both remain recognition-only/refused (no catalog/installer/support-matrix
+entry before a pinned-reference + token-exact `kindi verify` gate).
+
+- Diff vs `v0.6.0` including the uncommitted worktree: 416 files,
+  +57,922/−1,076; committed HEAD stays +56,988/−1,023; still zero file
+  deletions. The uncommitted slice is 28 tracked files (+1,112/−231) plus
+  four untracked files (`kindi/backends/gemma4.py`,
+  `kindi/backends/dsv41.py`, `tests/test_engine_gateway.py`, and the
+  FD-bisect note).
 
 ## 25. What changed in the 2026-11-15 full-suite fix + CPU parity round
 

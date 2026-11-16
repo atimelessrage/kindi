@@ -14,7 +14,7 @@ next person does not have to rediscover the wall.
 |---|---|---|---|---|
 | Continuous batching (multi-sequence decode) | **NO-GO** 2026-11-08 | Phase-0 spike: B=4 reached 131.8 tok/s = 0.69x of single decode; the gate was 1.5x | [CONTINUOUS-BATCHING.md](CONTINUOUS-BATCHING.md), phase-0 spike logs in `bench-logs/phase0-spike/` | a new batch-GEMM spike clears 1.5x aggregate at B=4 on the 2B |
 | Per-slot plain-engine refactor (Phase 1 of the batching plan) | **NO-GO/archived** 2026-11-08 | inherits the batching gate; the plan was never authorized | [PER-SLOT-REFACTOR.md](PER-SLOT-REFACTOR.md) | the batching gate passes |
-| Tandem CPU+GPU layer split | **PARTIAL** 2026-11-11: dense runtime in both placements, token-exact; joint prompt-cache checkpoints pass on 2B/9B/27B; 27B exactness, rate and sampled peak measured; 9B/27B saved-opening reloads exact at 4K/8K; 2B/4B/9B `cpu-first` throughput (medians of three) and the 2B/27B layer boundaries recorded | the original WIP `tandem.py` was corrupt; a clean dense runtime now replaces it. Both 27B placements are token-exact 4/4 at 8,192 context (peaks 7,005 / 7,017 MiB vs 7,238 MiB full-GPU). On 2026-11-13 the 27B rate plus sampled peak was measured at 8K and 24K against a full-GPU baseline (7.2-8.4 vs 34.8 tok/s at 100; 446 MiB less peak at 8K), the joint checkpoint cost (54.5-61.5 ms save, 27.0-28.5 ms restore, 149.6 MiB), the 2B layer knee (4-6 layers) and the 27B boundary (24K needs >=16 CPU layers; 24-32 layers lower the peak to 5.1-6.1 GiB at a 35-50% rate cost; the 8K sweep 8-28 layers in steps of 4 shows a flat exchange of 428-432 MiB peak saved per step for 15-37% decode cost per step, no knee, read 16.8 -> 6.5). Capacity is settled on this card: requesting 65,536/131,072 tokens auto-reduces to 37,120 (full GPU) and 30,464 (tandem) — the tandem is always the more reduced engine, so it buys headroom, not context. Tandem does not beat GPU-only. **2026-11-14, placement:** `--tandem-cpu-layers` now takes a count, an explicit layer set (`0-2,4-6`), `gdn:N` (the first N gated-delta layers, attention stays on the GPU) or `auto[:MiB]`, which computes the smallest GDN-first set that makes the context fit from the pack's own tensor sizes and the free VRAM, and refuses instead of splitting when the model already fits (27B at 24K: 19 layers, context unreduced, 522 MiB free, peak 7,257 MiB; 9B at 24K: refused with '~3282 MiB needed, 7075 MiB free'). The CPU owns layers that are cheap per token, which flattens long-context decode: 9B at 24K 23.6 vs 11.0 tok/s and 27B at 24K 7.9 vs 2.9 (medians of three, same layer count). Two limits are now measured and named: the 9B split saves no peak VRAM at 8K on this card (2.3 GiB pack, ~5 GiB free) so the right answer there is no split, and a split frees far less VRAM than its layer count implies because its GPU owner is the plain engine (the 27B plain engine cannot load full at 24K at all, while the plan engine can). **2026-11-14, plan-engine GPU owner:** the GPU half can now be the plan engine (`--tandem-gpu auto|plan|plain`, default auto): `TPEngine(layers=...)` loads only the owned tensors, allocates q8_0 K/V only for the owned attention layers, reads the f32 file per tensor and steps one prebuilt plan per block with the residual add resolved inside it (`k_padd`). Same 27B placement at 24,576 (`gdn:16`): peak **6,004 MiB** (5,862-6,083, n=5) and 1,985 MiB free after load against **7,721 MiB**/197 MiB for the plain owner, with decode inside this machine's run-to-run noise; the `auto` planner charges the owner's real allocation and predicts 6,548 MiB against 6,444-6,756 MiB measured. The capacity premise is now met on context: a 49,152-token request keeps all 49,152 tokens with 19 GDN layers (peak 6,876 MiB, 1,240 MiB free, 5.3 read, 4.9/4.9/2.8/2.7/2.0 tok/s) where the unsplit plan engine reduces it to 30,976 (122 MiB free). Exactness re-checked with the plan owner: 2B both head placements and 9B `gdn:6`, 4/4 each. Later the same day the plain engine gained the same q8_0 K/V cache (`KINDI_KV=q8_0`; the tandem's plain owner always uses it): token-exact against the fp16 references on the 2B, 9B and 27B, and the 27B 24K `gdn:16` peak falls from 7,721 MiB (fp16) to ~7,110 MiB (995 MiB free; byte accounting expects ~225 MiB of that), with the plan owner re-run the same day at 6,091 MiB (1,985 MiB free). Still open: tandem beats GPU-only (the CPU-owned layers dominate the token), a split across two GPU cards, and the MoE approach (needs a real MoE backend first) | [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md), [TANDEM-STATUS.md](TANDEM-STATUS.md), [27B-8K.md](benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md), [plan-owner results](benchmarks/2026-11-14-i7-8086k-rtx4060ti-plan-owner/RESULTS.md), [plain-q8 results](benchmarks/2026-11-14-i7-8086k-rtx4060ti-plain-q8/RESULTS.md), [MOE-TANDEM.md](MOE-TANDEM.md) | a larger-than-VRAM model runs token-exact with a recorded VRAM reduction; the MoE approach needs a real MoE backend first |
+| Tandem CPU+GPU layer split | **PARTIAL** 2026-11-11: dense runtime in both placements, token-exact; joint prompt-cache checkpoints pass on 2B/9B/27B; 27B exactness, rate and sampled peak measured; 9B/27B saved-opening reloads exact at 4K/8K; 2B/4B/9B `cpu-first` throughput (medians of three) and the 2B/27B layer boundaries recorded | the original WIP `tandem.py` was corrupt; a clean dense runtime now replaces it. Both 27B placements are token-exact 4/4 at 8,192 context (peaks 7,005 / 7,017 MiB vs 7,238 MiB full-GPU). On 2026-11-13 the 27B rate plus sampled peak was measured at 8K and 24K against a full-GPU baseline (7.2-8.4 vs 34.8 tok/s at 100; 446 MiB less peak at 8K), the joint checkpoint cost (54.5-61.5 ms save, 27.0-28.5 ms restore, 149.6 MiB), the 2B layer knee (4-6 layers) and the 27B boundary (24K needs >=16 CPU layers; 24-32 layers lower the peak to 5.1-6.1 GiB at a 35-50% rate cost; the 8K sweep 8-28 layers in steps of 4 shows a flat exchange of 428-432 MiB peak saved per step for 15-37% decode cost per step, no knee, read 16.8 -> 6.5). Capacity is settled on this card: requesting 65,536/131,072 tokens auto-reduces to 37,120 (full GPU) and 30,464 (tandem) — the tandem is always the more reduced engine, so it buys headroom, not context. Tandem does not beat GPU-only. **2026-11-14, placement:** `--tandem-cpu-layers` now takes a count, an explicit layer set (`0-2,4-6`), `gdn:N` (the first N gated-delta layers, attention stays on the GPU) or `auto[:MiB]`, which computes the smallest GDN-first set that makes the context fit from the pack's own tensor sizes and the free VRAM, and refuses instead of splitting when the model already fits (27B at 24K: 19 layers, context unreduced, 522 MiB free, peak 7,257 MiB; 9B at 24K: refused with '~3282 MiB needed, 7075 MiB free'). The CPU owns layers that are cheap per token, which flattens long-context decode: 9B at 24K 23.6 vs 11.0 tok/s and 27B at 24K 7.9 vs 2.9 (medians of three, same layer count). Two limits are now measured and named: the 9B split saves no peak VRAM at 8K on this card (2.3 GiB pack, ~5 GiB free) so the right answer there is no split, and a split frees far less VRAM than its layer count implies because its GPU owner is the plain engine (the 27B plain engine cannot load full at 24K at all, while the plan engine can). **2026-11-14, plan-engine GPU owner:** the GPU half can now be the plan engine (`--tandem-gpu auto|plan|plain`, default auto): `TPEngine(layers=...)` loads only the owned tensors, allocates q8_0 K/V only for the owned attention layers, reads the f32 file per tensor and steps one prebuilt plan per block with the residual add resolved inside it (`k_padd`). Same 27B placement at 24,576 (`gdn:16`): peak **6,004 MiB** (5,862-6,083, n=5) and 1,985 MiB free after load against **7,721 MiB**/197 MiB for the plain owner, with decode inside this machine's run-to-run noise; the `auto` planner charges the owner's real allocation and predicts 6,548 MiB against 6,444-6,756 MiB measured. The capacity premise is now met on context: a 49,152-token request keeps all 49,152 tokens with 19 GDN layers (peak 6,876 MiB, 1,240 MiB free, 5.3 read, 4.9/4.9/2.8/2.7/2.0 tok/s) where the unsplit plan engine reduces it to 30,976 (122 MiB free). Exactness re-checked with the plan owner: 2B both head placements and 9B `gdn:6`, 4/4 each. Later the same day the plain engine gained the same q8_0 K/V cache (`KINDI_KV=q8_0`; the tandem's plain owner always uses it): token-exact against the fp16 references on the 2B, 9B and 27B, and the 27B 24K `gdn:16` peak falls from 7,721 MiB (fp16) to ~7,110 MiB (995 MiB free; byte accounting expects ~225 MiB of that), with the plan owner re-run the same day at 6,091 MiB (1,985 MiB free). Still open: tandem beats GPU-only (the CPU-owned layers dominate the token), a split across two GPU cards, and the MoE approach itself (it needs a real MoE backend; since 2026-11-17 the dense split can no longer be built over a MoE manifest - `TandemEngine` refuses a non-dense family by name and `make_engine` explains and drops a `--tandem` flag on `kindi_lightning`/`kindi_dsv41` packs - so what remains there is the expert-tier runtime, not a layer split) | [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md), [TANDEM-STATUS.md](TANDEM-STATUS.md), [27B-8K.md](benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md), [plan-owner results](benchmarks/2026-11-14-i7-8086k-rtx4060ti-plan-owner/RESULTS.md), [plain-q8 results](benchmarks/2026-11-14-i7-8086k-rtx4060ti-plain-q8/RESULTS.md), [MOE-TANDEM.md](MOE-TANDEM.md) | a larger-than-VRAM model runs token-exact with a recorded VRAM reduction; the MoE approach needs a real MoE backend first |
 | `k8v4` 4-bit V K/V cache | **QUARANTINED** 2026-11-10 | 2B `kindi verify` is 2/4 against the fp16 reference (4B is 4/4); a 4-bit V cannot be token-exact | [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md), `bench-logs/k8v4-cache/RESULTS.md` | the project accepts lossy K/V behind a flag, or a V format that reproduces the reference exists |
 
 ## Why each one stopped
@@ -89,17 +89,22 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   The Nanbeige adapter is ported (2026-11-16) but its GPU gate is blocked: the
   catalog's ahtx GGUF is corrupt as served by Hugging Face (owner action in
   `docs/MANUAL-HELP-NEEDED.md`); the Lightning adapter is ported 2026-11-16
-  (CPU-tested; its GPU gate waits on the catalog GGUF download); the Gemma4
-  adapter is not started yet, so there is still no arbitrary-GGUF claim; the
-  generic
-
-  fallback stays decision-gated (llama.cpp proxy recommended, native generic
+  and its GPU gate is now closed on the RTX 4060 Ti with a clean catalog
+  download (fresh pack; verify 5 exact + 7 ties, 0 fail; bench ctx 8192
+  read 788.3–821.3 tok/s, write 165.96–167.41 tok/s; evidence
+  `docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-lightning-30b/RESULTS.md`);
+  the Gemma 4
+  and DeepSeek V4.1 adapters are ported 2026-11-16 and CPU-tested with both
+  GPU gates blocked (neither model is on this host; a DeepSeek V4.1 pack is
+  hand-written, there is no converter), so all five families now have an
+  adapter; there is still no arbitrary-GGUF claim; the generic fallback
+  stays decision-gated (llama.cpp proxy recommended, native generic
   backend design-only). The OpenAI error envelope and the conformance suite
   (`kindi/api/errors.py`, `tests/api/`) also landed as the T5.1 foundation for
   REQ-0018; the per-family tool-call parsers, scheduler, metrics T5.5 and
   structured output (T5.4) landed for the dense and Gemma 4 paths (the
-  T5.4 item in the Agent API bullet below) and remain planned for
-  Lightning/Nanbeige.
+  T5.4 item in the Agent API bullet below) and now for Lightning/Nanbeige too
+  (CPU-tested 2026-11-16; no GPU structured-output gate claimed for either).
 - **Agent API hardening (REQ-0018, proposed):** the next layer over the 0.6.0 base (token
   counting, sessions, priorities, progress comments): (0) unsupported
   `n > 1` and structured-output `response_format` are now rejected with an
@@ -111,9 +116,13 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   schema-ordered JSON automaton (`kindi/jsongrammar.py`) narrows the sampler's
   candidate set to schema-legal tokens (`kindi/sampling.py` `allowed`), so
   `json_object`/`json_schema` replies parse against the schema by construction.
-  The Lightning/Nanbeige paths reject structured output loudly (400 naming the
-  backend) rather than ignoring it, and arbitrary GBNF grammars stay to a later
-  slice; (2) a per-model
+  The Lightning and Nanbeige paths accepted the same constraint 2026-11-16
+  (their `{x}_gen` loops now advance the same `JsonGrammar`, skip a scripted
+  illegal top logit, and stop only once the automaton is done; CPU-only fake
+  engines — no GPU gate claimed), and arbitrary GBNF grammars **landed 2026-11-16**
+  (`response_format` type `grammar`, `kindi/gbnf.py`; regular grammars only — a
+  recursive rule is refused at compile time, `json_schema` is the recursive-JSON
+  path); (2) a per-model
   tool-call conformance suite — **landed 2026-11-15**
   (`tests/test_tool_call_conformance.py`: Gemma 4 native, Nanbeige/Lightning XML+JSON,
   DeepSeek DSML truncated blocks; all parsers hold the contract, no leak bugs found);
@@ -188,19 +197,44 @@ planned only: no code exists for these yet, and each needs its gate measured bef
 
 ## Small-MoE compatibility (2026-11-14)
 
-The six requested small MoEs below are recognized by `kindi/moe_compat.py` (and, for Cascade 2,
+The small MoEs below are recognized by `kindi/moe_compat.py` (and, for Cascade 2,
 `kindi/cascade.py`) so `kindi convert` can refuse each with its actual missing milestone.
 Recognition is not a backend: none of them enters the catalog, installer, or support matrix until
-`kindi verify` passes token-exact against a pinned llama.cpp reference.
+`kindi verify` passes token-exact against a pinned llama.cpp reference. The four Ollama-fetched
+candidates below were inspected in the local `D:\ollamaModels` store (GGUF blobs linkable by
+`tools/ollama_links.ps1`): Gemma 4 26B-A4B and Qwen3-Coder 30B-A3B are already recognized;
+GLM-4.7-Flash is added as `glm4moelite`; Granite 4.1 30B is **not** an MoE (architecture
+`granite`, 64 dense layers, no expert tensors) and is listed as a generic dense long-context
+candidate, not as an MoE backend.
 
 | model | arch | Kindi status | next milestone |
 |---|---|---|---|
 | Nemotron Cascade 2 30B-A3B | `nemotron_h_moe` | converter/validator only (`kindi_cascade`): header + exact F32/Q5_0/Q8_0/Q4_K dequant + pinned-reference gate (`kindi/cascade.py`, reference generator `tools/cascade_reference.py`) | GPU K-quant Nemotron-H matmul kernels so `kindi verify` can do token comparison against the pinned reference |
-| Gemma 4 26B-A4B | `gemma4` MoE | recognized, refused: backend is E4B-only (42 layers, width 2560) | separate 26B backend + pinned reference (contract in [GEMMA4-26B-MOE.md](GEMMA4-26B-MOE.md)) |
+| Gemma 4 26B-A4B (MoE) | `gemma4` MoE | recognized, refused: backend is E4B-only (42 layers, width 2560) | separate 26B backend + pinned reference (contract in [GEMMA4-26B-MOE.md](GEMMA4-26B-MOE.md)) |
 | Qwen3-Coder-30B-A3B | `qwen3moe` | recognized, refused | Qwen3-MoE loader + pinned reference |
-| Qwen3.6-35B-A3B | `qwen35moe` | recognized, refused | DeltaNet/hybrid attention loader, MoE router and expert path + pinned reference |
+| Qwen 3.6-35B-A3B (True MoE) | `qwen35moe` | recognized, refused; 40 layers (`10 × (3 Gated DeltaNet → 1 Gated Full Attention)`), hidden 2048, 248,320 padded vocab, 262,144 native ctx; 256 experts/layer (top-8 + 1 shared, intermediate 512) | **Q0 pinned GGUF/reference gate: byte-pinned Bartowski Q4_K_M (22.29 GB, Apache-2.0) or Unsloth UD-Q4_K_M, tensor inventory over every tensor, llama.cpp Q0 reference run.** Then Q1 Gated DeltaNet state/recurrence (30 layers; 16 QK + 32 V heads, head_dim 128, SSM inner 4096, conv kernel 4, time-step rank 32), Q2 Gated Full Attention (10 layers at 3/7/…/39; 16 Q / 2 KV heads, head_dim 256, partial RoPE 64, attn/output gate, mRoPE `[11,11,10]`), Q3 MoE router + experts (`ffn_gate_inp` `(256,2048)` no bias/correction; fused `ffn_{gate,up,down}_exps` + shared `ffn_*_shexp`; ~32.2 B expert params), Q4 host-resident expert cache, Q5 tokenizer/chat/no-vision text-only `kindi verify` |
+| GLM-4.7-Flash | `glm4moelite` | recognized, refused | GLM4-MoE-Lite loader, MLA/KV attention path, routed-plus-shared expert path + pinned reference |
 | North Mini Code 1.0 (30B/~3B) | `cohere2moe` | recognized, refused | Cohere2-MoE loader, chat template and tokenizer checks + pinned reference |
 | Recursive Flint 40B/2.5B | `flint` | recognized, refused | loader, router and expert path + pinned reference |
+
+**Qwen 3.6 Q0 first gate (do not start the backend before this):** pin one text-only GGUF at a
+repository revision, record its SHA-256 and Apache-2.0 license chain, and dump a tensor inventory
+that proves the layer pattern (30 `blk.N.ssm_*` GDN blocks; no `ssm_*` on blocks 3, 7, 11, …, 39),
+the full-attention tensors, and every `ffn_gate_inp` / `ffn_{gate,up,down}_exps` /
+`ffn_*_shexp` tensor. The same artifact runs once under the pinned upstream llama.cpp
+`qwen35moe` reference for a fixed 1K-2K greedy prompt; its logits/tokens are the gate every later
+DeltaNet, attention and MoE milestone is compared against. Vision and MTP are explicitly out of
+scope for this text-only backend. Do **not** use the Ollama-converted layout as the first pin:
+it has been observed to differ (`ssm_dt` without `.bias`, `rope.dimension_sections` length 3 vs 4);
+use a Bartowski/Unsloth llama.cpp-compatible GGUF, or normalize those two deltas in a Kindi
+converter with byte-level tests first.
+
+**Not an MoE (local Ollama candidate):** Granite 4.1 30B (`granite`, 64 blocks,
+131,072 context) is a dense 30B GGUF, so it is not part of the small-MoE recognition table.
+It is already on disk under `D:\ollamaModels` and can be linked with `tools/ollama_links.ps1`
+for a future native/generic-engine evaluation, but it needs a Granite loader and pinned reference
+like any other dense architecture; Qwen3 30B (non-coder) shares the `qwen3moe` architecture and
+therefore follows the Qwen3-Coder row once a loader exists.
 
 Cascade 2 goes first among these (it is closest to the existing `nemotron_h_moe` Lightning
 backend): its G1 acceptance gate is a pinned reference on the exact GGUF plus a token-exact

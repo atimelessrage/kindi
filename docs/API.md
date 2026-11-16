@@ -51,7 +51,7 @@ Implemented in `kindi/api/errors.py`, wired into `kindi/server.py` (T5.1).
 | `logprobs`, `top_logprobs` | supported on Gemma 4 only | **rejected** (400) on other backends |
 | `enable_thinking`, `chat_template_kwargs`, `reasoning_effort`, `thinking_budget_tokens` | supported | Kindi thinking controls |
 | `n` | supported only as 1 | **rejected** (400) when any other value is given; multiple completions are not generated |
-| `response_format` | `{"type": "text"}`, `{"type": "json_object"}`, `{"type": "json_schema", "json_schema": {"name": ..., "schema": {...}}}` | decode-side constraint (REQ-0018): every token is restricted to a JSON-schema automaton, so the content parses against the schema. `grammar` and unknown types are **rejected** (400, `param: response_format`); `tools` is rejected together with structured output; on the Lightning and Nanbeige backends structured output is **rejected loudly** (400, `param: response_format`) instead of silently unconstrained |
+| `response_format` | `{"type": "text"}`, `{"type": "json_object"}`, `{"type": "json_schema", "json_schema": {"name": ..., "schema": {...}}}`, `{"type": "grammar", "grammar": "root ::= ..."}` | decode-side constraint (REQ-0018): every token is restricted to the grammar automaton, so the content parses against the schema or matches the GBNF language. Supported on the dense Bonsai, Gemma 4, Lightning and Nanbeige backends; unknown types, an invalid schema or an invalid/recursive grammar are **rejected** (400, `param: response_format`), and `tools` is rejected together with structured output |
 | `frequency_penalty`, `logit_bias`, `user`, `modalities` and other OpenAI-only fields | ignored | accepted and not read |
 
 The live-HTTP conformance suite (`tests/api/`, real app over uvicorn driven by
@@ -70,9 +70,22 @@ construction. The Gemma 4 native path gained the same constraint later the
 same day (`Kindi._generate_gemma` + `_g4_json_token`): structured output takes
 over the reply — a thinking channel is not entered, the rest of the reply is
 the JSON document, and stop tokens are admitted only once the automaton is
-done. The `supports_json_grammar` flag gates the two supported backends at
-the HTTP boundary, so a Lightning/Nanbeige request gets a 400 naming the
-backend rather than an unconstrained reply. `n = 1` and
+done. The `supports_json_grammar` flag gates the supported backends at
+the HTTP boundary; Lightning and Nanbeige gained the same constraint
+2026-11-16 (their `{x}_gen` loops advance the same automaton; CPU-tested,
+no GPU structured-output gate claimed — the Lightning GGUF does pass plain
+`kindi verify`/`kindi bench` on the 4060 Ti, but not through this path).
+`{"type": "grammar"}` takes llama.cpp GBNF
+(`kindi/gbnf.py`: rules, alternation, groups, literals with C escapes,
+character classes, `.`, `* + ? {m} {m,} {m,n}`, rule references, comments).
+It is compiled before generation, so a syntax error, an unknown rule or a
+recursive rule is an enveloped 400 and never a half-constrained reply;
+recursion is refused because this slice is a regular automaton (use
+`json_schema` for recursive JSON). The same
+`supports_json_grammar` capability flag gates it. The
+adapter contract carries the same flag on
+`BackendCapabilities`; a backend that sets it treats `token_filter` as the
+full allowed set for constrained decoding. `n = 1` and
 `response_format: {"type": "text"}` are accepted, `grammar` stays rejected,
 and purely cosmetic fields keep being ignored. The grammar is schema-ordered
 (`kindi/jsongrammar.py`): properties are emitted in schema order, `required`

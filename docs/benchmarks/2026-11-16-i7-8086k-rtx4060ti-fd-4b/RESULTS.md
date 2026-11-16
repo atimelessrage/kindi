@@ -19,3 +19,10 @@ engine, ctx 1024, exact head, against the shipped `kindi/reference-4b.json`:
 measurement. Verdict: **the guard stays.** FD-on 4B is not exact, so no speed
 gain is recorded (the FD-on run was not benched: a gain on a diverging path is
 not a shippable gain).
+
+## Root cause (bisect, same day)
+
+These numbers were bisected after they were taken: the divergence is **float association in
+the split attention, not a kernel, masking or geometry defect**, and the guard's
+`width % 1024` trigger keys on a quantity the attention never reads. Full evidence:
+[`FD-BISECT.md`](FD-BISECT.md). No kernel was changed.
