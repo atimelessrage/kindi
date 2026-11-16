@@ -727,7 +727,6 @@ Run on the RTX 4060 Ti rig (`NVIDIA GeForce RTX 4060 Ti`, 8188 MiB, driver 617.4
 | PQ2_0/Q2_0 4B/9B/27B | still owner-bound: only the 2B variants are on this host (`~/.kindi/packs/bonsai-2b{,-pq2,-q2}`); 4B/9B packs here are PTQ1_0. |
 | dense standard-attention llama/qwen GGUFs refused | missing engine, not a regression: unchanged, and out of scope for this rig (the 0.6 backend set does not cover them either). |
 | MoE / DeepSeek / DSpine GPU gates | blocked on weights (no MoE pack, no DeepSeek shards, no DSpine profile) and the Nanbeige/Lightning upload problems; not addressable on the rig. |
-
 | performance sanity (is anything slower than the 0.6.0-era records?) | no regression found on the 2B: `kindi bench` at ctx 8192 with today's defaults (plan engine, q8_0 K/V) reads **298.2 tok/s** and generates **221.7 / 220.2 / 226.8 tok/s** at positions 100 / 2,000 / 8,000. The 2026-11-09 4060 Ti row for the same pack is 190.0 read and 161.5-165.5 generation; the settings differ, so this is a floor that rules out a regression, not a new record. 6,523 MiB free at 8,192 context. |
 
 Two fork surfaces verified on the rig in earlier rounds remain unchanged: `kindi plan`
