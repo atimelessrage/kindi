@@ -10,7 +10,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `36b4623` on `freebuff/tandem-cpu-recovery` (`main` receives the parent-of-this-commit bump and FF at handoff; guarded by `tests/test_agents_handoff.py`). Full suite last measured at `24b4a2f`: 779 passed, 11 skipped (clang 18.1.8 on PATH); the REQ-0018 Gemma-slice focused set (server/sessions/jsongrammar/sampling/conformance/backends/config-ref) was 152 passed, 1 skipped after `36b4623`'s parent. Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset (404 files, +55,343/−1,021, no deletions); comparison report in `CURRENT-VS-KINDI-0.6.md` (§28).
+- **HEAD:** `65a16d5` on `freebuff/tandem-cpu-recovery` (`main` receives the parent-of-this-commit bump and FF at handoff; guarded by `tests/test_agents_handoff.py`). Full suite last measured at `24b4a2f`: 779 passed, 11 skipped (clang 18.1.8 on PATH); the REQ-0018/0016 wire-coverage focused set (api + server/sessions/jsongrammar/sampling/conformance/backends/config-ref) was 167 passed, 1 skipped after `65a16d5`'s parent. Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset (404 files, +55,551/−1,021, no deletions); comparison report in `CURRENT-VS-KINDI-0.6.md` (§29).
 - **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
   512/4K/8K; 2B CPU-layer sweep; joint checkpoint 149.6 MiB on the 27B at 54.5-61.5 ms
   save), owned-slice CPU load, `kindi bench --sample-vram` sampled-peak VRAM, multi-ISA CPU
@@ -56,8 +56,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `36b4623` | main checkout; clean |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `36b4623` | this session; identical to `main` |
+| `T:/kindi` | `main` | `65a16d5` | main checkout; clean |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `65a16d5` | this session; identical to `main` |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
