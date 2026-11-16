@@ -152,6 +152,28 @@ def test_bonsai_resolves_by_model_id_unloaded():
         assert backend.loaded is False
 
 
+def test_nanbeige_resolves_by_model_id_unloaded():
+    from kindi.backends.nanbeige import NanbeigeBackend
+
+    backend = registry.resolve("nanbeige-33b")
+    assert isinstance(backend, NanbeigeBackend)
+    assert backend.loaded is False
+
+
+def test_nanbeige_load_rejects_a_missing_pack_directory():
+    with pytest.raises(registry.BackendUnavailable, match="pack directory"):
+        registry.resolve("nanbeige-33b", config={"pack": "no-such-pack-dir"})
+
+
+def test_nanbeige_model_id_for_manifest():
+    from kindi.backends.nanbeige import model_id_for_manifest
+
+    assert model_id_for_manifest({"backend": "kindi_nanbeige"}) == "nanbeige-33b"
+    assert model_id_for_manifest({"backend": "kindi_gemma4"}) is None
+    assert model_id_for_manifest({}) is None
+    assert model_id_for_manifest(None) is None
+
+
 def test_bonsai_load_rejects_a_missing_pack_directory():
     with pytest.raises(registry.BackendUnavailable, match="pack directory"):
         registry.resolve("bonsai2-2b", config={"pack": "no-such-pack-dir"})

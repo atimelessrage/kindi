@@ -717,10 +717,11 @@ def tc_hp_for(man):
 def make_engine(pack, ctx=4096, clusters=None, log=print, tandem="off", cpu_layers=None, gpu=None):
     """Engine on one GPU (or the tandem engine): the T4.2 gateway.
 
-    Dense Bonsai packs resolve through the backend registry (the ``bonsai`` adapter
-    in ``kindi.backends.bonsai``) unless ``KINDI_LEGACY_ENGINE_PATH=1`` is set; the
-    adapter builds the same engine via ``make_engine_legacy``, so serve/verify/bench
-    numbers do not change. Non-Bonsai packs keep using the legacy builder.
+    Dense Bonsai and Nanbeige (``kindi_nanbeige``) packs resolve through the backend
+    registry (the ``bonsai``/``nanbeige`` adapters) unless
+    ``KINDI_LEGACY_ENGINE_PATH=1`` is set; the adapters build the same engine via
+    ``make_engine_legacy``, so serve/verify/bench numbers do not change. Other
+    packs keep using the legacy builder.
     """
     if os.environ.get("KINDI_LEGACY_ENGINE_PATH") != "1":
         man = None
@@ -730,9 +731,10 @@ def make_engine(pack, ctx=4096, clusters=None, log=print, tandem="off", cpu_laye
         except Exception:  # noqa: BLE001 - leave broken packs to the legacy builder's error
             man = None
         if isinstance(man, dict):
-            from .backends.bonsai import model_id_for_manifest
+            from .backends.bonsai import model_id_for_manifest as _bonsai_model_id
+            from .backends.nanbeige import model_id_for_manifest as _nanbeige_model_id
 
-            model_id = model_id_for_manifest(man)
+            model_id = _bonsai_model_id(man) or _nanbeige_model_id(man)
             if model_id:
                 from .backends import resolve
 

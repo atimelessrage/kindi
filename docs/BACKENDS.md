@@ -95,9 +95,13 @@ GGUF architectures it serves instead of relying on the built-in engine paths.
   24576 agree with the valve within ~1% — evidence in
   `docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/RESULTS.md`.
   The 27B pack is not on the host, so no 27B adapter row is claimed.
-  Nanbeige, Nemotron Lightning and DeepSeek V4.1 are not ported yet
-  (no packs on the verification host), so their packs still take the
-  legacy path.
+  The Nanbeige adapter (`kindi/backends/nanbeige.py`, registered `nanbeige-33b`)
+  is ported 2026-11-16, but its GPU gate is blocked: the catalog's ahtx GGUF is
+  corrupt as served by Hugging Face (SHA mismatch, garbled tensor infos), so
+  no verify/bench parity is claimed; the owner action is in
+  `docs/MANUAL-HELP-NEEDED.md`. Nemotron Lightning and DeepSeek V4.1 are not
+  ported yet (no packs on the verification host), so their packs still take
+  the legacy path.
 - T4.3: `kindi backends` listing and this authoring guide. Done 2026-11-15.
 - T4.4: generic fallback as a llama.cpp proxy backend. Needs the maintainer
   decision on positioning (REQ-0019). Not done.

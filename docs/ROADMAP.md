@@ -81,8 +81,11 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   on the RTX 4060 Ti, and the gate was extended to 4B (3+tie both paths) and 9B
   (4/4 both paths) with adapter bench rows agreeing with the valve within ~1%
   — evidence `docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/RESULTS.md`;
-  no 27B pack on the host, so no 27B adapter row). The other engine families (Nanbeige, Lightning, Gemma4) are
-  not adapters yet, so there is still no arbitrary-GGUF claim; the generic
+  no 27B pack on the host, so no 27B adapter row). The Nanbeige adapter is ported
+  (2026-11-16) but its GPU gate is blocked: the catalog's ahtx GGUF is corrupt as
+  served by Hugging Face (owner action in `docs/MANUAL-HELP-NEEDED.md`); Lightning
+  and Gemma4 adapters are not started yet, so there is still no arbitrary-GGUF
+  claim; the generic
 
   fallback stays decision-gated (llama.cpp proxy recommended, native generic
   backend design-only). The OpenAI error envelope and the conformance suite

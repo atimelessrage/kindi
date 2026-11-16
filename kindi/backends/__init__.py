@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """Backend plugin interface (T4.1).
 
-Importing this package registers the fake backend and the T4.2 bonsai adapter
-(``kindi.backends.bonsai``). ``resolve`` serves the fake backend, the bonsai
-backend and any externally registered backend, and says so when asked for
-anything else.
+Importing this package registers the fake backend and the T4.2 bonsai and
+nanbeige adapters (``kindi.backends.bonsai``, ``kindi.backends.nanbeige``).
+``resolve`` serves the fake backend, the adapter backends and any
+externally registered backend, and says so when asked for anything else.
 """
 import os
 
@@ -22,11 +22,13 @@ from .registry import (
 )
 from .fake import FakeBackend
 from .bonsai import BonsaiBackend
+from .nanbeige import NanbeigeBackend
 
 __all__ = [
     "Backend",
     "BackendCapabilities",
     "BonsaiBackend",
+    "NanbeigeBackend",
     "BackendNotFound",
     "BackendUnavailable",
     "CancelToken",

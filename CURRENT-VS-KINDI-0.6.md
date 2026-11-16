@@ -387,6 +387,22 @@ adapter row is claimed; the other T4.2 families stay unported.
 - Diff vs `v0.6.0`: 405 files (+55,754 → +55,787 insertions),
   365 commits (363 → 365); still zero file deletions.
 
+## 32. What changed in the 2026-11-16 Nanbeige adapter round
+
+The T4.2 Nanbeige adapter (`kindi/backends/nanbeige.py`, registered
+`nanbeige-33b`) is ported and CPU-tested (registry resolve/load-reject/
+manifest-id tests, CLI listing, Python 3.6 grammar) — 27 passed, 2 skipped.
+Its GPU gate is **blocked**: the catalog's `ahtx/AH-Nanbeige4.3-33B-IQ3_XXS.gguf`
+downloaded in full (13,108,685,952 bytes) is corrupt as served by Hugging Face
+(SHA-256 `39d8e2d8…` vs the catalog's `9d4f18e8…`; only 5 of 471 tensor-info
+names parse as text, the rest NUL-garbled). The corrupt copy was deleted and
+the owner action recorded in `docs/MANUAL-HELP-NEEDED.md`. **No verify/bench
+parity is claimed**; `make_engine` previously built a wrong dense engine for
+Nanbeige packs and now returns the Nanbeige engine through the adapter.
+
+- Diff vs `v0.6.0`: 405 files (+55,787 → +55,830 insertions),
+  368 commits (365 → 368); still zero file deletions.
+
 ## 25. What changed in the 2026-11-15 full-suite fix + CPU parity round
 
 A full-suite run (783 passed, 20 skipped, 1 failure, 2 fixture
