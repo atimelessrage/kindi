@@ -28,14 +28,26 @@ ADD_SPECIAL = "<|endoftext|>"
 
 
 def model_id_for_manifest(man):
-    """Registry model id for a Bonsai pack manifest, or None for other packs."""
-    name = str((man or {}).get("model") or "")
-    if not name.startswith(MODEL_ID_PREFIX):
+    """Registry model id for a Bonsai pack manifest, or None for other packs.
+
+    A pack resolves when its `model` is a ``Ternary-Bonsai-2-<size>`` name —
+    or, like the 27B (whose GGUF ``general.name`` is the placeholder "Hf"),
+    when the `source_file` carries the size (the same fallback
+    `kindi/config.py` uses to name the served model).
+    """
+    import re as _re
+
+    man = man or {}
+    name = str(man.get("model") or "")
+    if name.startswith(MODEL_ID_PREFIX):
+        size = name.rsplit("-", 1)[-1].lower()
+        if size in SIZES:
+            return "bonsai2-" + size
         return None
-    size = name.rsplit("-", 1)[-1].lower()
-    if size not in SIZES:
-        return None
-    return "bonsai2-" + size
+    m = _re.search(r"(\d+(?:\.\d+)?)b(?:\b|-|_)", str(man.get("source_file") or "").lower())
+    if m and (m.group(1) + "b") in SIZES and "bonsai" in str(man.get("source_file") or "").lower():
+        return "bonsai2-" + m.group(1) + "b"
+    return None
 
 
 class BonsaiBackend(Backend):

@@ -403,6 +403,24 @@ Nanbeige packs and now returns the Nanbeige engine through the adapter.
 - Diff vs `v0.6.0`: 405 files (+55,787 → +55,830 insertions),
   368 commits (365 → 368); still zero file deletions.
 
+## 33. What changed in the 2026-11-16 Bonsai-27B adapter-gate round
+
+The Bonsai adapter's local gate is now complete for all four packs on this
+host. The earlier record said the 27B pack is not on this host; it is in fact
+at `T:/kindi-packs/bonsai-27b`, but its manifest's `model` is the 27B GGUF's
+placeholder `Hf`, so `backends/bonsai.model_id_for_manifest` returned `None`
+and the pack silently took the legacy path — the adapter already listed
+`27b` in `SIZES`/`model_ids`. Fixed: `model_id_for_manifest` now also reads
+the size from `source_file` (the fallback `kindi/config.py` uses to name the
+served model), pinned by a `tests/backends/test_registry.py` case. With the
+fix, `kindi verify` 27B is **4/4 PASS on both the adapter path (34.5 tok/s)
+and the valve path (35.7 tok/s)**, and `kindi bench` at ctx 24576 agrees
+within ~1% everywhere (read 36.7/37.1; gen identical at 8K/16K/24K).
+Evidence: `docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-t42-bonsai-27b/RESULTS.md`.
+
+- Diff vs `v0.6.0`: 412 files (+55,830 → +56,331 insertions),
+  377 commits (368 → 377); still zero file deletions.
+
 ## 25. What changed in the 2026-11-15 full-suite fix + CPU parity round
 
 A full-suite run (783 passed, 20 skipped, 1 failure, 2 fixture

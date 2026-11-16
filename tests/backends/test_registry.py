@@ -184,6 +184,12 @@ def test_bonsai_model_id_for_manifest():
 
     assert model_id_for_manifest({"model": "Ternary-Bonsai-2-2B"}) == "bonsai2-2b"
     assert model_id_for_manifest({"model": "Ternary-Bonsai-2-27B"}) == "bonsai2-27b"
+    # The 27B GGUF names itself only "Hf"; the size must come from source_file,
+    # the same fallback config.py uses to name the served model.
+    assert model_id_for_manifest({
+        "model": "Hf",
+        "source_file": "Ternary-Bonsai-2-27B-PTQ1_0.gguf",
+    }) == "bonsai2-27b"
     assert model_id_for_manifest({"model": "Ternary-Bonsai-2-XL"}) is None
     assert model_id_for_manifest({"model": "Other-Model"}) is None
     assert model_id_for_manifest({}) is None
