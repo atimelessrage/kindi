@@ -55,7 +55,13 @@ the dense engine for a MoE. The equivalent split for a MoE is the one its own en
 `Usage.coverage()` compares the measured picks the card serves with the slots against the same bytes as
 residency).
 
-None of that is new execution: the MoE backends below are still
+`kindi/moe_tandem.py` is that split written down for one execution unit (§5-§6): every selected pair is
+assigned to `card` (resident on the card), `copy` (a complete expert into a cache slot) or `cpu` (a host
+worker computes it and returns its output vector). The CPU lane is opt-in and throttled by a
+deterministic `cpu_share`, the copy set is one chunk-planned list (an expert shared by tokens is copied
+once), and the combine order is the backend's reference order, kept separate from the scheduling order.
+It takes ints, an `ExpertCache` and a `Placement`, and returns a plan; it moves no bytes, runs no
+kernel and is used by no backend. None of that is new execution: the MoE backends below are still
 design and prototype.
 
 The first backend must answer three questions before any performance work:
@@ -349,6 +355,7 @@ Implemented, model-free:
 | file | purpose |
 |---|---|
 | `kindi/expert_cache.py` | copy-only slot manager, pin-aware LRU, transient fallback and JSON-safe metrics; no tensors, GPU or engine wiring |
+| `kindi/moe_tandem.py` | one execution unit's expert split over the cache and a placement: `card` / `copy` / `cpu` lanes, opt-in CPU lane with a deterministic `cpu_share` throttle, router or expert-id combine order kept separate from scheduling, plan metrics; no tensors, copies or kernels |
 | `kindi/expert_chunk.py` | multi-token prefill planner over the cache: deduped copy list in first-need order, hit/coalesced/miss report, chunk rollback when a token does not fit; no tensors or engine wiring |
 | `tests/test_moe_cache.py` | synthetic-slot tests for transitions, eviction, pinning, transient slots, failed copies and metrics |
 | `tests/test_moe_cache_properties.py` | 32 seeded randomized route/acquire traces; checks capacity, pin ownership, slot states, atomic rejects and metrics after every operation |
