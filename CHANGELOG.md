@@ -13,6 +13,8 @@
 
 ### Added
 
+- **Doc-consistency fix** (no code) — `docs/BACKENDS.md`'s intro now describes the actual registry (fake + bonsai adapter + external; T4.2 Bonsai shipped 2026-11-15, T4.3 shipped the same day) instead of "only the fake backend resolves". `docs/AGENTS.md` documents `response_format` structured output (carrying backends, loud 400 elsewhere); ROADMAP's T5.1 bullet no longer lists structured output as planned for the dense/Gemma paths.
+
 - **OpenAI-client wire coverage** (REQ-0018/REQ-0016, tests only) — the live-HTTP conformance suite (`tests/api/`, real app over uvicorn driven by the official `openai` client) now sends a structured-output request (accepted, recorded) and a backend-without-the-grammar request (loud 400, `param: response_format`), plus a `/sessions` HTTP round trip (list/show/export/status/tags/read, malformed-id 400) over the same harness. GPU-free against the stub engine; `KINDI_API_URL` points the suite at a real server.
 
 - **JSON-schema constrained decoding** (REQ-0018) — `response_format` `json_object` and `json_schema` now constrain the dense decode instead of being rejected: a schema-ordered JSON automaton (`kindi/jsongrammar.py`) intersected with the sampler's candidate set (`allowed` in `kindi/sampling.py`), so the reply parses against the schema by construction. Malformed schemas and `tools` with structured output are enveloped 400s; `grammar` stays rejected. Covered by grammar conformance tests and a CPU-only end-to-end loop test.

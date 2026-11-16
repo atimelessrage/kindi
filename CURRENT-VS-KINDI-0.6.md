@@ -355,6 +355,21 @@ mention the round; not in this commit to keep it test+docs.
 - Diff vs `v0.6.0`: 404 files (+55,343 → +55,551 insertions),
   360 commits (357 → 360); still zero file deletions.
 
+## 30. What changed in the 2026-11-15 doc-consistency round
+
+Docs-only: `docs/BACKENDS.md`'s intro still said only the fake backend
+resolves (the T4.2 Bonsai adapter shipped 2026-11-15 and `kindi backends`
+lists it) and mislabeled the shipped T4.3 authoring guide as future work;
+the intro and status now describe the actual registry (fake + bonsai +
+external). `docs/AGENTS.md` — the page agent hosts actually read — never
+mentioned `response_format`; it now documents structured output, its two
+carrying backends, and the loud 400 elsewhere. ROADMAP's T5.1 bullet also
+still listed structured output (T5.4) as planned; it now says it landed for
+dense + Gemma 4 and stays planned only for Lightning/Nanbeige.
+
+- Diff vs `v0.6.0`: 405 files (+55,551 → +55,754 insertions),
+  363 commits (360 → 363); still zero file deletions.
+
 ## 25. What changed in the 2026-11-15 full-suite fix + CPU parity round
 
 A full-suite run (783 passed, 20 skipped, 1 failure, 2 fixture

@@ -9,6 +9,16 @@ Kindi is an OpenAI-compatible endpoint. Use these values:
 
 For tool calls, Kindi uses the standard `tools` / `tool_calls` fields.
 
+## Structured output
+
+Send `response_format: {"type": "json_object"}` or
+`{"type": "json_schema", "json_schema": {"name": ..., "schema": {...}}}`
+and the reply is constrained at decode time so it parses against the
+schema — on the dense Bonsai and Gemma 4 backends. On Nanbeige and
+Lightning the same request is rejected with HTTP 400 (`param:
+response_format`) instead of a silently unconstrained reply. `grammar`
+and unknown types are also 400. See [API.md](API.md) for the contract.
+
 ## Native endpoints
 
 Besides `/v1`, Kindi serves what an agent host needs to observe and to connect a non-OpenAI client:

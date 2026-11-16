@@ -85,7 +85,9 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   backend design-only). The OpenAI error envelope and the conformance suite
   (`kindi/api/errors.py`, `tests/api/`) also landed as the T5.1 foundation for
   REQ-0018; the per-family tool-call parsers, scheduler, metrics T5.5 and
-  structured output (T5.4) remain planned.
+  structured output (T5.4) landed for the dense and Gemma 4 paths (the
+  T5.4 item in the Agent API bullet below) and remain planned for
+  Lightning/Nanbeige.
 - **Agent API hardening (REQ-0018, proposed):** the next layer over the 0.6.0 base (token
   counting, sessions, priorities, progress comments): (0) unsupported
   `n > 1` and structured-output `response_format` are now rejected with an

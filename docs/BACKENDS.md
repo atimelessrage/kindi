@@ -3,12 +3,15 @@
 Kindi's inference backends sit behind one plugin contract, so adding a model is
 a contained change: one backend module plus docs, with no edits to the server
 or the CLI. This page covers the contract (T4.1). The adapter ports of the
-existing engines (T4.2), the authoring checklist (T4.3) and the generic
-fallback (T4.4) are roadmap items tracked in [REQ-0019](development/requirements/REQ-0019.md);
-until they land, only the fake backend and externally registered backends
-resolve through the registry, and `resolve` says so when asked for anything
-else. There is no generic-GGUF claim yet: an arbitrary GGUF cannot be served
-today.
+existing engines (T4.2) are in progress — the dense Bonsai adapter
+(`kindi/backends/bonsai.py`) is done and registered; the other families
+(Nanbeige, Nemotron Lightning, DeepSeek V4.1) still take the legacy path.
+The authoring checklist and `kindi backends` listing (T4.3) and the generic
+fallback (T4.4) are tracked in [REQ-0019](development/requirements/REQ-0019.md).
+Today the registry resolves the fake backend, the bonsai adapter and
+externally registered backends, and `resolve` says so when asked for
+anything else. There is no generic-GGUF claim yet: an arbitrary GGUF cannot
+be served today.
 
 ## The contract
 
@@ -89,8 +92,7 @@ GGUF architectures it serves instead of relying on the built-in engine paths.
   the valve path. Nanbeige, Nemotron Lightning and DeepSeek V4.1 are not
   ported yet (no packs on the verification host), so their packs still take
   the legacy path.
-- T4.3: `kindi backends` listing and this authoring guide. Done 2026-11-15;
-  the shipped-engine adapters are still T4.2.
+- T4.3: `kindi backends` listing and this authoring guide. Done 2026-11-15.
 - T4.4: generic fallback as a llama.cpp proxy backend. Needs the maintainer
   decision on positioning (REQ-0019). Not done.
 - T4.5: native generic backend. Design document only. Not done.
