@@ -338,6 +338,23 @@ env and installed to run the new test.
 - Diff vs `v0.6.0`: 404 files (+54,512 → +55,343 insertions),
   357 commits (354 → 357); still zero file deletions.
 
+## 29. What changed in the 2026-11-15 wire-coverage round
+
+Test-only round: the live-HTTP conformance suite (`tests/api/`, real app
+over uvicorn driven by the official `openai` client) never sent a
+`response_format`, and covered no `/sessions` route — so the headline
+feature of §27/§28 had no wire-level acceptance test and the sessions HTTP
+server was stub-only verified. New `tests/api/test_sessions_roundtrip.py`
+(list/show/export/status/tags/read + malformed-id 400 over the real app)
+and structured-output cases in
+`test_openai_client_conformance.py` (openai-client accept + record, and
+the loud-400 case for a backend without the grammar, via a stub flag).
+The conformance file header still names T5.1 only — a follow-up should
+mention the round; not in this commit to keep it test+docs.
+
+- Diff vs `v0.6.0`: 404 files (+55,343 → +55,551 insertions),
+  360 commits (357 → 360); still zero file deletions.
+
 ## 25. What changed in the 2026-11-15 full-suite fix + CPU parity round
 
 A full-suite run (783 passed, 20 skipped, 1 failure, 2 fixture

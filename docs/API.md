@@ -54,6 +54,12 @@ Implemented in `kindi/api/errors.py`, wired into `kindi/server.py` (T5.1).
 | `response_format` | `{"type": "text"}`, `{"type": "json_object"}`, `{"type": "json_schema", "json_schema": {"name": ..., "schema": {...}}}` | decode-side constraint (REQ-0018): every token is restricted to a JSON-schema automaton, so the content parses against the schema. `grammar` and unknown types are **rejected** (400, `param: response_format`); `tools` is rejected together with structured output; on the Lightning and Nanbeige backends structured output is **rejected loudly** (400, `param: response_format`) instead of silently unconstrained |
 | `frequency_penalty`, `logit_bias`, `user`, `modalities` and other OpenAI-only fields | ignored | accepted and not read |
 
+The live-HTTP conformance suite (`tests/api/`, real app over uvicorn driven by
+the official `openai` client, `KINDI_API_URL` for the real-server gate) covers
+the structured-output accept + record round trip, the loud 400 on a backend
+without the grammar, and the `/sessions` HTTP round trip (list/show/export/
+status/tags/read, malformed-id 400) — all GPU-free against the stub engine.
+
 Implemented 2026-11-15 (decision D2, REQ-0018): `n` greater than 1 and a
 `response_format` naming structured output are rejected with a clear 400
 naming the parameter instead of being silently ignored; constrained decoding

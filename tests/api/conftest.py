@@ -27,9 +27,10 @@ class _StubKindi(object):
 
     cp = None
     supports_logprobs = True
+    supports_json_grammar = True
 
     def __init__(self, script="Hello from the fake backend."):
-        self.cfg = {"model_name": "kindi-fake", "api_key": ""}
+        self.cfg = {"model_name": "kindi-fake", "api_key": "", "state_dir": ""}
         self.pack_id = "stub"
         self.eng = _StubEngine()
         self.lock = threading.Lock()

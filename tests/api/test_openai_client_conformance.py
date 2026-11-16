@@ -72,6 +72,35 @@ def test_models_listing_shape(client):
     assert model.meta["n_ctx"] == 8192
 
 
+def test_structured_output_is_accepted_and_records_the_request(client, api_server):
+    _base_url, stub = api_server
+    response = _chat(client, response_format={"type": "json_schema", "json_schema": {
+        "name": "x", "schema": {"type": "object",
+                            "properties": {"a": {"type": "string"}}, "required": ["a"]}}})
+    assert response.choices[0].message.content == "Hello from the fake backend."
+    assert stub is None or stub.last_req.get("response_format", {}).get("type") == "json_schema"
+
+
+def test_structured_output_rejected_on_a_backend_without_the_grammar(api_server):
+    import httpx
+
+    _base_url, stub = api_server
+    if stub is None:
+        pytest.skip("KINDI_API_URL runs against the real server; backend flags belong to the stub harness")
+    stub.supports_json_grammar = False
+    try:
+        response = httpx.post(_base_url + "/v1/chat/completions", json={
+            "model": "kindi-fake",
+            "messages": [{"role": "user", "content": "hello"}],
+            "response_format": {"type": "json_schema", "json_schema": {"schema": {
+                "type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"]}}},
+        }, timeout=10)
+    finally:
+        stub.supports_json_grammar = True
+    assert response.status_code == 400
+    assert response.json()["error"]["param"] == "response_format"
+
+
 def test_error_envelope_for_a_bad_request(client, api_server):
     import httpx
 
