@@ -372,9 +372,10 @@ class _NFA(object):
     def state(self):
         if self.count >= self.max_states:
             raise ValueError(
-                "GBNF: grammar too large (%d automaton states, limit %d); shorten a literal or a "
-                "repetition count, or use response_format json_schema "
-                "(KINDI_GBNF_MAX_STATES raises the limit)" % (self.count, self.max_states))
+                "GBNF: grammar too large (%d automaton states, limit %d); every reference is "
+                "expanded once per use, so prefer `*`/`+` to a large `{n}`, shorten a literal, or "
+                "use response_format json_schema (KINDI_GBNF_MAX_STATES raises the limit)"
+                % (self.count, self.max_states))
         s = self.count
         self.count += 1
         self.edges[s] = []
@@ -521,6 +522,13 @@ class Grammar(object):
         self._productive = self._productive_states()
         self._closures = {}
         self._vocab_cache = {}
+
+    @property
+    def states(self):
+        """Automaton states in this grammar (a size diagnostic; the build itself is bounded by
+        ``KINDI_GBNF_MAX_STATES``). Every reference is expanded once per use, so this grows with
+        reuse, not with the number of rules."""
+        return self._nfa.count
 
     @classmethod
     def from_string(cls, text):

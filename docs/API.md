@@ -92,7 +92,21 @@ llama.cpp's own `json.gbnf` reaches array nesting 2 inside the default
 20,000-state limit, so `json_schema` remains the path for unbounded recursive JSON. Compilation is bounded: `{m,n}` refuses a
 bound above 10,000 copies and the automaton above 20,000 states
 (`KINDI_GBNF_MAX_STATES`), both as a 400 rather than a memory request from the
-caller. The same
+caller.
+
+**What exact reuse costs.** A rule reference is expanded once per use. Sharing a rule's entry and
+exit states - what the first slice did - is not a valid NFA: the closure after one use reaches a
+later use's continuation and the language widens (the pre-2026-11-17 build accepted 0-5 pairs for
+a grammar that said exactly 3), which is why the cache was dropped rather than fixed. Exactness
+is paid in states, in proportion to reuse: a flat 40-pair record that references `ws` 82 times
+is **5,915 states / ~6 ms** here, against 302 states for the incorrect shared build, while the
+loop form of the same practical constraint (`pair (ws "," ws pair)*`) stays **~330 states** at
+any document length (zero pairs needs the group wrapped in `?`). The default 20,000 states
+therefore holds an enumerated record of roughly 130 copies - a few KB of grammar text - which
+`tests/test_gbnf.py` pins at 40 copies; past it the 400 names `*`/`+` (loop instead of
+enumeration), a shorter literal and `json_schema` as the alternatives, and `KINDI_GBNF_MAX_STATES`
+remains the operator escape hatch (it buys ~1.4 ms per 1,000 states on this host: 12k states in
+13 ms, measured 2026-11-17). The same
 `supports_json_grammar` capability flag gates it. The
 adapter contract carries the same flag on
 `BackendCapabilities`; a backend that sets it treats `token_filter` as the

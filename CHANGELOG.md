@@ -16,6 +16,17 @@
   depth 7 — the default 20,000-state limit allows nesting 2, and `json_schema` remains the
   unbounded path.
 
+### Changed
+
+- **A refused GBNF grammar now says why it is large and what to write instead** — the rule cache
+  dropped on 2026-11-17 (it let every use share one copy of a rule, which made an "exactly 3"
+  repetition accept 0-5 copies) was 20x smaller because it changed the language. With exact
+  per-use expansion the price is states: a flat 40-pair record referencing `ws` 82 times is 5,915
+  states / ~6 ms, against 302 for the incorrect build, and the loop form of the same constraint is
+  ~330 states at any document length. The 400 now names `*`/`+` and `json_schema` instead of only
+  the state count, `Grammar.states` exposes the compiled size, and `docs/API.md` records the
+  numbers and the default limit's practical reach (~130 enumerated copies).
+
 ### Fixed
 
 - **The tokenize and detokenize routes ignored the documented body cap** — they called

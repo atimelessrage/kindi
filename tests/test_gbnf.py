@@ -10,8 +10,11 @@ subset. That file is recursive, which is refused unless KINDI_GBNF_MAX_DEPTH opt
 bounded unroll: the test pins the layout (it parses), the refusal (it names the
 cycle), and test_gbnf_recursion.py covers the opt-in and its limits.
 """
+import string
+
 import pytest
 
+from kindi import gbnf
 from kindi.gbnf import Grammar, parse
 from gbnf_fixtures import CANONICAL_JSON
 
@@ -127,6 +130,76 @@ def test_the_compiled_size_is_bounded_and_raiseable(monkeypatch):
     monkeypatch.setenv("KINDI_GBNF_MAX_STATES", "not-a-number")
     g = Grammar.from_string('root ::= "ok"')
     assert g.done(g.advance(g.start(), "ok"))
+
+
+def _key(i):
+    """A key the grammar's [a-z]+ accepts: a, b, ..., z, aa, ab, ..."""
+    return string.ascii_lowercase[i % 26] * (1 + i // 26)
+
+
+def _enumerated_record(pairs):
+    """A flat JSON record whose pair group is enumerated `pairs` times: `ws` is referenced twice
+    per copy (plus one at each end) and every copy re-expands `pair`'s key/value subtree. This is
+    the reference-heavy shape the rule cache used to (wrongly) collapse: 40 copies is 82 uses."""
+    return "\n".join([
+        'root ::= ws "{" ws pair (ws "," ws pair){%d} ws "}" ws' % (pairs - 1),
+        'pair ::= key ws ":" ws value',
+        'key ::= "\\"" [a-z]+ "\\""',
+        'value ::= string | number | "true" | "false" | "null"',
+        'string ::= "\\"" [a-z0-9 ]* "\\""',
+        'number ::= "-"? [0-9]+ ("." [0-9]+)?',
+        'ws ::= (" " | "\\t" | "\\n")*',
+    ])
+
+
+def _record_text(keys):
+    return "{" + ",".join('"%s": 1' % k for k in keys) + "}"
+
+
+def test_a_reference_heavy_regular_grammar_fits_the_default_budget(monkeypatch):
+    """The rule cache that shipped before 2026-11-17 made this grammar 20x smaller by letting
+    every use share one copy of a rule - which is what changed the language: an ``exactly 3``
+    grammar accepted 0-5 pairs (the cache let the closure jump from one use to a later use's
+    successor). Expanding a rule once per use is exact, so the price is states, and the price is
+    pinned here: a 40-pair record (82 `ws` uses) compiles under the default limit and accepts
+    exactly 40 pairs."""
+    monkeypatch.delenv("KINDI_GBNF_MAX_STATES", raising=False)
+    g = Grammar.from_string(_enumerated_record(40))
+    assert g.states < 6500, g.states                 # measured 5,915 on 2026-11-17
+    keys = [_key(i) for i in range(40)]
+    assert _accepts(g, _record_text(keys))
+    assert not _accepts(g, _record_text(keys[:-1]))
+    assert not _accepts(g, _record_text(keys + [_key(40)]))
+
+
+def test_the_loop_form_of_the_same_constraint_costs_an_order_of_less(monkeypatch):
+    """`pair (" ," pair)*` says the same practical thing - a record of one or more pairs at any
+    length - in ~330 states regardless of the document, against ~143 states per enumerated copy.
+    This is the alternative the refusal message names; zero pairs needs the group wrapped in `?`."""
+    monkeypatch.delenv("KINDI_GBNF_MAX_STATES", raising=False)
+    text = _enumerated_record(2).replace('(ws "," ws pair){1}', '(ws "," ws pair)*')
+    g = Grammar.from_string(text)
+    assert g.states < 400, g.states
+    for n in (1, 40):
+        assert _accepts(g, _record_text([_key(i) for i in range(n)]))
+    assert not _accepts(g, _record_text([]))
+    zero_or_more = Grammar.from_string(text.replace('pair (ws "," ws pair)*',
+                                                   '(pair (ws "," ws pair)*)?'))
+    assert _accepts(zero_or_more, _record_text([]))
+
+
+def test_an_enumeration_past_the_budget_is_refused_with_the_alternative(monkeypatch):
+    """The limit is a contract, not a crash: past the default it stays a ValueError whose message
+    names the compact alternatives, and the documented operator escape hatch compiles the same
+    grammar."""
+    monkeypatch.delenv("KINDI_GBNF_MAX_STATES", raising=False)
+    with pytest.raises(ValueError, match="grammar too large") as exc:
+        Grammar.from_string(_enumerated_record(200))
+    message = str(exc.value)
+    assert "`*`/`+`" in message and "KINDI_GBNF_MAX_STATES" in message
+    monkeypatch.setenv("KINDI_GBNF_MAX_STATES", "60000")
+    g = Grammar.from_string(_enumerated_record(200))
+    assert g.states > gbnf.DEFAULT_MAX_STATES        # the raise was genuinely needed
 
 
 def test_a_reused_rule_cannot_lend_its_successors_to_another_use():
