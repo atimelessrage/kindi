@@ -45,7 +45,7 @@ not a code bug — the two tests pass with clang present).
 |---|---|---|
 | MoE backend (`kindi/moe*.py`, `moe_cpu.c`) | present (merged) | **no GPU run in this session**; fork adds expert-tier *planning* (`kindi plan` MoE strategy, `kindi/moe.py plan()`); small-MoE generalization tracked in §5 |
 | DeepSeek-V4.1-Flash backend (`kindi/dsv41*`) | present (merged) | **GPU-unverified here** |
-| Nemotron Lightning (`kindi/lightning*`) | present (merged) | **GPU-unverified here**; `kindi plan` describes its tiering header-only |
+| Nemotron Lightning (`kindi/lightning*`) | present (merged) | **GPU gate pending here**: the T4.2 adapter is ported (2026-11-16) and CPU-tested, and the catalog GGUF is downloading to `L:/kindi-lightning/`; no verify/bench parity claimed yet. `kindi plan` describes its tiering header-only |
 | **DSpine drafter** (`kindi/dspine.py`, `kindi/dspine.cu`) | present (merged); `spec.py` hooks wired | **GPU-unverified here**; fork wraps the build in `spec._optional` so a broken DSpine degrades to no-speculation instead of aborting startup |
 | Container entrypoint + compose, Kindi Bridge, `install.ps1` | present (merged) | `install.ps1` **not run on Windows in this session** |
 | Turn-save cache (`turn_keep`, `turn_disk_mb`), priority scheduler, `/v1/tokenize` + `/detokenize`, `dry_run` | present (merged) | CPU-tested; no Windows install run |
@@ -99,7 +99,7 @@ Still real and orderable against 0.6.0:
 - Dense standard-attention llama/qwen GGUFs are refused (no engine): see §5.
 - Intel Arc: A770 purchased and in transit (M1 unblocked on arrival); no SYCL backend exists, and the iGPU route is G0-only until an 11th-gen+ iGPU + oneAPI toolchain exists to compile/verify kernels.
 - Backend plugin interface: T4.2 engine adapters, T4.4 llama.cpp proxy, REQ-0018 structured output (T5.4) and real concurrency remain planned; the conformance suite and error envelope are the landed foundations.
-- PQ2_0/Q2_0 (type 142/42) import stays verified for the 2B only — the 4B/9B/27B files were never downloaded and Hugging Face is unreachable from this host.
+- PQ2_0/Q2_0 (type 142/42) import stays verified for the 2B only — the 4B/9B/27B files were never downloaded (owner action, `docs/MANUAL-HELP-NEEDED.md` §2).
 
 ## 5. Model and hardware status
 
@@ -436,6 +436,29 @@ got its missing REQUIREMENTS-HISTORY regen in a separate commit.
 
 - Diff vs `v0.6.0`: 415 files (+56,331 → +56,478 insertions),
   379 commits (377 → 379); still zero file deletions.
+
+## 35. What changed in the 2026-11-16 DEC-0003 re-measurement + tests/api cleanup + MANUAL-HELP-NEEDED rounds
+
+Three smaller rounds on the same day, none of them a feature: (1) **DEC-0003
+re-measured:** with the `fd_supported` guard bypassed, `KINDI_TC=1
+KINDI_FD=1 KINDI_ATT_TC=1` on the 4B is 2 exact / 2 fails (prompt 2 token 6,
+gap 0.0447; prompt 3 token 37) — exactly the 2026-11-11 points, so the
+4B flash-decode guard stays and no speed gain was recorded (DECISIONS.md
+entry + evidence in `docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-fd-4b/`).
+(2) **`tests/api` wire-test cleanup:** one `_serve` context manager replaces
+the duplicated uvicorn start/stop, the sessions fixture moved into conftest
+(patching `_make_engine` itself), `stub`/`no_grammar` fixtures removed the
+vacuous assert and inline flag flipping, and the sessions wire file dropped
+cases already pinned in-process (net −14 lines; 13 passed). (3)
+**`docs/MANUAL-HELP-NEEDED.md` expanded to the full owner-action inventory**:
+downloads (Nanbeige corrupt file, PQ2_0/Q2_0 quants, a pinned llama-server),
+other-hardware rigs (A770 M1, P106/P4000/M4000/RTX4000 pairs, Blackwell FP8,
+AVX-only CPUs, mixed cards), publications (push 403, installer refresh, GPU
+CI runner), and maintainer decisions (T4.4/T4.5, D3/D5). The Lightning T4.2
+gate remains the agent-side open item (GGUF downloading, ~2.3 MB/s).
+
+- Diff vs `v0.6.0`: 416 files (+56,478 → +56,909 insertions),
+  384 commits (379 → 384); still zero file deletions.
 
 ## 25. What changed in the 2026-11-15 full-suite fix + CPU parity round
 
