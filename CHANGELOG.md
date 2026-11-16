@@ -13,6 +13,8 @@
 
 ### Added
 
+- **T4.2 Bonsai adapter, 4B/9B gate** (REQ-0019, measurement only) — extended the adapter's GPU gate beyond the 2B to the other two packs on the RTX 4060 Ti host: verify 4B 3+tie and 9B 4/4 on both the adapter and legacy-valve paths, bench rows through the adapter agreeing with the valve within ~1%. Evidence: `docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/RESULTS.md`. No 27B pack on host; no new support claim.
+
 - **Doc-consistency fix** (no code) — `docs/BACKENDS.md`'s intro now describes the actual registry (fake + bonsai adapter + external; T4.2 Bonsai shipped 2026-11-15, T4.3 shipped the same day) instead of "only the fake backend resolves". `docs/AGENTS.md` documents `response_format` structured output (carrying backends, loud 400 elsewhere); ROADMAP's T5.1 bullet no longer lists structured output as planned for the dense/Gemma paths.
 
 - **OpenAI-client wire coverage** (REQ-0018/REQ-0016, tests only) — the live-HTTP conformance suite (`tests/api/`, real app over uvicorn driven by the official `openai` client) now sends a structured-output request (accepted, recorded) and a backend-without-the-grammar request (loud 400, `param: response_format`), plus a `/sessions` HTTP round trip (list/show/export/status/tags/read, malformed-id 400) over the same harness. GPU-free against the stub engine; `KINDI_API_URL` points the suite at a real server.

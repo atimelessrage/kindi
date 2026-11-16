@@ -78,7 +78,10 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   The Bonsai engine is a registered adapter since the T4.2-bonsai slice landed
   2026-11-15 (dense Bonsai packs resolve through the registry in `make_engine`,
   valve-gated by `KINDI_LEGACY_ENGINE_PATH=1`; `kindi verify` 2B is 4/4 on both paths
-  on the RTX 4060 Ti). The other engine families (Nanbeige, Lightning, Gemma4) are
+  on the RTX 4060 Ti, and the gate was extended to 4B (3+tie both paths) and 9B
+  (4/4 both paths) with adapter bench rows agreeing with the valve within ~1%
+  — evidence `docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/RESULTS.md`;
+  no 27B pack on the host, so no 27B adapter row). The other engine families (Nanbeige, Lightning, Gemma4) are
   not adapters yet, so there is still no arbitrary-GGUF claim; the generic
 
   fallback stays decision-gated (llama.cpp proxy recommended, native generic

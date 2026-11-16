@@ -370,6 +370,23 @@ dense + Gemma 4 and stays planned only for Lightning/Nanbeige.
 - Diff vs `v0.6.0`: 405 files (+55,551 → +55,754 insertions),
   363 commits (360 → 363); still zero file deletions.
 
+## 31. What changed in the 2026-11-15 T4.2 4B/9B gate round
+
+Measurement only (no code): the Bonsai adapter's GPU gate had covered only
+the 2B. Extended to the other two packs on the host (RTX 4060 Ti,
+2026-11-15): verify 4B PASS 3+tie on both the adapter and the
+`KINDI_LEGACY_ENGINE_PATH` valve (141.0/143.1 tok/s — the tie is the known
+prompt-3 llama.cpp top-2 gap 0.0012), 9B ALL PASS 4/4 on both (99.3/99.6
+tok/s); adapter bench at ctx 24576 (4B read 161.0, gen
+132.9/137.4/125.6/114.1/106.8; 9B read 109.2, gen 92.6/93.8/89.5/83.5/78.7)
+agrees with the 9B valve row within ~1%. Recorded in
+`docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/RESULTS.md`
+(+ machine-readable bench JSON). No 27B pack on the host, so no 27B
+adapter row is claimed; the other T4.2 families stay unported.
+
+- Diff vs `v0.6.0`: 405 files (+55,754 → +55,787 insertions),
+  365 commits (363 → 365); still zero file deletions.
+
 ## 25. What changed in the 2026-11-15 full-suite fix + CPU parity round
 
 A full-suite run (783 passed, 20 skipped, 1 failure, 2 fixture

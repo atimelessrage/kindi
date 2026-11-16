@@ -89,9 +89,15 @@ GGUF architectures it serves instead of relying on the built-in engine paths.
   adapter (`kindi/backends/bonsai.py`) is done: dense Bonsai packs resolve
   through the registry in `kindi.engine.make_engine` (valve-gated), and
   `kindi verify` 2B on the RTX 4060 Ti is 4/4 on both the adapter path and
-  the valve path. Nanbeige, Nemotron Lightning and DeepSeek V4.1 are not
-  ported yet (no packs on the verification host), so their packs still take
-  the legacy path.
+  the valve path. The gate was extended the same day to the other packs on
+  the host: 4B PASS 3+tie on both paths (the known prompt-3 llama.cpp
+  tie), 9B ALL PASS 4/4 on both paths, and adapter bench rows at ctx
+  24576 agree with the valve within ~1% — evidence in
+  `docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/RESULTS.md`.
+  The 27B pack is not on the host, so no 27B adapter row is claimed.
+  Nanbeige, Nemotron Lightning and DeepSeek V4.1 are not ported yet
+  (no packs on the verification host), so their packs still take the
+  legacy path.
 - T4.3: `kindi backends` listing and this authoring guide. Done 2026-11-15.
 - T4.4: generic fallback as a llama.cpp proxy backend. Needs the maintainer
   decision on positioning (REQ-0019). Not done.
