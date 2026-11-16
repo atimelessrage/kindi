@@ -421,6 +421,22 @@ Evidence: `docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-t42-bonsai-27b/RESULTS.
 - Diff vs `v0.6.0`: 412 files (+55,830 → +56,331 insertions),
   377 commits (368 → 377); still zero file deletions.
 
+## 34. What changed in the 2026-11-16 Lightning adapter-port round
+
+The T4.2 Lightning adapter (`kindi/backends/lightning.py`, registered
+`nemotron-lightning-30b`) is ported and CPU-tested (registry
+resolve/load-reject/manifest-id tests, CLI list updated, Python 3.6
+grammar) — 32 passed, 3 skipped. Its GPU gate is **pending**: the catalog
+GGUF (`boro64/Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf`,
+9,472,656,320 bytes) is downloading to `L:/kindi-lightning/`; **no
+verify/bench parity is claimed yet**. `make_engine` previously built a
+wrong dense engine for Lightning packs and now returns the Lightning
+engine through the adapter. The Bonsai-27B round's REQ-0019 change also
+got its missing REQUIREMENTS-HISTORY regen in a separate commit.
+
+- Diff vs `v0.6.0`: 415 files (+56,331 → +56,478 insertions),
+  379 commits (377 → 379); still zero file deletions.
+
 ## 25. What changed in the 2026-11-15 full-suite fix + CPU parity round
 
 A full-suite run (783 passed, 20 skipped, 1 failure, 2 fixture

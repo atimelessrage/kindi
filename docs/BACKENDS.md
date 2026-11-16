@@ -103,9 +103,11 @@ GGUF architectures it serves instead of relying on the built-in engine paths.
   is ported 2026-11-16, but its GPU gate is blocked: the catalog's ahtx GGUF is
   corrupt as served by Hugging Face (SHA mismatch, garbled tensor infos), so
   no verify/bench parity is claimed; the owner action is in
-  `docs/MANUAL-HELP-NEEDED.md`. Nemotron Lightning and DeepSeek V4.1 are not
-  ported yet (no packs on the verification host), so their packs still take
-  the legacy path.
+  `docs/MANUAL-HELP-NEEDED.md`. The Lightning adapter
+  (`kindi/backends/lightning.py`, registered `nemotron-lightning-30b`) is
+  ported 2026-11-16 and CPU-tested; its GPU gate is pending the catalog
+  GGUF download (no verify/bench parity claimed yet). DeepSeek V4.1 and
+  Gemma 4 are not ported yet, so their packs still take the legacy path.
 - T4.3: `kindi backends` listing and this authoring guide. Done 2026-11-15.
 - T4.4: generic fallback as a llama.cpp proxy backend. Needs the maintainer
   decision on positioning (REQ-0019). Not done.

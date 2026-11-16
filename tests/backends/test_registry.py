@@ -174,6 +174,28 @@ def test_nanbeige_model_id_for_manifest():
     assert model_id_for_manifest(None) is None
 
 
+def test_lightning_resolves_by_model_id_unloaded():
+    from kindi.backends.lightning import LightningBackend
+
+    backend = registry.resolve("nemotron-lightning-30b")
+    assert isinstance(backend, LightningBackend)
+    assert backend.loaded is False
+
+
+def test_lightning_load_rejects_a_missing_pack_directory():
+    with pytest.raises(registry.BackendUnavailable, match="pack directory"):
+        registry.resolve("nemotron-lightning-30b", config={"pack": "no-such-pack-dir"})
+
+
+def test_lightning_model_id_for_manifest():
+    from kindi.backends.lightning import model_id_for_manifest
+
+    assert model_id_for_manifest({"backend": "kindi_lightning"}) == "nemotron-lightning-30b"
+    assert model_id_for_manifest({"backend": "kindi_nanbeige"}) is None
+    assert model_id_for_manifest({}) is None
+    assert model_id_for_manifest(None) is None
+
+
 def test_bonsai_load_rejects_a_missing_pack_directory():
     with pytest.raises(registry.BackendUnavailable, match="pack directory"):
         registry.resolve("bonsai2-2b", config={"pack": "no-such-pack-dir"})

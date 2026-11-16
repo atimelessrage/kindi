@@ -88,8 +88,10 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   so the Bonsai family gate is complete for all four packs on this host.
   The Nanbeige adapter is ported (2026-11-16) but its GPU gate is blocked: the
   catalog's ahtx GGUF is corrupt as served by Hugging Face (owner action in
-  `docs/MANUAL-HELP-NEEDED.md`); Lightning and Gemma4 adapters are not started
-  yet, so there is still no arbitrary-GGUF claim; the generic
+  `docs/MANUAL-HELP-NEEDED.md`); the Lightning adapter is ported 2026-11-16
+  (CPU-tested; its GPU gate waits on the catalog GGUF download); the Gemma4
+  adapter is not started yet, so there is still no arbitrary-GGUF claim; the
+  generic
 
   fallback stays decision-gated (llama.cpp proxy recommended, native generic
   backend design-only). The OpenAI error envelope and the conformance suite
