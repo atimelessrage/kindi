@@ -91,7 +91,7 @@ Nothing upstream was deleted. Deliberate divergences kept from the fork:
 
 Still real and orderable against 0.6.0:
 
-- The 0.6 backends (MoE / DeepSeek / Lightning / DSpine) have **no GPU run record in this session** — first check with real hardware: `kindi verify` with `KINDI_USING=dsv41`, `KINDI_BACKEND=lightning`, `KINDI_DRAFTER=dspine` on the rig.
+- The 0.6 backends (MoE / DeepSeek / DSpine) have **no GPU run record in this session** — first check with real hardware: `kindi verify` with `KINDI_USING=dsv41`, `KINDI_BACKEND=lightning`, `KINDI_DRAFTER=dspine` on the rig. **Lightning closed 2026-11-16 (§38); the other three are blocked on weights/corrupt uploads, not code.**
 - `install.ps1` has never been run on Windows hardware.
 - Tandem is still slower than GPU-only on 1 GPU (24K decode ~8 vs ~31–34 tok/s equivalent rows at 8K/24K); the overlap step-0 (re-measured 2026-11-15) puts the head (17.6 ms/token) and boundary transfers (3.09 ms) ahead of any worker thread.
 - FP8 K/V (#8) is measured **lossy, not lossless** (KLD ~9–14× q8_0, verify 3/4) — an experimental opt-in, not a default; #9 (Windows unbuffered load) measured NOT met; #6's ≤1.2× clause recorded unsatisfiable with the dedupe rule.
@@ -128,6 +128,25 @@ measured, not assumed (`docs/MTP.md`). The adaptive draft-policy controller
 (REQ-0015) is now gated on both sizes: 2B +15.8% (368.4 vs 318.2 tok/s) and
 27B parity (40.1 vs 40.1 tok/s), exactness identical in both. The generalized
 arbitrary-draft-GGUF harness stays a separate gate.
+
+## 39. What changed in the 2026-11-17 rig review (worse / missing / unverified)
+
+Run on the RTX 4060 Ti rig (`NVIDIA GeForce RTX 4060 Ti`, 8188 MiB, driver 617.42).
+
+| item from §4 | state on 2026-11-17 |
+|---|---|
+| full suite / handoff count | **953 passed, 28 skipped, 0 failed** (121 s) at `b613264`, `bench-logs/full-suite-2026-11-17.log`. The handoff still said 886/28 from 2026-11-16; the difference is the rounds since (MoE chunk/tandem, GBNF, plan report). |
+| **GPU structured-output gate** (previously CPU-only, "GPU gate unclaimed") | **closed on the 2B**: live server, `response_format` GBNF — two ISO-8601 requests returned `2025-01-15T12:00:00Z` and `2026-05-06T14:30:00Z`, both matching the date automaton with `finish: stop`; an enum grammar returned `"blue"` in language; `json_schema` returned `{"name": "thing", "age": 0}` with both required keys in schema order. An unknown rule and the oversized `{1,100000}` both answered **400 `param: response_format`** before generation. Script: `bench-logs/grammar-gate.py` (gitignored, with the server log). |
+| tandem slower than GPU-only on one card | unchanged and not a bug: `step-0` overlap puts the head and boundary transfers ahead of any worker. Still the largest known performance gap vs a single-card run; hardware/tuning-bound. |
+| `install.ps1` never run on Windows | **still unverified.** Running it replaces the user's installed engine, so it needs a throwaway box/profile rather than this rig. |
+| PQ2_0/Q2_0 4B/9B/27B | still owner-bound: only the 2B variants are on this host (`~/.kindi/packs/bonsai-2b{,-pq2,-q2}`); 4B/9B packs here are PTQ1_0. |
+| dense standard-attention llama/qwen GGUFs refused | missing engine, not a regression: unchanged, and out of scope for this rig (the 0.6 backend set does not cover them either). |
+| MoE / DeepSeek / DSpine GPU gates | blocked on weights (no MoE pack, no DeepSeek shards, no DSpine profile) and the Nanbeige/Lightning upload problems; not addressable on the rig. |
+
+| performance sanity (is anything slower than the 0.6.0-era records?) | no regression found on the 2B: `kindi bench` at ctx 8192 with today's defaults (plan engine, q8_0 K/V) reads **298.2 tok/s** and generates **221.7 / 220.2 / 226.8 tok/s** at positions 100 / 2,000 / 8,000. The 2026-11-09 4060 Ti row for the same pack is 190.0 read and 161.5-165.5 generation; the settings differ, so this is a floor that rules out a regression, not a new record. 6,523 MiB free at 8,192 context. |
+
+Two fork surfaces verified on the rig in earlier rounds remain unchanged: `kindi plan`
+(model-free) and the MoE scheduler reports, which move no bytes.
 
 ## 6. Evidence
 
