@@ -39,6 +39,7 @@ class BackendCapabilities(object):
     def __init__(self, name, model_ids=(), architectures=(), devices=(), max_context=0,
                  supports_thinking=False, supports_tools=False, tool_format=None,
                  supports_speculation=False, supports_token_filter=False,
+                 supports_json_grammar=False,
                  cache_kind="none", max_concurrent_sequences=1,
                  deterministic_greedy=False):
         self.name = name
@@ -51,6 +52,7 @@ class BackendCapabilities(object):
         self.tool_format = tool_format
         self.supports_speculation = bool(supports_speculation)
         self.supports_token_filter = bool(supports_token_filter)
+        self.supports_json_grammar = bool(supports_json_grammar)
         self.cache_kind = cache_kind or "none"
         self.max_concurrent_sequences = max(1, int(max_concurrent_sequences or 1))
         self.deterministic_greedy = bool(deterministic_greedy)
@@ -67,6 +69,7 @@ class BackendCapabilities(object):
             "tool_format": self.tool_format,
             "supports_speculation": self.supports_speculation,
             "supports_token_filter": self.supports_token_filter,
+            "supports_json_grammar": self.supports_json_grammar,
             "cache_kind": self.cache_kind,
             "max_concurrent_sequences": self.max_concurrent_sequences,
             "deterministic_greedy": self.deterministic_greedy,
@@ -93,6 +96,31 @@ GenerationEvent = collections.namedtuple(
     "kind token_id text logprobs finish_reason timing drafted accepted",
 )
 GenerationEvent.__new__.__defaults__ = (None, "", None, None, None, 0, 0)
+
+
+class StopScanner(object):
+    """Decoded-text stop sequences, checked over only the not-yet-scanned tail.
+
+    A stop string can only first appear in the text appended since the last check, so
+    rescanning the whole reply after every token is O(n^2) in the reply length (the bug
+    fixed in ``server.py`` with a ``stop_from`` cursor). The cursor here keeps the last
+    ``len(longest_stop) - 1`` characters, which is what a match that straddles two
+    generated pieces needs.
+    """
+
+    def __init__(self, stops):
+        self.stops = [s for s in (stops or ()) if s]
+        self._keep = max([len(s) for s in self.stops] or [0]) - 1
+        self._scanned = 0
+
+    def hit(self, text):
+        """True when a stop string occurs in the new text (or across the piece boundary)."""
+        if not self.stops:
+            return False
+        start = max(0, self._scanned - self._keep)
+        found = any(s in text[start:] for s in self.stops)
+        self._scanned = len(text)
+        return found
 
 
 class Backend(object, metaclass=abc.ABCMeta):

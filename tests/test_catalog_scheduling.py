@@ -52,6 +52,35 @@ def test_model_dir_is_next_to_the_pack():
     assert catalog.model_dir({"pack": "/x/packs/bonsai-2b/"}) == os.path.join("/x/packs", "models")
 
 
+def _small_catalog(tmp_path, files):
+    entry = {"file": "Model.gguf", "repo": "owner/repo", "sha": "0" * 64,
+             "size": 4, "one": 1, "two": 0, "what": "test model"}
+    model_dir = tmp_path / "x" / "models"
+    model_dir.mkdir(parents=True)
+    for name, data in files.items():
+        (model_dir / name).write_bytes(data)
+    return {"pack": str(tmp_path / "x" / "pack")}, {"test-model": entry}
+
+
+def test_list_models_does_not_call_a_wrong_size_file_downloaded(tmp_path, monkeypatch):
+    cfg, models = _small_catalog(tmp_path, {"Model.gguf": b"bad"})
+    monkeypatch.setattr(catalog, "MODELS", models)
+    monkeypatch.setattr(catalog, "_cards", lambda: [])
+    lines = []
+    catalog.list_models(cfg, log=lines.append)
+    assert any("present (wrong size)" in line for line in lines)
+    assert not any("downloaded" in line for line in lines)
+
+
+def test_list_models_marks_a_size_matching_file_unchecked_until_use_verifies_it(tmp_path, monkeypatch):
+    cfg, models = _small_catalog(tmp_path, {"Model.gguf": b"good"})
+    monkeypatch.setattr(catalog, "MODELS", models)
+    monkeypatch.setattr(catalog, "_cards", lambda: [])
+    lines = []
+    catalog.list_models(cfg, log=lines.append)
+    assert any("present (size ok, unchecked)" in line for line in lines)
+
+
 def test_blocking_sync_opt_out_is_honored(monkeypatch):
     sched._done[0] = False
     monkeypatch.setenv("KINDI_BLOCKING_SYNC", "0")

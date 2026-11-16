@@ -32,7 +32,7 @@ def test_capabilities_have_the_contract_fields(backend_cls):
     assert isinstance(caps, BackendCapabilities)
     for field in ("name", "model_ids", "architectures", "devices", "max_context",
                   "supports_thinking", "supports_tools", "tool_format",
-                  "supports_speculation", "supports_token_filter", "cache_kind",
+                  "supports_speculation", "supports_token_filter", "supports_json_grammar", "cache_kind",
                   "max_concurrent_sequences", "deterministic_greedy"):
         assert hasattr(caps, field), field
     assert caps.max_concurrent_sequences >= 1

@@ -5,6 +5,7 @@ Copyright (c) 2026 Amir Husain. SPDX-License-Identifier: AGPL-3.0-only. See LICE
 """
 import configparser
 import hashlib
+import json
 import os
 import sys
 import urllib.request
@@ -78,15 +79,78 @@ def model_dir(cfg):
     return os.path.join(os.path.dirname(os.path.expanduser(cfg["pack"]).rstrip("/")) or ".", "models")
 
 
+def _download_state(path, m):
+    """A cheap, honest presence label for `kindi models`.
+
+    Existence alone used to be reported as "downloaded" even when the local
+    copy was truncated or damaged. `kindi use` is the hash-verifying path;
+    this label only checks presence and size so a listing never claims more
+    than it knows.
+    """
+    if not os.path.isfile(path):
+        return ""
+    if os.path.getsize(path) != m["size"]:
+        return "present (wrong size)"
+    return "present (size ok, unchecked)"
+
+
 def list_models(cfg, log=print):
     cards = _cards()
     log("GPUs: %s" % (", ".join("%s (%d MiB)" % c for c in cards) or "none (the CPU engine runs the Bonsai models)"))
     d = model_dir(cfg)
     for mid, m in MODELS.items():
-        have = os.path.isfile(os.path.join(d, m["file"]))
-        log("  %-13s %-52s %5.1f GB  %-10s %s" % (mid, m["what"], m["size"] / 1e9, fits(m, cards) or "too large",
-                                                  "downloaded" if have else ""))
+        state = _download_state(os.path.join(d, m["file"]), m)
+        log("  %-13s %-52s %5.1f GB  %-10s %s" % (mid, m["what"], m["size"] / 1e9, fits(m, cards) or "too large", state))
     log("kindi use ID  downloads a model, builds its pack and selects it")
+
+
+def _sha256_file(path):
+    """SHA-256 of a file, streaming so a multi-gigabyte GGUF is never fully in memory."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for b in iter(lambda: f.read(1 << 24), b""):
+            h.update(b)
+    return h.hexdigest()
+
+
+def _verified_marker(path):
+    return path + ".verified.json"
+
+
+def _matches_catalog(path, m):
+    """True when an already-downloaded file is the catalog bytes, by size and SHA-256.
+
+    `use` used to trust any file that merely existed, so a truncated or damaged
+    local copy could be converted as if it were the catalog model. This is the
+    presence check for the download path.
+
+    The result is cached next to the file (size + mtime_ns + sha256): re-reading a
+    9.5-13 GB GGUF on every `kindi use` costs 40-90 s on a desktop disk even when
+    nothing changed. A different size or mtime invalidates the marker, so a
+    replaced or truncated file is hashed again.
+    """
+    if not os.path.isfile(path):
+        return False
+    st = os.stat(path)
+    if st.st_size != m["size"]:
+        return False
+    marker = _verified_marker(path)
+    try:
+        with open(marker) as f:
+            seen = json.load(f)
+        if (seen.get("size") == st.st_size and seen.get("mtime_ns") == st.st_mtime_ns
+                and seen.get("sha256") == m["sha"]):
+            return True
+    except Exception:  # noqa: BLE001 - a missing or damaged marker just means "hash it"
+        pass
+    if _sha256_file(path) != m["sha"]:
+        return False
+    try:
+        with open(marker, "w") as f:
+            json.dump({"size": st.st_size, "mtime_ns": st.st_mtime_ns, "sha256": m["sha"]}, f)
+    except OSError:
+        pass
+    return True
 
 
 def _download(url, path, size, sha, log):
@@ -137,8 +201,18 @@ def _select(cfg, pack, log):
             tmp = link + ".new"
             if os.path.lexists(tmp):
                 os.remove(tmp)
-            os.symlink(pack, tmp); os.replace(tmp, link)
-            log("KINDI_PACK (%s) now points to %s" % (link, pack))
+            try:
+                os.symlink(pack, tmp); os.replace(tmp, link)
+            except OSError as exc:
+                # Windows without Developer Mode or admin cannot create symlinks
+                # (WinError 1314). The config file above is already written, so a
+                # link failure must not fail the command that selected the model.
+                if os.path.lexists(tmp):
+                    os.remove(tmp)
+                log("note: cannot update the KINDI_PACK symlink %s (%s); the config file "
+                    "was updated instead" % (link, exc))
+            else:
+                log("KINDI_PACK (%s) now points to %s" % (link, pack))
         else:
             log("note: KINDI_PACK=%s is set in the environment and wins over the config file" % env)
 
@@ -159,11 +233,14 @@ def use(cfg, mid, gguf=None, log=print):
     if not gguf:
         d = model_dir(cfg); os.makedirs(d, exist_ok=True)
         gguf = os.path.join(d, m["file"])
-        if not os.path.isfile(gguf):
+        if not _matches_catalog(gguf, m):
             if not m["repo"]:
                 raise SystemExit("kindi: %s has no download address in this version; download %s and run "
                                  "kindi use %s --gguf FILE" % (mid, m["file"], mid))
-            log("downloading %s (%.1f GB)" % (m["file"], m["size"] / 1e9))
+            if os.path.isfile(gguf):
+                log("existing %s does not match the catalog size/SHA-256; checking the download again" % m["file"])
+            else:
+                log("downloading %s (%.1f GB)" % (m["file"], m["size"] / 1e9))
             _download("%s/%s/resolve/main/%s" % (HF, m["repo"], m["file"]), gguf, m["size"], m["sha"], log)
     pack = os.path.join(os.path.dirname(model_dir(cfg)), "packs", mid)
     from .convert import convert

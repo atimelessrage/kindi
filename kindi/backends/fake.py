@@ -158,4 +158,4 @@ class FakeBackend(Backend):
         return [{"prompt": "The capital of France is", "expected": []}]
 
 
-registry.register_backend(FakeBackend, replace=True)
+registry.register_backend(FakeBackend)

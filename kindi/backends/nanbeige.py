@@ -22,7 +22,7 @@ import os
 import time
 
 from . import registry
-from .base import Backend, BackendCapabilities, GenerationEvent
+from .base import Backend, BackendCapabilities, GenerationEvent, StopScanner
 
 MODEL_ID = "nanbeige-33b"
 PACK_BACKEND = "kindi_nanbeige"
@@ -53,6 +53,7 @@ class NanbeigeBackend(Backend):
         tool_format="xml",
         supports_speculation=False,
         supports_token_filter=True,
+        supports_json_grammar=True,
         cache_kind="none",
         max_concurrent_sequences=1,
         deterministic_greedy=True,
@@ -188,7 +189,7 @@ class NanbeigeBackend(Backend):
             )
         nxt = eng.prefill_batch(ids)
         pos = len(ids)
-        stops = [s for s in ((params.stop or ()) if params is not None else ()) if s]
+        stops = StopScanner((params.stop or ()) if params is not None else ())
         text = ""
         generated = []
         started = time.time()
@@ -198,12 +199,13 @@ class NanbeigeBackend(Backend):
                 finish = "cancelled"
                 break
             if rng is not None:
-                nxt = self._sample_next(params, greedy=int(nxt), generated=generated, rng=rng)
+                nxt = self._sample_next(params, greedy=int(nxt), generated=generated,
+                                        rng=rng, prompt_ids=ids)
             generated.append(int(nxt))
             piece = self.tok.decode([int(nxt)])
             yield GenerationEvent(kind="token", token_id=int(nxt), text=piece)
             text += piece
-            if int(nxt) in self.stop_ids or any(s in text for s in stops):
+            if int(nxt) in self.stop_ids or stops.hit(text):
                 finish = "stop"
                 break
             if len(generated) >= max_tokens:
@@ -222,14 +224,14 @@ class NanbeigeBackend(Backend):
             accepted=0,
         )
 
-    def _sample_next(self, params, greedy, generated, rng):
+    def _sample_next(self, params, greedy, generated, rng, prompt_ids):
         """Sample the next token from the last step's logits.
 
-        Mirrors ``nanbeige_gen.NanbeigeBackend._pick``: candidates are the
-        tokens within 30 temperatures of the best, scored through
-        ``sampling.Sampler._pick``. A token filter masks the candidate set
-        to the allowed ids (a masked argmax at temperature 0); the 256 cap
-        then keeps the best of the surviving (allowed) candidates.
+        Mirrors ``nanbeige_gen.NanbeigeBackend._pick``: without a token
+        filter, candidates are the tokens within 30 temperatures of the
+        best, scored through ``sampling.Sampler._pick``. With a token
+        filter the allowed ids are read in full, so a grammar-legal token
+        outside the candidate window is not lost.
         """
         import numpy as np
 
@@ -237,24 +239,24 @@ class NanbeigeBackend(Backend):
         filt = params.token_filter
         allowed = None
         if filt is not None:
-            allowed = filt({"prompt_ids": [], "generated": list(generated)})
+            allowed = filt({"prompt_ids": list(prompt_ids), "generated": list(generated)})
         eng = self.engine
         cp = eng.cp
         c = eng.cards[-1]
         with cp.cuda.Device(c.dev):
             z = c.logits.ravel()[:len(self.tok.tokens)]
-            idx = cp.flatnonzero(z >= z.max() - 30.0 * max(temp, 1e-9))
-            cand = cp.asnumpy(idx).astype(np.int64)
-            sc = cp.asnumpy(z[idx]).astype(np.float64)
-        if allowed is not None:
-            allowed = set(int(t) for t in allowed)
-            keep = np.array([int(t) in allowed for t in cand], dtype=bool)
-            cand, sc = cand[keep], sc[keep]
-            if not cand.size:
-                return greedy
+            if allowed is not None:
+                cand = np.asarray(sorted(int(t) for t in allowed), dtype=np.int64)
+                if not cand.size:
+                    raise ValueError("constrained sampling: no allowed token in the model's candidates")
+                sc = cp.asnumpy(z[cand]).astype(np.float64)
+            else:
+                idx = cp.flatnonzero(z >= z.max() - 30.0 * max(temp, 1e-9))
+                cand = cp.asnumpy(idx).astype(np.int64)
+                sc = cp.asnumpy(z[idx]).astype(np.float64)
         if temp <= 0:
             return int(cand[int(np.argmax(sc))])
-        if temp > 0 and cand.size > 256:
+        if allowed is None and cand.size > 256:
             keep = np.argpartition(sc, -256)[-256:]
             cand, sc = cand[keep], sc[keep]
         from ..sampling import Sampler
@@ -264,4 +266,4 @@ class NanbeigeBackend(Backend):
         ))
 
 
-registry.register_backend(NanbeigeBackend, replace=True)
+registry.register_backend(NanbeigeBackend)

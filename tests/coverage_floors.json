@@ -1,4 +1,12 @@
 {
+  "kindi/backends/base.py": 90,
+  "kindi/backends/bonsai.py": 28,
+  "kindi/backends/dsv41.py": 78,
+  "kindi/backends/fake.py": 82,
+  "kindi/backends/gemma4.py": 78,
+  "kindi/backends/lightning.py": 72,
+  "kindi/backends/nanbeige.py": 63,
+  "kindi/backends/registry.py": 78,
   "kindi/bench.py": 50,
   "kindi/cache.py": 40,
   "kindi/catalog.py": 10,

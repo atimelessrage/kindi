@@ -20,7 +20,7 @@ import os
 import time
 
 from . import registry
-from .base import Backend, BackendCapabilities, GenerationEvent
+from .base import Backend, BackendCapabilities, GenerationEvent, StopScanner
 
 MODEL_ID_PREFIX = "Ternary-Bonsai-2-"
 SIZES = ("2b", "4b", "9b", "27b")
@@ -69,6 +69,7 @@ class BonsaiBackend(Backend):
         tool_format="json",
         supports_speculation=False,
         supports_token_filter=True,
+        supports_json_grammar=True,
         cache_kind="none",
         max_concurrent_sequences=1,
         deterministic_greedy=True,
@@ -218,7 +219,7 @@ class BonsaiBackend(Backend):
             eng.feed(ids[pos], pos)
         nxt = eng.step(ids[-1], len(ids) - 1)
         eos = self.tok.sid.get("<|im_end|>")
-        stops = [s for s in ((params.stop or ()) if params is not None else ()) if s]
+        stops = StopScanner((params.stop or ()) if params is not None else ())
         text = ""
         generated = []
         started = time.time()
@@ -235,7 +236,7 @@ class BonsaiBackend(Backend):
             piece = self.tok.decode([int(nxt)])
             yield GenerationEvent(kind="token", token_id=int(nxt), text=piece)
             text += piece
-            if (eos is not None and int(nxt) == eos) or any(s in text for s in stops):
+            if (eos is not None and int(nxt) == eos) or stops.hit(text):
                 finish = "stop"
                 break
             if len(generated) >= max_tokens:
@@ -324,4 +325,4 @@ class BonsaiBackend(Backend):
         return int(rng.choice(logits.size, p=probs))
 
 
-registry.register_backend(BonsaiBackend, replace=True)
+registry.register_backend(BonsaiBackend)

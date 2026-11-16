@@ -4,7 +4,8 @@ This is a cheap, dependency-free guard for the common accident: a key, token or 
 added to a source file or doc. It scans `git ls-files`, skips binary files, and reports only the file, line and detector name,
 never the matched text.
 
-It does not replace a full history scan: commit metadata and deleted lines are outside its scope.
+It scans tracked files and untracked files Git does not ignore (a secret in a new file used to be
+invisible). It does not replace a full history scan: commit metadata and deleted lines are outside its scope.
 Run `detect-secrets` over the unpushed diff before a release.
 """
 import re
@@ -37,16 +38,28 @@ GENERIC = re.compile(r"(?i)\b(api[_-]?key|secret|token|password|passwd)\b\s*[:=]
 HEX = re.compile(r"^[0-9a-fA-F]{32,}$")
 
 
-def tracked_files():
-    out = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z"], check=True,
+def _git_files(*args):
+    out = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z"] + list(args), check=True,
                          stdout=subprocess.PIPE).stdout
-    for raw in out.split(b"\0"):
-        if raw:
-            yield raw.decode("utf-8", "replace")
+    return [raw.decode("utf-8", "replace") for raw in out.split(b"\0") if raw]
+
+
+def scanned_files():
+    """Tracked files plus untracked files Git does not ignore.
+
+    Scanning only `git ls-files` made a credential pasted into a brand-new file
+    invisible until someone ran `git add`: the guard said ALL PASS while the
+    secret sat in the working tree.
+    """
+    seen = set()
+    for rel in _git_files() + _git_files("--others", "--exclude-standard"):
+        if rel not in seen:
+            seen.add(rel)
+            yield rel
 
 
 def findings():
-    for rel in tracked_files():
+    for rel in scanned_files():
         if Path(rel).suffix.lower() in SKIP:
             continue
         try:

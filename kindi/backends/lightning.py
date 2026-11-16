@@ -24,7 +24,7 @@ import os
 import time
 
 from . import registry
-from .base import Backend, BackendCapabilities, GenerationEvent
+from .base import Backend, BackendCapabilities, GenerationEvent, StopScanner
 
 MODEL_ID = "nemotron-lightning-30b"
 PACK_BACKEND = "kindi_lightning"
@@ -55,6 +55,7 @@ class LightningBackend(Backend):
         tool_format="xml",
         supports_speculation=False,
         supports_token_filter=True,
+        supports_json_grammar=True,
         cache_kind="none",
         max_concurrent_sequences=1,
         deterministic_greedy=True,
@@ -80,9 +81,7 @@ class LightningBackend(Backend):
         self.log = config.get("log") or print
         pack = config.get("pack")
         if not pack:
-            self.loaded = False
-            self.engine = None
-            self.tok = None
+            self.close()
             return self
         if not os.path.isdir(pack):
             raise registry.BackendUnavailable("no Lightning pack directory at %r" % (pack,))
@@ -97,8 +96,8 @@ class LightningBackend(Backend):
             self.man = json.load(f)
         self.engine = Engine(self.man["model_path"], ctx=self.ctx, log=self.log)
         self.tok = LightningTokenizer(GGUF(self.man["model_path"]).kv)
-        # every control token ends the turn, exactly as in
-        # lightning_gen.LightningBackend: EOS plus every type-3 token
+        # every control token ends the turn, as in lightning_gen.LightningBackend
+        # (the tokenizer always has eos: it defaults to 2)
         self.stop_ids = {self.tok.eos} | {i for i, ty in enumerate(self.tok.types) if ty == 3}
         self.loaded = True
         return self
@@ -144,12 +143,13 @@ class LightningBackend(Backend):
         return self.tok.decode([int(t) for t in (token_ids or [])])
 
     def apply_chat_template(self, messages, tools=None, enable_thinking=False):
+        self._require_loaded()
         from .. import lightning_chat
 
         return lightning_chat.render(
             self.man["model_path"], messages, tools=tools,
             enable_thinking=enable_thinking,
-        ) if self.loaded and self.man else ""
+        )
 
     # generation ---------------------------------------------------------
 
@@ -172,15 +172,18 @@ class LightningBackend(Backend):
         """
         self._require_loaded()
         eng = self.engine
-        ids = [int(t) for t in prompt_ids] if prompt_ids else []
-        if not ids:
-            ids = [int(self.tok.bos)] if getattr(self.tok, "bos", None) is not None else [0]
+        ids = [int(t) for t in prompt_ids] if prompt_ids else [int(self.tok.bos)]
+        if len(ids) > self.ctx:
+            raise registry.BackendUnavailable(
+                "the prompt is %d tokens but this pack's context is %d" % (len(ids), self.ctx))
         max_tokens = max(0, int(params.max_tokens)) if params is not None else 0
         max_tokens = max(0, min(max_tokens, self.ctx - len(ids)))
+        temp = float(params.temperature or 0.0) if params is not None else 0.0
+        # the engine's token is finalized at each step, so sampling (or a token mask, which
+        # even at temperature 0 decides between the allowed candidates) needs one more pass
+        resample = params is not None and (params.token_filter is not None or temp > 1e-9)
         rng = None
-        if params is not None and (
-            params.token_filter is not None or float(params.temperature or 0.0) > 1e-9
-        ):
+        if temp > 1e-9:
             import numpy as np
 
             rng = np.random.RandomState(
@@ -188,7 +191,7 @@ class LightningBackend(Backend):
             )
         eng.reset()
         greedy = eng.prefill(ids, 0)
-        stops = [s for s in ((params.stop or ()) if params is not None else ()) if s]
+        stops = StopScanner((params.stop or ()) if params is not None else ())
         text = ""
         generated = []
         started = time.time()
@@ -197,19 +200,18 @@ class LightningBackend(Backend):
             if cancel is not None and cancel.is_set():
                 finish = "cancelled"
                 break
-            if rng is not None:
-                greedy = self._sample_next(params, greedy=int(greedy), generated=generated, rng=rng)
+            if resample:
+                greedy = self._sample_next(params, greedy=int(greedy), generated=generated,
+                                           rng=rng, prompt_ids=ids)
             generated.append(int(greedy))
             piece = self.tok.decode([int(greedy)])
             yield GenerationEvent(kind="token", token_id=int(greedy), text=piece)
             text += piece
-            if int(greedy) in self.stop_ids or any(s in text for s in stops):
+            if int(greedy) in self.stop_ids or stops.hit(text):
                 finish = "stop"
                 break
-            if len(generated) >= max_tokens:
-                finish = "length"
-                break
-            greedy = eng.step(int(greedy))
+            if len(generated) < max_tokens:
+                greedy = eng.step(int(greedy))
         yield GenerationEvent(
             kind="done",
             finish_reason=finish,
@@ -218,53 +220,26 @@ class LightningBackend(Backend):
             accepted=0,
         )
 
-    def _sample_next(self, params, greedy, generated, rng):
-        """Sample the next token from the card's logits.
+    def _sample_next(self, params, greedy, generated, rng, prompt_ids):
+        """Sample the next token with the server path's own sampler.
 
-        Mirrors ``lightning_gen.LightningBackend._pick``: the candidates the
-        engine returns within a falling temperature window (30 temperatures
-        of the best, at most 256), then top-k, top-p, min-p and temperature
-        via ``sampling.Sampler._pick``; at temperature 0 a masked argmax.
-        A token filter masks the candidate set to the allowed ids.
+        ``lightning_gen.pick_candidates`` is the single copy of the candidate
+        window, the 256 cap and ``sampling.Sampler._pick``; the token filter
+        masks the candidates (an argmax over them at temperature 0).
         """
-        import numpy as np
+        from ..lightning_gen import pick_candidates
 
-        temp = float(params.temperature or 0.0)
-        filt = params.token_filter
         allowed = None
-        if filt is not None:
-            allowed = filt({"prompt_ids": [], "generated": list(generated)})
+        if params.token_filter is not None:
+            allowed = params.token_filter({"prompt_ids": list(prompt_ids),
+                                           "generated": list(generated)})
             if allowed is not None:
                 allowed = set(int(t) for t in allowed)
-        w = 16.0 * max(temp, 0.1)
-        got = self.engine.candidates(w)
-        while got is None and w > 0.5:
-            w /= 2
-            got = self.engine.candidates(w)
-        if got is not None:
-            cand, sc = got
-        else:  # more than 4096 candidates: the whole vocabulary
-            cp = self.engine.cp
-            z = self.engine.logits
-            idx = cp.flatnonzero(z >= z.max() - 30.0 * max(temp, 0.1))
-            cand = cp.asnumpy(idx).astype(np.int64)
-            sc = cp.asnumpy(z[idx]).astype(np.float64)
-        if allowed is not None:
-            keep = np.array([int(t) in allowed for t in cand], dtype=bool)
-            cand, sc = cand[keep], sc[keep]
-            if not cand.size:
-                return greedy
-        if temp <= 0:
-            return int(cand[int(np.argmax(sc))])
-        if cand.size > 256:
-            keep = np.argpartition(sc, -256)[-256:]
-            cand, sc = cand[keep], sc[keep]
-        from ..sampling import Sampler
-
-        return int(Sampler._pick(
-            cand, sc, temp, float(params.top_p or 1.0), int(params.top_k or 0), rng,
-            float(params.min_p or 0.0),
-        ))
+        return pick_candidates(
+            self.engine, greedy, float(params.temperature or 0.0),
+            float(params.top_p or 1.0), int(params.top_k or 0), rng,
+            float(params.min_p or 0.0), None, allowed, constrained=allowed is not None,
+        )
 
 
-registry.register_backend(LightningBackend, replace=True)
+registry.register_backend(LightningBackend)
