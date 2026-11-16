@@ -10,7 +10,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `949d3a4` on `freebuff/tandem-cpu-recovery` (`main` receives the parent-of-this-commit bump and FF at handoff; guarded by `tests/test_agents_handoff.py`). Full suite last measured at `24b4a2f`: 779 passed, 11 skipped (clang 18.1.8 on PATH); the Lightning-port focused set (backends + backends_cli) was 32 passed, 3 skipped after `949d3a4`'s parent. Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset (415 files, +56,478/−1,023, no deletions); comparison report in `CURRENT-VS-KINDI-0.6.md` (§34). Owner action pending: Nanbeige 33B GGUF download — `docs/MANUAL-HELP-NEEDED.md` §1 (catalog ahtx file is corrupt on HF).
+- **HEAD:** `14fcac0` on `freebuff/tandem-cpu-recovery` (`main` receives the parent-of-this-commit bump and FF at handoff; guarded by `tests/test_agents_handoff.py`). Full suite last measured at `24b4a2f`: 779 passed, 11 skipped (clang 18.1.8 on PATH); the MANUAL-HELP-NEEDED focused set (docs-links + project-memory + handoff) was 12 passed after `14fcac0`'s parent. Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset (415 files, +56,478/−1,023, no deletions); comparison report in `CURRENT-VS-KINDI-0.6.md` (§34). Owner actions pending: Nanbeige 33B GGUF download, PQ2_0/Q2_0 quant downloads, a pinned llama-server, other-hardware test rigs, push/installer/CI publications, T4.4/T4.5 + D3/D5 decisions — `docs/MANUAL-HELP-NEEDED.md`.
 - **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
   512/4K/8K; 2B CPU-layer sweep; joint checkpoint 149.6 MiB on the 27B at 54.5-61.5 ms
   save), owned-slice CPU load, `kindi bench --sample-vram` sampled-peak VRAM, multi-ISA CPU
@@ -56,8 +56,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `949d3a4` | main checkout; clean |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `949d3a4` | this session; identical to `main` |
+| `T:/kindi` | `main` | `14fcac0` | main checkout; clean |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `14fcac0` | this session; identical to `main` |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
