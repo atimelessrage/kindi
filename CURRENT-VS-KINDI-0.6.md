@@ -99,6 +99,7 @@ Still real and orderable against 0.6.0:
 - Intel Arc: A770 purchased and in transit (M1 unblocked on arrival); no SYCL backend exists, and the iGPU route is G0-only until an 11th-gen+ iGPU + oneAPI toolchain exists to compile/verify kernels.
 - Backend plugin interface: T4.2 engine adapters are ported for all five families (Bonsai, Nanbeige, Lightning, Gemma 4, DeepSeek V4.1) with the Bonsai and Lightning gates measured and the other three GPU-gated by missing/corrupt weights; T4.4 llama.cpp proxy and real concurrency remain planned. REQ-0018 structured output is landed for dense, Gemma 4, Lightning and Nanbeige (CPU-tested on the last two, GPU gates unclaimed).
 - PQ2_0/Q2_0 (type 142/42) import stays verified for the 2B only — the 4B/9B/27B files were never downloaded (owner action, `docs/MANUAL-HELP-NEEDED.md` §2).
+- Recursive GBNF is **opt-in and bounded**, not exact: `KINDI_GBNF_MAX_DEPTH=N` unrolls N levels (a fresh copy per reference, deeper branches pruned) and `tests/test_gbnf_recursion.py` checks the resulting language against an independent matcher at every allowed depth. Because copies are not shared, llama.cpp's `json.gbnf` reaches array nesting 2 inside the default 20,000-state limit (398,268 states at depth 7), so `response_format: json_schema` stays the unbounded path for real JSON.
 
 ## 5. Model and hardware status
 

@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Added
+
+- **Recursive GBNF compiles on request, up to a stated depth** — the canonical
+  `json.gbnf` was refused outright, which made the standard recursive grammar unusable.
+  `KINDI_GBNF_MAX_DEPTH=N` (default 0, i.e. still refused) unrolls the recursion N levels
+  deep, compiling a fresh copy per reference and pruning any branch that would need level
+  N+1, so deeper nesting is refused rather than silently truncated. The language at the
+  allowed depths is checked against an independent AST matcher over every string up to
+  length 8-9 for four recursion shapes, and the refusal paths keep their tests. The cost
+  is states, not runtime: with no sharing each level re-expands every reused rule, so
+  llama.cpp's `json.gbnf` is 4,000 states at depth 1, 21,252 at depth 3 and 398,268 at
+  depth 7 — the default 20,000-state limit allows nesting 2, and `json_schema` remains the
+  unbounded path.
+
 ### Fixed
 
 - **`--moe-cache-mib` was silently ignored by the usage-weighted plan** — with a usage file that has counts, `kindi plan`'s weighted scan spent free VRAM instead of the cap and reported every expert on the card (a 1 MiB cap printed "32 of 32 experts per layer"). The scan's budget is now bounded by the cap, so the report and the flag agree. The same line also stops quoting the top-n share a uniform split would get when a usage-weighted placement exists: it reports the share that placement actually serves. Tests: a capped plan with counts reports at most the cap's experts and still prints the measured share.

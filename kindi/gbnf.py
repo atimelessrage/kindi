@@ -13,11 +13,18 @@ A body may start on the line after ``::=`` and continue across newlines inside
 parentheses or after ``|``, which is the form llama.cpp documents and writes its own
 ``grammars/json.gbnf`` in; a newline anywhere else ends the rule.
 
-Not supported in this slice: a recursive rule (one that reaches itself). That is a
-pushdown language, not a regular one, so the parser refuses it with the cycle's name
-instead of quietly accepting a truncated language. Recursive JSON is what
-``response_format: json_schema`` is for. Every refusal is a ``ValueError`` at compile
-time, which the server turns into an enveloped 400 before any token is generated.
+A recursive rule (one that reaches itself) is a pushdown language, which a finite
+automaton cannot express. By default it is refused, naming the cycle. With
+``KINDI_GBNF_MAX_DEPTH=N`` (N > 0) it is compiled by unrolling: every reference to a
+recursive rule builds a fresh copy one level deeper, so nesting up to N levels is in
+the automaton's language and a branch that would need level N+1 is pruned (that
+nesting is refused, not silently truncated). Each reference gets its own copy - sharing
+one would let a caller's successor leak into another use, which is why a plain NFA
+cannot call and return. The default is 0 because the unrolled language is a *bounded*
+subset of the real one: ``response_format: json_schema`` stays the exact, unbounded
+path, and the state limit bounds the copies. Every refusal is a ``ValueError`` at
+compile time, which the server turns into an enveloped 400 before any token is
+generated.
 
 The automaton is forward-complete: a token is only accepted when the state it reaches
 can still reach the accepting state, so constrained decoding never paints itself into
@@ -31,6 +38,7 @@ import os
 # (ValueError -> an enveloped 400), not silent truncation.
 MAX_REPEAT = 10000
 DEFAULT_MAX_STATES = 20000
+DEFAULT_MAX_DEPTH = 0                     # recursion unrolling is opt-in (0 = refuse)
 
 
 def _state_limit():
@@ -40,6 +48,16 @@ def _state_limit():
         return max(1, int(os.environ.get("KINDI_GBNF_MAX_STATES", str(DEFAULT_MAX_STATES))))
     except (TypeError, ValueError):
         return DEFAULT_MAX_STATES
+
+
+def _depth_limit():
+    """KINDI_GBNF_MAX_DEPTH: how many times a recursive rule may be entered before the
+    automaton prunes that branch. 0 (the default) keeps the strict refusal; read per
+    grammar, so an operator can raise it without a restart."""
+    try:
+        return max(0, int(os.environ.get("KINDI_GBNF_MAX_DEPTH", str(DEFAULT_MAX_DEPTH))))
+    except (TypeError, ValueError):
+        return DEFAULT_MAX_DEPTH
 
 
 # --- parsing ---------------------------------------------------------------
@@ -293,16 +311,98 @@ class _Parser(object):
 
 # --- the automaton ---------------------------------------------------------
 
+class _TooDeep(Exception):
+    """A branch would need more recursion levels than KINDI_GBNF_MAX_DEPTH allows."""
+
+    def __init__(self, rule):
+        Exception.__init__(self, rule)
+        self.rule = rule
+
+
+def _refs(node, out):
+    kind = node[0]
+    if kind == "ref":
+        out.add(node[1])
+    elif kind == "group":
+        for seq in node[1]:
+            for item in seq:
+                _refs(item, out)
+    elif kind == "rep":
+        _refs(node[1], out)
+
+
+def _recursive_rules(rules):
+    """The rules that can reach themselves - the ones that are unrolled per level."""
+    edges = {}
+    for name, branches in rules.items():
+        out = set()
+        for seq in branches:
+            for item in seq:
+                _refs(item, out)
+        edges[name] = out
+    found = set()
+    for start in rules:
+        seen = set()
+        stack = list(edges[start])
+        while stack:
+            name = stack.pop()
+            if name == start:
+                found.add(start)
+                break
+            if name in seen or name not in edges:
+                continue
+            seen.add(name)
+            stack.extend(edges[name])
+    return found
+
+
+def _reachable_rules(rules, start):
+    """The rules a grammar can actually reach from its start rule."""
+    seen = set()
+    stack = [start]
+    while stack:
+        name = stack.pop()
+        if name in seen or name not in rules:
+            continue
+        seen.add(name)
+        out = set()
+        for seq in rules[name]:
+            for item in seq:
+                _refs(item, out)
+        stack.extend(out)
+    return seen
+
+
+def _cycle_path(rules, name):
+    """One concrete path from a recursive rule back to itself, for the refusal message."""
+    def walk(node, path):
+        for seq in rules.get(node, []):
+            for item in seq:
+                out = set()
+                _refs(item, out)
+                for ref in sorted(out):
+                    if ref == name:
+                        return path + [ref]
+                    if ref not in path:
+                        got = walk(ref, path + [ref])
+                        if got:
+                            return got
+        return None
+    return walk(name, [name]) or [name]
+
+
 class _NFA(object):
     """Thompson construction over labels ("ch", char) / ("range", ...) / ("any",)."""
 
-    def __init__(self, rules, max_states=None):
+    def __init__(self, rules, max_states=None, max_depth=None):
         self.program = rules
         self.edges = {}
         self.count = 0
-        self.built = {}
-        self.active = []
+        self.path = []                 # rules being built (for the cycle message)
+        self.limit_hit = None          # the rule whose nesting first exceeded max_depth
+        self.recursive = _recursive_rules(rules)
         self.max_states = _state_limit() if max_states is None else int(max_states)
+        self.max_depth = _depth_limit() if max_depth is None else int(max_depth)
 
     def state(self):
         if self.count >= self.max_states:
@@ -318,47 +418,54 @@ class _NFA(object):
     def edge(self, a, label, b):
         self.edges[a].append((label, b))
 
-    def build_rule(self, name):
-        """Compile a rule. Each reference gets its own copy of the sub-automaton.
+    def build_rule(self, name, level=0):
+        """Compile one reference to a rule. Every reference gets a fresh copy.
 
-        Sharing a built rule between two uses does not work in a plain NFA: the rule's entry
-        and exit states would be shared too, so the epsilon closure after the first use would
-        reach the second use's successor and the automaton would accept a string that skipped
-        the intervening symbols. Real grammars reuse rules constantly (``ws`` in every JSON
-        grammar), so the copy is what keeps the language exact. The state limit bounds it.
+        Sharing a completed sub-automaton between two uses does not work in a plain NFA: the
+        entry and exit states would be shared too, so the epsilon closure after the first use
+        would reach the second use's successor and the automaton would accept a string that
+        skipped the intervening symbols (real grammars reuse rules constantly).
+
+        ``level`` is the recursion budget: entering a rule that can reach itself costs one
+        level, and past ``max_depth`` that branch is pruned (``_TooDeep``). Non-recursive
+        rules never spend a level, so a flat grammar is unaffected.
         """
-        if name in self.active:
-            cycle = " -> ".join(self.active + [name])
-            raise ValueError(
-                "GBNF: recursive rule (%s); this slice compiles regular grammars only - "
-                "use response_format json_schema for recursive JSON" % cycle)
         if name not in self.program:
             raise ValueError("GBNF: unknown rule %r" % name)
-        self.active.append(name)
+        if name in self.recursive and level > self.max_depth:
+            self.limit_hit = name
+            raise _TooDeep(name)
+        self.path.append(name)
         try:
-            pair = self.build_alt(self.program[name])
+            return self.build_alt(self.program[name], level)
         finally:
-            self.active.pop()
-        self.built[name] = pair
-        return pair
+            self.path.pop()
 
-    def build_alt(self, branches):
+    def build_alt(self, branches, level=0):
         start, end = self.state(), self.state()
+        kept = 0
         for seq in branches:
-            s, e = self.build_seq(seq)
+            try:
+                s, e = self.build_seq(seq, level)
+            except _TooDeep:
+                continue                     # this branch needs more nesting than allowed
             self.edge(start, ("eps",), s)
             self.edge(e, ("eps",), end)
+            kept += 1
+        if not kept:
+            # nothing survived: report the rule that actually hit the limit, not the branch
+            raise _TooDeep(self.limit_hit or "branch")
         return start, end
 
-    def build_seq(self, items):
+    def build_seq(self, items, level=0):
         start = end = self.state()
         for item in items:
-            s, e = self.build_item(item)
+            s, e = self.build_item(item, level)
             self.edge(end, ("eps",), s)
             end = e
         return start, end
 
-    def build_item(self, item):
+    def build_item(self, item, level=0):
         kind = item[0]
         if kind == "lit":
             start = end = self.state()
@@ -376,21 +483,25 @@ class _NFA(object):
             self.edge(start, ("any",), end)
             return start, end
         if kind == "ref":
-            return self.build_rule(item[1])
+            name = item[1]
+            # one level per *re-entry* of a rule already being built, not per use: two
+            # sibling uses of a recursive rule are the same nesting level, and charging
+            # them separately would both waste the budget and duplicate more states.
+            return self.build_rule(name, level + 1 if name in self.path else level)
         if kind == "group":
-            return self.build_alt(item[1])
+            return self.build_alt(item[1], level)
         if kind == "rep":
-            return self.build_rep(item[1], item[2], item[3])
+            return self.build_rep(item[1], item[2], item[3], level)
         raise ValueError("GBNF: unknown node %r" % (kind,))
 
-    def build_rep(self, sub, lo, hi):
+    def build_rep(self, sub, lo, hi, level=0):
         start = end = self.state()
         for _ in range(lo):
-            s, e = self.build_item(sub)
+            s, e = self.build_item(sub, level)
             self.edge(end, ("eps",), s)
             end = e
         if hi is None:
-            s, e = self.build_item(sub)
+            s, e = self.build_item(sub, level)
             nxt = self.state()
             self.edge(end, ("eps",), s)
             self.edge(e, ("eps",), s)                 # loop
@@ -398,7 +509,7 @@ class _NFA(object):
             self.edge(e, ("eps",), nxt)
             return start, nxt
         for _ in range(hi - lo):
-            s, e = self.build_item(sub)
+            s, e = self.build_item(sub, level)
             nxt = self.state()
             self.edge(end, ("eps",), s)
             self.edge(e, ("eps",), nxt)
@@ -426,7 +537,22 @@ class Grammar(object):
     def __init__(self, rules, start_rule="root"):
         nfa = _NFA(rules)
         self._nfa = nfa
-        self._start, self._accept = nfa.build_rule(start_rule)
+        if nfa.max_depth == 0:
+            blocked = nfa.recursive & _reachable_rules(rules, start_rule)
+            if blocked:
+                cycle = " -> ".join(_cycle_path(rules, sorted(blocked)[0]))
+                raise ValueError(
+                    "GBNF: recursive rule(s) %s (%s); this slice compiles regular "
+                    "grammars only - use response_format json_schema for recursive JSON, "
+                    "or set KINDI_GBNF_MAX_DEPTH to unroll it"
+                    % (", ".join(sorted(blocked)), cycle))
+        try:
+            self._start, self._accept = nfa.build_rule(start_rule)
+        except _TooDeep as e:
+            raise ValueError(
+                "GBNF: recursion in %r needs more than KINDI_GBNF_MAX_DEPTH=%d levels; "
+                "raise the limit, or use response_format json_schema for recursive JSON"
+                % (e.rule, nfa.max_depth))
         self._productive = self._productive_states()
         self._closures = {}
         self._vocab_cache = {}

@@ -6,12 +6,14 @@ dead-end rule that keeps the sampler's allowed set non-empty, and the parse erro
 server turns into an enveloped 400. The last section runs the grammars people actually
 write - llama.cpp's own ``json.gbnf`` layout, a tool call, an enum and an ISO date - so
 the parser stays pinned to llama.cpp's documented GBNF rather than to a convenient
-subset. That file is recursive, which this slice still refuses by design: the test pins
-both the layout (it parses) and the refusal (it names the cycle).
+subset. That file is recursive, which is refused unless KINDI_GBNF_MAX_DEPTH opts into a
+bounded unroll: the test pins the layout (it parses), the refusal (it names the
+cycle), and test_gbnf_recursion.py covers the opt-in and its limits.
 """
 import pytest
 
 from kindi.gbnf import Grammar, parse
+from gbnf_fixtures import CANONICAL_JSON
 
 
 def _accepts(grammar, text):
@@ -147,27 +149,6 @@ def test_a_reused_rule_cannot_lend_its_successors_to_another_use():
 # continue across newlines inside parentheses - the parser used to refuse both, so the
 # canonical file failed with "expected a rule name or a reference" before any recursion
 # check could run.
-CANONICAL_JSON = r'''root   ::= object
-value  ::= object | array | string | number | ("true" | "false" | "null") ws
-object ::=
-  "{" ws (
-            string ":" ws value
-    ("," ws string ":" ws value)*
-  )? "}" ws
-array  ::=
-  "[" ws (
-            value
-    ("," ws value)*
-  )? "]" ws
-string ::=
-  "\"" (
-    [^"\\\x7F\x00-\x1F] |
-    "\\" (["\\bfnrt] | "u" [0-9a-fA-F]{4}) # escapes
-  )* "\"" ws
-number ::= ("-"? ([0-9] | [1-9] [0-9]{0,15})) ("." [0-9]+)? ([eE] [-+]? [0-9] [1-9]{0,15})? ws
-# Optional space: by convention, applied in this grammar after literal chars when allowed
-ws ::= | " " | "\n" [ \t]{0,20}
-'''
 
 
 def test_llamacpp_multiline_bodies_parse():

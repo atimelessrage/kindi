@@ -81,9 +81,15 @@ character classes, `.`, `* + ? {m} {m,} {m,n}`, rule references, comments).
 Bodies may start on the line after `::=` and continue across newlines inside
 parentheses or after `|`, which is llama.cpp's documented layout (its own
 `grammars/json.gbnf` is written that way). It is compiled before generation, so a
-syntax error, an unknown rule or a recursive rule is an enveloped 400 and never a
-half-constrained reply; recursion is refused because this slice is a regular
-automaton (use `json_schema` for recursive JSON). Compilation is bounded: `{m,n}` refuses a
+syntax error or an unknown rule is an enveloped 400 and never a
+half-constrained reply. A recursive rule is refused by default, naming the cycle,
+because this slice is a finite automaton; `KINDI_GBNF_MAX_DEPTH=N` opts into a
+bounded unroll that compiles N levels with a fresh copy per reference, so nesting
+up to N is in the language and one level deeper is refused rather than truncated.
+That language is exact at the depths it allows (checked against an independent
+matcher, `tests/test_gbnf_recursion.py`) but bounded, and the copies cost states:
+llama.cpp's own `json.gbnf` reaches array nesting 2 inside the default
+20,000-state limit, so `json_schema` remains the path for unbounded recursive JSON. Compilation is bounded: `{m,n}` refuses a
 bound above 10,000 copies and the automaton above 20,000 states
 (`KINDI_GBNF_MAX_STATES`), both as a 400 rather than a memory request from the
 caller. The same

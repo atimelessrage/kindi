@@ -173,7 +173,8 @@ variables, and are therefore not listed twice here.
 | `KINDI_G5_PINS` | (empty) | `kindi/tp.py:152` |
 | `KINDI_G5_TUNE` | `1` | `kindi/tp.py:178` |
 | `KINDI_G5_TUNELOG` | (unset) | `kindi/tp.py:292` |
-| `KINDI_GBNF_MAX_STATES` | `str(DEFAULT_MAX_STATES)` | `kindi/gbnf.py:40` |
+| `KINDI_GBNF_MAX_DEPTH` | `str(DEFAULT_MAX_DEPTH)` | `kindi/gbnf.py:58` |
+| `KINDI_GBNF_MAX_STATES` | `str(DEFAULT_MAX_STATES)` | `kindi/gbnf.py:48` |
 | `KINDI_GEMV_BLOCKS` | (unset) | `kindi/engine.py:198` |
 | `KINDI_HIP_LIB` | `libamdhip64.so` | `kindi/gpudrv.py:28` |
 | `KINDI_HOST_RAM_CHECK` | `1` | `kindi/hostram.py:93` |
