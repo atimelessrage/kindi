@@ -223,11 +223,28 @@ class SessionStore(object):
     def export_file(self, rec_or_id, directory):
         rec = self._coerce(rec_or_id)
         os.makedirs(directory, exist_ok=True)
-        name = "%s-%s.md" % (rec["created"][:10], slug(rec["title"]) or rec["id"])
-        path = os.path.join(directory, name)
+        stem = "%s-%s" % (rec["created"][:10], slug(rec["title"]) or rec["id"])
+        path = os.path.join(directory, stem + ".md")
+        if os.path.isfile(path) and self._exported_id(path) != rec["id"]:
+            # two sessions with the same title on the same day used to overwrite each other's
+            # export; the id disambiguates the second one (re-exporting a session still
+            # rewrites its own file)
+            path = os.path.join(directory, "%s-%s.md" % (stem, rec["id"]))
         with open(path, "w", encoding="utf-8") as f:
             f.write(self.export_markdown(rec))
         return path
+
+    @staticmethod
+    def _exported_id(path):
+        """The `- id:` line of an exported file, or None: tells a name collision from a re-export."""
+        try:
+            with open(path, encoding="utf-8") as f:
+                for line in f:
+                    if line.startswith("- id: "):
+                        return line[6:].strip()
+        except OSError:
+            return None
+        return None
 
     def import_markdown(self, text):
         """Parse the format `export_markdown` writes."""

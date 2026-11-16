@@ -1568,9 +1568,13 @@ def create_app(cfg, log=print):
         if not _auth(request):
             return _err(401, "invalid API key", "authentication_error")
         try:
-            req = await request.json()
-        except Exception:  # noqa: BLE001
-            return _err(400, "the body is not JSON")
+            req = await _read_json_body(request)      # the same 16 MiB cap as the chat routes
+        except RequestTooLarge as e:
+            return _err(413, str(e), "request_too_large")
+        except RequestError as e:
+            return _err(400, str(e), param=getattr(e, "param", None))
+        if not isinstance(req, dict):
+            return _err(400, "send a JSON object")
         ctx = K.eng.ctx
         try:
             if req.get("messages") is not None:   # a chat request: the whole prompt, as the chat endpoint builds it
@@ -1593,9 +1597,16 @@ def create_app(cfg, log=print):
         if not _auth(request):
             return _err(401, "invalid API key", "authentication_error")
         try:
-            req = await request.json()
+            req = await _read_json_body(request)      # the same 16 MiB cap as the chat routes
+        except RequestTooLarge as e:
+            return _err(413, str(e), "request_too_large")
+        except RequestError as e:
+            return _err(400, str(e), param=getattr(e, "param", None))
+        try:
+            if not isinstance(req, dict):
+                raise ValueError("the body must be a JSON object")
             ids = [int(i) for i in req.get("tokens") or []]
-        except Exception:  # noqa: BLE001
+        except (TypeError, ValueError):
             return _err(400, "send tokens: a list of token ids")
         text = K.decode_ids(ids)
         return {"prompt": text, "content": text}
@@ -1876,8 +1887,13 @@ def create_app(cfg, log=print):
             return _overflow(e)
         except ValueError as e:
             return _err(400, str(e))
-        except Exception:  # noqa: BLE001 - anything else: the request itself reports it
-            ids = None
+        except Exception as e:  # noqa: BLE001 - the prompt could not be counted
+            if dry:
+                # A preflight whose count failed must not answer "fits": that is the one answer a
+                # caller acts on, and a false positive is worse than an error (2026-11-16 audit, F2).
+                return _err(500, "the prompt could not be counted (%s: %s), so dry_run cannot say "
+                                 "whether it fits" % (type(e).__name__, e), "server_error")
+            ids = None                # the request itself reports it on the generation path
         if dry:
             n = len(ids or [])
             return {"object": "kindi.prompt_count", "model": model_id, "fits": n + 1 < K.eng.ctx,

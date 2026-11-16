@@ -1,4 +1,5 @@
 """Config precedence: defaults < config file < environment < command-line overrides."""
+import json
 import os
 
 import pytest
@@ -25,6 +26,31 @@ def write_conf(tmp_path, body):
     p = tmp_path / "kindi.conf"
     p.write_text("[kindi]\n" + body, encoding="utf-8")
     return str(p)
+
+
+def test_auto_model_name_comes_from_the_adapter_that_claims_the_pack(tmp_path):
+    """A literal tuple of backend names used to answer this, and it forgot nanbeige and dsv41, so
+    those packs reported a Bonsai id to every client. The adapters' own hooks are the one source."""
+    for backend, expected in (("kindi_nanbeige", "nanbeige-33b"),
+                              ("kindi_dsv41", "deepseek-v41-flash"),
+                              ("kindi_gemma4", "gemma4-e4b"),
+                              ("kindi_lightning", "nemotron-lightning-30b")):
+        pack = tmp_path / backend
+        pack.mkdir()
+        (pack / "kindi_pack.json").write_text(
+            json.dumps({"backend": backend, "model": "Hf"}), encoding="utf-8")
+        cfg = config.load(overrides={"pack": str(pack)})
+        assert cfg["model_name"] == expected, (backend, cfg["model_name"])
+
+
+def test_a_non_numeric_environment_value_is_an_actionable_error(monkeypatch):
+    monkeypatch.setenv("KINDI_CTX", "abc")
+    with pytest.raises(SystemExit, match="ctx must be an integer"):
+        config.load()
+    monkeypatch.setenv("KINDI_CTX", "24576")
+    monkeypatch.setenv("KINDI_TEMPERATURE", "warm")
+    with pytest.raises(SystemExit, match="temperature must be a number"):
+        config.load()
 
 
 def test_built_in_defaults():

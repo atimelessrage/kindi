@@ -18,6 +18,29 @@
 
 ### Fixed
 
+- **The tokenize and detokenize routes ignored the documented body cap** — they called
+  `await request.json()` instead of the capped reader the chat routes use, so on a `--lan`
+  bind a client could make the process allocate an unbounded body before the API key or the
+  shape was checked. Both routes now read through `_read_json_body` and answer 413
+  `request_too_large` over the limit, with the same 400s as before for a bad body.
+- **A dry run could answer "fits" for a prompt it failed to count** — an unexpected
+  exception from the tokenizer or counter was swallowed, `ids` became empty and the preflight
+  reported `fits: true, prompt_tokens: 0`. A caller acts on that answer, so a counting
+  failure now returns a 500 naming the exception instead of a fit.
+- **A Nanbeige or DeepSeek V4.1 pack reported a Bonsai model id** — `model_name: auto`
+  inferred the id from a literal tuple of backends that forgot those two families, so every
+  response, `/v1/models` entry and access-log line said e.g. `bonsai2-33b`. `kindi/modelids.py`
+  now resolves through the adapters' own `model_id_for_manifest` hooks, which config and the
+  engine gateway share; a manifest two adapters claim is still refused.
+- **A non-numeric config value raised a traceback instead of an actionable error** —
+  `KINDI_CTX=abc` now says "ctx must be an integer (got 'abc')" like the rest of the
+  config validation, instead of an unhandled `ValueError` at startup.
+- **Two sessions with the same title on the same day overwrote each other's export** —
+  the export name was date + slug with no uniqueness, so the second write won; a name that
+  already belongs to another session now gets the session id appended, while re-exporting a
+  session still rewrites its own file.
+- **`--api-key` is validated as a single line** before it is written to the container env
+  file: a value with a newline would have injected extra variables into that file.
 - **`--moe-cache-mib` was silently ignored by the usage-weighted plan** — with a usage file that has counts, `kindi plan`'s weighted scan spent free VRAM instead of the cap and reported every expert on the card (a 1 MiB cap printed "32 of 32 experts per layer"). The scan's budget is now bounded by the cap, so the report and the flag agree. The same line also stops quoting the top-n share a uniform split would get when a usage-weighted placement exists: it reports the share that placement actually serves. Tests: a capped plan with counts reports at most the cap's experts and still prints the measured share.
 - **A GBNF rule used twice lent its successors to the other use** — the compiler cached a
   rule's NFA pair and every use attached its successors to the same end state, so the

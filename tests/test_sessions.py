@@ -50,6 +50,21 @@ def test_export_is_raw_markdown_and_import_round_trips(tmp_path):
     assert back["tags"] == ["docs"]
 
 
+def test_two_same_day_sessions_with_one_title_do_not_share_an_export(tmp_path):
+    """The export name is date + slug, so a second session titled the same on the same day used to
+    overwrite the first one's file; the id now disambiguates it."""
+    st = SessionStore(str(tmp_path))
+    first = st.create(title="notes", messages=[("user", "first")])
+    second = st.create(title="notes", messages=[("user", "second")])
+    out = str(tmp_path / "exports")
+    pa = st.export_file(first, out)
+    pb = st.export_file(second, out)
+    assert pa != pb
+    assert "first" in open(pa, encoding="utf-8").read()
+    assert "second" in open(pb, encoding="utf-8").read()
+    assert st.export_file(first, out) == pa          # a re-export still rewrites its own file
+
+
 def test_sessions_cli_list_export_round_trip(tmp_path, capsys):
     from kindi.__main__ import main
     root = str(tmp_path)

@@ -56,6 +56,12 @@ class _FakeKindi(object):
     def head_active(self):
         return "exact"
 
+    def encode_text(self, text, special=True):
+        return [ord(c) % 256 for c in str(text)] or [1]   # one id per character, like _StopTok
+
+    def decode_ids(self, ids):
+        return "x" * len(ids)
+
     def after_turn(self, locked=False):
         return None
 
@@ -382,6 +388,25 @@ def test_grammar_response_format_generates_inside_the_language():
     done = _drive_constrained([ord(c) for c in "nope"] + [248046], response_format=rf)
     assert done["finish"] == "stop"
     assert done["content"] == "no"
+
+
+def test_nesting_past_the_unrolled_depth_is_a_legal_shallower_reply(monkeypatch):
+    """The audit predicted a 500 when the GBNF depth budget runs out. The budget is spent when
+    the grammar is compiled (recursion is unrolled and the deeper copies are pruned), so at run
+    time an over-deep token is simply not in the allowed set: the reply stays inside the
+    language, comes out shallower, and finishes normally. `json_schema` remains the exact
+    recursive path; this only pins that the bounded one degrades instead of erroring."""
+    monkeypatch.setenv("KINDI_GBNF_MAX_DEPTH", "2")
+    monkeypatch.setenv("KINDI_GBNF_MAX_STATES", "200000")
+    rf = {"type": "grammar",
+          "grammar": 'root ::= value\nvalue ::= "{" "\\"a\\"" ":" value "}" | "0"'}
+    script = [ord(c) for c in '{"a":{"a":{"a":0}}}'] + [248046]
+    done = _drive_constrained(script, response_format=rf)
+    assert done["finish"] == "stop"
+    doc, depth = json.loads(done["content"]), 0
+    while isinstance(doc, dict):
+        depth, doc = depth + 1, doc["a"]
+    assert depth <= 2
 
 
 def test_constrained_generate_rejects_a_grammar_escape():
@@ -990,6 +1015,38 @@ def test_ollama_images_are_400_without_vision_weights(app_client):
         assert K.last_req is None
         assert K.runner.eng.resets == 0
         assert K.runner.tokens == [1, 2, 3]
+
+
+def test_the_tokenize_routes_enforce_the_same_body_cap(app_client):
+    """`_read_json_body` is the documented 16 MiB cap; the tokenize/detokenize routes used
+    `await request.json()`, so a LAN client could make those two allocate an unbounded body."""
+    client, K = app_client
+    client.app.state.max_body_bytes = 512
+    raw = b'{"content":"' + b"x" * 1024 + b'"}'
+    for path in ("/v1/tokenize", "/detokenize"):
+        bad = client.post(path, content=raw, headers={"content-type": "application/json"})
+        assert bad.status_code == 413, (path, bad.text)
+        assert bad.json()["error"]["type"] == "request_too_large"
+
+    good = client.post("/v1/tokenize", json={"content": "hello"})
+    assert good.status_code == 200, good.text          # the capped reader did not break the route
+    assert good.json()["count"] == 5
+
+
+def test_a_dry_run_that_cannot_count_is_an_error_not_a_fit(app_client):
+    """A preflight is acted on, so a counting failure must not answer `fits: true` with 0 tokens:
+    the swallowed exception used to make every such run look like it fit."""
+    client, K = app_client
+
+    def boom(req):
+        raise RuntimeError("cuda fault")
+
+    K.check_prompt = boom
+    r = client.post("/v1/chat/completions",
+                    json={"messages": [{"role": "user", "content": "hello"}], "dry_run": True})
+    assert r.status_code == 500, r.text
+    assert "could not be counted" in r.json()["error"]["message"]
+    assert "fits" not in r.json()
 
 
 def _shared_prefix(a, b):

@@ -152,3 +152,24 @@ Use this shape:
   so the supported path is not read as refused). DEC-0003's 4B flash-decode guard is
   untouched: no 4B FD-on measurement shows a gain worth the exactness risk, and the guard
   stays.
+
+## DEC-0009: The server keeps its own backend booleans until a registry migration round
+
+- Requirements: REQ-0019 (backend plugin interface), REQ-0018 (structured output)
+- Context: `Kindi.__init__` still dispatches on `man["backend"]` and builds
+  `nanbeige_gen.NanbeigeBackend`, `lightning_gen.LightningBackend` and `kindi.gemma4.Engine`
+  directly, while `kindi/backends/*` holds a registry-driven implementation of the same
+  contract (`BackendCapabilities`, `resolve`). The 2026-11-16 audit (F11) called that the
+  largest structural weakness, and F3 was its concrete damage: the model id a client saw came
+  from a second, incomplete list in `config.py`. The adapter stack is not a drop-in
+  replacement yet — the `{x}_gen` loops own their family's structured-output constraint,
+  draft policy and stop set, and the dense path owns the prompt cache.
+- Decision: fix the observable split now (`kindi/modelids.py` is the one resolver for a
+  pack's model id, used by both `config` and the engine gateway) and keep the dispatch
+  where it is until a migration round can move the families behind
+  `BackendCapabilities` with their GPU gates re-run. A half migration would be worse than
+  the split: two code paths answering capability questions differently under one flag is
+  exactly what F11 describes.
+- Consequences: capability changes still have to be made in both places until then. Every
+  new family must register a `model_id_for_manifest` hook so the reported id cannot drift
+  again, and the migration is a named round, not a side effect of a feature commit.

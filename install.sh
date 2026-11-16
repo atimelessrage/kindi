@@ -1338,6 +1338,9 @@ elif [ "$LAN" = 1 ]; then
   if [ -s "$KEYFILE" ]; then KEY=$(cat "$KEYFILE")      # the key of an earlier --lan install: clients keep working
   else KEY="kindi-$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')"; fi
 fi
+case "$KEY" in
+  *$'\n'*|*$'\r'*) die "--api-key must be a single line: a newline would inject extra variables into the container env file" ;;
+esac
 [ "$LAN" = 1 ] && BIND=0.0.0.0
 if [ "$DRY" = 0 ]; then
   if [ -n "$KEY" ]; then

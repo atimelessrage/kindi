@@ -152,11 +152,18 @@ def load(explicit=None, overrides=None):
             explicit_keys.add(k)
     cfg = Config()
     for k, v in vals.items():
+        raw = v
         v = v.strip()
         if k in INT_KEYS:
-            cfg[k] = int(v)
+            try:
+                cfg[k] = int(v)
+            except ValueError:
+                raise SystemExit("kindi: %s must be an integer (got %r)" % (k, raw))
         elif k in FLOAT_KEYS:
-            cfg[k] = float(v)
+            try:
+                cfg[k] = float(v)
+            except ValueError:
+                raise SystemExit("kindi: %s must be a number (got %r)" % (k, raw))
         elif k in PATH_KEYS:
             cfg[k] = os.path.abspath(os.path.expanduser(v))
         else:
@@ -165,8 +172,14 @@ def load(explicit=None, overrides=None):
     if cfg["model_name"] == "auto":
         manifest = os.path.join(cfg["pack"], "kindi_pack.json")
         m = json.load(open(manifest)) if os.path.isfile(manifest) else {}
-        if m.get("backend") in ("kindi_gemma4", "kindi_lightning", "kindi_cascade"):
-            cfg["model_name"] = m.get("model_id", "gemma4")
+        # which family claims the pack is the adapters' answer, not a second list here: the
+        # literal tuple that used to live at this line forgot nanbeige and dsv41, so those packs
+        # reported a Bonsai id (2026-11-16 audit, F3).
+        from .modelids import adapter_model_id
+
+        claimed = adapter_model_id(m)
+        if claimed:
+            cfg["model_name"] = m.get("model_id") or claimed
         else:
             # the GGUF's general.name, then its file name: some files name the model only "Hf"
             size = None

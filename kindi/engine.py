@@ -731,18 +731,9 @@ def adapter_model_id(man):
     version of that same failure is a placeholder `model` field: the pack's own adapter misses its
     pack and the gateway quietly falls back to the legacy builder (T4.2's "Hf" 27B bug).
     """
-    from .backends.bonsai import model_id_for_manifest as _bonsai_model_id
-    from .backends.dsv41 import model_id_for_manifest as _dsv41_model_id
-    from .backends.gemma4 import model_id_for_manifest as _gemma4_model_id
-    from .backends.lightning import model_id_for_manifest as _lightning_model_id
-    from .backends.nanbeige import model_id_for_manifest as _nanbeige_model_id
+    from .modelids import adapter_model_id as _resolve
 
-    claims = [mid for mid in (_bonsai_model_id(man), _nanbeige_model_id(man), _lightning_model_id(man),
-                             _gemma4_model_id(man), _dsv41_model_id(man)) if mid]
-    if len(claims) > 1:
-        raise SystemExit("kindi: the pack manifest is claimed by more than one backend (%s): its `model` "
-                         "and `backend` fields contradict each other" % ", ".join(claims))
-    return claims[0] if claims else None
+    return _resolve(man)
 
 
 def make_engine(pack, ctx=4096, clusters=None, log=print, tandem="off", cpu_layers=None, gpu=None):
