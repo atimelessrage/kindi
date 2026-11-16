@@ -32,7 +32,7 @@ Use this shape:
 
 ## DEC-0002: Tensor-core plans refuse unsupported Hadamard widths
 
-- Status: accepted
+- Status: superseded by DEC-0008
 - Date: 2026-11-11
 - Requirements: REQ-0003
 - Context: The plan engine was built for 512- and 1024-point Hadamard blocks. The 9B pack
@@ -109,8 +109,30 @@ Use this shape:
   hosts keep the plain engine). The planner charges each owner its real allocation. Each block's
   residual add is resolved inside its plan with `k_padd`, because a CuPy call per block cost 17% of
   a 2B token.
-- Consequences: Same 27B placement at 24K drops from 7,721 to 6,004 MiB peak (1,985 MiB free after
-  load), which is what makes a 49,152-token context fit on this card; exactness and the joint prompt
+- Consequences: Same 27B placement at 24K drops from 7,721 to 6,004 MiB peak (1,985 MiB free after load), which is what makes a 49,152-token context fit on this card; exactness and the joint prompt
   cache are re-verified with the plan owner. A plan owner is one card, so a split across two GPUs
   still uses the plain engine. The plan engine's 1024-token context floor applies only to full
   engines now (a partial engine has no chunked or batched prompt path and needs 256).
+
+## DEC-0008: 9B tensor-core support via the 4096 Hadamard fold + high-precision activations
+
+- Status: accepted
+- Date: 2026-11-15
+- Requirements: REQ-0001, REQ-0003
+- Context: DEC-0002 refused 4096-point Hadamard blocks (the 9B) before graph construction.
+  Since then the fold was implemented as 512-point chunks plus `k_fwht_hi` to finish a block
+  above 512 (`kindi/engine.py: fold_args`, HB = 4096 on the 9B), and the tensor-core verify
+  was measured on the RTX 4060 Ti: with the default ~8-bit activations one borderline prompt
+  flips at token 36 (3/4), but with high-precision activations (~14 bits, same weight traffic)
+  the 9B passes 4/4 at 122.6 tok/s against 74.6-80.0 on the plain engine. `kindi/engine.py`
+  therefore defaults `KINDI_TC_HP` on for HB-4096 packs (`KINDI_TC_HP=0` asks for the default
+  activations, measured 3/4) and `kindi/spec.py` keeps refusing HB-4096 without them.
+- Decision: Supersede DEC-0002. The 9B runs on tensor-core plans with HP activations as the
+  measured-exact default; the plain engine remains the fallback (`KINDI_TP=0`). No padding
+  or approximation of the block was needed — the exact fold + verified activations is the
+  support.
+- Consequences: The open gap DEC-0002 recorded is closed. Revision alone gains no new
+  performance (the kernels and the HP default already shipped; this entry corrects the log
+  so the supported path is not read as refused). DEC-0003's 4B flash-decode guard is
+  untouched: no 4B FD-on measurement shows a gain worth the exactness risk, and the guard
+  stays.
