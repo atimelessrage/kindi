@@ -50,6 +50,11 @@ The 2026-11-11/12 slices in this branch add:
   5.8-6.0 s; see `docs/benchmarks/tandem-cache/RESULTS-9B.md`; saved-opening reloads also pass at
   4K/8K in both placements (4,080/8,176 extension, 3,072/6,144 branch and saved opening, exact;
   33.3-39.5 s owned-slice loads; `saved-9b-4k.json`, `saved-9b-8k.json`);
+- the 9B capacity/rate question vs a single card, measured 2026-11-17 across 8,192-131,072
+  tokens: the full-GPU engine keeps every request (5,149 MiB peak, 3,003 MiB free after loading
+  131,072), and the split saves 486-488 MiB (`gdn:8`) or 872-874 MiB (`gdn:16`) while decoding
+  2.8-3.0x / 4.5-4.6x slower, so for a pack that fits the split buys headroom, not context; see
+  `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-tandem-9b/RESULTS.md`;
 - a prepare-only 2B measurement in both placements: 320/325 and 256/261 tokens reused, a 19.27 MiB
   joint recurrent checkpoint, 8.7-8.9 ms median save and 3.3-3.5 ms median restore; see
   `docs/benchmarks/tandem-cache/PREFIX-RESULTS.md`;

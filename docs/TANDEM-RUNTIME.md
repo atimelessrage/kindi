@@ -470,6 +470,13 @@ same evening: the loader silently reduces context to fit, and on this card a ful
 ~37K tokens while the 16-layer tandem holds ~30K (7,812/7,518 MiB peaks). The split never gains
 usable context here; it trades throughput for headroom. Full table: [27B-8K.md](benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md).
 
+The 9B is the control case, and on 2026-11-17 it never reduced: across 8,192-131,072 tokens the
+full-GPU engine kept every request (5,149 MiB peak and 3,003 MiB still free after loading
+131,072), while the split lowered the peak by only 486-488 MiB (`gdn:8`) or 872-874 MiB
+(`gdn:16`) and decoded 2.8-3.0x / 4.5-4.6x slower. The remaining gap for a pack that fits is
+throughput, not context; the 27B above is the case the split exists for. Full table:
+[tandem-9b RESULTS](benchmarks/2026-11-17-i7-8086k-rtx4060ti-tandem-9b/RESULTS.md).
+
 ## Next gates
 
 1. **Larger-than-VRAM exactness:** both 27B placements are exact at 8K (2026-11-12).
@@ -478,6 +485,8 @@ usable context here; it trades throughput for headroom. Full table: [27B-8K.md](
    settled on this card: requesting 65,536 or 131,072 tokens reduces to 37,120 (full GPU) and
    30,464 (tandem), and the tandem is always the more reduced engine here. A genuinely closing
    case needs a device where the full-GPU engine cannot run at a usable context yet a split can.
+   The 9B is measured as the fitting case (2026-11-17): no reduction at any request up to
+   131,072, so a split there costs 2.8-4.6x and saves under 0.9 GiB.
 3. **Joint cache:** end-state reuse, joint-checkpoint restore and saved-opening reloads through the
    HTTP server are measured on both placements at 512 tokens; in-process equality and saved-opening
    reloads pass at 4K/8K on the 9B and 27B, and the 27B joint checkpoint costs 54.5-61.5 ms to save
