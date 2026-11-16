@@ -1,8 +1,18 @@
 # Manual help needed (owner actions)
 
 Work that needs a human, not the agent: downloads blocked by a broken upstream
-file, hardware only the owner has, and publications that need the release
-owner's authorization. Each entry has a state line — tick it off when done.
+file, hardware only the owner has, installations/publishing only the release
+owner can do, and optional tooling that unblocks agent work. Each entry has a
+state line — tick it off when done.
+
+## Automated tasks (no owner action)
+
+- The Lightning T4.2 GPU gate is **the agent's**, not the owner's: the catalog
+  GGUF (`boro64/Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf`, 9.5 GB)
+  is downloading to `L:/kindi-lightning/models/` on its own. When it lands,
+  the agent will convert, run `kindi verify`/`kindi bench` on both the
+  adapter and valve paths, and record the parity rows. Listed here only so
+  the state is visible; do nothing for it.
 
 ## 1. Download the Nanbeige 4.3 33B GGUF and resume the T4.2 Nanbeige gate
 
@@ -26,8 +36,91 @@ owner's authorization. Each entry has a state line — tick it off when done.
   `Nanbeige_Nanbeige4.3-33B-IQ3_XXS.gguf` (14.49 GB) from
   `bartowski/Nanbeige_Nanbeige4.3-33B-GGUF` — but that is a different quant,
   so the shipped `kindi/reference-nanbeige-33b*.json` will not reproduce and
-  the references must be regenerated from `~/llama.cpp` (llama-server) before
-  `kindi verify` can pass.
+  the references must be regenerated first (see §3).
 - **When done, tell the agent:** "rerun the Nanbeige T4.2 gate". The adapter
   (`kindi/backends/nanbeige.py`) is already ported and CPU-tested; only the
   pack + `kindi verify`/`kindi bench` parity remain.
+
+## 2. Download the PQ2_0 / Q2_0 files for 4B / 9B / 27B (the 142/42 import claim)
+
+- **State:** open since 2026-11-15, waiting on the owner (agent-side HF was
+  unreachable that day; recheck `curl https://huggingface.co` — it answers
+  200 now, so an agent retry is viable, but no agent should spend ~20 GB of
+  download without asking).
+- **What:** `Ternary-Bonsai-2-4B-PQ2_0.gguf`, `…-9B-PQ2_0.gguf`,
+  `…-27B-PQ2_0.gguf` (and the plain Q2_0 variants) from
+  `prism-ml/Ternary-Bonsai-2-4B-gguf` etc. — roughly 5 GB + 19 GB + 19 GB
+  in packs, on a drive that has room (L: or T:, not C:).
+- **Why:** Kindi's import claim for those types (tensor types 142/42) is
+  verified only on the 2B today. With the downloads: `kindi convert` each,
+  `kindi verify` against llama.cpp, and — if they pass — the claim can be
+  extended to all sizes and the AGENTS.md/SUPPORT-MATRIX notes updated.
+  Without them, "2B-only" stays the honest claim.
+- **When done, tell the agent:** "run the PQ2_0/Q2_0 import gate".
+
+## 3. Make a pinned llama.cpp reference server available (llama-server)
+
+- **State:** open, waiting on the owner (tooling).
+- **What:** a working `llama-server` binary pinned to a known llama.cpp
+  version, so reference-token generation (the thing `kindi verify` compares
+  against) can be regenerated on demand.
+- **Why:** several pending gates need fresh references: the bartowski Nanbeige
+  quant (§1b), the Gemma 26B G0 reference, the Cascade 2 pinned reference,
+  the Dory D1 goldens. Today `~/llama.cpp` has source and a build tree but
+  no `llama-server` on PATH. A pinned binary (or a short build command +
+  version pin committed to `docs/development/KNOWLEDGE.md`) unblocks all of
+  them; right now each of those gates is stuck on "no reference".
+- **When done, tell the agent:** the binary path (or that `llama-server` is
+  on PATH), and the version.
+
+## 4. Tests and runs on other hardware
+
+All of these need machines the owner controls; the agent can only write the
+commands and interpret the output. Each row states the gate it unlocks.
+
+| # | rig | gate it unlocks | what is needed |
+|---|---|---|---|
+| 4a | **Intel Arc A770 (purchased, in transit)** | REQ-0020 M1–M8: the SYCL/oneAPI backend (first non-NVIDIA GPU support) | Install it, run the M1 arrival checklist in `docs/INTEL-ARC.md` (device/driver, pinned oneAPI/SYCL/Level Zero, ReBAR/PCIe state, CPU + llama.cpp SYCL baselines), then tell the agent the checklist output. |
+| 4b | **P106-100 (6 GB, Pascal) single + dual** | Installer-offered pairs gain their first measured rows (single 2B/4B/9B; dual 27B) | `kindi verify` 4/4, sampled peak, read + decode at 100/2K/8K/24K — see `docs/TANDEM-RUNTIME.md` for the exact commands and cells. |
+| 4c | **M4000 / P4000 / RTX 4000 (Maxwell/Pascal/Turing rig)** | CARDS.md pair offers on Pascal/Maxwell; the tandem-on-pre-tensor-core question (the exchange rate of the split differs there) | Same verify/bench matrix as 4b, plus the tandem-vs-full-GPU run at 2B/9B (2 packs) — the roadmap's dedicated pass. |
+| 4d | **A Blackwell card (sm_120, e.g. RTX 5060 Ti)** | The native FP8 prompt GEMM, synthetic-tested on Ada but never on Blackwell | Run the manual Blackwell verification lane in `docs/ROADMAP.md` Formats; one real FP8 model run + a throughput number. |
+| 4e | **i5-2500K (AVX-only) / Xeon W-2133 / i9-13900K** | The AVX-only CPU fallback and the other CPU rows of the matrix | Native CPU engine + CPU server chat re-run; timing numbers. |
+| 4f | **A machine that cannot run full-GPU but can split (any 2-card pair)** | The mixed-card P2 phase and truly-larger-than-VRAM tandem rows | Two-card verify/bench on an unequal pair (e.g. 6 GB + 8 GB) for `KINDI_TP_SPLIT=auto`. |
+
+## 5. Publications and packages only the release owner can do
+
+- **Push the tree:** `git push origin` is 403 from this environment (house
+  rule is also never-push). The fork (`myfork/main`) is behind; the owner
+  must push. This is the single easiest owner action with the biggest
+  unblock value (CI, installer refresh, ever).
+- **Refresh the published installer** (`fd54148` → current HEAD, see
+  `docs/RELEASE-CHECKLIST.md`): publish the source archive, recompute
+  `SOURCE_COMMIT`/`SOURCE_SHA256`/`KINDI_VERSION`, update `docs/INSTALL.md`,
+  the checklist and `tests/test_installer_source.py` in the same commit.
+  Publishing/tagging needs the owner's explicit authorization (the checklist
+  says so); until then the installer payload is stale but correct.
+- **Report the corrupt ahtx upload (§1) to the repo author** (or file/feedback
+  on the HF repo) so a fixed file exists upstream; the agent cannot file
+  it for you.
+- **Register the self-hosted GPU CI runner** (steps in `docs/CI.md` §5.1):
+  the agreed-cards gate (P4000/M4000/RTX4000 trio) and every GPU gate in
+  this file want a machine that runs them; today they are hand-run and
+  hand-recorded. This is the registration that turns "measured once" into
+  "enforced".
+
+## 6. Decide (maintainer calls, no hardware or downloads needed)
+
+- **T4.4/T4.5 positioning (REQ-0019):** llama.cpp proxy (recommended) vs
+  native generic backend (design only). There is no format-coverage claim
+  until one of them lands and passes `kindi verify` or the proxy gate. Only
+  the maintainer can make this call; the agent will not invent the product
+  decision.
+- **Whether to add old runtimes** (Python floor D3, queue default D5 —
+  `docs/ROADMAP.md` Agent API bullet): these are product calls recorded in
+  the same place.
+
+## Done
+
+- **Nanbeige corrupt-file deletion** (2026-11-16): the 13.1 GB corrupt GGUF
+  and `L:/kindi-nb` were removed at the owner's request; the adapter port and
+  the gate are recorded so the download (§1) resumes cleanly.
