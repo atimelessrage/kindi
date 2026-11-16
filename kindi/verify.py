@@ -80,6 +80,11 @@ def run(cfg, log=print):
     if man.get("backend") == "kindi_cascade":
         from .cascade import verify
         return verify(cfg, man, log=log)
+    if man.get("backend") == "kindi_dsv41":
+        log("kindi verify: DeepSeek V4.1's release gate is `dsv41.verify` (teacher-forced against the "
+            "release gate data), not this llama.cpp reference matrix; run `python -m kindi.dsv41_server` "
+            "with the gate directory to use it")
+        return 2
     rp = reference_for(pack)
     if rp is None:
         log("no llama.cpp reference for this model in this version of Kindi")

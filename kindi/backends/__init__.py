@@ -2,8 +2,7 @@
 """Backend plugin interface (T4.1).
 
 Importing this package registers the fake backend and the T4.2 bonsai,
-nanbeige and lightning adapters (``kindi.backends.bonsai``,
-``kindi.backends.nanbeige``, ``kindi.backends.lightning``).
+nanbeige, lightning, gemma4 and dsv41 adapters (``kindi.backends.*``).
 ``resolve`` serves the fake backend, the adapter backends and any
 externally registered backend, and says so when asked for anything else.
 """
@@ -25,6 +24,8 @@ from .fake import FakeBackend
 from .bonsai import BonsaiBackend
 from .nanbeige import NanbeigeBackend
 from .lightning import LightningBackend
+from .gemma4 import Gemma4Backend
+from .dsv41 import DeepseekV41Backend
 
 __all__ = [
     "Backend",
@@ -32,6 +33,8 @@ __all__ = [
     "BonsaiBackend",
     "NanbeigeBackend",
     "LightningBackend",
+    "Gemma4Backend",
+    "DeepseekV41Backend",
     "BackendNotFound",
     "BackendUnavailable",
     "CancelToken",

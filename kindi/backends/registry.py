@@ -165,8 +165,9 @@ def resolve(model_id_or_gguf_path, device=None, config=None):
     "rocm", ...). When ``config`` is given the returned backend is loaded with it.
 
     Raises BackendNotFound listing what is registered when nothing matches. The
-    fake backend and the T4.2 bonsai adapter are registered; the remaining engine
-    families (Nanbeige, Lightning, Gemma4) are not ported yet.
+    fake backend and the T4.2 adapters for Bonsai, Nanbeige, Nemotron
+    Lightning, Gemma 4 and DeepSeek V4.1 are registered; Cascade is not
+    ported yet.
     """
     load_external_backends()
     hint = str(model_id_or_gguf_path or "")
@@ -186,6 +187,12 @@ def resolve(model_id_or_gguf_path, device=None, config=None):
             "ported yet - see docs/BACKENDS.md)" % (hint, " (architecture %r)" % architecture if architecture else "",
                                        ", ".join(_ORDER) or "none"))
     candidates.sort(key=lambda item: -item[0])
+    if len(candidates) > 1 and candidates[0][0] == candidates[1][0]:
+        # two backends match equally well: registration order would pick one silently and build
+        # the wrong engine, so say so instead (narrow the registrations or pass a model id)
+        raise BackendNotFound(
+            "%r is ambiguous: %s and %s match it equally well - pass a model id the backend "
+            "declares exclusively" % (hint, candidates[0][1], candidates[1][1]))
     factory = candidates[0][2]
     backend = factory()
     if config is not None:

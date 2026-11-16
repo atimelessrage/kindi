@@ -54,6 +54,14 @@ def run(cfg, log=print):
     if man.get("backend") == "kindi_cascade":
         log("kindi bench: the Cascade backend is converter/validator only; GPU K-quant Nemotron-H kernels are pending")
         return 2
+    if man.get("backend") == "kindi_gemma4":
+        log("kindi bench: the Gemma 4 engine is not wired into this benchmark (the dense loop below drives "
+            "prefill/step on Bonsai engines); its gate is `kindi verify`, which has a Gemma 4 reference")
+        return 2
+    if man.get("backend") == "kindi_dsv41":
+        log("kindi bench: DeepSeek V4.1 runs under `python -m kindi.dsv41_server` and its release gate is "
+            "dsv41.verify; this benchmark does not drive that engine")
+        return 2
     from .vram import VramMonitor
     # sample the card the engine will run on (the cupy device ordinal), not unconditionally GPU 0
     dev = 0

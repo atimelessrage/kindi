@@ -398,6 +398,10 @@ def cmd_info(cfg, a):
             print("backend: Kindi Cascade (Nemotron Cascade 2 converter/validator; GPU kernels pending)")
         elif m.get("backend") == "kindi_lightning":
             print("backend: Kindi Lightning CUDA (Nemotron-H MoE), exact head")
+        elif m.get("backend") == "kindi_nanbeige":
+            print("backend: Kindi Nanbeige CUDA (llama K/I-quant), exact head")
+        elif m.get("backend") == "kindi_dsv41":
+            print("backend: Kindi DeepSeek V4.1 (compiled CPU engine)")
         elif m.get("backend") == "kindi_gemma4":
             print("backend: Kindi Gemma 4 CUDA")
             print("fast head: %s" % ("available" if os.path.exists(os.path.join(cfg["pack"],"head_clusters.npz"))

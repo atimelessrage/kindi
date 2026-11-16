@@ -35,3 +35,21 @@ def test_bench_refuses_nanbeige_on_cpu(tmp_path, monkeypatch):
     logged = []
     assert bench.run({"pack": pack, "ctx": 1024}, log=logged.append) == 2
     assert any("Nanbeige" in line for line in logged)
+
+
+def test_bench_names_the_families_it_cannot_bench(tmp_path, monkeypatch):
+    """`kindi bench` must not fall through to the dense loop for a Gemma 4 or DeepSeek pack."""
+    monkeypatch.setenv("KINDI_DEVICE", "cpu")
+    for backend, word in (("kindi_gemma4", "Gemma 4"), ("kindi_dsv41", "DeepSeek")):
+        logged = []
+        pack = _pack(tmp_path, {"backend": backend})
+        assert bench.run({"pack": pack, "ctx": 1024}, log=logged.append) == 2
+        assert any(word in line for line in logged), logged
+
+
+def test_verify_refuses_the_deepseek_reference_matrix(tmp_path, capsys):
+    """dsv41 has its own release gate (dsv41.verify); verify must say so, not run the llama.cpp matrix."""
+    pack = _pack(tmp_path, {"backend": "kindi_dsv41"})
+    logged = []
+    assert verify.run({"pack": pack, "ctx": 1024}, log=logged.append) == 2
+    assert any("dsv41.verify" in line for line in logged), logged
