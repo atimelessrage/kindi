@@ -55,6 +55,12 @@ Use this shape:
   without a separate exactness investigation.
 - Consequences: The 4B tc path has a conditional pass, not a claim that split decode is
   correct for that geometry. The guard is covered by a CPU-only regression test.
+- Re-measured 2026-11-16 (RTX 4060 Ti, current tree): with the guard bypassed,
+  `KINDI_TC=1 KINDI_FD=1 KINDI_ATT_TC=1` verify on the 4B is 2 exact, 2 fails —
+  prompt 2 diverges at token 6 (gap 0.0447, not a tie), prompt 3 at token 37,
+  exactly the 2026-11-11 points. Guard stays; no speed gain was recorded
+  (a gain on a diverging path is not shippable). Evidence:
+  `docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-fd-4b/RESULTS.md`.
 
 ## DEC-0004: A streamed g5 cache must match the current tensor slices
 
