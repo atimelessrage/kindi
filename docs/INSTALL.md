@@ -42,6 +42,14 @@ bash install.sh
 |---|---|
 | `install.sh` (Kindi 0.6.0, fork-merged tree) | `070508a00c1b67d99692360c7e0d61289486a043a639203d6819f4e02ef8bb46` |
 
+**What that value hashes.** It is the `install.sh` in the repository root of this tree
+(`KINDI_VERSION="0.6.0"`). The GitHub release tag used by the one-liners above
+(`v0.5.0-installer`) was published before this script existed, so its asset does **not**
+hash to this value: a mismatch there means a stale artifact, not tampering. Until the
+release owner republishes the tag (tracked in `MANUAL-HELP-NEEDED.md` §5), take the file
+from the URL in this checksum block, or from a clone of this repository, and compare
+against a copy you fetched over TLS from a source you trust.
+
 If `sha256sum -c` does not print `install.sh: OK`, do not run the script. The checksum is for the fork-merged
 `install.sh` in the repository root (upstream 0.6.0 plus the fork's pinned source archive, card classes and
 verify-speed fallback; LF line endings - a copy re-saved with CRLF hashes differently). The upstream 0.6.0

@@ -101,6 +101,13 @@ commands and interpret the output. Each row states the gate it unlocks.
   the checklist and `tests/test_installer_source.py` in the same commit.
   Publishing/tagging needs the owner's explicit authorization (the checklist
   says so); until then the installer payload is stale but correct.
+- **Republish the installer release asset** (2026-11-16 audit, F9): the one-liners
+  point at tag `v0.5.0-installer`, whose asset predates the fork-merged 0.6.0
+  `install.sh`, while `docs/INSTALL.md` publishes that script's sha256
+  (`070508a0…`) — the two cannot both be right. Either republish the tag with the
+  current script and its hash, or retire the tag from the docs. `docs/INSTALL.md`
+  now says which artifact the value belongs to; only the release owner can make the
+  URL match.
 - **Report the corrupt ahtx upload (§1) to the repo author** (or file/feedback
   on the HF repo) so a fixed file exists upstream; the agent cannot file
   it for you.

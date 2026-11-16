@@ -524,7 +524,12 @@ class Grammar(object):
 
     @classmethod
     def from_string(cls, text):
-        """Parse GBNF text. Raises ValueError on syntax errors, unknown or recursive rules."""
+        """Parse GBNF text. Raises ValueError on syntax errors and unknown rules.
+
+        A recursive rule is refused too, unless KINDI_GBNF_MAX_DEPTH opts into the bounded
+        unroll; that language is exact at the depths it allows but bounded, so
+        ``response_format: json_schema`` stays the recursive-JSON path.
+        """
         return cls(_Parser(text).parse())
 
     # --- states ---------------------------------------------------------

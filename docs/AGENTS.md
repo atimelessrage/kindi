@@ -16,8 +16,14 @@ Send `response_format: {"type": "json_object"}` or
 and the reply is constrained at decode time so it parses against the
 schema — on the dense Bonsai, Gemma 4, Nanbeige and Lightning backends.
 `{"type": "grammar", "grammar": "root ::= ..."}` takes llama.cpp GBNF
-instead (regular grammars: a recursive rule is refused with the cycle
-named). A grammar or schema that does not compile is a 400 with
+instead. Recursion is a pushdown language, so a recursive rule (llama.cpp's own
+`json.gbnf`) is refused by default with the cycle named, and the refusal is a 400
+`param: response_format` before generation. Set `KINDI_GBNF_MAX_DEPTH=N` on the server to
+unroll it: nesting up to N levels is in the language, one level deeper is simply not an
+allowed token (the reply stays legal and gets shallower, never a 500), and
+`KINDI_GBNF_MAX_STATES` still bounds the copies. The unrolled language is a bounded
+subset; `json_schema` is the exact, unbounded recursive-JSON path. A grammar or schema
+that does not compile is a 400 with
 `param: response_format`; unknown types are 400 too. See [API.md](API.md)
 for the contract.
 
