@@ -356,41 +356,6 @@ def _recursive_rules(rules):
     return found
 
 
-def _reachable_rules(rules, start):
-    """The rules a grammar can actually reach from its start rule."""
-    seen = set()
-    stack = [start]
-    while stack:
-        name = stack.pop()
-        if name in seen or name not in rules:
-            continue
-        seen.add(name)
-        out = set()
-        for seq in rules[name]:
-            for item in seq:
-                _refs(item, out)
-        stack.extend(out)
-    return seen
-
-
-def _cycle_path(rules, name):
-    """One concrete path from a recursive rule back to itself, for the refusal message."""
-    def walk(node, path):
-        for seq in rules.get(node, []):
-            for item in seq:
-                out = set()
-                _refs(item, out)
-                for ref in sorted(out):
-                    if ref == name:
-                        return path + [ref]
-                    if ref not in path:
-                        got = walk(ref, path + [ref])
-                        if got:
-                            return got
-        return None
-    return walk(name, [name]) or [name]
-
-
 class _NFA(object):
     """Thompson construction over labels ("ch", char) / ("range", ...) / ("any",)."""
 
@@ -432,9 +397,18 @@ class _NFA(object):
         """
         if name not in self.program:
             raise ValueError("GBNF: unknown rule %r" % name)
-        if name in self.recursive and level > self.max_depth:
-            self.limit_hit = name
-            raise _TooDeep(name)
+        if name in self.path:
+            # a rule already being built is reached again: these rules have no
+            # representation without unrolling, and `path` already holds the cycle.
+            if self.max_depth == 0:
+                cycle = self.path[self.path.index(name):] + [name]
+                raise ValueError(
+                    "GBNF: recursive rule (%s); this slice compiles regular grammars "
+                    "only - use response_format json_schema for recursive JSON, or set "
+                    "KINDI_GBNF_MAX_DEPTH to unroll it" % " -> ".join(cycle))
+            if level > self.max_depth:
+                self.limit_hit = name
+                raise _TooDeep(name)
         self.path.append(name)
         try:
             return self.build_alt(self.program[name], level)
@@ -537,15 +511,6 @@ class Grammar(object):
     def __init__(self, rules, start_rule="root"):
         nfa = _NFA(rules)
         self._nfa = nfa
-        if nfa.max_depth == 0:
-            blocked = nfa.recursive & _reachable_rules(rules, start_rule)
-            if blocked:
-                cycle = " -> ".join(_cycle_path(rules, sorted(blocked)[0]))
-                raise ValueError(
-                    "GBNF: recursive rule(s) %s (%s); this slice compiles regular "
-                    "grammars only - use response_format json_schema for recursive JSON, "
-                    "or set KINDI_GBNF_MAX_DEPTH to unroll it"
-                    % (", ".join(sorted(blocked)), cycle))
         try:
             self._start, self._accept = nfa.build_rule(start_rule)
         except _TooDeep as e:
