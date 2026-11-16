@@ -8,7 +8,13 @@ the GGUF header and the engine's own fit arithmetic, with one reason per choice 
 `bench`/`verify` commands for tenants who don't own the card (`--assume-vram-gib`, `--usage`,
 `--moe-cache-mib`, `--dcache`).** The first planned backend target is still Raon-1 mini;
 `kindi/expert_cache.py` implements the copy-only slot, pin, LRU, transient-slot and metrics state
-machine, and `tests/test_moe_cache.py` covers it with synthetic slots. The Gemma 4 profile is a
+machine, and `tests/test_moe_cache.py` covers it with synthetic slots. `kindi/expert_chunk.py` plans
+a whole prefill chunk on top of it: an expert the router selects for several tokens is copied once,
+the copy list is first-need order (chunk order, then each token's router order), and the chunk reports
+hits, coalesced selections and misses. If one token does not fit, the tokens this call reserved are
+released and its copies failed, so a refused chunk leaves no pin, LOADING slot or resident key behind,
+while each token keeps the cache's own all-or-nothing reservation. It is model-free like the cache and
+is not wired into a backend. The Gemma 4 profile is a
 second backend contract in [GEMMA4-26B-MOE.md](GEMMA4-26B-MOE.md), not a second implementation.
 Its execution-level copy and combine contract is in
 [GEMMA4-26B-COPY-COMBINE.md](GEMMA4-26B-COPY-COMBINE.md); the policy-preserving cache-to-copy
@@ -47,7 +53,10 @@ with a log line pointing at `kindi plan`, so a config that sets tandem globally 
 the dense engine for a MoE. The equivalent split for a MoE is the one its own engine already runs, and
 `kindi plan` reports it, including the decode-slot trade (each slot displaces one expert per layer, and
 `Usage.coverage()` compares the measured picks the card serves with the slots against the same bytes as
-residency). None of that is new execution: the MoE backends below are still design and prototype.
+residency).
+
+None of that is new execution: the MoE backends below are still
+design and prototype.
 
 The first backend must answer three questions before any performance work:
 
@@ -340,6 +349,7 @@ Implemented, model-free:
 | file | purpose |
 |---|---|
 | `kindi/expert_cache.py` | copy-only slot manager, pin-aware LRU, transient fallback and JSON-safe metrics; no tensors, GPU or engine wiring |
+| `kindi/expert_chunk.py` | multi-token prefill planner over the cache: deduped copy list in first-need order, hit/coalesced/miss report, chunk rollback when a token does not fit; no tensors or engine wiring |
 | `tests/test_moe_cache.py` | synthetic-slot tests for transitions, eviction, pinning, transient slots, failed copies and metrics |
 | `tests/test_moe_cache_properties.py` | 32 seeded randomized route/acquire traces; checks capacity, pin ownership, slot states, atomic rejects and metrics after every operation |
 
