@@ -9,7 +9,10 @@ new backend contract (T4.1); wiring it into the server is the T4.2 adapter
 work, which is deliberately not part of this slice, so this harness drives the
 real HTTP stack with the current interface stubbed at the engine boundary.
 """
+import os
 import threading
+import time
+from contextlib import contextmanager
 
 import pytest
 import uvicorn
@@ -78,6 +81,26 @@ class _StubKindi(object):
         }
 
 
+@contextmanager
+def _serve(app):
+    """Run `app` in a uvicorn thread on a random local port; yield its base URL."""
+    config = uvicorn.Config(app, host="127.0.0.1", port=0, log_level="warning")
+    uvicorn_server = uvicorn.Server(config)
+    thread = threading.Thread(target=uvicorn_server.run, daemon=True)
+    thread.start()
+    # uvicorn binds asynchronously; wait for the socket.
+    for _ in range(100):
+        if uvicorn_server.started:
+            break
+        time.sleep(0.05)
+    host, port = uvicorn_server.servers[0].sockets[0].getsockname()[:2]
+    try:
+        yield "http://%s:%d" % (host, port)
+    finally:
+        uvicorn_server.should_exit = True
+        thread.join(timeout=5)
+
+
 @pytest.fixture(scope="module")
 def api_server():
     """A live HTTP server (uvicorn thread) serving the real app with a stub engine.
@@ -85,7 +108,6 @@ def api_server():
     When KINDI_API_URL is set, no server is started: the suite runs against
     that (real, GPU-backed) server instead, which is the maintainer gate.
     """
-    import os
     external = os.environ.get("KINDI_API_URL")
     if external:
         yield external.rstrip("/"), None
@@ -97,18 +119,51 @@ def api_server():
     server._make_engine = lambda cfg, log: stub
     app = server.create_app({"model_name": "kindi-fake", "api_key": ""},
                             log=lambda *args: None)
-    config = uvicorn.Config(app, host="127.0.0.1", port=0, log_level="warning")
-    uvicorn_server = uvicorn.Server(config)
-    thread = threading.Thread(target=uvicorn_server.run, daemon=True)
-    thread.start()
-    # uvicorn binds asynchronously; wait for the socket.
-    import time
-    for _ in range(100):
-        if uvicorn_server.started:
-            break
-        time.sleep(0.05)
-    host, port = uvicorn_server.servers[0].sockets[0].getsockname()[:2]
-    yield "http://%s:%d" % (host, port), stub
-    uvicorn_server.should_exit = True
-    thread.join(timeout=5)
-    server._make_engine = original
+    try:
+        with _serve(app) as base_url:
+            yield base_url, stub
+    finally:
+        server._make_engine = original
+
+
+@pytest.fixture()
+def stub(api_server):
+    """The stub engine behind `api_server`; skipped against the real server."""
+    _base_url, engine = api_server
+    if engine is None:
+        pytest.skip("KINDI_API_URL runs against the real server; stub state belongs to the harness")
+    return engine
+
+
+@pytest.fixture()
+def no_grammar(stub):
+    """A stub whose backend refuses structured output, restored after the test."""
+    stub.supports_json_grammar = False
+    yield stub
+    stub.supports_json_grammar = True
+
+
+@pytest.fixture()
+def api_server_with_sessions(tmp_path):
+    """A harness server whose app reads sessions from a fixture state_dir.
+
+    `api_server` starts its app with state_dir="", which falls back to the
+    CWD; this serves a second app on the same stub with a temp state_dir, so
+    the /sessions routes read the fixture store.
+    """
+    if os.environ.get("KINDI_API_URL"):
+        pytest.skip("KINDI_API_URL runs against a real server; sessions need a fixture state_dir")
+    from kindi import server
+
+    stub = _StubKindi()
+    original = server._make_engine
+    server._make_engine = lambda cfg, log: stub
+    state_dir = str(tmp_path / "state")
+    os.makedirs(state_dir, exist_ok=True)
+    app = server.create_app({"model_name": "kindi-fake", "api_key": "", "state_dir": state_dir},
+                            log=lambda *args: None)
+    try:
+        with _serve(app) as base_url:
+            yield base_url, state_dir
+    finally:
+        server._make_engine = original
