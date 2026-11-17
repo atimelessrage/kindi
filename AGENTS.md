@@ -10,7 +10,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `7eb6120` on `freebuff/tandem-cpu-recovery` (`main` receives the parent-of-this-commit bump and FF at handoff; guarded by `tests/test_agents_handoff.py`). Full suite measured 2026-11-17: **1050 passed, 28 skipped, 0 failed**, the newest two pinning `kindi plan`'s decode-slot arithmetic (the fit subtracts the slots before dividing over `n_moe - 2` layers, so 10 slots cost 20 experts per layer on the 256-expert test pack; the line used to claim one per slot); the coverage gate `python tools/check_coverage.py` passes on 26 modules from a measured run (`coverage run --branch --source=kindi -m pytest` -> `coverage json`, since `pytest-cov` hangs on this host), and `tests/test_no_secrets.py` now scans untracked files too (pinned by `test_untracked_files_are_scanned`), with `project_memory --check`, `config_reference --check` and `support_matrix --check` all clean; GPU grammar/JSON-schema gate closed on the 2B (§39); recursive GBNF is now opt-in (`KINDI_GBNF_MAX_DEPTH`, bounded unroll cross-checked against an independent matcher - see the newest rows in `docs/development/AGENTS-HISTORY.md`). Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset; comparison report in `CURRENT-VS-KINDI-0.6.md`. The numbers those docs quote are no longer prose: `python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (12 gates, 45 numbers across `docs/claims/*.json`, 4 citations listed as reasoned debt), and refuses a benchmark citation no claim accounts for - schema and procedure in `docs/claims/README.md`. Owner actions pending: Nanbeige 33B GGUF replacement, Gemma 4 E4B pack, DeepSeek V4.1 shards/gate data, PQ2_0/Q2_0 quant downloads, a pinned llama-server, other-hardware test rigs, push/installer/CI publications, T4.4/T4.5 + D3/D5 decisions — `docs/MANUAL-HELP-NEEDED.md`.
+- **HEAD:** `174204a` on `freebuff/tandem-cpu-recovery` (`main` receives the parent-of-this-commit bump and FF at handoff; guarded by `tests/test_agents_handoff.py`). Full suite measured 2026-11-17 at `174204a`: **1050 passed, 28 skipped, 0 failed (115.4 s)**; the skill round on top of that changes only `.agents/skills/`, documentation and this file, so no suite number moved; the newest two pinning `kindi plan`'s decode-slot arithmetic (the fit subtracts the slots before dividing over `n_moe - 2` layers, so 10 slots cost 20 experts per layer on the 256-expert test pack; the line used to claim one per slot); the coverage gate `python tools/check_coverage.py` passes on 26 modules from a measured run (`coverage run --branch --source=kindi -m pytest` -> `coverage json`, since `pytest-cov` hangs on this host), and `tests/test_no_secrets.py` now scans untracked files too (pinned by `test_untracked_files_are_scanned`), with `project_memory --check`, `config_reference --check` and `support_matrix --check` all clean; GPU grammar/JSON-schema gate closed on the 2B (§39); recursive GBNF is now opt-in (`KINDI_GBNF_MAX_DEPTH`, bounded unroll cross-checked against an independent matcher - see the newest rows in `docs/development/AGENTS-HISTORY.md`). Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset; comparison report in `CURRENT-VS-KINDI-0.6.md`. The numbers those docs quote are no longer prose: `python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (12 gates, 45 numbers across `docs/claims/*.json`, 4 citations listed as reasoned debt), and refuses a benchmark citation no claim accounts for - schema and procedure in `docs/claims/README.md`. Owner actions pending: Nanbeige 33B GGUF replacement, Gemma 4 E4B pack, DeepSeek V4.1 shards/gate data, PQ2_0/Q2_0 quant downloads, a pinned llama-server, other-hardware test rigs, push/installer/CI publications, T4.4/T4.5 + D3/D5 decisions — `docs/MANUAL-HELP-NEEDED.md`.
 - **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
   512/4K/8K; 2B CPU-layer sweep; joint checkpoint 149.6 MiB on the 27B at 54.5-61.5 ms
   save), owned-slice CPU load, `kindi bench --sample-vram` sampled-peak VRAM, multi-ISA CPU
@@ -37,7 +37,11 @@ line of evidence (command + result). A task must be resumable from this file alo
 Requirements, architecture, design decisions, lessons and operational knowledge live in
 `docs/development/`; start at `docs/development/README.md`. The project-local workflow is
 `.agents/skills/project-memory/SKILL.md`. Each requirement is one stable
-`docs/development/requirements/REQ-NNNN.md` file; `python tools/project_memory.py` records
+`docs/development/requirements/REQ-NNNN.md` file. The external local-AI knowledge base at
+`%USERPROFILE%\Dropbox\beratung\ai_inventory` is read-only inspiration (`.agents/skills/ai-inventory/SKILL.md`):
+its numbers are hypotheses about someone else's engine, so an idea from there becomes roadmap work
+only with a gate, and is a win only once measured here; what was read is recorded in
+`docs/development/AI-INVENTORY-SCAN.md`; `python tools/project_memory.py` records
 its added, last-modified and deleted commit hashes in
 `docs/development/REQUIREMENTS-HISTORY.md`.
 
@@ -59,8 +63,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `7eb6120` | main checkout; clean |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `7eb6120` | this session; fast-forwarded into `main` at the end of each round |
+| `T:/kindi` | `main` | `174204a` | main checkout; clean |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `174204a` | this session; fast-forwarded into `main` at the end of each round |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
