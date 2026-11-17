@@ -23,16 +23,18 @@ python tools/verify_matrix.py \
 
 Each cell is a fresh `kindi verify` process. The four-prompt, 40-greedy-token reference matrix is
 the same one used for the recorded 27B cell; the drafter modes add `--spec <mode>` and the mode's
-own files. One run per cell, no repeats.
+own files. The first pass recorded one run per cell; three later passes repeat the
+three speculation cells (and the base cell), and the table reports those three
+passes as medians with their range.
 
 ## Result
 
 | cell | status | exactness | tokens/s | requested -> effective | drafts accepted |
 |---|---|---|---:|---|---:|
-| `27b tc` | pass | 3 exact + 1 tie | 41.5 | — | — |
-| `27b tc-ngram` | pass | 3 exact + 1 tie | 49.8 | `ngram -> ngram` | 35/148 |
-| `27b tc-draft2b` | pass | 3 exact + 1 tie | 75.7 | `draft2b -> draft2b` | 112/162 |
-| `27b tc-both` | pass | 3 exact + 1 tie | 67.1 | `both -> both` | 90/211 |
+| `27b tc` | pass | 3 exact + 1 tie | 38.7 (38.7-38.8) | — | — |
+| `27b tc-ngram` | pass | 3 exact + 1 tie | 45.7 (44.5-46.7) | `ngram -> ngram` | 35/148 |
+| `27b tc-draft2b` | pass | 3 exact + 1 tie | 71.0 (70.7-71.1) | `draft2b -> draft2b` | 112/162 |
+| `27b tc-both` | pass | 3 exact + 1 tie | 62.0 (61.3-62.3) | `both -> both` | 90/211 |
 
 All four cells have the same reference verdict: prompts 2-4 are 40/40 token-exact, and prompt 1
 ("The sky is blue because") ends at the documented llama.cpp tie after 14 tokens with a top-2 gap
@@ -42,8 +44,10 @@ rule as the existing 27B record, not a claim that the tied prompt is 40/40.
 
 The drafter and its head attached in every relevant cell (`draft2b`/`both`), and each requested
 mode was the effective mode; a fallback would have been scored `refused` rather than `pass`. The
-throughput column is one run per cell and is therefore indicative, not a median: `draft2b` was
-1.82x the no-speculation cell, `both` 1.62x, and `ngram` 1.20x in this short verify matrix. The
+throughput column is the median of three passes, with the three-pass min-max in parentheses; the
+first pass's 41.5/49.8/75.7/67.1 were one run each and are superseded. On the medians `draft2b` is
+1.84x the no-speculation cell, `both` 1.60x and `ngram` 1.18x. The single-pass numbers overstated
+the three speculation cells by 6.6-9.0%, so the medians are the record. The
 fit also matters: with the 2B drafter loaded, the 27B plan engine had 663 MiB free at the 1,024-token
 verification context; the earlier 24K measurement still records the drafter reducing the 27B to a
 12,032-token context, so this does not claim a 24K drafter configuration.
@@ -82,6 +86,11 @@ Run against the saved baseline on 2026-11-17, the command passed: all three
 cells stayed `3/1/0` and requested their mode, at 48.3/73.3/64.7 tok/s
 (-3.0%, -3.2% and -3.6% against 49.8/75.7/67.1), with no missing cells.
 
+The baseline keeps that first pass's one-run values. The three-pass medians are
+6.6-9.0% below them, inside the 10% limit, so a typical run passes with less
+headroom than the first-pass figures suggest; a regression gate at 10% therefore
+still separates a real drop from the spread observed here.
+
 ## Artifacts
 
 - `results.json` — the full matrix record, including requested/effective modes, draft counts,
@@ -89,10 +98,13 @@ cells stayed `3/1/0` and requested their mode, at 48.3/73.3/64.7 tok/s
 - `results.csv` — the same rows in the matrix's flat format.
 - `verify-baseline.json` — the three speculation cells as a tracked verify-matrix
   baseline; the exact gate command is above.
+- `median-r{1,2,3}-results.json` — the three repeat matrices behind the table's
+  medians (all four cells each, with config, packs and draft counts). Raw logs
+  stayed in `bench-logs/verify-matrix/27b-spec-median/`.
 - `logs/27b-tc*.log` — the four raw verifier logs, including the tie location and attached files.
 
 ## Not verified
 
-One run per cell, one card and one pack; no repeated throughput measurement. The 27B's accepted
+Three passes per cell for the reported medians, on one card and one pack. The 27B's accepted
 tie remains, so this is not a 4/4-token-exact claim. `dspine` was not run because its weights are
 absent, and no 2B/4B/9B drafter pairing or server/cache cycle was measured here.
