@@ -31,6 +31,9 @@
   pin a foreign table and branches with different arities. DSpine moves from 4/39 measured to 37/39;
   across the four graph builders the coverage is 105 measured / 37 pinned
   (spec 13, dspine 2, mtp 2, tp 20 unresolvable), with every measured site still mutation-proven.
+  Conditional **argument** tuples get the same treatment: an `if`/`else` tuple contributes every
+  branch's count, so a 6-or-7 tuple against a 7-parameter kernel fails on the 6 branch instead of
+  passing on the larger one; `test_every_argument_branch_must_match_the_kernel` pins that case.
 - **`/metrics` names the effective speculation mode** — `kindi_spec_mode_effective{mode="..."} 1`
   comes from `drafting()["method"]`, so a refused head reports `none` and a missing 2B drafter
   reports `ngram`, never the requested `KINDI_SPEC` mode. The accepted/drafted counters stay global
@@ -160,6 +163,11 @@
 
 ### Fixed
 
+- **The 27B median evidence no longer carries machine paths** — the three tracked median JSONs
+  kept the local Python path and the `~/.kindi` pack/head paths from their run commands. They now
+  record `<python>/python.exe` and `~/.kindi/...`, and the history baseline records the seven
+  `local drive path` hits per file from the commit that added them (reviewed with
+  `check_secret_history.py --all-hits`; no credential was involved).
 - **`/health` explains MTP requested without the tensor-core path** — `KINDI_SPEC=mtp` with
   `KINDI_TC=0` reported `requested: "mtp", enabled: false, reason: null`, because `spec.install()`
   never patches `spec_begin` onto the engine without the tensor-core path. `drafting()` now names

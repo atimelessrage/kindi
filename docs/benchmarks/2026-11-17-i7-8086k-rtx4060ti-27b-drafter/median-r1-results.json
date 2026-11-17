@@ -88,7 +88,7 @@
         "KINDI_CARDS": "1"
       },
       "command": [
-        "C:\\Users\\ICH\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "<python>/python.exe",
         "-m",
         "kindi",
         "--pack",
@@ -153,7 +153,7 @@
         "KINDI_CARDS": "1"
       },
       "command": [
-        "C:\\Users\\ICH\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "<python>/python.exe",
         "-m",
         "kindi",
         "--pack",
@@ -218,10 +218,10 @@
         "KINDI_ATT_TC": "1",
         "KINDI_TC_TMAX": "4",
         "KINDI_CARDS": "1",
-        "KINDI_SPEC_PACK": "C:\\Users\\ICH\\.kindi\\packs\\bonsai-2b"
+        "KINDI_SPEC_PACK": "~/.kindi/packs/bonsai-2b"
       },
       "command": [
-        "C:\\Users\\ICH\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "<python>/python.exe",
         "-m",
         "kindi",
         "--pack",
@@ -286,11 +286,11 @@
         "KINDI_ATT_TC": "1",
         "KINDI_TC_TMAX": "4",
         "KINDI_CARDS": "1",
-        "KINDI_SPEC_PACK": "C:\\Users\\ICH\\.kindi\\packs\\bonsai-2b",
-        "KINDI_SPEC_DRAFT_HEAD": "C:\\Users\\ICH\\.kindi\\models\\kindi-mtp-2b-v1.npz"
+        "KINDI_SPEC_PACK": "~/.kindi/packs/bonsai-2b",
+        "KINDI_SPEC_DRAFT_HEAD": "~/.kindi/models/kindi-mtp-2b-v1.npz"
       },
       "command": [
-        "C:\\Users\\ICH\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+        "<python>/python.exe",
         "-m",
         "kindi",
         "--pack",
