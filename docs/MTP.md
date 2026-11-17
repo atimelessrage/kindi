@@ -85,10 +85,40 @@ greedy request repeated, temperature 0):
 | mode A (`KINDI_SPEC=mtp`) | 236.9, 239.6 tok/s | 378 of 1,680 drafted (22.5%) |
 | mode A, guard from position 0 (`KINDI_SPEC_GUARD_FROM=0`) | 230.9, 247.2, 246.6 tok/s | 115 of 520 drafted |
 
-Mode A costs **0.66x** on this card at these contexts, and the guard cannot rescue it inside a
-400-token reply: its first windows are spec windows, so the loss is paid before it can pause. Do not
-set `KINDI_MTP_HEAD` on this rig; the drafter modes further down (a smaller model drafting a bigger
-one) are where the measured win is.
+At that default (`KINDI_SPEC_K=4`) mode A costs **0.66x** on this card, and the guard cannot rescue
+it inside a 400-token reply: its first windows are spec windows, so the loss is paid before it can
+pause. The depth measurement below changes the conclusion for one setting: with `KINDI_SPEC_K=1`
+mode A is a win at 512 and 24K tokens of context, and a wash at 8K.
+
+### Mode A at depth, and the k that matters (2026-11-17)
+
+Same host, same pack and head, `kindi/mtp.py` fixed: `tools/mtp_context_bench.py` builds the engine
+once and runs plain and mode A alternately on it, 128 greedy tokens from a real-docs prompt at each
+position, prompt reading excluded from the clock ([RESULTS](benchmarks/2026-11-17-i7-8086k-rtx4060ti-mtp-context/RESULTS.md)):
+
+| context | `KINDI_SPEC_K` | plain tok/s | mode A tok/s | ratio | drafts accepted |
+|---:|---:|---:|---:|---:|---|
+| 512 | 1 | 335.4 | **375.6** | **1.12x** | 52/75 (69%) |
+| 512 | 4 (default) | 347.6 | 307.9 | 0.89x | 77/200 (39%) |
+| 8K | 1 | 327.4 | 329.1 | 1.01x | 43/84 (51%) |
+| 8K | 4 (default) | 330.1 | 218.3 | 0.66x | 60/272 (22%) |
+| 24K | 1 | 303.6 | **344.4** | **1.13x** | 53/74 (72%) |
+| 24K | 2 | 292.2 | 302.2 | 1.03x | 64/126 (51%) |
+| 24K | 3 | 293.1 | 279.2 | 0.95x | 71/168 (42%) |
+| 24K | 4 (default) | 292.1 | 254.4 | 0.87x | 75/208 (36%) |
+| 24K | 6 | 292.5 | 194.1 | 0.66x | 75/312 (24%) |
+
+Acceptance does rise with depth - 72% at k=1 and 24K against 22% at k=4 and 8K - but the extra
+drafts only pay when each one is cheap: `k=1` turns one draft into one verified token almost every
+step, while k=4 pays a 5-token verify for 1-2 accepted tokens. The 24K/k=1 row is four runs a side
+(plain 301.8-304.8, mode A 338.0-345.4) and `KINDI_SPEC_K=1 kindi verify --spec mtp` is still
+**4/4 token-exact**.
+
+So on this card: **do not set `KINDI_MTP_HEAD` at the default k** - it loses 0.66-0.89x - and set it
+only with `KINDI_SPEC_K=1`, where it buys about 12-13% at 512 and 24K and nothing measurable at 8K.
+The `auto` mode cannot reach that win: it caps mode A at k=2 below 8K and switches it off above
+(`AUTO_MTP_K2_MAX`), so at 24K it runs the plain engine. The drafter modes further down (a smaller
+model drafting a bigger one) are still where the large measured win is.
 
 ### Where a drafter pays, and where it does not
 

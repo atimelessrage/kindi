@@ -98,6 +98,15 @@
 
 ### Fixed
 
+- **Mode A is a win at `KINDI_SPEC_K=1`, and the docs now say so instead of "keep it off"** — the
+  0.66x recorded on 2026-11-17 was at the default `KINDI_SPEC_K=4`. Re-measured at depth on the 2B /
+  RTX 4060 Ti with one harness (`tools/mtp_context_bench.py`: same engine, plain and mode A
+  interleaved, prompt reading excluded): k=1 gives 1.12x at 512 tokens and 1.13x at 24K (4 runs a
+  side, 72% acceptance), a wash at 8K (1.01x), while the default k=4 still loses (0.89x / 0.66x /
+  0.87x) and k=6 at 24K is 0.66x. `KINDI_SPEC_K=1 kindi verify --spec mtp` stays 4/4 token-exact.
+  `docs/MTP.md` carries the table and the corrected advice; `auto` still cannot reach the win (it
+  caps mode A at k=2 below 8K and switches it off above). Results:
+  `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-mtp-context/RESULTS.md`.
 - **`/health`, the startup log and `kindi info` report the speculation that is running, not the one
   that was requested** — `drafting()` answered `enabled: true, method: mtp` from `KINDI_SPEC` alone,
   so a head whose graph never built still looked like drafting for four releases. One resolver
