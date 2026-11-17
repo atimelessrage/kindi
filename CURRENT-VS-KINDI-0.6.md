@@ -922,6 +922,13 @@ installer, still reports `0.6.0`, and its installer still pins the v0.6.0 source
 archive (sha256 `613f7320…`). Those are release-owner differences, not engine
 ones.
 
+The commit count and line total above are measured at `e66471f`, the last code commit
+of this refresh. The preview's chips are computed at render time from the worktree
+`HEAD`, so a preview rendered after the report, claims and handoff commits names a
+slightly higher commit count and insertion total; those later commits touch only this
+report, `docs/` and `AGENTS.md`, so the code delta is unchanged. The two figures
+measure different revisions, not a disagreement.
+
 What changed in this update: the baseline is the official release, not only the
 tag; §41 now separates the 16-file `v0.6.0..v0.6.1` range from the 15-file 0.6.1 commit and attributes `compose.amd.yaml` to `dce89df`; `0.6.1-rocm6`
 is added; §4's missing/divergence rows and the installer pin now name the
