@@ -274,6 +274,19 @@ def test_fail_on_regression_cli_exits_nonzero(tmp_path, capsys, monkeypatch):
     assert "25.0% drop" in output
 
 
+def test_27b_drafter_baseline_has_the_three_spec_cells():
+    mod = load()
+    baseline = mod.load_baseline(
+        ROOT / "docs" / "benchmarks" / "2026-11-17-i7-8086k-rtx4060ti-27b-drafter" / "verify-baseline.json")
+    cells = {(row["model"], row["mode"]): row for row in baseline["results"]}
+    assert set(cells) == {("27b", "tc-ngram"), ("27b", "tc-draft2b"), ("27b", "tc-both")}
+    for row in cells.values():
+        assert row["status"] == "pass"
+        assert (row["prompts_pass"], row["prompts_tie"], row["prompts_fail"]) == (3, 1, 0)
+        assert isinstance(row["tokens_per_second"], (int, float)) and row["tokens_per_second"] > 0
+        assert row["spec_requested"] == row["spec_effective"]
+
+
 def test_fail_on_regression_needs_a_baseline(tmp_path):
     mod = load()
     try:

@@ -48,11 +48,47 @@ fit also matters: with the 2B drafter loaded, the 27B plan engine had 663 MiB fr
 verification context; the earlier 24K measurement still records the drafter reducing the 27B to a
 12,032-token context, so this does not claim a 24K drafter configuration.
 
+## Baseline gate
+
+`verify-baseline.json` holds this run's three speculation cells in the matrix's
+`results.json` shape. Unlike the 2B baseline it is tracked, because these are the
+only 27B drafter cells and a clean checkout should be able to gate against them.
+
+```sh
+python tools/verify_matrix.py \
+  --models 27b --modes tc \
+  --spec-models 27b --spec-modes ngram,draft2b,both \
+  --pack-dir ~/.kindi/packs \
+  --pack-27b D:/kindi-27b/packs/bonsai-27b \
+  --spec-pack ~/.kindi/packs/bonsai-2b \
+  --mtp-head ~/.kindi/models/kindi-mtp-2b-v1.npz \
+  --out bench-logs/verify-matrix/27b-spec-gate \
+  --no-serve --no-bench \
+  --baseline docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-27b-drafter/verify-baseline.json \
+  --fail-on-regression --max-tps-drop-pct 10
+```
+
+The run also executes `27b tc` because the speculation cells build on a base
+mode; the baseline omits that cell, so it prints as `new` and is not
+throughput-gated. A failing `27b tc` still fails the run's own exit status. The
+gate exits 1 when a saved cell is not `pass`, loses an exact prompt, raises its
+fail count, disappears (for example a missing drafter pack or head, or a
+narrowed `--spec-modes`), loses its throughput number, or falls more than 10%
+below the saved tok/s. New cells and faster runs pass. The per-cell status,
+exactness and signed throughput deltas are written to `comparison.csv` and
+`comparison.json` under `--out`.
+
+Run against the saved baseline on 2026-11-17, the command passed: all three
+cells stayed `3/1/0` and requested their mode, at 48.3/73.3/64.7 tok/s
+(-3.0%, -3.2% and -3.6% against 49.8/75.7/67.1), with no missing cells.
+
 ## Artifacts
 
 - `results.json` — the full matrix record, including requested/effective modes, draft counts,
   per-prompt verdicts, config, card/driver and pack hash.
 - `results.csv` — the same rows in the matrix's flat format.
+- `verify-baseline.json` — the three speculation cells as a tracked verify-matrix
+  baseline; the exact gate command is above.
 - `logs/27b-tc*.log` — the four raw verifier logs, including the tie location and attached files.
 
 ## Not verified

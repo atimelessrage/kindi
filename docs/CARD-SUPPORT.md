@@ -101,6 +101,34 @@ Measured 2026-11-17 on the RTX 4060 Ti: seven cells saved, all `pass` (4/4 promp
 (45/120, 94/204, 120/120 and 100/189 drafts accepted), and the repeat gate passed with no status,
 exactness, coverage or throughput regression.
 
+### 27B drafter speculation baseline
+
+The 27B drafter run is saved as a tracked baseline at
+`docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-27b-drafter/verify-baseline.json`
+(three cells: `tc-ngram`, `tc-draft2b`, `tc-both`; the no-speculation `27b tc`
+cell is not in it). The gate command is the same run that saved it, with the
+baseline and the fail flags:
+
+```sh
+python tools/verify_matrix.py \
+  --models 27b --modes tc \
+  --spec-models 27b --spec-modes ngram,draft2b,both \
+  --pack-dir ~/.kindi/packs \
+  --pack-27b D:/kindi-27b/packs/bonsai-27b \
+  --spec-pack ~/.kindi/packs/bonsai-2b \
+  --mtp-head ~/.kindi/models/kindi-mtp-2b-v1.npz \
+  --out bench-logs/verify-matrix/27b-spec-gate \
+  --no-serve --no-bench \
+  --baseline docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-27b-drafter/verify-baseline.json \
+  --fail-on-regression --max-tps-drop-pct 10
+```
+
+It fails on a status or exactness loss, a missing baseline cell (including an
+absent drafter pack or head), a lost throughput number, or a drop over 10%; the
+`27b tc` base cell is new each run and is not throughput-gated, but its own
+failure still fails the run. The three cells passed against the baseline on
+2026-11-17 at 48.3/73.3/64.7 tok/s (-3.0/-3.2/-3.6%).
+
 Current single-card RTX 4060 Ti result: 2B tc **4/4 at 370.2 tokens/s**; 4B tc **3 exact + 1 tie at
 164.6 tokens/s** (FD fallback); 9B tc **refused** (Hadamard 4096); 27B tc **3 exact + 1 tie at 38.9
 tokens/s** in the one-pass matrix, with a three-run median of **38.1 tokens/s**
