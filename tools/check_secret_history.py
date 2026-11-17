@@ -58,7 +58,13 @@ def _git(args, repo=ROOT):
 
 
 def scan(rev_range="--all", repo=ROOT):
-    """Yield (commit, path, detector) for every credential or personal-data hit in history."""
+    """Yield (commit, path, detector) for every credential or personal-data hit in history.
+
+    Only **added** lines count. A leak enters history once, when it is added; the line that
+    removes it is the same content again, so counting it would make cleaning a leak raise the
+    total and fail the gate. The removed line is still in the scan for `--all-hits`, which is the
+    view a rewrite review needs, but it is not a new hit.
+    """
     args = ["log", "-p", "-U0", "--no-color", "--format=%s" % (RECORD + "%H" + FIELD + "%s")]
     args += rev_range.split() if isinstance(rev_range, str) else list(rev_range)
     commit, a_path, b_path = "", "", ""
@@ -74,9 +80,9 @@ def scan(rev_range="--all", repo=ROOT):
         if match:
             a_path, b_path = match.group(1), match.group(2)
             continue
-        if not line or line[0] not in "+-" or line.startswith(("+++", "---")):
+        if not line or line[0] != "+" or line.startswith("+++"):
             continue
-        path = b_path if line[0] == "+" else a_path
+        path = b_path
         if not path:
             continue
         for name in hits_in_line(line[1:]):

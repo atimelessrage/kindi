@@ -58,8 +58,9 @@ def test_a_key_deleted_from_the_tree_is_still_found_in_history(repo_with_a_delet
 def test_the_counting_gate_flags_a_new_row_and_passes_on_the_recorded_one(repo_with_a_deleted_key):
     mod = load()
     current = mod.counted("--all", repo_with_a_deleted_key)
-    # the key is one added line and one removed line: both are history, so two hits
-    assert current[("notes.md", "AWS access key")] == 2
+    # counted once, at the commit that added it: the removal is the same content again, and a
+    # cleanup must not raise the gate
+    assert current[("notes.md", "AWS access key")] == 1
     assert mod.differences(current, current) == []             # recorded counts pass
     assert mod.differences({}, current) != []                  # nothing recorded: a new row
     fewer = {("notes.md", "AWS access key"): 0}
