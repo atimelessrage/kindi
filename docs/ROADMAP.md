@@ -136,6 +136,13 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   drop-in-for-agent-frameworks claim until the conformance suite and a schema-constrained
   reply both pass. The goal is a backend an agent framework can rely on, not just a fast
   chat endpoint.
+- **An Anthropic Messages endpoint ([REQ-0028](development/requirements/REQ-0028.md), proposed):**
+  `kindi serve` speaks OpenAI shapes only, while Claude Code and several harnesses in the ranking
+  expect `POST /v1/messages` (content blocks, `tool_use`/`tool_result`, the SSE event order). A
+  translation adapter over the existing chat path would let those harnesses point at Kindi without a
+  proxy; it changes no decoding, so the gate is an app-level test with a Claude-Code-shaped request
+  plus one real harness run, not a benchmark. Proposed by the external knowledge-base scan of
+  2026-11-17 (`docs/development/AI-INVENTORY-SCAN.md`), which is inspiration only.
 - **Hardware identification and autotuning ([REQ-0022](development/requirements/REQ-0022.md),
   experimental):** `kindi caps` reports every card the driver sees (compute capability, total/free
   VRAM, PCI bus, UUID, driver) with pynvml and CuPy fallbacks, keeps the hardware fact table

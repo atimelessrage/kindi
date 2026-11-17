@@ -45,6 +45,32 @@ commit `1135eab` in that section, its HEAD since, and file mtimes newer than 202
 working tree lags its git view). The roadmap work in this round did not depend on it: the adopted
 items come from this repository's own measurements, and none of them cite the knowledge base.
 
+## Scan 2026-11-17 (incremental: tandem.cpp, Strata, BigMoeOnEdge)
+
+**Last checked:** 2026-11-17. **Knowledge base HEAD:** `1135eab` in its main checkout (no commit
+since the baseline there), but the delta this scan read lives in the base's own Freebuff worktree:
+`390cf16` and `32ca6f5` ("Record the latest benchmarks and the week's model, engine, and hardware
+knowledge"), i.e. two commits past `1135eab`, files touched up to 2026-11-17 09:08. The main
+checkout's tree is dirty in the same five paths the baseline recorded, so both views were needed.
+
+Files read: `docs/TANDEM_CPP.md` (verdict, §4–5, §9), `docs/STRATA.md` (verdict, §4–5),
+`docs/BIGMOEONEDGE.md` (verdict, §4–5), `docs/KINDI.md` §"The CPU+GPU tandem paste — checked
+2026-11-11", `docs/KINDI_CHANGELOG.md` (v0.6.0 opening), `models/raon_1_mini.md`,
+`architecture/hardware_optimization.md` (diff: a stale-pointer note only).
+
+| candidate | what the source says | what Kindi already has | verdict |
+|---|---|---|---|
+| Anthropic `/v1/messages` surface | BigMoeOnEdge: "the sleeper feature is the API surface, not the speed" — its server speaks Anthropic `/v1/messages`, which Claude Code and the harness rows expect; Ollama/llama.cpp give only OpenAI shapes `[P]` (`docs/BIGMOEONEDGE.md` §5) | nothing: no `v1/messages`, `x-api-key` or Anthropic content-block translation anywhere in `kindi/` or `docs/` (grep, 2026-11-17) | **adopted as a proposal — [REQ-0028](requirements/REQ-0028.md)**, roadmap bullet in the Agent API section. Translation onto the existing chat path, tested app-level with a Claude-Code-shaped request; no decoding change, so no GPU gate |
+| MoE expert cache with a CPU share | tandem.cpp / llama.cpp v1.0.0 add `moe_cache_size` + `moe_cache_cpu_share`, LRFU/ClassLRU and no CPU wait on cached experts `[P]` (`docs/TANDEM_CPP.md` §1) | `kindi/lightning.py` keeps the least-used experts of each layer in pinned host memory, with decode slots (10/layer) and LRU staging; `kindi/moe.py` owns placement; `kindi plan --moe-cache-mib/--dcache` reports the tier | **already-have** (`kindi/lightning.py` decode slots, `kindi/moe.py`, `kindi/plan.py`) |
+| slot concurrency on a MoE | Strata `parallel` 2/4 on a 5070: 61.0/61.2 tok/s total against 70.7 one at a time (−13/−15%), first token 11.2 s → 1.8 s, because a MoE window over four conversations reads ~24 experts/layer against ~8 `[P]` (`docs/STRATA.md` §4) | measured from the other direction and NO-GO: continuous batching B=4 = 131.8 tok/s = 0.69x of single decode (gate 1.5x); the server serves one active request under a bounded queue | **already-measured / NO-GO** (`docs/ROADMAP.md` batching rows, `docs/CONTINUOUS-BATCHING.md`). Strata's finding argues for the queue, not for a new spike |
+| an 8 GB/31 GB MoE-streaming row | Qwen3.6-35B-A3B (21 GB) on 8 GB + 31 GB RAM: 37–44 tok/s, 33–37 at 16k context, Windows installer, no card floor; v0.43.x is a prerelease `[P]` (`docs/BIGMOEONEDGE.md` §4–5) | the model is already a recognized-and-refused roadmap row (Qwen 3.6-35B-A3B; its Q0 gate is a pinned GGUF plus llama.cpp reference) | **reference only**: a target for that existing Q0 gate, not a new step; their number was measured by them on rented hardware and does not transfer |
+| Raon-1 mini | new card (preview 2026-10-21): 28.8 B / 4.3 B active hybrid MoE, fork-only runtime, gated weights, 8 GB cards only with experts on the CPU `[P]` (`models/raon_1_mini.md`) | roadmap already carries Raon/Gemma 26B backends as an open gate | **already tracked** (roadmap Cards row); no action |
+| intra-layer FFN row split | the KINDI.md tandem paste proposes per-matrix CPU/GPU slicing and a CPU drafter; the base's own check shows upstream Kindi already puts 55% of a host layer's FFN rows on the CPU with the card busy, and the paste's K6000 table disagrees with itself 2x (`docs/KINDI.md` §tandem paste) | our dense tandem splits at layer granularity; overlap is designed and measured (worker thread not justified; head work 17.6 ms/token and double-buffered staging first), and a hybrid FFN-on-CPU option is listed in `CPU_GPU_TANDEM_DESIGN.md` phase 4.1 | **parked, already in design**: the gate is the existing 24K ≥12.4 tok/s tandem gate with `kindi verify` 4/4; no new step |
+| the base's view of Kindi's install path | v0.6.0 adds a Windows PowerShell → WSL2 installer and states "native Windows is not in 0.6.0"; BigMoeOnEdge's table calls Kindi Linux-only `[P]` | this fork runs natively on Windows (CPU engine compiled here, `.cu` through CuPy; `kindi verify`/`serve` ran on this host) | **rejected as a source**: the base tracks upstream v0.6.0, not this tree's v0.6.1+ state; read this repository's `CHANGELOG.md` for install claims |
+
+One candidate was adopted as a proposal (REQ-0028); nothing was implemented in this pass, which is
+the expected outcome of a scan. No number above is a Kindi measurement.
+
 ## How a later scan appends
 
 Add a `## Scan <date>` section with **Last checked**, the knowledge base **HEAD**, the files read and
