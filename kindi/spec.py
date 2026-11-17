@@ -1249,31 +1249,86 @@ def tc_feed_batch(self, toks, pos):
         i += n
 
 
-def spec_begin(self, greedy, temperature=0.0, top_p=1.0, top_k=0, rng=None, min_p=0.0):
-    """speculative decoding for the steps that follow: greedy requests, or sampled ones when the server passes its
-    sampling settings and generator (speculative sampling)"""
-    mode = os.environ.get("KINDI_SPEC", "0")
-    self.spec_auto = mode == "auto"
+def resolve_mode(eng, requested, greedy=True):
+    """The mode that will actually run for `requested`, and why when it is not that mode (REQ-0024).
+
+    One source of truth: `spec_begin` picks the mode for a request with it, and `/health`, the startup
+    log and the tests ask it what is effective instead of reading `KINDI_SPEC` back as if it were
+    running. Returns (mode, reason); reason is None when the requested mode is the effective one.
+    """
+    mode, why = requested, None
     if mode == "auto":
         # KINDI_SPEC=auto (the measured choice on a 3080): the DSpine block drafter when it is attached (27B); a model
         # with its own MTP head drafts with it (greedy); a model with the 2B drafter uses it, plus the 2B's head (B2)
         # below KINDI_SPEC_B2_MAX tokens of context
-        if getattr(self, "dspine", None) is not None:
+        if getattr(eng, "dspine", None) is not None:
             mode = "dspine"
-        elif getattr(self, "drafter", None) is not None:
+        elif getattr(eng, "drafter", None) is not None:
             mode = "draft2b"
-        elif getattr(self, "mtp", None) is not None and greedy:
+        elif getattr(eng, "mtp", None) is not None and greedy:
             mode = "mtp"
         else:
-            mode = "0"
-    if mode == "dspine" and getattr(self, "dspine", None) is None:
-        mode = "draft2b" if getattr(self, "drafter", None) is not None else "ngram"
-    if mode in ("draft2b", "both") and getattr(self, "drafter", None) is None:
-        mode = "ngram"
-    if mode == "mtp" and (getattr(self, "mtp", None) is None or not greedy):
-        mode = "0"                               # the MTP head drafts for greedy requests only (for now)
+            mode, why = "0", "auto found no drafter attached"
+    if mode == "dspine" and getattr(eng, "dspine", None) is None:
+        mode = "draft2b" if getattr(eng, "drafter", None) is not None else "ngram"
+        why = "the DSpine drafter is not attached"
+    if mode in ("draft2b", "both") and getattr(eng, "drafter", None) is None:
+        mode, why = "ngram", "the 2B draft pack is not attached"
+    if mode == "mtp" and (getattr(eng, "mtp", None) is None or not greedy):
+        mode, why = "0", ("the MTP head is not attached" if getattr(eng, "mtp", None) is None
+                          else "the MTP head drafts greedy requests only")
     if _mtp.DUMP is not None:
-        mode = "0"
+        mode, why = "0", "a head dump is being recorded"
+    return mode, why
+
+
+def effective_state(eng, requested=None):
+    """What speculation will actually run, for /health, the startup log and the tests (REQ-0024 A1).
+
+    {"requested": KINDI_SPEC, "mode": the mode or None, "reason": why not the requested one,
+     "head": the attached head {"file", "sha256", "bytes"} or the refusal {"state": "refused",
+     "reason"}}. The head's own refusal is folded into `reason`, so one string explains a missing
+    drafter without the caller knowing which of the two downloads it was.
+    """
+    req = (os.environ.get("KINDI_SPEC", "0") or "0") if requested is None else requested
+    mode, why = resolve_mode(eng, req, True)
+    heads = getattr(eng, "_mtp_heads", None) or {}
+    slot = ("mtp" if mode == "mtp" else "draft2b" if mode in ("draft2b", "both")
+            else "mtp" if req in ("mtp", "auto") else "draft2b" if req in ("draft2b", "both")
+            else "dspine")
+    head = heads.get(slot)
+    if head is not None and head.get("state") == "refused":
+        why = "%s: %s" % (why, head.get("reason")) if why else head.get("reason")
+    return {"requested": req, "mode": mode if mode not in ("0", "") else None, "reason": why, "head": head}
+
+
+def _load_head(eng, slot, path, fn, log):
+    """Attach an optional MTP head and record what happened on the engine, for `/health` (REQ-0024).
+
+    A refusal is a warning - a requested mode that silently did not attach is the failure this
+    requirement exists for - and a load is the head's own `MTP head attached` line, so there is one
+    line either way and never a quiet fallback.
+    """
+    heads = getattr(eng, "_mtp_heads", None)
+    if heads is None:
+        heads = eng._mtp_heads = {}
+    try:
+        head = fn()
+    except Exception as e:                    # noqa: BLE001 - an optional accelerator must not stop the model
+        heads[slot] = {"file": os.path.basename(path), "path": path, "state": "refused", "reason": str(e)}
+        log("warning: speculation off: the %s head %s did not load (%s)" % (slot, path, e))
+        return None
+    heads[slot] = {"file": head.head["file"], "path": path, "state": "loaded", "sha256": head.sha256,
+                   "bytes": head.bytes, "registered": head.head["registered"]}
+    return head
+
+
+def spec_begin(self, greedy, temperature=0.0, top_p=1.0, top_k=0, rng=None, min_p=0.0):
+    """speculative decoding for the steps that follow: greedy requests, or sampled ones when the server passes its
+    sampling settings and generator (speculative sampling)"""
+    requested = os.environ.get("KINDI_SPEC", "0")
+    self.spec_auto = requested == "auto"
+    mode, _ = resolve_mode(self, requested, greedy)
     self.spec_mode = mode
     self.spec_k = int(os.environ.get("KINDI_SPEC_K", "4")) if mode in ("ngram", "draft2b", "both", "mtp") else 0
     if self.spec_auto and mode == "draft2b":
@@ -1832,12 +1887,11 @@ def install(log=print):
                 eng.log("speculative draft model attached: %s, ctx %d" % (_drafter[0].pack, _drafter[0].ctx))
                 if os.environ.get("KINDI_SPEC_DRAFT_HEAD"):
                     head = os.environ["KINDI_SPEC_DRAFT_HEAD"]
-                    eng.drafter.mtp = _optional(eng.log, "the draft head %s" % head,
-                                                lambda: _mtp.MTPDraft(_drafter[0], head, log=eng.log))
+                    eng.drafter.mtp = _load_head(eng, "draft2b", head,
+                                                 lambda: _mtp.MTPDraft(_drafter[0], head, log=eng.log), eng.log)
             if os.environ.get("KINDI_SPEC") in ("mtp", "auto") and os.environ.get("KINDI_MTP_HEAD") and not _building_drafter[0]:
                 head = os.environ["KINDI_MTP_HEAD"]
-                eng.mtp = _optional(eng.log, "the MTP head %s" % head,
-                                    lambda: _mtp.MTPDraft(eng, head, log=eng.log))
+                eng.mtp = _load_head(eng, "mtp", head, lambda: _mtp.MTPDraft(eng, head, log=eng.log), eng.log)
             if getattr(eng, "_dsp_want", False) and not _building_drafter[0]:
                 if _dsp.fits(eng.cards[0]) and "FEAT" in eng.cards[0].tcb:
                     dsp = os.environ["KINDI_DSPINE"]
@@ -1845,6 +1899,11 @@ def install(log=print):
                                            lambda: _dsp.DSpine(eng, dsp, log=eng.log))
                 else:
                     eng.log("dspine: not used (it drafts for the 27B on one NVIDIA card with the tensor-core plans)")
+        requested = os.environ.get("KINDI_SPEC", "0") or "0"
+        if requested not in ("0", "off") and not _building_drafter[0]:
+            st = effective_state(eng, requested)      # the effective mode, once every accelerator is attached
+            eng.log("speculation: requested %s, effective %s%s" % (
+                requested, st["mode"] or "0", "" if st["mode"] == requested else " (%s)" % (st["reason"] or "off")))
 
     _tp.Shard._load = _load
     _chunk.reserve = _reserve

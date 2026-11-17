@@ -819,20 +819,26 @@ class Kindi(object):
                 r.turn_end()
 
     def drafting(self):
-        """speculative drafting, for /health (Kindi Bridge shows it): on or off, the method, and the last request's
-        drafts and how many were accepted"""
+        """speculative drafting, for /health (Kindi Bridge shows it): what is actually attached, not
+        what KINDI_SPEC asked for - the effective mode, why it differs from the request, the loaded
+        head and its digest - and the last request's drafts and how many were accepted (REQ-0024)."""
         last = getattr(self, "last_spec", None)
-        out = {"enabled": False, "method": None, "drafter": None, "last": None}
+        requested = os.environ.get("KINDI_SPEC", "0") or "0"
+        out = {"enabled": False, "method": None, "requested": requested, "reason": None,
+               "head": None, "head_sha256": None, "drafter": None, "last": None}
         if self.nanbeige is not None:
             m = [n for n, on in (("lookup", int(self.cfg.get("lookup") or 0) > 0),
                                  ("mtp", bool(self.cfg.get("mtp_head")))) if on]
             out.update(enabled=bool(m), method="+".join(m) or None)
         elif not self.native and hasattr(self.eng, "spec_begin"):
-            mode = os.environ.get("KINDI_SPEC", "0")
-            if mode not in ("0", "", "off"):
-                dr = getattr(self.eng, "drafter", None)
-                out.update(enabled=True, method=getattr(self.eng, "spec_mode", None) or mode,
-                           drafter=getattr(getattr(dr, "eng", None), "pack", None) or (type(dr).__name__ if dr else None))
+            from . import spec as _sp
+            st = _sp.effective_state(self.eng, requested)
+            head = st["head"] or {}
+            dr = getattr(self.eng, "drafter", None)
+            out.update(enabled=st["mode"] is not None, method=st["mode"], reason=st["reason"],
+                       head=head.get("file") if head.get("state") == "loaded" else None,
+                       head_sha256=(head.get("sha256") or "")[:12] or None,
+                       drafter=getattr(getattr(dr, "eng", None), "pack", None) or (type(dr).__name__ if dr else None))
         if last and last.get("drafted"):
             out["last"] = {"passes": last.get("passes", 0), "drafted": last["drafted"], "accepted": last.get("accepted", 0),
                            "acceptance": round(last.get("accepted", 0) / float(last["drafted"]), 3)}

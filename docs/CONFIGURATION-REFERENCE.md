@@ -95,12 +95,12 @@ variables, and are therefore not listed twice here.
 |---|---|---|
 | `KINDI_ATT_TC` | `0` | `kindi/chunk.py:442` (+1 more) |
 | `KINDI_BACKEND_MODULES` | (empty) | `kindi/backends/__init__.py:56` (+1 more) |
-| `KINDI_BATCH` | `4` | `kindi/spec.py:1870` (+1 more) |
+| `KINDI_BATCH` | `4` | `kindi/spec.py:1929` (+1 more) |
 | `KINDI_BENCH_ATTN` | (unset) | `kindi/dsv41.py:1157` |
 | `KINDI_BLOCKING_SYNC` | `1` | `kindi/chunk.py:474` (+7 more) |
 | `KINDI_CACHE_TIMING` | (unset) | `kindi/cache.py:1141` |
 | `KINDI_CALIB_DIR` | (unset) | `kindi/calib.py:31` |
-| `KINDI_CARDS` | (unset) | `kindi/spec.py:1894` (+4 more) |
+| `KINDI_CARDS` | (unset) | `kindi/spec.py:1953` (+4 more) |
 | `KINDI_CC` | `clang` or `"clang" if os.name == "nt" else "gcc"` or `"gcc" if os.name != "nt" else "clang"` | `kindi/caps.py:280` (+4 more) |
 | `KINDI_CHUNK` | `256` or `"512" if all(f16_prompt(s.card) for s in eng.cards) else "256"` or `"256" if major >= 5 else "128"` | `kindi/chunk.py:160` (+2 more) |
 | `KINDI_CHUNK_ATT` | `flash` | `kindi/chunk.py:438` |
@@ -123,7 +123,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_DP4A` | `"1" if rt.is_hip else "0"` | `kindi/tp.py:463` |
 | `KINDI_DRAFT_POLICY` | `0` | `kindi/spec.py:1112` |
 | `KINDI_DSPINE` | (unset) | `kindi/dspine.py:41` (+1 more) |
-| `KINDI_DSPINE_K` | `str(_dsp.BLOCK - 1)` | `kindi/spec.py:1282` |
+| `KINDI_DSPINE_K` | `str(_dsp.BLOCK - 1)` | `kindi/spec.py:1337` |
 | `KINDI_DSPINE_MB` | `1400` | `kindi/dspine.py:52` |
 | `KINDI_DSPINE_NARROW` | (unset) | `kindi/dspine.py:160` |
 | `KINDI_DSV_CPUS0` | (unset) | `kindi/dsv41.py:348` |
@@ -210,6 +210,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_MOE_IDLE` | `1` | `kindi/dsv41.py:347` |
 | `KINDI_MOE_SHARE0` | `0.667` | `kindi/dsv41.py:350` (+2 more) |
 | `KINDI_MOE_WEIGHTED` | `1` | `kindi/lightning.py:256` (+2 more) |
+| `KINDI_MTP_HEAD_ALLOW_UNREGISTERED` | `0` | `kindi/mtp_heads.py:50` |
 | `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:665` |
 | `KINDI_NB_CPUF` | `0.55` | `kindi/nanbeige.py:34` |
 | `KINDI_NB_EMBD_HOST` | `"1" if kepler(cp, devices[0]) else "0"` | `kindi/nanbeige.py:272` |
@@ -242,11 +243,11 @@ variables, and are therefore not listed twice here.
 | `KINDI_Q8X2` | `1` | `kindi/chunk.py:272` |
 | `KINDI_SAMPLER_ORDER` | `llama` | `kindi/sampling.py:19` |
 | `KINDI_SM2` | (empty) | `kindi/spec.py:746` |
-| `KINDI_SPEC` | `0` | `kindi/dspine.py:41` (+7 more) |
+| `KINDI_SPEC` | `0` | `kindi/dspine.py:41` (+10 more) |
 | `KINDI_SPEC_B0_K2_MAX` | `1024` | `kindi/spec.py:58` |
 | `KINDI_SPEC_B2_MAX` | `0` | `kindi/spec.py:59` |
-| `KINDI_SPEC_CTX` | (unset) | `kindi/spec.py:1899` |
-| `KINDI_SPEC_DRAFT_HEAD` | (unset) | `kindi/spec.py:1833` (+1 more) |
+| `KINDI_SPEC_CTX` | (unset) | `kindi/spec.py:1958` |
+| `KINDI_SPEC_DRAFT_HEAD` | (unset) | `kindi/spec.py:1888` (+1 more) |
 | `KINDI_SPEC_GUARD` | `1` | `kindi/spec.py:1150` |
 | `KINDI_SPEC_GUARD_BOUND` | `2.5` | `kindi/spec.py:1010` |
 | `KINDI_SPEC_GUARD_BOUND_DEPTH` | `8192` | `kindi/spec.py:1012` |
@@ -255,9 +256,9 @@ variables, and are therefore not listed twice here.
 | `KINDI_SPEC_K` | `4` | `kindi/calibrate.py:69` (+2 more) |
 | `KINDI_SPEC_KNOWN` | `1` | `kindi/cache.py:1108` |
 | `KINDI_SPEC_MTP_K2_MAX` | `8192` | `kindi/spec.py:57` |
-| `KINDI_SPEC_PACK` | (unset) | `kindi/spec.py:1892` (+2 more) |
-| `KINDI_SPEC_SAMPLE` | `1` | `kindi/spec.py:1286` |
-| `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1899` |
+| `KINDI_SPEC_PACK` | (unset) | `kindi/spec.py:1951` (+2 more) |
+| `KINDI_SPEC_SAMPLE` | `1` | `kindi/spec.py:1341` |
+| `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1958` |
 | `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:194` |
 | `KINDI_TANDEM_DEBUG_TIMING` | `0` | `kindi/tandem.py:596` |
 | `KINDI_TANDEM_GPU` | `auto` | `kindi/plan.py:167` (+2 more) |

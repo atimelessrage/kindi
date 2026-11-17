@@ -404,6 +404,10 @@ def cmd_info(cfg, a):
     build = cpu_backend.select_isa(report)
     print("CPU engine build: %s%s" % (build or "native (-march=native)",
                                       " (KINDI_CPU_ISA)" if forced and forced != "auto" else ""))
+    from . import mtp_heads
+    # the requested mode and the head's registry verdict, which is what can be known before an engine
+    # loads; the effective mode is the serve log's "speculation: requested ... effective ..." (REQ-0024)
+    print("speculation: %s" % mtp_heads.report())
     print("config: %s" % cfg["source"])
     for k in sorted(C.DEFAULTS):
         v = cfg[k]

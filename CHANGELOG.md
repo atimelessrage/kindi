@@ -82,6 +82,22 @@
 
 ### Fixed
 
+- **`/health`, the startup log and `kindi info` report the speculation that is running, not the one
+  that was requested** — `drafting()` answered `enabled: true, method: mtp` from `KINDI_SPEC` alone,
+  so a head whose graph never built still looked like drafting for four releases. One resolver
+  (`spec.resolve_mode`) now answers for `spec_begin`, `/health` and the startup log, which prints
+  `speculation: requested <mode>, effective <mode> (<reason>)`; a head that refused to load is a
+  `warning: speculation off: ...` line rather than a debug note, the refusal reason is folded into
+  `/health`'s `reason` (with `requested`, the effective `method`, the loaded `head` and its
+  `head_sha256` prefix), and `kindi info` prints the requested mode with the head's registry verdict
+  instead of a mode it cannot know before an engine loads.
+- **The MTP head is checked against `kindi/mtp_heads.json` before its weights are loaded** — the
+  registry's `sha256` and `bytes` were used by hand once and never by the code, so a truncated or
+  patched 60 MB download would load and draft. `kindi/mtp_heads.py` hashes the file in 1 MiB blocks
+  and `MTPDraft` calls it before `np.load`, refusing a mismatch with the expected and found digest
+  (and both sizes) or an unregistered file, naming the local-development escape hatch
+  `KINDI_MTP_HEAD_ALLOW_UNREGISTERED=1` (documented in `docs/CONFIGURATION-REFERENCE.md`). The head's
+  startup line now carries its `sha256` prefix.
 - **The MTP head's CUDA graph never built, so mode A speculation was silently dead** — ported from
   upstream `v0.6.1`. `k_rmsfold_qT` gained a trailing `hp` argument in 0.5.0; `kindi/spec.py` and
   `kindi/dspine.py` were updated and `kindi/mtp.py` was not, so with `KINDI_TC=1` and

@@ -134,3 +134,9 @@ Set `KINDI_SPEC=0` to turn off all speculation. To keep the 2B drafter and stop 
 The installer turns on `KINDI_SPEC=auto` only on tensor-core profiles. For the 27B, auto needs only the 2B
 drafter. For the 2B, the installer downloads the head file and checks its sha256. If that fails, it prints one
 line, and the 2B runs without MTP.
+
+The engine checks the file again before it loads it: `kindi/mtp_heads.json` records the sha256 and the size,
+and a head that disagrees (or is not registered) is refused with `warning: speculation off: the mtp head ...`
+naming both digests, so a hand-patched file never reaches the card. A head you built yourself is allowed with
+`KINDI_MTP_HEAD_ALLOW_UNREGISTERED=1`. `/health`'s `drafting` block and the startup line
+`speculation: requested ..., effective ...` answer what attached, not what `KINDI_SPEC` asked for.

@@ -721,6 +721,55 @@ def test_health_without_a_key_keeps_the_detailed_view(app_client):
     assert "gpu_free_mib" in body and "uptime_s" in body
 
 
+class _SpecEngine(_FakeEngine):
+    """The two states REQ-0024 is about: an MTP head that attached, and one the loader refused."""
+
+    def __init__(self, loaded):
+        super(_SpecEngine, self).__init__()
+        self.spec_begin = lambda *a, **k: None
+        self.drafter = None
+        self.mtp = object() if loaded else None
+        self._mtp_heads = {"mtp": ({"file": "kindi-mtp-2b-v1.npz", "state": "loaded", "registered": True,
+                                   "sha256": "1b5c0c790a594af368c3646370c527c319cdb3bb0592dd3e523e752f721a5520",
+                                   "bytes": 60960552} if loaded else {
+                                       "file": "kindi-mtp-2b-v1.npz", "state": "refused",
+                                       "reason": "the MTP head /heads/kindi-mtp-2b-v1.npz does not match "
+                                                 "kindi/mtp_heads.json: expected sha256 1b5c0c790a59, "
+                                                 "60960552 bytes; found sha256 000000000000, 12 bytes"})}
+
+
+class _SpecKindi(_FakeKindi):
+    """The real `Kindi.drafting` on a stub engine: /health must report what attached, not KINDI_SPEC."""
+    drafting = server.Kindi.drafting
+    native = False
+    nanbeige = None
+
+    def __init__(self, loaded):
+        super(_SpecKindi, self).__init__()
+        self.eng = _SpecEngine(loaded)
+
+
+@pytest.mark.parametrize("loaded", [True, False], ids=["head-loaded", "head-refused"])
+def test_health_reports_the_effective_speculation_state(monkeypatch, loaded):
+    """REQ-0024 A1: KINDI_SPEC=mtp is the request; /health answers what is running. With the head
+    attached it names the head and its digest, and with the head refused it says disabled and why,
+    instead of echoing the requested mode as `enabled: true` for four releases."""
+    monkeypatch.setenv("KINDI_SPEC", "mtp")
+    K = _SpecKindi(loaded)
+    monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
+    app = server.create_app({"model_name": "bonsai2-2b", "api_key": ""}, log=lambda *a: None)
+    with TestClient(app) as client:
+        d = client.get("/health").json()["drafting"]
+    assert d["requested"] == "mtp"
+    if loaded:
+        assert d["enabled"] is True and d["method"] == "mtp" and d["reason"] is None
+        assert d["head"] == "kindi-mtp-2b-v1.npz" and d["head_sha256"] == "1b5c0c790a59"
+    else:
+        assert d["enabled"] is False and d["method"] is None
+        assert "does not match kindi/mtp_heads.json" in d["reason"]
+        assert d["head"] is None and d["head_sha256"] is None
+
+
 def test_keyless_non_loopback_health_gets_only_liveness_fields(monkeypatch):
     K = _FakeKindi()
     monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)

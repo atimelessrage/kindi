@@ -9,6 +9,8 @@ import os
 import numpy as np
 import cupy as cp
 
+from . import mtp_heads as _heads
+
 i32 = np.int32
 
 
@@ -163,6 +165,10 @@ class MTPDraft(object):
     NORMS = ("e_norm", "h_norm", "in_norm", "post_norm", "q_norm", "k_norm", "out_norm")
 
     def __init__(self, eng, path, log=print):
+        # the registry check comes first: a file that does not match kindi/mtp_heads.json is refused
+        # before a single byte of it is read as weights (REQ-0024 A3)
+        self.head = _heads.verify(path)
+        self.sha256, self.bytes = self.head["sha256"], self.head["bytes"]
         from . import spec as _sp
         from . import tp as _tp
         self.e, s = eng, eng.cards[0]
@@ -192,8 +198,8 @@ class MTPDraft(object):
             self.headg = _sp.Graph(self._head_plan(_sp, _tp))
         self.start, self.pend = None, None
         self.stats = {"calls": 0, "drafts": 0}
-        log("MTP head attached: %s (%.0f MB, window %d)" % (os.path.basename(path), sum(
-            a.nbytes for a, _ in self.w.values()) / 1e6, W))
+        log("MTP head attached: %s (%.0f MB, window %d, sha256 %s)" % (self.head["file"], sum(
+            a.nbytes for a, _ in self.w.values()) / 1e6, W, self.sha256[:12]))
 
     def _head_plan(self, _sp, _tp):
         s = self.s
