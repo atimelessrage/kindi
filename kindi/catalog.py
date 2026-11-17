@@ -203,12 +203,16 @@ def _select(cfg, pack, log):
                 os.remove(tmp)
             try:
                 os.symlink(pack, tmp); os.replace(tmp, link)
-            except OSError as exc:
+            except (OSError, NotImplementedError) as exc:
                 # Windows without Developer Mode or admin cannot create symlinks
-                # (WinError 1314). The config file above is already written, so a
+                # (WinError 1314), and a platform without symlink support at all raises
+                # NotImplementedError. The config file above is already written, so a
                 # link failure must not fail the command that selected the model.
-                if os.path.lexists(tmp):
-                    os.remove(tmp)
+                try:
+                    if os.path.lexists(tmp):
+                        os.remove(tmp)
+                except OSError:
+                    pass                      # a leftover .new must not fail the selection either
                 log("note: cannot update the KINDI_PACK symlink %s (%s); the config file "
                     "was updated instead" % (link, exc))
             else:

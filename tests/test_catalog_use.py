@@ -80,6 +80,25 @@ def test_select_survives_a_symlink_it_cannot_create(tmp_path, monkeypatch):
     catalog._select({"source": str(conf)}, str(tmp_path / "packs" / "m"), log=logged.append)
     assert any("cannot update the KINDI_PACK symlink" in line for line in logged)
     assert "pack = " in conf.read_text()
+    # the failed link leaves nothing behind next to it
+    assert not (tmp_path / "pack-link.new").exists()
+
+
+def test_select_survives_a_platform_without_symlinks(tmp_path, monkeypatch):
+    """os.symlink raises NotImplementedError where the platform has no symlinks at all; the
+    selection must still succeed on the config file, the same as the WinError 1314 case."""
+    conf = tmp_path / "kindi.conf"
+    conf.write_text("")
+    monkeypatch.setenv("KINDI_PACK", str(tmp_path / "pack-link"))
+
+    def boom(*args, **kwargs):
+        raise NotImplementedError("symlinks are not supported on this platform")
+
+    monkeypatch.setattr(catalog.os, "symlink", boom)
+    logged = []
+    catalog._select({"source": str(conf)}, str(tmp_path / "packs" / "m"), log=logged.append)
+    assert any("cannot update the KINDI_PACK symlink" in line for line in logged)
+    assert "pack = " in conf.read_text()
 
 
 def test_existing_bad_catalog_file_is_redownloaded_and_checked(tmp_path, monkeypatch):
