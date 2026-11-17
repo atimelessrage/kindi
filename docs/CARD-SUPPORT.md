@@ -63,6 +63,44 @@ python tools/verify_matrix.py --models 2b,4b,9b,27b --modes tc \
   --baseline bench-logs/verify-matrix/baseline.json
 ```
 
+### 2B speculation baseline
+
+The default speculation axis is `ngram,mtp,draft2b,both` on `--spec-models 2b`, built on
+`--spec-base tc`; each row carries `spec_requested -> spec_effective` and accepted/drafted
+drafts. Save all four cells with the three 2B engine modes, then run the same selection through
+the gate:
+
+```sh
+python tools/verify_matrix.py --models 2b \
+  --modes plain,tc,tc-hp \
+  --spec-models 2b --spec-modes ngram,mtp,draft2b,both \
+  --pack-dir ~/.kindi/packs \
+  --mtp-head ~/.kindi/models/kindi-mtp-2b-v1.npz \
+  --spec-pack ~/.kindi/packs/bonsai-2b \
+  --out bench-logs/verify-matrix/2b-spec-baseline-run \
+  --no-serve --no-bench \
+  --save-baseline bench-logs/verify-matrix/2b-spec-baseline.json
+
+python tools/verify_matrix.py --models 2b \
+  --modes plain,tc,tc-hp \
+  --spec-models 2b --spec-modes ngram,mtp,draft2b,both \
+  --pack-dir ~/.kindi/packs \
+  --out bench-logs/verify-matrix/2b-spec-baseline-gate \
+  --no-serve --no-bench \
+  --baseline bench-logs/verify-matrix/2b-spec-baseline.json \
+  --fail-on-regression --max-tps-drop-pct 10
+```
+
+The gate run omits `--mtp-head` and `--spec-pack` because their defaults are the same paths.
+`--fail-on-regression` also rejects a baseline cell that disappears, so running without the head
+or drafter pack does not silently pass the four speculation cells. The baseline is gitignored by
+design (see [CI.md](CI.md#performance-baseline)); save it on the runner, not in git.
+
+Measured 2026-11-17 on the RTX 4060 Ti: seven cells saved, all `pass` (4/4 prompts each);
+`tc-ngram`, `tc-mtp`, `tc-draft2b` and `tc-both` reported their requested mode as effective
+(45/120, 94/204, 120/120 and 100/189 drafts accepted), and the repeat gate passed with no status,
+exactness, coverage or throughput regression.
+
 Current single-card RTX 4060 Ti result: 2B tc **4/4 at 370.2 tokens/s**; 4B tc **3 exact + 1 tie at
 164.6 tokens/s** (FD fallback); 9B tc **refused** (Hadamard 4096); 27B tc **3 exact + 1 tie at 38.9
 tokens/s** in the one-pass matrix, with a three-run median of **38.1 tokens/s**

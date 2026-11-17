@@ -44,6 +44,12 @@
   baseline containing a cell makes `--fail-on-regression` fail when it disappears. `--spec-base`,
   `--mtp-head`, `--spec-pack` and `--draft-head` set the base and files. Eight tests cover the
   environment chaining, skip reasons, parsing, refusal ordering and dry run.
+- **The 2B verify-matrix baseline includes the four speculation cells** — a 2B run with
+  `--modes plain,tc,tc-hp --spec-modes ngram,mtp,draft2b,both` saved seven passing cells
+  (`tc-ngram`, `tc-mtp`, `tc-draft2b`, `tc-both` each 4/4; 45/120, 94/204, 120/120 and 100/189
+  drafts accepted) at `bench-logs/verify-matrix/2b-spec-baseline.json`, which is gitignored by
+  design. The repeat `--fail-on-regression` run passed with no status, exactness, coverage or
+  throughput regression; the exact commands are in `docs/CARD-SUPPORT.md` and `docs/CI.md`.
 - **`kindi io` measures this host's memory tiers** — a RAM copy, an unbuffered disk read and pinned
   PCIe copies both ways, as text or `--json` (`--mib`, `--disk-dir`, `--skip`). The disk probe writes
   a temporary file and reads it with `O_DIRECT` (Linux) or `FILE_FLAG_NO_BUFFERING` (Windows) so it

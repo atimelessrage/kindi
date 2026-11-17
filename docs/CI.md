@@ -197,7 +197,10 @@ python tools/verify_matrix.py \
 Then pass `/data/kindi/ci/gpu-baseline.json` as `baseline` on later dispatches. The default
 `max_tps_drop_pct` is 10%. Status, exactness and missing-cell regressions fail regardless of the
 throughput threshold. If `baseline` is empty, the job still checks token exactness but prints a
-warning and makes no performance-regression claim.
+warning and makes no performance-regression claim. The default speculation axis adds the four 2B
+cells (`tc-ngram`, `tc-mtp`, `tc-draft2b`, `tc-both`); keep them in the baseline, and do not pass
+`--spec-modes none`. For a 2B-only baseline, use the explicit command in
+[CARD-SUPPORT.md](CARD-SUPPORT.md#2b-speculation-baseline).
 
 Regenerate the baseline deliberately, on the same hardware, after a measured performance change;
 do not commit it. Upload the run's `comparison.json` alongside the baseline so a failure can be

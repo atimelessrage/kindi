@@ -72,8 +72,9 @@ DSpine weights, which are not on this host, so it has no cell yet (owner action)
 `tc-both`): `--spec-modes` defaults to all four, `--spec-models` to `2b` and `--spec-base` to `tc`;
 its rows and CSV/JSON carry the requested/effective mode and accepted/drafted counts, a fallback is
 `refused`, and a cell whose optional head or pack is absent is printed as a skip. A baseline saved
-with those files therefore makes `--fail-on-regression` gate them; a host without them still runs
-the plain matrix.
+with those files therefore makes `--fail-on-regression` gate them, and the exact 2B baseline and
+gate commands are in [CARD-SUPPORT.md](CARD-SUPPORT.md#2b-speculation-baseline); a host without
+them still runs the plain matrix.
 
 ### Measured 2026-11-17: mode A was silently dead, and costs on the 2B here
 
