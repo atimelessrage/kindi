@@ -258,6 +258,27 @@ historical equal split. Kepler stays single-card. No mixed-card execution has be
 
 - The 8 GB `tc` installer profile only adds tensor-core settings to the 27B (and the 2B when its MTP head is installed); the 2B/4B/9B/27B settings above are the documented tc plan. The plain 4B/9B paths remain the safe default.
 
+#### Stock Kindi v0.6.1 user report (plain engine, 2026-11-17)
+
+These rows are **stock upstream Kindi v0.6.1** (`7fececb`), not this fork and
+not its `tc` or speculation tables. They use the stock plain engine and exact
+head. The commands, logs and loader qualification are in the
+[benchmark record](benchmarks/2026-11-17-i7-8086k-rtx4060ti-stock-0.6.1/RESULTS.md).
+
+| model | context | prompt reading | generation @100 / 2,000 / 8,000 tokens | free |
+|---|---:|---:|---|---:|
+| 2B | 512 | 225.9 tokens/s | 188.4 / — / — | 6,505 MiB |
+| 2B | 8,192 | 223.3 tokens/s | 191.4 / 191.1 / 191.7 | 6,411 MiB |
+| 9B | 512 | 93.9 tokens/s | 85.6 / — / — | 4,613 MiB |
+| 9B | 8,192 | 55.3 tokens/s | 86.3 / 84.3 / 79.7 | 4,371 MiB |
+
+- One pass per cell; stock's fixed position sweep prints only positions that fit,
+  so the 512-context runs have only position 100. These are indicative, not medians.
+- Unmodified stock v0.6.1 stops on native Windows at `libcuda.so.1`; the measured
+  runs use a loader shim that maps that one name to `nvcuda.dll`. No Kindi module,
+  kernel or engine decision is changed. The failed unmodified run is in the benchmark
+  directory.
+
 #### Verify matrix (RTX 4060 Ti)
 
 `tools/verify_matrix.py` runs each selected model/mode cell as a fresh
