@@ -235,9 +235,17 @@ def check_module(path):
 
 
 def test_the_contract_covers_every_module():
+    """Every module contributes measurements, and the run prints how much is measured against how much
+    is skipped, so a passing suite does not imply full coverage (REQ-0023 A1)."""
+    rows, measured, skipped = [], 0, 0
     for path in MODULES:
-        checked, _, _ = check_module(path)
+        checked, unresolved, _ = check_module(path)
         assert checked, "%s has no measurable launch; the module list would be vacuous" % path
+        measured += len(checked)
+        skipped += len(unresolved)
+        rows.append("%s %d/%d" % (path.split("/")[-1], len(checked), len(checked) + len(unresolved)))
+    print("kernel arity: %d call sites checked, %d skipped (pinned with a reason in UNRESOLVED_SITES); %s"
+          % (measured, skipped, ", ".join(rows)))
 
 
 def test_every_call_site_passes_the_kernels_argument_count():

@@ -22,6 +22,18 @@ template and tool-call round trips, tokenizer behavior, sampling, cache decision
 plan-engine guards, the tracked-file secret/personal-data guard and detect-secrets baseline checks, the installer's GRUB fixture and
 CPU ISA preflight, and GPU-driver selection. No CUDA device or model pack is required.
 
+## The kernel launch contract is partly measured, and says how much
+
+`test_kernel_arity.py` reads every `__global__` declaration in `kindi/*.cu` (including
+`__launch_bounds__` forms and the generated `k_*_T` wrappers) and compares each graph launch's
+literal argument tuple with it. Current split: **71 call sites checked across 40 kernels** (`spec.py`
+26, `dspine.py` 4, `mtp.py` 3, `tp.py` 38) and **71 call sites skipped** because their kernel is a
+variable, list element, dict lookup, `getattr` or conditional, or their tuple is assembled at run
+time. The skipped ones are pinned in `UNRESOLVED_SITES` with a reason each - a new dynamic launch
+fails the suite until somebody classifies it - and the checked count is pinned too, so neither
+number can move silently. Running `pytest -s tests/test_kernel_arity.py` prints the per-module
+split.
+
 `tests/requirements-test.txt` lists the test dependencies. The same commands run in the CPU job of
 `.github/workflows/ci.yml`. A separate `cpu-engine-smoke` job compiles `kindi/kcpu.c` with gcc for
 the AVX2/FMA/F16C tier and runs `test_cpu_build.py`, `test_cpu_threads.py` and `test_cpu_smoke.py`;
