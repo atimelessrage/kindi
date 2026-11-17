@@ -18,6 +18,11 @@ current one. It separates verified behavior from recorded evidence,
 incomplete features, and release-hygiene problems. It is not a claim that
 everything described here has been re-run on current hardware.
 
+§4 was re-based at `6f62325` (2026-11-17): worse, missing and unverified are separate tables with a
+closure condition per row, and it corrects §41's claim that the fork ships no compose files -
+`compose.yaml`, `compose.amd.yaml` and `docs/CONTAINERS.md` are present from `dce89df`, and v0.6.1
+only changes their example image tags.
+
 ## 1. Baseline
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
@@ -53,7 +58,7 @@ GPU or model paths re-ran.
 
 | 0.6.0 item | in this tree | status here |
 |---|---|---|
-| MoE backend (`kindi/moe*.py`, `moe_cpu.c`) | present (merged) | **no GPU run in this session**; fork adds expert-tier *planning* (`kindi plan` MoE strategy, `kindi/moe.py plan()`); small-MoE generalization tracked in §5 |
+| MoE backend (`kindi/moe*.py`, `moe_cpu.c`) | present (merged) | **exercised on GPU through Lightning (§38: 5 exact + 7 ties, 0 fail)**, with no separate expert-tier run; the fork adds expert-tier *planning* (`kindi plan` MoE strategy, `kindi/moe.py plan()`); small-MoE generalization tracked in §5 |
 | DeepSeek-V4.1-Flash backend (`kindi/dsv41*`) | present (merged) | **GPU-unverified here** |
 | Nemotron Lightning (`kindi/lightning*`) | present (merged) | **GPU-gated here 2026-11-16**: the T4.2 adapter is ported, and a clean catalog GGUF (size/SHA-256/GGUF verified, fresh pack) verifies 5 exact + 7 llama.cpp ties, 0 fail on the RTX 4060 Ti, with bench ctx 8192 read 788.3–821.3 and write 165.96–167.41 tok/s (§38). `kindi plan` describes its tiering header-only |
 | **DSpine drafter** (`kindi/dspine.py`, `kindi/dspine.cu`) | present (merged); `spec.py` hooks wired | **GPU-unverified here**; fork wraps the build in `spec._optional` so a broken DSpine degrades to no-speculation instead of aborting startup |
@@ -96,33 +101,75 @@ GPU or model paths re-ran.
 
 ## 4. What is worse, missing, or unverified vs stock 0.6.0
 
-Nothing upstream was deleted. Deliberate divergences kept from the fork:
+Re-derived at `6f62325` (2026-11-17) against `v0.6.0` (`179710c` plus the post-tag `dce89df`) and
+`v0.6.1` (`7fececb`). The title folds three different questions together, so they are separate below;
+each row ends with what would move it, and §39–§41 hold the dated runs behind them.
+
+**The short answer.** Nothing upstream is deleted or unported: every file of `v0.6.0` is still present
+(`git diff --diff-filter=D --name-only v0.6.0..HEAD` is empty), and `v0.6.1`'s two code changes are in
+`d1d23f2`, with its version and container-tag strings deliberately not adopted until this fork has a
+release. What remains open is **evidence**: measurements that need weights, a second card, another ISA
+or a clean Windows box. The one measured "worse" than the simpler path is mode A speculation, and it
+is off by default.
+
+### 4.1 Worse than the simpler path (measured; not a regression against stock)
+
+| surface | measured here | why it stays | what would move it |
+|---|---|---|---|
+| Mode A speculation (the model's own MTP head, `KINDI_SPEC=mtp` / `KINDI_MTP_HEAD`) | **0.66x** on the 2B / RTX 4060 Ti at 24K: 361.2/363.7 tok/s plain vs 236.9/239.6 with the head, 378 of 1,680 drafted tokens accepted (22.5%); forcing the guard on from position 0 gives 230.9/247.2/246.6 | the head's graph had not built since 0.5.0 (fixed in `d1d23f2`, §41) and now that it builds it loses: the first guard windows are speculation windows, so a short reply pays the loss first | a per-model acceptance gate that stays off when acceptance is low, or a guard that reacts inside a few tokens; at `KINDI_SPEC_K=1` it measured 1.12–1.13x. `docs/MTP.md` |
+| Tandem CPU+GPU split on one card | 24K decode **~8 vs ~31–34 tok/s** against the equivalent full-GPU rows; step-0 is 17.6 ms/token of head plus 3.09 ms of boundary transfer, ahead of any worker thread | it is a **memory** feature: a 49,152-token request keeps all 49,152 where the unsplit plan engine reduces to 30,976 | a second card or a much faster CPU head, not a code fix (§39) |
+| 9B tandem `gdn:8` / `gdn:16` | saves **486–488 MiB** for 2.8–3.0x decode, or **872–874 MiB** for 4.5–4.6x, flat from 8K to 131,072, while full GPU already holds every request at 5,149 MiB peak | buys headroom, never context; the 27B is the only pack here that needs the split | a pack that does not fit full-GPU; otherwise no split |
+| FP8 E4M3 K/V (`KINDI_KV=fp8`) | KLD **2.48e-06** (2K) / **2.80e-06** (8K), ~9–14x q8_0, verify 3/4, same cache size as q8_0 (8.5 bits/value) | experimental opt-in, never a default | a lossless 8-bit format; keep it off otherwise |
+| Recursive GBNF (`KINDI_GBNF_MAX_DEPTH`) | opt-in and bounded: llama.cpp's `json.gbnf` reaches array nesting 2 inside the 20,000-state cap, and depth 7 is 398,268 states; `json_schema` is the unbounded path | exact expansion is what keeps the accepted language honest (the old rule cache was 20x smaller by widening it) | shared states or a token-class mask (REQ-0027) |
+
+### 4.2 Missing vs stock 0.6.0 / 0.6.1
+
+| item | stock | here | consequence / closure |
+|---|---|---|---|
+| Version identity | `0.6.1` | `0.6.0` in `kindi/__init__.py`; `install.sh` pins the published v0.6.0 archive (sha256 `613f7320…`) | Settings > Apps shows 0.6.0 for a distribution installed by the published 0.6.1 `install.sh` (2026-11-17 Windows run). A fork release, not an engine change; `docs/MANUAL-HELP-NEEDED.md` §5 |
+| 0.6.1 container packaging | compose files and `docs/CONTAINERS.md` reference `0.6.1-cuda` / `0.6.1-rocm7` | the files are **present from `dce89df`**; v0.6.1's change to them is only those example tags | no 0.6.1 images exist from this fork, so pointing at them would be false; publish images with a fork release. (§41's "ships no compose files" was wrong; corrected there and here) |
+| Upstream code | `kindi/mtp.py`'s `hp` argument and `kindi/spec.py`'s graph diagnostic | both ported in `d1d23f2`; the remaining v0.6.1 changes are version strings, docs, Dockerfiles, compose and install scripts | nothing to port; no file of the `v0.6.1` tree is missing here |
+| Not-behind-stock absences | stock lacks them too | dense standard-attention llama/qwen engines; an image projector (an image part is an enveloped 400); the llama.cpp proxy (REQ-0019 T4.4) and real concurrency (T4.5), whose positioning is an open maintainer call (MANUAL-HELP §6); Metal | listed so "missing" is not read as "behind stock" |
+| MoE expert-cache tandem | stock had no such path | **not a backend**: `kindi/expert_cache.py` is a model-free slot/LRU prototype, with no router, pack, GPU copy path or measured inference (`docs/MOE-TANDEM.md`) | Raon-1 mini R0 reference goldens or the Gemma 4 26B contract, plus a GPU copy path; until then no support claim |
+
+### 4.3 Unverified (in the tree, no recorded run)
+
+| # | surface | why there is no run here | what closes it |
+|---|---|---|---|
+| 1 | DeepSeek V4.1 Flash backend | shards and gate data are not on this host | weights + `kindi verify` on the 4060 Ti |
+| 2 | DSpine drafter | no dspine profile or weights; `kindi verify --spec dspine` exits non-zero when the drafter does not attach | `docs/MANUAL-HELP-NEEDED.md` §7 |
+| 3 | Nanbeige 4.3 33B | the served GGUF is corrupt (full size, wrong sha256, NUL-garbled tensor names) | a fixed upload, or bartowski's quant with regenerated references (MANUAL-HELP §1) |
+| 4 | Gemma 4 E4B pack | pack not on this host | download, then the adapter's GPU gate (MANUAL-HELP) |
+| 5 | Structured output on the non-dense families (Gemma 4, Lightning, Nanbeige) | all four families pass the CPU end-to-end gate, but only the dense 2B has had the GPU grammar gate (§39); Lightning's GPU verify/bench gate is closed (5 exact + 7 ties, 0 fail; read 788.3–821.3, write 165.96–167.41 tok/s at ctx 8192, §38) | the same grammar gate that closed for the dense 2B, on each family's GPU path |
+| 6 | `install.ps1` complete install | a real run on 2026-11-17 covered PC checks, rootfs download with a SHA256SUMS match, `wsl --import`, systemd, the GPU check and the Start-menu/uninstall entries (94 s); Docker integration, the model download and a served request were skipped | a clean box with Docker; then `/health` and one chat completion |
+| 7 | `kindi autotune` two-card and MoE candidates | one card and no Lightning pack; `tp-2-*` and `dcache-*` are unit-tested only | a second card and a Lightning pack; a placement-changing winner still needs `kindi verify` |
+| 8 | Five legacy cards, Arc A770, Intel iGPU | no physical cards (the A770 is in transit); iGPU G1+ needs an 11th-gen+ iGPU and oneAPI | MANUAL-HELP §4 |
+| 9 | AVX-512 / AMX CPU kernels | no host can compile or verify; the 2026-11-09 draft stays archived and `kindi caps` reports the flags only | an AVX-512 host, then kernels and tests |
+| 10 | Calibration's `>=20 s` startup clause | NVIDIA tuning is 0.2 s; the clause needs HIP | a HIP rig |
+| 11 | PQ2_0 / Q2_0 4B/9B/27B import | only the 2B variants are on this host | MANUAL-HELP §2 downloads |
+| 12 | Arbitrary-draft-GGUF speculation | generalized harness not built | that harness's gate |
+| 13 | Two-card TP and mixed-card pairs | one card only | a second card, same or mixed vendor |
+| 14 | Same-settings A/B against stock `v0.6.0` | the comparison is code-level (strict superset); §39's performance check used 2026-11-09 rows with different settings, so it rules out a gross regression but is not an A/B | run `v0.6.0` and this tree on the same pack, flags and card |
+| 15 | GPU CI (the agreed-cards gate) | hand-run and hand-recorded; the runner is not registered | the runner registration in `docs/CI.md` §5.1 |
+
+### 4.4 Deliberate divergences (not defects)
 
 | divergence | why |
 |---|---|
 | `presence_penalty` stays a config float key (upstream moved validation to the server; config defaults and `profiles.py` still read it) | local coherence; documented in the merge commit |
-| Server stats keep the fork's superset keys; `/health` unions both queue views + `drafting` | documented merge resolution |
-| Installer pins the published v0.6.0 tarball sha256 `613f7320…` | the fork cannot republish upstream's artifact; the **installer release asset itself is still unpublished** (release-owner step) |
+| Server stats keep the fork's superset keys; `/health` unions both queue views and `drafting` | documented merge resolution |
+| Installer pins the published v0.6.0 tarball sha256 `613f7320…` | the fork cannot republish upstream's artifact; the installer release asset itself is still unpublished (release-owner step) |
 | Turn-save entries' stored rows live under different keys than `Turns` blocks | cosmetic; no upstream rows are read by this fork |
+| The fork's version stays `0.6.0` while upstream is `0.6.1` | a version bump is a release-owner decision; claiming 0.6.1 without a published artifact would be a false version, and `kindi __version__` would disagree with the installer pin |
 
-Still real and orderable against 0.6.0:
+### 4.5 The measurements that would change the ranking
 
-- The 0.6 backends (MoE / DeepSeek / DSpine) have **no GPU run record in this session** — first check with real hardware: `kindi verify` with `KINDI_USING=dsv41`, `KINDI_BACKEND=lightning`, `KINDI_DRAFTER=dspine` on the rig. **Lightning closed 2026-11-16 (§38); the other three are blocked on weights/corrupt uploads, not code.**
-- `install.ps1` **has now been run for real, but not to completion on a clean box**: 2026-11-17, isolated on `S:` with `-AppName`/`-Distro`/`-DistroDir` set apart from the installed engine, `-DockerMode skip -NoBridge -NoDesktopShortcut -Yes -LinuxArgs --dry-run` (94 s). Real: PC checks, Ubuntu 24.04 rootfs download with Canonical SHA256SUMS match, `wsl --import`, systemd, the GPU check inside WSL, Start-menu items, the HKCU uninstall entry. Not covered: Docker integration, the model download and a served request. Two findings recorded: the published `install.sh` reports 0.6.1 while `install.ps1` and this tree say 0.6.0, and the in-WSL disk check reports the vhdx capacity (954.5 GB) while the host drive had 22 GB free. See `docs/WINDOWS.md`.
-- `kindi autotune`'s two-card and MoE candidates are **unit-tested, not measured**: this host has one card and no Lightning pack, so `tp-2-auto`/`tp-2-equal` and `dcache-*` have no recorded number, and a placement-changing winner still needs `kindi verify` before it is served.
-- The CPU engine has no AVX-512 or AMX kernel: the 2026-11-09 draft's AVX-512 kernels stay archived because no host here can compile or verify them. `kindi caps` reports the flags; it does not imply a kernel exists.
-- Speculation mode A (the model's own MTP head) **works but is not a win here**: its head graph had
-  not built since 0.5.0 (fixed in `d1d23f2`, see §41), and now that it runs it measures 0.66x on the
-  2B / RTX 4060 Ti at these contexts (22.5% acceptance, and the guard cannot pause fast enough inside
-  a 400-token reply). Enable it only where acceptance is high; the smaller-model drafter modes keep
-  their measured gain.
-- Tandem is still slower than GPU-only on 1 GPU (24K decode ~8 vs ~31–34 tok/s equivalent rows at 8K/24K); the overlap step-0 (re-measured 2026-11-15) puts the head (17.6 ms/token) and boundary transfers (3.09 ms) ahead of any worker thread.
-- FP8 K/V (#8) is measured **lossy, not lossless** (KLD ~9–14× q8_0, verify 3/4) — an experimental opt-in, not a default; #9 (Windows unbuffered load) measured NOT met; #6's ≤1.2× clause recorded unsatisfiable with the dedupe rule.
-- Dense standard-attention llama/qwen GGUFs are refused (no engine): see §5.
-- Intel Arc: A770 purchased and in transit (M1 unblocked on arrival); no SYCL backend exists, and the iGPU route is G0-only until an 11th-gen+ iGPU + oneAPI toolchain exists to compile/verify kernels.
-- Backend plugin interface: T4.2 engine adapters are ported for all five families (Bonsai, Nanbeige, Lightning, Gemma 4, DeepSeek V4.1) with the Bonsai and Lightning gates measured and the other three GPU-gated by missing/corrupt weights; T4.4 llama.cpp proxy and real concurrency remain planned. REQ-0018 structured output is landed for dense, Gemma 4, Lightning and Nanbeige (CPU-tested on the last two, GPU gates unclaimed).
-- PQ2_0/Q2_0 (type 142/42) import stays verified for the 2B only — the 4B/9B/27B files were never downloaded (owner action, `docs/MANUAL-HELP-NEEDED.md` §2).
-- Recursive GBNF is **opt-in and bounded**, not exact: `KINDI_GBNF_MAX_DEPTH=N` unrolls N levels (a fresh copy per reference, deeper branches pruned) and `tests/test_gbnf_recursion.py` checks the resulting language against an independent matcher at every allowed depth. Because copies are not shared, llama.cpp's `json.gbnf` reaches array nesting 2 inside the default 20,000-state limit (398,268 states at depth 7), so `response_format: json_schema` stays the unbounded path for real JSON.
+In order of how much of this table they would move: a **second card** (two-card TP, mixed cards, the
+autotune `tp-2-*` rows, tandem-vs-GPU on a pair), **weights** (a clean Nanbeige upload, DeepSeek shards,
+Gemma 4 E4B, the DSpine profile, a Raon/Gemma MoE pack), an **AVX-512 host** (the CPU half tops out at AVX2
+today), a **HIP or Metal rig** (the calibration clause and a non-CUDA backend), and one **same-settings
+A/B against stock `v0.6.0`**. None is addressable from this machine, which is why
+`docs/MANUAL-HELP-NEEDED.md` lists them as owner actions rather than planned work.
 
 ## 5. Model and hardware status
 
@@ -784,7 +831,7 @@ in `kindi/spec.py`, and one real code fix in `kindi/mtp.py`.
 |---|---|
 | `kindi/mtp.py` passes `k_rmsfold_qT`'s `hp` argument | **we had the bug; fixed in `d1d23f2`.** `k_rmsfold_qT` took a trailing `hp` in 0.5.0; `spec.py` and `dspine.py` were updated, `mtp.py` was not. With `KINDI_TC=1` and `KINDI_MTP_HEAD` set, the head's graph failed (`cuGraphAddKernelNode failed (1)`) and the engine logged `speculation off: the MTP head ... did not load` — mode A did not run at all on the tensor-core layout for four releases, and a short argument tuple is not a Python error. Reproduced on the rig before the fix; after it: `MTP head attached: kindi-mtp-2b-v1.npz (61 MB, window 64)` |
 | `kindi/spec.py` names node, grid, block and argument count on a graph-build failure | **ported in `d1d23f2`** — that diagnostic is what makes a missing argument visible instead of `failed (1)` |
-| container packaging (`compose.yaml`, `compose.amd.yaml`, `docs/CONTAINERS.md`) | **not ported.** This fork ships no compose files; it is a deployment surface, not an engine gap, and belongs to a release-owner decision |
+| container packaging (`compose.yaml`, `compose.amd.yaml`, `docs/CONTAINERS.md`) | **already here** (from `dce89df`); the 0.6.1 delta is only the example image tags (`0.6.1-cuda` / `0.6.1-rocm7`) in `compose.yaml` and `docs/CONTAINERS.md`, which need a fork release that publishes those images. §4 is corrected accordingly; the earlier "ships no compose files" was wrong |
 | version strings now `0.6.1` upstream | ours stay `0.6.0` plus this changelog: the installer pins upstream's published artifact, so a fork version bump needs a fork release |
 
 The fix revives a documented feature but does not make it a win here. Measured on the i7-8086K +
