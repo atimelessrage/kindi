@@ -143,6 +143,9 @@ pass is far more expensive than a drafter step *and* the accepted run is long en
 pass (about 2.3 plain steps at T = 4 here). At 41-43% acceptance that holds for the 27B and not for the
 9B, so the installer offers the 2B drafter to the 27B only. Do not add it to the 9B without measuring
 acceptance first. Output was byte-identical in every run: speculation changes the speed, never a token.
+The recorded [27B drafter exactness matrix](benchmarks/2026-11-17-i7-8086k-rtx4060ti-27b-drafter/RESULTS.md)
+backs that for `tc-ngram`, `tc-draft2b` and `tc-both`: each matches the no-speculation cell's
+verdict (3 exact + 1 accepted llama.cpp tie, 0 fail).
 
 **At 24K on the 8 GB card the drafter does not fit** (2026-11-14, same host; evidence in
 `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-drafter-24k/`): with the drafter the loader reduces
