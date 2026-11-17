@@ -36,6 +36,7 @@ the state at that commit.
 | [REQ-0024](requirements/REQ-0024.md) | Speculation state is reported as effective, and the head is verified on load | proposed | `13eaf46bb58c` | `13eaf46bb58c` |
 | [REQ-0025](requirements/REQ-0025.md) | `kindi verify` can run under speculation | proposed | `13eaf46bb58c` | `13eaf46bb58c` |
 | [REQ-0026](requirements/REQ-0026.md) | `kindi bench` can measure a speculation mode | proposed | `13eaf46bb58c` | `13eaf46bb58c` |
+| [REQ-0027](requirements/REQ-0027.md) | A constrained-decoding mask that does not sweep the vocabulary per state | proposed | `7f31c34b8393` | `7f31c34b8393` |
 
 `uncommitted` means the requirement file is not in `HEAD` yet. Commit the requirement
 and run the generator again to record its real added/last-modified hashes.
