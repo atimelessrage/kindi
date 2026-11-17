@@ -10,7 +10,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `c7b55a0` on `freebuff/tandem-cpu-recovery` (`main` receives the parent-of-this-commit bump and FF at handoff; guarded by `tests/test_agents_handoff.py`). Full suite last measured 2026-11-17 at `84068d2`: 986 passed, 28 skipped, 0 failed (103 s); GPU grammar/JSON-schema gate closed on the 2B (§39); recursive GBNF is now opt-in (`KINDI_GBNF_MAX_DEPTH`, bounded unroll cross-checked against an independent matcher - see the newest table row). Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset; comparison report in `CURRENT-VS-KINDI-0.6.md`. Owner actions pending: Nanbeige 33B GGUF replacement, Gemma 4 E4B pack, DeepSeek V4.1 shards/gate data, PQ2_0/Q2_0 quant downloads, a pinned llama-server, other-hardware test rigs, push/installer/CI publications, T4.4/T4.5 + D3/D5 decisions — `docs/MANUAL-HELP-NEEDED.md`.
+- **HEAD:** `7358285` on `freebuff/tandem-cpu-recovery` (`main` receives the parent-of-this-commit bump and FF at handoff; guarded by `tests/test_agents_handoff.py`). Full suite last measured 2026-11-17 at `84068d2`: 986 passed, 28 skipped, 0 failed (103 s); GPU grammar/JSON-schema gate closed on the 2B (§39); recursive GBNF is now opt-in (`KINDI_GBNF_MAX_DEPTH`, bounded unroll cross-checked against an independent matcher - see the newest table row). Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset; comparison report in `CURRENT-VS-KINDI-0.6.md`. Owner actions pending: Nanbeige 33B GGUF replacement, Gemma 4 E4B pack, DeepSeek V4.1 shards/gate data, PQ2_0/Q2_0 quant downloads, a pinned llama-server, other-hardware test rigs, push/installer/CI publications, T4.4/T4.5 + D3/D5 decisions — `docs/MANUAL-HELP-NEEDED.md`.
 - **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
   512/4K/8K; 2B CPU-layer sweep; joint checkpoint 149.6 MiB on the 27B at 54.5-61.5 ms
   save), owned-slice CPU load, `kindi bench --sample-vram` sampled-peak VRAM, multi-ISA CPU
@@ -58,8 +58,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `c7b55a0` | main checkout; clean |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `c7b55a0` | this session; ahead of `main` by the rounds below |
+| `T:/kindi` | `main` | `7358285` | main checkout; clean |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `7358285` | this session; ahead of `main` by the rounds below |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.
