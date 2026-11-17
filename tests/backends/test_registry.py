@@ -873,3 +873,211 @@ def test_gemma4_load_needs_the_model_path(tmp_path):
     (tmp_path / "kindi_pack.json").write_text('{"backend": "kindi_gemma4"}', encoding="utf-8")
     with pytest.raises(registry.BackendUnavailable, match="model_path"):
         registry.resolve("gemma4-e4b", config={"pack": str(tmp_path)})
+
+
+# --- the shared stop scan and the token-filter state, on the adapters that lacked them ---------
+
+# "END" is never one decoded piece here: the fakes split it as "EN" + "D", so only the
+# accumulated text contains the stop. Token 13 must never be emitted once it is found.
+_PIECES = {10: "The sky is ", 11: "EN", 12: "D", 13: "blue."}
+_SCRIPT = [10, 11, 12, 13]
+
+
+class _FakePieceTok(object):
+    """decode([id]) with scripted text, for the adapters that decode one id at a time."""
+
+    eos = None
+
+    def __init__(self, pieces):
+        self.pieces = dict(pieces)
+        self.sid = {"<|im_end|>": 2, "<|endoftext|>": 1}
+
+    def decode(self, ids):
+        return "".join(self.pieces.get(int(i), "?") for i in ids)
+
+
+class _FakeLightningScriptEngine(object):
+    def __init__(self, script):
+        self.script = list(script)
+        self.calls = []
+
+    def reset(self):
+        self.calls.append(("reset",))
+
+    def prefill(self, ids, pos=None):
+        self.calls.append(("prefill", list(ids), pos))
+        return self.script.pop(0) if self.script else 2
+
+    def step(self, tok):
+        self.calls.append(("step", int(tok)))
+        return self.script.pop(0) if self.script else 2
+
+
+def test_lightning_generate_stops_on_a_stop_string_split_across_two_pieces():
+    from kindi.backends.base import SamplingParams
+    from kindi.backends.lightning import LightningBackend
+
+    backend = LightningBackend()
+    backend.loaded = True
+    backend.ctx = 4096
+    backend.tok = _FakePieceTok(_PIECES)
+    backend.engine = _FakeLightningScriptEngine(_SCRIPT)
+    backend.stop_ids = set()
+    events = list(backend.generate([5, 6], SamplingParams(max_tokens=4, stop=("END",))))
+    assert [e.token_id for e in events if e.kind == "token"] == [10, 11, 12]
+    assert events[-1].finish_reason == "stop"
+
+
+class _FakeNanbeigeTok(object):
+    bos = 1
+    eos = None
+    tokens = [""] * 32
+    types = [0] * 32
+
+    def __init__(self, pieces):
+        self.pieces = dict(pieces)
+
+    def decode(self, ids):
+        return "".join(self.pieces.get(int(i), "?") for i in ids)
+
+
+class _FakeNanbeigeScriptEngine(object):
+    """prefill_batch/step plus the logits window _sample_next reads."""
+
+    def __init__(self, script, vocab=32):
+        import numpy as np
+        from types import SimpleNamespace
+
+        self.script, self.vocab, self.n, self.calls = list(script), vocab, 0, []
+        self.card = SimpleNamespace(dev=0, logits=np.full(vocab, -10.0))
+        self.cards = [self.card]
+
+        class _Device(object):
+            def __init__(self, dev):
+                self.dev = dev
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        class _Cuda(object):
+            Device = _Device
+
+        self.cp = SimpleNamespace(cuda=_Cuda(), asnumpy=np.asarray,
+                                  flatnonzero=np.flatnonzero)
+
+    def _logits(self):
+        import numpy as np
+
+        z = np.full(self.vocab, -10.0)
+        if self.n < len(self.script):
+            z[self.script[self.n]] = 10.0
+        self.n += 1
+        self.card.logits = z
+        return z
+
+    def prefill_batch(self, ids, pos0=0):
+        self.calls.append(("prefill", list(ids), pos0))
+        return int(self._logits().argmax())
+
+    def step(self, tok, pos):
+        self.calls.append(("step", int(tok), int(pos)))
+        return int(self._logits().argmax())
+
+
+def _nanbeige(script, pieces=None):
+    from kindi.backends.nanbeige import NanbeigeBackend
+
+    backend = NanbeigeBackend()
+    backend.loaded = True
+    backend.ctx = 4096
+    backend.tok = _FakeNanbeigeTok(pieces or _PIECES)
+    backend.engine = _FakeNanbeigeScriptEngine(script)
+    backend.stop_ids = set()
+    return backend
+
+
+def test_nanbeige_generate_stops_on_a_stop_string_split_across_two_pieces():
+    from kindi.backends.base import SamplingParams
+
+    events = list(_nanbeige(_SCRIPT).generate(
+        [5, 6], SamplingParams(max_tokens=4, stop=("END",))))
+    assert [e.token_id for e in events if e.kind == "token"] == [10, 11, 12]
+    assert events[-1].finish_reason == "stop"
+
+
+def test_dsv41_generate_stops_on_a_stop_string_split_across_two_pieces():
+    """dsv41's own pieces are "b" then "x" through _FakeDsTok, so "bx" only exists in the
+    accumulated text - the case a per-piece check would miss."""
+    from kindi.backends.base import SamplingParams
+
+    events = list(_dsv41(_FakeDsEngine(peak=5)).generate(
+        [10], SamplingParams(max_tokens=4, stop=("bx",))))
+    assert [e.token_id for e in events if e.kind == "token"] == [5, 6]
+    assert events[-1].finish_reason == "stop"
+
+
+def test_gemma4_and_dsv41_token_filters_receive_the_prompt():
+    """A prompt-dependent filter (a grammar seeded from the prompt, a "do not stop inside a
+    fenced block" rule) is useless if the adapter hands it an empty list: it must see the real
+    prompt ids, and the masked id must be the token that comes out."""
+    from kindi.backends.base import SamplingParams
+
+    for backend in (_gemma4(_FakeG4Engine(peak=5)), _dsv41(_FakeDsEngine(peak=5))):
+        seen = []
+
+        def filt(state, seen=seen):
+            seen.append((list(state["prompt_ids"]), list(state["generated"])))
+            return {6}
+
+        events = list(backend.generate([10, 11, 12], SamplingParams(max_tokens=1,
+                                                                   token_filter=filt)))
+        assert seen == [([10, 11, 12], [])], type(backend).__name__
+        assert [e.token_id for e in events if e.kind == "token"] == [6]
+
+
+def test_nanbeige_token_filter_receives_the_prompt():
+    from kindi.backends.base import SamplingParams
+
+    seen = []
+
+    def filt(state):
+        seen.append(list(state["prompt_ids"]))
+        return {10}
+
+    events = list(_nanbeige([10]).generate([5, 6, 7], SamplingParams(max_tokens=1,
+                                                                    token_filter=filt)))
+    assert seen == [[5, 6, 7]]
+    assert [e.token_id for e in events if e.kind == "token"] == [10]
+
+
+class _CountingText(str):
+    """A str that counts the characters slicing hands out, so a rescan is measurable."""
+
+    read = 0
+
+    def __getitem__(self, item):
+        piece = str.__getitem__(self, item)
+        _CountingText.read += len(piece)
+        return piece
+
+
+def test_stop_scanner_reads_only_the_tail_of_a_long_reply():
+    """The O(n^2) defect re-scanned the whole reply per token; the cursor must read only the
+    new characters plus the longest-stop overlap, however long the reply gets."""
+    from kindi.backends.base import StopScanner
+
+    scanner = StopScanner(("<eos>",))
+    _CountingText.read = 0
+    text = _CountingText("x" * 4000)
+    assert scanner.hit(text) is False
+    first = _CountingText.read
+    for _ in range(200):
+        text = _CountingText(text + "xxxx")
+        assert scanner.hit(text) is False
+    tail = _CountingText.read - first
+    # 200 pieces of 4 chars each, read with the 4-char overlap window: ~8 chars per call.
+    assert tail <= 200 * 12, "the scanner re-read %d chars for 800 new ones" % tail
+    assert scanner.hit(_CountingText(text + "<eos>")) is True
