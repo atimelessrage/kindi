@@ -8,9 +8,11 @@ tuple is not a Python error, so nothing caught it.
 
 This test is the launch-shape contract for the four modules that build graphs (`spec.py`,
 `dspine.py`, `mtp.py`, `tp.py`): it reads each kernel's parameter count from its `.cu` declaration and
-each call site's argument tuple from the Python source. Call sites it cannot resolve statically are
-**listed and pinned** (`UNRESOLVED_SITES`) rather than skipped, so a new dynamic launch has to be
-classified by a person instead of disappearing from the check.
+each call site's argument tuple from the Python source. DSpine's `self.kf` dictionary and its
+`self.k` / `self.k8` / `self.k16` assignments are resolved from the literals that build them, so the
+contract reaches those graph nodes instead of pinning the lookup. Call sites it cannot resolve
+statically are **listed and pinned** (`UNRESOLVED_SITES`) rather than skipped, so a new dynamic
+launch has to be classified by a person instead of disappearing from the check.
 
 `test_every_checked_site_is_detected_when_mutated` proves each check is real: for every measured call
 site it writes a copy of the module with that site's argument tuple shortened and requires the checker
@@ -49,42 +51,10 @@ UNRESOLVED_SITES = [
     ('kindi/spec.py', 'fdk', 'kernel expression is not a static k_* attribute'),
     ('kindi/spec.py', 'getattr(K, vdec)', 'kernel expression is not a static k_* attribute'),
     ('kindi/spec.py', 'SK.mv[nw]', 'kernel expression is not a static k_* attribute'),
-    # dspine.py
-    ('kindi/dspine.py', 'self.k', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'self.k8 if n <= 8 else self.k16', 'kernel expression is not a static k_* attribute'),
+    # dspine.py: `kf[...]`, `self.k` and `self.k8 if ... else self.k16` are resolved from the
+    # literals that build their tables; these two are still not kernel expressions.
     ('kindi/dspine.py', 'fn if hasattr(fn, "kernel") else _Fk(fn)', 'kernel expression is not a static k_* attribute'),
     ('kindi/dspine.py', 'self.hmv', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_rms_rows"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_rpos_set"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_rms_rows"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_gather_tok"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_top16a"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_top16b"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_tail_base"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_gather_sid"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_gather_h"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_tail_sc"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_chain"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_headnorm_rope"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_ring_mod"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_ring_mod"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_headnorm_rope"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_headnorm_rope"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_ring_store"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_ring_store"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_att_part"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_att_comb"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_rms_rows"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_silu_mul"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_bridge_a"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_h16mm8"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_bridge_codes"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_h16mm8"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_bridge_msg"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_h16mm8"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_bridge_out"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_rms_rows"]', 'kernel expression is not a static k_* attribute'),
-    ('kindi/dspine.py', 'kf["k_h16mm16"]', 'kernel expression is not a static k_* attribute'),
     # mtp.py
     ('kindi/mtp.py', 'SK.mv[nw]', 'kernel expression is not a static k_* attribute'),
     ('kindi/mtp.py', 'SK.mv[nw]', 'kernel expression is not a static k_* attribute'),
@@ -96,7 +66,6 @@ UNRESOLVED_SITES = [
     ('kindi/tp.py', 'attn_v', 'kernel expression is not a static k_* attribute'),
     ('kindi/tp.py', 'tuple(args) + (x, a[0][3])', 'argument count is not a literal tuple'),
     ('kindi/tp.py', 'store_kv', 'kernel expression is not a static k_* attribute'),
-    ('kindi/tp.py', 'K.k_attn_sq8d if s.dp4a else K.k_attn_sq8t', 'kernel expression is not a static k_* attribute'),
     ('kindi/tp.py', 'attn_v', 'kernel expression is not a static k_* attribute'),
     ('kindi/tp.py', 'kern', 'kernel expression is not a static k_* attribute'),
     ('kindi/tp.py', 'kern', 'kernel expression is not a static k_* attribute'),
@@ -164,10 +133,104 @@ def _norm(node, src):
     return text if len(text) <= 60 else text[:57] + "..."
 
 
-def _kernel_name(node):
-    """The kernel a launch names, or None when the expression is not a static attribute."""
-    if isinstance(node, ast.Attribute) and node.attr.startswith("k_"):
-        return node.attr
+def _string_values(node, consts):
+    """Possible string values of a small literal expression (`"k_" + sfx`, `x if c else y`)."""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return {node.value}
+    if isinstance(node, ast.Name):
+        return set(consts.get(node.id, ()))
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        return {a + b for a in _string_values(node.left, consts)
+                for b in _string_values(node.right, consts)}
+    if isinstance(node, ast.IfExp):
+        return _string_values(node.body, consts) | _string_values(node.orelse, consts)
+    return set()
+
+
+def _assign_pairs(target, value):
+    """`a, b = x, y` as pairs, otherwise one pair."""
+    if (isinstance(target, (ast.Tuple, ast.List)) and isinstance(value, (ast.Tuple, ast.List))
+            and len(target.elts) == len(value.elts)):
+        return list(zip(target.elts, value.elts))
+    return [(target, value)]
+
+
+def _dict_keys(node):
+    """The static keys of `{k: ... for k in (...)}` (or a literal dict)."""
+    if isinstance(node, ast.Dict):
+        return {k.value for k in node.keys if isinstance(k, ast.Constant) and isinstance(k.value, str)}
+    if isinstance(node, ast.DictComp):
+        keys = set()
+        for gen in node.generators:
+            if isinstance(gen.iter, (ast.Tuple, ast.List)):
+                keys.update(v.value for v in gen.iter.elts
+                            if isinstance(v, ast.Constant) and isinstance(v.value, str))
+        return keys
+    return set()
+
+
+def _function_names(node, consts):
+    """Kernel names behind `M.get_function("name" + suffix)`; empty when not such a call."""
+    if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "get_function" and node.args):
+        return _string_values(node.args[0], consts)
+    return set()
+
+
+def _kernel_tables(src):
+    """Resolve the local kernel dictionaries/attributes the checker can read statically.
+
+    `dspine.py` builds `self.kf` from a literal list of names and keeps kernels on `self.k` /
+    `self.k8`/`self.k16`; those are as static as `SK.k_*`, but the old checker only accepted the
+    latter.  The table keeps the dict keys, the attributes' possible names, and the local aliases
+    (`kf = self.kf`) so a launch through any of them is measured instead of pinned.
+    """
+    tree = ast.parse(src)
+    consts = {}
+    for _ in range(3):                       # resolve `sfx = ...` before `"prefix" + sfx`
+        before = {k: set(v) for k, v in consts.items()}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and len(node.targets) == 1:
+                for target, value in _assign_pairs(node.targets[0], node.value):
+                    if isinstance(target, ast.Name):
+                        consts.setdefault(target.id, set()).update(_string_values(value, consts))
+        if consts == before:
+            break
+    attrs, dicts, aliases = {}, {}, set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        for target, value in _assign_pairs(node.targets[0], node.value):
+            if isinstance(target, ast.Attribute) and target.attr == "kf":
+                keys = _dict_keys(value)
+                if keys:
+                    dicts.setdefault("kf", set()).update(keys)
+            elif isinstance(target, ast.Attribute):
+                names = _function_names(value, consts)
+                if names:
+                    attrs.setdefault(target.attr, set()).update(names)
+            elif isinstance(target, ast.Name) and target.id == "kf":
+                if (isinstance(value, ast.Attribute) and value.attr == "kf") or (
+                        isinstance(value, ast.Name) and value.id in aliases):
+                    aliases.add(target.id)
+    return {"attrs": attrs, "dicts": dicts, "aliases": aliases}
+
+
+def _kernel_names(node, tables):
+    """Possible kernel names a launch expression denotes, or None when it is not static."""
+    if isinstance(node, ast.Attribute):
+        if node.attr.startswith("k_"):
+            return {node.attr}
+        return set(tables["attrs"].get(node.attr, ())) or None
+    if isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
+        is_table = (isinstance(node.value, ast.Attribute) and node.value.attr == "kf") or (
+            isinstance(node.value, ast.Name) and node.value.id in tables["aliases"])
+        if is_table and node.slice.value in tables["dicts"].get("kf", ()):
+            return {node.slice.value}
+        return None
+    if isinstance(node, ast.IfExp):
+        body, other = _kernel_names(node.body, tables), _kernel_names(node.orelse, tables)
+        return body | other if body is not None and other is not None else None
     return None
 
 
@@ -188,9 +251,8 @@ def _count(node):
     return None
 
 
-def _launches(path):
-    """(call node, kernel expr node, args expr node) for every graph launch in a module."""
-    src = (ROOT / path).read_text(encoding="utf-8")
+def _launch_sites(src, path):
+    """(call node, kernel expr node, args expr node) for every graph launch in `src`."""
     tree = ast.parse(src, filename=str(path))
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call) or len(node.args) != 4:
@@ -206,32 +268,45 @@ def _launches(path):
         yield node, node.args[0], node.args[3], src
 
 
-def check_module(path):
-    """(checked, unresolved, mismatches) for one module.
+def _launches(path):
+    src = (ROOT / path).read_text(encoding="utf-8")
+    yield from _launch_sites(src, path)
+
+
+def _check_source(src, path):
+    """(checked, unresolved, mismatches) over one module source.
 
     checked:    [(lineno, kernel, count, declared)]
     unresolved: [(expression, reason)]
     mismatches: [(lineno, kernel, count, declared)]
     """
     arities = _kernel_arity()
+    tables = _kernel_tables(src)
     checked, unresolved, mismatches = [], [], []
-    for _node, kernel_expr, args_expr, src in _launches(path):
-        name = _kernel_name(kernel_expr)
-        if name is None:
-            unresolved.append((_norm(kernel_expr, src), "kernel expression is not a static k_* attribute"))
+    for node, kernel_expr, args_expr, source in _launch_sites(src, path):
+        names = _kernel_names(kernel_expr, tables)
+        if names is None:
+            unresolved.append((_norm(kernel_expr, source), "kernel expression is not a static k_* attribute"))
             continue
-        if name not in arities:
-            unresolved.append(("%s (args)" % _norm(kernel_expr, src),
-                               "kernel %s has no .cu declaration" % name))
+        missing = names - set(arities)
+        if missing:
+            unresolved.append(("%s (args)" % _norm(kernel_expr, source),
+                               "kernel %s has no .cu declaration" % "+".join(sorted(missing))))
             continue
         count = _count(args_expr)
         if count is None:
-            unresolved.append((_norm(args_expr, src), "argument count is not a literal tuple"))
+            unresolved.append((_norm(args_expr, source), "argument count is not a literal tuple"))
             continue
-        checked.append((_node.lineno, name, count, sorted(arities[name])))
-        if count not in arities[name]:
-            mismatches.append((_node.lineno, name, count, sorted(arities[name])))
+        name = "+".join(sorted(names))
+        declared = sorted(set().union(*(arities[n] for n in names)))
+        checked.append((node.lineno, name, count, declared))
+        if count not in declared:
+            mismatches.append((node.lineno, name, count, declared))
     return checked, unresolved, mismatches
+
+
+def check_module(path):
+    return _check_source((ROOT / path).read_text(encoding="utf-8"), path)
 
 
 def test_the_contract_covers_every_module():
@@ -280,8 +355,10 @@ def test_measured_sites_are_the_pinned_count():
     """A pin on the number checked, so a silent drop in coverage is a failure too."""
     counts = {path: len(check_module(path)[0]) for path in MODULES}
     total = sum(counts.values())
-    assert total == 71, counts
+    assert total == 105, counts
+    assert counts["kindi/dspine.py"] == 37, counts
     assert counts["kindi/spec.py"] >= 26, counts
+    assert len(UNRESOLVED_SITES) == 37
 
 
 def _mutate(path, kernel_expr, args_expr, mode="drop"):
@@ -312,10 +389,12 @@ def test_every_checked_site_is_detected_when_mutated():
     detected, missed = [], []
     for path in MODULES:
         src = (ROOT / path).read_text(encoding="utf-8")
-        for node, kernel_expr, args_expr, _ in _launches(path):
-            if _kernel_name(kernel_expr) is None or _count(args_expr) is None:
+        tables = _kernel_tables(src)
+        for node, kernel_expr, args_expr, _ in _launch_sites(src, path):
+            names = _kernel_names(kernel_expr, tables)
+            if names is None or _count(args_expr) is None:
                 continue
-            name = _kernel_name(kernel_expr)
+            name = "+".join(sorted(names))
             want = node.lineno
             caught, last_reason = False, ""
             for mode in ("drop", "empty"):
@@ -340,31 +419,9 @@ def test_every_checked_site_is_detected_when_mutated():
             else:
                 missed.append("%s:%d %s (%s)" % (path, want, name, last_reason))
     assert not missed, "mutations that no check caught:\n" + "\n".join(missed)
-    assert len(detected) == 71, len(detected)
+    assert len(detected) == 105, len(detected)
 
 
 def check_module_from_source(src, name):
     """check_module over an in-memory copy (the mutation test must not touch the worktree)."""
-    arities = _kernel_arity()
-    tree = ast.parse(src, filename=str(name))
-    checked, unresolved, mismatches = [], [], []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call) or len(node.args) != 4:
-            continue
-        func = node.func
-        if not ((isinstance(func, ast.Attribute) and func.attr == "add") or
-                (isinstance(func, ast.Name) and func.id == "E")):
-            continue
-        kernel_expr, args_expr = node.args[0], node.args[3]
-        kname = _kernel_name(kernel_expr)
-        if kname is None or kname not in arities:
-            unresolved.append((_norm(kernel_expr, src), "not static"))
-            continue
-        count = _count(args_expr)
-        if count is None:
-            unresolved.append((_norm(args_expr, src), "not a literal tuple"))
-            continue
-        checked.append((node.lineno, kname, count, sorted(arities[kname])))
-        if count not in arities[kname]:
-            mismatches.append((node.lineno, kname, count, sorted(arities[kname])))
-    return checked, unresolved, mismatches
+    return _check_source(src, name)
