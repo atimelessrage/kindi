@@ -125,6 +125,55 @@ def test_probe_annotates_every_card_with_features_and_paths(monkeypatch):
     assert "sm_89" in text and "Kindi can use" in text and "card 0" in text
 
 
+def test_windows_features_are_read_from_kernel32(monkeypatch):
+    import ctypes
+
+    class _K32(object):
+        def IsProcessorFeaturePresent(self, number):
+            return {39: 1, 40: 1, 41: 0}.get(number, 0)
+
+    class _Windll(object):
+        kernel32 = _K32()
+
+    monkeypatch.setattr(ctypes, "windll", _Windll(), raising=False)
+    got = caps.windows_features()
+    assert got == {"avx": True, "avx2": True, "avx512": False}
+    assert caps.WINDOWS_PF == (("avx", 39), ("avx2", 40), ("avx512", 41))
+
+
+def test_a_missing_kernel32_leaves_the_flags_unknown(monkeypatch):
+    import ctypes
+
+    class _Broken(object):
+        def __getattr__(self, name):
+            raise OSError("no kernel32 here")
+
+    monkeypatch.setattr(ctypes, "windll", _Broken(), raising=False)
+    assert caps.windows_features() == {"avx": None, "avx2": None, "avx512": None}
+
+
+def test_detected_windows_flags_fill_gaps_but_never_override_the_engine(monkeypatch):
+    from kindi import cpu as cpu_backend
+
+    monkeypatch.setattr(caps, "cpu_extras", lambda: {"l2_kb": None, "l3_kb": None,
+                                                     "avx512": None, "amx": None})
+    monkeypatch.setattr(caps, "windows_features",
+                        lambda: {"avx": False, "avx2": True, "avx512": False})
+    monkeypatch.setattr(caps.os, "name", "nt")
+    monkeypatch.setattr(cpu_backend, "feature_report",
+                        lambda: {"model": "cpu", "physical": 4, "logical": 8,
+                                 "features": {"avx": True, "avx2": None, "fma": None,
+                                              "f16c": None}})
+
+    report = caps.cpu_report()
+    assert report["features"]["avx"] is True        # the engine's own answer wins
+    assert report["features"]["avx2"] is True       # gap filled from kernel32
+    assert report["avx512"] is False                # also filled, and a real value not None
+    text = "\n".join(caps.render({"gpus": [], "gpu_source": "none", "cpu": report}))
+    assert "AVX2=yes" in text
+    assert "FMA3/F16C not exposed by this OS" in text
+
+
 def test_toolchain_reports_the_resolved_compiler(monkeypatch):
     monkeypatch.setattr(caps.shutil, "which", lambda name: "C:/llvm/bin/clang.exe")
     found = caps.toolchain()

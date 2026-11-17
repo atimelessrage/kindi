@@ -248,6 +248,29 @@ def cpu_extras():
         return {"l2_kb": None, "l3_kb": None, "avx512": None, "amx": None}
 
 
+# kernel32's PF_*_INSTRUCTIONS_AVAILABLE values (Windows 10 SDK winnt.h). There is no constant
+# for FMA3 or F16C, so those two stay unknown on Windows unless a compiler probe answers them.
+WINDOWS_PF = (("avx", 39), ("avx2", 40), ("avx512", 41))
+
+
+def windows_features():
+    """AVX / AVX2 / AVX-512F from `IsProcessorFeaturePresent` — no compiler, no /proc needed.
+
+    This is the part of the interrupted CPUID draft that can be settled without compiling anything;
+    its AVX-512 kernels are still archived because no AVX-512 machine is available to verify them.
+    """
+    out = {"avx": None, "avx2": None, "avx512": None}
+    try:
+        import ctypes
+
+        kernel32 = ctypes.windll.kernel32
+        for key, number in WINDOWS_PF:
+            out[key] = bool(kernel32.IsProcessorFeaturePresent(number))
+    except Exception:  # noqa: BLE001 - not Windows, or no kernel32: unknown, not false
+        return {"avx": None, "avx2": None, "avx512": None}
+    return out
+
+
 def toolchain():
     """The compiler the CPU engine would be built with, resolved the same way `kindi/cpu.py` does.
 
@@ -266,14 +289,24 @@ def cpu_report():
     report = cpu_backend.feature_report()
     tier = cpu_backend.cpu_tier(report)
     extras = cpu_extras()
+    # Fill what the OS would not tell the engine probe with what it will tell this command; the
+    # engine's own answer always wins where it has one, so the report cannot contradict it.
+    features = dict(report["features"] or {})
+    if os.name == "nt":
+        detected = windows_features()
+        for key in ("avx", "avx2"):
+            if features.get(key) is None and detected.get(key) is not None:
+                features[key] = detected[key]
+        if extras.get("avx512") is None and detected.get("avx512") is not None:
+            extras["avx512"] = detected["avx512"]
     return {
         # WMI has the marketing name and core counts on Windows, where platform.processor()
         # answers "Intel64 Family 6 Model 158 Stepping 10"; Linux answers from /proc/cpuinfo.
         "model": extras.get("model") or report["model"],
         "physical": report["physical"] or extras.get("physical"),
         "logical": report["logical"] or extras.get("logical"),
-        "features_known": any(v is not None for v in (report["features"] or {}).values()),
-        "features": report["features"],
+        "features_known": any(v is not None for v in features.values()),
+        "features": features,
         "tier": tier,
         "tier_label": cpu_backend.CPU_TIER_LABELS.get(tier, tier),
         "build": cpu_backend.select_isa(report) or "native (-march=native)",
@@ -367,6 +400,12 @@ def render(report):
     if cpu.get("features_known") is False:
         lines.append("     note: this OS exposes no CPU flags to Python; the build compiler probe "
                      "(kindi/cpu.py, KINDI_CC) is the authority, and KINDI_CPU_ISA can name the tier")
+    else:
+        missing = [label for name, label in (("fma", "FMA3"), ("f16c", "F16C"))
+                   if (cpu.get("features") or {}).get(name) is None]
+        if missing:
+            lines.append("     note: %s not exposed by this OS; the build compiler probe "
+                         "(kindi/cpu.py, KINDI_CC) answers them and picks the tier" % "/".join(missing))
     if cpu.get("avx512"):
         lines.append("     note: AVX-512 is present but no Kindi kernel uses it yet (a named roadmap gate)")
     return lines

@@ -37,10 +37,32 @@ A card having FP8 tensor cores does not mean Kindi has an FP8 kernel for the mod
 is why the second list is shorter and why AVX-512 on the CPU is printed as *present but unused*:
 there is no AVX-512 kernel, and that is a named roadmap gate rather than a hidden one.
 
+The detection half of the interrupted 2026-11-09 CPUID draft
+(`wip/main-interrupted-snapshot-20261109-045352:kindi/kcpu_cpuid.c`) was taken over here — that is
+where the AVX-512/AMX reporting started. Its AVX-512 kernels (`fwht_block_avx512`, `rows16_avx512`)
+stay archived on purpose: no machine here has AVX-512, so they could not be compiled, verified or
+measured, and an unverifiable kernel would be a claim, not a feature. Reopening them needs an
+AVX-512 host and the roadmap gate that already names it.
+
 The CPU half reuses the engine's own probe (`kindi/cpu.py`), so the report cannot disagree with the
 engine about AVX/AVX2/FMA3/F16C or about which build tier would be selected. On top of that it adds
 what the engine does not need but a tuner does: the marketing model name and core counts (from WMI on
-Windows, `/proc/cpuinfo` on Linux), L2/L3 size, and whether AVX-512/AMX exist. Two honesty rules:
+Windows, `/proc/cpuinfo` on Linux), L2/L3 size, and whether AVX-512/AMX exist.
+
+Which OS answers which question, so a value is never invented:
+
+| flag | Linux | Windows |
+|---|---|---|
+| AVX, AVX2 | `/proc/cpuinfo` flags | `kernel32.IsProcessorFeaturePresent(39/40)` |
+| AVX-512F | `/proc/cpuinfo` flags | `IsProcessorFeaturePresent(41)` |
+| AMX | `/proc/cpuinfo` flags | unknown (no kernel32 constant) |
+| FMA3, F16C | `/proc/cpuinfo` flags | unknown — the build compiler probe answers them, which is why the line says so |
+| L2/L3 | `lscpu` | WMI `Win32_Processor` |
+
+The engine's own answer always wins where it has one: `kindi caps` only fills values the OS would not
+give the engine probe, so it cannot report something the engine disagrees with.
+
+Two honesty rules:
 
 - a feature the OS does not expose is **unknown**, never "unsupported" (Windows hands Python no CPU
   flags; the build compiler probe is the authority there, and the output says so);
@@ -58,10 +80,11 @@ GPU: 1 card (identified with nvidia-smi)
            Kindi can use: 5-trit kernels, dense CPU+GPU tandem split, plan engine (tensor-core MMA),
                           FP8 Gemma 4 path (on by default, KINDI_G4_FP8=0 disables)
 CPU: Intel(R) Core(TM) i7-8086K CPU @ 4.00GHz, 6 physical / 12 logical threads
-     AVX=unknown, AVX2=unknown, FMA3=unknown, F16C=unknown
-     L3 12 MiB, L2 1 MiB, AVX-512=unknown, AMX=unknown
+     AVX=yes, AVX2=yes, FMA3=unknown, F16C=unknown
+     L3 12 MiB, L2 1 MiB, AVX-512=no, AMX=unknown
      Kindi CPU path: unknown until the compiler selects the path (build native (-march=native)), 6 threads recommended
-     note: this OS exposes no CPU flags to Python; the build compiler probe (kindi/cpu.py, KINDI_CC) is the authority…
+     CPU engine toolchain: clang not found on PATH (set KINDI_CC, and KINDI_LLVM on Windows) — the CPU engine and the tandem split cannot be built here
+     note: FMA3/F16C not exposed by this OS; the build compiler probe (kindi/cpu.py, KINDI_CC) answers them and picks the tier
 ```
 
 ## `kindi autotune` — which placement this model actually likes here
