@@ -69,6 +69,40 @@ falls from 93.9 to 55.3 tok/s as the context grows, while decode at position
 100 is effectively unchanged (85.6 to 86.3 tok/s); at 8K its decode is
 79.7 tok/s. Free memory after the engine fit is 4,371 MiB on the 9B at 8K.
 
+## Position 512 (separate harness, not the bench sweep)
+
+`kindi bench` prints a generation position only when `p + 20 < ctx`, so its
+ctx-512 runs stop at position 100 and the sweep never reports a literal position
+512. [`pos512_stock.py`](pos512_stock.py) fills that gap: it calls the same stock
+engine, the same `step(token, pos)` and the same 10-step timing as the bench,
+after the bench's own 20-call prompt-reading warm-up, for positions 100 (a
+fidelity anchor) and 512. The context is 8192 because position 512 plus the ten
+timed steps does not fit in a 512-token K/V cache. This is a separate harness,
+not a change to `kindi bench`, and the sweep table above is unchanged.
+
+Five passes per model, same host and loader shim, medians (range = five-pass
+min-max):
+
+| model | position | median tok/s | range |
+|---|---:|---:|---|
+| 2B | 512 | 171.2 | 159.2-175.0 |
+| 9B | 512 | 80.7 | 76.3-83.3 |
+
+The position-100 anchor measured 170.0 (130.3-182.3) on the 2B and 81.7
+(78.5-84.4) on the 9B. It is lower than the sweep's own single-pass position-100
+rows at ctx 8192 (191.4 and 86.3), so the harness is used only for the 512 row
+and not to restate 100; the drift is the same GPU-clock spread that makes
+single-pass cells indicative. The 512 row is therefore a median with a range,
+not a precise rate, and it is not a row in the sweep table.
+
+```sh
+cp docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-stock-0.6.1/pos512_stock.py \
+   bench-logs/stock-v0.6.1/pos512_stock.py
+cd bench-logs/stock-v0.6.1
+python pos512_stock.py ~/.kindi/packs/bonsai-2b 8192
+python pos512_stock.py ~/.kindi/packs/bonsai-9b 8192
+```
+
 ## Artifacts
 
 - [`2b-512.log`](2b-512.log), [`2b-8192.log`](2b-8192.log),
@@ -77,6 +111,9 @@ falls from 93.9 to 55.3 tok/s as the context grows, while decode at position
 - [`2b-512-unmodified-stock-failure.log`](2b-512-unmodified-stock-failure.log):
   the unmodified-stock loader failure, not a benchmark result.
 - [`run_stock.py`](run_stock.py): the loader shim used for the runs.
+- [`pos512_stock.py`](pos512_stock.py): the separate position-512 harness.
+- `pos512-{2b,9b}-r{1..5}.log`: the ten harness passes, each with its command
+  and the position-100 anchor plus the position-512 row.
 
 Logs are verbatim except that local Python and pack prefixes were replaced
 with `<python>` and `~/.kindi`; timings and engine lines are unchanged.
@@ -88,3 +125,9 @@ stock plain engine and exact head. It does not measure tensor cores,
 speculation, server/cache behavior, token exactness, longer contexts, or
 repeated-run variance. Do not compare these rows to the fork's `tc` and
 `tc-spec` tables as if they were the same configuration.
+
+The position-512 section is a separate harness using the bench's own
+`step(token, pos)` semantics at `p = 512`, at ctx 8192; it does not prefill a
+512-token request, and its position-100 anchor is reported only as a check on
+the harness. Stock still needs the loader shim for every run on this page; the
+unmodified-stock failure above is unchanged.
