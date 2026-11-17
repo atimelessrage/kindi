@@ -4,6 +4,15 @@
 
 ### Added
 
+- **The verify matrix runs and scores speculation** — `tools/verify_matrix.py` gained a second axis:
+  `--spec-modes` (default all four) on `--spec-models` (default 2b) builds `<spec-base>-<spec>`
+  cells (default `tc-ngram`, `tc-mtp`, `tc-draft2b`, `tc-both`), passes `verify --spec` plus the
+  mode's files, and records requested/effective and accepted/drafted counts in the table, CSV and
+  JSON. A fallback is `refused` (checked before the generic exit-2/no-reference branch), and a
+  missing head or pack is a printed skip, so a host without them still runs the plain matrix; a
+  baseline containing a cell makes `--fail-on-regression` fail when it disappears. `--spec-base`,
+  `--mtp-head`, `--spec-pack` and `--draft-head` set the base and files. Eight tests cover the
+  environment chaining, skip reasons, parsing, refusal ordering and dry run.
 - **`kindi io` measures this host's memory tiers** — a RAM copy, an unbuffered disk read and pinned
   PCIe copies both ways, as text or `--json` (`--mib`, `--disk-dir`, `--skip`). The disk probe writes
   a temporary file and reads it with `O_DIRECT` (Linux) or `FILE_FLAG_NO_BUFFERING` (Windows) so it

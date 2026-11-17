@@ -68,6 +68,13 @@ this host. Two caveats: B0 and B2 draft with the same 2B that is the target, so 
 exact but the 128/128 and 102/242 acceptance numbers say nothing about the 27B; and `dspine` needs the
 DSpine weights, which are not on this host, so it has no cell yet (owner action).
 
+`tools/verify_matrix.py` runs the same cells as `<base>-<spec>` (`tc-ngram`, `tc-mtp`, `tc-draft2b`,
+`tc-both`): `--spec-modes` defaults to all four, `--spec-models` to `2b` and `--spec-base` to `tc`;
+its rows and CSV/JSON carry the requested/effective mode and accepted/drafted counts, a fallback is
+`refused`, and a cell whose optional head or pack is absent is printed as a skip. A baseline saved
+with those files therefore makes `--fail-on-regression` gate them; a host without them still runs
+the plain matrix.
+
 ### Measured 2026-11-17: mode A was silently dead, and costs on the 2B here
 
 `k_rmsfold_qT` gained a trailing `hp` argument in 0.5.0; `kindi/mtp.py` never passed it, so the

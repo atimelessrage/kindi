@@ -20,6 +20,14 @@ run once per model in the first requested mode; `--no-serve` / `--no-bench`
 skip them. Their statuses are recorded in results.json and printed; the exit
 code stays driven by the verify cells.
 
+Speculation is a second axis: `--spec-modes` (default ngram,mtp,draft2b,both)
+runs the `tc` cell plus `verify --spec <mode>` on `--spec-models` (default 2b).
+Each cell records the requested and effective mode and its accepted/drafted
+drafts; a mode that silently settled on another mode is `refused`, not a pass.
+A missing MTP head or 2B drafter pack is printed as a skip, so a host without
+the optional files still runs; when the files are present, a saved baseline
+and `--fail-on-regression` gate these cells like every other one.
+
 Examples:
   python tools/verify_matrix.py
   python tools/verify_matrix.py --models 2b,4b,9b,27b --modes tc \
@@ -60,6 +68,12 @@ MODELS = ("2b", "4b", "9b", "27b")
 # "tc-hp" is the tc mode plus KINDI_TC_HP=1: the 9B (Hadamard 4096) is refused
 # by default and only exact with the high-precision activations.
 MODES = ("plain", "tc", "tc-hp")
+# Speculation cells build on any engine mode (default tc) and add KINDI_SPEC plus the mode's files.
+# They are a separate axis so the default three-mode run keeps its meaning and the spec cells can be
+# limited to the models whose drafter exists. A cell's mode is `<base>-<spec>`.
+SPEC_MODES = ("ngram", "mtp", "draft2b", "both")
+SPEC_BASES = MODES
+SPEC_VALUES = {"%s-%s" % (base, spec): spec for base in SPEC_BASES for spec in SPEC_MODES}
 PACK_NAMES = {"2b": "bonsai-2b", "4b": "bonsai-4b", "9b": "bonsai-9b", "27b": "bonsai-27b"}
 
 # Keep these explicit: the script must not inherit a KINDI_* switch from the caller.
@@ -95,15 +109,24 @@ MODE_ENV = {
         "KINDI_TC_HP": "1",
     },
 }
+for _base in SPEC_BASES:
+    for _spec in SPEC_MODES:
+        MODE_ENV["%s-%s" % (_base, _spec)] = dict(MODE_ENV[_base], KINDI_SPEC=_spec)
 
 PROMPT_RE = re.compile(r"prompt\s+(\d+)\s+.*?\s+(PASS|TIE|FAIL)\s+(\d+)/(\d+) tokens match")
 TPS_RE = re.compile(r"([0-9]+(?:\.[0-9]+)?) tokens/s over the run")
 DIFF_RE = re.compile(r"first difference at token (\d+)(?: \(llama\.cpp top-2 gap there ([0-9.]+)\))?")
+# `verify.py` prints "speculation: requested mtp, effective mtp, head ..." first; a requested
+# model-drafter mode that settled elsewhere is a refusal (REQ-0025 A4), not a plain PASS.
+SPEC_RE = re.compile(r"speculation:\s+requested\s+([^,\s]+),\s+effective\s+([^,\s]+)")
+DRAFT_RE = re.compile(r",\s*(\d+)/(\d+)\s+drafts accepted")
+SPEC_REFUSAL_RE = re.compile(r"was requested but (?:the effective mode is|this engine cannot speculate)")
 
 CSV_FIELDS = (
     "model", "mode", "status", "prompts_pass", "prompts_tie", "prompts_fail",
     "tokens_per_second", "exit_code", "duration_s", "first_diff_token",
-    "first_diff_gap", "log",
+    "first_diff_gap", "spec_requested", "spec_effective", "drafts_accepted",
+    "drafts_drafted", "log",
 )
 
 COMPARISON_FIELDS = (
@@ -123,13 +146,50 @@ def mode_env(mode: str, cards: int = 1) -> dict[str, str]:
     return env
 
 
-def child_env(mode: str, cards: int = 1, base: dict[str, str] | None = None) -> dict[str, str]:
-    """Copy the caller's environment except every KINDI_* setting."""
+def child_env(mode: str, cards: int = 1, base: dict[str, str] | None = None,
+              extra: dict[str, str] | None = None) -> dict[str, str]:
+    """Copy the caller's environment except every KINDI_* setting.
+
+    `extra` adds the speculation mode's own file variables after the mode environment, so it is
+    the only place that can name KINDI_MTP_HEAD / KINDI_SPEC_PACK / KINDI_SPEC_DRAFT_HEAD.
+    """
     source = os.environ if base is None else base
     env = {k: v for k, v in source.items() if not k.startswith("KINDI_")}
     env.update(mode_env(mode, cards))
+    env.update(extra or {})
     env["PYTHONUNBUFFERED"] = "1"
     return env
+
+
+def spec_env(spec: str, mtp_head: Path | None = None, spec_pack: Path | None = None,
+             draft_head: Path | None = None) -> dict[str, str]:
+    """The files a speculation mode needs, as the engine reads them."""
+    env: dict[str, str] = {}
+    if spec == "mtp" and mtp_head is not None:
+        env["KINDI_MTP_HEAD"] = str(mtp_head)
+    if spec in ("draft2b", "both") and spec_pack is not None:
+        env["KINDI_SPEC_PACK"] = str(spec_pack)
+    if spec == "both" and draft_head is not None:
+        env["KINDI_SPEC_DRAFT_HEAD"] = str(draft_head)
+    return env
+
+
+def spec_missing(spec: str, mtp_head: Path | None, spec_pack: Path | None,
+                 draft_head: Path | None) -> list[str]:
+    """Why a speculation cell cannot run here; empty means it can.
+
+    A host without the optional head or the 2B drafter still runs the plain matrix, so these are
+    skips (printed and absent from the rows), not failures. A baseline that has the cell makes the
+    skip visible as a missing cell when the file disappears.
+    """
+    missing: list[str] = []
+    if spec == "mtp" and (mtp_head is None or not mtp_head.is_file()):
+        missing.append("no MTP head at %s" % (mtp_head or "(not set)"))
+    if spec == "both" and (draft_head is None or not draft_head.is_file()):
+        missing.append("no draft head at %s" % (draft_head or "(not set)"))
+    if spec in ("draft2b", "both") and (spec_pack is None or not spec_pack.is_dir()):
+        missing.append("no 2B drafter pack at %s" % (spec_pack or "(not set)"))
+    return missing
 
 
 def parse_verify_output(text: str, exit_code: int) -> dict:
@@ -148,6 +208,15 @@ def parse_verify_output(text: str, exit_code: int) -> dict:
 
     tps_matches = TPS_RE.findall(text)
     tokens_per_second = float(tps_matches[-1]) if tps_matches else None
+
+    spec_match = SPEC_RE.search(text)
+    spec_requested = spec_match.group(1) if spec_match else None
+    spec_effective = spec_match.group(2) if spec_match else None
+    drafts_accepted = drafts_drafted = 0
+    for line in text.splitlines():
+        for draft in DRAFT_RE.finditer(line):
+            drafts_accepted += int(draft.group(1))
+            drafts_drafted += int(draft.group(2))
 
     diffs = []
     for line in text.splitlines():
@@ -168,12 +237,17 @@ def parse_verify_output(text: str, exit_code: int) -> dict:
     tie_count = sum(p["state"] == "TIE" for p in prompts)
     fail_count = sum(p["state"] == "FAIL" for p in prompts)
 
-    if exit_code == 2 or "no llama.cpp reference" in text:
-        status = "no-reference"
-    elif exit_code == 124:
+    # A spec cell must not pass on another mode's output. Check the refusal before exit code 2,
+    # because verify exits 2 both for "no reference" and for a drafter that did not attach.
+    spec_fallback = bool(spec_requested and spec_requested != "auto" and spec_effective != spec_requested)
+    if exit_code == 124:
         status = "timeout"
+    elif spec_fallback or SPEC_REFUSAL_RE.search(text):
+        status = "refused"
     elif re.search(r"refus|supports Hadamard blocks|use the plain engine", text, re.IGNORECASE):
         status = "refused"
+    elif exit_code == 2 or "no llama.cpp reference" in text:
+        status = "no-reference"
     elif exit_code != 0 or fail_count:
         status = "fail"
     elif prompts and pass_count + tie_count == len(prompts):
@@ -193,6 +267,10 @@ def parse_verify_output(text: str, exit_code: int) -> dict:
         "tokens_per_second": tokens_per_second,
         "first_diff_token": first["token"] if first else None,
         "first_diff_gap": first["gap"] if first else None,
+        "spec_requested": spec_requested,
+        "spec_effective": spec_effective,
+        "drafts_accepted": drafts_accepted if spec_requested else None,
+        "drafts_drafted": drafts_drafted if spec_requested else None,
         "summary": summary,
     }
 
@@ -222,7 +300,12 @@ def _git_revision() -> str | None:
         return None
 
 
-def _missing_row(model: str, mode: str, pack: Path, cards: int) -> dict:
+def _missing_row(model: str, mode: str, pack: Path, cards: int,
+                 extra_env: dict[str, str] | None = None) -> dict:
+    spec = SPEC_VALUES.get(mode)
+    command = [sys.executable, "-m", "kindi", "--pack", _display_path(pack), "verify"]
+    if spec:
+        command += ["--spec", spec]
     return {
         "model": model,
         "mode": mode,
@@ -236,10 +319,14 @@ def _missing_row(model: str, mode: str, pack: Path, cards: int) -> dict:
         "duration_s": 0.0,
         "first_diff_token": None,
         "first_diff_gap": None,
+        "spec_requested": spec,
+        "spec_effective": None,
+        "drafts_accepted": None,
+        "drafts_drafted": None,
         "summary": "pack not found: %s" % _display_path(pack),
         "log": "",
-        "config": mode_env(mode, cards),
-        "command": [],
+        "config": dict(mode_env(mode, cards), **(extra_env or {})),
+        "command": command,
     }
 
 
@@ -452,10 +539,14 @@ def run_cell(
     cards: int,
     timeout: float,
     python: str = sys.executable,
+    extra_env: dict[str, str] | None = None,
 ) -> dict:
     log_path = out_dir / "logs" / ("%s-%s.log" % (model, mode))
+    spec = SPEC_VALUES.get(mode)
     command = [python, "-m", "kindi", "--pack", str(pack), "verify"]
-    env = child_env(mode, cards)
+    if spec:
+        command += ["--spec", spec]
+    env = child_env(mode, cards, extra=extra_env)
     started = time.monotonic()
     exit_code: int | None = None
     output = ""
@@ -483,10 +574,16 @@ def run_cell(
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_text(output, encoding="utf-8", newline="\n")
     parsed = parse_verify_output(output, exit_code)
+    status, summary = parsed["status"], parsed["summary"]
+    if spec and status == "pass" and parsed.get("spec_effective") != spec:
+        # a log that never named the effective mode is not evidence the mode ran; do not let it pass
+        status = "refused"
+        summary = "speculation: requested %s, effective %s" % (
+            spec, parsed.get("spec_effective") or "0")
     return {
         "model": model,
         "mode": mode,
-        "status": parsed["status"],
+        "status": status,
         "prompts": parsed["prompts"],
         "prompts_pass": parsed["prompts_pass"],
         "prompts_tie": parsed["prompts_tie"],
@@ -496,10 +593,15 @@ def run_cell(
         "duration_s": duration,
         "first_diff_token": parsed["first_diff_token"],
         "first_diff_gap": parsed["first_diff_gap"],
-        "summary": parsed["summary"],
+        "spec_requested": parsed.get("spec_requested") or spec,
+        "spec_effective": parsed.get("spec_effective"),
+        "drafts_accepted": parsed.get("drafts_accepted"),
+        "drafts_drafted": parsed.get("drafts_drafted"),
+        "summary": summary,
         "log": log_path.relative_to(out_dir).as_posix(),
-        "config": mode_env(mode, cards),
-        "command": [python, "-m", "kindi", "--pack", _display_path(pack), "verify"],
+        "config": dict(mode_env(mode, cards), **(extra_env or {})),
+        "command": [python, "-m", "kindi", "--pack", _display_path(pack), "verify"]
+                   + (["--spec", spec] if spec else []),
     }
 
 
@@ -611,6 +713,10 @@ def _write_results(out_dir: Path, rows: list[dict], args: argparse.Namespace,
                 "duration_s": "%.1f" % row["duration_s"],
                 "first_diff_token": "" if row["first_diff_token"] is None else row["first_diff_token"],
                 "first_diff_gap": "" if row["first_diff_gap"] is None else "%.4f" % row["first_diff_gap"],
+                "spec_requested": row.get("spec_requested") or "",
+                "spec_effective": row.get("spec_effective") or "",
+                "drafts_accepted": "" if row.get("drafts_accepted") is None else row["drafts_accepted"],
+                "drafts_drafted": "" if row.get("drafts_drafted") is None else row["drafts_drafted"],
                 "log": row["log"],
             })
     payload = {
@@ -777,13 +883,13 @@ def _format_delta(delta, delta_pct) -> str:
 
 def _print_comparison(comparisons: list[dict], baseline_only: list[dict], baseline_path: Path) -> None:
     print("\ncomparison vs %s" % baseline_path)
-    print("%-4s %-5s %-14s %8s %8s %18s  %s" %
+    print("%-4s %-10s %-14s %8s %8s %18s  %s" %
           ("model", "mode", "status", "base", "now", "throughput delta", "exactness base -> now"))
-    print("-" * 96)
+    print("-" * 101)
     for row in comparisons:
         exactness = row["exactness"] if row["baseline_exactness"] is None else \
             "%s -> %s" % (row["baseline_exactness"], row["exactness"])
-        print("%-4s %-5s %-14s %8s %8s %18s  %s" % (
+        print("%-4s %-10s %-14s %8s %8s %18s  %s" % (
             row["model"], row["mode"], row["status_change"],
             _format_tps(row["baseline_tokens_per_second"]),
             _format_tps(row["tokens_per_second"]),
@@ -846,14 +952,18 @@ def save_baseline(results_json: Path, target: Path) -> Path:
 
 
 def _print_table(rows: list[dict]) -> None:
-    print("\n%-4s %-5s %-11s %4s %3s %4s %8s  %s" %
-          ("model", "mode", "status", "pass", "tie", "fail", "tok/s", "log"))
-    print("-" * 76)
+    print("\n%-4s %-10s %-11s %4s %3s %4s %8s %-10s %-9s  %s" %
+          ("model", "mode", "status", "pass", "tie", "fail", "tok/s", "spec", "drafts", "log"))
+    print("-" * 100)
     for row in rows:
         tps = "n/a" if row["tokens_per_second"] is None else "%.1f" % row["tokens_per_second"]
-        print("%-4s %-5s %-11s %4d %3d %4d %8s  %s" %
+        spec = ("-" if row.get("spec_requested") is None else
+                "%s->%s" % (row["spec_requested"], row.get("spec_effective") or "0"))
+        drafts = ("-" if row.get("drafts_drafted") is None else
+                  "%d/%d" % (row.get("drafts_accepted") or 0, row["drafts_drafted"]))
+        print("%-4s %-10s %-11s %4d %3d %4d %8s %-10s %-9s  %s" %
               (row["model"], row["mode"], row["status"], row["prompts_pass"],
-               row["prompts_tie"], row["prompts_fail"], tps, row["log"]))
+               row["prompts_tie"], row["prompts_fail"], tps, spec, drafts, row["log"]))
 
 
 def _split_choice(value: str, allowed: tuple[str, ...], what: str) -> list[str]:
@@ -866,6 +976,40 @@ def _split_choice(value: str, allowed: tuple[str, ...], what: str) -> list[str]:
     return [item for item in allowed if item in wanted]
 
 
+def _split_optional(value: str, allowed: tuple[str, ...], what: str) -> list[str]:
+    """Like `_split_choice`, but an empty value (or `none`) selects nothing."""
+    if value.strip().lower() in ("", "none", "off"):
+        return []
+    return _split_choice(value, allowed, what)
+
+
+def matrix_cells(models: list[str], modes: list[str], spec_models: list[str],
+                 spec_modes: list[str], spec_base: str, pack_dir: Path,
+                 pack_27b: Path | None, mtp_head: Path | None,
+                 spec_pack: Path | None, draft_head: Path | None) -> list[dict]:
+    """The cells a run covers: every model x mode, then the speculation cells.
+
+    A spec cell is `<spec-base>-<spec>` (default `tc-ngram`, ...). It carries the mode's file
+    variables and a `skip` reason when an optional file is absent, so the plain matrix still runs
+    on a host without the head or the 2B drafter pack.
+    """
+    cells: list[dict] = []
+    for model in models:
+        pack = pack_for(model, pack_dir, pack_27b)
+        for mode in modes:
+            cells.append({"model": model, "mode": mode, "pack": pack,
+                          "extra_env": None, "spec": None, "skip": None})
+        if model not in spec_models:
+            continue
+        for spec in spec_modes:
+            extra = spec_env(spec, mtp_head, spec_pack, draft_head)
+            missing = spec_missing(spec, mtp_head, spec_pack, draft_head)
+            cells.append({"model": model, "mode": "%s-%s" % (spec_base, spec), "pack": pack,
+                          "extra_env": extra, "spec": spec,
+                          "skip": "; ".join(missing) or None})
+    return cells
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--pack-dir", type=Path, default=Path.home() / ".kindi" / "packs",
@@ -875,7 +1019,20 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--models", default=",".join(MODELS),
                     help="comma-separated models (default: 2b,4b,9b)")
     ap.add_argument("--modes", default=",".join(MODES),
-                    help="comma-separated modes (default: plain,tc)")
+                    help="comma-separated engine modes (default: %s)" % ",".join(MODES))
+    ap.add_argument("--spec-modes", default=",".join(SPEC_MODES),
+                    help="comma-separated speculation modes added on --spec-models "
+                         "(default: %s; 'none' disables)" % ",".join(SPEC_MODES))
+    ap.add_argument("--spec-models", default="2b",
+                    help="comma-separated models to run the speculation cells on (default: 2b)")
+    ap.add_argument("--spec-base", default="tc", choices=MODES,
+                    help="engine mode the speculation cells build on (default: tc)")
+    ap.add_argument("--mtp-head", type=Path, default=Path.home() / ".kindi" / "models" / "kindi-mtp-2b-v1.npz",
+                    help="MTP head for mtp (default: ~/.kindi/models/kindi-mtp-2b-v1.npz)")
+    ap.add_argument("--spec-pack", type=Path, default=None,
+                    help="2B pack used as the drafter for draft2b/both (default: <pack-dir>/bonsai-2b)")
+    ap.add_argument("--draft-head", type=Path, default=None,
+                    help="2B MTP head for both (default: --mtp-head)")
     ap.add_argument("--cards", type=int, default=1,
                     help="KINDI_CARDS for every cell (default: 1)")
     ap.add_argument("--timeout", type=float, default=900.0,
@@ -911,9 +1068,16 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit("--max-tps-drop-pct needs --baseline")
     models = _split_choice(args.models, MODELS, "model")
     modes = _split_choice(args.modes, MODES, "mode")
+    spec_models = _split_optional(args.spec_models, MODELS, "spec model")
+    spec_modes = _split_optional(args.spec_modes, SPEC_MODES, "speculation mode")
     args.pack_dir = args.pack_dir.expanduser().resolve()
     if args.pack_27b is not None:
         args.pack_27b = args.pack_27b.expanduser().resolve()
+    args.mtp_head = args.mtp_head.expanduser().resolve() if args.mtp_head is not None else None
+    args.draft_head = (args.draft_head.expanduser().resolve()
+                       if args.draft_head is not None else args.mtp_head)
+    args.spec_pack = (args.spec_pack.expanduser().resolve() if args.spec_pack is not None
+                      else pack_for("2b", args.pack_dir, args.pack_27b).resolve())
     args.out = args.out.expanduser().resolve()
     if args.baseline is not None:
         args.baseline = args.baseline.expanduser().resolve()
@@ -921,15 +1085,24 @@ def main(argv: list[str] | None = None) -> int:
         args.save_baseline = args.save_baseline.expanduser().resolve()
     args.started_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    cells = matrix_cells(models, modes, spec_models, spec_modes, args.spec_base,
+                         args.pack_dir, args.pack_27b, args.mtp_head, args.spec_pack,
+                         args.draft_head)
     if args.dry_run:
+        for cell in cells:
+            model, mode, pack = cell["model"], cell["mode"], cell["pack"]
+            if cell["skip"]:
+                print("would skip: %s %s (%s)" % (model, mode, cell["skip"]))
+                continue
+            env = dict(mode_env(mode, args.cards), **(cell["extra_env"] or {}))
+            env_text = " ".join("%s=%s" % (k, v) for k, v in sorted(env.items()))
+            command = [sys.executable, "-m", "kindi", "--pack", str(pack), "verify"]
+            if cell["spec"]:
+                command += ["--spec", cell["spec"]]
+            prefix = "would run" if (pack / "kindi_pack.json").is_file() else "missing pack"
+            print("%s: %s %s %s" % (prefix, model, mode, env_text))
+            print("  " + shlex.join(command))
         for model in models:
-            pack = pack_for(model, args.pack_dir, args.pack_27b)
-            for mode in modes:
-                env_text = " ".join("%s=%s" % (k, v) for k, v in sorted(mode_env(mode, args.cards).items()))
-                command = [sys.executable, "-m", "kindi", "--pack", str(pack), "verify"]
-                prefix = "would run" if (pack / "kindi_pack.json").is_file() else "missing pack"
-                print("%s: %s %s %s" % (prefix, model, mode, env_text))
-                print("  " + shlex.join(command))
             if args.serve:
                 print("would serve: %s %s (server/cache cycle)" % (model, modes[0]))
             if args.bench:
@@ -940,22 +1113,25 @@ def main(argv: list[str] | None = None) -> int:
     args.out.mkdir(parents=True, exist_ok=True)
     rows = []
     packs_used: list[Path] = []
-    total = len(models) * len(modes)
-    index = 0
     for model in models:
         pack = pack_for(model, args.pack_dir, args.pack_27b)
         if pack not in packs_used:
             packs_used.append(pack)
-        for mode in modes:
-            index += 1
-            if not (pack / "kindi_pack.json").is_file():
-                row = _missing_row(model, mode, pack, args.cards)
-                print("[%d/%d] %s %s: missing pack %s" % (index, total, model, mode, pack), flush=True)
-            else:
-                print("[%d/%d] %s %s: verifying..." % (index, total, model, mode), flush=True)
-                row = run_cell(model, mode, pack, args.out, args.cards, args.timeout)
-                print("[%d/%d] %s %s: %s" % (index, total, model, mode, row["status"]), flush=True)
-            rows.append(row)
+    total = len(cells)
+    for index, cell in enumerate(cells, 1):
+        model, mode, pack = cell["model"], cell["mode"], cell["pack"]
+        if cell["skip"]:
+            print("[%d/%d] %s %s: skipped (%s)" % (index, total, model, mode, cell["skip"]), flush=True)
+            continue
+        if not (pack / "kindi_pack.json").is_file():
+            row = _missing_row(model, mode, pack, args.cards, cell["extra_env"])
+            print("[%d/%d] %s %s: missing pack %s" % (index, total, model, mode, pack), flush=True)
+        else:
+            print("[%d/%d] %s %s: verifying..." % (index, total, model, mode), flush=True)
+            row = run_cell(model, mode, pack, args.out, args.cards, args.timeout,
+                           extra_env=cell["extra_env"])
+            print("[%d/%d] %s %s: %s" % (index, total, model, mode, row["status"]), flush=True)
+        rows.append(row)
 
     bench, serve, offered_map = {}, {}, {}
     if not args.dry_run:

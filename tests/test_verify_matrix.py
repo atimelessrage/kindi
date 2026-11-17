@@ -519,3 +519,140 @@ def test_dry_run_lists_serve_and_bench(tmp_path, capsys):
     assert rc == 0
     text = capsys.readouterr().out
     assert "would serve" not in text and "would bench" not in text
+
+
+def test_spec_modes_chain_from_each_engine_mode_and_change_only_kindi_spec():
+    mod = load()
+    for base in mod.SPEC_BASES:
+        base_env = mod.mode_env(base, cards=1)
+        for spec in mod.SPEC_MODES:
+            env = mod.mode_env(base + "-" + spec, cards=1)
+            assert env["KINDI_SPEC"] == spec
+            assert {k: v for k, v in env.items() if k != "KINDI_SPEC"} == \
+                {k: v for k, v in base_env.items() if k != "KINDI_SPEC"}
+
+
+def test_spec_env_names_only_the_files_the_mode_uses(tmp_path):
+    mod = load()
+    head = tmp_path / "kindi-mtp-2b-v1.npz"
+    head.write_bytes(b"x")
+    pack = tmp_path / "bonsai-2b"
+    pack.mkdir()
+    assert mod.spec_env("ngram", head, pack, head) == {}
+    assert mod.spec_env("mtp", head, pack, head) == {"KINDI_MTP_HEAD": str(head)}
+    assert mod.spec_env("draft2b", head, pack, head) == {"KINDI_SPEC_PACK": str(pack)}
+    assert mod.spec_env("both", head, pack, head) == {
+        "KINDI_SPEC_PACK": str(pack),
+        "KINDI_SPEC_DRAFT_HEAD": str(head),
+    }
+
+
+def test_spec_missing_is_empty_when_the_files_exist_and_names_what_is_absent(tmp_path):
+    mod = load()
+    head = tmp_path / "head.npz"
+    head.write_bytes(b"x")
+    pack = tmp_path / "bonsai-2b"
+    pack.mkdir()
+    assert mod.spec_missing("ngram", None, None, None) == []
+    assert mod.spec_missing("mtp", head, pack, head) == []
+    assert mod.spec_missing("draft2b", None, pack, None) == []
+    assert mod.spec_missing("both", None, pack, head) == []
+    assert "no MTP head" in mod.spec_missing("mtp", None, pack, None)[0]
+    assert "no draft head" in mod.spec_missing("both", head, pack, None)[0]
+    assert "no 2B drafter pack" in mod.spec_missing("draft2b", head, None, None)[0]
+
+
+def test_parse_spec_mode_scores_the_effective_mode_and_drafts():
+    mod = load()
+    text = """[kindi] speculation: requested mtp, effective mtp, head kindi-mtp-2b-v1.npz sha256 1b5c0c790a59
+[kindi] prompt 1 'A' PASS  40/40 tokens match  (0.1s, 5/12 drafts accepted)
+[kindi] prompt 2 'B' PASS  40/40 tokens match  (0.1s, 3/8 drafts accepted)
+[kindi] ALL PASS: token-exact with llama.cpp with KINDI_SPEC=mtp - 100.0 tokens/s over the run
+"""
+    out = mod.parse_verify_output(text, 0)
+    assert out["status"] == "pass"
+    assert out["spec_requested"] == "mtp" and out["spec_effective"] == "mtp"
+    assert (out["drafts_accepted"], out["drafts_drafted"]) == (8, 20)
+
+
+def test_parse_a_spec_fallback_is_refused_not_a_missing_reference():
+    mod = load()
+    text = """[kindi] speculation: requested draft2b, effective ngram, the 2B draft pack is not attached
+[kindi] FAIL: draft2b was requested but the effective mode is ngram: the 2B draft pack is not attached
+"""
+    out = mod.parse_verify_output(text, 2)
+    assert out["status"] == "refused"
+    assert out["spec_requested"] == "draft2b" and out["spec_effective"] == "ngram"
+
+
+def test_run_cell_passes_the_spec_flag_and_records_the_scores(tmp_path, monkeypatch):
+    mod = load()
+    pack = tmp_path / "bonsai-2b"
+    pack.mkdir()
+    (pack / "kindi_pack.json").write_text("{}", encoding="utf-8")
+    head = tmp_path / "head.npz"
+    seen = {}
+
+    class Done:
+        returncode = 0
+        stdout = (
+            "[kindi] speculation: requested mtp, effective mtp, head head.npz sha256 abc\n"
+            "[kindi] prompt 1 'A' PASS  40/40 tokens match  (0.1s, 2/3 drafts accepted)\n"
+            "[kindi] ALL PASS: token-exact with llama.cpp with KINDI_SPEC=mtp - 10.0 tokens/s over the run\n"
+        )
+        stderr = ""
+
+    def fake_run(command, **kwargs):
+        seen["command"] = command
+        seen["env"] = kwargs["env"]
+        return Done()
+
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+    row = mod.run_cell("2b", "tc-mtp", pack, tmp_path, 1, 5.0,
+                       extra_env={"KINDI_MTP_HEAD": str(head)})
+    assert seen["command"][-2:] == ["--spec", "mtp"]
+    assert seen["env"]["KINDI_SPEC"] == "mtp" and seen["env"]["KINDI_MTP_HEAD"] == str(head)
+    assert row["status"] == "pass"
+    assert row["spec_requested"] == "mtp" and row["spec_effective"] == "mtp"
+    assert (row["drafts_accepted"], row["drafts_drafted"]) == (2, 3)
+
+
+def test_run_cell_refuses_a_pass_that_never_named_the_mode(tmp_path, monkeypatch):
+    mod = load()
+    pack = tmp_path / "bonsai-2b"
+    pack.mkdir()
+    (pack / "kindi_pack.json").write_text("{}", encoding="utf-8")
+
+    class Done:
+        returncode = 0
+        stdout = "[kindi] ALL PASS: token-exact with llama.cpp - 10.0 tokens/s over the run\n"
+        stderr = ""
+
+    monkeypatch.setattr(mod.subprocess, "run", lambda *a, **k: Done())
+    row = mod.run_cell("2b", "tc-ngram", pack, tmp_path, 1, 5.0)
+    assert row["status"] == "refused"
+    assert row["spec_requested"] == "ngram" and row["spec_effective"] is None
+
+
+def test_dry_run_lists_the_spec_cells_commands_and_skips(tmp_path, capsys):
+    mod = load()
+    packs = tmp_path / "packs"
+    pack = packs / "bonsai-2b"
+    pack.mkdir(parents=True)
+    (pack / "kindi_pack.json").write_text("{}", encoding="utf-8")
+    head = tmp_path / "head.npz"
+    head.write_bytes(b"x")
+    rc = mod.main(["--dry-run", "--models", "2b", "--modes", "plain",
+                   "--spec-modes", "ngram,mtp", "--spec-models", "2b",
+                   "--pack-dir", str(packs), "--mtp-head", str(head),
+                   "--out", str(tmp_path / "out")])
+    assert rc == 0
+    text = capsys.readouterr().out
+    assert "2b tc-ngram" in text and "2b tc-mtp" in text
+    assert "--spec ngram" in text and "KINDI_MTP_HEAD=%s" % head in text
+    rc = mod.main(["--dry-run", "--models", "2b", "--modes", "plain",
+                   "--spec-modes", "mtp", "--spec-models", "2b",
+                   "--pack-dir", str(packs), "--mtp-head", str(tmp_path / "absent.npz"),
+                   "--out", str(tmp_path / "out")])
+    assert rc == 0
+    assert "would skip: 2b tc-mtp" in capsys.readouterr().out
