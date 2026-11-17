@@ -103,9 +103,10 @@ class ColdExpertReader(object):
 
     # ------------------------------------------------------------------ opening
     def _open_posix(self):
-        flags = os.O_RDONLY
-        direct = getattr(os, "O_DIRECT", 0)
-        self._fd = os.open(self.path, flags | direct)
+        direct = getattr(os, "O_DIRECT", None)
+        if direct is None or not hasattr(os, "preadv"):
+            raise OSError("O_DIRECT/preadv unavailable")
+        self._fd = os.open(self.path, os.O_RDONLY | direct)
         self.method = "O_DIRECT"
 
     def _open_windows(self):

@@ -188,12 +188,12 @@ variables, and are therefore not listed twice here.
 | `KINDI_LT_CHUNK` | (unset) | `kindi/lightning.py:151` |
 | `KINDI_LT_COLD` | (empty) | `kindi/cold_experts.py:36` |
 | `KINDI_LT_DCACHE` | `str(DCACHE_DEFAULT)` | `kindi/ltfit.py:22` |
-| `KINDI_LT_DGRP` | `mvdg` | `kindi/lightning.py:896` |
-| `KINDI_LT_GRAPH` | `1` | `kindi/lightning.py:1015` |
+| `KINDI_LT_DGRP` | `mvdg` | `kindi/lightning.py:899` |
+| `KINDI_LT_GRAPH` | `1` | `kindi/lightning.py:1018` |
 | `KINDI_LT_K35` | (unset) | `kindi/lightning.py:122` |
 | `KINDI_LT_K35_EXACT` | (unset) | `kindi/lightning.py:39` |
 | `KINDI_LT_KBLAS` | `1` | `kindi/lightning.py:37` |
-| `KINDI_LT_KGRP` | `mmk32` or `mvkg` | `kindi/lightning.py:663` (+1 more) |
+| `KINDI_LT_KGRP` | `mmk32` or `mvkg` | `kindi/lightning.py:666` (+1 more) |
 | `KINDI_LT_NSPLIT` | `32` | `kindi/lightning.py:28` |
 | `KINDI_LT_NSPLIT_TC` | `64` | `kindi/lightning.py:29` |
 | `KINDI_LT_PRE6` | `"1" if self.cc >= 60 else "0"` | `kindi/lightning.py:136` |
@@ -210,7 +210,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_MOE_DROP_CACHE` | `1` | `kindi/dsv41.py:362` |
 | `KINDI_MOE_IDLE` | `1` | `kindi/dsv41.py:347` |
 | `KINDI_MOE_SHARE0` | `0.667` | `kindi/dsv41.py:350` (+2 more) |
-| `KINDI_MOE_WEIGHTED` | `1` | `kindi/lightning.py:264` (+2 more) |
+| `KINDI_MOE_WEIGHTED` | `1` | `kindi/lightning.py:267` (+2 more) |
 | `KINDI_MTP_HEAD_ALLOW_UNREGISTERED` | `0` | `kindi/mtp_heads.py:50` |
 | `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:665` |
 | `KINDI_NB_CPUF` | `0.55` | `kindi/nanbeige.py:34` |

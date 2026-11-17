@@ -247,8 +247,11 @@ class Engine(object):
             self._plan_weighted(room, eb, n_moe)
         where = self.placement.describe() if self.placement else "%d of %d experts per layer on the card" % (
             self.n_card, s.n_exp)
+        cold_tail = ("" if self.n_card == s.n_exp else
+                     ", the rest in the cold file tier" if self.cold_reader is not None else
+                     ", the rest in host memory")
         self.log("plan: %.2f GB dense weights, %.2f GB K/V at ctx %d, %s%s" % (
-            dense / 1e9, kv / 1e9, self.ctx, where, "" if self.n_card == s.n_exp else ", the rest in host memory"))
+            dense / 1e9, kv / 1e9, self.ctx, where, cold_tail))
 
     def _reserve(self):
         """the bytes the plan keeps free: KINDI_LT_RESERVE_MB, plus what a failed first plan added"""
