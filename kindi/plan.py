@@ -282,6 +282,63 @@ def _lt_fit(s, free_bytes, dense, kv, state, buf_bytes, reserve, eb, moe_layers,
     return _ltfit.fit_experts(room, len(moe_layers), s.n_exp, s.n_used, eb, int(dcache)), room
 
 
+def _weighted_placement(spec, usage, room, cap, eb, n_moe, dcache, anchor):
+    """The usage-weighted placement for `room` with `dcache` slots per layer, or None.
+
+    Mirrors `lightning._plan_weighted`'s candidate scan: try a few minimum experts per layer and keep
+    the placement that serves the most measured picks from the card. `anchor` is the uniform fit's
+    card count and sets the candidate range; the staging buffers and the slots come off `room`
+    before the budget goes to `moe.plan`. Returns (placement, n_card).
+    """
+    from .moe import plan as moe_plan
+
+    best = None
+    for m in sorted(set(list(range(max(spec.n_used, anchor - 64), anchor + 1, 4)) + [anchor])):
+        budget = room - 2 * (spec.n_exp - m) * eb - n_moe * dcache * eb
+        if cap is not None:
+            # --moe-cache-mib is a cap on the experts' bytes: the weighted scan must not spend
+            # past it, or the report names more card experts than the flag allows
+            budget = min(budget, cap)
+        if budget < m * n_moe * eb:
+            continue
+        try:
+            p = moe_plan(spec, usage, budget, min_card=m, weighted=True)
+        except MemoryError:
+            continue
+        f = p.served("card")
+        if best is None or (f is not None and f > best[0] + 1e-9):
+            best = (f, p, m)
+    if best is None:
+        return None
+    return best[1], min(best[1].counts("card").values())
+
+
+def _slots_cost(placement, placement_no_slots):
+    """What the decode slots cost the weighted plan, against the same room with `dcache=0`.
+
+    Both placements come from the same room and cap, so the difference is the slots: the served
+    share of the measured picks, and the experts that stay on the card. None unless both sides
+    placed something and the usage has counts.
+    """
+    if placement is None or placement_no_slots is None:
+        return None
+    served, served_without = placement.served("card"), placement_no_slots.served("card")
+    if served is None or served_without is None:
+        return None
+    return {"served": round(served, 6), "served_without": round(served_without, 6),
+            "cost_pp": round((served_without - served) * 100, 1),
+            "experts": sum(placement.counts("card").values()),
+            "experts_without": sum(placement_no_slots.counts("card").values())}
+
+
+def _slots_cost_phrase(cost):
+    """The weighted clause of the `slots:` line, from `_slots_cost` (kept separate to be tested)."""
+    return ("the usage-weighted placement leaves room for them: it serves %.1f%% of the measured "
+            "picks against %.1f%% with the same room and no slots, so they cost %.1f points of "
+            "served share and %d card experts (%d instead of %d)"
+            % (100 * cost["served"], 100 * cost["served_without"], cost["cost_pp"],
+               cost["experts_without"] - cost["experts"], cost["experts"], cost["experts_without"]))
+
 def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
                  dcache=None, reserve_mb=None, chunk_tokens=None, chunk_lane="copy"):
     """The MoE strategy for a `kindi_lightning` pack: expert tiers (+ decode slots), not a layer split.
@@ -351,28 +408,18 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
         os.path.dirname(__file__), "lightning-experts.json")
     spec = MoESpec(moe_layers, s.n_exp, s.n_used, eb, shared=True)
     usage = Usage.load(spec, usage_path)
-    placement = None
+    placement = placement_no_slots = None
     if usage.has_counts() and os.environ.get("KINDI_MOE_WEIGHTED", "1") != "0":
         room2 = free_bytes - dense - kv - state - _lt_buf_bytes(s, 512) - reserve
-        best = None
-        for m in sorted(set(list(range(max(s.n_used, n_card - 64), n_card + 1, 4)) + [n_card])):
-            b = room2 - 2 * (s.n_exp - m) * eb - n_moe * dcache * eb
-            if cap is not None:
-                # --moe-cache-mib is a cap on the experts' bytes: the weighted scan must not spend
-                # past it, or the report names more card experts than the flag allows
-                b = min(b, cap)
-            if b < m * n_moe * eb:
-                continue
-            try:
-                p = moe_plan(spec, usage, b, min_card=m, weighted=True)
-            except MemoryError:
-                continue
-            f = p.served("card")
-            if best is None or (f is not None and f > best[0] + 1e-9):
-                best = (f, p, m)
-        if best is not None:
-            placement = best[1]
-            n_card = min(placement.counts("card").values())
+        weighted = _weighted_placement(spec, usage, room2, cap, eb, n_moe, dcache, n_card)
+        if weighted is not None:
+            placement, n_card = weighted
+            # the same room and cap with the slots priced at zero: what the weighted plan gives up
+            # for them is the difference between the two placements, not an assumed one per layer
+            anchor = n_resident if n_resident is not None else n_card
+            no_slots = _weighted_placement(spec, usage, room2, cap, eb, n_moe, 0, anchor)
+            placement_no_slots = no_slots[0] if no_slots is not None else None
+    slots_cost = _slots_cost(placement, placement_no_slots)
     if placement is not None:
         head = placement.describe()
         lines.append(("experts", "%s (usage-weighted placement; the most-used experts stay on the card)"
@@ -388,12 +435,15 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
         if placement is not None:
             # The weighted plan already spent these bytes before it chose m, so the honest number
             # is the share that placement serves, not the top-n share a uniform split would get.
-            share = placement.served("card")
-            if share is not None:
-                why += ("; the usage-weighted placement already leaves room for them and serves "
-                        "%.1f%% of the measured picks from the card" % (100 * share))
+            if slots_cost is not None:
+                why += "; " + _slots_cost_phrase(slots_cost)
             else:
-                why += "; the usage-weighted placement already leaves room for them"
+                share = placement.served("card")
+                if share is not None:
+                    why += ("; the usage-weighted placement already leaves room for them and serves "
+                            "%.1f%% of the measured picks from the card" % (100 * share))
+                else:
+                    why += "; the usage-weighted placement already leaves room for them"
         else:
             if n_resident is not None:
                 why += ("; the same room without them fits %d experts per layer instead of %d, so "
@@ -419,7 +469,7 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
                       est / 2 ** 30, int(ctx), est // 2 ** 20, int(free_bytes) // 2 ** 20)))
     out = {"pack": pack, "model": man.get("model"), "strategy": "moe-expert-tiers",
            "lines": lines, "n_card": n_card, "n_exp": s.n_exp, "dcache": dcache,
-           "slots_resident": n_resident, "fit": True,
+           "slots_resident": n_resident, "slots_cost": slots_cost, "fit": True,
            "estimate_mib": est // 2 ** 20,
            "command": "%s -m kindi --pack %s bench" % (sys.executable, pack)}
     if chunk_tokens:

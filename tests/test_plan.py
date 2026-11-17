@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from kindi import plan as _plan
+from kindi.moe import MoESpec, Usage
 
 
 def make_pack(tmp_path, *, layers=4, interval=2, scale=1):
@@ -352,3 +353,52 @@ def test_run_prints_the_chunk_report_when_asked(tmp_path, capsys):
     assert rc == 0
     out = capsys.readouterr().out
     assert "chunk:" in out and "copies:" in out and "lane" in out
+
+
+def test_slots_cost_is_the_weighted_plans_counterfactual():
+    """What the decode slots cost a weighted plan is the difference from the same room with
+    `dcache=0`, not an assumed one expert per layer. Two layers, 4 experts, 1 used, 1-byte
+    experts, room 10:
+
+    - with 1 slot per layer the budget is 10 + 2m - 10; m=2 fits 4 experts and serves 90%,
+      m=3 cannot fit, so the plan takes 4 experts and 90%.
+    - with no slots the budget is 10 + 2m - 8; m=2 fits 6 experts (3 per layer) and serves 100%.
+    """
+    spec = MoESpec([0, 1], 4, 1, 1, shared=True)
+    usage = Usage(spec, counts={0: [8, 1, 1, 0], 1: [8, 1, 1, 0]})
+    with_slots, n_card = _plan._weighted_placement(spec, usage, 10, None, 1, 2, 1, 2)
+    no_slots, _ = _plan._weighted_placement(spec, usage, 10, None, 1, 2, 0, 2)
+    assert with_slots.counts("card") == {0: 2, 1: 2} and n_card == 2
+    assert no_slots.counts("card") == {0: 3, 1: 3}
+    cost = _plan._slots_cost(with_slots, no_slots)
+    assert cost == {"served": 0.9, "served_without": 1.0, "cost_pp": 10.0,
+                    "experts": 4, "experts_without": 6}
+    assert _plan._slots_cost_phrase(cost) == (
+        "the usage-weighted placement leaves room for them: it serves 90.0% of the measured "
+        "picks against 100.0% with the same room and no slots, so they cost 10.0 points of "
+        "served share and 2 card experts (4 instead of 6)")
+
+
+def test_slots_cost_needs_both_side_placements():
+    spec = MoESpec([0], 4, 1, 1, shared=True)
+    usage = Usage(spec, counts={0: [8, 1, 1, 0]})
+    placed, _ = _plan._weighted_placement(spec, usage, 8, None, 1, 1, 1, 2)
+    assert _plan._slots_cost(placed, None) is None
+    assert _plan._slots_cost(None, placed) is None
+
+
+def test_describe_moe_reports_the_slots_cost_on_a_tight_card(tmp_path):
+    """On a card where the slots genuinely compete with experts, the slots line states what the
+    weighted plan gives up: 4 slots per layer cost 9 card experts and 5.8 points of served share
+    against the same room with `dcache=0`, and the report dict carries the same numbers.
+    """
+    pack, usage = _moe_pack_with_counts(tmp_path)
+    rep = _plan.describe(str(pack), 2048, None, assume_vram_gib=0.077, assume_ram_gib=4,
+                         assume_cores=2, reserve_mib=0, usage_path=str(usage),
+                         moe_cache_mib=None, dcache=4)
+    assert rep["slots_cost"] == {"served": 0.94203, "served_without": 1.0, "cost_pp": 5.8,
+                                "experts": 119, "experts_without": 128}
+    slots = next(r for c, r in rep["lines"] if c == "slots")
+    assert ("it serves 94.2% of the measured picks against 100.0% with the same room and no "
+            "slots, so they cost 5.8 points of served share and 9 card experts (119 instead "
+            "of 128)") in slots

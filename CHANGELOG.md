@@ -108,6 +108,16 @@
 
 ### Fixed
 
+- **`kindi plan`'s `slots:` line now prices the decode slots in the weighted branch** — once usage
+  counts exist the line reported only the served share, so the slots' cost was invisible exactly
+  where the plan had already paid it. It now runs the same usage-weighted placement twice, once with
+  the slots and once against the same room and `--moe-cache-mib` cap with `dcache=0`, and states the
+  difference: on the test pack at 0.077 GiB of free VRAM, 4 slots per layer cost 9 of 128 card
+  experts and 5.8 points of served share (94.2% against 100%). The report dict carries the same
+  numbers as `slots_cost` (`served`, `served_without`, `cost_pp`, `experts`, `experts_without`), so a
+  room or cap where the slots are free reads as 0.0 points instead of an assumed one expert per
+  layer. Pinned by `tests/test_plan.py` on a synthetic two-layer spec and on the fake pack's
+  tight-card case.
 - **`kindi plan` and the Lightning engine now plan from one helper, so the slots line cannot drift**
   — `plan._lt_fit` and `lightning._plan` carried the same fit arithmetic twice, which is how the
   report's slots line fell behind the engine in the first place. `kindi/ltfit.py` now holds
