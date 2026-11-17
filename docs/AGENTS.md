@@ -33,9 +33,11 @@ Besides `/v1`, Kindi serves what an agent host needs to observe and to connect a
 
 - `GET /metrics` - Prometheus text. `kindi_requests_total`, `kindi_prompt_tokens_total`,
   `kindi_cached_prompt_tokens_total`, `kindi_completion_tokens_total`, `kindi_spec_drafted_tokens_total`,
-  `kindi_spec_accepted_tokens_total`, `kindi_queue_depth`, `kindi_queue_max`, `kindi_rate_limit_per_min`,
-  `kindi_rate_limited_total`, `kindi_uptime_seconds` and `kindi_model_info{model,ctx,head}`. It is protected
-  by the API key when one is set.
+  `kindi_spec_accepted_tokens_total`, `kindi_spec_mode_effective{mode}` (the mode `drafting()` resolves;
+  `none` when off), `kindi_queue_depth`, `kindi_queue_max`, `kindi_rate_limit_per_min`,
+  `kindi_rate_limited_total`, `kindi_uptime_seconds` and `kindi_model_info{model,ctx,head}`. The two
+  spec token counters are global; pair their ratio with the effective-mode gauge. It is protected by
+  the API key when one is set.
 - `log_json = 1` (`KINDI_LOG_JSON=1`) writes one JSON line per inference request on stdout: `request_id`
   (also returned as `X-Request-ID`), `status`, `duration_ms`, `queue_wait_ms`, `stream`, and on success
   `prompt_tokens`, `cached_tokens`, `completion_tokens`, `gen_tok_s` and `finish`. Rejected, cancelled and

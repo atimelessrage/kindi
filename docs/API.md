@@ -176,9 +176,9 @@ simultaneous tag post and status post cannot overwrite each other.
 
 - `GET /health`: liveness plus (loopback or authenticated) queue, stats,
   drafting and GPU memory.
-- `GET /metrics`: Prometheus text (requests, tokens, speculative stats,
-  queue, uptime). The richer per-request metrics in T5.5 are not implemented
-  yet.
+- `GET /metrics`: Prometheus text (requests, tokens, speculative stats and the effective
+  `kindi_spec_mode_effective` mode, queue, uptime). The richer per-request metrics in T5.5 are not
+  implemented yet.
 - `log_json = 1`: one JSON access-log line per inference request with the
   request id, status, duration, queue wait and token counts.
 

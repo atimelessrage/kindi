@@ -4,6 +4,10 @@
 
 ### Added
 
+- **`/metrics` names the effective speculation mode** — `kindi_spec_mode_effective{mode="..."} 1`
+  comes from `drafting()["method"]`, so a refused head reports `none` and a missing 2B drafter
+  reports `ngram`, never the requested `KINDI_SPEC` mode. The accepted/drafted counters stay global
+  and their help points at the gauge; three test cases cover the loaded, refused and fallback states.
 - **The verify matrix runs and scores speculation** — `tools/verify_matrix.py` gained a second axis:
   `--spec-modes` (default all four) on `--spec-models` (default 2b) builds `<spec-base>-<spec>`
   cells (default `tc-ngram`, `tc-mtp`, `tc-draft2b`, `tc-both`), passes `verify --spec` plus the

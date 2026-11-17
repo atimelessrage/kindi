@@ -169,6 +169,9 @@ class _MetricsKindi(object):
     def head_active(self):
         return "exact"
 
+    def drafting(self):
+        return {"method": None}
+
 
 def test_metrics_exposes_saved_opening_save_failures(monkeypatch):
     """REQ-0005 / review B8: a swallowed cache save failure must be visible in /metrics."""

@@ -1762,6 +1762,9 @@ def create_app(cfg, log=print):
         if not _auth(request):
             return _err(401, "invalid API key", "authentication_error")
         s = K.stats
+        # `/health` already resolves the mode the next request will take; reuse that answer here
+        # instead of reading KINDI_SPEC back as if it were the mode that drafted (REQ-0024 A2).
+        effective_mode = (K.drafting() or {}).get("method")
 
         def g(k):
             return s.get(k, 0)
@@ -1848,9 +1851,14 @@ def create_app(cfg, log=print):
                "kindi_cached_prompt_tokens_total %d" % g("cached_tokens"))
         metric("kindi_completion_tokens_total", "counter", "completion tokens generated",
                "kindi_completion_tokens_total %d" % g("completion_tokens"))
-        metric("kindi_spec_drafted_tokens_total", "counter", "tokens proposed by speculative drafting",
+        metric("kindi_spec_mode_effective", "gauge",
+               "the effective speculation mode, 1 for the mode now running (none when off)",
+               'kindi_spec_mode_effective{mode="%s"} 1' % label(effective_mode or "none"))
+        metric("kindi_spec_drafted_tokens_total", "counter",
+               "tokens proposed by speculative drafting, over all modes (see kindi_spec_mode_effective)",
                "kindi_spec_drafted_tokens_total %d" % g("spec_drafted"))
-        metric("kindi_spec_accepted_tokens_total", "counter", "drafted tokens accepted by the verify pass",
+        metric("kindi_spec_accepted_tokens_total", "counter",
+               "drafted tokens accepted by the verify pass, over all modes (see kindi_spec_mode_effective)",
                "kindi_spec_accepted_tokens_total %d" % g("spec_accepted"))
         metric("kindi_generation_seconds_total", "counter", "seconds spent generating",
                "kindi_generation_seconds_total %.3f" % g("gen_seconds"))

@@ -770,6 +770,25 @@ def test_health_reports_the_effective_speculation_state(monkeypatch, loaded):
         assert d["head"] is None and d["head_sha256"] is None
 
 
+@pytest.mark.parametrize("loaded, requested, expected", [
+    (True, "mtp", "mtp"),
+    (False, "mtp", "none"),
+    (False, "draft2b", "ngram"),
+], ids=["head-loaded", "head-refused", "drafter-fallback"])
+def test_metrics_report_the_effective_speculation_mode(monkeypatch, loaded, requested, expected):
+    """REQ-0024 A2: the scrape names the mode `drafting()` resolved, not KINDI_SPEC. A refused
+    head or an absent drafter must not leave an acceptance ratio attributed to the requested mode."""
+    monkeypatch.setenv("KINDI_SPEC", requested)
+    K = _SpecKindi(loaded)
+    monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
+    app = server.create_app({"model_name": "bonsai2-2b", "api_key": ""}, log=lambda *a: None)
+    with TestClient(app) as client:
+        body = client.get("/metrics").text
+    assert 'kindi_spec_mode_effective{mode="%s"} 1' % expected in body
+    if expected != requested:
+        assert 'kindi_spec_mode_effective{mode="%s"} 1' % requested not in body
+
+
 def test_keyless_non_loopback_health_gets_only_liveness_fields(monkeypatch):
     K = _FakeKindi()
     monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
