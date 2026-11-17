@@ -72,9 +72,12 @@ On a `kindi_lightning` pack the report also measures the host's RAM/disk/PCIe ra
 probes as `kindi io`, sizes the decode slots from the measured refill path, and prints the three
 rates in a `rates:` line and in the slot explanation. Its follow-up `bench` command prefixes the
 planned `KINDI_LT_DCACHE=<count>`, so the child engine uses the same slot count instead of falling
-back to its default 10. `kindi autotune` also proposes an `expert-cache-<MiB>` cold-tier budget
-(`KINDI_LT_COLD=1` + `KINDI_LT_HOST_MB`) sized from the same rate model and capped by the host
-experts. Both counts are predictions; the Lightning-pack comparison remains the gate.
+back to its default 10. `kindi plan` and `kindi autotune` also accept `--io-report FILE` (or
+`KINDI_IO_REPORT`) to reuse a saved `kindi io --json FILE` report instead of running the probe
+again; a missing or unusable report falls back to one probe. `kindi autotune` also proposes an
+`expert-cache-<MiB>` cold-tier budget (`KINDI_LT_COLD=1` + `KINDI_LT_HOST_MB`) sized from the same
+rate model and capped by the host experts. Both counts are predictions; the Lightning-pack
+comparison remains the gate.
 
 On a `kindi_lightning` pack the opt-in cold tier is now a real file path, not only a plan: with
 `KINDI_LT_COLD=1`, the hottest host experts stay pinned under `KINDI_LT_HOST_MB` (default:

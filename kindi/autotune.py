@@ -34,6 +34,13 @@ def _manifest(pack):
     return data if isinstance(data, dict) else {}
 
 
+def io_rates(a, mib=64, log=print):
+    """Saved `kindi io` rates when available, else one probe with a visible fallback."""
+    from . import io_probe
+    path = getattr(a, "io_report", None) or os.environ.get("KINDI_IO_REPORT")
+    return io_probe.load_or_probe(path, mib=mib, log=log, label="kindi autotune")
+
+
 def _expert_cache_mib(moe, rates):
     """The pinned-host cache size for the cold tier, from the rate-sized slot working set.
 
@@ -268,11 +275,8 @@ def run(cfg, a, log=print):
     report = caps.probe()
     rates, moe = None, None
     if manifest.get("backend") in MOE_BACKENDS:
-        from . import io_probe, plan as _plan
-        try:
-            rates = io_probe.rates(io_probe.probe(mib=64))
-        except Exception:
-            rates = None
+        from . import plan as _plan
+        rates = io_rates(a, log=log)
         gpu = (report.get("gpus") or [{}])[0]
         free = gpu.get("memory_free_mib")
         try:

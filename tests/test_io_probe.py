@@ -92,6 +92,48 @@ def test_cli_json_is_machine_readable(capsys):
     assert report["disk"]["reason"] == "skipped"
 
 
+def test_cli_json_file_saves_a_report_that_plan_and_autotune_can_reuse(tmp_path, capsys):
+    path = tmp_path / "rates" / "io.json"
+    assert io_probe.main(["--mib", "4", "--skip", "disk,pcie", "--json", str(path)]) == 0
+    assert set(json.loads(capsys.readouterr().out)) == {"ram", "disk", "pcie"}
+    saved = io_probe.read_report(str(path))
+    assert saved["ram"]["available"] is True
+    rates = io_probe.load_rates(str(path))
+    assert rates["ram_bytes_s"] == saved["ram"]["mib_s"] * 2 ** 20
+
+
+RATE_REPORT = {
+    "ram": {"available": True, "mib_s": 100.0},
+    "disk": {"available": True, "mib_s": 50.0, "unbuffered": True},
+    "pcie": {"available": True, "h2d_gib_s": 2.0, "d2h_gib_s": 2.1, "device": "test"},
+}
+
+
+def test_a_missing_or_unusable_report_falls_back_to_one_probe(tmp_path, monkeypatch):
+    calls = []
+    monkeypatch.setattr(io_probe, "probe", lambda **kw: calls.append(kw["mib"]) or RATE_REPORT)
+    missing = tmp_path / "missing.json"
+    lines = []
+    rates = io_probe.load_or_probe(str(missing), mib=32, log=lines.append)
+    assert calls == [32]
+    assert rates["pcie_bytes_s"] == 2.0 * 2 ** 30
+    assert any("no saved I/O report at" in line and "measuring" in line for line in lines)
+
+    broken = tmp_path / "broken.json"
+    broken.write_text("{}", encoding="utf-8")
+    lines = []
+    assert io_probe.load_or_probe(str(broken), mib=16, log=lines.append)["ram_bytes_s"] == 100 * 2 ** 20
+    assert calls == [32, 16]
+    assert any("unusable saved I/O report" in line for line in lines)
+
+
+def test_no_report_still_falls_back_and_says_how_to_save_one(monkeypatch):
+    monkeypatch.setattr(io_probe, "probe", lambda **kw: RATE_REPORT)
+    lines = []
+    assert io_probe.load_or_probe(None, mib=8, log=lines.append)["ram_bytes_s"] == 100 * 2 ** 20
+    assert any("no saved I/O report" in line and "kindi io --json FILE" in line for line in lines)
+
+
 def test_the_cli_command_is_wired(capsys):
     from kindi import __main__ as cli
     assert cli.main(["io", "--mib", "4", "--skip", "disk,pcie", "--json"]) == 0

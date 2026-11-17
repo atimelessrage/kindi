@@ -178,6 +178,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_GEMV_BLOCKS` | (unset) | `kindi/engine.py:198` |
 | `KINDI_HIP_LIB` | `libamdhip64.so` | `kindi/gpudrv.py:28` |
 | `KINDI_HOST_RAM_CHECK` | `1` | `kindi/hostram.py:93` |
+| `KINDI_IO_REPORT` | (unset) | `kindi/autotune.py:40` (+1 more) |
 | `KINDI_KEEPALIVE_S` | `10` | `kindi/dsv41_server.py:69` (+1 more) |
 | `KINDI_KEXPF` | (empty) or `0` | `kindi/spec.py:154` (+1 more) |
 | `KINDI_KV` | (empty) or `q8_0` | `kindi/engine.py:76` (+6 more) |
@@ -198,11 +199,11 @@ variables, and are therefore not listed twice here.
 | `KINDI_LT_NSPLIT` | `32` | `kindi/lightning.py:29` |
 | `KINDI_LT_NSPLIT_TC` | `64` | `kindi/lightning.py:30` |
 | `KINDI_LT_PRE6` | `"1" if self.cc >= 60 else "0"` | `kindi/lightning.py:141` |
-| `KINDI_LT_RESERVE_MB` | `350` | `kindi/autotune.py:281` (+2 more) |
+| `KINDI_LT_RESERVE_MB` | `350` | `kindi/autotune.py:285` (+2 more) |
 | `KINDI_LT_SELFCHECK` | `1` | `kindi/lightning_gen.py:241` |
 | `KINDI_LT_SM75` | (unset) | `kindi/lightning.py:144` |
 | `KINDI_LT_TC` | `1` | `kindi/lightning.py:139` |
-| `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:437` |
+| `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:443` |
 | `KINDI_MEM_RESERVE_MB` | `96` or `256` or `32` | `kindi/engine.py:306` (+4 more) |
 | `KINDI_MODEL` | (empty) | `kindi/container.py:240` |
 | `KINDI_MOE_COPY` | `0` | `kindi/dsv41.py:356` |
@@ -263,9 +264,9 @@ variables, and are therefore not listed twice here.
 | `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1958` |
 | `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:194` |
 | `KINDI_TANDEM_DEBUG_TIMING` | `0` | `kindi/tandem.py:596` |
-| `KINDI_TANDEM_GPU` | `auto` | `kindi/plan.py:178` (+2 more) |
+| `KINDI_TANDEM_GPU` | `auto` | `kindi/plan.py:184` (+2 more) |
 | `KINDI_TANDEM_RATIO` | (unset) | `kindi/tandem.py:268` |
-| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/plan.py:593` (+2 more) |
+| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/plan.py:607` (+2 more) |
 | `KINDI_TC` | `0` | `kindi/spec.py:81` (+3 more) |
 | `KINDI_TC_B2` | (empty) | `kindi/tc.py:51` |
 | `KINDI_TC_DP4A` | `0` | `kindi/tc.py:74` |

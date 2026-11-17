@@ -238,6 +238,31 @@ def probe(mib=DEFAULT_MIB, disk_dir=None, skip=()):
     return out
 
 
+def save_report(report, path):
+    """Write a probe report that `load_or_probe()` and `kindi plan` can reuse."""
+    path = os.path.abspath(os.path.expanduser(path))
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=2, sort_keys=True)
+    return path
+
+
+def read_report(path):
+    """Read and shape-check a saved `kindi io` report."""
+    with open(path, encoding="utf-8") as f:
+        report = json.load(f)
+    if not isinstance(report, dict):
+        raise ValueError("the report is not a JSON object")
+    if not any(name in report for name in VALID_PROBES):
+        raise ValueError("the report has no ram, disk or pcie section")
+    for name in VALID_PROBES:
+        if name in report and not isinstance(report[name], dict):
+            raise ValueError("the report's %s section is not an object" % name)
+    return report
+
+
 def rates(report):
     """Numeric rates from a `probe()` report, in bytes/s where they were measured.
 
@@ -267,6 +292,45 @@ def rates(report):
         if pcie.get("device"):
             out["pcie_device"] = pcie["device"]
     return out if len(out) > 1 else {}
+
+
+def load_rates(path):
+    """Normalize a saved `kindi io --json FILE` report into the rates model."""
+    out = rates(read_report(path))
+    if not out:
+        raise ValueError("the report has no usable numeric rate")
+    return out
+
+
+def load_or_probe(path=None, mib=DEFAULT_MIB, log=None, label="kindi"):
+    """Use a saved report when it has rates; otherwise measure, with a visible reason.
+
+    `path` is the explicit `--io-report`/`KINDI_IO_REPORT` value. With no path, the
+    old behavior remains: measure once. The log line names the fallback and the
+    command that saves a report for the next run.
+    """
+    if path:
+        try:
+            out = load_rates(path)
+        except (OSError, ValueError, TypeError) as exc:
+            if log:
+                why = "no saved I/O report" if not os.path.exists(path) else "unusable saved I/O report"
+                log("%s: %s at %s (%s); measuring RAM/disk/PCIe now" %
+                    (label, why, path, exc))
+        else:
+            if log:
+                log("%s: using saved I/O report at %s (%s)" %
+                    (label, path, rate_line(out)))
+            return out
+    elif log:
+        log("%s: no saved I/O report; measuring RAM/disk/PCIe now (save one with `kindi io --json FILE`)"
+            % label)
+    try:
+        return rates(probe(mib=mib))
+    except Exception as exc:                       # a probe failure must not abort a plan
+        if log:
+            log("%s: I/O probe failed (%s); slot sizing uses its default" % (label, exc))
+        return None
 
 
 def rate_line(rates):
@@ -317,13 +381,22 @@ def render(report):
     return lines
 
 
-def run(mib=DEFAULT_MIB, disk_dir=None, skip="", as_json=False):
+def run(mib=DEFAULT_MIB, disk_dir=None, skip="", as_json=False, save_path=None):
     skip = [s.strip() for s in str(skip or "").split(",") if s.strip()]
     try:
         report = probe(mib=mib, disk_dir=disk_dir, skip=skip)
     except ValueError as exc:
         print("kindi io: %s" % exc, file=sys.stderr)
         return 2
+    if isinstance(as_json, str) and not save_path:
+        save_path = as_json
+        as_json = True
+    if save_path:
+        try:
+            save_report(report, save_path)
+        except OSError as exc:
+            print("kindi io: could not write %s (%s)" % (save_path, exc), file=sys.stderr)
+            return 2
     if as_json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
@@ -340,7 +413,8 @@ def main(argv=None):
     ap.add_argument("--disk-dir", default=None,
                     help="where to create the temporary disk-probe file (default: the system temp dir)")
     ap.add_argument("--skip", default="", help="comma-separated probes to skip: ram,disk,pcie")
-    ap.add_argument("--json", action="store_true", help="print the report as JSON")
+    ap.add_argument("--json", nargs="?", const=True, default=False, metavar="FILE",
+                    help="print the report as JSON, or write it to FILE for plan/autotune reuse")
     a = ap.parse_args(argv)
     return run(a.mib, a.disk_dir, a.skip, a.json)
 

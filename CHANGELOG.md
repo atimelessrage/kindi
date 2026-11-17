@@ -4,6 +4,13 @@
 
 ### Added
 
+- **`kindi plan` and `kindi autotune` reuse a saved `kindi io` report** — `kindi io --json FILE`
+  writes the probe report, and `--io-report FILE` (or `KINDI_IO_REPORT`) feeds it to either command
+  through the same normalizer as a fresh probe, so the 64 MiB disk probe is not repeated. A missing,
+  unreadable or rate-less report is named in a log line and falls back to one fresh probe; with no
+  report selected, the command says how to save one. Tests cover save/reload, the fallback and the
+  plan/autotune wiring. This reuses measurements, not another host's numbers: the file is the one
+  `kindi io` wrote on this machine.
 - **`kindi autotune` now tests an explicit cold-tier host cache size** — Lightning packs with
   measured rates get `expert-cache-<MiB>` beside the decode-slot candidates. It sets both engine
   settings the cache needs (`KINDI_LT_COLD=1` and `KINDI_LT_HOST_MB`) and sizes the budget from the

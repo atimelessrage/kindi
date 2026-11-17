@@ -3,7 +3,7 @@ import argparse
 import json
 import os
 
-from kindi import autotune
+from kindi import autotune, io_probe
 
 ONE_CARD = {"gpus": [{"index": 0, "name": "NVIDIA GeForce RTX 4060 Ti", "compute_cap": "8.9"}],
             "gpu_source": "nvidia-smi", "cpu": {"model": "Intel i7", "physical": 6, "logical": 12}}
@@ -72,6 +72,35 @@ def test_moe_cache_candidate_exposes_the_cold_tier_budget_and_rate_size():
     assert option["env"] == {"KINDI_LT_COLD": "1", "KINDI_LT_HOST_MB": "64"}
     assert "rate-sized slot working set" in option["why"]
     assert "PCIe H2D 6.0 GiB/s" in option["why"]
+
+
+def test_autotune_reuses_a_saved_io_report_without_probing(tmp_path, monkeypatch):
+    saved = tmp_path / "io.json"
+    io_probe.save_report({
+        "ram": {"available": True, "mib_s": 13456.7},
+        "disk": {"available": True, "mib_s": 2509.8, "unbuffered": True},
+        "pcie": {"available": True, "h2d_gib_s": 6.0, "d2h_gib_s": 6.1,
+                 "device": "test"},
+    }, str(saved))
+    monkeypatch.setattr(io_probe, "probe",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("the probe ran")))
+    lines = []
+    rates = autotune.io_rates(argparse.Namespace(io_report=str(saved)), mib=8, log=lines.append)
+    assert rates["pcie_bytes_s"] == 6.0 * 2 ** 30
+    assert any("using saved I/O report" in line for line in lines)
+
+
+def test_autotune_falls_back_when_the_saved_io_report_is_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(io_probe, "probe", lambda **kw: {
+        "ram": {"available": True, "mib_s": 100.0},
+        "disk": {"available": True, "mib_s": 50.0, "unbuffered": True},
+        "pcie": {"available": True, "h2d_gib_s": 2.0, "d2h_gib_s": 2.1},
+    })
+    lines = []
+    rates = autotune.io_rates(argparse.Namespace(io_report=str(tmp_path / "missing.json")),
+                              mib=8, log=lines.append)
+    assert rates["ram_bytes_s"] == 100.0 * 2 ** 20
+    assert any("no saved I/O report at" in line and "measuring" in line for line in lines)
 
 
 def test_moe_cache_candidate_survives_the_default_run_budget_on_two_cards():

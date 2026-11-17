@@ -522,6 +522,9 @@ def main(argv=None):
     s.add_argument("--assume-ram-gib", type=float, default=None, help="the host RAM, instead of probing it")
     s.add_argument("--assume-cores", type=int, default=None, help="the CPU cores, instead of probing them")
     s.add_argument("--usage", default=None, help="an MoE usage file (kindi.moe Usage JSON); defaults to the shipped lightning-experts.json")
+    s.add_argument("--io-report", default=None, metavar="FILE",
+                   help="reuse a saved `kindi io --json FILE` report instead of measuring the rates "
+                        "again (also KINDI_IO_REPORT); a missing report falls back to one probe")
     s.add_argument("--moe-cache-mib", type=int, default=None, help="cap the MoE experts' card budget (planner only; the engine derives it from free VRAM)")
     s.add_argument("--dcache", type=int, default=None, help="MoE decode LRU slots per layer (KINDI_LT_DCACHE; default 10)")
     s.add_argument("--moe-chunk", type=int, default=None, metavar="TOKENS",
@@ -563,10 +566,14 @@ def main(argv=None):
     s.add_argument("--mib", type=int, default=128, help="buffer/file size per probe in MiB (default 128)")
     s.add_argument("--disk-dir", default=None, help="where to create the temporary disk-probe file (default: the system temp dir)")
     s.add_argument("--skip", default="", help="comma-separated probes to skip: ram,disk,pcie")
-    s.add_argument("--json", action="store_true", help="print the report as JSON")
+    s.add_argument("--json", nargs="?", const=True, default=False, metavar="FILE",
+                   help="print the report as JSON; with FILE, also save it for plan/autotune reuse")
     s = sub.add_parser("autotune", help="measure the placements for this model and rank them (one bench per candidate)")
     s.add_argument("--max-runs", type=int, default=6, help="how many configurations to measure (default 6)")
     s.add_argument("--dry-run", action="store_true", help="print the candidate list and stop (loads nothing)")
+    s.add_argument("--io-report", default=None, metavar="FILE",
+                   help="reuse a saved `kindi io --json FILE` report instead of measuring the rates "
+                        "again (also KINDI_IO_REPORT); a missing report falls back to one probe")
     s.add_argument("--include-cpu", action="store_true", help="also measure the CPU engine, even with a card present")
     s.add_argument("--timeout-s", type=float, default=600.0, help="per-candidate time limit (default 600 s)")
     s.add_argument("--json", default=None, metavar="FILE", help="record the candidates, every run and the winner")

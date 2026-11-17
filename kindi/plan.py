@@ -106,6 +106,12 @@ def _io_rates(mib=64):
         return None
 
 
+def _io_rates_for(path, mib=64, log=None):
+    """Rates from a saved `kindi io` report, falling back to one measured probe."""
+    from . import io_probe
+    return io_probe.load_or_probe(path, mib=mib, log=log, label="kindi plan")
+
+
 def _moe_free_bytes(assume_vram_gib):
     if assume_vram_gib is not None:
         return int(float(assume_vram_gib) * 2 ** 30)
@@ -580,7 +586,15 @@ def run(cfg, a, log=print):
     spec = getattr(a, "tandem_cpu_layers", None) or cfg.get("tandem_cpu_layers") or "auto"
     med = getattr(a, "tandem", None) or cfg.get("tandem") or "cpu-first"
     gpu_kind = getattr(a, "tandem_gpu", None) or cfg.get("tandem_gpu") or os.environ.get("KINDI_TANDEM_GPU")
-    rates = _io_rates() if _manifest(pack).get("backend") == "kindi_lightning" else None
+    rates = None
+    if _manifest(pack).get("backend") == "kindi_lightning":
+        report_path = getattr(a, "io_report", None) or os.environ.get("KINDI_IO_REPORT")
+        if report_path:
+            rates = _io_rates_for(report_path, log=log)
+        else:
+            log("kindi plan: no saved I/O report; measuring RAM/disk/PCIe now "
+                "(save one with `kindi io --json FILE`)")
+            rates = _io_rates()
     rep = describe(pack, cfg.get("ctx", 24576), spec, mode=med, gpu_kind=gpu_kind,
                    assume_vram_gib=getattr(a, "assume_vram_gib", None),
                    assume_ram_gib=getattr(a, "assume_ram_gib", None),

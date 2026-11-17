@@ -92,6 +92,7 @@ CPU: Intel(R) Core(TM) i7-8086K CPU @ 4.00GHz, 6 physical / 12 logical threads
 ```bash
 kindi io --mib 64              # RAM copy, unbuffered disk read, PCIe both ways
 kindi io --mib 64 --json       # the same report as data
+kindi io --mib 64 --json ~/.kindi/io.json  # save it for plan/autotune
 kindi io --skip disk,pcie      # only the host copy rate
 ```
 
@@ -104,6 +105,13 @@ buffered read of a file this process just wrote measures the page cache; where t
 report says `buffered` and that rate is a cache/RAM rate, not the device's. The PCIe probe uses
 pinned host memory through the active CUDA device, like the engine's staging buffers, and reports
 H2D and D2H separately.
+
+`kindi io --json FILE` writes the report as well as printing it. `kindi plan` and `kindi autotune`
+accept `--io-report FILE` (or `KINDI_IO_REPORT`) and normalize that saved report exactly like a fresh
+probe, so the 64 MiB disk probe runs once instead of on every plan. A missing, unreadable or
+rate-less file is reported by name and both commands fall back to one fresh probe; with no report
+selected they say how to save one. A report describes this host and this storage, so rerun
+`kindi io` after changing either.
 
 Measured on the i7-8086K + RTX 4060 Ti, 2026-11-17, `--mib 64`: RAM copy **13,456.7 MiB/s**, disk
 read **2,509.8 MiB/s** unbuffered, PCIe **6.0 GiB/s H2D / 6.1 GiB/s D2H**. These are this host's

@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from kindi import io_probe
 from kindi import plan as _plan
 from kindi.moe import MoESpec, Usage
 
@@ -292,6 +293,43 @@ def test_run_measures_rates_for_a_lightning_pack(tmp_path, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "rates:" in out and "PCIe H2D 6.0 GiB/s" in out
     assert "KINDI_LT_DCACHE=16" in out
+
+
+def test_run_reuses_a_saved_io_report_instead_of_probing(tmp_path, monkeypatch, capsys):
+    pack = make_lightning_pack(tmp_path)
+    saved = tmp_path / "io.json"
+    io_probe.save_report({
+        "ram": {"available": True, "mib_s": 13456.7},
+        "disk": {"available": True, "mib_s": 2509.8, "unbuffered": True},
+        "pcie": {"available": True, "h2d_gib_s": 6.0, "d2h_gib_s": 6.1,
+                 "device": "test"},
+    }, str(saved))
+    monkeypatch.setattr(_plan, "_io_rates",
+                        lambda *a, **k: (_ for _ in ()).throw(AssertionError("the probe ran")))
+    monkeypatch.setenv("KINDI_TANDEM_RESERVE_MB", "0")
+    args = _FakeArgs(assume_vram_gib=0.5, assume_ram_gib=4, assume_cores=2,
+                     io_report=str(saved))
+    assert _plan.run({"pack": str(pack), "ctx": 2048}, args) == 0
+    out = capsys.readouterr().out
+    assert "using saved I/O report" in out
+    assert "rates:" in out and "PCIe H2D 6.0 GiB/s" in out
+    assert "KINDI_LT_DCACHE=16" in out
+
+
+def test_run_falls_back_to_one_probe_when_the_saved_report_is_missing(tmp_path, monkeypatch, capsys):
+    pack = make_lightning_pack(tmp_path)
+    monkeypatch.setattr(io_probe, "probe", lambda **kw: {
+        "ram": {"available": True, "mib_s": 13456.7},
+        "disk": {"available": True, "mib_s": 2509.8, "unbuffered": True},
+        "pcie": {"available": True, "h2d_gib_s": 6.0, "d2h_gib_s": 6.1},
+    })
+    monkeypatch.setenv("KINDI_TANDEM_RESERVE_MB", "0")
+    args = _FakeArgs(assume_vram_gib=0.5, assume_ram_gib=4, assume_cores=2,
+                     io_report=str(tmp_path / "missing.json"))
+    assert _plan.run({"pack": str(pack), "ctx": 2048}, args) == 0
+    out = capsys.readouterr().out
+    assert "no saved I/O report at" in out and "measuring RAM/disk/PCIe now" in out
+    assert "rates:" in out and "PCIe H2D 6.0 GiB/s" in out
 
 
 def test_describe_moe_reports_a_refusal_when_nothing_fits(tmp_path):
