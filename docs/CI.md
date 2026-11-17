@@ -78,7 +78,12 @@ CI break with no commit. `tests/test_ci_config.py` pins both contracts.
 The secret scan is intentionally tracked-file based. CI runs
 [tools/check_secret_baseline.py](../tools/check_secret_baseline.py) to compare the baseline with a
 fresh scan of `git ls-files`, then runs `detect-secrets-hook --baseline .secrets.baseline` to reject
-new findings. The pre-commit hook uses the same baseline and scans all text files; only
+new findings. It also runs [tools/check_secret_history.py](../tools/check_secret_history.py) over the
+full history (that job checks out with `fetch-depth: 0`): the tracked-file scan cannot see a key that
+was committed and deleted, and history is what a push publishes. The history gate compares against a
+counted snapshot (`tools/secret_history_baseline.json`) and fails on any new row or a row whose count
+grew; `tests/test_no_secrets.py` covers the present tree (tracked and untracked), so the two scans
+plus the entropy baseline cover files, deleted lines and commit subjects. The pre-commit hook uses the same baseline and scans all text files; only
 `.secrets.baseline` is excluded so the hashes in the baseline are not reported as secrets.
 
 Install the local hook once:

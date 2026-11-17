@@ -4,6 +4,22 @@
 
 ### Added
 
+- **The secret guards now cover git history** — both existing scans look only at the files that exist
+  now, so a key that was committed and deleted lived on in history, which is exactly what a push
+  publishes. `tools/check_secret_history.py` walks every commit's diff once (`git log --all -p -U0`),
+  shares the detector patterns with the file guard (`tools/secret_patterns.py`), reports only the
+  commit, path and detector, and gates against a counted snapshot
+  (`tools/secret_history_baseline.json`) so any new row or a row whose count grew fails. CI runs it in
+  the `secret-scan` job with `fetch-depth: 0`; `tests/test_secret_history.py` proves a key deleted from
+  the tree is still found there. The first baseline records the legacy exposure (3,430 hits: an old
+  gitignored benchmark dump, old benchmark evidence with drive paths, and old revisions with home
+  paths) as a reviewed snapshot rather than an endorsement - removing it needs a history rewrite,
+  which is now a decision instead of an accident.
+- **A synced-folder path counts as personal data** — the file scan gained a cloud-storage rule
+  (Dropbox, OneDrive, iCloud, Nextcloud, ...) and validates addresses against a no-reply/placeholder
+  domain list. It immediately caught the knowledge-base path this repository had just gained in
+  `AGENTS.md`, the skill and the scan ledger; that path is now read from `$KINDI_AI_INVENTORY` and is
+  no longer written down anywhere in the tree.
 - **`kindi caps`: what each card and this CPU can actually do** — card names alone were not
   enough to pick settings. `kindi caps [--json]` reports every card the driver sees (index, name,
   UUID, PCI bus id, compute capability, total/free VRAM, driver) from nvidia-smi, with pynvml and

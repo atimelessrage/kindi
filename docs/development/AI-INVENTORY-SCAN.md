@@ -1,7 +1,8 @@
 # AI inventory scan ledger
 
 What has been read from the external knowledge base
-`%USERPROFILE%\Dropbox\beratung\ai_inventory`, what was considered, and what was decided. The
+the folder named by `$KINDI_AI_INVENTORY` (the path is deliberately not written down here: a
+synced-folder path is personal data), what was considered, and what was decided. The
 procedure is the [ai-inventory skill](../../.agents/skills/ai-inventory/SKILL.md); this file is its
 memory. One row per scan, one line per verdict.
 

@@ -8,7 +8,8 @@ metadata:
 
 # AI inventory: the external knowledge base
 
-`%USERPROFILE%\Dropbox\beratung\ai_inventory` is a second, **external** knowledge base about local
+The base named by `$KINDI_AI_INVENTORY` (a synced folder outside this repository; ask the user for
+the path when the variable is unset, and never commit it) is a second, **external** base about local
 AI on the same two machines Kindi targets (Machine 1 is the i7-8086K + RTX 4060 Ti this project is
 developed on). A cron agent ("Hermes") rewrites it weekly; it is git-versioned and every number in it
 carries a provenance tag. It is useful as **inspiration and a source of hypotheses**, never as
@@ -40,9 +41,9 @@ before scanning; update it after every scan.
 
 1. **What changed since last time**
    ```sh
-   git -C "$USERPROFILE/Dropbox/beratung/ai_inventory" rev-parse HEAD
-   git -C "$USERPROFILE/Dropbox/beratung/ai_inventory" log --oneline <last_commit>..HEAD
-   git -C "$USERPROFILE/Dropbox/beratung/ai_inventory" status --short
+   git -C "$KINDI_AI_INVENTORY" rev-parse HEAD
+   git -C "$KINDI_AI_INVENTORY" log --oneline <last_commit>..HEAD
+   git -C "$KINDI_AI_INVENTORY" status --short
    ```
    Then files newer than the ledger's date (`ls -lt`, or `find -newer <marker>`), which catch
    uncommitted work.

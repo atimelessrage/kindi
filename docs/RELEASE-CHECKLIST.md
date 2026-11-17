@@ -145,10 +145,12 @@ change the documented hash to the old file.
 
 ## 5. Commit and tag
 
-- Run the secret scan over history before tagging, not only over tracked files: on a clean export, run
-  `detect-secrets scan --all-files` (or an equivalent `git log -S`/`-G` credential-pattern scan over the
-  release range) and confirm the baseline still matches. The tracked-file test does not scan commit
-  metadata or deleted lines.
+- Run the secret scans before tagging, not only the tracked-file one:
+  `python tools/check_secret_history.py` fails on any new credential or personal-data row in history
+  (it compares against `tools/secret_history_baseline.json`), and `python tools/check_secret_history.py
+  --all-hits` prints every recorded row so the release owner can decide whether a row still belongs
+  there. Also run `detect-secrets scan --all-files` on a clean export and confirm `.secrets.baseline`
+  still matches. The tracked-file test scans neither commit metadata nor deleted lines.
 - Commit the guard (already in `2b84658`), the checksum update, and this checklist together in the release
   history. Do not amend or reuse a published tag.
 - Decide the release version before tagging. `install.sh` and `kindi/__init__.py` currently say `0.5.0`; if

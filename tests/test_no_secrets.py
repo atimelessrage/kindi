@@ -1,49 +1,22 @@
-"""Fail when a scanned (tracked or untracked) file contains a credential or a local home path.
+"""Fail when a scanned file contains a credential, a machine path or a personal identifier.
 
-This is a cheap, dependency-free guard for the common accident: a key, token or local path is
-added to a source file or doc. It scans `git ls-files`, skips binary files, and reports only the file, line and detector name,
-never the matched text.
+This is a cheap, dependency-free guard for the common accident: a key, token, local path, cloud
+folder or address is added to a source file or doc. It scans `git ls-files`, skips binary files,
+and reports only the file, line and detector name, never the matched text. The patterns live in
+`tools/secret_patterns.py`, shared with `tools/check_secret_history.py`.
 
 It scans tracked files and untracked files Git does not ignore (a secret in a new file used to be
-invisible). It does not replace a full history scan: commit metadata and deleted lines are outside its scope.
-Run `detect-secrets` over the unpushed diff before a release.
+invisible). It does not replace the history scan: commit metadata and deleted lines are outside its
+scope, which is what `tools/check_secret_history.py` covers. `.secrets.baseline` /
+`tools/check_secret_baseline.py` are the entropy-based pass over the same tracked tree.
 """
-import re
 import subprocess
 import sys
 from pathlib import Path
 
+from tools.secret_patterns import ALLOW, HEX, PATTERNS, SKIP, hits_in_line
+
 ROOT = Path(__file__).resolve().parents[1]
-SKIP = {".gguf", ".bin", ".npz", ".npy", ".dll", ".exe", ".lib", ".exp", ".so", ".o", ".a",
-        ".pyc", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".zip", ".gz", ".xz"}
-
-# Placeholders and documented examples are not credentials.
-# `KindiInstallerTest` is the deliberate -AppName/-DistroDir fixture of the documented
-# installer run (docs/WINDOWS.md), not a machine layout that leaked into the tree.
-ALLOW = re.compile(r"(?i)(?:example|placeholder|your[-_]|none|redacted|choose-a-long-random-string|random-string|KindiInstallerTest|\*\*\*|<[^>]+>)")
-
-PATTERNS = [
-    ("private key", re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----")),
-    ("AWS access key", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
-    ("GitHub token", re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}\b")),
-    ("OpenAI key", re.compile(r"\bsk-[A-Za-z0-9]{32,}\b")),
-    ("Anthropic key", re.compile(r"\bsk-ant-[A-Za-z0-9_-]{20,}\b")),
-    ("Slack token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")),
-    ("Google API key", re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b")),
-    ("JWT", re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")),
-    # /home/kindi is the fixed non-root container user the Dockerfiles create, not a person's home directory
-    ("local home path", re.compile(r"(?i)(?:[A-Z]:[\\/]Users[\\/][^\\/\s\"'<>]+|/home/(?![\[(]|kindi\b)[^/\s\"'<>]+)")),
-    # A backslash-form drive path is machine-local data (a pack dir, a model cache): the docs write
-    # repository paths as T:/kindi, so this shape is the machine-specific one. The 2026-11-16 audit
-    # found exactly that shape (a drive letter, then a backslash-separated pack directory) in
-    # tracked benchmark JSONs.
-    ("local drive path", re.compile(r"(?i)\b[A-Z]:\\+(?:[A-Za-z0-9_.$~-]+\\+)+")),
-    ("email address", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
-]
-
-# Assignments with a long literal value, excluding the common placeholders and hashes.
-GENERIC = re.compile(r"(?i)\b(api[_-]?key|secret|token|password|passwd)\b\s*[:=]\s*['\"]?([A-Za-z0-9_\-]{20,})")
-HEX = re.compile(r"^[0-9a-fA-F]{32,}$")
 
 
 def _git_files(*args):
@@ -81,13 +54,8 @@ def findings():
         else:
             text = raw.decode("utf-8", "replace")
         for lineno, line in enumerate(text.splitlines(), 1):
-            for name, pattern in PATTERNS:
-                match = pattern.search(line)
-                if match and not ALLOW.search(match.group(0)):
-                    yield rel, lineno, name
-            m = GENERIC.search(line)
-            if m and not ALLOW.search(m.group(0)) and not HEX.match(m.group(2)):
-                yield rel, lineno, "secret assignment"
+            for name in hits_in_line(line):
+                yield rel, lineno, name
 
 
 def test_the_local_drive_path_rule_is_not_vacuous():
@@ -98,6 +66,20 @@ def test_the_local_drive_path_rule_is_not_vacuous():
     assert drive.search("pack is at " + "D:" + "\\" + "ollamaModels" + "\\" + "gemma4")
     assert not drive.search("pack `~/.kindi/packs/bonsai-27b`")
     assert not drive.search("the T:/kindi worktree")
+
+
+def test_the_cloud_storage_rule_is_not_vacuous():
+    """A synced folder is personal data even when its contents are dull: the account name and the
+    sibling directories are the person's. This rule is what a synced-folder path slipped past
+    before (2026-11-17), so pin both the hit and the prose that must not trip it."""
+    cloud = dict(PATTERNS)["cloud storage path"]
+    # assembled from pieces so this guard's own test file is not a finding
+    synced = "/".join(["%USERPROFILE%", "Dropbox", "work", "notes.md"])
+    assert cloud.search(synced)
+    assert hits_in_line("the base at " + synced) == ("cloud storage path",)
+    assert hits_in_line("OneDrive" + "/" + "notes.txt") == ("cloud storage path",)
+    assert not cloud.search("the user's Dropbox folder, read-only")
+    assert not cloud.search("Dropbox and OneDrive are synced by the OS")
 
 
 def test_untracked_files_are_scanned(tmp_path, monkeypatch):
