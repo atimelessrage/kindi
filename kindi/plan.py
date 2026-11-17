@@ -97,6 +97,15 @@ def _owner(kind, assume_vram):
     return _t._pick_owner("auto")
 
 
+def _io_rates(mib=64):
+    """Measured RAM/disk/PCIe assumptions for the MoE slot count; None when unavailable."""
+    try:
+        from . import io_probe
+        return io_probe.rates(io_probe.probe(mib=mib))
+    except Exception:
+        return None
+
+
 def _moe_free_bytes(assume_vram_gib):
     if assume_vram_gib is not None:
         return int(float(assume_vram_gib) * 2 ** 30)
@@ -110,14 +119,15 @@ def _moe_free_bytes(assume_vram_gib):
 def describe(pack, ctx, spec, mode="cpu-first", gpu_kind=None,
              assume_vram_gib=None, assume_ram_gib=None, assume_cores=None, reserve_mib=512,
              usage_path=None, moe_cache_mib=None, dcache=None,
-             chunk_tokens=None, chunk_lane="copy"):
+             chunk_tokens=None, chunk_lane="copy", rates=None):
     """The placement report as a dict; no weight tensor is read, only indexes and the manifest."""
     man = _manifest(pack)
     if man.get("backend") == "kindi_lightning":
         return describe_moe(pack, ctx, _moe_free_bytes(assume_vram_gib),
                             usage_path=usage_path, moe_cache_mib=moe_cache_mib,
                             dcache=dcache, reserve_mb=reserve_mib,
-                            chunk_tokens=chunk_tokens, chunk_lane=chunk_lane)
+                            chunk_tokens=chunk_tokens, chunk_lane=chunk_lane,
+                            rates=rates)
     dims = dict(man.get("dimensions") or {})
     lines = []          # (choice, reason) pairs, printed in order
     out = {"pack": pack, "model": man.get("model"), "backend": man.get("backend"),
@@ -340,7 +350,7 @@ def _slots_cost_phrase(cost):
                cost["experts_without"] - cost["experts"], cost["experts"], cost["experts_without"]))
 
 def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
-                 dcache=None, reserve_mb=None, chunk_tokens=None, chunk_lane="copy"):
+                 dcache=None, reserve_mb=None, chunk_tokens=None, chunk_lane="copy", rates=None):
     """The MoE strategy for a `kindi_lightning` pack: expert tiers (+ decode slots), not a layer split.
 
     Same arithmetic as `lightning._plan`; the weights are never read - the GGUF header, `Spec` and
@@ -366,20 +376,32 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
     state = s.kind.count("ssm") * (s.n_sh * 64 * s.d_state + s.d_xbc * 3) * 4
     reserve = (int(os.environ.get("KINDI_LT_RESERVE_MB", "350")) if reserve_mb is None
                else int(reserve_mb)) * 2 ** 20
+    room = free_bytes - dense - kv - state - reserve
+    slot_room = room - _lt_buf_bytes(s, 512)
+    rate_sized = False
     if dcache is None:
-        dcache = _ltfit.dcache_default(s.n_used)
+        predicted = _ltfit.rate_slots(s.n_used, s.n_exp, eb, rates,
+                                      room=slot_room, n_moe=n_moe)
+        rate_sized = predicted is not None
+        dcache = predicted if predicted is not None else _ltfit.dcache_default(s.n_used)
     else:
         dcache = int(dcache)
-    room = free_bytes - dense - kv - state - reserve
     lines = [("model", "%s (%s, %d layers, %d MoE layers, %d experts, %d per token)"
               % (man.get("model"), man.get("backend"), s.n_layer, n_moe, s.n_exp, s.n_used)),
              ("strategy", "moe-expert-tiers: the dense core and shared expert live on the card; "
               "routed experts are tiered card / pinned host / mmap, and the last-used dcache="
-              "%d per layer stay in device slots (the engine's LRU)" % dcache),
+              "%d per layer stay in device slots (the engine's LRU)%s"
+              % (dcache, " - sized from the measured I/O rates" if rate_sized else "")),
              ("host ram", "the whole expert set + dense core (~%.1f GiB) stays readable from host RAM"
               % ((n_moe * s.n_exp * eb + dense) / 2 ** 30)),
              ("reserve", "%d MiB kept free (the CUDA context, kernels and pool rounding; the engine "
               "adds more after a failed load)" % (reserve // 2 ** 20))]
+    from . import io_probe
+    if rates:
+        lines.append(("rates", io_probe.rate_line(rates) +
+                      (" (assumed for the slot count)" if rate_sized else "")))
+    else:
+        lines.append(("rates", "not measured; the slot count uses the engine's default"))
     n_card = None
     cap = int(moe_cache_mib) * 2 ** 20 if moe_cache_mib is not None else None
     if cap is not None:
@@ -401,7 +423,9 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
                       "reduce --ctx or add free VRAM" % (n_card or 0, s.n_used)))
         return {"pack": pack, "model": man.get("model"), "strategy": "moe-expert-tiers",
                 "lines": lines, "n_card": n_card if n_card is not None else 0,
-                "n_exp": s.n_exp, "fit": False,
+                "n_exp": s.n_exp, "n_used": s.n_used, "n_moe": n_moe, "expert_bytes": eb,
+                "room": room, "dcache": dcache, "rate_sized": rate_sized, "rates": rates,
+                "fit": False,
                 "command": "%s -m kindi --pack %s bench" % (sys.executable, pack)}
     # weighted placement, mirroring lightning._plan_weighted's candidate scan
     usage_path = usage_path or os.environ.get("KINDI_LT_USAGE") or os.path.join(
@@ -458,17 +482,24 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
             elif cov_slots is None:
                 why += " (no usage counts: run bench to measure use)"
         why += "; --dcache or KINDI_LT_DCACHE moves the split"
+        if rates:
+            why += "; assumed " + io_probe.rate_line(rates)
         lines.append(("slots", why))
     else:
-        lines.append(("slots", "%d per MoE layer (%.2f GiB) are reserved but unused: all %d experts per "
-                      "layer fit on the card, so no host expert needs a slot (--dcache still sizes them)"
-                      % (dcache, slot_gib, s.n_exp)))
+        why = ("%d per MoE layer (%.2f GiB) are reserved but unused: all %d experts per "
+               "layer fit on the card, so no host expert needs a slot (--dcache still sizes them)"
+               % (dcache, slot_gib, s.n_exp))
+        if rates:
+            why += "; assumed " + io_probe.rate_line(rates)
+        lines.append(("slots", why))
     est = dense + kv + state + reserve + n_moe * n_card * eb
     lines.append(("placement", "~%.2f GiB on the card at ctx %d (%d MiB of %d MiB free); host experts are "
                   "read over PCIe through per-expert pointer tables" % (
                       est / 2 ** 30, int(ctx), est // 2 ** 20, int(free_bytes) // 2 ** 20)))
     out = {"pack": pack, "model": man.get("model"), "strategy": "moe-expert-tiers",
-           "lines": lines, "n_card": n_card, "n_exp": s.n_exp, "dcache": dcache,
+           "lines": lines, "n_card": n_card, "n_exp": s.n_exp, "n_used": s.n_used,
+           "n_moe": n_moe, "expert_bytes": eb, "room": room, "dcache": dcache,
+           "rate_sized": rate_sized, "rates": rates,
            "slots_resident": n_resident, "slots_cost": slots_cost, "fit": True,
            "estimate_mib": est // 2 ** 20,
            "command": "%s -m kindi --pack %s bench" % (sys.executable, pack)}
@@ -543,6 +574,7 @@ def run(cfg, a, log=print):
     spec = getattr(a, "tandem_cpu_layers", None) or cfg.get("tandem_cpu_layers") or "auto"
     med = getattr(a, "tandem", None) or cfg.get("tandem") or "cpu-first"
     gpu_kind = getattr(a, "tandem_gpu", None) or cfg.get("tandem_gpu") or os.environ.get("KINDI_TANDEM_GPU")
+    rates = _io_rates() if _manifest(pack).get("backend") == "kindi_lightning" else None
     rep = describe(pack, cfg.get("ctx", 24576), spec, mode=med, gpu_kind=gpu_kind,
                    assume_vram_gib=getattr(a, "assume_vram_gib", None),
                    assume_ram_gib=getattr(a, "assume_ram_gib", None),
@@ -552,7 +584,8 @@ def run(cfg, a, log=print):
                    dcache=getattr(a, "dcache", None),
                    chunk_tokens=getattr(a, "moe_chunk", None),
                    chunk_lane=getattr(a, "moe_lane", None) or "copy",
-                   reserve_mib=int(os.environ.get("KINDI_TANDEM_RESERVE_MB", "512")))
+                   reserve_mib=int(os.environ.get("KINDI_TANDEM_RESERVE_MB", "512")),
+                   rates=rates)
     for choice, reason in rep["lines"]:
         log("%-11s %s" % (choice + ":", reason))
     log("follow up: %s" % rep["command"])

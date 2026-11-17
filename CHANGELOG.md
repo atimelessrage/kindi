@@ -30,6 +30,13 @@
   D2H apart. It loads no model. Measured here on 2026-11-17 with `--mib 64`: 13,456.7 MiB/s RAM,
   2,509.8 MiB/s disk, 6.0/6.1 GiB/s H2D/D2H on the 4060 Ti. The rates feed slot sizing and the
   parked NVMe cold-expert tier, whose gate is in `docs/ROADMAP.md` "Memory-tier follow-ups".
+- **`kindi plan` and `kindi autotune` now consume the `kindi io` rates** — the Lightning report
+  normalizes the measured RAM, disk and PCIe numbers into bytes/s, predicts one token's slot
+  working set plus `ceil((RAM copy + disk read) / PCIe H2D)` lookahead, caps it by `n_exp` and by
+  the room that still leaves `n_used` experts resident, and prints the three assumptions in a
+  `rates:` line and in the slots explanation. Autotune tests that count with half and double it.
+  Unit-tested on synthetic rates; the within-10%-of-measured-best Lightning-pack gate is still
+  **not measured** (`docs/ROADMAP.md`, memory-tier #3).
 - **`tools/ollama_links.py` links the GGUF models Ollama already downloaded under readable names**
   — Ollama keeps its weights as `blobs/sha256-<hash>` and describes them in manifests, so a model
   you already have could not be named on a Kindi command line. The helper reads those manifests

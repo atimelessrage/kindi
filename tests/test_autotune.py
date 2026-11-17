@@ -45,6 +45,21 @@ def test_a_moe_pack_gets_its_decode_cache_knob_and_no_dense_tandem():
     assert not [n for n in names if n.startswith("tandem")]
 
 
+RATES = {"source": "kindi io", "ram_mib_s": 13456.7, "disk_mib_s": 2509.8,
+         "pcie_h2d_gib_s": 6.0, "pcie_bytes_s": 6.0 * 2 ** 30}
+
+
+def test_moe_slot_candidates_follow_the_rate_sized_count():
+    options = autotune.candidates(ONE_CARD, LIGHTNING, 8192, max_runs=10, rates=RATES,
+                                  moe={"dcache": 16, "n_used": 4, "n_exp": 32})
+    names = _names(options)
+    assert "dcache-16" in names and "dcache-8" in names and "dcache-32" in names
+    assert "dcache-6" not in names
+    why = next(item["why"] for item in options if item["name"] == "dcache-16")
+    assert "sized from the measured I/O rates" in why
+    assert "PCIe H2D 6.0 GiB/s" in why
+
+
 def test_a_host_without_a_card_only_offers_the_cpu_engine():
     assert _names(autotune.candidates(NO_CARD, DENSE, 8192)) == ["cpu"]
 

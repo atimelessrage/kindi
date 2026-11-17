@@ -66,6 +66,11 @@ It takes ints, an `ExpertCache` and a `Placement`, and returns a plan; it moves 
 kernel and is used by no backend. None of that is new execution: the MoE backends below are still
 design and prototype.
 
+On a `kindi_lightning` pack the report also measures the host's RAM/disk/PCIe rates with the same
+probes as `kindi io`, sizes the decode slots from the measured refill path, and prints the three
+rates in a `rates:` line and in the slot explanation. The slot count is a prediction; the
+Lightning-pack comparison remains the gate.
+
 `kindi plan` can show that plan before a backend exists: on a `kindi_lightning` pack,
 `--moe-chunk N` (with `--usage`, `--moe-cache-mib` and `--dcache` as usual) builds the placement,
 feeds `MoeTandem` an N-token sample prompt chunk and reports the lane split, the deduped copy list

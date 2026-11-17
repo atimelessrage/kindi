@@ -242,6 +242,40 @@ def test_the_slots_line_uses_the_fits_own_numbers(tmp_path, monkeypatch):
     assert "%.1f%%" % coverage(162) == "86.4%" and "%.1f%%" % coverage(182) == "91.6%"
 
 
+RATES = {"source": "kindi io", "ram_mib_s": 13456.7,
+         "ram_bytes_s": 13456.7 * 2 ** 20, "disk_mib_s": 2509.8,
+         "disk_bytes_s": 2509.8 * 2 ** 20, "pcie_h2d_gib_s": 6.0,
+         "pcie_bytes_s": 6.0 * 2 ** 30, "pcie_d2h_gib_s": 6.1}
+
+
+def test_describe_moe_sizes_slots_from_the_measured_rates(tmp_path):
+    """A slot count chosen from `kindi io` prints the RAM/PCIe/disk rates it used, in its own
+    `rates:` line and in the slot explanation."""
+    pack = make_lightning_pack(tmp_path)
+    rep = _plan.describe(str(pack), 2048, None, assume_vram_gib=0.5, assume_ram_gib=4,
+                         assume_cores=2, reserve_mib=0, rates=RATES)
+    assert rep["rate_sized"] is True and rep["dcache"] == 16
+    assert rep["rates"] == RATES
+    choices = {c for c, _ in rep["lines"]}
+    assert "rates" in choices
+    rates = next(r for c, r in rep["lines"] if c == "rates")
+    assert "RAM 13456.7 MiB/s" in rates
+    assert "PCIe H2D 6.0 GiB/s" in rates
+    assert "disk 2509.8 MiB/s" in rates
+    slots = next(r for c, r in rep["lines"] if c == "slots")
+    assert "assumed RAM 13456.7 MiB/s" in slots
+    assert "sized from the measured I/O rates" in next(r for c, r in rep["lines"] if c == "strategy")
+
+
+def test_run_measures_rates_for_a_lightning_pack(tmp_path, monkeypatch, capsys):
+    pack = make_lightning_pack(tmp_path)
+    monkeypatch.setattr(_plan, "_io_rates", lambda: RATES)
+    args = _FakeArgs(assume_vram_gib=0.5, assume_ram_gib=4, assume_cores=2)
+    assert _plan.run({"pack": str(pack), "ctx": 2048}, args) == 0
+    out = capsys.readouterr().out
+    assert "rates:" in out and "PCIe H2D 6.0 GiB/s" in out
+
+
 def test_describe_moe_reports_a_refusal_when_nothing_fits(tmp_path):
     pack = make_lightning_pack(tmp_path)
     rep = _plan.describe(str(pack), 2048, None, assume_vram_gib=0.0002, assume_ram_gib=4,

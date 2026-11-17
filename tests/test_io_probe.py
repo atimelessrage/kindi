@@ -48,6 +48,21 @@ def test_probe_skips_what_is_asked():
                for k in ("ram", "disk", "pcie"))
 
 
+def test_rates_are_normalized_and_a_buffered_disk_is_flagged():
+    report = {
+        "ram": {"available": True, "mib_s": 13456.7},
+        "disk": {"available": True, "mib_s": 2509.8, "unbuffered": False},
+        "pcie": {"available": True, "h2d_gib_s": 6.0, "d2h_gib_s": 6.1, "device": "RTX"},
+    }
+    rates = io_probe.rates(report)
+    assert rates["ram_bytes_s"] == 13456.7 * 2 ** 20
+    assert rates["pcie_bytes_s"] == 6.0 * 2 ** 30
+    assert "disk_bytes_s" not in rates and rates["disk_buffered"] is True
+    assert "buffered" in io_probe.rate_line(rates)
+    assert "RAM 13456.7 MiB/s" in io_probe.rate_line(rates)
+    assert "PCIe H2D 6.0 GiB/s" in io_probe.rate_line(rates)
+
+
 def test_render_names_the_method_and_the_boundary():
     report = io_probe.probe(mib=4, skip=("disk", "pcie"))
     text = "\n".join(io_probe.render(report))

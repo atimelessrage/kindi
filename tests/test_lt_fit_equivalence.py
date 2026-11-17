@@ -122,6 +122,30 @@ def test_neither_caller_has_its_own_formula(monkeypatch):
     assert all(c[3] == spec.n_used and c[4] == _expert_bytes(spec) for c in calls)
 
 
+def test_rate_slots_prices_the_refill_path_from_measured_rates():
+    """One token's `n_used` experts plus one lookahead per measured tier-time multiple: with
+    13,456.7 MiB/s RAM, 2,509.8 MiB/s disk and 6.0 GiB/s PCIe, a 1 MiB expert needs four working
+    sets (4 slots) and four used experts give 16 slots."""
+    rates = {"ram_bytes_s": 13456.7 * 2 ** 20, "disk_bytes_s": 2509.8 * 2 ** 20,
+             "pcie_bytes_s": 6.0 * 2 ** 30}
+    assert ltfit.rate_slots(4, 256, 2 ** 20, rates, room=1 << 40, n_moe=8) == 16
+    assert ltfit.rate_slots(4, 256, 2 ** 20, {"ram_bytes_s": rates["ram_bytes_s"],
+                                              "pcie_bytes_s": rates["pcie_bytes_s"]},
+                            room=1 << 40, n_moe=8) == 8
+    assert ltfit.rate_slots(4, 256, 2 ** 20, {"pcie_bytes_s": rates["pcie_bytes_s"]},
+                            room=1 << 40, n_moe=8) == 4
+    assert ltfit.rate_slots(4, 256, 2 ** 20, {}, room=1 << 40, n_moe=8) is None
+
+
+def test_rate_slots_never_exceeds_what_the_room_can_hold():
+    """The prediction is capped by the same fit that the report and engine use, and a room that
+    cannot hold `n_used` residents has no slot answer."""
+    rates = {"ram_bytes_s": 13456.7 * 2 ** 20, "disk_bytes_s": 2509.8 * 2 ** 20,
+             "pcie_bytes_s": 6.0 * 2 ** 30}
+    assert ltfit.rate_slots(4, 32, 1000, rates, room=98000, n_moe=4) == 6
+    assert ltfit.rate_slots(4, 32, 1000, rates, room=4 * 1000, n_moe=4) is None
+
+
 def test_the_slots_cost_is_the_report_counterfactual(monkeypatch):
     """The number the slots line prints is `_lt_fit(dcache=0)` against `_lt_fit(dcache=engine)`:
     on this spec 10 slots per layer cost 13 experts per layer (19 -> 6), not one."""

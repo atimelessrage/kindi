@@ -127,8 +127,13 @@ proposes what this machine could actually run:
 | `tp-2-auto`, `tp-2-equal` | **two or more cards** | tensor-parallel row split (`KINDI_TP=1`, `KINDI_TP_SPLIT=auto` or `equal`) |
 | `tandem-auto` | a card, a dense pack, ≥4 physical cores | the smallest CPU slice that makes the requested context fit |
 | `tandem-gdn:8`, `tandem-gdn:16` | same | fixed CPU slices: the first N non-attention layers |
-| `dcache-16`, `dcache-6` | a Lightning (MoE) pack | decode LRU slots per expert layer (`KINDI_LT_DCACHE`, default 10) against VRAM |
+| `dcache-<sized>` | a Lightning (MoE) pack | decode LRU slots per expert layer (`KINDI_LT_DCACHE`, default 10) against VRAM; with measured rates the list is the predicted count plus half and double it |
 | `cpu` | no card, or `--include-cpu` | the CPU engine (`KINDI_DEVICE=cpu`) |
+
+For a Lightning pack the slot candidates are sized from the `kindi io` rates: one token's `n_used`
+experts plus `ceil((RAM copy + disk read) / PCIe H2D)` lookahead of the same working set, capped by
+`n_exp` and by the room that still leaves `n_used` experts per layer resident. The plan's `rates:`
+line prints the three assumptions. This is a prediction; the Lightning-pack comparison is the gate.
 
 Every candidate is **one real `kindi bench` run in a child process**, with `--sample-vram`, so decode
 and read rates, the context actually granted and the device-wide VRAM peak all come from the code

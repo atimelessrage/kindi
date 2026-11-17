@@ -238,6 +238,52 @@ def probe(mib=DEFAULT_MIB, disk_dir=None, skip=()):
     return out
 
 
+def rates(report):
+    """Numeric rates from a `probe()` report, in bytes/s where they were measured.
+
+    A buffered disk read is reported but not exposed as `disk_bytes_s`: it is a page-cache rate,
+    not the device's, so a sizing model must not use it as a disk assumption.
+    """
+    report = report or {}
+    out = {"source": "kindi io"}
+    ram = report.get("ram") or {}
+    if ram.get("available") and ram.get("mib_s"):
+        out["ram_mib_s"] = float(ram["mib_s"])
+        out["ram_bytes_s"] = out["ram_mib_s"] * 2 ** 20
+    disk = report.get("disk") or {}
+    if disk.get("available") and disk.get("mib_s"):
+        out["disk_mib_s"] = float(disk["mib_s"])
+        if disk.get("unbuffered", True):
+            out["disk_bytes_s"] = out["disk_mib_s"] * 2 ** 20
+        else:
+            out["disk_buffered"] = True
+    pcie = report.get("pcie") or {}
+    if pcie.get("available"):
+        for key, out_key in (("h2d_gib_s", "pcie_h2d_gib_s"), ("d2h_gib_s", "pcie_d2h_gib_s")):
+            if pcie.get(key) is not None:
+                out[out_key] = float(pcie[key])
+                if key == "h2d_gib_s":
+                    out["pcie_bytes_s"] = out[out_key] * 2 ** 30
+        if pcie.get("device"):
+            out["pcie_device"] = pcie["device"]
+    return out if len(out) > 1 else {}
+
+
+def rate_line(rates):
+    """A compact human-readable list of the measured assumptions."""
+    if not rates:
+        return "not measured"
+    parts = []
+    if rates.get("ram_mib_s") is not None:
+        parts.append("RAM %.1f MiB/s" % rates["ram_mib_s"])
+    if rates.get("pcie_h2d_gib_s") is not None:
+        parts.append("PCIe H2D %.1f GiB/s" % rates["pcie_h2d_gib_s"])
+    if rates.get("disk_mib_s") is not None:
+        suffix = " (buffered, not used)" if rates.get("disk_buffered") else ""
+        parts.append("disk %.1f MiB/s%s" % (rates["disk_mib_s"], suffix))
+    return ", ".join(parts) if parts else "not measured"
+
+
 def _rate(value, unit):
     return "%.1f %s" % (value, unit) if value is not None else "-"
 

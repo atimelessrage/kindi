@@ -33,10 +33,12 @@ def _manifest(pack):
     return data if isinstance(data, dict) else {}
 
 
-def candidates(report, manifest, ctx, max_runs=6, include_cpu=False):
+def candidates(report, manifest, ctx, max_runs=6, include_cpu=False, rates=None, moe=None):
     """The configurations worth measuring on this host, most likely useful first.
 
     Every entry is a dict: `name`, `why`, `args` (bench flags) and `env` (process environment).
+    `moe` is the Lightning sizing report (`dcache`, `n_used`, `n_exp`); with `rates` it lets the
+    slot candidates follow the measured I/O model instead of the fixed 16/6 pair.
     """
     cards = (report or {}).get("gpus") or []
     cpu = (report or {}).get("cpu") or {}
@@ -61,10 +63,25 @@ def candidates(report, manifest, ctx, max_runs=6, include_cpu=False):
                         "args": ["--tandem", "cpu-first", "--tandem-cpu-layers", "gdn:%d" % n],
                         "why": "fixed CPU slice: the first %d non-attention layers" % n, "env": {}})
     if backend in MOE_BACKENDS:
-        for slots in (16, 6):
+        sized = int((moe or {}).get("dcache") or 0)
+        n_used = int((moe or {}).get("n_used") or 4)
+        n_exp = int((moe or {}).get("n_exp") or 32)
+        values = ([sized, max(n_used, sized // 2), min(n_exp, sized * 2)]
+                  if sized else [16, 6])
+        values = list(dict.fromkeys(max(1, int(v)) for v in values))
+        from . import io_probe
+        rate_note = io_probe.rate_line(rates) if rates else ""
+        for slots in values:
+            why = "decode LRU slots per MoE layer against VRAM"
+            if sized:
+                why += "; sized from the measured I/O rates"
+            elif rate_note:
+                why += "; default pair (rates were not usable for sizing)"
+            if rate_note:
+                why += " (%s)" % rate_note
             out.append({"name": "dcache-%d" % slots,
                         "args": [], "env": {"KINDI_LT_DCACHE": str(slots)},
-                        "why": "decode LRU slots per MoE layer (default 10) against VRAM"})
+                        "why": why})
     if include_cpu or not cards:
         out.append({"name": "cpu", "why": "the CPU engine (KINDI_DEVICE=cpu)",
                     "args": [], "env": {"KINDI_DEVICE": "cpu"}})
@@ -204,8 +221,25 @@ def run(cfg, a, log=print):
         return 2
     ctx = int(getattr(a, "ctx", None) or cfg.get("ctx") or 24576)
     report = caps.probe()
+    rates, moe = None, None
+    if manifest.get("backend") in MOE_BACKENDS:
+        from . import io_probe, plan as _plan
+        try:
+            rates = io_probe.rates(io_probe.probe(mib=64))
+        except Exception:
+            rates = None
+        gpu = (report.get("gpus") or [{}])[0]
+        free = gpu.get("memory_free_mib")
+        try:
+            moe = _plan.describe(pack, ctx, None,
+                                 assume_vram_gib=(free / 1024.0 if free else None),
+                                 reserve_mib=int(os.environ.get("KINDI_LT_RESERVE_MB", "350")),
+                                 rates=rates)
+        except (Exception, SystemExit):
+            moe = None
     options = candidates(report, manifest, ctx, max_runs=getattr(a, "max_runs", 6),
-                         include_cpu=getattr(a, "include_cpu", False))
+                         include_cpu=getattr(a, "include_cpu", False),
+                         rates=rates, moe=moe)
     if getattr(a, "dry_run", False):
         log("kindi autotune: %d candidate%s at ctx %d (dry run: nothing is loaded)" %
             (len(options), "" if len(options) == 1 else "s", ctx))
@@ -231,6 +265,9 @@ def run(cfg, a, log=print):
     if getattr(a, "json", None):
         payload = {"pack": pack, "model": manifest.get("model"), "ctx": ctx,
                    "cards": report.get("gpus") or [], "cpu": report.get("cpu") or {},
+                   "rates": rates, "moe": ({k: moe.get(k) for k in
+                                           ("dcache", "n_used", "n_exp", "n_moe", "room")}
+                                          if moe else None),
                    "candidates": options, "results": results,
                    "best": (next((r for r in rank(results) if r.get("ok")
                                   and r.get("gen_tok_s") is not None), None) or {}).get("name")}

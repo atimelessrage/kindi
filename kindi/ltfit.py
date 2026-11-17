@@ -11,6 +11,7 @@ staging buffers (`n_exp` experts each) and the `dcache` decode slots of every Mo
 room first, and what is left divides over the `n_moe - 2` layers that are not staging - which is why
 one slot per layer costs `n_moe / (n_moe - 2)` experts per layer, not one.
 """
+import math
 import os
 
 DCACHE_DEFAULT = 10
@@ -19,6 +20,51 @@ DCACHE_DEFAULT = 10
 def dcache_default(n_used):
     """The engine's decode-slot count per MoE layer: KINDI_LT_DCACHE, never below `n_used`."""
     return max(int(n_used), int(os.environ.get("KINDI_LT_DCACHE", str(DCACHE_DEFAULT))))
+
+
+def expert_seconds(eb, bytes_s):
+    """Time to move one expert at a measured byte rate, or None without the rate."""
+    return float(eb) / float(bytes_s) if bytes_s else None
+
+
+def _max_slots(room, n_moe, n_exp, n_used, eb):
+    """Largest decode-slot count that still leaves `n_used` experts per layer resident."""
+    if room is None or not n_moe:
+        return n_exp
+    if fit_experts(room, n_moe, n_exp, n_used, eb, 0) is None:
+        return None
+    lo, hi = 0, n_exp
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if fit_experts(room, n_moe, n_exp, n_used, eb, mid) is None:
+            hi = mid - 1
+        else:
+            lo = mid
+    return lo
+
+
+def rate_slots(n_used, n_exp, eb, rates, room=None, n_moe=None):
+    """Predict decode slots per MoE layer from measured transfer rates and the room.
+
+    One token needs `n_used` experts per layer. The lookahead is the number of experts whose
+    transfer can be hidden behind one RAM/disk pass at the measured rates: a slot set holds the
+    current working set plus `ceil((ram + disk) / pcie)` more. That is a prediction from rates,
+    not a measured optimum; the Lightning-pack comparison remains the gate. `room` caps it at
+    what still leaves `n_used` residents; None when even that does not fit.
+    """
+    rates = rates or {}
+    pcie = expert_seconds(eb, rates.get("pcie_bytes_s"))
+    if not pcie:
+        return None
+    stage = (expert_seconds(eb, rates.get("ram_bytes_s")) or 0.0) + \
+            (expert_seconds(eb, rates.get("disk_bytes_s")) or 0.0)
+    depth = 1 + int(math.ceil(stage / pcie)) if stage else 1
+    wanted = max(1, int(n_used)) * depth
+    wanted = min(int(n_exp), wanted)
+    limit = _max_slots(room, n_moe, n_exp, n_used, eb)
+    if limit is None:
+        return None
+    return max(int(n_used), min(wanted, limit))
 
 
 def fit_experts(room, n_moe, n_exp, n_used, eb, dcache):
