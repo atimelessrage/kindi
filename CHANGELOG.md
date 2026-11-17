@@ -4,6 +4,19 @@
 
 ### Added
 
+- **`tools/ollama_links.py` links the GGUF models Ollama already downloaded under readable names**
+  — Ollama keeps its weights as `blobs/sha256-<hash>` and describes them in manifests, so a model
+  you already have could not be named on a Kindi command line. The helper reads those manifests
+  (`$OLLAMA_MODELS`, else `~/.ollama/models`; `-m` for another directory), picks the model layer
+  (not the projector, template or license) and makes one link per model into
+  `~/.kindi/models/ollamaLinks` (`-o` to move it), named after the manifest: `gemma3/4b` becomes
+  `gemma3-4b.gguf`. A symlink is used when the host allows it and a hard link otherwise, so nothing
+  is copied; a cross-volume failure explains both ways out, `--dry-run` lists without writing, and
+  `--force` replaces a file that is not the same blob. If there are no manifests, the blobs
+  themselves are scanned for the `GGUF` magic, so a bare `blobs` folder or a folder of `.gguf`
+  files works too. `tools/ollama_links.ps1` is now a thin wrapper over the same script, and twelve
+  tests cover manifest naming, the blob fallback, the environment variable, dry run, idempotence,
+  the symlink-to-hardlink fallback and the failure hints.
 - **`kindi bench` reports prefill vs decode as a share of one request's wall clock** — two separate
   tok/s numbers left the reader to combine them, and the printed `prompt reading` rate was measured
   one token per `feed` call, so it was not a request's prefill rate at all. `--split-at` (default

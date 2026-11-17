@@ -161,6 +161,25 @@ The script pins these files. It does not use a file with a different sha256.
 | Nemotron | `NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q3_K_XL.gguf` (unsloth) | 4,219,133,120 | `3f8032b9d2c18536c4ac51b97959a563cc27434de99823640c98147edc62ce9b` |
 | Nanbeige 33B | `AH-Nanbeige4.3-33B-IQ3_XXS.gguf` | 13,108,685,952 | `9d4f18e8a22573c94b18a455147e807a8b9d2cd4b30302f2a4639c2db0a6c239` |
 
+### Use a model you already downloaded in Ollama
+
+Ollama stores its weights as content-addressed blobs (`blobs/sha256-<hash>`), which Kindi cannot
+name. This helper reads Ollama's manifests and links each model under a readable `.gguf` name,
+without copying or downloading anything:
+
+```sh
+python tools/ollama_links.py --dry-run    # list what it would link
+python tools/ollama_links.py              # $OLLAMA_MODELS, else ~/.ollama/models
+python tools/ollama_links.py -m D:/ollama/models -o D:/kindi-links
+```
+
+It links into `~/.kindi/models/ollamaLinks` by default, named after the manifest (`gemma3/4b` ->
+`gemma3-4b.gguf`), and then `python3 -m kindi convert ~/.kindi/models/ollamaLinks/gemma3-4b.gguf`
+works like any other GGUF. A symbolic link is made when the host allows it; otherwise a hard link,
+which needs the output on the same drive as the blobs (the script says so when they differ, and
+`-o` moves it). Manifests whose blob is missing are reported, `--force` replaces a file that is
+not the same model, and `--dry-run` changes nothing. On Windows, `tools/ollama_links.ps1` is the
+same script for PowerShell.
 ## Options
 
 | Option | What it does |
