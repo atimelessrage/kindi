@@ -50,6 +50,28 @@ each card. The cells give tok/s in auto mode (the default). On the RTX 3080, the
 
 The output of every mode was the same as without speculation.
 
+### Measured 2026-11-17: mode A was silently dead, and costs on the 2B here
+
+`k_rmsfold_qT` gained a trailing `hp` argument in 0.5.0; `kindi/mtp.py` never passed it, so the
+head's CUDA graph did not build (`cuGraphAddKernelNode failed (1)`) and the engine logged
+`speculation off: the MTP head ... did not load` — mode A did not run at all on the tensor-core
+layout for four releases. Fixed upstream in 0.6.1 and ported here; `tests/test_kernel_arity.py`
+now checks every call site's argument tuple against the kernel's declaration.
+
+With the head building again, on the i7-8086K + RTX 4060 Ti (`KINDI_TC=1`, ctx 24576, one 400-token
+greedy request repeated, temperature 0):
+
+| run | generation | accepted |
+|---|---|---|
+| no speculation (`KINDI_SPEC=0`) | 361.2, 363.7 tok/s | — |
+| mode A (`KINDI_SPEC=mtp`) | 236.9, 239.6 tok/s | 378 of 1,680 drafted (22.5%) |
+| mode A, guard from position 0 (`KINDI_SPEC_GUARD_FROM=0`) | 230.9, 247.2, 246.6 tok/s | 115 of 520 drafted |
+
+Mode A costs **0.66x** on this card at these contexts, and the guard cannot rescue it inside a
+400-token reply: its first windows are spec windows, so the loss is paid before it can pause. Do not
+set `KINDI_MTP_HEAD` on this rig; the drafter modes further down (a smaller model drafting a bigger
+one) are where the measured win is.
+
 ### Where a drafter pays, and where it does not
 
 Measured on the i7-8086K + RTX 4060 Ti, 2026-11-14, greedy, 8K context, one prompt per pair

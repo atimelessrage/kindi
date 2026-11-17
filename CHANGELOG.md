@@ -69,6 +69,17 @@
 
 ### Fixed
 
+- **The MTP head's CUDA graph never built, so mode A speculation was silently dead** — ported from
+  upstream `v0.6.1`. `k_rmsfold_qT` gained a trailing `hp` argument in 0.5.0; `kindi/spec.py` and
+  `kindi/dspine.py` were updated and `kindi/mtp.py` was not, so with `KINDI_TC=1` and
+  `KINDI_MTP_HEAD` set the head failed to build (`cuGraphAddKernelNode failed (1)`) and the engine
+  logged `speculation off` — a documented feature that had not run on the tensor-core layout for four
+  releases. A short argument tuple is not a Python error, so nothing caught it; `tests/test_kernel_arity.py`
+  now reads each kernel's parameter count from its `.cu` source and each Python call site's argument
+  tuple, and fails on the pre-fix `mtp.py`. The 0.6.1 graph-build diagnostic (node, grid, block,
+  argument count) is ported with it. Measured after the fix on the 2B / RTX 4060 Ti: the head attaches,
+  and mode A costs 0.66x (236.9-239.6 vs 361.2-363.7 tok/s, 22.5% acceptance) — the feature works,
+  the card still does not want it (`docs/MTP.md`).
 - **`kindi plan`'s `slots:` line priced the decode slots wrong** — it said each slot displaces one
   expert per layer. The engine's fit (`lightning._plan`, mirrored by `plan._lt_fit`) takes the slots
   off the room *before* dividing it over the remaining `n_moe - 2` layers, so `dcache` slots per

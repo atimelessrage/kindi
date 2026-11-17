@@ -1,7 +1,11 @@
-# Current worktree vs stock Kindi 0.6.0
+# Current worktree vs stock Kindi 0.6.0 / 0.6.1
 
-Report date: **2026-11-17** (refresh of the 2026-11-16 report; §40 records every
-round since §39 — the repo consolidation, the 9B tandem measurement, the GBNF
+Report date: **2026-11-17**. §41 is the newest section: stock moved to `v0.6.1`
+(`7fececb`, fetched 2026-11-17) after this report's §40 refresh, and one of its
+fixes is a bug this fork had too — the MTP head's CUDA graph did not build, so
+mode A speculation was silently dead. §41 records that port, the measured
+result, and the six rounds since §40. (The earlier 2026-11-16 refresh; §40
+records every round since §39 — the repo consolidation, the 9B tandem measurement, the GBNF
 rule-cache result, the first real Windows installer run, the evaluation triage,
 the vision-gate/grammar-compile fixes, `kindi caps` + `kindi autotune`, and the
 verified full-suite state of `main`). §36–§37 keep the T4.2 Gemma 4/DeepSeek
@@ -108,6 +112,11 @@ Still real and orderable against 0.6.0:
 - `install.ps1` **has now been run for real, but not to completion on a clean box**: 2026-11-17, isolated on `S:` with `-AppName`/`-Distro`/`-DistroDir` set apart from the installed engine, `-DockerMode skip -NoBridge -NoDesktopShortcut -Yes -LinuxArgs --dry-run` (94 s). Real: PC checks, Ubuntu 24.04 rootfs download with Canonical SHA256SUMS match, `wsl --import`, systemd, the GPU check inside WSL, Start-menu items, the HKCU uninstall entry. Not covered: Docker integration, the model download and a served request. Two findings recorded: the published `install.sh` reports 0.6.1 while `install.ps1` and this tree say 0.6.0, and the in-WSL disk check reports the vhdx capacity (954.5 GB) while the host drive had 22 GB free. See `docs/WINDOWS.md`.
 - `kindi autotune`'s two-card and MoE candidates are **unit-tested, not measured**: this host has one card and no Lightning pack, so `tp-2-auto`/`tp-2-equal` and `dcache-*` have no recorded number, and a placement-changing winner still needs `kindi verify` before it is served.
 - The CPU engine has no AVX-512 or AMX kernel: the 2026-11-09 draft's AVX-512 kernels stay archived because no host here can compile or verify them. `kindi caps` reports the flags; it does not imply a kernel exists.
+- Speculation mode A (the model's own MTP head) **works but is not a win here**: its head graph had
+  not built since 0.5.0 (fixed in `d1d23f2`, see §41), and now that it runs it measures 0.66x on the
+  2B / RTX 4060 Ti at these contexts (22.5% acceptance, and the guard cannot pause fast enough inside
+  a 400-token reply). Enable it only where acceptance is high; the smaller-model drafter modes keep
+  their measured gain.
 - Tandem is still slower than GPU-only on 1 GPU (24K decode ~8 vs ~31–34 tok/s equivalent rows at 8K/24K); the overlap step-0 (re-measured 2026-11-15) puts the head (17.6 ms/token) and boundary transfers (3.09 ms) ahead of any worker thread.
 - FP8 K/V (#8) is measured **lossy, not lossless** (KLD ~9–14× q8_0, verify 3/4) — an experimental opt-in, not a default; #9 (Windows unbuffered load) measured NOT met; #6's ≤1.2× clause recorded unsatisfiable with the dedupe rule.
 - Dense standard-attention llama/qwen GGUFs are refused (no engine): see §5.
@@ -765,9 +774,49 @@ fixes and record-keeping. Every row names the evidence, not the intention.
 | Windows CPU flags without a compiler | `78fb27f` | Took over the detection half of the archived 2026-11-09 CPUID draft: `kernel32.IsProcessorFeaturePresent(39/40/41)` answers AVX/AVX2/AVX-512F and is merged only where the engine probe has no answer. Measured on the i7-8086K: `AVX=yes, AVX2=yes, AVX-512=no` (was three `unknown`s); FMA3/F16C have no kernel32 constant and stay unknown with a note naming `KINDI_CC`. The draft's AVX-512 kernels stay archived — no host here can compile or verify them | `kindi/caps.py:windows_features`; `tests/test_caps.py` (kernel32, no-kernel32, merge-precedence) |
 | Verification round (this report's baseline) | `893bacd`, `899a110` | `main` verified end to end: **1026 passed, 28 skipped, 0 failed** (109 s) plus the three generated-artifact gates. The run caught two real defects: a stale `docs/CONFIGURATION-REFERENCE.md` (the new `KINDI_CC` probe moved a recorded line) and a handoff table lagging its commit | run log in the round's commit message; `docs/CONFIGURATION-REFERENCE.md` regenerated |
 
-Delta against stock `v0.6.0` at this refresh: **430 commits, 443 files changed,
-+64,541 / −1,094 lines, 556 tracked files (169 upstream), zero file deletions,
-22 numbered requirements**, full suite 1026 passed / 28 skipped. Everything in
+## 41. Stock moved to v0.6.1 — and its MTP fix was our bug too (2026-11-17)
+
+Upstream `v0.6.1` (`7fececb`, fetched 2026-11-17) landed after the §40 refresh at `899a110`. It is
+sixteen files, +336/−43: container packaging (`compose.yaml`, `compose.amd.yaml`,
+`docs/CONTAINERS.md`), the Docker/install docs, the 0.6.1 version strings, a graph-build diagnostic
+in `kindi/spec.py`, and one real code fix in `kindi/mtp.py`.
+
+| 0.6.1 item | our status |
+|---|---|
+| `kindi/mtp.py` passes `k_rmsfold_qT`'s `hp` argument | **we had the bug; fixed in `d1d23f2`.** `k_rmsfold_qT` took a trailing `hp` in 0.5.0; `spec.py` and `dspine.py` were updated, `mtp.py` was not. With `KINDI_TC=1` and `KINDI_MTP_HEAD` set, the head's graph failed (`cuGraphAddKernelNode failed (1)`) and the engine logged `speculation off: the MTP head ... did not load` — mode A did not run at all on the tensor-core layout for four releases, and a short argument tuple is not a Python error. Reproduced on the rig before the fix; after it: `MTP head attached: kindi-mtp-2b-v1.npz (61 MB, window 64)` |
+| `kindi/spec.py` names node, grid, block and argument count on a graph-build failure | **ported in `d1d23f2`** — that diagnostic is what makes a missing argument visible instead of `failed (1)` |
+| container packaging (`compose.yaml`, `compose.amd.yaml`, `docs/CONTAINERS.md`) | **not ported.** This fork ships no compose files; it is a deployment surface, not an engine gap, and belongs to a release-owner decision |
+| version strings now `0.6.1` upstream | ours stay `0.6.0` plus this changelog: the installer pins upstream's published artifact, so a fork version bump needs a fork release |
+
+The fix revives a documented feature but does not make it a win here. Measured on the i7-8086K +
+RTX 4060 Ti (`KINDI_TC=1`, ctx 24576, one 400-token greedy request, temperature 0): 361.2/363.7 tok/s
+without speculation against 236.9/239.6 with mode A (378 of 1,680 drafted tokens accepted, 22.5%),
+and 230.9/247.2/246.6 with the guard forced on from position 0 — the first guard windows are already
+spec windows, so a 400-token reply pays the loss before the guard can pause. Mode A therefore costs
+**0.66x** on this card; the modes that draft a smaller model for a bigger one keep their measured
+win. Details and the table: `docs/MTP.md`. The bug class is now pinned by
+`tests/test_kernel_arity.py` (4 tests): it parses the kernel's 20 parameters out of `tcf.cu` and
+every call site's argument tuple through `ast`, and dropping `hp` again fails exactly the `mtp.py`
+case.
+
+Rounds since §40 (`899a110` → `d1d23f2`):
+
+| round | commit | what it changed |
+|---|---|---|
+| Lease rows out of the live handoff | `7e94156` | `AGENTS.md` 371 → 265 lines; the dated table moved to `docs/development/AGENTS-HISTORY.md` |
+| Claims registry | `9d1a817` | every number the three claimed docs quote is re-derived from its tracked run (`docs/claims/*.json`, `tools/check_claims.py`, 12 gates / 45 numbers, 4 reasoned debt entries) |
+| Adapter stop scan + real prompt ids | `1cac59f`, `e7ee6d3` | cross-piece stop tests for the remaining adapters and prompt-seeing filter tests; both defects were already fixed in `861d3eb` and the coverage is what was missing |
+| `kindi use` symlink guard | `d2b124a` | the WinError 1314 guard also covers `NotImplementedError`, and its cleanup can no longer abort the selection |
+| Coverage floors + untracked secret scan | `7eb6120` | measured floors for `engine.py` (24.3% → floor 19) and every `kindi/backends/*`; `fake.py` was below its recorded floor, so the gate was red; the file scan's untracked union is now pinned |
+| `kindi plan` decode-slot arithmetic | `174204a` | the `slots:` line runs the engine's own fit twice (`dcache=0`) instead of claiming one displaced expert per slot; 10 slots cost 20 experts per layer, 162 vs 182 experts and 86.4% vs 91.6% of measured picks |
+| External knowledge-base skill | `c89f88d` | read-only skill + scan ledger (`docs/development/AI-INVENTORY-SCAN.md`) for the local-AI base, with a stated gate before any idea becomes roadmap work |
+| Secret scans: history and synced paths | `75ae9d9`, `9cd89fe` | `tools/check_secret_history.py` gates every commit's diff against a counted baseline; a synced-folder path now counts as personal data, which removed the knowledge-base path from the tree |
+| MTP head graph (this section) | `d1d23f2` | the 0.6.1 `hp` port, its diagnostic, and the arity test |
+
+Delta against stock `v0.6.1` at `d1d23f2`: **433 commits, 467 files changed,
++67,049 / −1,128 lines, 578 tracked files (169 upstream)**, full suite 1059 passed / 28 skipped.
+Against `v0.6.0` the same tree is 435 commits, 465 files, +67,308 / −1,094, 578 tracked files,
+zero file deletions, 22 numbered requirements. Everything in
 §4 that was open before this refresh is still open, with two exceptions: the
 Windows installer has now been exercised for real (one step short of a complete
 install, as recorded there), and the image-input loophole is closed.
