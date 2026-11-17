@@ -4,6 +4,12 @@
 
 ### Added
 
+- **An opt-in GPU smoke test covers the 2B MTP server path** — `tools/mtp_smoke.py` boots the
+  real `kindi serve` process with the registered `kindi-mtp-2b-v1.npz` head, sends one greedy
+  completion, and fails unless `/health` says `drafting.method=mtp`, both `drafting.last.drafted`
+  and `kindi_spec_drafted_tokens_total` are above zero, and the accepted counters are consistent.
+  It uses a temporary state directory, an empty config and a free loopback port, and is not
+  collected by the CPU-only pytest suite. `docs/MTP.md` documents the command and defaults.
 - **The cold-expert reader has a real lookahead prefetch queue** — the old `read_ahead` knob only
   merged adjacent ranges. `ColdExpertReader` now names that behavior `coalesce`, and `prefetch`
   reads exact ranges into a bounded queue before demand; a later `read_many` consumes those bytes

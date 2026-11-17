@@ -36,6 +36,28 @@ draft cannot save time. These are the measurements for T = 2, 3 and 4 tokens per
 | Quadro K1200 (sm_50), 2B | 1.80 | 2.61 | 3.42 | 0.80x (k=1) |
 | GTX 1080 (sm_61), 27B | 1.82 | 2.81 | 3.65 | 0.95x (k=1) |
 
+## Smoke test it (opt-in, GPU)
+
+`tools/mtp_smoke.py` is the server-level check for this mode. It starts a real `kindi serve`
+process with the registered head and `KINDI_SPEC=mtp`, waits for `/health`, sends one greedy chat
+completion, and reads the result back from both `/health` and `/metrics`. It exits non-zero unless
+`drafting.enabled` is true, the effective method is `mtp`, `drafting.last.drafted` is above zero,
+and `kindi_spec_drafted_tokens_total` is above zero. The engine is not a stand-in: this is the same
+server path a client uses.
+
+```bash
+python tools/mtp_smoke.py \
+  --pack ~/.kindi/packs/bonsai-2b \
+  --head ~/.kindi/models/kindi-mtp-2b-v1.npz
+```
+
+The defaults are `--spec-k 1` (the measured win), `--ctx 4096`, 16 greedy tokens, and a free
+loopback port. The script uses a temporary state directory and an empty config, so a host config
+cannot change authentication, rate limits, or the engine; `--log FILE` keeps the server log. It
+needs a tensor-core GPU and the registered head, and fails before starting the server when either
+is missing. It is a `tools/` script, not a `tests/test_*.py` file, so the CPU-only pytest suite does
+not collect it.
+
 ## Measured speed
 
 These measurements used greedy decoding, 128 tokens (2B: 512 tokens, the median of 3 runs), and the same text on
