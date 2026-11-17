@@ -437,6 +437,78 @@ def test_bonsai_model_id_for_manifest():
     assert model_id_for_manifest({}) is None
 
 
+class _FakeBonsaiTok(object):
+    """The tokenizer surface BonsaiBackend.generate uses: per-token decode and the stop ids."""
+
+    def __init__(self, pieces):
+        self.pieces = dict(pieces)
+        self.sid = {"<|endoftext|>": 1, "<|im_end|>": 2}
+
+    def decode(self, ids):
+        return "".join(self.pieces.get(int(i), "?") for i in ids)
+
+
+class _FakeBonsaiEngine(object):
+    """feed/step in the adapter's order: prefill the prompt, then one prediction per step."""
+
+    def __init__(self, script):
+        self.script = list(script)
+        self.calls = []
+
+    def reset(self):
+        self.calls.append(("reset",))
+
+    def feed(self, tok, pos):
+        self.calls.append(("feed", int(tok), int(pos)))
+
+    def step(self, tok, pos):
+        self.calls.append(("step", int(tok), int(pos)))
+        return self.script.pop(0) if self.script else 2      # 2 is <|im_end|>: a short script ends
+
+
+def _bonsai(script):
+    from kindi.backends.bonsai import BonsaiBackend
+
+    backend = BonsaiBackend()
+    backend.loaded = True
+    backend.ctx = 4096
+    # "END" is split as "EN" + "D" by the tokenizer, which is what the scanner must survive
+    backend.tok = _FakeBonsaiTok({10: "The sky is ", 11: "EN", 12: "D", 13: "blue."})
+    backend.engine = _FakeBonsaiEngine(script)
+    return backend
+
+
+def test_bonsai_generate_stops_on_a_stop_string_split_across_two_pieces():
+    """The StopScanner swap has to hold on the adapter's own decoded pieces.
+
+    "END" arrives as "EN" then "D": neither piece contains the stop, only the
+    accumulated text does. A scanner that looked at the new piece alone, or that
+    dropped its overlap between hits, would miss it and finish the turn on 13.
+    """
+    from kindi.backends.base import SamplingParams
+
+    backend = _bonsai([10, 11, 12, 13])
+    events = list(backend.generate([5, 6], SamplingParams(max_tokens=4, stop=("END",))))
+    assert [e.token_id for e in events if e.kind == "token"] == [10, 11, 12]
+    assert events[-1].kind == "done"
+    assert events[-1].finish_reason == "stop"
+    # three steps after prefill: the split stop is found on the third piece, and
+    # the engine is not stepped again once it is, so 13 is never decoded
+    assert backend.engine.calls == [
+        ("reset",),
+        ("feed", 5, 0),
+        ("step", 6, 1),
+        ("step", 10, 2),
+        ("step", 11, 3),
+    ]
+
+    # contrast: the same script with a stop that fits inside one piece ends a piece earlier
+    early = list(_bonsai([10, 11, 12, 13]).generate(
+        [5, 6], SamplingParams(max_tokens=4, stop=("EN",))))
+    assert [e.token_id for e in early if e.kind == "token"] == [10, 11]
+    assert early[-1].finish_reason == "stop"
+
+
 # --- T4.2 Gemma 4 and DeepSeek V4.1 adapters (CPU only: no pack, no engine) -------------
 
 
