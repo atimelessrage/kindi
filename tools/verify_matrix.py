@@ -883,13 +883,13 @@ def _format_delta(delta, delta_pct) -> str:
 
 def _print_comparison(comparisons: list[dict], baseline_only: list[dict], baseline_path: Path) -> None:
     print("\ncomparison vs %s" % baseline_path)
-    print("%-4s %-10s %-14s %8s %8s %18s  %s" %
+    print("%-4s %-13s %-14s %8s %8s %18s  %s" %
           ("model", "mode", "status", "base", "now", "throughput delta", "exactness base -> now"))
-    print("-" * 101)
+    print("-" * 104)
     for row in comparisons:
         exactness = row["exactness"] if row["baseline_exactness"] is None else \
             "%s -> %s" % (row["baseline_exactness"], row["exactness"])
-        print("%-4s %-10s %-14s %8s %8s %18s  %s" % (
+        print("%-4s %-13s %-14s %8s %8s %18s  %s" % (
             row["model"], row["mode"], row["status_change"],
             _format_tps(row["baseline_tokens_per_second"]),
             _format_tps(row["tokens_per_second"]),
@@ -952,16 +952,16 @@ def save_baseline(results_json: Path, target: Path) -> Path:
 
 
 def _print_table(rows: list[dict]) -> None:
-    print("\n%-4s %-10s %-11s %4s %3s %4s %8s %-10s %-9s  %s" %
+    print("\n%-4s %-13s %-11s %4s %3s %4s %8s %-17s %-9s  %s" %
           ("model", "mode", "status", "pass", "tie", "fail", "tok/s", "spec", "drafts", "log"))
-    print("-" * 100)
+    print("-" * 108)
     for row in rows:
         tps = "n/a" if row["tokens_per_second"] is None else "%.1f" % row["tokens_per_second"]
         spec = ("-" if row.get("spec_requested") is None else
                 "%s->%s" % (row["spec_requested"], row.get("spec_effective") or "0"))
         drafts = ("-" if row.get("drafts_drafted") is None else
                   "%d/%d" % (row.get("drafts_accepted") or 0, row["drafts_drafted"]))
-        print("%-4s %-10s %-11s %4d %3d %4d %8s %-10s %-9s  %s" %
+        print("%-4s %-13s %-11s %4d %3d %4d %8s %-17s %-9s  %s" %
               (row["model"], row["mode"], row["status"], row["prompts_pass"],
                row["prompts_tie"], row["prompts_fail"], tps, spec, drafts, row["log"]))
 
