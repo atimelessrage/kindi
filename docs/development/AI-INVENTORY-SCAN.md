@@ -106,3 +106,24 @@ Add a `## Scan <date>` section with **Last checked**, the knowledge base **HEAD*
 a table like the one above. Verdicts are `adopted` (with the commit), `parked` (with the gate that
 would close it), `rejected` (with the reason) or `already-have` (with the path that proves it). Keep
 earlier sections as written; a reversed verdict goes in a new row that names the row it supersedes.
+
+## Check attempt 2026-11-17 (knowledge base unavailable; public comparison triaged)
+
+`$KINDI_AI_INVENTORY` was unset in this session's shell and in both Windows scopes (User and
+Machine), and the path is deliberately not stored in the repository, so the base itself was not
+read. Nothing was taken from it and no `[M]` number was adopted.
+
+The user supplied a written comparison of Kindi 0.6.0 with Strata, KTransformers, BigMoeOnEdge and
+`tandem.cpp`. The three projects were read from their public sources (read-only pages; no scripts and
+no models), and the claims were checked against the tree:
+
+| source | read | verdict |
+|---|---|---|
+| BigMoeOnEdge (`Helldez/BigMoeOnEdge`) | README and `docs/moe-streaming.md`, `hardware-planning.md`, `benchmarks.md`, `comparison.md`, `roadmap.md` | NVMe expert streaming (`O_DIRECT`, n=1 decode only), a measured `--auto` planner, any-MoE-GGUF via a llama.cpp patch, Anthropic+OpenAI servers. Triaged in [EXTERNAL-ENGINES.md](../../docs/EXTERNAL-ENGINES.md) "Strata, KTransformers and BigMoeOnEdge (2026-11-17)" and gated in [ROADMAP.md](../../docs/ROADMAP.md) "Memory-tier follow-ups"; the measurement half, `kindi io`, is implemented this round |
+| Strata | the same comparison, and its row in BigMoeOnEdge's comparison page | hybrid CPU/VRAM expert mode and SSD reads for a 500B-class MoE; their numbers are their rig's. No new step: the CPU lane is memory-tier follow-up #2 |
+| KTransformers | the AVX-512/AMX `kt-kernel` CPU expert path named in the comparison | same CPU-lane gate; its cache-line-aligned INT4/INT8 packing is follow-up #4 (mixed-precision tiers) |
+| `tandem.cpp` (already in this ledger) | re-checked only through the comparison; no new file | its measured CPU/PCIe split is already prior-art row 1, met by `--tandem-cpu-layers rate` |
+
+Adopted result: the I/O probe (`kindi/io_probe.py`, `kindi io`) and the gates in the two docs above.
+No speed claim was adopted, and no other engine's number became ours. The knowledge base still needs
+its path supplied before the next real incremental scan.

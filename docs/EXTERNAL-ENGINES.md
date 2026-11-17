@@ -60,3 +60,35 @@ Two of our recorded results now have external corroboration, and one is qualifie
   scheduling and staging (measured split, read-ahead, pinned/huge-page copies, kept graphs), not
   from new math. Our plan-engine work was the same kind of win (peak 6,004 MiB against 7,721 MiB
   at the same placement). The overlap scheduler remains the open half.
+
+## Strata, KTransformers and BigMoeOnEdge (2026-11-17)
+
+A user-supplied comparison of Kindi 0.6.0 with **Strata**, **KTransformers**,
+**BigMoeOnEdge** and **tandem.cpp** was checked against the tree, not taken at face value. The
+public sources read for it are BigMoeOnEdge's repository and its `docs/` pages (`moe-streaming`,
+`hardware-planning`, `benchmarks`, `comparison`, `roadmap`); Strata is a closed-source desktop
+engine and KTransformers' CPU path is documented in its own repository. Every number below is
+theirs, on their hardware; none is a Kindi measurement.
+
+The comparison's shape is right on its three big items, but two of its premises are stale for this
+tree: **the host tier is already pinned** (`kindi/lightning.py` stages experts into pinned RAM, which
+is why it survives the 8 GB cards), and **the slot count is not a hardcoded 10** — 10 is the default
+of `KINDI_LT_DCACHE`, floored at `n_used` and weighted by `kindi/ltfit.py`'s slot cost. `kindi plan`,
+`kindi caps` and `kindi autotune` already print hardware, reasons and measured candidates, so the
+`--auto` gap is narrower than "no planner": the missing input was this host's I/O rates, now
+measured by `kindi io`.
+
+| # | their mechanism | what we have | verdict and gate |
+|---|---|---|---|
+| 1 | **NVMe cold-expert streaming** (BigMoeOnEdge): the dense core and attention stay in RAM, routed experts come from the pack file with `O_DIRECT` and a read-ahead queue; hot experts sit in a GPU cache. `--no-mmap` forces the path, the benchmark separates flash bytes from compute, and it is explicitly **n=1 decode only** — batching and speculation are incompatible. | `kindi/moe.py` can label a `disk` tier but `kindi/lightning.py` only stages host experts from RAM, and [MOE-TANDEM.md](MOE-TANDEM.md) deliberately forbids decode faults from disk. `kindi io` now measures the disk rate (2,509.8 MiB/s unbuffered here on 2026-11-17). | **parked with a gate** (ROADMAP memory-tier #1): a Lightning pack larger than RAM, `kindi verify` 4/4, decode tok/s against the same model's recorded mmap-fault path, and flash MiB/token with the compute/I/O split. Must run at n=1; our drafters stay off for that row. |
+| 2 | **Compute misses on the CPU** instead of shipping weights (Strata's hybrid mode keeps most experts on the CPU; tandem.cpp splits by the measured CPU/PCIe ratio; KTransformers tiles CPU experts for AVX-512/AMX). | More than the comparison credits: `kindi/moe_tandem.py` already schedules `card`/`copy`/`cpu` lanes with a deterministic `cpu_share`, and prior-art row 1 below is our measured CPU/PCIe ratio (8.0 vs 7.9). What is missing is still the real thing: CPU expert **kernels** and a backend that uses them. | **parked on M2** (ROADMAP #2): bit-identical expert output between the CPU and GPU kernel for the quant format, then a capacity-bound MoE row beats the copy lane, `kindi verify` 4/4. |
+| 3 | **Measured `--auto` planner**: probe the machine and the model in a separate process, choose cache/threads/device, print the reason for each choice; re-rank for asymmetric cards. | `kindi caps` (CPU/GPU/pack facts), `kindi plan` (placement with reasons and `--assume-*`), `kindi autotune` (measured candidates incl. two-card and `dcache-*`). The gap was a measured **I/O** input, not a planner. | **partly adopted 2026-11-17**: `kindi io` measures RAM/disk/PCIe. Next step is to let `autotune`'s MoE candidates consume those rates, gated at a predicted slot count within 10% of the measured best on a Lightning pack. |
+| 4 | **Any MoE GGUF**: BigMoeOnEdge is a llama.cpp patch, so it inherits every MoE GGUF and expert layout llama.cpp loads, plus OpenAI and Anthropic servers. | Custom per-family CUDA kernels; `kindi/moe_compat.py` recognizes and refuses what it cannot run; T4.4's proxy is undecided; the server is OpenAI-shaped (REQ-0028 proposes the Anthropic surface). | **already tracked** (T4.4, REQ-0028); no new row here. Nothing to port: their generic path is llama.cpp's, and we do not ship llama.cpp. |
+| 5 | **Mixed-precision tiers**: Strata's native FP4/hybrid quants on newer cards; KTransformers repacks CPU experts into cache-line-aligned INT4/INT8 tiles. | Both tiers use the same format. `MoESpec` already carries per-layer expert bytes and Q2_0/PQ2_0/FP8 codecs exist, so the plumbing for a different format per tier is partly there. | **parked** (ROADMAP #4): gate on bytes/token for the same served share, exactness where the format is exact, KLD where it is not. No codec work before a measured memory wall. |
+| 6 | **Cache-aware routing** (BigMoeOnEdge): re-rank the top-k toward experts already cached, reported as +62% decode at 1-4% perplexity cost. | Kindi's contract is token-exactness against the pinned reference. Approximate skipping/substitution is already in [What we leave](#what-we-leave), with the reason. | **rejected as a default**, and not a roadmap row. If ever offered it is off by default with a KLD gate, like `k8v4` was. |
+
+What this changes in our expectations: nothing about our numbers, and one thing about our plans. The
+disk tier is no longer blocked on "we do not know what flash costs here" — it is blocked on the
+engine work in ROADMAP #1, whose gate is written above. The comparison's "full model in RAM" limit is
+real for the engine as it stands (pinned host tier), and it is the one external claim in the list
+that matches a Kindi limitation exactly.

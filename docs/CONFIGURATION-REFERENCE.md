@@ -113,7 +113,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:584` |
 | `KINDI_CONFIG` | (unset) | `kindi/config.py:120` (+1 more) |
 | `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:211` (+4 more) |
-| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:406` (+1 more) |
+| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:410` (+1 more) |
 | `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:46` |
 | `KINDI_D1` | `1` or `0` | `kindi/spec.py:726` (+1 more) |
 | `KINDI_DATA` | `/data` | `kindi/container.py:243` |

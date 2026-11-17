@@ -87,6 +87,29 @@ CPU: Intel(R) Core(TM) i7-8086K CPU @ 4.00GHz, 6 physical / 12 logical threads
      note: FMA3/F16C not exposed by this OS; the build compiler probe (kindi/cpu.py, KINDI_CC) answers them and picks the tier
 ```
 
+## `kindi io` — what the memory tiers actually cost
+
+```bash
+kindi io --mib 64              # RAM copy, unbuffered disk read, PCIe both ways
+kindi io --mib 64 --json       # the same report as data
+kindi io --skip disk,pcie      # only the host copy rate
+```
+
+Every plan that moves experts between tiers has to assume three rates: the host memcpy into a
+staging buffer, the disk for an expert that is not in RAM, and PCIe for a host expert copied into a
+device slot. `kindi io` measures them on this machine. The disk probe writes a temporary file and
+reads it **unbuffered** (`O_DIRECT` on Linux, `FILE_FLAG_NO_BUFFERING` on Windows), because a
+buffered read of a file this process just wrote measures the page cache; where the OS refuses, the
+report says `buffered` and that rate is a cache/RAM rate, not the device's. The PCIe probe uses
+pinned host memory through the active CUDA device, like the engine's staging buffers, and reports
+H2D and D2H separately.
+
+Measured on the i7-8086K + RTX 4060 Ti, 2026-11-17, `--mib 64`: RAM copy **13,456.7 MiB/s**, disk
+read **2,509.8 MiB/s** unbuffered, PCIe **6.0 GiB/s H2D / 6.1 GiB/s D2H**. These are this host's
+numbers, not targets: a different disk or a PCIe x4 riser moves them, which is why they are measured
+before a cache or a streaming budget is sized. The probe loads no model, so it runs on a machine with
+no pack, in about a second per probe at the default size.
+
 ## `kindi autotune` — which placement this model actually likes here
 
 ```bash

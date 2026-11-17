@@ -338,6 +338,22 @@ measurement):
 | Queueing curve | 2/4/8/16 concurrent clients against one server: wait p50/p95, tokens/s, and the client count where 429 starts; states the serial-only line honestly |
 | Cold-start table | pack directory wiped, then 2B/9B/27B first load (pack write + load) and second load from the written pack, sampled peak alongside; the 27B row explains the recorded ~12 minutes |
 
+## Memory-tier follow-ups (2026-11-17)
+
+Drawn from the user-supplied comparison with Strata, KTransformers and BigMoeOnEdge, checked against
+the tree and triaged in [EXTERNAL-ENGINES.md](EXTERNAL-ENGINES.md). None of their numbers is ours;
+each row names the gate that would make it a Kindi result. `kindi io` (this round) is the measurement
+half: RAM copy, unbuffered disk read and pinned PCIe copies on this host, so a slot or streaming
+budget no longer has to be assumed. The generic-GGUF MoE item is not repeated here because T4.4 and
+the small-MoE rows already own it, and the Anthropic request surface is REQ-0028.
+
+| # | item | direction | gate | status |
+|---|---|---|---|---|
+| 1 | NVMe cold-expert tier | keep the dense core and hot experts as today; stream a routed expert that is neither in a card slot nor in the pinned host pool from the pack file, unbuffered and read ahead; report flash MiB/token and the compute/I/O split | a Lightning pack larger than RAM: `kindi verify` 4/4, decode tok/s better than the same model's recorded mmap-fault path, and no decode fault on a warm slot; run at n=1, because expert streaming and speculation/batching conflict (BigMoeOnEdge's own limitation) | **planned, not started.** `kindi/lightning.py` stages host experts into pinned RAM; `moe.plan` can label a `disk` tier but nothing reads it, and [MOE-TANDEM.md](MOE-TANDEM.md) deliberately forbids disk faults in decode |
+| 2 | CPU-compute lane for misses | a miss is computed on the CPU from host-resident weights while the GPU computes the hits; only the expert's output vector crosses PCIe | bit-identical expert output between the CPU and GPU kernel for the quant format (M2 in [MOE-TANDEM.md](MOE-TANDEM.md)), then a capacity-bound MoE row beats the copy lane's tok/s with `kindi verify` 4/4 | **parked on M2.** `kindi/moe_tandem.py` already schedules `card`/`copy`/`cpu` lanes with a deterministic `cpu_share`; there are no CPU expert kernels and no backend wiring |
+| 3 | I/O-aware slot and cache sizing | use the measured RAM/PCIe/disk rates, the usage file and the room to choose the per-layer slot count, and the RAM cache size for a streamed model; print the reason per choice | predicted slots/cache within 10% of the measured best for a Lightning pack on this host, and a plan whose numbers a live `bench` reproduces | **measurement half done 2026-11-17** (`kindi io`); `autotune`'s `dcache-*` candidates stay unit-tested until a Lightning pack is here |
+| 4 | Mixed-precision tiers | keep fast-unpacking or higher-precision experts in VRAM and compact 2-3 bit/ternary ones in RAM or on disk | bytes/token for the same served share, plus exactness where the format is exact and a KLD tolerance where it is not | **parked.** `MoESpec` already takes per-layer expert bytes and the Q2_0/PQ2_0/FP8 codecs exist, but both tiers use the same format today |
+
 ## Engine-liveness follow-ups (2026-11-17)
 
 Drawn from the 0.6.1 port (§41 of `CURRENT-VS-KINDI-0.6.md`): the MTP head's CUDA graph had not

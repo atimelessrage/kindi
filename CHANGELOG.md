@@ -4,6 +4,14 @@
 
 ### Added
 
+- **`kindi io` measures this host's memory tiers** — a RAM copy, an unbuffered disk read and pinned
+  PCIe copies both ways, as text or `--json` (`--mib`, `--disk-dir`, `--skip`). The disk probe writes
+  a temporary file and reads it with `O_DIRECT` (Linux) or `FILE_FLAG_NO_BUFFERING` (Windows) so it
+  measures the device instead of the page cache, and says `buffered` rather than pretending when the
+  OS refuses; the PCIe probe uses pinned memory like the engine's staging buffers and reports H2D and
+  D2H apart. It loads no model. Measured here on 2026-11-17 with `--mib 64`: 13,456.7 MiB/s RAM,
+  2,509.8 MiB/s disk, 6.0/6.1 GiB/s H2D/D2H on the 4060 Ti. The rates feed slot sizing and the
+  parked NVMe cold-expert tier, whose gate is in `docs/ROADMAP.md` "Memory-tier follow-ups".
 - **`tools/ollama_links.py` links the GGUF models Ollama already downloaded under readable names**
   — Ollama keeps its weights as `blobs/sha256-<hash>` and describes them in manifests, so a model
   you already have could not be named on a Kindi command line. The helper reads those manifests

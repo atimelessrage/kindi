@@ -386,6 +386,10 @@ def cmd_caps(cfg, a):
     return 0
 
 
+def cmd_io(cfg, a):
+    from . import io_probe
+    return io_probe.run(a.mib, a.disk_dir, a.skip, a.json)
+
 def cmd_autotune(cfg, a):
     from . import autotune
     return autotune.run(cfg, a, log=log)
@@ -555,6 +559,11 @@ def main(argv=None):
     sub.add_parser("info", help="show configuration, pack and GPU")
     s = sub.add_parser("caps", help="what each card and this CPU can do, and which Kindi paths that enables")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
+    s = sub.add_parser("io", help="measure this host's memory-tier rates: RAM copy, disk read, PCIe copies")
+    s.add_argument("--mib", type=int, default=128, help="buffer/file size per probe in MiB (default 128)")
+    s.add_argument("--disk-dir", default=None, help="where to create the temporary disk-probe file (default: the system temp dir)")
+    s.add_argument("--skip", default="", help="comma-separated probes to skip: ram,disk,pcie")
+    s.add_argument("--json", action="store_true", help="print the report as JSON")
     s = sub.add_parser("autotune", help="measure the placements for this model and rank them (one bench per candidate)")
     s.add_argument("--max-runs", type=int, default=6, help="how many configurations to measure (default 6)")
     s.add_argument("--dry-run", action="store_true", help="print the candidate list and stop (loads nothing)")
@@ -591,7 +600,7 @@ def main(argv=None):
         cfg["vram_sample_s"] = a.vram_sample_s
     return {"convert": cmd_convert, "fast-head": cmd_fast_head, "verify": cmd_verify, "bench": cmd_bench, "kld": cmd_kld, "calibrate": cmd_calibrate,
             "plan": cmd_plan, "serve": cmd_serve, "chat": cmd_chat, "head": cmd_head, "info": cmd_info,
-            "caps": cmd_caps, "autotune": cmd_autotune,
+            "caps": cmd_caps, "io": cmd_io, "autotune": cmd_autotune,
             "backends": cmd_backends, "models": cmd_models, "use": cmd_use, "sessions": cmd_sessions}[a.cmd](cfg, a)
 
 
