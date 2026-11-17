@@ -45,6 +45,12 @@ matters:
 | record grammar, 8 enumerated keys | 1,061 | 19 | 45.3 s | 2,058 ms |
 | `json_schema`, 3 properties | — | 17 | 5.1 s | 231 ms |
 
+**Run-to-run:** re-running both harnesses after they moved into `tools/` reproduced the state counts
+and miss counts exactly and the grammar row within 5% (2,567 vs 2,720 ms/token; 2.38 vs 2.36 s per
+server token, 0.4 tok/s), while the schema row is noisier — 198 vs 231 ms/token and 6.0 vs 4.9
+tok/s across the two server sessions — because it pays fewer, smaller sweeps. The grammar/schema
+ratio held at 11-13x in every run, which is the decision-relevant part.
+
 The 1,737 → 9,483 state range moves the per-token cost by 3%, so a grammar at 4,000 states (between
 the depth-2 and depth-3 rows) lands at **~2.8 s per token** as well: the premise's 4,000 states
 neither explains nor bounds the cost. What does explain it is the per-sweep price: a GBNF sweep over
@@ -67,14 +73,23 @@ sweep per new state, is the obvious direction and is **not** measured here).
 
 ## Reproduce
 
+The two harnesses are tracked, so this page's numbers can be re-derived from a clean checkout with
+the pack as the only local input:
+
 ```sh
-python bench-logs/gbnf-cost.py                       # CPU: per-state sweeps, both grammars
-/python -m kindi --pack ~/.kindi/packs/bonsai-2b serve --host 127.0.0.1 --port 8102   # with KINDI_GBNF_MAX_DEPTH=1
-python bench-logs/gbnf-serve.py http://127.0.0.1:8102
+python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b     # CPU rows above (2-3 min)
+
+KINDI_GBNF_MAX_DEPTH=1 python -m kindi --pack ~/.kindi/packs/bonsai-2b serve \
+    --host 127.0.0.1 --port 8102                                  # the server row
+python tools/grammar_cost_serve.py http://127.0.0.1:8102          # ~1 min: 0.42 tok/s on the gbnf row
 ```
 
-Both scripts live in the gitignored `bench-logs/` (local evidence). Their content is reproducible
-from the commands above; only this page and `grammar-cost.json` are tracked.
+`tools/grammar_cost.py` prints one row per grammar (states, compile time, misses, filter total,
+ms/token, per-sweep median and max) and exits non-zero if a grammar refuses the document, so a
+rejected document can never be reported as a number. Its `--long` flag adds the longer document and
+will exit non-zero here for the reason in "What this does not cover": the schema refuses keys it
+does not declare and the depth-1 grammar refuses deeper nesting, which is why the rows above come
+from the 22-token document (CPU) and the 20-token reply (server).
 
 ## What this does not cover
 
