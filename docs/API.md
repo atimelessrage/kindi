@@ -107,7 +107,18 @@ therefore holds an enumerated record of roughly 130 copies - a few KB of grammar
 `tests/test_gbnf.py` pins at 40 copies; past it the 400 names `*`/`+` (loop instead of
 enumeration), a shorter literal and `json_schema` as the alternatives, and `KINDI_GBNF_MAX_STATES`
 remains the operator escape hatch (it buys ~1.4 ms per 1,000 states on this host: 12k states in
-13 ms, measured 2026-11-17). The same
+13 ms, measured 2026-11-17).
+
+**What the unrolled grammar costs at run time** (measured 2026-11-17, 2B, 248,320-entry
+vocabulary): the filter sweeps the whole vocabulary once per new automaton state, so the price is
+per token, not per state. llama.cpp's `json.gbnf` at `KINDI_GBNF_MAX_DEPTH=1` compiles to 1,737
+states and measures **2,720 ms** per token against **231 ms** for `json_schema` (**12x**), which is
+**0.42** tok/s end to end on a pack that decodes at 235 tok/s. Tripling the grammar to 9,483 states
+moves that by 3%: the cost is the vocabulary sweep (a JSON-shaped sweep costs ~3.5 s because its
+string and whitespace classes accept almost every byte), not the state count. Treat the unrolled
+recursive grammar as a diagnostic, not a serving option, on this class of vocabulary; the run is
+recorded in
+[grammar-cost RESULTS](benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/RESULTS.md). The same
 `supports_json_grammar` capability flag gates it. The
 adapter contract carries the same flag on
 `BackendCapabilities`; a backend that sets it treats `token_filter` as the

@@ -1,0 +1,26 @@
+{
+  "host": "i7-8086K + RTX 4060 Ti 8 GB",
+  "date": "2026-11-17",
+  "pack": "bonsai-2b",
+  "vocab_entries": 248320,
+  "document": "{\"name\": \"alpha\", \"tags\": [\"x\", \"y\"], \"n\": 42}",
+  "cpu_filter": {
+    "note": "vocab_allowed over the real 248,320-entry vocabulary; the cache is per automaton state, so ms_per_token counts real misses over the 22-token document",
+    "gbnf_json_d1": {"states": 1737, "tokens": 22, "misses": 18, "filter_ms": 59845, "ms_per_token": 2720},
+    "gbnf_json_d2": {"states": 3195, "tokens": 22, "misses": 18, "filter_ms": 62624, "ms_per_token": 2847},
+    "gbnf_json_d3": {"states": 9483, "tokens": 22, "misses": 18, "filter_ms": 62049, "ms_per_token": 2820},
+    "gbnf_record": {"states": 1061, "tokens": 22, "misses": 19, "filter_ms": 45265, "ms_per_token": 2058},
+    "json_schema": {"states": null, "tokens": 22, "misses": 17, "filter_ms": 5071, "ms_per_token": 231}
+  },
+  "server": {
+    "note": "same 49-token prompt, max_tokens 20, temperature 0, one 2B server, response_format switched per request",
+    "completion_tokens": 20,
+    "unconstrained": {"wall_s": 0.34, "gen_s": 0.09, "gen_tok_s": 234.8},
+    "json_schema": {"wall_s": 4.49, "gen_s": 4.12, "gen_tok_s": 4.9},
+    "gbnf": {"wall_s": 47.41, "gen_s": 47.24, "gen_tok_s": 0.42}
+  },
+  "shape": {
+    "document_header_seconds": {"gbnf_d1": 0.6, "json_schema": 0.1},
+    "accepts_document": {"gbnf_json_d1": true, "gbnf_json_d2": true, "gbnf_json_d3": true, "gbnf_record": true, "json_schema": true}
+  }
+}
