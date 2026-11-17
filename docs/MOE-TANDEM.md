@@ -2,7 +2,8 @@
 
 Status: **design plus a model-free cache prototype; Raon-1 mini R0 and a Gemma 4 26B-A4B
 adaptation recorded, 2026-11-12; the Lightning cold-expert reader started 2026-11-17 behind
-`KINDI_LT_COLD=1`, gate open.** The MoE placement strategy has its first runnable surface:
+`KINDI_LT_COLD=1`, gate open.** The Lightning path keeps the hottest host experts pinned under a
+host budget and streams only their overflow. The MoE placement strategy has its first runnable surface:
 `kindi plan` on a `kindi_lightning` pack reports the expert-tier strategy (dense core + shared
 expert on the card, routed experts tiered card / pinned host / mmap, last-used decode slots) from
 the GGUF header and the engine's own fit arithmetic, with one reason per choice and the actual
@@ -73,14 +74,17 @@ rates in a `rates:` line and in the slot explanation. The slot count is a predic
 Lightning-pack comparison remains the gate.
 
 On a `kindi_lightning` pack the opt-in cold tier is now a real file path, not only a plan: with
-`KINDI_LT_COLD=1`, every host expert is read from the pack instead of pinned at load. A prompt
-stages a layer's host block through a pinned host buffer, and a decode step fetches only the
-routed cold experts whose slots are not already warm. `kindi/cold_experts.py` performs the
-unbuffered aligned read and coalesces neighbouring ranges into one read-ahead window; each read is
-accounted as requested expert bytes versus bytes actually transferred. The engine disables the
-decode CUDA graph while this tier is active, because a cold miss needs a host read after the
-router. Warm slots take no file read and no page fault. This is a start, not a gate result: no
-larger-than-RAM pack, no tok/s and no GPU run are claimed.
+`KINDI_LT_COLD=1`, the hottest host experts stay pinned under `KINDI_LT_HOST_MB` (default:
+available host RAM less 10% or 1 GiB, whichever is larger), and only their overflow is read from
+the pack. The split uses measured pick counts when the usage file has them, otherwise the measured
+order. A prompt stages a layer's full host block through a pinned host buffer, and a decode step
+fetches only routed cold experts whose slots are not already warm. `kindi/cold_experts.py`
+performs the unbuffered aligned read and coalesces neighbouring ranges into one read-ahead window;
+each read is accounted as requested expert bytes versus bytes actually transferred, and the split
+reports exact pinned and disk expert bytes. The engine disables the decode CUDA graph while this
+tier is active, because a cold miss needs a host read after the router. Warm slots take no file
+read and no page fault. This is a start, not a gate result: no larger-than-RAM pack, no tok/s and
+no GPU run are claimed.
 
 `kindi plan` can show that plan before a backend exists: on a `kindi_lightning` pack,
 `--moe-chunk N` (with `--usage`, `--moe-cache-mib` and `--dcache` as usual) builds the placement,
@@ -334,9 +338,10 @@ Key: `(layer, expert_id)`. Value: complete expert tensors and scales, never a pa
   the minimum cannot fit, the model is not offered on that GPU.
 - **Host side** keeps the whole expert set resident and memory-mapped by default. A bounded pinned
   staging area holds one or a few expert tensors; decode must not fault expert weights from disk.
-  `mlock` is optional and must not be assumed. The opt-in cold tier replaces the pinned host copy
-  with `kindi/cold_experts.py`'s explicit unbuffered reads; warm decode slots never read the file,
-  and a cold miss is a scheduled read, not an mmap/page fault.
+  `mlock` is optional and must not be assumed. The opt-in cold tier keeps the hottest host experts
+  pinned under a byte budget and replaces only the overflow with `kindi/cold_experts.py`'s explicit
+  unbuffered reads; warm decode slots never read the file, and a cold miss is a scheduled read, not
+  an mmap/page fault.
 - **Accounting** includes tensor bytes, scales and alignment. A cache hit rate without bytes and
   slot count is not a useful metric.
 
@@ -387,7 +392,7 @@ Implemented, model-free:
 | `kindi/moe_tandem.py` | one execution unit's expert split over the cache and a placement: `card` / `copy` / `cpu` lanes, opt-in CPU lane with a deterministic `cpu_share` throttle, router or expert-id combine order kept separate from scheduling, plan metrics; no tensors, copies or kernels |
 | `kindi/plan.py` | `kindi plan` on a `kindi_lightning` pack: expert tiers, the decode-slot trade, and with `--moe-chunk N` what `MoeTandem` would do for an N-token sample prompt chunk (lane split, distinct copies, copy bytes) from the header and `--usage`; no weights read, no bytes moved |
 | `kindi/expert_chunk.py` | multi-token prefill planner over the cache: deduped copy list in first-need order, hit/coalesced/miss report, chunk rollback when a token does not fit; no tensors or engine wiring |
-| `kindi/cold_experts.py` | opt-in Lightning host tier: aligned unbuffered reads, read-ahead merge, Q2_0 de-interleave and requested/transferred byte accounting; no VRAM allocation or kernel |
+| `kindi/cold_experts.py` | opt-in Lightning host tier: hottest-first host/disk split under a byte budget, aligned unbuffered reads, read-ahead merge, Q2_0 de-interleave and requested/transferred/ tier byte accounting; no VRAM allocation or kernel |
 | `tests/test_moe_cache.py` | synthetic-slot tests for transitions, eviction, pinning, transient slots, failed copies and metrics |
 | `tests/test_moe_cache_properties.py` | 32 seeded randomized route/acquire traces; checks capacity, pin ownership, slot states, atomic rejects and metrics after every operation |
 
@@ -456,7 +461,8 @@ GPU expert kernel.
 
 **Gate:** 4/4 greedy prompts token-exact at 1K-2K for every cache state; no OOM; no partial expert;
 no disk read during decode (the default pinned path). The opt-in `KINDI_LT_COLD=1` path instead
-does scheduled cold reads; its warm-slot rows must show no file read and no page fault.
+keeps the hottest host experts pinned under `KINDI_LT_HOST_MB` and does scheduled cold reads for
+the overflow; its warm-slot rows must show no file read and no page fault.
 
 ### M2 — CPU miss lane, parity-gated
 

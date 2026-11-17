@@ -31,16 +31,20 @@
   2,509.8 MiB/s disk, 6.0/6.1 GiB/s H2D/D2H on the 4060 Ti. The rates feed slot sizing; the
   NVMe cold-expert tier now has its first engine path, whose gate is in `docs/ROADMAP.md`
   "Memory-tier follow-ups".
-- **The Lightning cold-expert tier is opt-in and reads the pack, not a page cache** — with
-  `KINDI_LT_COLD=1`, every routed expert outside the card tier is file-backed instead of pinned at
-  load. A prompt stages a layer's host block through a pinned buffer; a decode step reads only
-  routed experts that are not already in a warm device slot. `kindi/cold_experts.py` issues aligned
-  `O_DIRECT`/`FILE_FLAG_NO_BUFFERING` reads where available, merges neighbouring ranges into a
-  read-ahead window, and separates requested expert bytes from bytes actually transferred;
-  `Engine.cold_stats()` exposes the accounting. The decode graph is disabled only on this opt-in
-  path because the read follows the router, and warm slots take no file read. Eight CPU tests
-  cover the flag, exact bytes, read-ahead merging, order and short reads. **No larger-than-RAM
-  pack, GPU run, tok/s or verify result is claimed**; those are the open gate in `docs/ROADMAP.md`.
+- **The Lightning cold-expert tier is opt-in and reads only the host overflow, not a page cache** —
+  with `KINDI_LT_COLD=1`, the hottest host experts stay pinned under `KINDI_LT_HOST_MB` (default:
+  available host RAM less 10% or 1 GiB, whichever is larger) and only the overflow is file-backed.
+  The split uses measured expert use when `kindi/lightning-experts.json` has counts, so the hot
+  tier is not lost. A prompt stages a layer's host block through a pinned buffer; a decode step
+  reads only routed cold experts that are not already in a warm device slot. `kindi/cold_experts.py`
+  issues aligned `O_DIRECT`/`FILE_FLAG_NO_BUFFERING` reads where available, merges neighbouring
+  ranges into a read-ahead window, and separates requested expert bytes from bytes actually
+  transferred; `Engine.cold_stats()` exposes requested/transferred bytes plus exact pinned and
+  disk tier bytes. The decode graph is disabled only on this opt-in path because the read follows
+  the router, and warm slots take no file read. Fourteen CPU tests cover the flag, the host/disk
+  split and byte accounting, exact bytes, read-ahead merging, order, warm-slot skips and short
+  reads. **No larger-than-RAM pack, GPU run, tok/s or verify result is claimed**; those are the
+  open gate in `docs/ROADMAP.md`.
 - **`kindi plan` and `kindi autotune` now consume the `kindi io` rates** — the Lightning report
   normalizes the measured RAM, disk and PCIe numbers into bytes/s, predicts one token's slot
   working set plus `ceil((RAM copy + disk read) / PCIe H2D)` lookahead, caps it by `n_exp` and by

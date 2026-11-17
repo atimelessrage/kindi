@@ -17,7 +17,8 @@ import time
 import numpy as np
 
 from . import ltfit
-from .cold_experts import ColdExpertReader, cold_enabled, cold_misses, split_q2
+from .cold_experts import (ColdExpertReader, cold_enabled, cold_misses, host_budget_bytes,
+                           split_host_tiers, split_q2)
 from .gguf import GGUF
 from .moe import MoESpec, Usage, plan
 from .nanbeige import _capture, _free_bytes, module
@@ -104,9 +105,13 @@ class Engine(object):
         g = GGUF(path)
         self.g, self.s = g, Spec(g)
         s = self.s
-        # Off by default: host experts stay pinned. With KINDI_LT_COLD=1 the host tier is read from
-        # the pack on demand instead; see `_cold_setup` / `_cold_prepare`.
-        self.cold_reader = ColdExpertReader(path, read_ahead=1, log=log) if cold_enabled() else None
+        # Off by default: host experts stay pinned. With KINDI_LT_COLD=1 the hottest host experts
+        # stay pinned under KINDI_LT_HOST_MB and only the overflow is read from the pack on demand;
+        # see `_split_host_tiers` / `_cold_setup` / `_cold_prepare`.
+        cold = cold_enabled()
+        self.cold_reader = ColdExpertReader(path, read_ahead=1, log=log) if cold else None
+        self.host_budget = host_budget_bytes() if cold else 0
+        self.host_warm, self.host_cold, self.host_tier_stats = {}, {}, {}
         self.cold_active = False
         self.cold_experts = 0          # host experts in the file-backed tier
         self.cold_read_experts = 0     # decode misses actually fetched
@@ -245,11 +250,19 @@ class Engine(object):
         self.placement, self.max_host = None, s.n_exp - self.n_card
         if experts_on_card is None and self.n_card < s.n_exp:
             self._plan_weighted(room, eb, n_moe)
+        self._split_host_tiers()
         where = self.placement.describe() if self.placement else "%d of %d experts per layer on the card" % (
             self.n_card, s.n_exp)
-        cold_tail = ("" if self.n_card == s.n_exp else
-                     ", the rest in the cold file tier" if getattr(self, "cold_reader", None) is not None else
-                     ", the rest in host memory")
+        cold_tail = ""
+        if self.n_card != s.n_exp:
+            if getattr(self, "cold_reader", None) is None:
+                cold_tail = ", the rest in host memory"
+            elif getattr(self, "host_tier_stats", None):
+                cold_tail = (", %d pinned in host memory and %d file-backed (%.1f GiB host budget)"
+                             % (self.host_tier_stats["host_experts"],
+                                self.host_tier_stats["disk_experts"], self.host_budget / 2 ** 30))
+            else:
+                cold_tail = ", the rest in host memory"
         self.log("plan: %.2f GB dense weights, %.2f GB K/V at ctx %d, %s%s" % (
             dense / 1e9, kv / 1e9, self.ctx, where, cold_tail))
 
@@ -285,6 +298,43 @@ class Engine(object):
         if os.path.exists(p):
             return {int(k): v for k, v in json.load(open(p))["order"].items()}
         return {}
+
+    def _usage_counts(self):
+        """measured pick counts per layer, when the usage file has them"""
+        p = os.path.join(HERE, "lightning-experts.json")
+        if os.path.exists(p):
+            return {int(k): v for k, v in json.load(open(p)).get("counts", {}).items()}
+        return {}
+
+    def _tiers(self, il, order):
+        """(card, host) expert ids for one MoE layer; `host` is every non-card expert (warm or cold)."""
+        s = self.s
+        if self.placement is not None:
+            card = set(self.placement.on(il, "card"))
+            host = set(self.placement.on(il, "host")) | set(self.placement.on(il, "disk"))
+        else:
+            ordr = order.get(il, list(range(s.n_exp)))
+            card = set(ordr[:self.n_card])
+            host = set(ordr[self.n_card:]) if self.n_card < s.n_exp else set()
+        return card, host
+
+    def _split_host_tiers(self):
+        """Pin the hottest host experts under the host budget; only their overflow becomes cold."""
+        if getattr(self, "cold_reader", None) is None:
+            return
+        s = self.s
+        order, counts = self._usage(), self._usage_counts()
+        hosts = {}
+        for il, kind in enumerate(s.kind):
+            if kind == "moe":
+                _card, host = self._tiers(il, order)
+                if host:
+                    hosts[il] = tuple(sorted(host))
+        warm, cold, stats = split_host_tiers(hosts, order, self.host_budget,
+                                             self._expert_bytes(), counts)
+        self.host_warm, self.host_cold, self.host_tier_stats = warm, cold, stats
+        self.cold_experts = stats["disk_experts"]
+        self.cold_active = bool(self.cold_experts)
 
     def _q2(self, name, host_rows=None, cold_rows=None):
         """Upload a Q2_0 tensor: codes and scales. Host experts are pinned unless `cold_rows` names
@@ -393,21 +443,9 @@ class Engine(object):
             else:
                 L["router"] = self._f32(p + "ffn_gate_inp.weight")
                 L["rbias"] = self._f32(p + "exp_probs_b.bias")
-                if self.placement is not None:
-                    host = set(self.placement.on(il, "host")) or None
-                    card = set(self.placement.on(il, "card"))
-                else:
-                    ordr = order.get(il, list(range(s.n_exp)))
-                    host = set(ordr[self.n_card:]) if self.n_card < s.n_exp else None
-                    card = set(ordr[:self.n_card])
-                cold = None
-                if self.cold_reader is not None and host:
-                    # The opt-in tier makes every host expert cold. Card experts and the dense core
-                    # keep their current path; no cold expert is pinned or mmap-faulted.
-                    host = set(range(s.n_exp)) - card
-                    cold = set(host)
-                    self.cold_active = True
-                    self.cold_experts += len(cold)
+                card, host = self._tiers(il, order)
+                host = host or None
+                cold = set(self.host_cold.get(il, ())) if self.cold_reader is not None and host else None
                 L["up"] = self._q2(p + "ffn_up_exps.weight", host, cold)
                 L["down"] = self._q2(p + "ffn_down_exps.weight", host, cold)
                 if host:
@@ -436,7 +474,7 @@ class Engine(object):
             self.copy_stream = cp.cuda.Stream(non_blocking=True)
             self.ev_staged = [cp.cuda.Event(disable_timing=True) for _ in range(2)]
             self.ev_used = [cp.cuda.Event(disable_timing=True) for _ in range(2)]
-            if self.cold_reader is not None:
+            if getattr(self, "cold_active", False):
                 # the cold path de-interleaves Q2_0 bytes in pinned host memory before the H2D copy
                 self.stage_host = [cp.cuda.alloc_pinned_memory(n) for _ in range(2)]
                 self.stage_n = n
@@ -453,7 +491,7 @@ class Engine(object):
         L["stage"] = b
 
     def _cold_setup(self, L):
-        """Pinned slots for the experts a decode step may stream; no expert is pinned at load time."""
+        """Pinned slots for cold experts a decode step may stream; warm host experts stay pinned."""
         cp, s = self.cp, self.s
         n = s.n_used
         for key in ("up", "down"):
@@ -538,9 +576,21 @@ class Engine(object):
         if self.cold_reader is None:
             return {"active": False, "experts": 0}
         out = self.cold_reader.stats()
+        host_bytes = cold_bytes = host_experts = 0
+        for L in self.layers:
+            if "up" not in L:
+                continue
+            for key in ("up", "down"):
+                w = L[key]
+                per = w.cw + w.sw
+                host_experts += len(w.hwarm)
+                host_bytes += len(w.hwarm) * per
+                cold_bytes += len(w.hcold) * per
         out.update({"active": self.cold_active, "experts": self.cold_experts,
+                    "cold_experts": self.cold_experts,
                     "experts_read": self.cold_read_experts,
-                    "host_experts": sum(len(L["up"].hcold) for L in self.layers if "up" in L)})
+                    "host_experts": host_experts, "host_bytes": host_bytes,
+                    "cold_bytes": cold_bytes, "host_budget_bytes": self.host_budget})
         return out
 
     def _dec_slots(self):

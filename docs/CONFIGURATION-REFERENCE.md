@@ -185,22 +185,23 @@ variables, and are therefore not listed twice here.
 | `KINDI_LEGACY_ENGINE_PATH` | (unset) | `kindi/engine.py:761` |
 | `KINDI_LLVM` | (unset) | `kindi/cpu.py:91` |
 | `KINDI_LOG_RAW` | (unset) | `kindi/lightning_gen.py:378` (+2 more) |
-| `KINDI_LT_CHUNK` | (unset) | `kindi/lightning.py:151` |
-| `KINDI_LT_COLD` | (empty) | `kindi/cold_experts.py:36` |
+| `KINDI_LT_CHUNK` | (unset) | `kindi/lightning.py:156` |
+| `KINDI_LT_COLD` | (empty) | `kindi/cold_experts.py:40` |
 | `KINDI_LT_DCACHE` | `str(DCACHE_DEFAULT)` | `kindi/ltfit.py:22` |
-| `KINDI_LT_DGRP` | `mvdg` | `kindi/lightning.py:899` |
-| `KINDI_LT_GRAPH` | `1` | `kindi/lightning.py:1018` |
-| `KINDI_LT_K35` | (unset) | `kindi/lightning.py:122` |
-| `KINDI_LT_K35_EXACT` | (unset) | `kindi/lightning.py:39` |
-| `KINDI_LT_KBLAS` | `1` | `kindi/lightning.py:37` |
-| `KINDI_LT_KGRP` | `mmk32` or `mvkg` | `kindi/lightning.py:666` (+1 more) |
-| `KINDI_LT_NSPLIT` | `32` | `kindi/lightning.py:28` |
-| `KINDI_LT_NSPLIT_TC` | `64` | `kindi/lightning.py:29` |
-| `KINDI_LT_PRE6` | `"1" if self.cc >= 60 else "0"` | `kindi/lightning.py:136` |
+| `KINDI_LT_DGRP` | `mvdg` | `kindi/lightning.py:949` |
+| `KINDI_LT_GRAPH` | `1` | `kindi/lightning.py:1068` |
+| `KINDI_LT_HOST_MB` | (empty) | `kindi/cold_experts.py:56` |
+| `KINDI_LT_K35` | (unset) | `kindi/lightning.py:127` |
+| `KINDI_LT_K35_EXACT` | (unset) | `kindi/lightning.py:40` |
+| `KINDI_LT_KBLAS` | `1` | `kindi/lightning.py:38` |
+| `KINDI_LT_KGRP` | `mmk32` or `mvkg` | `kindi/lightning.py:716` (+1 more) |
+| `KINDI_LT_NSPLIT` | `32` | `kindi/lightning.py:29` |
+| `KINDI_LT_NSPLIT_TC` | `64` | `kindi/lightning.py:30` |
+| `KINDI_LT_PRE6` | `"1" if self.cc >= 60 else "0"` | `kindi/lightning.py:141` |
 | `KINDI_LT_RESERVE_MB` | `350` | `kindi/autotune.py:236` (+2 more) |
 | `KINDI_LT_SELFCHECK` | `1` | `kindi/lightning_gen.py:241` |
-| `KINDI_LT_SM75` | (unset) | `kindi/lightning.py:139` |
-| `KINDI_LT_TC` | `1` | `kindi/lightning.py:134` |
+| `KINDI_LT_SM75` | (unset) | `kindi/lightning.py:144` |
+| `KINDI_LT_TC` | `1` | `kindi/lightning.py:139` |
 | `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:431` |
 | `KINDI_MEM_RESERVE_MB` | `96` or `256` or `32` | `kindi/engine.py:306` (+4 more) |
 | `KINDI_MODEL` | (empty) | `kindi/container.py:240` |
@@ -210,7 +211,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_MOE_DROP_CACHE` | `1` | `kindi/dsv41.py:362` |
 | `KINDI_MOE_IDLE` | `1` | `kindi/dsv41.py:347` |
 | `KINDI_MOE_SHARE0` | `0.667` | `kindi/dsv41.py:350` (+2 more) |
-| `KINDI_MOE_WEIGHTED` | `1` | `kindi/lightning.py:267` (+2 more) |
+| `KINDI_MOE_WEIGHTED` | `1` | `kindi/lightning.py:280` (+2 more) |
 | `KINDI_MTP_HEAD_ALLOW_UNREGISTERED` | `0` | `kindi/mtp_heads.py:50` |
 | `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:665` |
 | `KINDI_NB_CPUF` | `0.55` | `kindi/nanbeige.py:34` |

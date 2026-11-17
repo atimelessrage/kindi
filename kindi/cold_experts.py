@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """Cold routed-expert reads from a pack/GGUF file, behind `KINDI_LT_COLD`.
 
-The host expert tier in `kindi/lightning.py` is pinned RAM: every expert the card does not hold is
-copied there at load time. That makes the whole expert set a RAM requirement. This module is the
-file side of the alternative tier: it reads the Q2_0 bytes of a selected expert range with an
-unbuffered read where the OS allows one (``O_DIRECT`` on Linux, ``FILE_FLAG_NO_BUFFERING`` on
-Windows), and coalesces neighbouring ranges into one read-ahead window. It does not allocate VRAM,
-run a kernel, or decide which expert is needed; the engine owns those parts.
+The host expert tier in `kindi/lightning.py` is pinned RAM. Without this module the whole expert
+set is a RAM requirement. With the opt-in cold tier the hottest host experts stay pinned up to a
+host byte budget and only the overflow is file-backed. This module is the file side of that tier:
+it reads the Q2_0 bytes of a selected expert range with an unbuffered read where the OS allows one
+(``O_DIRECT`` on Linux, ``FILE_FLAG_NO_BUFFERING`` on Windows), and coalesces neighbouring ranges
+into one read-ahead window. It also owns the pure host/disk split so the engine, tests and reports
+use the same accounting. It does not allocate VRAM, run a kernel, or decide which expert is needed;
+the engine owns those parts.
 
 Every read is accounted for separately:
 
@@ -28,6 +30,8 @@ import numpy as np
 
 ALIGN = 4096
 COLD_ENV = "KINDI_LT_COLD"
+HOST_ENV = "KINDI_LT_HOST_MB"
+HOST_RESERVE = 1 << 30
 
 
 def cold_enabled(environ=None):
@@ -37,6 +41,95 @@ def cold_enabled(environ=None):
     else:
         value = environ.get("KINDI_LT_COLD", "")
     return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+def host_budget_bytes(environ=None, available=None):
+    """Bytes available to pin host experts under the cold tier.
+
+    ``KINDI_LT_HOST_MB`` is an explicit budget in MiB (0 pins none). Without it, use the host's
+    currently available RAM less a safety margin: 10% or 1 GiB, whichever is larger. That keeps
+    the hot tier automatic for a pack larger than RAM while leaving the OS and the rest of the
+    process room to run. When neither an explicit value nor an available-RAM figure exists, the
+    safe answer is 0 (nothing extra is pinned).
+    """
+    if environ is None:
+        raw = os.environ.get("KINDI_LT_HOST_MB", "")
+    else:
+        raw = environ.get("KINDI_LT_HOST_MB", "")
+    raw = str(raw).strip()
+    if raw:
+        try:
+            mib = int(raw)
+        except (TypeError, ValueError):
+            raise ValueError("KINDI_LT_HOST_MB must be an integer number of MiB (got %r)" % raw)
+        if mib < 0:
+            raise ValueError("KINDI_LT_HOST_MB must not be negative (got %r)" % raw)
+        return mib << 20
+    if available is None:
+        try:
+            from .hostram import available as _available
+            available = _available()
+        except Exception:
+            available = None
+    if available is None:
+        return 0
+    reserve = max(HOST_RESERVE, int(available) // 10)
+    return max(0, int(available) - reserve)
+
+
+def split_host_tiers(host, order, budget, expert_bytes, counts=None):
+    """Split non-card experts into pinned host and file-backed disk tiers.
+
+    `host` maps a layer to its non-card expert ids; `order` maps a layer to the same ids in
+    most-used-first order. When `counts` has a measured count for every host layer, the global
+    ordering uses each expert's share of its layer's picks (every token passes every MoE layer
+    once, so layers are comparable); otherwise it uses the order rank. The hottest experts that
+    fit `budget` stay host-pinned and the rest become cold. Expert bytes are counted from the
+    actual ids selected, not from the budget, so `host_bytes` is always the pinned set's size and
+    is never larger than the budget.
+
+    Returns `(warm, cold, stats)`: warm/cold are per-layer id tuples and stats contains the exact
+    host/disk expert counts and bytes. Layer ordering is stable, so the split is reproducible.
+    """
+    if isinstance(expert_bytes, dict):
+        eb = {il: int(expert_bytes[il]) for il in host}
+    else:
+        eb = {il: int(expert_bytes) for il in host}
+    budget = max(0, int(budget))
+    counts = counts or {}
+    use_counts = bool(host) and all(il in counts and counts[il] for il in host)
+    candidates = []
+    for il in host:
+        hs = [int(e) for e in host[il]]
+        ordr = [int(e) for e in order.get(il, ())]
+        rank = {e: i for i, e in enumerate(ordr)}
+        for e in hs:
+            rank.setdefault(e, len(rank))
+        total = float(sum(counts[il])) if use_counts else 0.0
+        for e in hs:
+            if use_counts and total:
+                key = (-(counts[il][e] / total), rank[e], il, e)
+            else:
+                key = (rank[e], il, e)
+            candidates.append((key, il, e))
+    candidates.sort(key=lambda row: row[0])
+    warm = {il: [] for il in host}
+    cold = {il: [] for il in host}
+    room = budget
+    for _key, il, e in candidates:
+        if eb[il] <= room:
+            warm[il].append(e)
+            room -= eb[il]
+        else:
+            cold[il].append(e)
+    warm = {il: tuple(sorted(v)) for il, v in warm.items()}
+    cold = {il: tuple(sorted(v)) for il, v in cold.items()}
+    host_bytes = sum(len(warm[il]) * eb[il] for il in host)
+    cold_bytes = sum(len(cold[il]) * eb[il] for il in host)
+    stats = {"budget_bytes": budget, "host_bytes": host_bytes, "disk_bytes": cold_bytes,
+             "host_experts": sum(len(v) for v in warm.values()),
+             "disk_experts": sum(len(v) for v in cold.values())}
+    return warm, cold, stats
 
 
 def cold_misses(ids, owners, cold):
