@@ -4,7 +4,8 @@ Report date: **2026-11-17**. §42 is the newest section: GitHub published
 **Kindi 0.6.1** on 2026-11-16 (`7fececb`), with release notes, three GHCR
 images, a source tarball and installer hashes. §41 keeps the tag-level history
 of the MTP fix and the path to `f934a55`; §42 refreshes that against the published
-release and `main` at `e66471f`. (The earlier 2026-11-16 refresh; §40 records
+release and `main` at `e66471f`, and §4.6 records the first same-settings A/B against
+the official release (2026-11-17). (The earlier 2026-11-16 refresh; §40 records
 every round since §39 — the repo consolidation, the 9B tandem measurement, the GBNF
 rule-cache result, the first real Windows installer run, the evaluation triage,
 the vision-gate/grammar-compile fixes, `kindi caps` + `kindi autotune`, and the
@@ -158,8 +159,7 @@ mode A speculation, and it is off by default.
 | 11 | PQ2_0 / Q2_0 4B/9B/27B import | only the 2B variants are on this host | MANUAL-HELP §2 downloads |
 | 12 | Arbitrary-draft-GGUF speculation | generalized harness not built | that harness's gate |
 | 13 | Two-card TP and mixed-card pairs | one card only | a second card, same or mixed vendor |
-| 14 | Same-settings A/B against official `v0.6.1` | the comparison is code-level (zero v0.6.1 path deletions); §39's performance check used 2026-11-09 rows with different settings, so it rules out a gross regression but is not an A/B | run `v0.6.1` and this tree on the same pack, flags and card |
-| 15 | GPU CI (the agreed-cards gate) | hand-run and hand-recorded; the runner is not registered | the runner registration in `docs/CI.md` §5.1 |
+| 14 | GPU CI (the agreed-cards gate) | hand-run and hand-recorded; the runner is not registered | the runner registration in `docs/CI.md` §5.1 |
 
 ### 4.4 Deliberate divergences (not defects)
 
@@ -176,9 +176,43 @@ mode A speculation, and it is off by default.
 In order of how much of this table they would move: a **second card** (two-card TP, mixed cards, the
 autotune `tp-2-*` rows, tandem-vs-GPU on a pair), **weights** (a clean Nanbeige upload, DeepSeek shards,
 Gemma 4 E4B, the DSpine profile, a Raon/Gemma MoE pack), an **AVX-512 host** (the CPU half tops out at AVX2
-today), a **HIP or Metal rig** (the calibration clause and a non-CUDA backend), and one **same-settings
-A/B against official `v0.6.1`**. None is addressable from this machine, which is why
-`docs/MANUAL-HELP-NEEDED.md` lists them as owner actions rather than planned work.
+today) and a **HIP or Metal rig** (the calibration clause and a non-CUDA backend). None is addressable from
+this machine, which is why `docs/MANUAL-HELP-NEEDED.md` lists them as owner actions rather than planned work.
+The same-settings A/B is no longer on that list: §4.6 records it on the 2B and 9B.
+
+### 4.6 Same-settings A/B against official v0.6.1 (2026-11-17)
+
+The comparison is no longer only code-level. Stock `v0.6.1` (`7fececb`, extracted with
+`git archive v0.6.1`, not the release tarball or a container image) and this tree at
+`a79137f` ran `kindi bench` on the same 2B and 9B packs, on the same RTX 4060 Ti, at
+`--ctx 8192`. Both sides used the plain engine and the exact head: stock has no plan
+engine, so the fork used its plain path (`KINDI_TP=0`) and `--split-at off`, and no
+tensor-core, speculation, tandem or cache setting was enabled on either side. Stock
+still needs the native-Windows `libcuda.so.1` -> `nvcuda.dll` loader shim recorded on
+the earlier stock page; it changes no engine path.
+
+Five interleaved passes per cell, medians (tok/s):
+
+| model | engine | prompt reading | gen @100 | @2,000 | @8,000 |
+|---|---|---:|---:|---:|---:|
+| 2B | stock v0.6.1 | 215.5 | 180.5 | 182.9 | 176.4 |
+| 2B | this fork | 211.1 | 178.8 | 179.9 | 178.6 |
+| 9B | stock v0.6.1 | 83.9 | 83.8 | 81.3 | 77.4 |
+| 9B | this fork | 72.4 | 81.7 | 81.5 | 77.2 |
+
+Decode is the same on both models: every fork median is within 2.6% of stock's, and
+the five-pass ranges overlap (the 2B at position 8,000 is 176.4 with a 148.2-182.1
+range against 178.6 with 174.0-180.9). Prompt reading is not resolved: the 2B medians
+are 215.5 and 211.1 with overlapping ranges, and the 9B medians (83.9 and 72.4) sit
+inside ranges that overlap across the same passes (stock 52.0-92.7, fork 56.2-89.7),
+so this run does not establish a reading difference in either direction. The spread
+is why the row is recorded as ranges rather than a single figure.
+
+This does not measure the fork's plan engine, tensor cores, speculation, tandem,
+server/cache paths or token exactness; it compares the shared plain-engine bench path
+on one card, with the stock tree still on the loader shim. Evidence:
+`docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-ab-0.6.1/RESULTS.md` (20 logs, 10 fork
+JSONs, `summarize.py` -> `ab.json`).
 
 ## 5. Model and hardware status
 

@@ -1,0 +1,18 @@
+{
+  "cpu_layers": null,
+  "ctx": 8192,
+  "ctx_reduced": false,
+  "ctx_requested": 8192,
+  "device": "gpu",
+  "free_mib_after_load": 6409,
+  "gen_tok_s": {
+    "exact:100": 159.6,
+    "exact:2000": 179.9,
+    "exact:8000": 177.7
+  },
+  "model": "Ternary-Bonsai-2-2B",
+  "pack": "~/.kindi/packs/bonsai-2b",
+  "read_tok_s": 219.6,
+  "tandem": "off",
+  "total_mib": 8188
+}
