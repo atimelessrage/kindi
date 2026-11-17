@@ -44,6 +44,17 @@ comparable on the same runner, card, driver and CuPy/CUDA build, so re-recording
 (`--update`) is a deliberate, reviewed step — never a drive-by. `tests/test_perf_baseline.py`
 pins the gate behaviour.
 
+The same job runs `python tools/check_claims.py`: every number quoted in `docs/BACKENDS.md`,
+`docs/ROADMAP.md` and `CURRENT-VS-KINDI-0.6.md` is re-derived from the tracked artifact of its run
+(a JSON row, a `CROSS-MODE.csv` cell, a ratio of two cells, a max gap between two files, or a
+verbatim line in the run's `RESULTS.md`), and a doc that stops quoting the number fails. It also
+refuses a `docs/benchmarks/<dir>` citation that no `docs/claims/<gate>.json` (and no reasoned
+`unclaimed` entry in `docs/claims/REGISTRY.json`) accounts for, so new evidence cannot enter a doc
+without an owner. Schema, check kinds and the add/change procedure are in
+[docs/claims/README.md](claims/README.md); `tests/test_claims.py` pins both the repository's claims
+and the checker's own failure modes (a drifted doc number, a moved artifact, untracked evidence, an
+unregistered citation).
+
 ## CUDA static analysis
 
 The `static-analysis` job installs `cppcheck` and `clang-tidy-18` on the hosted runner and runs

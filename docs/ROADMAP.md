@@ -79,7 +79,8 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   2026-11-15 (dense Bonsai packs resolve through the registry in `make_engine`,
   valve-gated by `KINDI_LEGACY_ENGINE_PATH=1`; `kindi verify` 2B is 4/4 on both paths
   on the RTX 4060 Ti, and the gate was extended to 4B (3+tie both paths) and 9B
-  (4/4 both paths) with adapter bench rows agreeing with the valve within ~1%
+  (4/4 both paths) with adapter bench decode rows agreeing with the valve within ~1% (the read
+  row differs by 1.4%)
   — evidence `docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/RESULTS.md`;
   the 27B gate closed 2026-11-16 (pack at `~/.kindi/packs/bonsai-27b`; its
   manifest `model` is the GGUF's placeholder "Hf", so resolution needed a

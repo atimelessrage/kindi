@@ -1,0 +1,37 @@
+{
+  "gate": "determinism",
+  "title": "Determinism gate: ten server processes, same prompt, same greedy tokens",
+  "measured": "2026-11-14",
+  "commit": "1bacabc",
+  "command": "ten separate `python -m kindi serve` runs per model, same greedy prompt, exact head, speculation off",
+  "notes": "The hashes in the quoted text are the completion digests the run compared, so they double as the evidence that ten runs agreed.",
+  "evidence": [
+    "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-determinism/RESULTS.md"
+  ],
+  "numbers": [
+    {
+      "id": "all-identical",
+      "display": "10/10 identical",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-determinism/RESULTS.md",
+                "needle": "**Gate met: 10/10 identical on both.**"}
+    },
+    {
+      "id": "digest-2b",
+      "display": "180e7392dce5",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-determinism/RESULTS.md",
+                "needle": "`180e7392dce5`"}
+    },
+    {
+      "id": "digest-9b",
+      "display": "d5b027f65ade",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-determinism/RESULTS.md",
+                "needle": "`d5b027f65ade`"}
+    }
+  ]
+}

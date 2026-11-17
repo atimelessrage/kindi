@@ -1,0 +1,38 @@
+{
+  "gate": "split-ratio",
+  "title": "Prior-art 1: measured CPU/PCIe split rule (`--tandem-cpu-layers rate`)",
+  "measured": "2026-11-14",
+  "commit": "7c456bb",
+  "command": "python tools/measure_split_ratio.py, then python -m kindi --pack ~/.kindi/packs/bonsai-27b --ctx 24576 bench --tandem cpu-first --tandem-cpu-layers rate --sample-vram",
+  "notes": "Two verdicts, one met and one not: the ratio predicts the best gdn:N within one step, and the +10% beat clause was missed (+1.3% instead). Both live in the same page, so both quotes are pinned here.",
+  "evidence": [
+    "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-split-ratio/split-ratio.json",
+    "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-split-ratio/RESULTS.md"
+  ],
+  "numbers": [
+    {
+      "id": "rate-pick-layers",
+      "display": "12 CPU layers",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-split-ratio/RESULTS.md",
+                "needle": "picked **12** CPU layers"}
+    },
+    {
+      "id": "rate-pick-24k",
+      "display": "8.0 tok/s at 24K",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-split-ratio/RESULTS.md",
+                "needle": "**8.0** tok/s"}
+    },
+    {
+      "id": "rate-pick-peak",
+      "display": "6,151 MiB",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-split-ratio/RESULTS.md",
+                "needle": "6,151 MiB"}
+    }
+  ]
+}

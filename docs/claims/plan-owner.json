@@ -1,0 +1,37 @@
+{
+  "gate": "plan-owner",
+  "title": "Plan-engine GPU owner: 27B placement peak and rate against the plain owner",
+  "measured": "2026-11-14",
+  "commit": "549c030",
+  "command": "python -m kindi bench --tandem cpu-first --sample-vram (plan owner vs plain owner, 27B, ctx 8K/24K)",
+  "notes": "Two numbers from one table row: the plan owner's sampled peak and the plain owner's, which is what the memory half of the tandem verdict rests on.",
+  "evidence": [
+    "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plan-owner/RESULTS.md"
+  ],
+  "numbers": [
+    {
+      "id": "plan-peak",
+      "display": "6,004 MiB",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plan-owner/RESULTS.md",
+                "needle": "**6,004 MiB** (5,862-6,083)"}
+    },
+    {
+      "id": "plain-peak",
+      "display": "7,721 MiB",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plan-owner/RESULTS.md",
+                "needle": "7,721 MiB"}
+    },
+    {
+      "id": "reduced-context",
+      "display": "30,976",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plan-owner/RESULTS.md",
+                "needle": "| 49,152 | unsplit plan engine | 30,976 |"}
+    }
+  ]
+}

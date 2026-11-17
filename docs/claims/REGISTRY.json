@@ -1,0 +1,27 @@
+{
+  "docs": [
+    "docs/BACKENDS.md",
+    "docs/ROADMAP.md",
+    "CURRENT-VS-KINDI-0.6.md"
+  ],
+  "unclaimed": [
+    {
+      "dir": "2026-11-12-i7-8086k-rtx4060ti-tandem",
+      "reason": "the 27B joint-checkpoint rows are quoted from this run (peaks 7,005/7,017 MiB), but the tracked page keeps the breakdown and the idle baseline rather than those two peak cells; binding them needs the page to state the peaks it is quoted for",
+      "claim_pending": "2026-11-17"
+    },
+    {
+      "dir": "2026-11-14-i7-8086k-rtx4060ti-plain-q8",
+      "reason": "cited for the plain-engine q8_0 context; its numbers are re-stated (and claimed) in the plan-owner and split-ratio gates, so this page adds provenance, not a separate measurement"
+    },
+    {
+      "dir": "2026-11-16-i7-8086k-rtx4060ti-fd-4b",
+      "reason": "the report quotes '2 exact / 2 fails' from this page, but the page records the four prompts and the verdict rather than that summary line; binding it needs the summary in the page",
+      "claim_pending": "2026-11-17"
+    },
+    {
+      "dir": "dory-d0",
+      "reason": "architecture constants from the model's own config (layer counts, tensor totals) and reference goldens, not a measured gate on this hardware"
+    }
+  ]
+}

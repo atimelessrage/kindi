@@ -1,0 +1,21 @@
+{
+  "gate": "rebar-9b",
+  "title": "Resizable BAR check on the rig before the 9B capacity rows",
+  "measured": "2026-11-15",
+  "commit": "4e0f17f",
+  "command": "nvidia-smi -q (BAR1 total, PCIe link, driver) plus the step-0 baselines it re-reads",
+  "notes": "A precondition recorded as a fact rather than a measurement claim: the full VRAM window is why the 131,072-token rows are possible on an 8 GB card.",
+  "evidence": [
+    "docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-rebar-9b/RESULTS.md"
+  ],
+  "numbers": [
+    {
+      "id": "bar1",
+      "display": "BAR1 8192 MiB",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-rebar-9b/RESULTS.md",
+                "needle": "BAR1 total 8192 MiB"}
+    }
+  ]
+}
