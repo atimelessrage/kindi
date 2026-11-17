@@ -1,6 +1,6 @@
 # Roadmap
 
-Status: **living document, updated 2026-11-12.** The generated capability tables are in
+Status: **living document, updated 2026-11-17.** The generated capability tables are in
 [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md); this page is the single index of what was tried and
 rejected, why it was rejected, and what evidence would reopen it. The detailed documents stay as
 appendices and are linked from their rows.
@@ -250,6 +250,21 @@ scope for this text-only backend. Do **not** use the Ollama-converted layout as 
 it has been observed to differ (`ssm_dt` without `.bias`, `rope.dimension_sections` length 3 vs 4);
 use a Bartowski/Unsloth llama.cpp-compatible GGUF, or normalize those two deltas in a Kindi
 converter with byte-level tests first.
+
+**Qwen3.6-35B-A3B ternary community builds (external, checked 2026-11-17):** the official model
+uses the `qwen35moe` architecture, and these are real third-party quantizations, but they are not
+Q0 artifacts.
+[russellwmy/qwen3.6-35b-a3b-ternary](https://huggingface.co/russellwmy/qwen3.6-35b-a3b-ternary) stores 9.1 GB of 2-bit ternary expert codes plus 2.3 GB of
+the rest and runs only through ironbark on Apple Silicon; its card says it is not loadable by
+`transformers` or MLX-LM. [manjunathshiva/Qwen3.6-35B-A3B-tq3a-tqTe-down4-g64](https://huggingface.co/manjunathshiva/Qwen3.6-35B-A3B-tq3a-tqTe-down4-g64) is 12.6 GB of
+3-bit attention, ternary gate/up experts and 4-bit down experts in the TurboQuant-MLX format,
+also Apple Silicon only. The cards report a 9.4 GB pure-ternary sibling and a quality split on
+one agentic task (0/4 pure ternary, 3/3 asymmetric down4), which is a hypothesis about asymmetric
+expert precision, not a Kindi measurement. Neither file is a llama.cpp-compatible GGUF or has an
+NVIDIA kernel path, so neither replaces the pinned-GGUF Q0 gate or gives this repository a 16 GB
+fit today. A later, separate experiment may test ternary gate/up plus a higher-bit down
+projection, but only after a byte-pinned GGUF export (or a converter with bit-level dequant
+tests) and a token-exact `kindi verify` plus the existing KLD/PPL quality gate.
 
 **Not an MoE (local Ollama candidate):** Granite 4.1 30B (`granite`, 64 blocks,
 131,072 context) is a dense 30B GGUF, so it is not part of the small-MoE recognition table.
