@@ -139,6 +139,16 @@
   depth 7 — the default 20,000-state limit allows nesting 2, and `json_schema` remains the
   unbounded path.
 
+### Fixed
+
+- **Comma-separated CLI values now reject unknown tokens with their valid set** — `kindi bench`
+  `--split-at` used to drop zero/negative lengths and end a run with a bare `ValueError` for text;
+  it now rejects anything that is not a positive integer (or `none`/`off`) before the model loads.
+  `--tandem-cpu-layers` now rejects malformed forms (`auto:lots`, `gdn:many`, a bad list entry) at
+  the parser with the accepted count/list/`gdn:N`/`auto[:MiB]`/`rate[:FLOOR]` forms, while its
+  existing count, subset and GDN-range errors keep naming their valid range. Unit and CLI tests
+  cover both; `kindi io --skip` remains the reference for the error style.
+
 ### Changed
 
 - **The kernel launch contract now covers every graph call site, not one kernel** — `k_rmsfold_qT`'s

@@ -178,7 +178,21 @@ def test_a_split_that_does_not_fit_the_context_is_skipped_with_a_reason(tmp_path
 
 def test_split_prompts_parsing():
     assert bench.split_prompts({"split_at": "none"}) == []
+    assert bench.split_prompts({"split_at": "off"}) == []
     assert bench.split_prompts({"split_at": ""}) == []
     assert bench.split_prompts({"split_at": "512, 4096"}) == [512, 4096]
     assert bench.split_prompts({"split_at": [1024]}) == [1024]
     assert bench.split_prompts({}) == list(bench.SPLIT_PROMPTS)
+    for bad in ("4096,fast", "0", "-1", "512,0"):
+        with pytest.raises(ValueError, match="positive integers.*none/off"):
+            bench.split_prompts({"split_at": bad})
+
+
+def test_bench_cli_rejects_unknown_comma_values_before_loading():
+    import subprocess, sys
+    for args, expected in ((["--split-at", "4096,fast"], "positive integers"),
+                           (["--tandem-cpu-layers", "0,1,fast"], "layer spec")):
+        out = subprocess.run([sys.executable, "-m", "kindi", "bench"] + args,
+                             capture_output=True, text=True, timeout=30)
+        assert out.returncode == 2, out.stderr
+        assert expected in out.stderr, out.stderr

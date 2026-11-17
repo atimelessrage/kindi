@@ -325,6 +325,12 @@ def test_parse_layers_accepts_the_rate_forms():
         tandem._parse_layers("0.25")
 
 
+def test_parse_layers_rejects_unknown_forms_with_the_valid_set():
+    for bad in ("fast", "0,1,fast", "auto:lots", "rate:fast", "gdn:many", "0", "-1"):
+        with pytest.raises(ValueError, match="layer spec.*gdn:N.*auto.*rate"):
+            tandem._parse_layers(bad)
+
+
 def _fake_ratio():
     # full-GPU 30 tok/s, each CPU GDN layer costs 2 tok/s: rate falls linearly with the count
     return {"kind": "kindi-split-ratio/1", "pack": {"source_sha256": "sha"},

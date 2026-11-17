@@ -203,7 +203,10 @@ def describe(pack, ctx, spec, mode="cpu-first", gpu_kind=None,
     budget = free_bytes - reserve_mib * 2 ** 20
     out["estimate_full_mib"] = full // 2 ** 20
 
-    parsed = spec if not isinstance(spec, str) else _t._parse_layers(spec)
+    try:
+        parsed = spec if not isinstance(spec, str) else _t._parse_layers(spec)
+    except ValueError as exc:
+        raise SystemExit("kindi: %s" % exc)
     chosen, reason = [], ""
     try:
         if parsed in ("auto", "rate"):

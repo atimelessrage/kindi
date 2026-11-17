@@ -49,27 +49,81 @@ def _normalise_mode(mode):
     return str(mode or "off").strip().lower().replace("_", "-")
 
 
+LAYER_SPEC_FORMS = ("a count, an ordered layer list (0,1,2 or 0-2,4-6), gdn:N, "
+                    "auto[:MiB] or rate[:FLOOR]")
+
+
 def _parse_layers(text):
-    """-> an int count, a tuple of layer numbers, or a ``gdn:N`` spec (returned as a string)."""
+    """-> an int count, a tuple of layer numbers, or a spec string (``gdn:N``/``auto``/``rate``).
+
+    Unknown forms are rejected with the accepted forms in the message; the model-dependent
+    range checks (0..NL-1, the GDN count) stay in ``TandemEngine``/``gdn_first`` and name their
+    own valid range.  A bare count must be at least one; zero is only meaningful in a list.
+    """
     text = str(text).strip()
+
+    def bad(why=None):
+        raise ValueError("layer spec %r is not %s%s" % (text, LAYER_SPEC_FORMS,
+                                                       " (%s)" % why if why else ""))
+
     try:
-        return int(text)
-    except ValueError:
+        count = int(text)
+    except (TypeError, ValueError):
         pass
+    else:
+        if count <= 0:
+            bad("a bare count must be at least 1")
+        return count
     low = text.lower()
-    if (low.startswith("gdn:") or low == "auto" or low.startswith("auto:")
-            or low == "rate" or low.startswith("rate:")):
+    if low.startswith("gdn:"):
+        arg = low.partition(":")[2]
+        try:
+            int(arg)
+        except ValueError:
+            bad("gdn: needs a layer count, e.g. gdn:8")
+        return low
+    if low == "auto" or low.startswith("auto:"):
+        arg = low.partition(":")[2]
+        if arg:
+            try:
+                int(arg)
+            except ValueError:
+                bad("auto: needs a target in MiB, e.g. auto:8192")
+        return low
+    if low == "rate" or low.startswith("rate:"):
+        arg = low.partition(":")[2]
+        if arg:
+            try:
+                float(arg)
+            except ValueError:
+                bad("rate: needs a floor fraction, e.g. rate:0.25")
         return low
     parts = [p.strip() for p in text.replace(";", ",").split(",") for p in p.split() if p.strip()]
+    if not parts:
+        bad()
     flat = []
     for part in parts:
         # a-b or a:b both mean the inclusive contiguous block
         if "-" in part[1:] or ":" in part:
             sep = "-" if "-" in part[1:] else ":"
-            lo, hi = part.split(sep, 1)
-            flat.extend(range(int(lo), int(hi) + 1))
+            try:
+                lo, hi = part.split(sep, 1)
+                lo, hi = int(lo), int(hi)
+            except ValueError:
+                bad("malformed entry %r" % part)
+            if hi < lo:
+                bad("range %r must be ascending" % part)
+            if lo < 0:
+                bad("layer numbers must be non-negative")
+            flat.extend(range(lo, hi + 1))
         else:
-            flat.append(int(part))
+            try:
+                n = int(part)
+            except ValueError:
+                bad("malformed entry %r" % part)
+            if n < 0:
+                bad("layer numbers must be non-negative")
+            flat.append(n)
     return tuple(flat)
 
 
@@ -505,7 +559,10 @@ class TandemEngine(object):
             cpu_layers = max(1, self.NL // 4)
         auto_target = None
         if isinstance(cpu_layers, str):
-            cpu_layers = _parse_layers(cpu_layers)
+            try:
+                cpu_layers = _parse_layers(cpu_layers)
+            except ValueError as exc:
+                raise SystemExit("kindi: %s" % exc)
             if isinstance(cpu_layers, str):
                 kind, _, arg = cpu_layers.partition(":")
                 if kind == "gdn":

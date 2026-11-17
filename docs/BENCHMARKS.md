@@ -11,7 +11,8 @@ generated. Project page: [amirhusain.com/kindi](https://amirhusain.com/kindi/).
 
 `kindi bench` also reports the prefill/decode share of one whole request: `--split-at` (default
 4096,8192) and `--split-generated` (default 128) time a real chunked prefill followed by that many
-decode steps, then print each phase's share of the wall clock. On the 2B that request is 14% prefill
+decode steps, then print each phase's share of the wall clock. `--split-at` accepts only positive
+prompt lengths; use `none` or `off` to turn the split report off. On the 2B that request is 14% prefill
 at 512 prompt tokens, 64% at 4,096 and 82% at 8,192
 ([results](benchmarks/2026-11-17-i7-8086k-rtx4060ti-bench-split/RESULTS.md)); the read and write
 columns below are separate rates and do not by themselves say which phase a request spends its

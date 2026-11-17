@@ -26,7 +26,8 @@ between them per token.
 | `cpu-first` | CPU | CPU prefix `0..n-1`, GPU suffix `n..NL-1` | GPU | a small GPU that can hold the expensive suffix and the LM head |
 | `gpu-first` | GPU | GPU prefix `0..NL-n-1`, CPU suffix `NL-n..NL-1` | CPU | keeping the embedding and early layers on the GPU while the last layers and LM head stay off it |
 
-`--tandem-cpu-layers` takes one of three forms (default: a quarter of the layers):
+`--tandem-cpu-layers` takes one of these forms (default: a quarter of the layers); any other form is
+rejected with the accepted forms named in the error:
 
 - a **count** — `6`: a contiguous CPU prefix (`cpu-first`) or suffix (`gpu-first`), the original behavior;
 - an **explicit layer set** — `0,1,2,4,5,6` or `0-2,4-6`: any sorted subset, so the two backends can interleave;

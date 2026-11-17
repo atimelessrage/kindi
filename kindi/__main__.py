@@ -463,16 +463,34 @@ def _malloc_tuning():
         pass                                               # not glibc: nothing to tune
 
 
+def _split_at_arg(text):
+    from .bench import split_prompts
+    try:
+        split_prompts({"split_at": text})
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc))
+    return text
+
+
+def _tandem_layers_arg(text):
+    from .tandem import _parse_layers
+    try:
+        _parse_layers(text)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc))
+    return text
+
+
 def _tandem_args(s):
     """The dense CPU+GPU split flags, available on the commands that build an engine."""
     s.add_argument("--tandem", choices=("off", "cpu-first", "gpu-first"), default=None,
                    help="split the Bonsai layers between the CPU and one GPU (default: off)")
-    s.add_argument("--tandem-cpu-layers", default=None,
+    s.add_argument("--tandem-cpu-layers", type=_tandem_layers_arg, default=None,
                    help="layers the CPU owns in a tandem split: a count (cpu-first prefix / "
                         "gpu-first suffix), an explicit list such as 0,1,2,4,5,6 / 0-2,4-6, "
-                        "gdn:N (the first N non-attention layers) or auto[:MiB] (the smallest "
+                        "gdn:N (the first N non-attention layers), auto[:MiB] (the smallest "
                         "set that makes the context fit, or refuse when no split is needed) "
-                        "(default: a quarter of the model)")
+                        "or rate[:FLOOR] (default: a quarter of the model)")
     s.add_argument("--tandem-gpu", choices=("auto", "plan", "plain"), default=None,
                    help="engine that owns the GPU side of a tandem split: auto (the plan engine, "
                         "which loads only the GPU-owned layers and uses q8_0 K/V), plan or plain "
@@ -505,9 +523,10 @@ def main(argv=None):
     _tandem_args(s)
     s.add_argument("--json", default=None, metavar="FILE", help="also record the numbers in a machine-readable JSON file")
     s.add_argument("--sample-vram", action="store_true", help="sample device-wide VRAM and log the peak during the run")
-    s.add_argument("--split-at", default=None, metavar="LIST",
-                   help="prompt lengths (comma-separated) to time as one whole request and report the "
-                        "prefill/decode share of wall clock (default: 4096,8192; 'none' turns it off)")
+    s.add_argument("--split-at", type=_split_at_arg, default=None, metavar="LIST",
+                   help="positive prompt lengths (comma-separated) to time as one whole request and "
+                        "report the prefill/decode share of wall clock (default: 4096,8192; "
+                        "'none' or 'off' turns it off)")
     s.add_argument("--split-generated", type=int, default=None, metavar="TOKENS",
                    help="tokens generated in each --split-at request (default: 128)")
     s = sub.add_parser("kld", help="teacher-forced KLD quality gate for lossy K/V caches against fp16")

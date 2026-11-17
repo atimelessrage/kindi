@@ -28,7 +28,12 @@ def _cupy():
 
 
 def split_prompts(cfg):
-    """The prompt lengths `--split-at` asked for ("none"/empty turns the report off)."""
+    """The prompt lengths `--split-at` asked for ("none"/empty turns the report off).
+
+    Every other token must be a positive integer.  A token used to be dropped when it was
+    zero or negative, and text raised a bare ``ValueError``; both now name the valid choices
+    before a model is loaded.
+    """
     raw = cfg.get("split_at", SPLIT_PROMPTS)
     if isinstance(raw, (list, tuple)):
         values = list(raw)
@@ -39,9 +44,15 @@ def split_prompts(cfg):
         values = [part.strip() for part in text.split(",") if part.strip()]
     out = []
     for value in values:
-        n = int(value)
-        if n > 0:
-            out.append(n)
+        try:
+            n = int(str(value).strip())
+        except (TypeError, ValueError):
+            raise ValueError("prompt lengths must be comma-separated positive integers, or "
+                             "none/off (got %r)" % (value,))
+        if n <= 0:
+            raise ValueError("prompt lengths must be comma-separated positive integers, or "
+                             "none/off (got %r)" % (value,))
+        out.append(n)
     return out
 
 
@@ -93,6 +104,11 @@ def bench_json(result, path):
 
 
 def run(cfg, log=print):
+    try:
+        requested_splits = split_prompts(cfg)
+    except ValueError as exc:
+        log("kindi bench: %s" % exc)
+        return 2
     import numpy as np
     cp = _cupy()
     from .engine import make_engine
@@ -183,7 +199,7 @@ def run(cfg, log=print):
     eng.shortlist = 0
     generated = int(cfg.get("split_generated", SPLIT_GENERATED) or 0)
     splits = {}
-    for prompt in split_prompts(cfg):
+    for prompt in requested_splits:
         if generated and prompt + generated > eng.ctx:
             log("request split at %d prompt tokens skipped: %d + %d does not fit the %d-token context"
                 % (prompt, prompt, generated, eng.ctx))
