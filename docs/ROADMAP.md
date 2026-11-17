@@ -331,6 +331,29 @@ measurement):
 | Queueing curve | 2/4/8/16 concurrent clients against one server: wait p50/p95, tokens/s, and the client count where 429 starts; states the serial-only line honestly |
 | Cold-start table | pack directory wiped, then 2B/9B/27B first load (pack write + load) and second load from the written pack, sampled peak alongside; the 27B row explains the recorded ~12 minutes |
 
+## Engine-liveness follow-ups (2026-11-17)
+
+Drawn from the 0.6.1 port (§41 of `CURRENT-VS-KINDI-0.6.md`): the MTP head's CUDA graph had not
+built since 0.5.0, the engine logged one line about it, `/health` still reported drafting as
+enabled, `kindi verify` cannot run under `KINDI_SPEC` at all, and the only way to get a speculation
+number was to start a server by hand and `curl` it. The general lesson is not "MTP"; it is that a
+documented feature can be dead while every gate stays green. Four items are accepted with their gate
+written first; the rest are parked with the measurement that would reopen them.
+
+| # | idea | verdict | where it lands |
+|---|---|---|---|
+| 1 | **The kernel-arity check covers one kernel; make it a launch-shape contract for every kernel and every graph call site** | **Adopted.** `tests/test_kernel_arity.py` proved the method on `k_rmsfold_qT` after four releases of silent breakage; the same `ast` + `.cu` parse generalizes to every `Plan.add`/`E(...)` tuple in `spec.py`, `dspine.py`, `mtp.py` and `tp.py` at CPU-only cost | [REQ-0023](development/requirements/REQ-0023.md) |
+| 2 | **Report the *effective* speculation state, not the requested one — and check the head's integrity when it loads** | **Adopted.** `server.py` `drafting()` answers `enabled: true, method: mtp` from `KINDI_SPEC` alone, so `/health` said "drafting" for four releases while nothing drafted; and `kindi/mtp_heads.json` carries `sha256`+`bytes` that no code reads, so the 60 MB weight file is loaded unverified | [REQ-0024](development/requirements/REQ-0024.md) |
+| 3 | **An exactness gate that can run *under* speculation** | **Adopted.** `spec_mode` is never set on the engine `kindi verify` builds, so no speculation mode has ever been token-compared against the reference, while `docs/MTP.md` states the output is identical. The repo's own rule (a feature that changes decoding needs a gate) is unmet for `ngram`, `draft2b`, `dspine`, `mtp` and `both` | [REQ-0025](development/requirements/REQ-0025.md) |
+| 4 | **`kindi bench --spec`: a reproducible speculation measurement** | **Adopted.** Speculation numbers today need a hand-started server and `curl`, so none of them can be a tracked `docs/benchmarks/` row or a `tools/check_claims.py` cite — including this round's 0.66x mode-A result, which therefore lives in prose only | [REQ-0026](development/requirements/REQ-0026.md) |
+| 5 | Mode-A break-even: make `auto` refuse a drafter whose measured acceptance is too low | **Parked.** The 22.5% acceptance measured here is far under break-even, but one prompt family on one card does not define the threshold; `auto`'s k policy (k=2 up to 8K) would still pick it | gate: an acceptance-vs-position sweep (512/8K/24K, two prompt families) that predicts the measured tok/s within 10% on the 2B, then `auto` uses it |
+| 6 | A cheaper guard probe (per-token rate over ~4-token windows instead of 48-token spec windows) | **Parked.** The guard cannot rescue a short reply because its first windows are spec windows — the loss is paid before it may pause (measured: 230.9-247.2 vs 236.9-239.6 tok/s with the guard forced on) | gate: lands within 5% of plain on a 400-token reply, and no worse than today's guard above 32K; rides with REQ-0026's harness |
+| 7 | **A liveness check for every documented knob** (`KINDI_*` in the generated configuration reference): setting it must change an effective setting in a test, or be listed inert with a reason | **Parked, cheapest half first.** This is the general form of the bug just fixed: a documented knob can be dead while every gate is green | gate: start with the 12 speculation/tensor-core knobs, each with a test or an "inert by design" row; then the whole reference |
+| 8 | The long-context mode-A sweep (8K/24K/32K positions) | **Parked behind #4.** `GUARD_FROM` assumes speculation pays above 32K on every card; this round only measured short replies | gate: the sweep through `kindi bench --spec`, mode A vs off per position |
+| 9 | Register this round's mode-A run as a tracked benchmark directory with claim entries | **Rides with #4**, not an item of its own: without a reproducible command a registered number would be a hand-typed one, which `docs/claims/README.md` forbids | `docs/benchmarks/<date>-<host>-mtp-mode-a/RESULTS.md` + a claims JSON once REQ-0026 exists |
+| 10 | Per-mode acceptance as `/metrics` gauges | **Folded into #2.** The counters exist (`kindi_spec_drafted_tokens_total`, `kindi_spec_accepted_tokens_total`); what is missing is the *effective mode* they belong to | REQ-0024 A2 |
+| 11 | 0.6.1 container packaging (`compose.yaml`, `docs/CONTAINERS.md`) | **Not adopted.** Deployment surface, not an engine gap; recorded as an owner decision in §41 of the comparison report | no row |
+
 ## Review follow-ups (2026-11-11)
 
 These are planned, not implemented. The review that produced them is an audit, not a support

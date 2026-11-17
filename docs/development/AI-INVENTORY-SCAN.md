@@ -32,6 +32,19 @@ Files read: `README.md`, `HERMES_CRON_TASK.md`, `docs/KINDI.md` (opening), `docs
 Nothing was adopted in this scan, so no roadmap or requirement step was created and nothing was
 implemented — which is the expected outcome of a baseline scan.
 
+## Check attempt 2026-11-17 (path unavailable)
+
+A roadmap session (the `docs/ROADMAP.md` "Engine-liveness follow-ups") asked for a scan.
+`$KINDI_AI_INVENTORY` was unset in the shell and empty in both the Windows User and Machine scopes,
+so nothing was read this time and no candidate is recorded — the previous section is still the
+whole record. The path is deliberately not written into the repository, so it has to be supplied
+per session rather than recovered from here.
+
+Gate for the next scan: set `$KINDI_AI_INVENTORY`, then follow the incremental procedure (last seen
+commit `1135eab` in that section, its HEAD since, and file mtimes newer than 2026-11-17 because its
+working tree lags its git view). The roadmap work in this round did not depend on it: the adopted
+items come from this repository's own measurements, and none of them cite the knowledge base.
+
 ## How a later scan appends
 
 Add a `## Scan <date>` section with **Last checked**, the knowledge base **HEAD**, the files read and
