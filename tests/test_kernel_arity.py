@@ -245,21 +245,30 @@ def _kernel_names(node, tables):
     return None
 
 
-def _count(node):
-    """The argument count a literal tuple expression yields, or None when it cannot be counted."""
+def _counts(node):
+    """Every argument count a literal expression can yield, or None when it cannot be counted.
+
+    A conditional tuple is not one tuple with its larger branch's length: `() if rf2 else (hp,)`
+    is either zero or one argument, and both are checked. Keeping the branches apart is what stops
+    a short branch from riding on the largest branch's count.
+    """
     if isinstance(node, (ast.Tuple, ast.List)):
-        return len(node.elts)
+        return {len(node.elts)}
     if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
-        left, right = _count(node.left), _count(node.right)
+        left, right = _counts(node.left), _counts(node.right)
         if left is None or right is None:
             return None
-        return left + right
-    if isinstance(node, ast.IfExp):                 # `() if rf2 else (hp,)`: the larger branch
-        body, other = _count(node.body), _count(node.orelse)
-        if body is None or other is None:
-            return None
-        return max(body, other)
+        return {a + b for a in left for b in right}
+    if isinstance(node, ast.IfExp):
+        body, other = _counts(node.body), _counts(node.orelse)
+        return None if body is None or other is None else body | other
     return None
+
+
+def _count(node):
+    """The largest possible count, for callers that only ask whether an expression is countable."""
+    counts = _counts(node)
+    return None if counts is None else max(counts)
 
 
 def _launch_sites(src, path):
@@ -287,10 +296,12 @@ def _launches(path):
 def _check_source(src, path, arities=None):
     """(checked, unresolved, mismatches) over one module source.
 
-    checked:    [(lineno, kernel, count, declared)]
+    checked:    [(lineno, kernel, counts, declared)] where counts is every argument count the
+                expression can take
     unresolved: [(expression, reason)]
-    mismatches: [(lineno, kernel_branch, count, declared)]; every branch must accept `count`, so a
-                union of the branches' declared counts is not enough.
+    mismatches: [(lineno, kernel_branch, count, declared)]; every kernel branch must accept every
+                argument count, so neither a union of the branches' declared counts nor the largest
+                tuple branch is enough.
     """
     arities = _kernel_arity() if arities is None else arities
     tables = _kernel_tables(src)
@@ -305,17 +316,18 @@ def _check_source(src, path, arities=None):
             unresolved.append(("%s (args)" % _norm(kernel_expr, source),
                                "kernel %s has no .cu declaration" % "+".join(sorted(missing))))
             continue
-        count = _count(args_expr)
-        if count is None:
+        counts = _counts(args_expr)
+        if counts is None:
             unresolved.append((_norm(args_expr, source), "argument count is not a literal tuple"))
             continue
         name = "+".join(sorted(names))
         declared = sorted(set().union(*(arities[n] for n in names)))
-        checked.append((node.lineno, name, count, declared))
-        for branch in sorted(names):
-            branch_declared = sorted(arities[branch])
-            if count not in arities[branch]:
-                mismatches.append((node.lineno, branch, count, branch_declared))
+        checked.append((node.lineno, name, tuple(sorted(counts)), declared))
+        for count in sorted(counts):
+            for branch in sorted(names):
+                branch_declared = sorted(arities[branch])
+                if count not in arities[branch]:
+                    mismatches.append((node.lineno, branch, count, branch_declared))
     return checked, unresolved, mismatches
 
 
@@ -394,6 +406,21 @@ def launch(self, cond):
         src, "fixture.py", {"k_six": {6}, "k_seven": {7}})
     assert not unresolved
     assert [name for _, name, _, _ in checked] == ["k_seven+k_six"]
+    assert [(name, count, declared) for _, name, count, declared in mismatches] == [
+        ("k_seven", 6, [7])]
+
+
+def test_every_argument_branch_must_match_the_kernel():
+    """A shorter tuple branch cannot ride on the largest branch's count."""
+    src = '''
+def launch(self, cond):
+    self.k = M.get_function("k_seven")
+    E(self.k, (1,), (1,), (a, b, c, d, e, f) if cond else (a, b, c, d, e, f, g))
+'''
+    checked, unresolved, mismatches = _check_source(
+        src, "fixture.py", {"k_seven": {7}})
+    assert not unresolved
+    assert [(name, counts) for _, name, counts, _ in checked] == [("k_seven", (6, 7))]
     assert [(name, count, declared) for _, name, count, declared in mismatches] == [
         ("k_seven", 6, [7])]
 
