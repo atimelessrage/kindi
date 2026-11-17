@@ -3,13 +3,14 @@
 
 `tests/test_no_secrets.py` and `tools/check_secret_baseline.py` both look at the files that
 exist now. A key that was committed and deleted afterwards survives only in history, and so
-does a machine path or an address in an old revision - and history is what a push publishes.
-This walks every commit's diff once (`git log --all -p -U0`) and reports the commit, path and
-detector for each hit; like the file scan it never prints the matched text.
+does a machine path or an address in an old revision - and history is what a push publishes. This walks every commit's message and every
+commit's diff once (`git log --all -p -U0`) and reports the commit, path and detector for each hit;
+like the file scan it never prints the matched text.
 
-Commit subjects are scanned for credential shapes only: a message that names a machine folder
-is a review question rather than a secret, and `docs/RELEASE-CHECKLIST.md` already asks for a
-human look before a release.
+Commit subjects are scanned with the same rules as file content, because a subject is content a
+push publishes: a message that names a synced folder, a home directory or an account is the same
+personal data the file scan refuses, and nothing else in the repository ever looks at it. A subject
+is one line, so it carries at most one hit per detector.
 
 History cannot be "fixed" without a rewrite, so the gate is a **count baseline**
 (`tools/secret_history_baseline.json`, one `path<TAB>detector` row with its hit count), the
@@ -44,9 +45,7 @@ DEFAULT_BASELINE = ROOT / "tools" / "secret_history_baseline.json"
 RECORD = "\x01"
 FIELD = "\x02"
 DIFF = re.compile(r"^diff --git a/(.+?) b/(.+)$")
-# Only credential shapes travel in a subject; a path or an address in a message is prose.
-SUBJECT_ONLY = ("private key", "AWS access key", "GitHub token", "OpenAI key", "Anthropic key",
-                "Slack token", "Google API key", "JWT", "secret assignment")
+
 
 
 def _git(args, repo=ROOT):
@@ -55,6 +54,25 @@ def _git(args, repo=ROOT):
     if proc.returncode != 0:
         raise SystemExit("git %s failed: %s" % (" ".join(args), (proc.stderr or "").strip()[-500:]))
     return proc.stdout
+
+
+def messages(rev_range="--all", repo=ROOT):
+    """Yield (commit, "(commit message)", detector) for every hit in a commit message.
+
+    The whole message is scanned, subject and body: `git log -p` shows only the subject in its
+    header, so a body that names a synced folder was invisible to every guard in the repository.
+    A path is a leak in a message for the same reason it is one in a file - a push publishes it.
+    """
+    args = ["log", "--no-color", "--format=%H" + FIELD + "%B" + RECORD]
+    args += rev_range.split() if isinstance(rev_range, str) else list(rev_range)
+    for record in _git(args, repo).split(RECORD):
+        record = record.strip("\n")
+        if not record.strip():
+            continue
+        commit, _, body = record.partition(FIELD)
+        for line in body.splitlines():
+            for name in hits_in_line(line):
+                yield commit, "(commit message)", name
 
 
 def scan(rev_range="--all", repo=ROOT):
@@ -68,13 +86,12 @@ def scan(rev_range="--all", repo=ROOT):
     args = ["log", "-p", "-U0", "--no-color", "--format=%s" % (RECORD + "%H" + FIELD + "%s")]
     args += rev_range.split() if isinstance(rev_range, str) else list(rev_range)
     commit, a_path, b_path = "", "", ""
+    for hit in messages(rev_range, repo):
+        yield hit
     for line in _git(args, repo).splitlines():
         if line.startswith(RECORD):
-            commit, _, subject = line[1:].partition(FIELD)
+            commit, _, _subject = line[1:].partition(FIELD)
             a_path = b_path = ""
-            for name in hits_in_line(subject):
-                if name in SUBJECT_ONLY:
-                    yield commit, "(commit message)", name
             continue
         match = DIFF.match(line)
         if match:
@@ -110,8 +127,9 @@ def read_baseline(path):
 def write_baseline(path, counts, repo=ROOT):
     payload = {
         "note": ("Legacy exposure in history, recorded so a later commit cannot add more. "
-                 "These rows are evidence dumps and old revisions that would need a history "
-                 "rewrite to remove; they are not endorsed. Review with --all-hits."),
+                 "These rows are evidence dumps, old revisions and commit messages that would "
+                 "need a history rewrite to remove; they are not endorsed. Review with "
+                 "--all-hits."),
         "head": _git(["log", "-1", "--format=%H"], repo).strip(),
         "counts": {"%s\t%s" % key: value for key, value in sorted(counts.items())},
     }

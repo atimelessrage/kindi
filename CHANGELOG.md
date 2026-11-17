@@ -98,6 +98,14 @@
 
 ### Fixed
 
+- **A commit message is now scanned like file content, so a path in one is a caught leak** — the history
+  gate read each commit's subject for credential shapes only and never read a body at all, which is
+  exactly where a path survives a push with no file left to find it in. `tools/check_secret_history.py`
+  now scans the whole message (subject and body) with the same detectors as a diff line, reporting
+  `(commit message)` and the detector, never the text. Re-recording the baseline found one such row in
+  this history: a legacy commit body names a cloud storage folder, so the baseline is 128 rows / 3,247
+  hits and that row is visible instead of invisible. Two tests pin the behaviour — an empty commit
+  whose subject carries a home path, with no file containing it, and a body carrying a drive path.
 - **`CURRENT-VS-KINDI-0.6.md` §41's delta figures were 7 commits stale, and the harness now gates
   repository figures the way it gates runs** — re-derived from the tags on 2026-11-17: the v0.6.1
   release delta (16 files, +336/−43) reproduced exactly, but "433 commits, 467 files, +67,049/−1,128,

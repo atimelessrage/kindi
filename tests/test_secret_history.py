@@ -67,6 +67,44 @@ def test_the_counting_gate_flags_a_new_row_and_passes_on_the_recorded_one(repo_w
     assert mod.differences(fewer, current) != []
 
 
+def test_a_path_in_a_commit_message_is_caught_with_no_file_change(tmp_path):
+    """A message-only leak: an empty commit whose message names a home directory.
+
+    The path is assembled from pieces so this test file carries nothing the file scan would flag -
+    the commit message is the only place the path exists.
+    """
+    mod = load()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    (repo / "notes.md").write_text("build notes\n", encoding="utf-8")
+    _git(repo, "add", "notes.md")
+    _git(repo, "commit", "-q", "-m", "notes")
+    leaked = "C:" + "/Users/" + "someone" + "/synced"
+    _git(repo, "commit", "-q", "--allow-empty", "-m", "backup from " + leaked)
+    hits = list(mod.scan("--all", repo))
+    assert any(path == "(commit message)" and name == "local home path"
+               for _commit, path, name in hits), hits
+    assert [hit for hit in hits if hit[1] != "(commit message)"] == []   # no file carries it
+    current = mod.counted("--all", repo)
+    assert current[("(commit message)", "local home path")] == 1
+
+
+def test_a_path_in_a_commit_body_is_caught_too(tmp_path):
+    mod = load()
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    (repo / "notes.md").write_text("build notes\n", encoding="utf-8")
+    _git(repo, "add", "notes.md")
+    leaked = "D:" + "\\cache\\" + "models"
+    _git(repo, "commit", "-q", "-m", "import notes", "-m", "copied from " + leaked)
+    hits = list(mod.scan("--all", repo))
+    assert any(path == "(commit message)" and name == "local drive path"
+               for _commit, path, name in hits), hits
+
+
+
 def test_the_baseline_is_counted_rows_and_carries_no_matched_text():
     payload = json.loads(BASELINE.read_text(encoding="utf-8"))
     assert payload["counts"], "the baseline has no rows"
