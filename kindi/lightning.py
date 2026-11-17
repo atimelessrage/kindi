@@ -580,12 +580,14 @@ class Engine(object):
         for L in self.layers:
             if "up" not in L:
                 continue
+            pinned = set()                 # one entry per pinned host expert, not one per matrix
             for key in ("up", "down"):
                 w = L[key]
                 per = w.cw + w.sw
-                host_experts += len(w.hwarm)
-                host_bytes += len(w.hwarm) * per
+                pinned.update(w.hwarm)
+                host_bytes += len(w.hwarm) * per      # bytes stay per matrix: up and down each have one
                 cold_bytes += len(w.hcold) * per
+            host_experts += len(pinned)
         out.update({"active": self.cold_active, "experts": self.cold_experts,
                     "cold_experts": self.cold_experts,
                     "experts_read": self.cold_read_experts,

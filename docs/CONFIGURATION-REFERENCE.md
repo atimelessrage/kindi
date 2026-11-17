@@ -189,13 +189,13 @@ variables, and are therefore not listed twice here.
 | `KINDI_LT_CHUNK` | (unset) | `kindi/lightning.py:156` |
 | `KINDI_LT_COLD` | (empty) | `kindi/cold_experts.py:40` |
 | `KINDI_LT_DCACHE` | `str(DCACHE_DEFAULT)` | `kindi/ltfit.py:22` |
-| `KINDI_LT_DGRP` | `mvdg` | `kindi/lightning.py:949` |
-| `KINDI_LT_GRAPH` | `1` | `kindi/lightning.py:1068` |
+| `KINDI_LT_DGRP` | `mvdg` | `kindi/lightning.py:951` |
+| `KINDI_LT_GRAPH` | `1` | `kindi/lightning.py:1070` |
 | `KINDI_LT_HOST_MB` | (empty) | `kindi/cold_experts.py:56` |
 | `KINDI_LT_K35` | (unset) | `kindi/lightning.py:127` |
 | `KINDI_LT_K35_EXACT` | (unset) | `kindi/lightning.py:40` |
 | `KINDI_LT_KBLAS` | `1` | `kindi/lightning.py:38` |
-| `KINDI_LT_KGRP` | `mmk32` or `mvkg` | `kindi/lightning.py:716` (+1 more) |
+| `KINDI_LT_KGRP` | `mmk32` or `mvkg` | `kindi/lightning.py:718` (+1 more) |
 | `KINDI_LT_NSPLIT` | `32` | `kindi/lightning.py:29` |
 | `KINDI_LT_NSPLIT_TC` | `64` | `kindi/lightning.py:30` |
 | `KINDI_LT_PRE6` | `"1" if self.cc >= 60 else "0"` | `kindi/lightning.py:141` |

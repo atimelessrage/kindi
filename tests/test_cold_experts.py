@@ -84,7 +84,7 @@ def test_host_budget_without_counts_keeps_the_usage_order_hot():
 
 
 def test_the_engine_reports_pinned_and_disk_bytes_without_a_gpu():
-    """`cold_stats` counts each expert's codes and scales on both sides of the split."""
+    """`cold_stats` counts a pinned host expert once, while the byte totals stay per matrix."""
     eng = lightning.Engine.__new__(lightning.Engine)
     eng.cold_reader = type("Reader", (), {"stats": lambda self: {"method": "test"}})()
     eng.cold_active = True
@@ -96,9 +96,9 @@ def test_the_engine_reports_pinned_and_disk_bytes_without_a_gpu():
                    "down": type("W", (), {"cw": 100, "sw": 20, "hwarm": (0,),
                                            "hcold": (1, 2)})()}]
     stats = eng.cold_stats()
-    assert stats["host_experts"] == 3
+    assert stats["host_experts"] == 2          # {0, 1}: unique pinned experts, not up 2 + down 1
     assert stats["cold_experts"] == 4
-    assert stats["host_bytes"] == 3 * 120
+    assert stats["host_bytes"] == 3 * 120      # up 2 + down 1, each matrix counted once
     assert stats["cold_bytes"] == 4 * 120
     assert stats["host_budget_bytes"] == 250
 
