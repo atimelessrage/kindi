@@ -523,6 +523,8 @@ def main(argv=None):
     _tandem_args(s)
     s.add_argument("--json", default=None, metavar="FILE", help="also record the numbers in a machine-readable JSON file")
     s.add_argument("--sample-vram", action="store_true", help="sample device-wide VRAM and log the peak during the run")
+    s.add_argument("--dcache", type=int, default=None, metavar="N",
+                   help="MoE decode LRU slots per layer for this run (KINDI_LT_DCACHE; default 10)")
     s.add_argument("--split-at", type=_split_at_arg, default=None, metavar="LIST",
                    help="positive prompt lengths (comma-separated) to time as one whole request and "
                         "report the prefill/decode share of wall clock (default: 4096,8192; "
@@ -618,6 +620,8 @@ def main(argv=None):
         cfg["json"] = a.json
     if getattr(a, "sample_vram", False):
         cfg["sample_vram"] = True
+    if getattr(a, "dcache", None) is not None:
+        cfg["dcache"] = a.dcache
     if getattr(a, "split_at", None) is not None:
         cfg["split_at"] = a.split_at
     if getattr(a, "split_generated", None) is not None:

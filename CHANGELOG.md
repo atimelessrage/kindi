@@ -19,11 +19,13 @@
   available RAM after the same 10% / 1 GiB headroom as the default host budget. Tests cover the env
   pair, both caps and the missing-rate/no-host-tier cases. No Lightning pack is available here, so
   this is an arithmetic candidate, not a measured cache optimum.
-- **The Lightning plan's follow-up bench command carries its planned slot count** — a rate-sized
-  `dcache` was shown in the report but the printed command let the child engine fall back to
-  `KINDI_LT_DCACHE`'s default 10. The MoE command now prefixes `KINDI_LT_DCACHE=<planned>` (also for
-  an explicit `--dcache`), and a plan test parses that value back through the engine's own
-  `ltfit.dcache_default` to prove the planned count is reproduced.
+- **`kindi bench` carries the Lightning plan's slot count as a portable flag** — a rate-sized
+  `dcache` was shown in the report but the printed follow-up prefixed `KINDI_LT_DCACHE=<planned>`,
+  which cmd.exe and PowerShell do not parse as an environment assignment and the child engine
+  therefore missed. `kindi bench` now accepts `--dcache N`, applies it as the engine's slot budget
+  for that run and restores the caller's own `KINDI_LT_DCACHE` afterwards. `kindi plan` emits
+  `... bench --dcache <planned>` (also for an explicit `--dcache`), and tests pin the flag, the
+  engine's view of it and the absence of the POSIX prefix.
 - **The kernel-arity check reaches the DSpine graph** — the checker now resolves the 31
   `kf["..."]` launches from the literal iterable that builds `self.kf`, and `self.k` /
   `self.k8 if n <= 8 else self.k16` from their `get_function(...)` assignments. The resolver now

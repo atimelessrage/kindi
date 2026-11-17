@@ -104,6 +104,22 @@ def bench_json(result, path):
 
 
 def run(cfg, log=print):
+    """Run one benchmark; an explicit `--dcache` is the engine's slot budget for this run only."""
+    dcache = cfg.get("dcache")
+    previous = os.environ.get("KINDI_LT_DCACHE")
+    if dcache is not None:
+        os.environ["KINDI_LT_DCACHE"] = str(int(dcache))
+    try:
+        return _run(cfg, log=log)
+    finally:
+        if dcache is not None:
+            if previous is None:
+                os.environ.pop("KINDI_LT_DCACHE", None)
+            else:
+                os.environ["KINDI_LT_DCACHE"] = previous
+
+
+def _run(cfg, log=print):
     try:
         requested_splits = split_prompts(cfg)
     except ValueError as exc:

@@ -188,7 +188,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_LOG_RAW` | (unset) | `kindi/lightning_gen.py:378` (+2 more) |
 | `KINDI_LT_CHUNK` | (unset) | `kindi/lightning.py:156` |
 | `KINDI_LT_COLD` | (empty) | `kindi/cold_experts.py:40` |
-| `KINDI_LT_DCACHE` | `str(DCACHE_DEFAULT)` | `kindi/ltfit.py:22` |
+| `KINDI_LT_DCACHE` | `str(DCACHE_DEFAULT)` | `kindi/bench.py:109` (+3 more) |
 | `KINDI_LT_DGRP` | `mvdg` | `kindi/lightning.py:951` |
 | `KINDI_LT_GRAPH` | `1` | `kindi/lightning.py:1070` |
 | `KINDI_LT_HOST_MB` | (empty) | `kindi/cold_experts.py:56` |
@@ -203,7 +203,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_LT_SELFCHECK` | `1` | `kindi/lightning_gen.py:241` |
 | `KINDI_LT_SM75` | (unset) | `kindi/lightning.py:144` |
 | `KINDI_LT_TC` | `1` | `kindi/lightning.py:139` |
-| `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:446` |
+| `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:450` |
 | `KINDI_MEM_RESERVE_MB` | `96` or `256` or `32` | `kindi/engine.py:306` (+4 more) |
 | `KINDI_MODEL` | (empty) | `kindi/container.py:240` |
 | `KINDI_MOE_COPY` | `0` | `kindi/dsv41.py:400` |
@@ -266,7 +266,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_TANDEM_DEBUG_TIMING` | `0` | `kindi/tandem.py:653` |
 | `KINDI_TANDEM_GPU` | `auto` | `kindi/plan.py:184` (+2 more) |
 | `KINDI_TANDEM_RATIO` | (unset) | `kindi/tandem.py:322` |
-| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/plan.py:610` (+2 more) |
+| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/plan.py:614` (+2 more) |
 | `KINDI_TC` | `0` | `kindi/spec.py:81` (+3 more) |
 | `KINDI_TC_B2` | (empty) | `kindi/tc.py:51` |
 | `KINDI_TC_DP4A` | `0` | `kindi/tc.py:74` |

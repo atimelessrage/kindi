@@ -141,6 +141,27 @@ def test_bench_help_accepts_tandem_flags():
                          capture_output=True, text=True, timeout=30)
     assert out.returncode == 0
     assert "--tandem" in out.stdout and "--tandem-cpu-layers" in out.stdout
+    assert "--dcache" in out.stdout
+
+
+def test_bench_dcache_flag_sets_and_restores_the_engine_budget(tmp_path, monkeypatch):
+    """The flag is the portable form of KINDI_LT_DCACHE: it reaches the engine for one run and the
+    caller's environment is restored afterwards."""
+    seen = {}
+
+    class DcacheEngine(FakeEngine):
+        def __init__(self, *args, **kwargs):
+            seen["dcache"] = os.environ.get("KINDI_LT_DCACHE")
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setenv("KINDI_DEVICE", "cpu")
+    monkeypatch.setenv("KINDI_LT_DCACHE", "3")
+    monkeypatch.setattr("kindi.engine.make_engine", DcacheEngine)
+    rc = bench.run({"pack": str(tmp_path), "ctx": 1024, "fast_clusters": 256,
+                    "split_at": "none", "dcache": 7}, log=lambda *_: None)
+    assert rc == 0
+    assert seen["dcache"] == "7"
+    assert os.environ["KINDI_LT_DCACHE"] == "3"
 
 
 def test_bench_reports_the_prefill_decode_split_of_one_request(tmp_path, monkeypatch):

@@ -776,7 +776,7 @@ def make_engine(pack, ctx=4096, clusters=None, log=print, tandem="off", cpu_laye
             "layers, which does not apply. This family's CPU/GPU split is the expert-tier path inside "
             "its own engine (dense core and shared expert on the card, routed experts host-resident "
             "with last-used device slots). Tandem stays off; `kindi plan --pack %s` prints that "
-            "placement (`--dcache` sizes its report, KINDI_LT_DCACHE sizes the run)."
+            "placement (`--dcache` sizes its report; `kindi bench --dcache` or KINDI_LT_DCACHE sizes a run)."
             % (pack, family, pack))
         tandem = "off"
     if isinstance(man, dict):

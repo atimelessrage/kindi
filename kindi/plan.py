@@ -267,9 +267,13 @@ def _command(pack, mode, spec):
 
 
 def _moe_bench_command(pack, dcache):
-    """The Lightning follow-up: carry the planned slot count into the child engine."""
-    return "KINDI_LT_DCACHE=%d %s -m kindi --pack %s bench" % (
-        int(dcache), sys.executable, pack)
+    """The Lightning follow-up: carry the planned slot count into the child engine.
+
+    The count is a flag, not a POSIX ``KINDI_LT_DCACHE=...`` prefix, so the same command runs in
+    cmd.exe/PowerShell and a POSIX shell.
+    """
+    return "%s -m kindi --pack %s bench --dcache %d" % (
+        sys.executable, pack, int(dcache))
 
 
 _Q2, _Q8, _F32 = 42, 8, 0                     # lightning.py's tensor-type ids
