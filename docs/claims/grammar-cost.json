@@ -2,7 +2,7 @@
   "gate": "grammar-cost",
   "title": "Constrained decoding cost per token: unrolled GBNF vs json_schema on the 2B",
   "measured": "2026-11-17",
-  "commit": "1d7a05f",
+  "commit": "95b4c74",
   "command": "python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b; KINDI_GBNF_MAX_DEPTH=1 python -m kindi --pack ~/.kindi/packs/bonsai-2b serve --port 8102; python tools/grammar_cost_serve.py http://127.0.0.1:8102",
   "notes": "Asked for before enabling the unrolled recursive grammar. The 248,320-entry vocabulary is swept once per new automaton state, so the cost is (misses) x (sweep) and is flat in total grammar size: 1,737 states at depth 1 already costs 2,720 ms per token, and 9,483 states costs 2,820. JSON-shaped GBNF sweeps cost ~3.5 s each because their string/whitespace classes accept nearly every byte; the schema automaton rejects most tokens on the first character and sweeps in ~250 ms.",
   "evidence": [

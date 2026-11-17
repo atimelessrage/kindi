@@ -159,7 +159,7 @@
 - **`CURRENT-VS-KINDI-0.6.md` §41's delta figures were 7 commits stale, and the harness now gates
   repository figures the way it gates runs** — re-derived from the tags on 2026-11-17: the v0.6.1
   release delta (16 files, +336/−43) reproduced exactly, but "433 commits, 467 files, +67,049/−1,128,
-  578 tracked files (169 upstream)" at `d1d23f2` was measured at an earlier commit: the real values
+  578 tracked files (169 upstream)" at `f934a55` was measured at an earlier commit: the real values
   are 440 commits, 468 files, +67,156/−1,125, 579 tracked files, and 172 upstream files at v0.6.1
   (169 is v0.6.0's tree). The v0.6.0 comparison is 442 commits, 467 files, +67,420/−1,096. `v0.6.1`
   turns out to be one commit past the shared base `dce89df` and not an ancestor of the fork, which

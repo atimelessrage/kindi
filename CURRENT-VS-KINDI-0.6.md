@@ -18,7 +18,7 @@ current one. It separates verified behavior from recorded evidence,
 incomplete features, and release-hygiene problems. It is not a claim that
 everything described here has been re-run on current hardware.
 
-§4 was re-based at `6f62325` (2026-11-17): worse, missing and unverified are separate tables with a
+§4 was re-based at `fdae7f4` (2026-11-17): worse, missing and unverified are separate tables with a
 closure condition per row, and it corrects §41's claim that the fork ships no compose files -
 `compose.yaml`, `compose.amd.yaml` and `docs/CONTAINERS.md` are present from `dce89df`, and v0.6.1
 only changes their example image tags.
@@ -101,13 +101,13 @@ GPU or model paths re-ran.
 
 ## 4. What is worse, missing, or unverified vs stock 0.6.0
 
-Re-derived at `6f62325` (2026-11-17) against `v0.6.0` (`179710c` plus the post-tag `dce89df`) and
+Re-derived at `fdae7f4` (2026-11-17) against `v0.6.0` (`179710c` plus the post-tag `dce89df`) and
 `v0.6.1` (`7fececb`). The title folds three different questions together, so they are separate below;
 each row ends with what would move it, and §39–§41 hold the dated runs behind them.
 
 **The short answer.** Nothing upstream is deleted or unported: every file of `v0.6.0` is still present
 (`git diff --diff-filter=D --name-only v0.6.0..HEAD` is empty), and `v0.6.1`'s two code changes are in
-`d1d23f2`, with its version and container-tag strings deliberately not adopted until this fork has a
+`f934a55`, with its version and container-tag strings deliberately not adopted until this fork has a
 release. What remains open is **evidence**: measurements that need weights, a second card, another ISA
 or a clean Windows box. The one measured "worse" than the simpler path is mode A speculation, and it
 is off by default.
@@ -116,7 +116,7 @@ is off by default.
 
 | surface | measured here | why it stays | what would move it |
 |---|---|---|---|
-| Mode A speculation (the model's own MTP head, `KINDI_SPEC=mtp` / `KINDI_MTP_HEAD`) | **0.66x** on the 2B / RTX 4060 Ti at 24K: 361.2/363.7 tok/s plain vs 236.9/239.6 with the head, 378 of 1,680 drafted tokens accepted (22.5%); forcing the guard on from position 0 gives 230.9/247.2/246.6 | the head's graph had not built since 0.5.0 (fixed in `d1d23f2`, §41) and now that it builds it loses: the first guard windows are speculation windows, so a short reply pays the loss first | a per-model acceptance gate that stays off when acceptance is low, or a guard that reacts inside a few tokens; at `KINDI_SPEC_K=1` it measured 1.12–1.13x. `docs/MTP.md` |
+| Mode A speculation (the model's own MTP head, `KINDI_SPEC=mtp` / `KINDI_MTP_HEAD`) | **0.66x** on the 2B / RTX 4060 Ti at 24K: 361.2/363.7 tok/s plain vs 236.9/239.6 with the head, 378 of 1,680 drafted tokens accepted (22.5%); forcing the guard on from position 0 gives 230.9/247.2/246.6 | the head's graph had not built since 0.5.0 (fixed in `f934a55`, §41) and now that it builds it loses: the first guard windows are speculation windows, so a short reply pays the loss first | a per-model acceptance gate that stays off when acceptance is low, or a guard that reacts inside a few tokens; at `KINDI_SPEC_K=1` it measured 1.12–1.13x. `docs/MTP.md` |
 | Tandem CPU+GPU split on one card | 24K decode **~8 vs ~31–34 tok/s** against the equivalent full-GPU rows; step-0 is 17.6 ms/token of head plus 3.09 ms of boundary transfer, ahead of any worker thread | it is a **memory** feature: a 49,152-token request keeps all 49,152 where the unsplit plan engine reduces to 30,976 | a second card or a much faster CPU head, not a code fix (§39) |
 | 9B tandem `gdn:8` / `gdn:16` | saves **486–488 MiB** for 2.8–3.0x decode, or **872–874 MiB** for 4.5–4.6x, flat from 8K to 131,072, while full GPU already holds every request at 5,149 MiB peak | buys headroom, never context; the 27B is the only pack here that needs the split | a pack that does not fit full-GPU; otherwise no split |
 | FP8 E4M3 K/V (`KINDI_KV=fp8`) | KLD **2.48e-06** (2K) / **2.80e-06** (8K), ~9–14x q8_0, verify 3/4, same cache size as q8_0 (8.5 bits/value) | experimental opt-in, never a default | a lossless 8-bit format; keep it off otherwise |
@@ -128,7 +128,7 @@ is off by default.
 |---|---|---|---|
 | Version identity | `0.6.1` | `0.6.0` in `kindi/__init__.py`; `install.sh` pins the published v0.6.0 archive (sha256 `613f7320…`) | Settings > Apps shows 0.6.0 for a distribution installed by the published 0.6.1 `install.sh` (2026-11-17 Windows run). A fork release, not an engine change; `docs/MANUAL-HELP-NEEDED.md` §5 |
 | 0.6.1 container packaging | compose files and `docs/CONTAINERS.md` reference `0.6.1-cuda` / `0.6.1-rocm7` | the files are **present from `dce89df`**; v0.6.1's change to them is only those example tags | no 0.6.1 images exist from this fork, so pointing at them would be false; publish images with a fork release. (§41's "ships no compose files" was wrong; corrected there and here) |
-| Upstream code | `kindi/mtp.py`'s `hp` argument and `kindi/spec.py`'s graph diagnostic | both ported in `d1d23f2`; the remaining v0.6.1 changes are version strings, docs, Dockerfiles, compose and install scripts | nothing to port; no file of the `v0.6.1` tree is missing here |
+| Upstream code | `kindi/mtp.py`'s `hp` argument and `kindi/spec.py`'s graph diagnostic | both ported in `f934a55`; the remaining v0.6.1 changes are version strings, docs, Dockerfiles, compose and install scripts | nothing to port; no file of the `v0.6.1` tree is missing here |
 | Not-behind-stock absences | stock lacks them too | dense standard-attention llama/qwen engines; an image projector (an image part is an enveloped 400); the llama.cpp proxy (REQ-0019 T4.4) and real concurrency (T4.5), whose positioning is an open maintainer call (MANUAL-HELP §6); Metal | listed so "missing" is not read as "behind stock" |
 | MoE expert-cache tandem | stock had no such path | **not a backend**: `kindi/expert_cache.py` is a model-free slot/LRU prototype, with no router, pack, GPU copy path or measured inference (`docs/MOE-TANDEM.md`) | Raon-1 mini R0 reference goldens or the Gemma 4 26B contract, plus a GPU copy path; until then no support claim |
 
@@ -829,8 +829,8 @@ in `kindi/spec.py`, and one real code fix in `kindi/mtp.py`.
 
 | 0.6.1 item | our status |
 |---|---|
-| `kindi/mtp.py` passes `k_rmsfold_qT`'s `hp` argument | **we had the bug; fixed in `d1d23f2`.** `k_rmsfold_qT` took a trailing `hp` in 0.5.0; `spec.py` and `dspine.py` were updated, `mtp.py` was not. With `KINDI_TC=1` and `KINDI_MTP_HEAD` set, the head's graph failed (`cuGraphAddKernelNode failed (1)`) and the engine logged `speculation off: the MTP head ... did not load` — mode A did not run at all on the tensor-core layout for four releases, and a short argument tuple is not a Python error. Reproduced on the rig before the fix; after it: `MTP head attached: kindi-mtp-2b-v1.npz (61 MB, window 64)` |
-| `kindi/spec.py` names node, grid, block and argument count on a graph-build failure | **ported in `d1d23f2`** — that diagnostic is what makes a missing argument visible instead of `failed (1)` |
+| `kindi/mtp.py` passes `k_rmsfold_qT`'s `hp` argument | **we had the bug; fixed in `f934a55`.** `k_rmsfold_qT` took a trailing `hp` in 0.5.0; `spec.py` and `dspine.py` were updated, `mtp.py` was not. With `KINDI_TC=1` and `KINDI_MTP_HEAD` set, the head's graph failed (`cuGraphAddKernelNode failed (1)`) and the engine logged `speculation off: the MTP head ... did not load` — mode A did not run at all on the tensor-core layout for four releases, and a short argument tuple is not a Python error. Reproduced on the rig before the fix; after it: `MTP head attached: kindi-mtp-2b-v1.npz (61 MB, window 64)` |
+| `kindi/spec.py` names node, grid, block and argument count on a graph-build failure | **ported in `f934a55`** — that diagnostic is what makes a missing argument visible instead of `failed (1)` |
 | container packaging (`compose.yaml`, `compose.amd.yaml`, `docs/CONTAINERS.md`) | **already here** (from `dce89df`); the 0.6.1 delta is only the example image tags (`0.6.1-cuda` / `0.6.1-rocm7`) in `compose.yaml` and `docs/CONTAINERS.md`, which need a fork release that publishes those images. §4 is corrected accordingly; the earlier "ships no compose files" was wrong |
 | version strings now `0.6.1` upstream | ours stay `0.6.0` plus this changelog: the installer pins upstream's published artifact, so a fork version bump needs a fork release |
 
@@ -845,7 +845,7 @@ win. Details and the table: `docs/MTP.md`. The bug class is now pinned by
 every call site's argument tuple through `ast`, and dropping `hp` again fails exactly the `mtp.py`
 case.
 
-Rounds since §40 (`899a110` → `d1d23f2`):
+Rounds since §40 (`899a110` → `f934a55`):
 
 | round | commit | what it changed |
 |---|---|---|
@@ -855,16 +855,16 @@ Rounds since §40 (`899a110` → `d1d23f2`):
 | `kindi use` symlink guard | `d2b124a` | the WinError 1314 guard also covers `NotImplementedError`, and its cleanup can no longer abort the selection |
 | Coverage floors + untracked secret scan | `7eb6120` | measured floors for `engine.py` (24.3% → floor 19) and every `kindi/backends/*`; `fake.py` was below its recorded floor, so the gate was red; the file scan's untracked union is now pinned |
 | `kindi plan` decode-slot arithmetic | `174204a` | the `slots:` line runs the engine's own fit twice (`dcache=0`) instead of claiming one displaced expert per slot; 10 slots cost 20 experts per layer, 162 vs 182 experts and 86.4% vs 91.6% of measured picks |
-| External knowledge-base skill | `c89f88d` | read-only skill + scan ledger (`docs/development/AI-INVENTORY-SCAN.md`) for the local-AI base, with a stated gate before any idea becomes roadmap work |
-| Secret scans: history and synced paths | `75ae9d9`, `9cd89fe` | `tools/check_secret_history.py` gates every commit's diff against a counted baseline; a synced-folder path now counts as personal data, which removed the knowledge-base path from the tree |
-| MTP head graph (this section) | `d1d23f2` | the 0.6.1 `hp` port, its diagnostic, and the arity test |
+| External knowledge-base skill | `992d8f4` | read-only skill + scan ledger (`docs/development/AI-INVENTORY-SCAN.md`) for the local-AI base, with a stated gate before any idea becomes roadmap work |
+| Secret scans: history and synced paths | `84aecd4`, `b710b1e` | `tools/check_secret_history.py` gates every commit's diff against a counted baseline; a synced-folder path now counts as personal data, which removed the knowledge-base path from the tree |
+| MTP head graph (this section) | `f934a55` | the 0.6.1 `hp` port, its diagnostic, and the arity test |
 
-Delta against stock `v0.6.1` at `d1d23f2`: **440 commits, 468 files changed,
+Delta against stock `v0.6.1` at `f934a55`: **440 commits, 468 files changed,
 +67,156 / −1,125 lines, 579 tracked files (172 upstream)**, full suite 1059 passed / 28 skipped.
 Against `v0.6.0` the same tree is 442 commits, 467 files, +67,420 / −1,096, 579 tracked files,
 zero file deletions, 22 numbered requirements. `v0.6.1` is one commit past the shared base
-`dce89df` and is not an ancestor of the fork, so the 440 is `v0.6.1..d1d23f2` - the same as
-`dce89df..d1d23f2`. Everything in
+`dce89df` and is not an ancestor of the fork, so the 440 is `v0.6.1..f934a55` - the same as
+`dce89df..f934a55`. Everything in
 §4 that was open before this refresh is still open, with two exceptions: the
 Windows installer has now been exercised for real (one step short of a complete
 install, as recorded there), and the image-input loophole is closed.
