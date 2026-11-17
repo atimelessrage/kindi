@@ -17,6 +17,15 @@ Kinds of check (one per number, `check` field):
     {"kind": "compare","pairs": [[file_a, pointer_a, file_b, pointer_b], ...],
                        "expect_percent": 1.0}          # max relative gap, in percent
     {"kind": "text",   "file": ..., "needle": "486-488 MiB"}   # verbatim in the artifact
+    {"kind": "git",    "op": "diffstat", "revs": ["v0.6.0", "v0.6.1"], "field": "files",
+                       "expect": 16}                   # numbers about the repository itself
+
+A `git` check re-derives a figure from a revision range rather than from a file: `commits`
+(`rev-list --count a..b`), `diffstat` (`files`/`insertions`/`deletions` of `git diff --numstat`),
+`deleted` (files removed between two revisions) and `treefiles` (tracked files at one revision,
+optionally narrowed by `path` and a basename `match` glob). Its evidence is not a file but a ref:
+an evidence entry `ref:<tag-or-commit>` must resolve to a commit, so a claim on a tag cannot survive
+the tag moving or disappearing.
 
 Numbers are compared with a relative tolerance (`tolerance`, default 0.2% = the rounding the docs use).
 Artifacts must be tracked: a claim cannot rest on gitignored local output, because no future reader or
@@ -25,6 +34,7 @@ CI run can reproduce it. Gitignored runs are named in the doc text as such and s
 from __future__ import print_function
 
 import csv
+import fnmatch
 import json
 import os
 import re
@@ -114,9 +124,60 @@ def _row_value(root, spec):
     raise ClaimError("%s has no row matching %r" % (spec["file"], where))
 
 
+def _git(root, args):
+    """Run one read-only git query against the repository, rewriting a failure as a claim error."""
+    command = ["git", "-C", _root(root)] + list(args)
+    try:
+        out = subprocess.check_output(command, stderr=subprocess.STDOUT)
+    except (subprocess.CalledProcessError, OSError) as exc:
+        detail = (getattr(exc, "output", b"") or b"").decode("utf-8", "replace").strip()
+        raise ClaimError("git %s failed: %s" % (" ".join(args), detail or exc))
+    return out.decode("utf-8", "replace")
+
+
+def _git_value(root, spec):
+    """One repository figure, recomputed from the revision range the claim names."""
+    op = spec.get("op")
+    if op == "commits":
+        first, second = spec["revs"]
+        return float(_git(root, ["rev-list", "--count", "%s..%s" % (first, second)]).strip())
+    if op == "deleted":
+        first, second = spec["revs"]
+        names = _git(root, ["diff", "--diff-filter=D", "--name-only", first, second])
+        return float(len([line for line in names.splitlines() if line.strip()]))
+    if op == "diffstat":
+        first, second = spec["revs"]
+        field = spec.get("field", "files")
+        if field not in ("files", "insertions", "deletions"):
+            raise ClaimError("unknown diffstat field %r" % field)
+        counts = {"files": 0, "insertions": 0, "deletions": 0}
+        for line in _git(root, ["diff", "--numstat", first, second]).splitlines():
+            if not line.strip():
+                continue
+            parts = line.split("\t")
+            counts["files"] += 1
+            # a binary file shows "-" in both columns; it counts as a changed file, no lines
+            if len(parts) > 1 and parts[0].isdigit():
+                counts["insertions"] += int(parts[0])
+            if len(parts) > 1 and parts[1].isdigit():
+                counts["deletions"] += int(parts[1])
+        return float(counts[field])
+    if op == "treefiles":
+        args = ["ls-tree", "-r", "--name-only", spec["rev"]]
+        if spec.get("path"):
+            args += ["--", spec["path"]]
+        names = [line for line in _git(root, args).splitlines() if line.strip()]
+        if spec.get("match"):
+            names = [name for name in names if fnmatch.fnmatch(os.path.basename(name), spec["match"])]
+        return float(len(names))
+    raise ClaimError("unknown git op %r" % op)
+
+
 def run_check(root, spec):
     """Recompute one number; returns the value the artifact gives (or None for a text check)."""
     kind = spec.get("kind")
+    if kind == "git":
+        return _git_value(root, spec)
     if kind == "json":
         value = _pointer(_json(root, spec["file"]), spec["pointer"], spec["file"])
         return _number(value, "%s%s" % (spec["file"], spec["pointer"]))
@@ -206,6 +267,12 @@ def check_claim(claim, root=None, tracked=True):
         problems.append("%s: evidence is empty" % name)
 
     for rel in claim["evidence"]:
+        if rel.startswith("ref:"):
+            try:
+                _git(root, ["rev-parse", "--verify", "--quiet", rel[4:] + "^{commit}"])
+            except ClaimError:
+                problems.append("%s: evidence %s does not resolve to a commit" % (name, rel))
+            continue
         if not os.path.exists(_join(root, rel)):
             problems.append("%s: evidence %s does not exist" % (name, rel))
         elif tracked and not _tracked(root, rel):

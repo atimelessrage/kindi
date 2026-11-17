@@ -98,6 +98,16 @@
 
 ### Fixed
 
+- **`CURRENT-VS-KINDI-0.6.md` §41's delta figures were 7 commits stale, and the harness now gates
+  repository figures the way it gates runs** — re-derived from the tags on 2026-11-17: the v0.6.1
+  release delta (16 files, +336/−43) reproduced exactly, but "433 commits, 467 files, +67,049/−1,128,
+  578 tracked files (169 upstream)" at `d1d23f2` was measured at an earlier commit: the real values
+  are 440 commits, 468 files, +67,156/−1,125, 579 tracked files, and 172 upstream files at v0.6.1
+  (169 is v0.6.0's tree). The v0.6.0 comparison is 442 commits, 467 files, +67,420/−1,096. `v0.6.1`
+  turns out to be one commit past the shared base `dce89df` and not an ancestor of the fork, which
+  the section now says. `tools/check_claims.py` grows a `git` check kind (`commits`, `diffstat`,
+  `deleted`, `treefiles`) and `ref:` evidence, so all 22 of these figures - including §1's baseline -
+  are recomputed from the tags on every run: 14 gates, 75 numbers, four citations as debt.
 - **Mode A is a win at `KINDI_SPEC_K=1`, and the docs now say so instead of "keep it off"** — the
   0.66x recorded on 2026-11-17 was at the default `KINDI_SPEC_K=4`. Re-measured at depth on the 2B /
   RTX 4060 Ti with one harness (`tools/mtp_context_bench.py`: same engine, plain and mode A

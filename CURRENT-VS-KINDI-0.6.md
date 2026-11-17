@@ -38,8 +38,7 @@ ls docs/development/requirements/REQ-*.md | wc -l   # 22 numbered requirements
 The 0.6.0 merge landed on 2026-11-14 (commit `f635513`, 18 conflicted files
 over 172 diverged upstream commits) and has been carried forward since. The
 tree vs `v0.6.0` is a **strict superset**: every upstream file is present,
-and the fork adds behavior on top of it. The −993 in the shortstat are line
-deletions inside files, not file deletions (the name-only check above is
+and the fork adds behavior on top of it. The line-count drop in the shortstat is edits inside files, not file deletions (the name-only check above is
 empty).
 
 Full suite on `main` at `899a110` (this refresh): **1026 passed, 28 skipped,
@@ -777,7 +776,7 @@ fixes and record-keeping. Every row names the evidence, not the intention.
 ## 41. Stock moved to v0.6.1 — and its MTP fix was our bug too (2026-11-17)
 
 Upstream `v0.6.1` (`7fececb`, fetched 2026-11-17) landed after the §40 refresh at `899a110`. It is
-sixteen files, +336/−43: container packaging (`compose.yaml`, `compose.amd.yaml`,
+16 files, +336/−43: container packaging (`compose.yaml`, `compose.amd.yaml`,
 `docs/CONTAINERS.md`), the Docker/install docs, the 0.6.1 version strings, a graph-build diagnostic
 in `kindi/spec.py`, and one real code fix in `kindi/mtp.py`.
 
@@ -813,10 +812,12 @@ Rounds since §40 (`899a110` → `d1d23f2`):
 | Secret scans: history and synced paths | `75ae9d9`, `9cd89fe` | `tools/check_secret_history.py` gates every commit's diff against a counted baseline; a synced-folder path now counts as personal data, which removed the knowledge-base path from the tree |
 | MTP head graph (this section) | `d1d23f2` | the 0.6.1 `hp` port, its diagnostic, and the arity test |
 
-Delta against stock `v0.6.1` at `d1d23f2`: **433 commits, 467 files changed,
-+67,049 / −1,128 lines, 578 tracked files (169 upstream)**, full suite 1059 passed / 28 skipped.
-Against `v0.6.0` the same tree is 435 commits, 465 files, +67,308 / −1,094, 578 tracked files,
-zero file deletions, 22 numbered requirements. Everything in
+Delta against stock `v0.6.1` at `d1d23f2`: **440 commits, 468 files changed,
++67,156 / −1,125 lines, 579 tracked files (172 upstream)**, full suite 1059 passed / 28 skipped.
+Against `v0.6.0` the same tree is 442 commits, 467 files, +67,420 / −1,096, 579 tracked files,
+zero file deletions, 22 numbered requirements. `v0.6.1` is one commit past the shared base
+`dce89df` and is not an ancestor of the fork, so the 440 is `v0.6.1..d1d23f2` - the same as
+`dce89df..d1d23f2`. Everything in
 §4 that was open before this refresh is still open, with two exceptions: the
 Windows installer has now been exercised for real (one step short of a complete
 install, as recorded there), and the image-input loophole is closed.

@@ -1,0 +1,150 @@
+{
+  "gate": "upstream-delta",
+  "title": "The fork's delta against upstream v0.6.0 and v0.6.1, re-derived from the tags",
+  "measured": "2026-11-17",
+  "commit": "d1d23f2",
+  "command": "git rev-list --count / git diff --numstat / git diff --diff-filter=D --name-only / git ls-tree -r --name-only against tags v0.6.0 (179710c) and v0.6.1 (7fececb), at 899a110 and d1d23f2",
+  "notes": "CURRENT-VS-KINDI-0.6.md quoted these as prose typed off a terminal. Re-derived on 2026-11-17: the v0.6.0..v0.6.1 release delta and the whole §1 baseline at 899a110 reproduced exactly, but the §41 delta at d1d23f2 did not - it was 7 commits short and one file short, and its '169 upstream' was the v0.6.0 tree rather than v0.6.1's. The doc now quotes the measured values. v0.6.1 (7fececb) is one commit past the shared base dce89df and is not an ancestor of the fork, so the commit count is v0.6.1..d1d23f2 (440), the same number as dce89df..d1d23f2.",
+  "evidence": [
+    "ref:v0.6.0",
+    "ref:v0.6.1",
+    "ref:899a110",
+    "ref:d1d23f2"
+  ],
+  "numbers": [
+    {
+      "id": "v061-files",
+      "display": "16 files",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.0", "v0.6.1"], "field": "files", "expect": 16}
+    },
+    {
+      "id": "v061-insertions",
+      "display": "+336",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.0", "v0.6.1"], "field": "insertions", "expect": 336}
+    },
+    {
+      "id": "v061-deletions",
+      "display": "−43",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.0", "v0.6.1"], "field": "deletions", "expect": 43}
+    },
+    {
+      "id": "base-commits",
+      "display": "430 commits",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "commits", "revs": ["v0.6.0", "899a110"], "expect": 430}
+    },
+    {
+      "id": "base-files",
+      "display": "443 files",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.0", "899a110"], "field": "files", "expect": 443}
+    },
+    {
+      "id": "base-insertions",
+      "display": "+64,541",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.0", "899a110"], "field": "insertions", "expect": 64541}
+    },
+    {
+      "id": "base-deletions",
+      "display": "-1,094",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.0", "899a110"], "field": "deletions", "expect": 1094}
+    },
+    {
+      "id": "base-tracked",
+      "display": "556 tracked files",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "treefiles", "rev": "899a110", "expect": 556}
+    },
+    {
+      "id": "base-upstream",
+      "display": "169 upstream files",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "treefiles", "rev": "v0.6.0", "expect": 169}
+    },
+    {
+      "id": "base-requirements",
+      "display": "22 numbered requirements",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "treefiles", "rev": "899a110",
+                "path": "docs/development/requirements", "match": "REQ-*.md", "expect": 22}
+    },
+    {
+      "id": "d1-commits",
+      "display": "440 commits",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "commits", "revs": ["v0.6.1", "d1d23f2"], "expect": 440}
+    },
+    {
+      "id": "d1-files",
+      "display": "468 files changed",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.1", "d1d23f2"], "field": "files", "expect": 468}
+    },
+    {
+      "id": "d1-insertions",
+      "display": "+67,156",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.1", "d1d23f2"], "field": "insertions", "expect": 67156}
+    },
+    {
+      "id": "d1-deletions",
+      "display": "−1,125",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.1", "d1d23f2"], "field": "deletions", "expect": 1125}
+    },
+    {
+      "id": "d1-tracked",
+      "display": "579 tracked files",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "treefiles", "rev": "d1d23f2", "expect": 579}
+    },
+    {
+      "id": "v061-tracked",
+      "display": "172 upstream",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "treefiles", "rev": "v0.6.1", "expect": 172}
+    },
+    {
+      "id": "d1-vs-060-commits",
+      "display": "442 commits",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "commits", "revs": ["v0.6.0", "d1d23f2"], "expect": 442}
+    },
+    {
+      "id": "d1-vs-060-files",
+      "display": "467 files",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.0", "d1d23f2"], "field": "files", "expect": 467}
+    },
+    {
+      "id": "d1-vs-060-insertions",
+      "display": "+67,420",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.0", "d1d23f2"], "field": "insertions", "expect": 67420}
+    },
+    {
+      "id": "d1-vs-060-deletions",
+      "display": "−1,096",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.0", "d1d23f2"], "field": "deletions", "expect": 1096}
+    },
+    {
+      "id": "d1-vs-060-deleted-files",
+      "display": "zero file deletions",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "deleted", "revs": ["v0.6.0", "d1d23f2"], "expect": 0}
+    },
+    {
+      "id": "d1-requirements",
+      "display": "22 numbered requirements",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {"kind": "git", "op": "treefiles", "rev": "d1d23f2",
+                "path": "docs/development/requirements", "match": "REQ-*.md", "expect": 22}
+    }
+  ]
+}

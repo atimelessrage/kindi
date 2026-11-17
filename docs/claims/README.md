@@ -57,9 +57,15 @@ Optional: `notes`, and per number `tolerance` (relative, default `0.002`).
 | `ratio` | `a` / `b` | `a`, `b` (`{file, pointer}`), `expect` |
 | `compare` | the **largest** relative gap in percent between value pairs, which must stay under `expect` | `pairs` (`[[file_a, pointer_a, file_b, pointer_b], ...]`), `expect` |
 | `text` | nothing; the `needle` must appear verbatim in the artifact (whitespace-insensitive) | `file`, `needle` |
+| `git` | a figure from a revision range: `commits` (`rev-list --count a..b`), `diffstat` (`files`/`insertions`/`deletions`), `deleted` (files removed), `treefiles` (tracked files at one revision) | `op`, `revs` or `rev`, optional `field`/`path`/`match`, `expect` |
 
 `text` is for runs whose evidence is prose. It is the weakest kind: it proves the page still records
 the figure, not that the figure was recomputed. Prefer a JSON or CSV row when the run wrote one.
+
+`git` is for claims about the repository itself: a tag's diffstat, commits since a tag, tracked-file
+counts at a commit. There is no artifact to read - the tag is the evidence - so the claim names it in
+`evidence` as `ref:v0.6.1`, which the checker resolves to a commit; a moved or deleted tag fails as
+missing evidence. `tools/check_claims.py` gates `CURRENT-VS-KINDI-0.6.md` this way.
 
 ## Adding or changing a gate
 
@@ -77,7 +83,7 @@ file to `docs/development/AGENTS-HISTORY.md`-style history or delete it with the
 
 ## Coverage today
 
-12 gates, 45 numbers. Four citations are listed as debt in `REGISTRY.json` with the reason each one
+14 gates, 75 numbers. Four citations are listed as debt in `REGISTRY.json` with the reason each one
 cannot be claimed yet (a page that keeps the breakdown but not the cell the doc quotes, a page that
 adds provenance rather than a measurement, architecture constants, and a summary line the run's page
 never states). `python tools/check_claims.py` prints the debt count on every run, so the gap is

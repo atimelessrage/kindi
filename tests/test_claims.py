@@ -87,6 +87,10 @@ def test_repository_evidence_is_tracked():
     claims = check_claims.load_claims(ROOT)
     for claim in claims:
         for rel in claim["evidence"]:
+            if rel.startswith("ref:"):
+                # a git-derived claim rests on a tag or commit, not on a file
+                assert check_claims._git(ROOT, ["rev-parse", "--verify", rel[4:] + "^{commit}"]).strip(), rel
+                continue
             assert os.path.isfile(os.path.join(ROOT, rel.replace("/", os.sep))), rel
             assert check_claims._tracked(ROOT, rel), "%s rests on untracked %s" % (claim["gate"], rel)
 
@@ -179,3 +183,75 @@ def test_text_kind_needs_the_needle_in_the_artifact(tmp_path):
     spec["needle"] = "tc,9b,133.9"
     with pytest.raises(check_claims.ClaimError):
         check_claims.run_check(root, spec)
+
+
+
+def _git_fixture(tmp_path, doc_number="1"):
+    """A real two-commit repository, so the git kind is checked against git, not a mock."""
+    root = str(tmp_path)
+
+    def run(*args):
+        subprocess.check_call(
+            ["git", "-C", root, "-c", "user.email=t@example.invalid", "-c", "user.name=test"] + list(args),
+            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+
+    run("init", "-q")
+    _write(root, "docs/DOC.md", "The fork is %s commits ahead." % doc_number)
+    _write(root, "a.txt", "one\n")
+    run("add", "docs/DOC.md", "a.txt")
+    run("commit", "-qm", "one")
+    run("tag", "v1")
+    _write(root, "a.txt", "one\ntwo\nthree\n")
+    _write(root, "b.txt", "x\n")
+    run("add", "a.txt", "b.txt")
+    run("commit", "-qm", "two")
+    _write(root, "docs/claims/REGISTRY.json", json.dumps({"docs": ["docs/DOC.md"], "unclaimed": []}))
+    claim = {
+        "gate": "repo",
+        "title": "fixture git gate",
+        "measured": "2026-01-01",
+        "commit": "HEAD",
+        "command": "git rev-list --count v1..HEAD",
+        "evidence": ["ref:v1"],
+        "numbers": [{
+            "id": "ahead", "display": doc_number + " commits", "quoted_in": ["docs/DOC.md"],
+            "check": {"kind": "git", "op": "commits", "revs": ["v1", "HEAD"], "expect": 1},
+        }],
+    }
+    _write(root, "docs/claims/repo.json", json.dumps(claim, indent=1))
+    return root
+
+
+def test_git_kind_recomputes_from_a_revision_range(tmp_path):
+    root = _git_fixture(tmp_path)
+    assert check_claims.run_check(root, {"kind": "git", "op": "commits", "revs": ["v1", "HEAD"]}) == 1.0
+    assert check_claims.run_check(root, {"kind": "git", "op": "diffstat", "revs": ["v1", "HEAD"],
+                                         "field": "files"}) == 2.0
+    assert check_claims.run_check(root, {"kind": "git", "op": "diffstat", "revs": ["v1", "HEAD"],
+                                         "field": "insertions"}) == 3.0
+    assert check_claims.run_check(root, {"kind": "git", "op": "diffstat", "revs": ["v1", "HEAD"],
+                                         "field": "deletions"}) == 0.0
+    assert check_claims.run_check(root, {"kind": "git", "op": "treefiles", "rev": "HEAD",
+                                         "path": ".", "match": "*.txt"}) == 2.0
+    assert check_claims.run_check(root, {"kind": "git", "op": "deleted", "revs": ["v1", "HEAD"]}) == 0.0
+
+
+def test_a_git_claim_passes_and_a_wrong_expectation_fails(tmp_path):
+    root = _git_fixture(tmp_path)
+    assert _problems(root) == []
+    claim_path = os.path.join(root, "docs", "claims", "repo.json")
+    claim = json.load(open(claim_path, encoding="utf-8"))
+    claim["numbers"][0]["check"]["expect"] = 2
+    _write(root, "docs/claims/repo.json", json.dumps(claim, indent=1))
+    problems = _problems(root)
+    assert any("artifact says" in p for p in problems), problems
+
+
+def test_ref_evidence_must_resolve_to_a_commit(tmp_path):
+    root = _git_fixture(tmp_path)
+    claim_path = os.path.join(root, "docs", "claims", "repo.json")
+    claim = json.load(open(claim_path, encoding="utf-8"))
+    claim["evidence"] = ["ref:nope-not-a-tag"]
+    _write(root, "docs/claims/repo.json", json.dumps(claim, indent=1))
+    problems = _problems(root)
+    assert any("does not resolve to a commit" in p for p in problems), problems
