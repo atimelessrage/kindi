@@ -147,6 +147,10 @@
 
 ### Fixed
 
+- **`kindi io --skip` rejects unknown probe names** — a misspelled name used to match nothing,
+  so every probe ran, including the disk probe the user had asked to skip. The names are now
+  validated before any probe starts; an unknown one exits 2 and prints the valid set (`ram`,
+  `disk`, `pcie`). Pinned by `tests/test_io_probe.py`.
 - **`kindi plan`'s `slots:` line now prices the decode slots in the weighted branch** — once usage
   counts exist the line reported only the served share, so the slots' cost was invisible exactly
   where the plan had already paid it. It now runs the same usage-weighted placement twice, once with

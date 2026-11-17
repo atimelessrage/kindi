@@ -55,6 +55,20 @@ def test_render_names_the_method_and_the_boundary():
     assert "no other engine's rate is ours" in text
 
 
+def test_unknown_skip_name_is_rejected_before_any_probe(capsys, monkeypatch):
+    def fail(*args, **kwargs):
+        raise AssertionError("a probe ran despite an invalid --skip name")
+
+    monkeypatch.setattr(io_probe, "ram_copy", fail)
+    monkeypatch.setattr(io_probe, "disk_read", fail)
+    monkeypatch.setattr(io_probe, "pcie_copy", fail)
+    assert io_probe.main(["--mib", "4", "--skip", "ram,diskk", "--json"]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "unknown probe: diskk" in captured.err
+    assert "valid probes: ram, disk, pcie" in captured.err
+
+
 def test_cli_json_is_machine_readable(capsys):
     assert io_probe.main(["--mib", "4", "--skip", "disk,pcie", "--json"]) == 0
     report = json.loads(capsys.readouterr().out)

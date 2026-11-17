@@ -95,7 +95,8 @@ kindi io --mib 64 --json       # the same report as data
 kindi io --skip disk,pcie      # only the host copy rate
 ```
 
-Every plan that moves experts between tiers has to assume three rates: the host memcpy into a
+`--skip` accepts only `ram`, `disk` and `pcie`; a misspelled name exits 2 with that set instead of
+running the probe. Every plan that moves experts between tiers has to assume three rates: the host memcpy into a
 staging buffer, the disk for an expert that is not in RAM, and PCIe for a host expert copied into a
 device slot. `kindi io` measures them on this machine. The disk probe writes a temporary file and
 reads it **unbuffered** (`O_DIRECT` on Linux, `FILE_FLAG_NO_BUFFERING` on Windows), because a

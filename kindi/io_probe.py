@@ -23,10 +23,27 @@ import time
 
 DEFAULT_MIB = 128
 DISK_CHUNK = 4 * 2 ** 20          # O_DIRECT/NO_BUFFERING reads need a block-aligned chunk
+VALID_PROBES = ("ram", "disk", "pcie")
 
 
 def _bytes(mib):
     return max(1, int(mib)) * 2 ** 20
+
+
+def _skip_names(skip):
+    """Validate `--skip` names before any probe starts."""
+    if isinstance(skip, str):
+        skip = skip.split(",")
+    names = {str(name).strip() for name in (skip or ())}
+    names.discard("")
+    unknown = sorted(names - set(VALID_PROBES))
+    if unknown:
+        raise ValueError("unknown probe%s: %s (valid probes: %s)" % (
+            "" if len(unknown) == 1 else "s",
+            ", ".join(unknown),
+            ", ".join(VALID_PROBES),
+        ))
+    return names
 
 
 def _median(values):
@@ -207,11 +224,11 @@ def pcie_copy(mib=64, repeats=5):
     finally:
         if dev is not None:
             rt.free(dev)
-        host = None                                # the pinned pool owns it, as in the engine
+        # the pinned pool owns host, as in the engine
 
 
 def probe(mib=DEFAULT_MIB, disk_dir=None, skip=()):
-    skip = set(skip or ())
+    skip = _skip_names(skip)
     out = {}
     out["ram"] = {"available": False, "reason": "skipped"} if "ram" in skip else ram_copy(mib)
     out["disk"] = ({"available": False, "reason": "skipped"} if "disk" in skip
@@ -256,7 +273,11 @@ def render(report):
 
 def run(mib=DEFAULT_MIB, disk_dir=None, skip="", as_json=False):
     skip = [s.strip() for s in str(skip or "").split(",") if s.strip()]
-    report = probe(mib=mib, disk_dir=disk_dir, skip=skip)
+    try:
+        report = probe(mib=mib, disk_dir=disk_dir, skip=skip)
+    except ValueError as exc:
+        print("kindi io: %s" % exc, file=sys.stderr)
+        return 2
     if as_json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
