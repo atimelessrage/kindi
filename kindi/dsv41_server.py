@@ -375,7 +375,7 @@ class Engine(object):
         self.slot_keys = []                             # RAM slots (--slots), the oldest first
         self.state = {"busy": False}
         self.last = {}
-        self.cal = tuple(float(x) for x in a.cal.split(","))
+        self.cal = a.cal
         self.reqdir = os.path.join(a.cache_dir, "last-requests") if a.cache_dir else None
         self._turn_file = None                          # (tokens, path, key) of the last turn saved (after_turn)
 
@@ -1183,10 +1183,12 @@ def main(argv=None):
     ap.add_argument("model")
     ap.add_argument("--host", default="0.0.0.0")
     ap.add_argument("--port", type=int, default=8101)
-    ap.add_argument("--ctx", type=int, default=32768)
+    ap.add_argument("--ctx", type=dsv41._positive_int, default=32768,
+                    help="context length in tokens (a positive integer; default: 32768)")
     ap.add_argument("--tmax", type=int, default=512)
     ap.add_argument("--dspark", default=None, help="DSpark drafter directory (converted by kindi.dsv41_dspark)")
-    ap.add_argument("--cal", default="1,0", help="DSpark draft length calibration a,b")
+    ap.add_argument("--cal", type=dsv41._cal_arg, default=(1.0, 0.0),
+                    help="DSpark draft length calibration: two comma-separated finite numbers, a,b")
     ap.add_argument("--encoding", default=None,
                     help="DeepSeek-V4.1 encoding.py (encoding/encoding.py of the model release; default: "
                          "$KINDI_DSV_ENCODING, else encoding.py in the --dspark directory or next to the model)")

@@ -96,7 +96,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_ATT_TC` | `0` | `kindi/chunk.py:442` (+1 more) |
 | `KINDI_BACKEND_MODULES` | (empty) | `kindi/backends/__init__.py:56` (+1 more) |
 | `KINDI_BATCH` | `4` | `kindi/spec.py:1929` (+1 more) |
-| `KINDI_BENCH_ATTN` | (unset) | `kindi/dsv41.py:1157` |
+| `KINDI_BENCH_ATTN` | (unset) | `kindi/dsv41.py:1202` |
 | `KINDI_BLOCKING_SYNC` | `1` | `kindi/chunk.py:474` (+7 more) |
 | `KINDI_CACHE_TIMING` | (unset) | `kindi/cache.py:1141` |
 | `KINDI_CALIB_DIR` | (unset) | `kindi/calib.py:31` |
@@ -114,7 +114,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_CONFIG` | (unset) | `kindi/config.py:120` (+1 more) |
 | `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:211` (+4 more) |
 | `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:410` (+1 more) |
-| `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:46` |
+| `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:47` |
 | `KINDI_D1` | `1` or `0` | `kindi/spec.py:726` (+1 more) |
 | `KINDI_DATA` | `/data` | `kindi/container.py:243` |
 | `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:745` |
@@ -126,22 +126,22 @@ variables, and are therefore not listed twice here.
 | `KINDI_DSPINE_K` | `str(_dsp.BLOCK - 1)` | `kindi/spec.py:1337` |
 | `KINDI_DSPINE_MB` | `1400` | `kindi/dspine.py:52` |
 | `KINDI_DSPINE_NARROW` | (unset) | `kindi/dspine.py:160` |
-| `KINDI_DSV_CPUS0` | (unset) | `kindi/dsv41.py:348` |
-| `KINDI_DSV_CPUS1` | (unset) | `kindi/dsv41.py:349` |
+| `KINDI_DSV_CPUS0` | (unset) | `kindi/dsv41.py:392` |
+| `KINDI_DSV_CPUS1` | (unset) | `kindi/dsv41.py:393` |
 | `KINDI_DSV_ENCODING` | (unset) | `kindi/dsv41_server.py:194` |
-| `KINDI_DSV_GATE` | `os.path.expanduser("~/.cache/kindi/dsv41-gate")` | `kindi/dsv41.py:823` |
-| `KINDI_DSV_GPU` | `0` | `kindi/dsv41.py:164` (+1 more) |
-| `KINDI_DSV_GPU2` | `1` | `kindi/dsv41.py:166` |
-| `KINDI_DSV_GPU2_DEVS` | (unset) | `kindi/dsv41.py:87` (+1 more) |
-| `KINDI_DSV_GPU2_LIBS` | (unset) | `kindi/dsv41.py:167` (+1 more) |
-| `KINDI_DSV_GPU_LIB` | (unset) | `kindi/dsv41.py:164` (+1 more) |
-| `KINDI_DSV_PLACE` | `same` | `kindi/dsv41.py:345` |
-| `KINDI_DSV_SHARE0` | `0.667` | `kindi/dsv41.py:351` |
-| `KINDI_DSV_SNAP_DIR` | `/dev/shm/kindi-dsv41` | `kindi/dsv41.py:408` |
-| `KINDI_DS_LOG` | (unset) | `kindi/dsv41.py:1033` (+1 more) |
-| `KINDI_DS_NGRAM` | (unset) | `kindi/dsv41.py:598` |
-| `KINDI_DS_STATS` | `0` | `kindi/dsv41.py:599` (+1 more) |
-| `KINDI_DS_UNION` | `1` | `kindi/dsv41.py:586` |
+| `KINDI_DSV_GATE` | `os.path.expanduser("~/.cache/kindi/dsv41-gate")` | `kindi/dsv41.py:867` |
+| `KINDI_DSV_GPU` | `0` | `kindi/dsv41.py:165` (+1 more) |
+| `KINDI_DSV_GPU2` | `1` | `kindi/dsv41.py:167` |
+| `KINDI_DSV_GPU2_DEVS` | (unset) | `kindi/dsv41.py:88` (+1 more) |
+| `KINDI_DSV_GPU2_LIBS` | (unset) | `kindi/dsv41.py:168` (+1 more) |
+| `KINDI_DSV_GPU_LIB` | (unset) | `kindi/dsv41.py:165` (+1 more) |
+| `KINDI_DSV_PLACE` | `same` | `kindi/dsv41.py:389` |
+| `KINDI_DSV_SHARE0` | `0.667` | `kindi/dsv41.py:395` |
+| `KINDI_DSV_SNAP_DIR` | `/dev/shm/kindi-dsv41` | `kindi/dsv41.py:452` |
+| `KINDI_DS_LOG` | (unset) | `kindi/dsv41.py:1078` (+1 more) |
+| `KINDI_DS_NGRAM` | (unset) | `kindi/dsv41.py:642` |
+| `KINDI_DS_STATS` | `0` | `kindi/dsv41.py:643` (+1 more) |
+| `KINDI_DS_UNION` | `1` | `kindi/dsv41.py:630` |
 | `KINDI_FD` | `0` | `kindi/spec.py:171` (+6 more) |
 | `KINDI_FD_CH` | (empty) or `str(FD_CH)` | `kindi/spec.py:133` (+1 more) |
 | `KINDI_FF` | (empty) or `1` | `kindi/spec.py:179` (+1 more) |
@@ -206,12 +206,12 @@ variables, and are therefore not listed twice here.
 | `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:446` |
 | `KINDI_MEM_RESERVE_MB` | `96` or `256` or `32` | `kindi/engine.py:306` (+4 more) |
 | `KINDI_MODEL` | (empty) | `kindi/container.py:240` |
-| `KINDI_MOE_COPY` | `0` | `kindi/dsv41.py:356` |
-| `KINDI_MOE_CPUS0` | `0-19` | `kindi/dsv41.py:124` (+2 more) |
-| `KINDI_MOE_CPUS1` | `20-23,32-39` | `kindi/dsv41.py:124` (+2 more) |
-| `KINDI_MOE_DROP_CACHE` | `1` | `kindi/dsv41.py:362` |
-| `KINDI_MOE_IDLE` | `1` | `kindi/dsv41.py:347` |
-| `KINDI_MOE_SHARE0` | `0.667` | `kindi/dsv41.py:350` (+2 more) |
+| `KINDI_MOE_COPY` | `0` | `kindi/dsv41.py:400` |
+| `KINDI_MOE_CPUS0` | `0-19` | `kindi/dsv41.py:125` (+2 more) |
+| `KINDI_MOE_CPUS1` | `20-23,32-39` | `kindi/dsv41.py:125` (+2 more) |
+| `KINDI_MOE_DROP_CACHE` | `1` | `kindi/dsv41.py:406` |
+| `KINDI_MOE_IDLE` | `1` | `kindi/dsv41.py:391` |
+| `KINDI_MOE_SHARE0` | `0.667` | `kindi/dsv41.py:394` (+2 more) |
 | `KINDI_MOE_WEIGHTED` | `1` | `kindi/lightning.py:280` (+2 more) |
 | `KINDI_MTP_HEAD_ALLOW_UNREGISTERED` | `0` | `kindi/mtp_heads.py:50` |
 | `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:665` |
@@ -236,12 +236,12 @@ variables, and are therefore not listed twice here.
 | `KINDI_NB_TC` | `1` | `kindi/nanbeige.py:293` |
 | `KINDI_NB_TSPLIT` | `0` | `kindi/nanbeige.py:1067` |
 | `KINDI_NB_TWARPS` | `24` | `kindi/nanbeige.py:1066` |
-| `KINDI_NVCC` | `/usr/local/cuda/bin/nvcc` | `kindi/dsv41.py:52` |
-| `KINDI_NVCC2` | `/usr/local/cuda-12.4/bin/nvcc` | `kindi/dsv41.py:92` |
+| `KINDI_NVCC` | `/usr/local/cuda/bin/nvcc` | `kindi/dsv41.py:53` |
+| `KINDI_NVCC2` | `/usr/local/cuda-12.4/bin/nvcc` | `kindi/dsv41.py:93` |
 | `KINDI_P100_FP16_PROMPT` | (empty) | `kindi/chunk.py:95` |
 | `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:973` (+1 more) |
 | `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:974` |
-| `KINDI_PIPE` | `1` | `kindi/dsv41.py:443` |
+| `KINDI_PIPE` | `1` | `kindi/dsv41.py:487` |
 | `KINDI_PROMPT_CACHE` | `1` | `kindi/cache.py:766` (+1 more) |
 | `KINDI_Q8X2` | `1` | `kindi/chunk.py:272` |
 | `KINDI_SAMPLER_ORDER` | `llama` | `kindi/sampling.py:19` |

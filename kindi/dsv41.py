@@ -20,6 +20,7 @@ import ctypes
 import glob
 import hashlib
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -218,6 +219,49 @@ def lib():
         L.dsv_dspark_draft.restype = I
         _lib = L
     return _lib
+
+
+def _positive_int(text):
+    """A single positive integer, rejected at argparse time with its valid set."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = 0
+    if value <= 0:
+        raise argparse.ArgumentTypeError("context must be a positive integer (got %r)" % (text,))
+    return value
+
+
+def _ctx_arg(text):
+    """Context sizes: one or more comma-separated positive integers (e.g. 2048,8192)."""
+    parts = [part.strip() for part in str(text).split(",")]
+    try:
+        if not parts or any(not part for part in parts):
+            raise ValueError
+        values = [int(part) for part in parts]
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            "context sizes must be comma-separated positive integers, e.g. 2048,8192 (got %r)" % (text,))
+    if any(value <= 0 for value in values):
+        raise argparse.ArgumentTypeError(
+            "context sizes must be comma-separated positive integers, e.g. 2048,8192 (got %r)" % (text,))
+    return values
+
+
+def _cal_arg(text):
+    """A calibration pair a,b: exactly two comma-separated finite numbers."""
+    parts = [part.strip() for part in str(text).split(",")]
+    try:
+        if len(parts) != 2 or any(not part for part in parts):
+            raise ValueError
+        values = tuple(float(part) for part in parts)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            "calibration must be two comma-separated finite numbers: a,b (got %r)" % (text,))
+    if not all(math.isfinite(value) for value in values):
+        raise argparse.ArgumentTypeError(
+            "calibration must be two comma-separated finite numbers: a,b (got %r)" % (text,))
+    return values
 
 
 def _cpus(text):
@@ -892,15 +936,16 @@ def main(argv=None):
     ap.add_argument("--spec", type=int, default=4, help="specbench: positions per verify step (1 + drafts)")
     ap.add_argument("--dspark", default=None, help="specbench: DSpark drafter directory (converted)")
     ap.add_argument("--conf", type=float, default=0.0, help="specbench --dspark: draft while confidence logit >= this")
-    ap.add_argument("--auto", default=None, help="specbench --dspark: choose k by expected tokens per ms; "
-                    "calibration a,b of p = sigmoid(a * conf + b)")
+    ap.add_argument("--auto", type=_cal_arg, default=None, help="specbench --dspark: choose k by expected tokens per ms; "
+                    "calibration a,b (two finite comma-separated numbers) of p = sigmoid(a * conf + b)")
     ap.add_argument("model")
     ap.add_argument("--prompt", default="")
     ap.add_argument("--system", default=None)
     ap.add_argument("--chat", action="store_true", help="wrap the prompt in the chat format")
     ap.add_argument("--think", action="store_true")
     ap.add_argument("-n", type=int, default=64)
-    ap.add_argument("--ctx", default="8192")
+    ap.add_argument("--ctx", type=_ctx_arg, default=[8192],
+                    help="context length(s): comma-separated positive integers (default: 8192)")
     ap.add_argument("--tmax", type=int, default=64)
     ap.add_argument("--gen", type=int, default=32)
     ap.add_argument("--prompts", default=None)
@@ -917,7 +962,7 @@ def main(argv=None):
     ap.add_argument("--rowsplit", action="store_true", help="numa: each expert's first rows on node 0, the rest on node 1 "
                     "(the rows each node's threads compute; share KINDI_MOE_SHARE0)")
     a = ap.parse_args(argv)
-    ctxs = [int(x) for x in a.ctx.split(",")]
+    ctxs = a.ctx
     if a.cmd == "numa":
         # make room on NUMA node 1 for the node-bound dense weights: move page-cache pages of the model (largest
         # shard first) to node 0, until node 1 has --free1 GB free
@@ -1029,7 +1074,7 @@ def main(argv=None):
             if a.dspark:
                 g2, _, d2 = model.generate_dspark(ids, a.n, conf_min=a.conf, kmax=a.spec, stop_eos=False, stats=st,
                                                   auto=a.auto is not None,
-                                                  cal=tuple(float(x) for x in (a.auto or "1,0").split(",")))
+                                                  cal=a.auto if a.auto is not None else (1.0, 0.0))
                 if os.environ.get("KINDI_DS_LOG"):
                     with open(os.environ["KINDI_DS_LOG"], "a") as fl:
                         fl.write(json.dumps({"id": j["id"], "conf_acc": st.get("conf_log", [])}) + chr(10))

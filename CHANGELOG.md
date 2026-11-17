@@ -163,6 +163,13 @@
 
 ### Fixed
 
+- **The standalone DSV4.1 CLIs reject malformed comma values at argparse time** —
+  `python -m kindi.dsv41 --ctx` requires one or more positive integers (e.g. `2048,8192`), its
+  `--auto` and the server's `--cal` require exactly two finite `a,b` numbers, and the server's
+  `--ctx` requires a positive integer. `--ctx` used to be converted after parsing (a bare
+  `ValueError`), and the calibration pairs were split into floats when the engine started; all four
+  now exit 2 before a model or native library is touched, naming the valid set. `tests/test_dsv41_cli.py`
+  pins the parsers and both CLI rejection paths.
 - **The 27B median evidence no longer carries machine paths** — the three tracked median JSONs
   kept the local Python path and the `~/.kindi` pack/head paths from their run commands. They now
   record `<python>/python.exe` and `~/.kindi/...`, and the history baseline records the seven
