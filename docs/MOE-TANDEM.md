@@ -1,7 +1,8 @@
 # MoE expert-cache tandem path
 
 Status: **design plus a model-free cache prototype; Raon-1 mini R0 and a Gemma 4 26B-A4B
-adaptation recorded, 2026-11-12. **The MoE placement strategy has its first runnable surface:
+adaptation recorded, 2026-11-12; the Lightning cold-expert reader started 2026-11-17 behind
+`KINDI_LT_COLD=1`, gate open.** The MoE placement strategy has its first runnable surface:
 `kindi plan` on a `kindi_lightning` pack reports the expert-tier strategy (dense core + shared
 expert on the card, routed experts tiered card / pinned host / mmap, last-used decode slots) from
 the GGUF header and the engine's own fit arithmetic, with one reason per choice and the actual
@@ -70,6 +71,16 @@ On a `kindi_lightning` pack the report also measures the host's RAM/disk/PCIe ra
 probes as `kindi io`, sizes the decode slots from the measured refill path, and prints the three
 rates in a `rates:` line and in the slot explanation. The slot count is a prediction; the
 Lightning-pack comparison remains the gate.
+
+On a `kindi_lightning` pack the opt-in cold tier is now a real file path, not only a plan: with
+`KINDI_LT_COLD=1`, every host expert is read from the pack instead of pinned at load. A prompt
+stages a layer's host block through a pinned host buffer, and a decode step fetches only the
+routed cold experts whose slots are not already warm. `kindi/cold_experts.py` performs the
+unbuffered aligned read and coalesces neighbouring ranges into one read-ahead window; each read is
+accounted as requested expert bytes versus bytes actually transferred. The engine disables the
+decode CUDA graph while this tier is active, because a cold miss needs a host read after the
+router. Warm slots take no file read and no page fault. This is a start, not a gate result: no
+larger-than-RAM pack, no tok/s and no GPU run are claimed.
 
 `kindi plan` can show that plan before a backend exists: on a `kindi_lightning` pack,
 `--moe-chunk N` (with `--usage`, `--moe-cache-mib` and `--dcache` as usual) builds the placement,
@@ -321,9 +332,11 @@ Key: `(layer, expert_id)`. Value: complete expert tensors and scales, never a pa
 - **Minimum cache** is backend-scoped. A Raon token-level plan must hold all selected experts plus
   the shared expert; a Gemma 4 layer-level plan needs eight cache slots plus a transient slot. If
   the minimum cannot fit, the model is not offered on that GPU.
-- **Host side** keeps the whole expert set resident and memory-mapped. A bounded pinned staging
-  area holds one or a few expert tensors; decode must not fault expert weights from disk. `mlock`
-  is optional and must not be assumed.
+- **Host side** keeps the whole expert set resident and memory-mapped by default. A bounded pinned
+  staging area holds one or a few expert tensors; decode must not fault expert weights from disk.
+  `mlock` is optional and must not be assumed. The opt-in cold tier replaces the pinned host copy
+  with `kindi/cold_experts.py`'s explicit unbuffered reads; warm decode slots never read the file,
+  and a cold miss is a scheduled read, not an mmap/page fault.
 - **Accounting** includes tensor bytes, scales and alignment. A cache hit rate without bytes and
   slot count is not a useful metric.
 
@@ -374,6 +387,7 @@ Implemented, model-free:
 | `kindi/moe_tandem.py` | one execution unit's expert split over the cache and a placement: `card` / `copy` / `cpu` lanes, opt-in CPU lane with a deterministic `cpu_share` throttle, router or expert-id combine order kept separate from scheduling, plan metrics; no tensors, copies or kernels |
 | `kindi/plan.py` | `kindi plan` on a `kindi_lightning` pack: expert tiers, the decode-slot trade, and with `--moe-chunk N` what `MoeTandem` would do for an N-token sample prompt chunk (lane split, distinct copies, copy bytes) from the header and `--usage`; no weights read, no bytes moved |
 | `kindi/expert_chunk.py` | multi-token prefill planner over the cache: deduped copy list in first-need order, hit/coalesced/miss report, chunk rollback when a token does not fit; no tensors or engine wiring |
+| `kindi/cold_experts.py` | opt-in Lightning host tier: aligned unbuffered reads, read-ahead merge, Q2_0 de-interleave and requested/transferred byte accounting; no VRAM allocation or kernel |
 | `tests/test_moe_cache.py` | synthetic-slot tests for transitions, eviction, pinning, transient slots, failed copies and metrics |
 | `tests/test_moe_cache_properties.py` | 32 seeded randomized route/acquire traces; checks capacity, pin ownership, slot states, atomic rejects and metrics after every operation |
 
@@ -413,7 +427,9 @@ Expose at least:
 `kindi/expert_cache.py` exposes the model-free subset now: plans, selected keys, hits, misses,
 coalesced loads, evictions, cache/transient admissions, copy bytes, pins, rejects and slot-state
 counts. It does no copy or compute, so it cannot provide H2D wait, CPU/GPU seconds, VRAM/RSS or
-disk counters; the backend must add those before operational metrics are complete.
+disk counters; the backend must add those before operational metrics are complete. The Lightning
+cold path exposes `Engine.cold_stats()`: requested bytes, transferred bytes, read-ahead bytes,
+reads, method and the number of cold experts; it makes no throughput claim.
 
 `/health` must report the fitted cache and the mode (`copy` or parity-passed `cpu`). `/metrics` must
 carry counters. A cache error, failed copy, partial expert or parity failure is a hard error, not a
@@ -439,7 +455,8 @@ slot cache with H2D promotion; run cold, warm, forced-eviction and reload prompt
 GPU expert kernel.
 
 **Gate:** 4/4 greedy prompts token-exact at 1K-2K for every cache state; no OOM; no partial expert;
-no disk read during decode.
+no disk read during decode (the default pinned path). The opt-in `KINDI_LT_COLD=1` path instead
+does scheduled cold reads; its warm-slot rows must show no file read and no page fault.
 
 ### M2 — CPU miss lane, parity-gated
 
@@ -532,7 +549,9 @@ The 16 GB row is a comparison, not a separate backend.
 - It does not add a model or backend; `kindi/expert_cache.py` is a standalone state machine with no
   tensor copy, GPU allocation or inference path.
 - It does not add a converter, pack, catalog entry, installer offer or support-matrix row.
-- It does not claim a cache hit rate, tokens/s, VRAM figure or host-RAM figure.
+- It does not claim a cache hit rate, tokens/s, VRAM figure or host-RAM figure, and the new
+  cold-expert reader does not claim a larger-than-RAM speedup: that gate still needs a Lightning
+  pack larger than RAM, `kindi verify` 4/4 and a recorded comparison against the mmap-fault path.
 - It does not claim that CPU miss compute is exact; only the `copy` lane is the first exact design.
 - It does not change the dense `TandemEngine` or its joint prompt cache: the tandem only gained the
   refusal described in §1, which rejects a non-dense manifest before any backend is built.

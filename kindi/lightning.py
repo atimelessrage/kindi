@@ -17,6 +17,7 @@ import time
 import numpy as np
 
 from . import ltfit
+from .cold_experts import ColdExpertReader, cold_enabled, cold_misses, split_q2
 from .gguf import GGUF
 from .moe import MoESpec, Usage, plan
 from .nanbeige import _capture, _free_bytes, module
@@ -103,6 +104,12 @@ class Engine(object):
         g = GGUF(path)
         self.g, self.s = g, Spec(g)
         s = self.s
+        # Off by default: host experts stay pinned. With KINDI_LT_COLD=1 the host tier is read from
+        # the pack on demand instead; see `_cold_setup` / `_cold_prepare`.
+        self.cold_reader = ColdExpertReader(path, read_ahead=1, log=log) if cold_enabled() else None
+        self.cold_active = False
+        self.cold_experts = 0          # host experts in the file-backed tier
+        self.cold_read_experts = 0     # decode misses actually fetched
         self.tinfo = {n: (ne, ty, off) for n, ne, ty, off in g.tensors}
         f = open(path, "rb")
         self.mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
@@ -179,8 +186,9 @@ class Engine(object):
                     % (str(e).split("(")[0].strip(), self.extra_mb))
         self.graph = None
         self.pos = 0
-        log("loaded %s on device %d (sm_%d) in %.1f s: ctx %d, experts on the card %d of %d per layer" % (
-            os.path.basename(path), self.dev.id, self.cc, time.time() - t0, self.ctx, self.n_card, s.n_exp))
+        log("loaded %s on device %d (sm_%d) in %.1f s: ctx %d, experts on the card %d of %d per layer%s" % (
+            os.path.basename(path), self.dev.id, self.cc, time.time() - t0, self.ctx, self.n_card, s.n_exp,
+            ", cold host tier %d experts" % self.cold_experts if self.cold_active else ""))
 
     # ------------------------------------------------------------------ loading
     def _raw(self, name):
@@ -275,12 +283,13 @@ class Engine(object):
             return {int(k): v for k, v in json.load(open(p))["order"].items()}
         return {}
 
-    def _q2(self, name, host_rows=None):
-        """upload a Q2_0 tensor: codes and scales; for an expert stack, the experts listed in host_rows go to pinned
-        host memory"""
+    def _q2(self, name, host_rows=None, cold_rows=None):
+        """Upload a Q2_0 tensor: codes and scales. Host experts are pinned unless `cold_rows` names
+        them; a cold expert keeps only its file span, and `_cold_prepare` fills its pointer later."""
         cp = self.cp
         raw, ne, ty = self._raw(name)
         assert ty == Q2_0, name
+        tensor_off = int(self.tinfo[name][2])
         cols = int(ne[0])
         rows = int(np.prod(ne[1:]))
         n = int(ne[2]) if len(ne) > 2 else 1
@@ -289,8 +298,11 @@ class Engine(object):
         w = Q2(per, cols, n)
         blk = raw.reshape(rows * nb, 18)
         cw, sw = per * nb * 16, per * nb * 2                   # bytes per expert
-        on = [e for e in range(n) if not host_rows or e not in host_rows]
-        off = [e for e in range(n) if host_rows and e in host_rows]
+        host = set(host_rows or ())
+        cold = set(cold_rows or ()) & host
+        warm = [e for e in range(n) if e in host and e not in cold]
+        hoff = [e for e in range(n) if e in host]
+        on = [e for e in range(n) if e not in host]
         w.codes = cp.empty(len(on) * cw, cp.uint8)
         w.sc = cp.empty(len(on) * sw // 2, cp.float16)
         pc, ps = [0] * n, [0] * n
@@ -300,19 +312,27 @@ class Engine(object):
             w.sc[i * sw // 2:(i + 1) * sw // 2].set(np.ascontiguousarray(b[:, :2]).view(np.float16).reshape(-1))
             pc[e] = w.codes.data.ptr + i * cw
             ps[e] = w.sc.data.ptr + i * sw
-        w.hoff, w.cw, w.sw = off, cw, sw
-        w.hbytes = len(off) * (cw + sw)
-        if off:
-            w.hmem = cp.cuda.alloc_pinned_memory(len(off) * (cw + sw))
-            h = np.frombuffer(w.hmem, np.uint8, len(off) * (cw + sw))
-            for i, e in enumerate(off):
+        w.hoff, w.hwarm, w.hcold, w.cw, w.sw = hoff, warm, cold, cw, sw
+        w.hbytes = len(hoff) * (cw + sw)
+        w.hpos = {e: i for i, e in enumerate(warm)}
+        if warm:
+            w.hmem = cp.cuda.alloc_pinned_memory(len(warm) * (cw + sw))
+            h = np.frombuffer(w.hmem, np.uint8, len(warm) * (cw + sw))
+            for i, e in enumerate(warm):
                 b = blk[e * per * nb:(e + 1) * per * nb]
                 h[i * cw:(i + 1) * cw] = b[:, 2:].reshape(-1)
-                h[len(off) * cw + i * sw:len(off) * cw + (i + 1) * sw] = b[:, :2].reshape(-1)
+                h[len(warm) * cw + i * sw:len(warm) * cw + (i + 1) * sw] = b[:, :2].reshape(-1)
                 pc[e] = w.hmem.ptr + i * cw
-                ps[e] = w.hmem.ptr + len(off) * cw + i * sw
-        w.tc = cp.asarray(np.array(pc, np.uint64))
-        w.ts = cp.asarray(np.array(ps, np.uint64))
+                ps[e] = w.hmem.ptr + len(warm) * cw + i * sw
+        else:
+            w.hmem = None
+        # where this expert stack lives in the pack: `_cold_prepare` preads one expert at a time
+        w.raw_off = self.g.data_start + tensor_off
+        w.raw_stride = per * nb * 18
+        w.raw_bytes = w.raw_stride
+        w.ptr_c, w.ptr_s = np.array(pc, np.uint64), np.array(ps, np.uint64)
+        w.tc = cp.asarray(w.ptr_c)
+        w.ts = cp.asarray(w.ptr_s)
         return w
 
     def _q2cat(self, names):
@@ -372,11 +392,21 @@ class Engine(object):
                 L["rbias"] = self._f32(p + "exp_probs_b.bias")
                 if self.placement is not None:
                     host = set(self.placement.on(il, "host")) or None
+                    card = set(self.placement.on(il, "card"))
                 else:
                     ordr = order.get(il, list(range(s.n_exp)))
                     host = set(ordr[self.n_card:]) if self.n_card < s.n_exp else None
-                L["up"] = self._q2(p + "ffn_up_exps.weight", host)
-                L["down"] = self._q2(p + "ffn_down_exps.weight", host)
+                    card = set(ordr[:self.n_card])
+                cold = None
+                if self.cold_reader is not None and host:
+                    # The opt-in tier makes every host expert cold. Card experts and the dense core
+                    # keep their current path; no cold expert is pinned or mmap-faulted.
+                    host = set(range(s.n_exp)) - card
+                    cold = set(host)
+                    self.cold_active = True
+                    self.cold_experts += len(cold)
+                L["up"] = self._q2(p + "ffn_up_exps.weight", host, cold)
+                L["down"] = self._q2(p + "ffn_down_exps.weight", host, cold)
                 if host:
                     self._stage_tables(L, s.kind[:il].count("moe") % 2)
                     hidx = np.full(s.n_exp, -1, np.int32)
@@ -384,6 +414,8 @@ class Engine(object):
                         hidx[e] = i
                     L["hidx"] = cp.asarray(hidx)
                     L["dci"] = sum("hidx" in M for M in self.layers) - 1  # (its row in the decode slot tables)
+                    if cold:
+                        self._cold_setup(L)
                 L["shup"] = self._q2(p + "ffn_up_shexp.weight")
                 L["shdown"] = self._q2(p + "ffn_down_shexp.weight")
                 if not host:                    # decode: the shared expert as entry n_exp of the up table
@@ -401,6 +433,10 @@ class Engine(object):
             self.copy_stream = cp.cuda.Stream(non_blocking=True)
             self.ev_staged = [cp.cuda.Event(disable_timing=True) for _ in range(2)]
             self.ev_used = [cp.cuda.Event(disable_timing=True) for _ in range(2)]
+            if self.cold_reader is not None:
+                # the cold path de-interleaves Q2_0 bytes in pinned host memory before the H2D copy
+                self.stage_host = [cp.cuda.alloc_pinned_memory(n) for _ in range(2)]
+                self.stage_n = n
         base = self.stage[b].data.ptr
         for key, b0 in (("up", base), ("down", base + L["up"].hbytes)):
             w = L[key]
@@ -412,6 +448,97 @@ class Engine(object):
             w.tcp = cp.asarray(np.array(pc, np.uint64))
             w.tsp = cp.asarray(np.array(ps, np.uint64))
         L["stage"] = b
+
+    def _cold_setup(self, L):
+        """Pinned slots for the experts a decode step may stream; no expert is pinned at load time."""
+        cp, s = self.cp, self.s
+        n = s.n_used
+        for key in ("up", "down"):
+            w = L[key]
+            w.cold_c = cp.cuda.alloc_pinned_memory(n * w.cw)
+            w.cold_s = cp.cuda.alloc_pinned_memory(n * w.sw)
+            w.cold_cnp = np.frombuffer(w.cold_c, np.uint8, n * w.cw)
+            w.cold_snp = np.frombuffer(w.cold_s, np.uint8, n * w.sw)
+        L["cold"] = True
+
+    @staticmethod
+    def _cold_span(w, e):
+        return w.raw_off + int(e) * w.raw_stride, w.raw_bytes
+
+    def _cold_copy(self, w, e, slot, raw):
+        """Split one raw Q2_0 expert into its pinned slot and point its table entry at the slot."""
+        codes, scales = split_q2(raw, w.rows, w.cols // 64)
+        w.cold_cnp[slot * w.cw:(slot + 1) * w.cw] = codes
+        w.cold_snp[slot * w.sw:(slot + 1) * w.sw] = scales
+        w.ptr_c[e] = w.cold_c.ptr + slot * w.cw
+        w.ptr_s[e] = w.cold_s.ptr + slot * w.sw
+
+    def _stage_cold(self, il):
+        """Build a layer's full host staging block, reading only its cold experts from the file."""
+        L = self.layers[il]
+        b = L["stage"]
+        cs = self.copy_stream
+        cs.wait_event(self.ev_used[b])
+        cs.synchronize()                 # the host de-interleave must not race the previous H2D
+        host = np.frombuffer(self.stage_host[b], np.uint8, self.stage_n)
+        base = 0
+        for key in ("up", "down"):
+            w = L[key]
+            nh = len(w.hoff)
+            warm = np.frombuffer(w.hmem, np.uint8, len(w.hwarm) * (w.cw + w.sw)) if w.hmem is not None else None
+            for e in w.hoff:
+                i = w.hpos.get(e)
+                if i is not None:
+                    host[base + i * w.cw:base + (i + 1) * w.cw] = warm[i * w.cw:(i + 1) * w.cw]
+                    host[base + nh * w.cw + i * w.sw:base + nh * w.cw + (i + 1) * w.sw] = \
+                        warm[len(w.hwarm) * w.cw + i * w.sw:len(w.hwarm) * w.cw + (i + 1) * w.sw]
+            cold = [(i, e) for i, e in enumerate(w.hoff) if e in w.hcold]
+            spans = [self._cold_span(w, e) for _, e in cold]
+            for (i, e), raw in zip(cold, self.cold_reader.read_many(spans, read_ahead=1)):
+                codes, scales = split_q2(raw, w.rows, w.cols // 64)
+                host[base + i * w.cw:base + (i + 1) * w.cw] = codes
+                host[base + nh * w.cw + i * w.sw:base + nh * w.cw + (i + 1) * w.sw] = scales
+            base += w.hbytes
+        total = L["up"].hbytes + L["down"].hbytes
+        self.cp.cuda.runtime.memcpyAsync(self.stage[b].data.ptr, self.stage_host[b].ptr, total, 1, cs.ptr)
+        self.ev_staged[b].record(cs)
+
+    def _cold_prepare(self, il):
+        """Before a decode layer's slot kernel: fetch only cold experts that are not already in a warm
+        device slot. A warm slot takes no file read and no page fault."""
+        L = self.layers[il]
+        if not L.get("cold"):
+            return 0
+        self.stream.synchronize()
+        ids = np.asarray(self.ids.get(), np.int32).reshape(-1)[:self.s.n_used]
+        owners = np.asarray(self.downer[L["dci"]].get(), np.int32).reshape(-1)
+        need = cold_misses(ids, owners, L["up"].hcold)
+        if not need:
+            return 0
+        spans = []
+        for e in need:
+            for key in ("up", "down"):
+                spans.append(self._cold_span(L[key], e))
+        raw = self.cold_reader.read_many(spans, read_ahead=1)
+        for slot, e in enumerate(need):
+            for p, key in enumerate(("up", "down")):
+                self._cold_copy(L[key], e, slot, raw[2 * slot + p])
+        for key in ("up", "down"):
+            w = L[key]
+            w.tc.set(w.ptr_c, stream=self.stream)
+            w.ts.set(w.ptr_s, stream=self.stream)
+        self.cold_read_experts += len(need)
+        return len(need)
+
+    def cold_stats(self):
+        """Byte accounting for the opt-in cold tier; no throughput is implied by these numbers."""
+        if self.cold_reader is None:
+            return {"active": False, "experts": 0}
+        out = self.cold_reader.stats()
+        out.update({"active": self.cold_active, "experts": self.cold_experts,
+                    "experts_read": self.cold_read_experts,
+                    "host_experts": sum(len(L["up"].hcold) for L in self.layers if "up" in L)})
+        return out
 
     def _dec_slots(self):
         """decode with host experts: the device slots of each MoE layer (self.dcache experts: lt_cache_dec keeps the
@@ -434,6 +561,9 @@ class Engine(object):
         """queue the copy of layer il's host experts into its staging buffer (copy stream), after the layer that
         used the buffer before it; the compute stream waits for the copy before the layer's grouped products"""
         L = self.layers[il]
+        if L.get("cold"):
+            self._stage_cold(il)
+            return
         b = L["stage"]
         cs = self.copy_stream
         cs.wait_event(self.ev_used[b])
@@ -720,6 +850,8 @@ class Engine(object):
                 ids, slotted = self.ids, False
                 if T == 1 and "hidx" in L:      # host experts: copy the chosen ones to device slots first
                     self._dec_slots()
+                    if self.cold_active:
+                        self._cold_prepare(il)
                     a, b, c, d = self.dsz
                     li, C = L["dci"], self.dcache
                     k["lt_cache_dec"]((1,), (32,), (self.ids, L["hidx"], self.downer[li], self.dage[li],
@@ -866,12 +998,24 @@ class Engine(object):
         """read one token (default: the last greedy token, already on the card) at the current position; return the
         greedy next token"""
         cp = self.cp
+        assert self.pos < self.ctx, "the context is full (%d)" % self.ctx
+        if self.cold_active:
+            # A cold miss needs a host read after the router, so the decode cannot be one captured
+            # graph. Warm slots still take the ordinary kernels and no file read.
+            with self.stream:
+                if tok is not None:
+                    self.k["lt_set"]((1,), (32,), (self.tok, np.int32(tok)))
+                self._step_launches()
+                cp.cuda.runtime.memcpyAsync(self.h.ctypes.data + 8, self.tok_out.data.ptr, 4, 2,
+                                            self.stream.ptr)
+            self.stream.synchronize()
+            self.pos += 1
+            return int(self.h[2])
         if self.graph is None:
             if os.environ.get("KINDI_LT_GRAPH", "1") == "1":
                 self.graph = _capture(self.stream, self._step_launches)
             else:
                 self.graph = _capture(self.stream, self._step_launches, replay=True)
-        assert self.pos < self.ctx, "the context is full (%d)" % self.ctx
         if tok is not None:
             with self.stream:
                 self.k["lt_set"]((1,), (32,), (self.tok, np.int32(tok)))

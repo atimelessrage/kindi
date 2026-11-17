@@ -28,8 +28,19 @@
   measures the device instead of the page cache, and says `buffered` rather than pretending when the
   OS refuses; the PCIe probe uses pinned memory like the engine's staging buffers and reports H2D and
   D2H apart. It loads no model. Measured here on 2026-11-17 with `--mib 64`: 13,456.7 MiB/s RAM,
-  2,509.8 MiB/s disk, 6.0/6.1 GiB/s H2D/D2H on the 4060 Ti. The rates feed slot sizing and the
-  parked NVMe cold-expert tier, whose gate is in `docs/ROADMAP.md` "Memory-tier follow-ups".
+  2,509.8 MiB/s disk, 6.0/6.1 GiB/s H2D/D2H on the 4060 Ti. The rates feed slot sizing; the
+  NVMe cold-expert tier now has its first engine path, whose gate is in `docs/ROADMAP.md`
+  "Memory-tier follow-ups".
+- **The Lightning cold-expert tier is opt-in and reads the pack, not a page cache** — with
+  `KINDI_LT_COLD=1`, every routed expert outside the card tier is file-backed instead of pinned at
+  load. A prompt stages a layer's host block through a pinned buffer; a decode step reads only
+  routed experts that are not already in a warm device slot. `kindi/cold_experts.py` issues aligned
+  `O_DIRECT`/`FILE_FLAG_NO_BUFFERING` reads where available, merges neighbouring ranges into a
+  read-ahead window, and separates requested expert bytes from bytes actually transferred;
+  `Engine.cold_stats()` exposes the accounting. The decode graph is disabled only on this opt-in
+  path because the read follows the router, and warm slots take no file read. Eight CPU tests
+  cover the flag, exact bytes, read-ahead merging, order and short reads. **No larger-than-RAM
+  pack, GPU run, tok/s or verify result is claimed**; those are the open gate in `docs/ROADMAP.md`.
 - **`kindi plan` and `kindi autotune` now consume the `kindi io` rates** — the Lightning report
   normalizes the measured RAM, disk and PCIe numbers into bytes/s, predicts one token's slot
   working set plus `ceil((RAM copy + disk read) / PCIe H2D)` lookahead, caps it by `n_exp` and by
