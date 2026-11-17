@@ -32,6 +32,10 @@ the state at that commit.
 | [REQ-0020](requirements/REQ-0020.md) | Intel Arc A770 (Alchemist/DG2) support via a SYCL/oneAPI backend | proposed | `147e3dc61f78` | `147e3dc61f78` |
 | [REQ-0021](requirements/REQ-0021.md) | CPU + Intel integrated-graphics tandem (SYCL/Level Zero) | proposed | `ac0c767005ba` | `eec5bc790a66` |
 | [REQ-0022](requirements/REQ-0022.md) | Hardware identification and per-machine autotuning | experimental | `9e6405f223c0` | `78fb27f8b559` |
+| [REQ-0023](requirements/REQ-0023.md) | A kernel launch contract checked for every call site | proposed | `13eaf46bb58c` | `13eaf46bb58c` |
+| [REQ-0024](requirements/REQ-0024.md) | Speculation state is reported as effective, and the head is verified on load | proposed | `13eaf46bb58c` | `13eaf46bb58c` |
+| [REQ-0025](requirements/REQ-0025.md) | `kindi verify` can run under speculation | proposed | `13eaf46bb58c` | `13eaf46bb58c` |
+| [REQ-0026](requirements/REQ-0026.md) | `kindi bench` can measure a speculation mode | proposed | `13eaf46bb58c` | `13eaf46bb58c` |
 
 `uncommitted` means the requirement file is not in `HEAD` yet. Commit the requirement
 and run the generator again to record its real added/last-modified hashes.
