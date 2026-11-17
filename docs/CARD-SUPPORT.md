@@ -96,6 +96,12 @@ The gate run omits `--mtp-head` and `--spec-pack` because their defaults are the
 or drafter pack does not silently pass the four speculation cells. The baseline is gitignored by
 design (see [CI.md](CI.md#performance-baseline)); save it on the runner, not in git.
 
+Verified fail-closed on 2026-11-17: pointing `--mtp-head` and `--spec-pack` at absent paths printed
+`2b/tc-mtp`, `2b/tc-draft2b` and `2b/tc-both` as skipped, reported each as a missing baseline
+cell, and exited 1. `ngram` needs no optional file and still ran; deselecting it
+(`--spec-modes mtp,draft2b,both`) makes the same gate report all four baseline cells missing,
+including `2b/tc-ngram`, and exit 1.
+
 Measured 2026-11-17 on the RTX 4060 Ti: seven cells saved, all `pass` (4/4 prompts each);
 `tc-ngram`, `tc-mtp`, `tc-draft2b` and `tc-both` reported their requested mode as effective
 (45/120, 94/204, 120/120 and 100/189 drafts accepted), and the repeat gate passed with no status,
