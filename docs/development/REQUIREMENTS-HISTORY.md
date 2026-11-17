@@ -32,9 +32,9 @@ the state at that commit.
 | [REQ-0020](requirements/REQ-0020.md) | Intel Arc A770 (Alchemist/DG2) support via a SYCL/oneAPI backend | proposed | `147e3dc61f78` | `147e3dc61f78` |
 | [REQ-0021](requirements/REQ-0021.md) | CPU + Intel integrated-graphics tandem (SYCL/Level Zero) | proposed | `ac0c767005ba` | `eec5bc790a66` |
 | [REQ-0022](requirements/REQ-0022.md) | Hardware identification and per-machine autotuning | experimental | `9e6405f223c0` | `78fb27f8b559` |
-| [REQ-0023](requirements/REQ-0023.md) | A kernel launch contract checked for every call site | proposed | `3ececca68d4a` | `563bf4a6651d` |
-| [REQ-0024](requirements/REQ-0024.md) | Speculation state is reported as effective, and the head is verified on load | proposed | `3ececca68d4a` | `6e2967ddd66d` |
-| [REQ-0025](requirements/REQ-0025.md) | `kindi verify` can run under speculation | proposed | `3ececca68d4a` | `cf0539e56538` |
+| [REQ-0023](requirements/REQ-0023.md) | A kernel launch contract checked for every call site | proposed | `3ececca68d4a` | `7eec7d6489ec` |
+| [REQ-0024](requirements/REQ-0024.md) | Speculation state is reported as effective, and the head is verified on load | proposed | `3ececca68d4a` | `7eec7d6489ec` |
+| [REQ-0025](requirements/REQ-0025.md) | `kindi verify` can run under speculation | proposed | `3ececca68d4a` | `7eec7d6489ec` |
 | [REQ-0026](requirements/REQ-0026.md) | `kindi bench` can measure a speculation mode | proposed | `3ececca68d4a` | `3ececca68d4a` |
 | [REQ-0027](requirements/REQ-0027.md) | A constrained-decoding mask that does not sweep the vocabulary per state | proposed | `62ea1a6828f0` | `62ea1a6828f0` |
 | [REQ-0028](requirements/REQ-0028.md) | An Anthropic Messages endpoint for agent harnesses | proposed | `8c4decde1d0f` | `8c4decde1d0f` |
