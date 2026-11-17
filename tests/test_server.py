@@ -804,6 +804,24 @@ def test_metrics_report_the_effective_speculation_mode(monkeypatch, loaded, requ
         assert 'kindi_spec_mode_effective{mode="%s"} 1' % requested not in body
 
 
+@pytest.mark.parametrize("loaded", [True, False], ids=["head-loaded", "head-refused"])
+def test_metrics_mode_gauge_matches_the_effective_method(monkeypatch, loaded):
+    """REQ-0024 A2 regression: the gauge label is the method `/health` reports, and `none` when
+    no method is active - not the requested mode and not a second, independently resolved answer."""
+    monkeypatch.setenv("KINDI_SPEC", "mtp")
+    K = _SpecKindi(loaded)
+    monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
+    app = server.create_app({"model_name": "bonsai2-2b", "api_key": ""}, log=lambda *a: None)
+    with TestClient(app) as client:
+        method = client.get("/health").json()["drafting"]["method"]
+        body = client.get("/metrics").text
+    expected = 'kindi_spec_mode_effective{mode="%s"} 1' % (method or "none")
+    gauges = [line for line in body.splitlines() if line.startswith("kindi_spec_mode_effective{")]
+    assert gauges == [expected]
+    if method is None:
+        assert 'mode="mtp"' not in gauges[0]
+
+
 def test_keyless_non_loopback_health_gets_only_liveness_fields(monkeypatch):
     K = _FakeKindi()
     monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
