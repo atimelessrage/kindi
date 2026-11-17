@@ -113,11 +113,11 @@ def _gguf_value(buf, ty, v):
     buf += struct.pack(fmt, v)
 
 
-def write_fake_gguf(path, tensors):
+def write_fake_gguf(path, tensors, n_exp=32):
     """A minimal GGUF v3 whose tensors are all type 42 (Q2_0), just names and shapes.
 
     The engine reads weights from a real file; `plan` needs only the header and `tinfo`, so
-    data never follows."""
+    data never follows. `n_exp` is the routed-expert count per MoE layer."""
     a = "nemotron_h_moe"
     kv = [
         ("general.architecture", 8, a),
@@ -133,7 +133,7 @@ def write_fake_gguf(path, tensors):
         (a + ".ssm.group_count", 4, 2),
         (a + ".ssm.inner_size", 4, 64),
         (a + ".ssm.time_step_rank", 4, 1),
-        (a + ".expert_count", 4, 32),
+        (a + ".expert_count", 4, n_exp),
         (a + ".expert_used_count", 4, 4),
         (a + ".expert_feed_forward_length", 4, 128),
         (a + ".expert_shared_feed_forward_length", 4, 64),
@@ -164,7 +164,7 @@ def write_fake_gguf(path, tensors):
     Path(path).write_bytes(bytes(out))
 
 
-def make_lightning_pack(tmp_path, free_gib=0.01):
+def make_lightning_pack(tmp_path, free_gib=0.01, n_exp=32):
     pack = tmp_path / "ltpack"
     pack.mkdir()
     gguf = tmp_path / "lt.gguf"
@@ -174,7 +174,7 @@ def make_lightning_pack(tmp_path, free_gib=0.01):
         tensors.append(("blk.%d.exps.w1" % il, [128, 256], 42, off)); off += 1
         tensors.append(("blk.%d.exps.w2" % il, [256, 128], 42, off)); off += 1
         tensors.append(("blk.%d.some_q2" % il, [256, 128], 42, off)); off += 1
-    write_fake_gguf(gguf, tensors)
+    write_fake_gguf(gguf, tensors, n_exp=n_exp)
     (pack / "kindi_pack.json").write_text(json.dumps({
         "backend": "kindi_lightning", "model": "fake-lt", "model_path": str(gguf),
         "source_sha256": "x"}))
@@ -188,15 +188,57 @@ def test_describe_moe_uses_the_expert_tiers(tmp_path):
     assert rep["strategy"] == "moe-expert-tiers"
     choices = {c for c, _ in rep["lines"]}
     assert {"strategy", "host ram", "reserve", "experts", "slots", "placement"} <= choices
-    # the decode-slot split is inspectable: it names the bytes, and that each slot costs one expert
+    # the decode-slot split is inspectable: with every expert resident it says the slots are unused
     slots = next(r for c, r in rep["lines"] if c == "slots")
-    assert "displace" in slots or "unused" in slots
+    assert "unused" in slots
     assert rep["dcache"] >= 4
     strat = next(r for c, r in rep["lines"] if c == "strategy")
     assert "expert" in strat and "host" in strat
     assert rep["n_exp"] == 32 and rep["fit"] is True
     assert 4 <= rep["n_card"] <= 32                            # at least n_used per layer
     assert rep["command"].endswith("bench")
+
+
+def test_the_fit_prices_a_slot_at_more_than_one_expert():
+    """`_lt_fit` takes the decode slots off the room *before* dividing it over the remaining
+    (n_moe - 2) layers, so dcache slots per layer cost dcache * n_moe / (n_moe - 2) experts per
+    layer. With 4 MoE layers one slot costs two experts per layer, not the one the slots line
+    used to claim."""
+    spec = type("Spec", (), {"n_exp": 32, "n_used": 4})()
+    eb, n_moe, dcache = 1000, 4, 10
+    room = 2 * spec.n_exp * eb + 60 * eb                 # 30 experts per layer once the two full layers are paid
+    fit = lambda d: _plan._lt_fit(spec, room, 0, 0, 0, 0, 0, eb, [0] * n_moe, dcache=d)[0]
+    assert fit(0) == 30                                  # the same room as pure residency
+    assert fit(dcache) == 10
+    assert fit(0) - fit(dcache) == dcache * n_moe // (n_moe - 2) == 20
+
+
+def test_the_slots_line_uses_the_fits_own_numbers(tmp_path, monkeypatch):
+    """The line must report what the engine's fit actually does: with 4 MoE layers and dcache=10
+    the slots cost 20 experts per layer (n_moe / (n_moe - 2) x dcache), so 162 experts per layer
+    stay resident against 182 without them, and the two coverage percentages must be the counts
+    for those two numbers."""
+    monkeypatch.setenv("KINDI_MOE_WEIGHTED", "0")       # the uniform split, not the usage-weighted scan
+    pack = make_lightning_pack(tmp_path, n_exp=256)
+    usage = tmp_path / "usage.json"
+    counts = [256 - e for e in range(256)]
+    usage.write_text(json.dumps({"counts": {str(il): counts for il in range(16)}}), encoding="utf-8")
+    rep = _plan.describe(str(pack), 2048, None, assume_vram_gib=0.09, assume_ram_gib=4,
+                         assume_cores=2, reserve_mib=0, usage_path=str(usage))
+    assert rep["fit"] is True and rep["n_exp"] == 256
+    assert (rep["n_card"], rep["slots_resident"], rep["dcache"]) == (162, 182, 10)
+    # 4 MoE layers: the fit divides what the slots leave over the remaining 2, so a slot costs two
+    assert rep["slots_resident"] - rep["n_card"] == 2 * rep["dcache"]
+
+    def coverage(n):                                    # the share of picks the top n of each layer take
+        return 100.0 * sum(counts[:n]) / sum(counts)
+    slots = next(r for c, r in rep["lines"] if c == "slots")
+    assert "Each slot displaces one" not in slots
+    assert ("fits %d experts per layer instead of %d" % (rep["slots_resident"], rep["n_card"])) in slots
+    assert ("cost %d per layer" % (rep["slots_resident"] - rep["n_card"])) in slots
+    assert ("%.1f%% of the measured picks against %.1f%%"
+            % (coverage(rep["n_card"]), coverage(rep["slots_resident"]))) in slots
+    assert "%.1f%%" % coverage(162) == "86.4%" and "%.1f%%" % coverage(182) == "91.6%"
 
 
 def test_describe_moe_reports_a_refusal_when_nothing_fits(tmp_path):

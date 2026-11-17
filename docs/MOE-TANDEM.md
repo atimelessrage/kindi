@@ -51,9 +51,11 @@ MoE pack's own split (expert tiers, not layers) instead of splitting the GDN rec
 does not have one; `make_engine` turns a `--tandem` flag on a `kindi_lightning`/`kindi_dsv41` pack off
 with a log line pointing at `kindi plan`, so a config that sets tandem globally cannot silently build
 the dense engine for a MoE. The equivalent split for a MoE is the one its own engine already runs, and
-`kindi plan` reports it, including the decode-slot trade (each slot displaces one expert per layer, and
-`Usage.coverage()` compares the measured picks the card serves with the slots against the same bytes as
-residency).
+`kindi plan` reports it, including the decode-slot trade: the fit subtracts the slot bytes before it
+divides what is left over the remaining `n_moe - 2` layers, so `dcache` slots per layer cost
+`dcache * n_moe / (n_moe - 2)` resident experts there — the line runs the same fit with `dcache=0` to
+report that number, and `Usage.coverage()` compares the measured picks the card serves with the slots
+against the same room as pure residency.
 
 `kindi/moe_tandem.py` is that split written down for one execution unit (§5-§6): every selected pair is
 assigned to `card` (resident on the card), `copy` (a complete expert into a cache slot) or `cpu` (a host

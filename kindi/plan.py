@@ -266,15 +266,21 @@ def _lt_buf_bytes(s, chunk):
     return int(f + chunk * max(s.d_in, s.n_ffsh) * 1.5 + s.vocab * 4 + (64 << 20))
 
 
-def _lt_fit(s, free_bytes, dense, kv, state, buf_bytes, reserve, eb, moe_layers):
+def _lt_fit(s, free_bytes, dense, kv, state, buf_bytes, reserve, eb, moe_layers, dcache=None):
     """Lightning's placement math (`_plan` plus the min-card rule), free of the engine's GPU work.
 
-    Returns (n_card, room) or None when even n_used experts per layer do not fit."""
+    `dcache=None` takes the engine's own default (KINDI_LT_DCACHE, at least n_used); `dcache=0`
+    prices the same room with no decode slots, which is what the slots cost. The slots come off
+    the room *before* the division over the remaining (n_moe - 2) layers, so one slot per layer
+    costs n_moe / (n_moe - 2) experts per layer, not one - see `slots_resident` in the report.
+
+    Returns (n_card, room), or (None, room) when even n_used experts per layer do not fit."""
     n_moe = len(moe_layers)
     room = free_bytes - dense - kv - state - buf_bytes - reserve
     fit = max(0, room // (n_moe * eb)) if n_moe else 0
     if fit < s.n_exp and n_moe > 2:
-        dcache = max(s.n_used, int(os.environ.get("KINDI_LT_DCACHE", "10")))
+        if dcache is None:
+            dcache = max(s.n_used, int(os.environ.get("KINDI_LT_DCACHE", "10")))
         fit = max(0, int((room - 2 * s.n_exp * eb - n_moe * dcache * eb) // ((n_moe - 2) * eb)))
     if fit < s.n_used:
         return None, room
@@ -330,7 +336,13 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
                       "experts per layer on the card" % (int(moe_cache_mib), n_card, s.n_exp)))
     else:
         n_card, room = _lt_fit(s, free_bytes, dense, kv, state, _lt_buf_bytes(s, 512),
-                               reserve, eb, moe_layers)
+                               reserve, eb, moe_layers, dcache=dcache)
+    # the same room with the slots priced at zero: the fit's own counterfactual, so the line can
+    # state what they cost instead of assuming "one expert per layer"
+    n_resident = None
+    if moe_cache_mib is None:
+        n_resident, _ = _lt_fit(s, free_bytes, dense, kv, state, _lt_buf_bytes(s, 512),
+                                reserve, eb, moe_layers, dcache=0)
     if n_card is None or n_card < s.n_used:
         lines.append(("experts", "nothing fits (%d experts per MoE layer cannot be resident at "
                       "this context and free VRAM; the engine needs at least %d per token): "
@@ -376,8 +388,8 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
                       % (n_card, s.n_exp, suffix)))
     slot_gib = n_moe * dcache * eb / 2 ** 30
     if n_card < s.n_exp:
-        why = ("%d per MoE layer (%.2f GiB): the last-used host experts kept in device slots so the next "
-               "use is not a PCIe read. Each slot displaces one expert per layer" % (dcache, slot_gib))
+        why = ("%d per MoE layer (%.2f GiB): the last-used host experts kept in device slots so the "
+               "next use is not a PCIe read" % (dcache, slot_gib))
         if placement is not None:
             # The weighted plan already spent these bytes before it chose m, so the honest number
             # is the share that placement serves, not the top-n share a uniform split would get.
@@ -388,15 +400,17 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
             else:
                 why += "; the usage-weighted placement already leaves room for them"
         else:
-            if moe_cache_mib is None:
-                why += ("; the fit already leaves room for them, and as residency the same bytes would "
-                        "hold %d experts per layer" % (n_card + dcache))
+            if n_resident is not None:
+                why += ("; the same room without them fits %d experts per layer instead of %d, so "
+                        "they cost %d per layer (the fit takes the slots off the room the remaining "
+                        "%d MoE layers share)" % (n_resident, n_card, n_resident - n_card,
+                                                   max(1, n_moe - 2)))
             cov_slots = usage.coverage(n_card)
-            cov_resident = usage.coverage(n_card + dcache) if moe_cache_mib is None else None
+            cov_resident = usage.coverage(n_resident) if n_resident is not None else None
             if cov_slots is not None and cov_resident is not None:
-                why += (" - %.1f%% of the measured picks against %.1f%%"
+                why += (" - %.1f%% of the measured picks against %.1f%% without them"
                         % (100 * cov_slots, 100 * cov_resident))
-            else:
+            elif cov_slots is None:
                 why += " (no usage counts: run bench to measure use)"
         why += "; --dcache or KINDI_LT_DCACHE moves the split"
         lines.append(("slots", why))
@@ -409,7 +423,8 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
                   "read over PCIe through per-expert pointer tables" % (
                       est / 2 ** 30, int(ctx), est // 2 ** 20, int(free_bytes) // 2 ** 20)))
     out = {"pack": pack, "model": man.get("model"), "strategy": "moe-expert-tiers",
-           "lines": lines, "n_card": n_card, "n_exp": s.n_exp, "dcache": dcache, "fit": True,
+           "lines": lines, "n_card": n_card, "n_exp": s.n_exp, "dcache": dcache,
+           "slots_resident": n_resident, "fit": True,
            "estimate_mib": est // 2 ** 20,
            "command": "%s -m kindi --pack %s bench" % (sys.executable, pack)}
     if chunk_tokens:
