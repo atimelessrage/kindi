@@ -198,7 +198,7 @@ def test_describe_moe_uses_the_expert_tiers(tmp_path):
     assert "expert" in strat and "host" in strat
     assert rep["n_exp"] == 32 and rep["fit"] is True
     assert 4 <= rep["n_card"] <= 32                            # at least n_used per layer
-    assert rep["command"].endswith("bench --dcache %d" % rep["dcache"])
+    assert rep["command"].endswith("--ctx 2048 bench --dcache %d" % rep["dcache"])
 
 
 def test_the_fit_prices_a_slot_at_more_than_one_expert():
@@ -277,8 +277,23 @@ def test_the_planned_bench_command_reproduces_the_rate_sized_slot_count(tmp_path
     rep = _plan.describe(str(pack), 2048, None, assume_vram_gib=0.5, assume_ram_gib=4,
                          assume_cores=2, reserve_mib=0, rates=RATES)
     assert rep["rate_sized"] is True and rep["dcache"] == 16
-    assert rep["command"].split()[-3:] == ["bench", "--dcache", str(rep["dcache"])]
+    assert rep["command"].split()[-5:] == ["--ctx", "2048", "bench", "--dcache",
+                                           str(rep["dcache"])]
     assert "KINDI_LT_DCACHE=" not in rep["command"]
+
+
+def test_the_planned_bench_command_carries_the_planned_context(tmp_path):
+    """The fit and slot count were computed at the planned ctx, so the child bench must use it.
+
+    `--ctx` is a global option and is only accepted before the `bench` subcommand.
+    """
+    pack = make_lightning_pack(tmp_path)
+    rep = _plan.describe(str(pack), 3072, None, assume_vram_gib=0.5, assume_ram_gib=4,
+                         assume_cores=2, reserve_mib=0, rates=RATES)
+    argv = rep["command"].split()
+    assert argv[argv.index("--ctx") + 1] == "3072"
+    assert argv.index("--ctx") < argv.index("bench")
+    assert argv[-3:] == ["bench", "--dcache", str(rep["dcache"])]
 
 
 def test_run_measures_rates_for_a_lightning_pack(tmp_path, monkeypatch, capsys):

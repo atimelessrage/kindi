@@ -26,6 +26,11 @@
   for that run and restores the caller's own `KINDI_LT_DCACHE` afterwards. `kindi plan` emits
   `... bench --dcache <planned>` (also for an explicit `--dcache`), and tests pin the flag, the
   engine's view of it and the absence of the POSIX prefix.
+- **The Lightning plan's follow-up bench command carries its planned context** — the fit and slot
+  count are computed at `ctx`, but the command omitted it, so a configured default context could
+  produce a different run. The command now passes the global option as
+  `... --ctx <planned> bench --dcache <planned>`; a plan test pins the value and that it precedes
+  the `bench` subcommand, where the CLI accepts it.
 - **The kernel-arity check reaches the DSpine graph** — the checker now resolves the 31
   `kf["..."]` launches from the literal iterable that builds `self.kf`, and `self.k` /
   `self.k8 if n <= 8 else self.k16` from their `get_function(...)` assignments. The resolver now
