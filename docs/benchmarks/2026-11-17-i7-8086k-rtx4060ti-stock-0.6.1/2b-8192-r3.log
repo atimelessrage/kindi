@@ -1,0 +1,14 @@
+# stock v0.6.1 (7fececb) + native-Windows libcuda -> nvcuda.dll shim (no engine changes)
+# pass 3 of 3; `kindi bench --ctx 8192`
+python run_stock.py --pack ~/.kindi/packs/bonsai-2b --ctx 8192 bench
+
+<python>\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+[kindi 22:03:23] blocking sync: card 0 primary context flags 0x4 (set: 0)
+[kindi 22:03:23] GPU: NVIDIA GeForce RTX 4060 Ti, sm_89, 34 SMs, 8187 MiB
+[kindi 22:03:24] engine ready: ctx 8192, head plain (1.8s)
+[kindi 22:03:24] GPU memory: 6411 MiB free of 8188 with a 8192-token context
+[kindi 22:03:24] prompt reading:       228.4 tokens/s
+[kindi 22:03:25] generation (exact head) at position   100: 187.8 tokens/s
+[kindi 22:03:25] generation (exact head) at position  2000: 187.7 tokens/s
+[kindi 22:03:25] generation (exact head) at position  8000: 185.4 tokens/s

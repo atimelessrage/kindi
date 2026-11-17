@@ -267,13 +267,15 @@ head. The commands, logs and loader qualification are in the
 
 | model | context | prompt reading | generation @100 / 2,000 / 8,000 tokens | free |
 |---|---:|---:|---|---:|
-| 2B | 512 | 225.9 tokens/s | 188.4 / — / — | 6,505 MiB |
-| 2B | 8,192 | 223.3 tokens/s | 191.4 / 191.1 / 191.7 | 6,411 MiB |
-| 9B | 512 | 93.9 tokens/s | 85.6 / — / — | 4,613 MiB |
-| 9B | 8,192 | 55.3 tokens/s | 86.3 / 84.3 / 79.7 | 4,371 MiB |
+| 2B | 512 | 225.9 (216.0-226.8) tokens/s | 177.9 (162.8-188.4) / — / — | 6,505 MiB |
+| 2B | 8,192 | 228.4 (223.3-231.0) tokens/s | 187.8 (187.8-191.4) / 187.7 (183.4-191.1) / 188.4 (185.4-191.7) | 6,411 MiB |
+| 9B | 512 | 63.6 (52.3-93.9) tokens/s | 83.9 (83.2-85.6) / — / — | 4,613 MiB |
+| 9B | 8,192 | 69.0 (55.3-91.0) tokens/s | 84.1 (82.4-86.3) / 82.1 (81.7-84.3) / 77.4 (77.4-79.7) | 4,371 MiB |
 
-- One pass per cell; stock's fixed position sweep prints only positions that fit,
-  so the 512-context runs have only position 100. These are indicative, not medians.
+- Three passes per cell; medians, with the three-pass min-max in parentheses.
+  Decode is stable across passes; prompt reading is not (the 9B at ctx 512 spans
+  52.3-93.9), so no reading shape is claimed. Stock's fixed position sweep prints
+  only positions that fit, so the 512-context runs have only position 100.
 - A separate five-pass harness ([`pos512_stock.py`](benchmarks/2026-11-17-i7-8086k-rtx4060ti-stock-0.6.1/pos512_stock.py))
   fills the literal position-512 gap for both models at ctx 8192: **171.2 tok/s**
   (2B) and **80.7 tok/s** (9B), medians. It is not a bench-sweep row, it uses the
