@@ -201,9 +201,13 @@ class MTPDraft(object):
         D, HB, work = s.D, s.HB, b["work"]
         TT = i32(1)
         P = _tp.Plan()
+        # the last argument is k_rmsfold_qT's `hp`: 0 = one int8 row per token, which is what the head
+        # GEMV below reads. 0.5.0 added `hp` to the kernel and to the spec/dspine call sites but not to
+        # this one, so the head's CUDA graph did not build (cuGraphAddKernelNode failed (1)) and the
+        # engine logged "speculation off" - fixed upstream in 0.6.1, ported here with the arity test.
         P.add(SK.k_rmsfold_qT, (D // HB, 1), (512,), (self.src, b["Y"], self.h2, self.ones, s.sD, self.xn, self.xp,
                                                       i32(D), i32(0), i32(HB), TT, i32(D), i32(D), i32(D), i32(D),
-                                                      i32(work), b["XQ"], b["XS"], b["XA"]))
+                                                      i32(work), b["XQ"], b["XS"], b["XA"], i32(0)))
         _, Wt, R, C = s.w[s.head_name]
         R, C = int(R), int(C)
         nw, sp = _sp.tune(s, R, C)

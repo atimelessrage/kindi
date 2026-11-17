@@ -281,7 +281,10 @@ class Graph(object):
                     dep = (ctypes.c_void_p * 1)(prev)
                     r = d.cuGraphAddKernelNode(ctypes.byref(node), g, dep, 1, ctypes.byref(kp))
                 if r:
-                    raise RuntimeError("kindi: cuGraphAddKernelNode failed (%d)" % r)
+                    # the node and its launch shape are what makes a graph-build failure diagnosable
+                    # (a short argument tuple used to surface only as "failed (1)"); upstream 0.6.1
+                    raise RuntimeError("kindi: cuGraphAddKernelNode failed (%d) at node %d: grid %s, block %s, %d arguments"
+                                       % (r, len(self.nodes), tuple(gr), tuple(bl), len(hs)))
                 self.nodes.append((node, kp, arr, hs))
                 if any(id(h) in dynids for h in hs):
                     self.dyn.append((node, kp))
