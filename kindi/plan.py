@@ -15,6 +15,7 @@ import sys
 
 import numpy as np
 
+from . import ltfit as _ltfit
 from . import tandem as _t
 
 
@@ -269,22 +270,16 @@ def _lt_buf_bytes(s, chunk):
 def _lt_fit(s, free_bytes, dense, kv, state, buf_bytes, reserve, eb, moe_layers, dcache=None):
     """Lightning's placement math (`_plan` plus the min-card rule), free of the engine's GPU work.
 
+    The arithmetic lives in `kindi.ltfit`, which `lightning._plan` calls too - this function only
+    builds the room and reads the engine's defaults, so the report and the engine cannot drift.
     `dcache=None` takes the engine's own default (KINDI_LT_DCACHE, at least n_used); `dcache=0`
-    prices the same room with no decode slots, which is what the slots cost. The slots come off
-    the room *before* the division over the remaining (n_moe - 2) layers, so one slot per layer
-    costs n_moe / (n_moe - 2) experts per layer, not one - see `slots_resident` in the report.
+    prices the same room with no decode slots, which is what the slots cost.
 
     Returns (n_card, room), or (None, room) when even n_used experts per layer do not fit."""
-    n_moe = len(moe_layers)
     room = free_bytes - dense - kv - state - buf_bytes - reserve
-    fit = max(0, room // (n_moe * eb)) if n_moe else 0
-    if fit < s.n_exp and n_moe > 2:
-        if dcache is None:
-            dcache = max(s.n_used, int(os.environ.get("KINDI_LT_DCACHE", "10")))
-        fit = max(0, int((room - 2 * s.n_exp * eb - n_moe * dcache * eb) // ((n_moe - 2) * eb)))
-    if fit < s.n_used:
-        return None, room
-    return min(s.n_exp, fit), room
+    if dcache is None:
+        dcache = _ltfit.dcache_default(s.n_used)
+    return _ltfit.fit_experts(room, len(moe_layers), s.n_exp, s.n_used, eb, int(dcache)), room
 
 
 def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
@@ -315,7 +310,7 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
     reserve = (int(os.environ.get("KINDI_LT_RESERVE_MB", "350")) if reserve_mb is None
                else int(reserve_mb)) * 2 ** 20
     if dcache is None:
-        dcache = max(s.n_used, int(os.environ.get("KINDI_LT_DCACHE", "10")))
+        dcache = _ltfit.dcache_default(s.n_used)
     else:
         dcache = int(dcache)
     room = free_bytes - dense - kv - state - reserve

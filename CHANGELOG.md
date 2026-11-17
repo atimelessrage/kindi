@@ -108,6 +108,15 @@
 
 ### Fixed
 
+- **`kindi plan` and the Lightning engine now plan from one helper, so the slots line cannot drift**
+  — `plan._lt_fit` and `lightning._plan` carried the same fit arithmetic twice, which is how the
+  report's slots line fell behind the engine in the first place. `kindi/ltfit.py` now holds
+  `dcache_default` and `fit_experts`: the report builds the room and calls them, the engine calls them
+  too, and the module-level `DCACHE` snapshot that could disagree with a `KINDI_LT_DCACHE` set later is
+  gone (both read the environment at plan time). Sharing also removes a latent division by zero for a
+  model with two MoE layers, where the engine copy divided by `n_moe - 2`. `tests/test_lt_fit_equivalence.py`
+  drives both callers over synthetic specs (all resident, slots priced, two layers, nothing fits), pins
+  exact equality and the identical refusal, and fails if either side grows its own formula again.
 - **A commit message is now scanned like file content, so a path in one is a caught leak** — the history
   gate read each commit's subject for credential shapes only and never read a body at all, which is
   exactly where a path survives a push with no file left to find it in. `tools/check_secret_history.py`

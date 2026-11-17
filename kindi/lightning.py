@@ -16,6 +16,7 @@ import time
 
 import numpy as np
 
+from . import ltfit
 from .gguf import GGUF
 from .moe import MoESpec, Usage, plan
 from .nanbeige import _capture, _free_bytes, module
@@ -40,7 +41,6 @@ K35_EXACT = os.environ.get("KINDI_LT_K35_EXACT") == "1"    # prompts: the exact 
 # decode slots per MoE layer for host experts: 10 (0.4.5: 6). Text write test, 11-10: an RTX 2070 SUPER 8 GB on
 # PCIe 3.0 x16, 106.4 -> 112.4 tokens/s at 512 and 110.3 -> 115.1 at 8K; an RTX 3080 on PCIe x1 with 2.6 GB held
 # back, 7.18 -> 7.88 and 8.36 -> 9.05. (More slots leave fewer experts on the card: 85 -> 81 on the 2070 SUPER.)
-DCACHE = int(os.environ.get("KINDI_LT_DCACHE", "10"))
 KRPB = 64                                                   # lt_mvk_*: rows per block
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -222,14 +222,14 @@ class Engine(object):
         kv = per_pos * self.ctx
         state = s.kind.count("ssm") * (s.n_sh * 64 * s.d_state + s.d_xbc * 3) * 4
         reserve = self._reserve()
-        self.dcache = max(s.n_used, DCACHE)
+        self.dcache = ltfit.dcache_default(s.n_used)
         room = free - dense - kv - state - self._buf_bytes() - reserve
         eb = self._expert_bytes()
-        fit = max(0, int(room // (n_moe * eb)))
-        if fit < s.n_exp:          # host experts: two staging buffers (prompts) of (n_exp - n) experts each,
-            # and the decode slots (self.dcache per layer)
-            fit = max(0, int((room - 2 * s.n_exp * eb - n_moe * self.dcache * eb) // ((n_moe - 2) * eb)))
-        self.n_card = min(s.n_exp, fit if experts_on_card is None else int(experts_on_card))
+        # host experts: two staging buffers (prompts) of n_exp experts each and the decode slots
+        # (self.dcache per layer) come off the room before the division - see `kindi/ltfit.py`
+        fit = ltfit.fit_experts(room, n_moe, s.n_exp, s.n_used, eb, self.dcache)
+        self.n_card = min(s.n_exp, (fit if fit is not None else 0)
+                          if experts_on_card is None else int(experts_on_card))
         if self.n_card < s.n_used:
             need = dense + kv + state + self._buf_bytes() + reserve + n_moe * s.n_used * eb
             raise MemoryError("Lightning needs %.1f GB on the card at ctx %d; %.1f GB are free" % (
