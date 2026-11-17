@@ -9,6 +9,14 @@ Unless a table says otherwise, the method is the same for the two engines. They 
 is read in segments up to each N, and the read time of N tokens is the sum of the segments. At each N, 32 tokens are
 generated. Project page: [amirhusain.com/kindi](https://amirhusain.com/kindi/).
 
+`kindi bench` also reports the prefill/decode share of one whole request: `--split-at` (default
+4096,8192) and `--split-generated` (default 128) time a real chunked prefill followed by that many
+decode steps, then print each phase's share of the wall clock. On the 2B that request is 14% prefill
+at 512 prompt tokens, 64% at 4,096 and 82% at 8,192
+([results](benchmarks/2026-11-17-i7-8086k-rtx4060ti-bench-split/RESULTS.md)); the read and write
+columns below are separate rates and do not by themselves say which phase a request spends its
+clock in.
+
 ## Kindi 0.6.0 (in development): Nemotron 3.5 Lightning 30B-A3B (ternary, Q2_0)
 
 Model file: Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf, sha256 38854de6…, f16 K/V for both engines.

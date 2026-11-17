@@ -4,6 +4,9 @@ and context), so benchmark runs do not have to be scraped out of the human log.
 """
 import json
 import os
+import time
+
+import pytest
 
 from kindi import bench
 
@@ -24,8 +27,13 @@ class FakeEngine(object):
     def feed(self, tok, pos):
         self.calls["feed"] += 1
 
+    def feed_batch(self, toks, pos):
+        self.calls["feed"] += len(toks)
+        time.sleep(0.0001)          # a nonzero prefill clock too, so the share is not 100% one way
+
     def step(self, tok, pos):
         self.calls["step"] += 1
+        time.sleep(0.0002)          # a nonzero clock, so the split's shares are meaningful
 
 
 def test_bench_json_records_the_printed_numbers(tmp_path, monkeypatch):
@@ -133,3 +141,44 @@ def test_bench_help_accepts_tandem_flags():
                          capture_output=True, text=True, timeout=30)
     assert out.returncode == 0
     assert "--tandem" in out.stdout and "--tandem-cpu-layers" in out.stdout
+
+
+def test_bench_reports_the_prefill_decode_split_of_one_request(tmp_path, monkeypatch):
+    """`kindi bench` reports the share of wall clock, from one timed request, not two rates."""
+    monkeypatch.setenv("KINDI_DEVICE", "cpu")
+    dest = str(tmp_path / "split.json")
+    monkeypatch.setattr("kindi.engine.make_engine", FakeEngine)
+    logged = []
+    rc = bench.run({"pack": str(tmp_path), "ctx": 8448, "fast_clusters": 256, "json": dest,
+                    "split_at": "512,4096", "split_generated": 32}, log=logged.append)
+    assert rc == 0
+    got = json.loads(open(dest, encoding="utf-8").read())
+    assert sorted(got["split"]) == ["4096", "512"]
+    row = got["split"]["4096"]
+    assert row["prompt_tokens"] == 4096 and row["generated_tokens"] == 32
+    assert row["prefill_ms"] > 0 and row["decode_ms"] > 0
+    assert row["prefill_share"] + row["decode_share"] == pytest.approx(100.0, abs=0.2)
+    assert row["prefill_tok_s"] == pytest.approx(4096 / (row["prefill_ms"] / 1000.0), rel=0.01)
+    assert row["decode_tok_s"] == pytest.approx(32 / (row["decode_ms"] / 1000.0), rel=0.01)
+    assert "request split: 4096 prompt + 32 generated" in "\n".join(logged)
+
+
+def test_a_split_that_does_not_fit_the_context_is_skipped_with_a_reason(tmp_path, monkeypatch):
+    monkeypatch.setenv("KINDI_DEVICE", "cpu")
+    dest = str(tmp_path / "split.json")
+    monkeypatch.setattr("kindi.engine.make_engine", FakeEngine)
+    logged = []
+    rc = bench.run({"pack": str(tmp_path), "ctx": 1024, "fast_clusters": 256, "json": dest,
+                    "split_at": "512,4096", "split_generated": 128}, log=logged.append)
+    assert rc == 0
+    got = json.loads(open(dest, encoding="utf-8").read())
+    assert sorted(got["split"]) == ["512"]
+    assert any("4096 prompt tokens skipped" in line for line in logged), logged
+
+
+def test_split_prompts_parsing():
+    assert bench.split_prompts({"split_at": "none"}) == []
+    assert bench.split_prompts({"split_at": ""}) == []
+    assert bench.split_prompts({"split_at": "512, 4096"}) == [512, 4096]
+    assert bench.split_prompts({"split_at": [1024]}) == [1024]
+    assert bench.split_prompts({}) == list(bench.SPLIT_PROMPTS)

@@ -1,0 +1,50 @@
+{
+  "cpu_layers": null,
+  "ctx": 8448,
+  "ctx_reduced": false,
+  "ctx_requested": 8448,
+  "device": "gpu",
+  "free_mib_after_load": 6517,
+  "gen_tok_s": {
+    "exact:100": 235.4,
+    "exact:2000": 227.4,
+    "exact:8000": 219.3
+  },
+  "model": "Ternary-Bonsai-2-2B",
+  "pack": "bonsai-2b",
+  "read_tok_s": 300.6,
+  "split": {
+    "4096": {
+      "decode_ms": 528.11,
+      "decode_share": 35.9,
+      "decode_tok_s": 242.4,
+      "generated_tokens": 128,
+      "prefill_ms": 942.38,
+      "prefill_share": 64.1,
+      "prefill_tok_s": 4346.4,
+      "prompt_tokens": 4096
+    },
+    "512": {
+      "decode_ms": 522.18,
+      "decode_share": 86.5,
+      "decode_tok_s": 245.1,
+      "generated_tokens": 128,
+      "prefill_ms": 81.81,
+      "prefill_share": 13.5,
+      "prefill_tok_s": 6258.4,
+      "prompt_tokens": 512
+    },
+    "8192": {
+      "decode_ms": 543.57,
+      "decode_share": 17.6,
+      "decode_tok_s": 235.5,
+      "generated_tokens": 128,
+      "prefill_ms": 2548.25,
+      "prefill_share": 82.4,
+      "prefill_tok_s": 3214.8,
+      "prompt_tokens": 8192
+    }
+  },
+  "tandem": "off",
+  "total_mib": 8188
+}

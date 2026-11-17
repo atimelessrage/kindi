@@ -1,4 +1,5 @@
-"""kindi bench: generation speed at several context positions, prompt-reading speed, and GPU memory.
+"""kindi bench: generation speed at several context positions, prompt-reading speed, the prefill/
+decode share of one whole request, and GPU memory.
 With KINDI_DEVICE=cpu (or without CuPy) it times the CPU engine with the host clock.
 
 `--json FILE` additionally records the numbers in a machine-readable JSON file, so a recorded
@@ -9,6 +10,11 @@ import os
 import time
 
 POSITIONS = (100, 2000, 8000, 16000, 24000)
+# A request is a prompt plus a reply, so the two rates decide different things: a 4K prompt with a
+# 128-token reply spends most of its wall clock in prefill, and tuning decode would not move it.
+# `--split-at` times that whole request and reports each phase's share of the clock.
+SPLIT_PROMPTS = (4096, 8192)
+SPLIT_GENERATED = 128
 
 
 def _cupy():
@@ -19,6 +25,60 @@ def _cupy():
         return cp
     except ImportError:
         return None
+
+
+def split_prompts(cfg):
+    """The prompt lengths `--split-at` asked for ("none"/empty turns the report off)."""
+    raw = cfg.get("split_at", SPLIT_PROMPTS)
+    if isinstance(raw, (list, tuple)):
+        values = list(raw)
+    else:
+        text = str(raw).strip().lower()
+        if text in ("", "none", "off"):
+            return []
+        values = [part.strip() for part in text.split(",") if part.strip()]
+    out = []
+    for value in values:
+        n = int(value)
+        if n > 0:
+            out.append(n)
+    return out
+
+
+def request_split(eng, sync, prompt, generated, warmup=True):
+    """Time one whole request: a real `prompt`-token prefill, then `generated` greedy steps.
+
+    The prefill goes through `feed_batch` when the engine has one - the chunked path the server
+    uses - so this is the request a user waits for, not two per-token rates multiplied together.
+    Returns (prefill_ms, decode_ms); both blocks are synced before the clock is read.
+    """
+    ids = [1 + (i % 977) for i in range(prompt)]
+
+    def feed_all(tokens, start=0):
+        if hasattr(eng, "feed_batch"):
+            eng.feed_batch(tokens, start)
+        else:
+            for i, tok in enumerate(tokens):
+                eng.feed(tok, start + i)
+
+    if warmup:
+        eng.reset()
+        feed_all(ids[:8])
+        eng.step(ids[0], 8)
+        sync()
+    eng.reset()
+    sync()
+    t0 = time.perf_counter()
+    feed_all(ids)
+    sync()
+    prefill_ms = (time.perf_counter() - t0) * 1000.0
+    sync()
+    t0 = time.perf_counter()
+    for i in range(generated):
+        eng.step(ids[-1], prompt + i)
+    sync()
+    decode_ms = (time.perf_counter() - t0) * 1000.0
+    return prefill_ms, decode_ms
 
 
 def bench_json(result, path):
@@ -121,6 +181,32 @@ def run(cfg, log=print):
             result["gen_tok_s"]["%s:%d" % (name, p)] = round(1000 / ms, 1)
             log("generation (%s head) at position %5d: %5.1f tokens/s" % (name, p, 1000 / ms))
     eng.shortlist = 0
+    generated = int(cfg.get("split_generated", SPLIT_GENERATED) or 0)
+    splits = {}
+    for prompt in split_prompts(cfg):
+        if generated and prompt + generated > eng.ctx:
+            log("request split at %d prompt tokens skipped: %d + %d does not fit the %d-token context"
+                % (prompt, prompt, generated, eng.ctx))
+            continue
+        prefill_ms, decode_ms = request_split(eng, sync, prompt, generated)
+        # every reported figure is derived from the rounded milliseconds, so the file is consistent
+        # with itself: a rate recomputed from the printed ms must be the rate printed next to it
+        prefill_ms, decode_ms = round(prefill_ms, 2), round(decode_ms, 2)
+        total = prefill_ms + decode_ms
+        row = {"prompt_tokens": prompt, "generated_tokens": generated,
+               "prefill_ms": prefill_ms, "decode_ms": decode_ms,
+               "prefill_share": round(prefill_ms / total * 100.0, 1),
+               "decode_share": round(decode_ms / total * 100.0, 1),
+               "prefill_tok_s": round(prompt / (prefill_ms / 1000.0), 1) if prefill_ms > 0 else None,
+               "decode_tok_s": round(generated / (decode_ms / 1000.0), 1) if decode_ms > 0 else None}
+        splits[str(prompt)] = row
+        log("request split: %d prompt + %d generated = %.2f s; prefill %.2f s (%4.1f%%) at %.1f "
+            "tokens/s, decode %.2f s (%4.1f%%) at %.1f tokens/s"
+            % (prompt, generated, total / 1000.0, prefill_ms / 1000.0, row["prefill_share"],
+               row["prefill_tok_s"] or 0.0, decode_ms / 1000.0, row["decode_share"],
+               row["decode_tok_s"] or 0.0))
+    if splits:
+        result["split"] = splits
     timing = eng.timing_summary() if hasattr(eng, "timing_summary") else None
     if timing is not None:
         result["tandem_timing"] = timing

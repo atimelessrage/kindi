@@ -4,6 +4,16 @@
 
 ### Added
 
+- **`kindi bench` reports prefill vs decode as a share of one request's wall clock** — two separate
+  tok/s numbers left the reader to combine them, and the printed `prompt reading` rate was measured
+  one token per `feed` call, so it was not a request's prefill rate at all. `--split-at` (default
+  4096,8192) and `--split-generated` (default 128) now time a real chunked prefill followed by that
+  many decode steps, sync, and report each phase's milliseconds, tokens/s and share. Measured on the
+  2B (i7-8086K + RTX 4060 Ti, two runs per context): 512+128 is 13.6% prefill / 86.4% decode,
+  4,096+128 is 64.1% / 35.9%, 8,192+128 is 82.2% / 17.8%; chunked prefill runs at 4,349 tok/s at 4K
+  against the 302 tok/s read line, so the split is not derivable from the old numbers. The
+  AI-inventory row that asked for this is closed for the 2B, with the 27B half and the multi-request
+  share still open: `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-bench-split/RESULTS.md`.
 - **The secret guards now cover git history** — both existing scans look only at the files that exist
   now, so a key that was committed and deleted lived on in history, which is exactly what a push
   publishes. `tools/check_secret_history.py` walks every commit's diff once (`git log --all -p -U0`),

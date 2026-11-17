@@ -71,6 +71,35 @@ Files read: `docs/TANDEM_CPP.md` (verdict, §4–5, §9), `docs/STRATA.md` (verd
 One candidate was adopted as a proposal (REQ-0028); nothing was implemented in this pass, which is
 the expected outcome of a scan. No number above is a Kindi measurement.
 
+## Follow-up 2026-11-17 (the prefill-share row, closed for the 2B)
+
+The baseline row "prefill dominates wall clock" (**parked, cheap**, gate: our own measured split on
+the 2B/27B packs at 4K and 8K) is measured for the 2B. `kindi bench` now times one whole request
+(`--split-at`, default 4096,8192; `--split-generated`, default 128) and reports each phase's share of
+wall clock, so the two rates are no longer left for the reader to combine.
+
+| prompt + reply | prefill | decode | share (prefill / decode) |
+|---|---|---|---|
+| 512 + 128 | 0.08 s (6,189 tok/s) | 0.52 s (244.5 tok/s) | **13.6% / 86.4%** |
+| 4,096 + 128 | 0.94 s (4,349 tok/s) | 0.53 s (242.7 tok/s) | **64.1% / 35.9%** |
+| 8,192 + 128 | 2.55 s (3,215 tok/s) | 0.54 s (233.2 tok/s) | **82.2% / 17.8%** |
+
+Verdict: **adopted and measured** (2B, i7-8086K + RTX 4060 Ti, two runs per context, medians;
+[results](../../docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-bench-split/RESULTS.md)). What the
+measurement changed:
+
+- the candidate's claim holds only above roughly 1K prompt tokens: at 512 the request is 86% decode,
+  at 4K 64% prefill, at 8K 82% prefill. A fixed "prefill dominates" reading would be wrong for short
+  chat turns;
+- the split is *not* derivable from the two numbers `kindi bench` already printed. The `prompt
+  reading` line times one token per `feed` call (300.6-304.5 tok/s warm, 63.0 on a cold first run),
+  while a real chunked prefill runs at 4,349 tok/s at 4K and 3,215 at 8K - 11-14x faster. From 302
+  tok/s a 4K request would look like 13.6 s of prefill; it spends 0.94 s.
+
+The 27B half of the original gate stays open (no 27B run on this card in this pass), and the share is
+one-request, greedy, 128-token, default chunk size; a second concurrent request or a different chunk
+size would move it.
+
 ## How a later scan appends
 
 Add a `## Scan <date>` section with **Last checked**, the knowledge base **HEAD**, the files read and

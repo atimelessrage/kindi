@@ -118,7 +118,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_D1` | `1` or `0` | `kindi/spec.py:726` (+1 more) |
 | `KINDI_DATA` | `/data` | `kindi/container.py:243` |
 | `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:745` |
-| `KINDI_DEVICE` | `gpu` | `kindi/bench.py:15` (+5 more) |
+| `KINDI_DEVICE` | `gpu` | `kindi/bench.py:21` (+5 more) |
 | `KINDI_DOWNLOAD` | `1` | `kindi/container.py:108` |
 | `KINDI_DP4A` | `"1" if rt.is_hip else "0"` | `kindi/tp.py:463` |
 | `KINDI_DRAFT_POLICY` | `0` | `kindi/spec.py:1112` |
