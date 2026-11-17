@@ -31,6 +31,13 @@
   produce a different run. The command now passes the global option as
   `... --ctx <planned> bench --dcache <planned>`; a plan test pins the value and that it precedes
   the `bench` subcommand, where the CLI accepts it.
+- **The Lightning plan reports the cold host-tier split** — when `KINDI_LT_COLD` is enabled,
+  `kindi plan` now runs the engine's own `cold_experts.split_host_tiers` over the planned host set
+  and budget. The `host ram` line names the pinned host experts and the file-backed overflow with
+  their bytes and budget, the `experts` line no longer calls the whole remainder pinned, and the
+  report's `host_tier` object carries the same counts for JSON consumers. A test enables a 1 MiB
+  budget on the fake pack and checks the pinned/file-backed counts, the displayed line and the
+  byte totals.
 - **The kernel-arity check reaches the DSpine graph** — the checker now resolves the 31
   `kf["..."]` launches from the literal iterable that builds `self.kf`, and `self.k` /
   `self.k8 if n <= 8 else self.k16` from their `get_function(...)` assignments. The resolver now

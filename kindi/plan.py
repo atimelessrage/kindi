@@ -15,6 +15,7 @@ import sys
 
 import numpy as np
 
+from . import cold_experts as _cold
 from . import ltfit as _ltfit
 from . import tandem as _t
 
@@ -464,12 +465,43 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
             no_slots = _weighted_placement(spec, usage, room2, cap, eb, n_moe, 0, anchor)
             placement_no_slots = no_slots[0] if no_slots is not None else None
     slots_cost = _slots_cost(placement, placement_no_slots)
+    host_tier = None
+    if _cold.cold_enabled() and n_card < s.n_exp:
+        hosts, order = {}, {}
+        for il in moe_layers:
+            if placement is not None:
+                host = set(placement.on(il, "host")) | set(placement.on(il, "disk"))
+            else:
+                seq = usage.order(il)
+                host = set(seq[n_card:]) if n_card < s.n_exp else set()
+            if host:
+                hosts[il] = tuple(sorted(host))
+                order[il] = usage.order(il)
+        _, _, host_tier = _cold.split_host_tiers(
+            hosts, order, _cold.host_budget_bytes(), eb,
+            usage.counts if usage.has_counts() else {})
+        for i, (choice, _reason) in enumerate(lines):
+            if choice == "host ram":
+                lines[i] = (
+                    "host ram",
+                    "%d pinned in host memory and %d file-backed (%.2f GiB pinned, %.2f GiB on "
+                    "disk; %d MiB host budget); the whole expert set + dense core is ~%.1f GiB"
+                    % (host_tier["host_experts"], host_tier["disk_experts"],
+                       host_tier["host_bytes"] / 2 ** 30, host_tier["disk_bytes"] / 2 ** 30,
+                       host_tier["budget_bytes"] // 2 ** 20,
+                       (n_moe * s.n_exp * eb + dense) / 2 ** 30))
+                break
     if placement is not None:
         head = placement.describe()
         lines.append(("experts", "%s (usage-weighted placement; the most-used experts stay on the card)"
                       % head))
     else:
-        suffix = "" if n_card >= s.n_exp else ", the rest in pinned host memory"
+        if n_card >= s.n_exp:
+            suffix = ""
+        elif host_tier is not None and host_tier["disk_experts"]:
+            suffix = ", the rest split across pinned host memory and the file-backed overflow"
+        else:
+            suffix = ", the rest in pinned host memory"
         lines.append(("experts", "%d of %d experts per layer on the card%s"
                       % (n_card, s.n_exp, suffix)))
     slot_gib = n_moe * dcache * eb / 2 ** 30
@@ -520,8 +552,8 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
            "lines": lines, "n_card": n_card, "n_exp": s.n_exp, "n_used": s.n_used,
            "n_moe": n_moe, "expert_bytes": eb, "room": room, "dcache": dcache,
            "rate_sized": rate_sized, "rates": rates,
-           "slots_resident": n_resident, "slots_cost": slots_cost, "fit": True,
-           "estimate_mib": est // 2 ** 20,
+           "slots_resident": n_resident, "slots_cost": slots_cost, "host_tier": host_tier,
+           "fit": True, "estimate_mib": est // 2 ** 20,
            "command": _moe_bench_command(pack, ctx, dcache)}
     if chunk_tokens:
         chunk = _sample_tandem(spec, usage, placement, moe_layers, n_card, eb,

@@ -201,6 +201,27 @@ def test_describe_moe_uses_the_expert_tiers(tmp_path):
     assert rep["command"].endswith("--ctx 2048 bench --dcache %d" % rep["dcache"])
 
 
+def test_describe_moe_reports_the_cold_host_tier(tmp_path, monkeypatch):
+    """With the cold tier enabled, the dry run uses the same host/disk split as the engine."""
+    monkeypatch.setenv("KINDI_LT_COLD", "1")
+    monkeypatch.setenv("KINDI_LT_HOST_MB", "1")
+    pack = make_lightning_pack(tmp_path)
+    rep = _plan.describe(str(pack), 2048, None, assume_vram_gib=0.5, assume_ram_gib=4,
+                         assume_cores=2, reserve_mib=0, moe_cache_mib=1, dcache=4)
+    tier = rep["host_tier"]
+    assert tier["budget_bytes"] == 1 << 20
+    assert tier["host_experts"] > 0 and tier["disk_experts"] > 0
+    assert tier["host_bytes"] <= tier["budget_bytes"]
+    assert tier["host_bytes"] + tier["disk_bytes"] == \
+        (tier["host_experts"] + tier["disk_experts"]) * rep["expert_bytes"]
+    host = next(r for c, r in rep["lines"] if c == "host ram")
+    experts = next(r for c, r in rep["lines"] if c == "experts")
+    assert "%d pinned in host memory" % tier["host_experts"] in host
+    assert "%d file-backed" % tier["disk_experts"] in host
+    assert "1 MiB host budget" in host
+    assert "file-backed overflow" in experts
+
+
 def test_the_fit_prices_a_slot_at_more_than_one_expert():
     """`_lt_fit` takes the decode slots off the room *before* dividing it over the remaining
     (n_moe - 2) layers, so dcache slots per layer cost dcache * n_moe / (n_moe - 2) experts per
