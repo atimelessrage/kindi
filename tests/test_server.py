@@ -749,6 +749,21 @@ class _SpecKindi(_FakeKindi):
         self.eng = _SpecEngine(loaded)
 
 
+def test_health_explains_mtp_needs_the_tensor_core_path(monkeypatch):
+    """KINDI_SPEC=mtp without KINDI_TC=1 never installs spec_begin, so there is no effective
+    state to resolve; /health must name the missing tensor-core path instead of a null reason."""
+    monkeypatch.setenv("KINDI_SPEC", "mtp")
+    K = _SpecKindi(False)
+    K.eng = _FakeEngine()                 # the KINDI_TC=0 engine: no spec_begin patch
+    monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
+    app = server.create_app({"model_name": "bonsai2-2b", "api_key": ""}, log=lambda *a: None)
+    with TestClient(app) as client:
+        d = client.get("/health").json()["drafting"]
+    assert d["requested"] == "mtp"
+    assert d["enabled"] is False and d["method"] is None
+    assert "tensor-core" in d["reason"] and "KINDI_TC=1" in d["reason"]
+
+
 @pytest.mark.parametrize("loaded", [True, False], ids=["head-loaded", "head-refused"])
 def test_health_reports_the_effective_speculation_state(monkeypatch, loaded):
     """REQ-0024 A1: KINDI_SPEC=mtp is the request; /health answers what is running. With the head

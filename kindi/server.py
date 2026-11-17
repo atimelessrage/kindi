@@ -839,6 +839,11 @@ class Kindi(object):
                        head=head.get("file") if head.get("state") == "loaded" else None,
                        head_sha256=(head.get("sha256") or "")[:12] or None,
                        drafter=getattr(getattr(dr, "eng", None), "pack", None) or (type(dr).__name__ if dr else None))
+        elif not self.native and requested not in ("", "0", "off"):
+            # without KINDI_TC=1, spec.install() never patches spec_begin onto the engine, so there is
+            # no effective state to resolve; name the missing path instead of returning a null reason.
+            out["reason"] = ("KINDI_SPEC=%s requires the tensor-core plan engine: set "
+                             "KINDI_TC=1 (and do not set KINDI_TP=0)" % requested)
         if last and last.get("drafted"):
             out["last"] = {"passes": last.get("passes", 0), "drafted": last["drafted"], "accepted": last.get("accepted", 0),
                            "acceptance": round(last.get("accepted", 0) / float(last["drafted"]), 3)}

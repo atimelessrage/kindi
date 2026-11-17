@@ -160,6 +160,12 @@
 
 ### Fixed
 
+- **`/health` explains MTP requested without the tensor-core path** — `KINDI_SPEC=mtp` with
+  `KINDI_TC=0` reported `requested: "mtp", enabled: false, reason: null`, because `spec.install()`
+  never patches `spec_begin` onto the engine without the tensor-core path. `drafting()` now names
+  the missing switch when the engine has no speculation path, and
+  `tests/test_server.py::test_health_explains_mtp_needs_the_tensor_core_path` pins it with an engine
+  that has no `spec_begin`.
 - **Comma-separated CLI values now reject unknown tokens with their valid set** — `kindi bench`
   `--split-at` used to drop zero/negative lengths and end a run with a bare `ValueError` for text;
   it now rejects anything that is not a positive integer (or `none`/`off`) before the model loads.
