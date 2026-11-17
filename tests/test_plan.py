@@ -267,13 +267,31 @@ def test_describe_moe_sizes_slots_from_the_measured_rates(tmp_path):
     assert "sized from the measured I/O rates" in next(r for c, r in rep["lines"] if c == "strategy")
 
 
+def test_the_planned_bench_command_reproduces_the_rate_sized_slot_count(tmp_path, monkeypatch):
+    """The plan's child command must set the count the report used, not the engine's default 10."""
+    pack = make_lightning_pack(tmp_path)
+    rep = _plan.describe(str(pack), 2048, None, assume_vram_gib=0.5, assume_ram_gib=4,
+                         assume_cores=2, reserve_mib=0, rates=RATES)
+    assert rep["rate_sized"] is True and rep["dcache"] == 16
+    prefix, rest = rep["command"].split(" ", 1)
+    key, value = prefix.split("=", 1)
+    assert key == "KINDI_LT_DCACHE" and value == str(rep["dcache"])
+    assert rest.endswith("bench")
+    # The environment the command sets is the one `lightning._plan` reads through this helper.
+    monkeypatch.delenv("KINDI_LT_DCACHE", raising=False)
+    monkeypatch.setenv(key, value)
+    assert _plan._ltfit.dcache_default(rep["n_used"]) == rep["dcache"]
+
+
 def test_run_measures_rates_for_a_lightning_pack(tmp_path, monkeypatch, capsys):
     pack = make_lightning_pack(tmp_path)
     monkeypatch.setattr(_plan, "_io_rates", lambda: RATES)
+    monkeypatch.setenv("KINDI_TANDEM_RESERVE_MB", "0")
     args = _FakeArgs(assume_vram_gib=0.5, assume_ram_gib=4, assume_cores=2)
     assert _plan.run({"pack": str(pack), "ctx": 2048}, args) == 0
     out = capsys.readouterr().out
     assert "rates:" in out and "PCIe H2D 6.0 GiB/s" in out
+    assert "KINDI_LT_DCACHE=16" in out
 
 
 def test_describe_moe_reports_a_refusal_when_nothing_fits(tmp_path):

@@ -257,6 +257,12 @@ def _command(pack, mode, spec):
     return "%s -m kindi --pack %s%s" % (sys.executable, pack, tail)
 
 
+def _moe_bench_command(pack, dcache):
+    """The Lightning follow-up: carry the planned slot count into the child engine."""
+    return "KINDI_LT_DCACHE=%d %s -m kindi --pack %s bench" % (
+        int(dcache), sys.executable, pack)
+
+
 _Q2, _Q8, _F32 = 42, 8, 0                     # lightning.py's tensor-type ids
 
 
@@ -426,7 +432,7 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
                 "n_exp": s.n_exp, "n_used": s.n_used, "n_moe": n_moe, "expert_bytes": eb,
                 "room": room, "dcache": dcache, "rate_sized": rate_sized, "rates": rates,
                 "fit": False,
-                "command": "%s -m kindi --pack %s bench" % (sys.executable, pack)}
+                "command": _moe_bench_command(pack, dcache)}
     # weighted placement, mirroring lightning._plan_weighted's candidate scan
     usage_path = usage_path or os.environ.get("KINDI_LT_USAGE") or os.path.join(
         os.path.dirname(__file__), "lightning-experts.json")
@@ -502,7 +508,7 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
            "rate_sized": rate_sized, "rates": rates,
            "slots_resident": n_resident, "slots_cost": slots_cost, "fit": True,
            "estimate_mib": est // 2 ** 20,
-           "command": "%s -m kindi --pack %s bench" % (sys.executable, pack)}
+           "command": _moe_bench_command(pack, dcache)}
     if chunk_tokens:
         chunk = _sample_tandem(spec, usage, placement, moe_layers, n_card, eb,
                                int(chunk_tokens), chunk_lane)

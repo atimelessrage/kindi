@@ -4,6 +4,11 @@
 
 ### Added
 
+- **The Lightning plan's follow-up bench command carries its planned slot count** — a rate-sized
+  `dcache` was shown in the report but the printed command let the child engine fall back to
+  `KINDI_LT_DCACHE`'s default 10. The MoE command now prefixes `KINDI_LT_DCACHE=<planned>` (also for
+  an explicit `--dcache`), and a plan test parses that value back through the engine's own
+  `ltfit.dcache_default` to prove the planned count is reproduced.
 - **The kernel-arity check reaches the DSpine graph** — the checker now resolves the 31
   `kf["..."]` launches from the literal iterable that builds `self.kf`, and `self.k` /
   `self.k8 if n <= 8 else self.k16` from their `get_function(...)` assignments. DSpine moves from

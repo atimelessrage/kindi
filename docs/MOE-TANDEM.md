@@ -70,8 +70,10 @@ design and prototype.
 
 On a `kindi_lightning` pack the report also measures the host's RAM/disk/PCIe rates with the same
 probes as `kindi io`, sizes the decode slots from the measured refill path, and prints the three
-rates in a `rates:` line and in the slot explanation. The slot count is a prediction; the
-Lightning-pack comparison remains the gate.
+rates in a `rates:` line and in the slot explanation. Its follow-up `bench` command prefixes the
+planned `KINDI_LT_DCACHE=<count>`, so the child engine uses the same slot count instead of falling
+back to its default 10. The slot count is a prediction; the Lightning-pack comparison remains the
+gate.
 
 On a `kindi_lightning` pack the opt-in cold tier is now a real file path, not only a plan: with
 `KINDI_LT_COLD=1`, the hottest host experts stay pinned under `KINDI_LT_HOST_MB` (default:
