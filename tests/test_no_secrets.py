@@ -17,7 +17,9 @@ SKIP = {".gguf", ".bin", ".npz", ".npy", ".dll", ".exe", ".lib", ".exp", ".so", 
         ".pyc", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf", ".zip", ".gz", ".xz"}
 
 # Placeholders and documented examples are not credentials.
-ALLOW = re.compile(r"(?i)(?:example|placeholder|your[-_]|none|redacted|choose-a-long-random-string|random-string|\*\*\*|<[^>]+>)")
+# `KindiInstallerTest` is the deliberate -AppName/-DistroDir fixture of the documented
+# installer run (docs/WINDOWS.md), not a machine layout that leaked into the tree.
+ALLOW = re.compile(r"(?i)(?:example|placeholder|your[-_]|none|redacted|choose-a-long-random-string|random-string|KindiInstallerTest|\*\*\*|<[^>]+>)")
 
 PATTERNS = [
     ("private key", re.compile(r"-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP )?PRIVATE KEY-----")),

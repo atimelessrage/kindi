@@ -108,6 +108,70 @@ proxy for the downloads, for `apt` and Docker inside WSL2, and for `docker build
 `localhost` (for example Px or Cntlm) is not visible from WSL2, unless `networkingMode=mirrored` is set in
 `.wslconfig`. Otherwise, give the proxy's network address in `HTTPS_PROXY`.
 
+## Verified installer run (2026-11-17)
+
+The Windows installer had only ever been exercised through `-DryRun`/`-Check` on real
+hardware. This is a real run on a Windows 10 Pro 19045 PC (i7-8086K, 32 GB RAM, RTX 4060 Ti,
+WSL2 already on, Docker Desktop installed), done with a separate name and location so the
+machine's own setup is untouched:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1 `
+  -AppName KindiInstallerTest -Distro KindiInstallerTest `
+  -DistroDir 'S:\KindiInstallerTest\wsl' `
+  -DockerMode skip -NoBridge -NoDesktopShortcut -Yes -LinuxArgs '--dry-run'
+```
+
+`-DockerMode skip` and `-LinuxArgs '--dry-run'` keep the run off Docker Desktop's settings and
+off the multi-GB model download; everything the Windows half does (PC checks, the Ubuntu
+image, the distribution, systemd, the GPU check, the Windows items) ran for real. Wall clock: **01:02:30 to 01:04:04** (94 s, transcript times).
+
+| step | observed |
+|---|---|
+| PC check | Windows 10 Pro build 19045 x86-64, virtualization on, 12 threads, 32 GB RAM, 22 GB free on `S:`, RTX 4060 Ti on driver 617.42, no proxy, WSL2 on; noted that 22 GB is under the 15-40 GB guidance and that Docker setup was skipped |
+| Ubuntu image | downloaded from `cloud-images.ubuntu.com/wsl/releases/24.04/current`, **sha256 `8251e27f…` matched Canonical's SHA256SUMS**, then deleted from the cache |
+| distribution | `wsl --import KindiInstallerTest S:\KindiInstallerTest\wsl` (WSL2), a Linux user named after the Windows account, `systemd=on` and that user as the default written to `/etc/wsl.conf`, distro restarted (other distributions kept running) |
+| resources | WSL memory 16 GB of 32 (the script says `-WslMemoryGB 24` is the way to raise it) |
+| GPU in WSL | `nvidia-smi -L` inside the distribution: `GPU 0: NVIDIA GeForce RTX 4060 Ti (UUID: GPU-78de4e15…)` — the Windows driver reaches WSL2 as documented |
+| Linux installer | the *published* `install.sh` reports **0.6.1**, checked the machine (GPU 0 sm_89, 8188 MiB), listed the supported setups and picked setup 1 (27B on GPU 0, context 65536, profile `pascal8`, `kindi` container on port 8093), then stopped at its own `--dry-run` before building the image |
+| Windows check | no server to poll, so the localhost check was skipped exactly as a dry run predicts |
+| Windows items | Start-menu folder with `KindiInstallerTest Console`, `KindiInstallerTest Shell (WSL)` and `Uninstall KindiInstallerTest`; Settings > Apps entry `KindiInstallerTest (WSL2)`; no desktop shortcut (`-NoDesktopShortcut`); no scheduled task; `keepAlivePid: 0` in `state.json` |
+
+Where it wrote, and nowhere else:
+
+| location | contents |
+|---|---|
+| `S:\KindiInstallerTest\wsl\ext4.vhdx` | the distribution's disk, 1.3 GB after provisioning |
+| `%LOCALAPPDATA%\KindiInstallerTest\` | `state.json` (172 B: distro, `createdDistro`, `dockerMode`, user, `bridge: false`), `install.log` (the transcript, 3.8 KB), a copy of `install.ps1`, `kindi-console.ps1`, empty `download\` cache, `wsl-scripts\`; 85 KB total |
+| `%APPDATA%\Microsoft\Windows\Start Menu\Programs\KindiInstallerTest\` | the three shortcuts (1.2-1.7 KB each) |
+| `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KindiInstallerTest` | `DisplayName KindiInstallerTest (WSL2)`, `DisplayVersion 0.6.0`, `InstallLocation` = the state folder, `UninstallString` = `install.ps1 -Uninstall -AppName … -Distro …` |
+
+What it did **not** touch, verified after the run: the `Ubuntu` and `docker-desktop`
+distributions (both still registered, `Ubuntu` still the default), Docker Desktop's
+`settings-store.json` (mtime August 23), and port 8093 (nothing listening). The machine's own
+Kindi setup was never a target: a different `-Distro`, `-AppName` and `-DistroDir` keep the
+distribution, shortcuts, registry entry and state folder distinct.
+
+Two things this run showed and did not hide:
+
+- **The Windows and Linux installers report different versions.** The published `install.sh`
+  says **0.6.1**; `install.ps1` (`$KindiWinVersion`) and this repository's `install.sh` say
+  **0.6.0**, so Settings > Apps shows 0.6.0 while the distribution holds 0.6.1. The version
+  pairing is a release-owner step (republish or pin the two together), tracked in
+  [MANUAL-HELP-NEEDED.md](MANUAL-HELP-NEEDED.md).
+- **The in-WSL disk check is not a host-space check.** Inside the distribution `install.sh`
+  reported **954.5 GB free** for its own home directory, because it sees the virtual disk's capacity,
+  while the host `S:` actually had 22 GB free. The Windows layer is the one that knows: it prints
+  the host figure. On a nearly full drive the host-side note is the constraint to trust, and a
+  model download can still fail after the Linux check passes.
+
+To remove the test install (this deletes the distribution and its disk):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1 -Uninstall -Purge `
+  -AppName KindiInstallerTest -Distro KindiInstallerTest -Yes
+```
+
 ## Remove Kindi
 
 Use Settings > Apps > Kindi (WSL2) > Uninstall, or Start menu > Kindi > Uninstall Kindi. It removes the Kindi servers

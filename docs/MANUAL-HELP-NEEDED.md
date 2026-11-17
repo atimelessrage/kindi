@@ -108,6 +108,13 @@ commands and interpret the output. Each row states the gate it unlocks.
   current script and its hash, or retire the tag from the docs. `docs/INSTALL.md`
   now says which artifact the value belongs to; only the release owner can make the
   URL match.
+- **Pair the Windows and Linux installer versions** (2026-11-17 real run, see
+  [WINDOWS.md](WINDOWS.md#verified-installer-run-2026-11-17)): the published
+  `install.sh` reports **0.6.1** while `install.ps1` (`$KindiWinVersion`) and this
+  tree say **0.6.0**, so Settings > Apps shows 0.6.0 for a distribution that holds
+  0.6.1. Republishing one of the two (or bumping `$KindiWinVersion` with the next
+  published script) is a release-owner decision; the agent cannot verify the hosted
+  pair from here.
 - **Report the corrupt ahtx upload (§1) to the repo author** (or file/feedback
   on the HF repo) so a fixed file exists upstream; the agent cannot file
   it for you.
