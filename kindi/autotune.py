@@ -13,6 +13,7 @@ context is a different question. Exactness is not re-measured here: `kindi verif
 placement-changing winner (tandem, two-card split) has to pass it before it is served.
 """
 import json
+import math
 import os
 import subprocess
 import sys
@@ -31,6 +32,37 @@ def _manifest(pack):
     except (OSError, ValueError):
         return {}
     return data if isinstance(data, dict) else {}
+
+
+def _expert_cache_mib(moe, rates):
+    """The pinned-host cache size for the cold tier, from the rate-sized slot working set.
+
+    The host cache is the RAM side of the same prediction as the decode slots: keep the
+    rate-sized working set of each MoE layer in host memory so a slot refill is a RAM copy
+    instead of a cold file read. The size is capped by the experts that actually live on the
+    host tier (`n_card` is the card-resident count), so a pack that fits on the card gets no
+    cache candidate. Returns None without a usable rate report or a host tier smaller than one
+    token's selection.
+    """
+    m = moe or {}
+    if not rates or m.get("fit") is False:
+        return None
+    try:
+        n_used = int(m.get("n_used") or 0)
+        n_exp = int(m.get("n_exp") or 0)
+        n_moe = int(m.get("n_moe") or 0)
+        eb = int(m.get("expert_bytes") or 0)
+        n_card = max(0, int(m.get("n_card") or 0))
+    except (TypeError, ValueError):
+        return None
+    host_per_layer = max(0, n_exp - min(n_exp, n_card))
+    if n_used <= 0 or n_moe <= 0 or eb <= 0 or host_per_layer < n_used:
+        return None
+    from . import ltfit
+    slots = ltfit.rate_slots(n_used, host_per_layer, eb, rates)
+    if not slots:
+        return None
+    return max(1, int(math.ceil(slots * n_moe * eb / 2 ** 20)))
 
 
 def candidates(report, manifest, ctx, max_runs=6, include_cpu=False, rates=None, moe=None):
@@ -71,7 +103,12 @@ def candidates(report, manifest, ctx, max_runs=6, include_cpu=False, rates=None,
         values = list(dict.fromkeys(max(1, int(v)) for v in values))
         from . import io_probe
         rate_note = io_probe.rate_line(rates) if rates else ""
-        for slots in values:
+        cache_mib = _expert_cache_mib(moe, rates)
+        cache_why = ("pinned host expert cache for the cold tier: the rate-sized slot working "
+                     "set kept in RAM; KINDI_LT_COLD=1 and KINDI_LT_HOST_MB")
+        if rate_note:
+            cache_why += " (%s)" % rate_note
+        for i, slots in enumerate(values):
             why = "decode LRU slots per MoE layer against VRAM"
             if sized:
                 why += "; sized from the measured I/O rates"
@@ -82,6 +119,14 @@ def candidates(report, manifest, ctx, max_runs=6, include_cpu=False, rates=None,
             out.append({"name": "dcache-%d" % slots,
                         "args": [], "env": {"KINDI_LT_DCACHE": str(slots)},
                         "why": why})
+            # Keep the explicit cache candidate visible under the default --max-runs 6:
+            # two cards already spend three slots on gpu0/tp-2-auto/tp-2-equal.
+            if i == 0 and cache_mib:
+                out.append({"name": "expert-cache-%d" % cache_mib,
+                            "args": [],
+                            "env": {"KINDI_LT_COLD": "1",
+                                    "KINDI_LT_HOST_MB": str(cache_mib)},
+                            "why": cache_why})
     if include_cpu or not cards:
         out.append({"name": "cpu", "why": "the CPU engine (KINDI_DEVICE=cpu)",
                     "args": [], "env": {"KINDI_DEVICE": "cpu"}})
@@ -266,7 +311,8 @@ def run(cfg, a, log=print):
         payload = {"pack": pack, "model": manifest.get("model"), "ctx": ctx,
                    "cards": report.get("gpus") or [], "cpu": report.get("cpu") or {},
                    "rates": rates, "moe": ({k: moe.get(k) for k in
-                                           ("dcache", "n_used", "n_exp", "n_moe", "room")}
+                                           ("dcache", "n_used", "n_exp", "n_moe", "n_card",
+                                            "expert_bytes", "room", "fit")}
                                           if moe else None),
                    "candidates": options, "results": results,
                    "best": (next((r for r in rank(results) if r.get("ok")

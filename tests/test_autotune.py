@@ -46,6 +46,7 @@ def test_a_moe_pack_gets_its_decode_cache_knob_and_no_dense_tandem():
 
 
 RATES = {"source": "kindi io", "ram_mib_s": 13456.7, "disk_mib_s": 2509.8,
+         "ram_bytes_s": 13456.7 * 2 ** 20, "disk_bytes_s": 2509.8 * 2 ** 20,
          "pcie_h2d_gib_s": 6.0, "pcie_bytes_s": 6.0 * 2 ** 30}
 
 
@@ -58,6 +59,47 @@ def test_moe_slot_candidates_follow_the_rate_sized_count():
     why = next(item["why"] for item in options if item["name"] == "dcache-16")
     assert "sized from the measured I/O rates" in why
     assert "PCIe H2D 6.0 GiB/s" in why
+
+
+def test_moe_cache_candidate_exposes_the_cold_tier_budget_and_rate_size():
+    options = autotune.candidates(ONE_CARD, LIGHTNING, 8192, max_runs=10, rates=RATES,
+                                  moe={"dcache": 16, "n_used": 4, "n_exp": 32, "n_moe": 4,
+                                       "n_card": 16, "expert_bytes": 1 << 20, "fit": True})
+    option = next(item for item in options if item["name"].startswith("expert-cache-"))
+    # 4 selected experts + ceil((RAM + disk) / PCIe) lookahead = 16 slots per layer
+    # 16 hosts/layer x 4 MoE layers x 1 MiB/expert = 64 MiB
+    assert option["name"] == "expert-cache-64"
+    assert option["env"] == {"KINDI_LT_COLD": "1", "KINDI_LT_HOST_MB": "64"}
+    assert "rate-sized slot working set" in option["why"]
+    assert "PCIe H2D 6.0 GiB/s" in option["why"]
+
+
+def test_moe_cache_candidate_survives_the_default_run_budget_on_two_cards():
+    options = autotune.candidates(TWO_CARDS, LIGHTNING, 8192, rates=RATES,
+                                  moe={"dcache": 16, "n_used": 4, "n_exp": 32, "n_moe": 4,
+                                       "n_card": 16, "expert_bytes": 1 << 20, "fit": True})
+    names = _names(options)
+    assert "expert-cache-64" in names
+    assert len(options) == 6
+
+
+def test_moe_cache_candidate_is_capped_by_the_host_tier():
+    options = autotune.candidates(ONE_CARD, LIGHTNING, 8192, max_runs=10, rates=RATES,
+                                  moe={"dcache": 16, "n_used": 4, "n_exp": 32, "n_moe": 4,
+                                       "n_card": 24, "expert_bytes": 1 << 20, "fit": True})
+    option = next(item for item in options if item["name"].startswith("expert-cache-"))
+    assert option["name"] == "expert-cache-32"       # 8 host experts/layer, not 16
+
+
+def test_moe_cache_candidate_needs_measured_rates_and_a_host_tier():
+    moe = {"dcache": 16, "n_used": 4, "n_exp": 32, "n_moe": 4, "n_card": 16,
+           "expert_bytes": 1 << 20, "fit": True}
+    assert not [item for item in autotune.candidates(ONE_CARD, LIGHTNING, 8192, max_runs=10,
+                                                    moe=moe)
+                if item["name"].startswith("expert-cache-")]
+    assert not [item for item in autotune.candidates(ONE_CARD, LIGHTNING, 8192, max_runs=10,
+                                                    rates=RATES, moe=dict(moe, n_card=32))
+                if item["name"].startswith("expert-cache-")]
 
 
 def test_a_host_without_a_card_only_offers_the_cpu_engine():

@@ -128,12 +128,17 @@ proposes what this machine could actually run:
 | `tandem-auto` | a card, a dense pack, ≥4 physical cores | the smallest CPU slice that makes the requested context fit |
 | `tandem-gdn:8`, `tandem-gdn:16` | same | fixed CPU slices: the first N non-attention layers |
 | `dcache-<sized>` | a Lightning (MoE) pack | decode LRU slots per expert layer (`KINDI_LT_DCACHE`, default 10) against VRAM; with measured rates the list is the predicted count plus half and double it |
+| `expert-cache-<MiB>` | a Lightning pack with measured rates and host-tier experts | the pinned host cache for the cold tier: `KINDI_LT_COLD=1` plus `KINDI_LT_HOST_MB`, sized from the same rate-sized working set and capped by the experts that live on the host tier |
 | `cpu` | no card, or `--include-cpu` | the CPU engine (`KINDI_DEVICE=cpu`) |
 
 For a Lightning pack the slot candidates are sized from the `kindi io` rates: one token's `n_used`
 experts plus `ceil((RAM copy + disk read) / PCIe H2D)` lookahead of the same working set, capped by
 `n_exp` and by the room that still leaves `n_used` experts per layer resident. The plan's `rates:`
-line prints the three assumptions. This is a prediction; the Lightning-pack comparison is the gate.
+line prints the three assumptions. The `expert-cache-<MiB>` candidate keeps that same rate-sized
+working set in pinned host RAM, multiplied by the MoE layer count and the expert bytes and capped by
+the host tier's `n_exp - n_card`; it sets `KINDI_LT_COLD=1` as well as `KINDI_LT_HOST_MB`, because the
+budget is inert on the default pinned-RAM path. Both are predictions; a Lightning-pack comparison is
+the gate.
 
 Every candidate is **one real `kindi bench` run in a child process**, with `--sample-vram`, so decode
 and read rates, the context actually granted and the device-wide VRAM peak all come from the code
@@ -165,7 +170,8 @@ the same), and this shell has no compiler on `PATH`, which `kindi caps` now repo
 - **No exactness.** `kindi verify` owns token-exactness; a winner that changes placement (tandem,
   two-card split) must pass it before it is served, and the tuner says so in its last line.
 - **No two-card numbers yet.** The `tp-2-*` candidates are unit-tested here but unmeasured: this
-  host has one card. The same is true for the Lightning cache knob (no Lightning pack here).
+  host has one card. The same is true for the Lightning decode-slot and host-cache candidates (no
+  Lightning pack here).
 - **Not a search over everything.** Context sizes, `KINDI_KV` modes, chunk sizes and the sampler are
   out of scope; the tuner covers placement, the split and the MoE decode cache — the settings whose
   best value is machine-specific. Each run is a real model load, so the budget is the user's.

@@ -198,7 +198,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_LT_NSPLIT` | `32` | `kindi/lightning.py:29` |
 | `KINDI_LT_NSPLIT_TC` | `64` | `kindi/lightning.py:30` |
 | `KINDI_LT_PRE6` | `"1" if self.cc >= 60 else "0"` | `kindi/lightning.py:141` |
-| `KINDI_LT_RESERVE_MB` | `350` | `kindi/autotune.py:236` (+2 more) |
+| `KINDI_LT_RESERVE_MB` | `350` | `kindi/autotune.py:281` (+2 more) |
 | `KINDI_LT_SELFCHECK` | `1` | `kindi/lightning_gen.py:241` |
 | `KINDI_LT_SM75` | (unset) | `kindi/lightning.py:144` |
 | `KINDI_LT_TC` | `1` | `kindi/lightning.py:139` |
