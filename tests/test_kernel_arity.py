@@ -9,10 +9,12 @@ tuple is not a Python error, so nothing caught it.
 This test is the launch-shape contract for the four modules that build graphs (`spec.py`,
 `dspine.py`, `mtp.py`, `tp.py`): it reads each kernel's parameter count from its `.cu` declaration and
 each call site's argument tuple from the Python source. DSpine's `self.kf` dictionary and its
-`self.k` / `self.k8` / `self.k16` assignments are resolved from the literals that build them, so the
-contract reaches those graph nodes instead of pinning the lookup. Call sites it cannot resolve
-statically are **listed and pinned** (`UNRESOLVED_SITES`) rather than skipped, so a new dynamic
-launch has to be classified by a person instead of disappearing from the check.
+`self.k` / `self.k8` / `self.k16` assignments are resolved from the literals that build them, but only
+when the table is rooted at `self`; `other.k = ...` is not this object's table. A conditional kernel
+expression is checked branch by branch: matching the union of the branches' arities is not enough.
+Call sites it cannot resolve statically are **listed and pinned** (`UNRESOLVED_SITES`) rather than
+skipped, so a new dynamic launch has to be classified by a person instead of disappearing from the
+check.
 
 `test_every_checked_site_is_detected_when_mutated` proves each check is real: for every measured call
 site it writes a copy of the module with that site's argument tuple shortened and requires the checker
@@ -177,12 +179,19 @@ def _function_names(node, consts):
     return set()
 
 
+def _is_self_attr(node):
+    """True only for a direct `self.<name>` attribute, not `other.name` or a chained table."""
+    return (isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
+            and node.value.id == "self")
+
+
 def _kernel_tables(src):
     """Resolve the local kernel dictionaries/attributes the checker can read statically.
 
     `dspine.py` builds `self.kf` from a literal list of names and keeps kernels on `self.k` /
     `self.k8`/`self.k16`; those are as static as `SK.k_*`, but the old checker only accepted the
-    latter.  The table keeps the dict keys, the attributes' possible names, and the local aliases
+    latter.  Only assignments rooted at `self` are followed: `other.k = ...` is not this object's
+    table.  The table keeps the dict keys, the attributes' possible names, and the local aliases
     (`kf = self.kf`) so a launch through any of them is measured instead of pinned.
     """
     tree = ast.parse(src)
@@ -201,16 +210,16 @@ def _kernel_tables(src):
         if not isinstance(node, ast.Assign) or len(node.targets) != 1:
             continue
         for target, value in _assign_pairs(node.targets[0], node.value):
-            if isinstance(target, ast.Attribute) and target.attr == "kf":
+            if _is_self_attr(target) and target.attr == "kf":
                 keys = _dict_keys(value)
                 if keys:
                     dicts.setdefault("kf", set()).update(keys)
-            elif isinstance(target, ast.Attribute):
+            elif _is_self_attr(target):
                 names = _function_names(value, consts)
                 if names:
                     attrs.setdefault(target.attr, set()).update(names)
             elif isinstance(target, ast.Name) and target.id == "kf":
-                if (isinstance(value, ast.Attribute) and value.attr == "kf") or (
+                if (_is_self_attr(value) and value.attr == "kf") or (
                         isinstance(value, ast.Name) and value.id in aliases):
                     aliases.add(target.id)
     return {"attrs": attrs, "dicts": dicts, "aliases": aliases}
@@ -221,9 +230,11 @@ def _kernel_names(node, tables):
     if isinstance(node, ast.Attribute):
         if node.attr.startswith("k_"):
             return {node.attr}
-        return set(tables["attrs"].get(node.attr, ())) or None
+        if _is_self_attr(node):
+            return set(tables["attrs"].get(node.attr, ())) or None
+        return None
     if isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Constant) and isinstance(node.slice.value, str):
-        is_table = (isinstance(node.value, ast.Attribute) and node.value.attr == "kf") or (
+        is_table = (_is_self_attr(node.value) and node.value.attr == "kf") or (
             isinstance(node.value, ast.Name) and node.value.id in tables["aliases"])
         if is_table and node.slice.value in tables["dicts"].get("kf", ()):
             return {node.slice.value}
@@ -273,14 +284,15 @@ def _launches(path):
     yield from _launch_sites(src, path)
 
 
-def _check_source(src, path):
+def _check_source(src, path, arities=None):
     """(checked, unresolved, mismatches) over one module source.
 
     checked:    [(lineno, kernel, count, declared)]
     unresolved: [(expression, reason)]
-    mismatches: [(lineno, kernel, count, declared)]
+    mismatches: [(lineno, kernel_branch, count, declared)]; every branch must accept `count`, so a
+                union of the branches' declared counts is not enough.
     """
-    arities = _kernel_arity()
+    arities = _kernel_arity() if arities is None else arities
     tables = _kernel_tables(src)
     checked, unresolved, mismatches = [], [], []
     for node, kernel_expr, args_expr, source in _launch_sites(src, path):
@@ -300,8 +312,10 @@ def _check_source(src, path):
         name = "+".join(sorted(names))
         declared = sorted(set().union(*(arities[n] for n in names)))
         checked.append((node.lineno, name, count, declared))
-        if count not in declared:
-            mismatches.append((node.lineno, name, count, declared))
+        for branch in sorted(names):
+            branch_declared = sorted(arities[branch])
+            if count not in arities[branch]:
+                mismatches.append((node.lineno, branch, count, branch_declared))
     return checked, unresolved, mismatches
 
 
@@ -349,6 +363,39 @@ def test_unresolved_call_sites_are_listed_not_skipped():
         "new (add to UNRESOLVED_SITES with a reason): %r\n"
         "gone (remove from UNRESOLVED_SITES): %r\n"
         "seen: %r" % (extra, missing, sorted(seen)))
+
+
+def test_kernel_tables_are_only_followed_when_rooted_at_self():
+    src = '''\
+def launch(self, other):
+    self.k = M.get_function("k_self")
+    other.k = M.get_function("k_other")
+    other.kf = {"k_other": M.get_function("k_other")}
+    E(self.k, (1,), (1,), (a,))
+    E(other.k, (1,), (1,), (a,))
+    E(other.kf["k_other"], (1,), (1,), (a,))
+'''
+    checked, unresolved, mismatches = _check_source(
+        src, "fixture.py", {"k_self": {1}, "k_other": {1}})
+    assert [name for _, name, _, _ in checked] == ["k_self"]
+    assert [expr for expr, _ in unresolved] == ["other.k", 'other.kf["k_other"]']
+    assert not mismatches
+
+
+def test_every_kernel_branch_must_accept_the_argument_count():
+    """A conditional launch is not valid when only the union of its branches' arities matches."""
+    src = '''\
+def launch(self, cond):
+    self.k = M.get_function("k_six")
+    self.k8 = M.get_function("k_seven")
+    E(self.k if cond else self.k8, (1,), (1,), (a, b, c, d, e, f))
+'''
+    checked, unresolved, mismatches = _check_source(
+        src, "fixture.py", {"k_six": {6}, "k_seven": {7}})
+    assert not unresolved
+    assert [name for _, name, _, _ in checked] == ["k_seven+k_six"]
+    assert [(name, count, declared) for _, name, count, declared in mismatches] == [
+        ("k_seven", 6, [7])]
 
 
 def test_measured_sites_are_the_pinned_count():
@@ -410,7 +457,7 @@ def test_every_checked_site_is_detected_when_mutated():
                         last_reason = "site moved after mutation"
                         continue
                     _c, _u, mism = check_module_from_source(mutated.decode("utf-8"), path)
-                    if any(k == name and c not in declared for _, k, c, declared in mism):
+                    if any(k in names and c not in declared for _, k, c, declared in mism):
                         caught = True
                         break
                     last_reason = "%s mutation not detected" % mode

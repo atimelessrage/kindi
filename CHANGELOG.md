@@ -25,8 +25,11 @@
   `ltfit.dcache_default` to prove the planned count is reproduced.
 - **The kernel-arity check reaches the DSpine graph** — the checker now resolves the 31
   `kf["..."]` launches from the literal iterable that builds `self.kf`, and `self.k` /
-  `self.k8 if n <= 8 else self.k16` from their `get_function(...)` assignments. DSpine moves from
-  4/39 measured to 37/39; across the four graph builders the coverage is 105 measured / 37 pinned
+  `self.k8 if n <= 8 else self.k16` from their `get_function(...)` assignments. The resolver now
+  follows only table assignments rooted at `self`, and every branch of a conditional kernel must
+  accept the call's argument count instead of the union of the branches' declared counts; two tests
+  pin a foreign table and branches with different arities. DSpine moves from 4/39 measured to 37/39;
+  across the four graph builders the coverage is 105 measured / 37 pinned
   (spec 13, dspine 2, mtp 2, tp 20 unresolvable), with every measured site still mutation-proven.
 - **`/metrics` names the effective speculation mode** — `kindi_spec_mode_effective{mode="..."} 1`
   comes from `drafting()["method"]`, so a refused head reports `none` and a missing 2B drafter
