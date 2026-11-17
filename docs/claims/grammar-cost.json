@@ -33,6 +33,22 @@
                      "pointer": "/cpu_filter/gbnf_json_d1/ms_per_token"},
                "b": {"file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/grammar-cost.json",
                      "pointer": "/cpu_filter/json_schema/ms_per_token"},
-               "expect": 12}}
+               "expect": 12}},
+    {"id": "gbnf-long-ms-per-token", "display": "463 ms",
+     "quoted_in": ["docs/API.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/grammar-cost.json",
+               "pointer": "/long/cpu_filter/gbnf_ordered_record/ms_per_token", "expect": 463}},
+    {"id": "json-schema-long-ms-per-token", "display": "57 ms",
+     "quoted_in": ["docs/API.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/grammar-cost.json",
+               "pointer": "/long/cpu_filter/json_schema/ms_per_token", "expect": 57}},
+    {"id": "long-ratio", "display": "8x", "tolerance": 0.03,
+     "quoted_in": ["docs/API.md"],
+     "check": {"kind": "ratio",
+               "a": {"file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/grammar-cost.json",
+                     "pointer": "/long/cpu_filter/gbnf_ordered_record/ms_per_token"},
+               "b": {"file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/grammar-cost.json",
+                     "pointer": "/long/cpu_filter/json_schema/ms_per_token"},
+               "expect": 8}}
   ]
 }

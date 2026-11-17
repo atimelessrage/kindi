@@ -63,13 +63,55 @@ states are the open-string and whitespace states in the middle of a document.
 Compilation is not the issue: 3-17 ms per grammar (1,737-9,483 states), against the multi-second
 runtime cost.
 
+## 3. At a realistic reply length: 200 tokens, both constraints accept
+
+The 22-token row above is a floor from one short document. The extension uses a **200-token document**
+(measured with the 2B tokenizer) and a *pair* of constraints that describe exactly it: an ordered flat
+record as GBNF (keys, types and order fixed, 831 states) and the same shape as a JSON schema. Both
+accept the document.
+
+| constraint | tokens | cache misses | filter total | per token | quarters |
+|---|---|---|---|---|---|
+| GBNF ordered record (831 states) | 200 | 55 | 92.6 s | **463 ms** | 573 / 575 / 178 / 526 |
+| `json_schema`, same document | 200 | 43 | 11.5 s | **57 ms** | 94 / 49 / 28 / 58 |
+
+**The cost does not grow with the document; it falls.** At 22 tokens the grammar cost 2,720 ms per
+token and the schema 231 ms; at 200 tokens they cost 463 ms and 57 ms, an **8x** ratio instead of
+12x. The mechanism is the same cache that sets the short-document price: 145 of the 200 grammar
+tokens and 157 of the 200 schema tokens landed on automaton states already swept, because a record's
+repeated array elements revisit the same state sets. The quarters show it directly — the repetitive
+`items`/`tags` stretch runs at 178 ms per token while the unique `value` sentence returns to ~520 ms.
+
+What does not fall is the absolute price of the *unique* part of a reply: the end-to-end
+whitespace-free run below measures 909-959 ms per token on 79 tokens of fresh content.
+
+### End to end at `max_tokens 200`, and the whitespace trap
+
+| response_format | tokens | generation | chars | outcome |
+|---|---|---|---|---|
+| none | 148 | 0.65 s (226.8 tok/s) | 354 | normal reply |
+| `json_schema` (whitespace permitted) | 200 | 3.37 s | 9 | **stalled**: all budget on whitespace after the first colon |
+| GBNF ordered record (whitespace permitted) | 200 | 6.60 s | 9 | **same stall** |
+| GBNF ordered record, **whitespace-free** | 79 | 75.76 s (1.0 tok/s) | 223 | progresses, valid compact JSON |
+
+The stall is not prompt-side: asking for compact JSON with no spaces changed nothing. Both
+automata permit `[ \t\n\r]*` between tokens, and the 2B's greedy path spends the entire budget emitting
+whitespace — 200 tokens for 9 characters. Note what that does to a throughput number: the stalled
+runs look *cheap* per token (17 and 33 ms) only because the repeated whitespace state is cached after
+the first sweep, so "tok/s" is high while nothing is produced. A long constrained reply needs a
+constraint that bounds or omits whitespace; with that, the same grammar produces 223 characters of
+valid compact JSON at 1.0 tok/s.
+
 ## Verdict
 
-Do not turn the unrolled grammar on for this path: at ~2.4 s per token it is 560x the 2B's decode
-cost, and ~12x the schema path. `json_schema` is the correct constraint for recursive JSON here, but
-its own ~0.21 s per token on a 248k vocabulary is a second, separate problem worth a road map entry
-of its own (a per-state mask computed once on the card / a token-class table, instead of a Python
-sweep per new state, is the obvious direction and is **not** measured here).
+Do not turn the unrolled grammar on for this path: even after the per-token price falls with length
+(2,720 → 463 ms/token on a 200-token document), it is ~8x the schema path and ~165x the 2B's 2.8 ms
+decode, and a whitespace-permitting version does not finish a long reply at all. `json_schema`
+remains the correct constraint for recursive JSON, but it is not free either: 231 ms/token at 22
+tokens and 57 ms/token at 200 on a 248k vocabulary, with the same whitespace trap. Both want the same
+fix, which is **not** measured here: compute the mask per state once on the card (or from a
+token-class table) instead of sweeping the vocabulary in Python per new state, and bound whitespace in
+the constraints.
 
 ## Reproduce
 
@@ -77,27 +119,30 @@ The two harnesses are tracked, so this page's numbers can be re-derived from a c
 the pack as the only local input:
 
 ```sh
-python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b     # CPU rows above (2-3 min)
+python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b                    # 22-token rows (2-3 min)
+python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b --doc long          # 200-token rows (~2 min)
 
 KINDI_GBNF_MAX_DEPTH=1 python -m kindi --pack ~/.kindi/packs/bonsai-2b serve \
-    --host 127.0.0.1 --port 8102                                  # the server row
-python tools/grammar_cost_serve.py http://127.0.0.1:8102          # ~1 min: 0.42 tok/s on the gbnf row
+    --host 127.0.0.1 --port 8102                                                 # server rows
+python tools/grammar_cost_serve.py http://127.0.0.1:8102                         # 20-token reply (~1 min)
+python tools/grammar_cost_serve.py http://127.0.0.1:8102 --doc long              # the whitespace stall (~10 s)
+python tools/grammar_cost_serve.py http://127.0.0.1:8102 --doc long --tight      # 79 tokens at 1.0 tok/s (~80 s)
 ```
 
 `tools/grammar_cost.py` prints one row per grammar (states, compile time, misses, filter total,
-ms/token, per-sweep median and max) and exits non-zero if a grammar refuses the document, so a
-rejected document can never be reported as a number. Its `--long` flag adds the longer document and
-will exit non-zero here for the reason in "What this does not cover": the schema refuses keys it
-does not declare and the depth-1 grammar refuses deeper nesting, which is why the rows above come
-from the 22-token document (CPU) and the 20-token reply (server).
+ms/token, per-sweep median and max, and per-quarter ms/token for a long document) and exits non-zero
+if a grammar refuses the document, so a rejected document can never be reported as a number.
+`--doc long` walks the 200-token document through the ordered-record GBNF and its equivalent schema;
+`tools/grammar_cost_serve.py --doc long --tight` is the whitespace-free variant that makes a long
+constrained reply progress.
 
 ## What this does not cover
 
-- The **long-document** rows of the same harness were rejected by the constraints — the schema
-  refuses keys it does not declare and the depth-1 grammar refuses deeper nesting — so every number
-  above comes from one 22-token document (CPU) and one 20-token reply (server). Longer documents
-  would add states and therefore sweeps, so these numbers are a floor for a longer reply, not a
-  bound.
+- One prompt family and one document shape: an ordered flat record. A recursive document adds states
+  and depth, and the depth-1 unroll is exactly where a deeper document is refused; the length
+  question answered here is the *flat* one. The 200-token CPU rows use the same document for both
+  constraints, and the end-to-end rows use the model's own output, which is shorter (79 tokens) under
+  the whitespace-free grammar.
 - The tensor-core plan engine (`KINDI_TC=1`) was not measured: constrained decoding is CPU-side
   vocabulary filtering, so the engine choice changes only the 2.8 ms decode term it is swamped by.
 - No other pack, no other card, no sampled peak (the filter allocates nothing on the card).

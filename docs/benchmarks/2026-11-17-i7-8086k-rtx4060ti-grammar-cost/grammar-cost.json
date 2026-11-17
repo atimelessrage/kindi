@@ -19,6 +19,28 @@
     "json_schema": {"wall_s": 4.49, "gen_s": 4.12, "gen_tok_s": 4.9},
     "gbnf": {"wall_s": 47.41, "gen_s": 47.24, "gen_tok_s": 0.42}
   },
+  "long": {
+    "note": "the realistic-length pair: a 200-token document both constraints accept, walked through each; then the same shape generated end to end",
+    "document_tokens": 200,
+    "cpu_filter": {
+      "gbnf_ordered_record": {"states": 831, "tokens": 200, "misses": 55, "filter_ms": 92620,
+                              "ms_per_token": 463, "quarters_ms_per_token": [573, 575, 178, 526],
+                              "miss_median_ms": 883, "miss_max_ms": 4595},
+      "json_schema": {"tokens": 200, "misses": 43, "filter_ms": 11451, "ms_per_token": 57,
+                      "quarters_ms_per_token": [94, 49, 28, 58],
+                      "miss_median_ms": 222, "miss_max_ms": 680}
+    },
+    "server": {
+      "max_tokens": 200,
+      "unconstrained": {"tokens": 148, "gen_s": 0.65, "gen_tok_s": 226.8, "chars": 354},
+      "json_schema_ws_allowed": {"tokens": 200, "gen_s": 3.37, "gen_tok_s": 59.3, "chars": 9,
+                                 "degenerate": "spent the whole budget on whitespace after the first colon"},
+      "gbnf_ws_allowed": {"tokens": 200, "gen_s": 6.60, "gen_tok_s": 30.3, "chars": 9,
+                          "degenerate": "same stall: [ \\t\\n\\r]* is permitted, the greedy path emits it"},
+      "gbnf_whitespace_free": {"tokens": 79, "gen_s": 75.76, "gen_tok_s": 1.0, "chars": 223,
+                               "ms_per_token": 959}
+    }
+  },
   "shape": {
     "document_header_seconds": {"gbnf_d1": 0.6, "json_schema": 0.1},
     "accepts_document": {"gbnf_json_d1": true, "gbnf_json_d2": true, "gbnf_json_d3": true, "gbnf_record": true, "json_schema": true}

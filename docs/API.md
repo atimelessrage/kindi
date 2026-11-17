@@ -115,9 +115,15 @@ per token, not per state. llama.cpp's `json.gbnf` at `KINDI_GBNF_MAX_DEPTH=1` co
 states and measures **2,720 ms** per token against **231 ms** for `json_schema` (**12x**), which is
 **0.42** tok/s end to end on a pack that decodes at 235 tok/s. Tripling the grammar to 9,483 states
 moves that by 3%: the cost is the vocabulary sweep (a JSON-shaped sweep costs ~3.5 s because its
-string and whitespace classes accept almost every byte), not the state count. Treat the unrolled
-recursive grammar as a diagnostic, not a serving option, on this class of vocabulary; the run is
-recorded in
+string and whitespace classes accept almost every byte), not the state count.
+
+At a realistic 200-token document the average **falls** to **463 ms** per token against **57 ms** for
+the schema (**8x**), because 145 of the 200 grammar tokens land on automaton states already swept by
+the repeated array elements. The per-token cost therefore does not grow with reply length; what does
+is a separate trap: a constraint that permits whitespace anywhere lets a greedy 2B spend the whole
+`max_tokens` budget on it (measured: 200 tokens for nine characters, under both the grammar and the
+schema), so bound or omit whitespace in a long constrained reply. Treat the unrolled recursive
+grammar as a diagnostic, not a serving option, on this class of vocabulary; the run is recorded in
 [grammar-cost RESULTS](benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/RESULTS.md). The same
 `supports_json_grammar` capability flag gates it. The
 adapter contract carries the same flag on
