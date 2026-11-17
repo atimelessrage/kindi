@@ -101,7 +101,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_CACHE_TIMING` | (unset) | `kindi/cache.py:1141` |
 | `KINDI_CALIB_DIR` | (unset) | `kindi/calib.py:31` |
 | `KINDI_CARDS` | (unset) | `kindi/spec.py:1891` (+4 more) |
-| `KINDI_CC` | `clang` or `"clang" if os.name == "nt" else "gcc"` or `"gcc" if os.name != "nt" else "clang"` | `kindi/cpu.py:108` (+3 more) |
+| `KINDI_CC` | `clang` or `"clang" if os.name == "nt" else "gcc"` or `"gcc" if os.name != "nt" else "clang"` | `kindi/caps.py:257` (+4 more) |
 | `KINDI_CHUNK` | `256` or `"512" if all(f16_prompt(s.card) for s in eng.cards) else "256"` or `"256" if major >= 5 else "128"` | `kindi/chunk.py:160` (+2 more) |
 | `KINDI_CHUNK_ATT` | `flash` | `kindi/chunk.py:438` |
 | `KINDI_CHUNK_MIN` | `32` | `kindi/chunk.py:500` (+1 more) |
@@ -113,7 +113,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:581` |
 | `KINDI_CONFIG` | (unset) | `kindi/config.py:120` (+1 more) |
 | `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:211` (+4 more) |
-| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:385` (+1 more) |
+| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:403` (+1 more) |
 | `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:46` |
 | `KINDI_D1` | `1` or `0` | `kindi/spec.py:723` (+1 more) |
 | `KINDI_DATA` | `/data` | `kindi/container.py:243` |
@@ -157,7 +157,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_G4_PAD` | `1` | `kindi/gemma4.py:599` |
 | `KINDI_G4_PARK_MAX` | `4` | `kindi/gemma4_cache.py:35` |
 | `KINDI_G4_PLE_HOST` | `auto` | `kindi/gemma4.py:482` |
-| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:647` |
+| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:667` |
 | `KINDI_G4_PROMPT_CACHE` | `1` | `kindi/gemma4_cache.py:33` |
 | `KINDI_G4_Q5_DP4A` | `1` | `kindi/gemma4.py:80` |
 | `KINDI_G4_RESERVE_MB` | `1024` | `kindi/gemma4.py:543` |

@@ -6,6 +6,7 @@ others are kept as history, design notes or evidence and are not maintained in p
 | subject | authoritative page | the rest are |
 |---|---|---|
 | Cards and engines | [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md) (generated, per-card rows) and [CARDS.md](CARDS.md) (model/settings) | [CARD-SUPPORT.md](CARD-SUPPORT.md), [P106.md](P106.md), [P4000.md](P4000.md), [M4000.md](M4000.md), [BONSAI-2-SUPPORT.md](BONSAI-2-SUPPORT.md), [CPU-SUPPORT.md](CPU-SUPPORT.md), [AMD.md](AMD.md), [INTEL-ARC.md](INTEL-ARC.md) are per-card notes, [OLD-CARD-RIG.md](OLD-CARD-RIG.md) the session script for the unmeasured P106/P4000/M4000 |
+| Hardware identification and tuning | [AUTOTUNE.md](AUTOTUNE.md) (`kindi caps`, `kindi autotune`) | per-card notes in [CARDS.md](CARDS.md), generated rows in [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md), [REQ-0022](development/requirements/REQ-0022.md) |
 | Tandem (CPU+GPU split) | [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md) | [TANDEM-STATUS.md](TANDEM-STATUS.md) is the dated status snapshot, [CPU_GPU_TANDEM_DESIGN.md](CPU_GPU_TANDEM_DESIGN.md) the design, [MOE-TANDEM.md](MOE-TANDEM.md) design-only, [TANDEM-PROPOSAL-REVIEW.md](TANDEM-PROPOSAL-REVIEW.md) the review |
 | Measurements | [BENCHMARKS.md](BENCHMARKS.md) and [benchmarks/](benchmarks/) | raw dumps stay local under `bench-logs/` (gitignored); every file a doc links to must be tracked in `benchmarks/` |
 | Server API | [AGENTS.md](AGENTS.md) | `docker-compose` and server behavior are in [DOCKER.md](DOCKER.md) |

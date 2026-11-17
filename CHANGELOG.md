@@ -4,6 +4,23 @@
 
 ### Added
 
+- **`kindi caps`: what each card and this CPU can actually do** — card names alone were not
+  enough to pick settings. `kindi caps [--json]` reports every card the driver sees (index, name,
+  UUID, PCI bus id, compute capability, total/free VRAM, driver) from nvidia-smi, with pynvml and
+  CuPy fallbacks, so it still answers when the CUDA runtime is missing; the CPU half reuses the
+  engine's own probe (same tier/build the engine would select) and adds the marketing model name,
+  core counts, L2/L3, AVX-512/AMX and the CPU-engine toolchain. Hardware facts (tensor cores, BF16,
+  FP8, FP4) are kept apart from the Kindi paths those capabilities enable, a missing compute
+  capability is reported as unknown rather than inferred from the name, and a missing compiler is
+  named instead of implying the CPU engine or tandem can run.
+- **`kindi autotune`: measure the placements for this model and rank them** — candidates are
+  derived from the hardware report and the pack manifest (full card, two-card tensor-parallel split,
+  tandem `auto`/`gdn:N`, Lightning decode-cache slots, CPU engine), each one a real
+  `kindi bench --sample-vram` child run, ranked by decode tok/s with a reduced-context run ranked
+  below a full-context one and a failed run reported with its own error text. `--dry-run` prints the
+  plan without loading weights, `--json` records every run. Measured on the RTX 4060 Ti with the 2B
+  pack at ctx 8192: 97.4-97.8 tok/s decode, 3,050 MiB sampled peak; the two tandem candidates were
+  refused (already fits) and blocked (no compiler) and were reported as such, not scored.
 - **Recursive GBNF compiles on request, up to a stated depth** — the canonical
   `json.gbnf` was refused outright, which made the standard recursive grammar unusable.
   `KINDI_GBNF_MAX_DEPTH=N` (default 0, i.e. still refused) unrolls the recursion N levels

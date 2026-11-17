@@ -13,6 +13,8 @@
   kindi sessions                list, triage, tag and export chat sessions as raw markdown
   kindi head exact|fast         choose the output head of a running server (next request, no restart)
   kindi info                    show the configuration, the pack and the GPU
+  kindi caps                    what each card and this CPU can do (and which Kindi paths that enables)
+  kindi autotune                measure the placements for this model here and rank them (one bench each)
   kindi backends                list backend plugins registered in the plugin registry
 Global options: --config FILE, --pack DIR, --state-dir DIR, --ctx N.
 Tandem: verify/bench/serve/chat accept --tandem cpu-first|gpu-first --tandem-cpu-layers N|LIST|gdn:N
@@ -370,6 +372,22 @@ def cmd_backends(cfg, a):
     return 0
 
 
+def cmd_caps(cfg, a):
+    from . import caps as _caps
+    report = _caps.probe()
+    if getattr(a, "json", False):
+        print(json.dumps(report, indent=2, sort_keys=True))
+        return 0
+    for line in _caps.render(report):
+        print(line)
+    return 0
+
+
+def cmd_autotune(cfg, a):
+    from . import autotune
+    return autotune.run(cfg, a, log=log)
+
+
 def cmd_info(cfg, a):
     print("Kindi %s" % __version__)
     from . import cpu as cpu_backend
@@ -519,6 +537,14 @@ def main(argv=None):
     s = sub.add_parser("head", help="exact or fast output head for a running server")
     s.add_argument("mode", choices=("exact", "fast"))
     sub.add_parser("info", help="show configuration, pack and GPU")
+    s = sub.add_parser("caps", help="what each card and this CPU can do, and which Kindi paths that enables")
+    s.add_argument("--json", action="store_true", help="print the whole report as JSON")
+    s = sub.add_parser("autotune", help="measure the placements for this model and rank them (one bench per candidate)")
+    s.add_argument("--max-runs", type=int, default=6, help="how many configurations to measure (default 6)")
+    s.add_argument("--dry-run", action="store_true", help="print the candidate list and stop (loads nothing)")
+    s.add_argument("--include-cpu", action="store_true", help="also measure the CPU engine, even with a card present")
+    s.add_argument("--timeout-s", type=float, default=600.0, help="per-candidate time limit (default 600 s)")
+    s.add_argument("--json", default=None, metavar="FILE", help="record the candidates, every run and the winner")
     s = sub.add_parser("backends", help="list registered backend plugins")
     s.add_argument("--json", action="store_true", help="print registered backends as JSON")
     sub.add_parser("models", help="list the models and what fits this machine")
@@ -545,6 +571,7 @@ def main(argv=None):
         cfg["vram_sample_s"] = a.vram_sample_s
     return {"convert": cmd_convert, "fast-head": cmd_fast_head, "verify": cmd_verify, "bench": cmd_bench, "kld": cmd_kld, "calibrate": cmd_calibrate,
             "plan": cmd_plan, "serve": cmd_serve, "chat": cmd_chat, "head": cmd_head, "info": cmd_info,
+            "caps": cmd_caps, "autotune": cmd_autotune,
             "backends": cmd_backends, "models": cmd_models, "use": cmd_use, "sessions": cmd_sessions}[a.cmd](cfg, a)
 
 

@@ -135,6 +135,19 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   drop-in-for-agent-frameworks claim until the conformance suite and a schema-constrained
   reply both pass. The goal is a backend an agent framework can rely on, not just a fast
   chat endpoint.
+- **Hardware identification and autotuning ([REQ-0022](development/requirements/REQ-0022.md),
+  experimental):** `kindi caps` reports every card the driver sees (compute capability, total/free
+  VRAM, PCI bus, UUID, driver) with pynvml and CuPy fallbacks, keeps the hardware fact table
+  separate from the Kindi paths that capability enables, and reports the CPU half from the engine's
+  own probe plus model name, core counts, L2/L3, AVX-512/AMX and the CPU-engine toolchain.
+  `kindi autotune` turns that into a measurement: candidates derived from the hardware and the pack
+  manifest (full card, two-card TP split, tandem auto/gdn:N, Lightning decode cache, CPU engine),
+  one real `kindi bench --sample-vram` child run each, ranked by decode tok/s with a reduced-context
+  run ranked below a full one and a failed run recorded with its own error. Measured on this host
+  2026-11-17 (2B, ctx 8192): `gpu0` 97.4-97.8 tok/s decode / 111.7-113.0 read / 3,050 MiB peak,
+  `tandem-auto` refused as unnecessary, `tandem-gdn:8` blocked by a missing compiler — all three
+  reported honestly in [AUTOTUNE.md](AUTOTUNE.md). Open: two-card and MoE candidates are unit-tested
+  only (one card here, no Lightning pack); exactness stays with `kindi verify`.
 - **Cards:** single/dual card support targets are in [CARD-SUPPORT.md](CARD-SUPPORT.md). The P106-100
   single-card (2B/4B/9B) and two-card (27B) offers are installer-tested but not measured on hardware.
   Whether the CPU+GPU tandem helps pre-tensor-core cards — Pascal (GTX 1080, P106-100) and the
