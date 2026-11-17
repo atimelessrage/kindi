@@ -11,7 +11,7 @@
   ],
   "numbers": [
     {"id": "gbnf-d1-ms-per-token", "display": "2,720 ms",
-     "quoted_in": ["docs/API.md"],
+     "quoted_in": ["docs/API.md", "docs/ROADMAP.md"],
      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/grammar-cost.json",
                "pointer": "/cpu_filter/gbnf_json_d1/ms_per_token", "expect": 2720}},
     {"id": "gbnf-d1-states", "display": "1,737",
@@ -19,7 +19,7 @@
      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/grammar-cost.json",
                "pointer": "/cpu_filter/gbnf_json_d1/states", "expect": 1737}},
     {"id": "json-schema-ms-per-token", "display": "231 ms",
-     "quoted_in": ["docs/API.md"],
+     "quoted_in": ["docs/API.md", "docs/ROADMAP.md"],
      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/grammar-cost.json",
                "pointer": "/cpu_filter/json_schema/ms_per_token", "expect": 231}},
     {"id": "gbnf-server-tok-s", "display": "0.42",

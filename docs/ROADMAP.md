@@ -354,6 +354,21 @@ written first; the rest are parked with the measurement that would reopen them.
 | 10 | Per-mode acceptance as `/metrics` gauges | **Folded into #2.** The counters exist (`kindi_spec_drafted_tokens_total`, `kindi_spec_accepted_tokens_total`); what is missing is the *effective mode* they belong to | REQ-0024 A2 |
 | 11 | 0.6.1 container packaging (`compose.yaml`, `docs/CONTAINERS.md`) | **Not adopted.** Deployment surface, not an engine gap; recorded as an owner decision in §41 of the comparison report | no row |
 
+## Constrained-decoding cost (2026-11-17)
+
+The grammar-cost run priced the mask that every constrained reply pays for. It is not a grammar-size
+problem: the filter sweeps all 248,320 vocabulary entries in Python once per **new automaton state**,
+so the baseline is set by the sweep, not by the 831-1,737 states of the constraint.
+
+| item | direction | baseline the gate must beat | gate | status |
+|---|---|---|---|---|
+| Constrained-decoding mask cost ([REQ-0027](development/requirements/REQ-0027.md)) | compute the mask once per state instead of once per token pair: either a **token-class table** (group ids by the character/prefix class the state accepts, so a mask is assembled from a few precomputed sets) or an **on-card mask** (accept test as a gather/compare kernel over the token-text table, ids returned in device memory) | **231 ms/token** for `json_schema` and **2,720 ms/token** for the unrolled `json.gbnf` on the 2B (22-token document, greedy); 57 and 463 ms/token at 200 tokens | same host, pack, document and harness (`tools/grammar_cost.py`): `json_schema` at most **23 ms/token** and the unrolled grammar at most **272 ms/token** (a 10x improvement), with the 200-token rows 57 → 6 and 463 → 46; the mask must equal today's `vocab_allowed` set for every vocabulary entry (CPU test, no GPU), keep the §39 structured-output exactness cell, and leave unconstrained decode within 1%. A miss on either row is a no-go recorded here | **planned, not started**; direction named only |
+
+Not in this item: the whitespace trap. Both constraints permit `[ \t\n\r]*`, and a greedy 2B spends a
+whole 200-token budget on it (9 characters of reply) — measured in the same run. A faster mask does not
+fix that, and it must not be counted toward the gate; bounding whitespace in the constraints or the
+sampler is its own change.
+
 ## Review follow-ups (2026-11-11)
 
 These are planned, not implemented. The review that produced them is an audit, not a support
