@@ -50,6 +50,24 @@ each card. The cells give tok/s in auto mode (the default). On the RTX 3080, the
 
 The output of every mode was the same as without speculation.
 
+That is now a gate, not a claim: `kindi verify --spec <mode>` runs the same reference matrix under the mode
+and prints the effective mode on its first line (a drafter that did not attach exits non-zero instead of
+verifying the plain engine). Measured 2026-11-17 on the 2B / RTX 4060 Ti, ctx 1024, 4 prompts, 40 greedy
+tokens each, `KINDI_TC=1`, pack `bonsai-2b`:
+
+| mode | command | result | tok/s | drafts accepted |
+|---|---|---|---|---|
+| off | `kindi verify` | 4/4 prompts, 160/160 tokens | 279.0 | - |
+| ngram | `kindi verify --spec ngram` | 4/4 | 435.3 | 51/152 |
+| A (`mtp`) | `--spec mtp` with `KINDI_MTP_HEAD=~/.kindi/models/kindi-mtp-2b-v1.npz` | 4/4 | 203.5 | 98/248 |
+| B0 (`draft2b`) | `--spec draft2b` with `KINDI_SPEC_PACK=<2B pack>` | 4/4 | 311.1 | 128/128 |
+| B2 (`both`) | `--spec both` with both variables | 4/4 | 276.2 | 102/242 |
+
+Every mode is token-exact with llama.cpp here, so the sentence above holds for the modes that can run on
+this host. Two caveats: B0 and B2 draft with the same 2B that is the target, so their path is exercised and
+exact but the 128/128 and 102/242 acceptance numbers say nothing about the 27B; and `dspine` needs the
+DSpine weights, which are not on this host, so it has no cell yet (owner action).
+
 ### Measured 2026-11-17: mode A was silently dead, and costs on the 2B here
 
 `k_rmsfold_qT` gained a trailing `hp` argument in 0.5.0; `kindi/mtp.py` never passed it, so the

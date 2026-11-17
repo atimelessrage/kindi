@@ -59,6 +59,38 @@ def run_gemma4(cfg, man, log=print):
 # TIE_GAP nats, or where Kindi gives the token of another llama.cpp run ("alt"), is a tie, as in nanbeige_cli
 TIE_GAP = 0.01
 
+OFF = ("0", "", "off")
+
+
+def spec_state(eng, requested=None):
+    """The speculation `kindi verify` will run, the line that says so, and a refusal (REQ-0025 A1/A4).
+
+    Returns (mode, line, refusal). A model-drafter mode whose drafter did not attach is a refusal,
+    not a quiet fallback to the plain engine: `draft2b` with no pack resolves to `ngram`, so the
+    requested mode would otherwise never be tested. `auto` is the one mode allowed to resolve to a
+    different name, since choosing is what it is for.
+    """
+    requested = (os.environ.get("KINDI_SPEC", "0") or "0") if requested is None else requested
+    off = requested in OFF
+    if not hasattr(eng, "spec_begin"):
+        line = "speculation: unavailable (this engine has no spec_begin); verifying the plain engine"
+        return None, line, None if off else "KINDI_SPEC=%s was requested but this engine cannot speculate" % requested
+    from . import spec as _sp
+    st = _sp.effective_state(eng, requested)
+    mode, head = st["mode"], st["head"] or {}
+    if off:
+        return None, "speculation: off (KINDI_SPEC=%s)" % requested, None
+    parts = ["requested %s, effective %s" % (requested, mode or "0")]
+    if head.get("state") == "loaded":
+        parts.append("head %s sha256 %s" % (head["file"], (head.get("sha256") or "")[:12]))
+    if st["reason"]:
+        parts.append(st["reason"])
+    refusal = None
+    if mode is None or (requested != "auto" and mode != requested):
+        refusal = "%s was requested but the effective mode is %s%s" % (
+            requested, mode or "0", (": " + st["reason"]) if st["reason"] else "")
+    return mode, "speculation: " + ", ".join(parts), refusal
+
 
 def run(cfg, log=print):
     try:
@@ -94,12 +126,26 @@ def run(cfg, log=print):
     eng = make_engine(pack, ctx=1024, clusters=dict(np.load(cl)) if os.path.exists(cl) else None, log=log,
                        tandem=cfg.get("tandem", "off"), cpu_layers=cfg.get("tandem_cpu_layers"),
                        gpu=cfg.get("tandem_gpu"))
+    # the first line names the mode that will generate, so a PASS is never read as the plain engine's
+    # when speculation was on - or the reverse (REQ-0025 A1); a drafter that did not attach stops here (A4)
+    spec_mode, spec_line, refusal = spec_state(eng)
+    log(spec_line)
+    if refusal:
+        log("FAIL: %s" % refusal)
+        return 2
     ok_all, tok, dt, ties = True, 0, 0.0, 0
     for i, r in enumerate(ref["prompts"]):
         sync = (lambda: cp.cuda.Device().synchronize()) if cp is not None and hasattr(eng, "k") else (lambda: None)
         sync()
         t0 = time.time()
-        got = eng.generate(r["ids"], len(r["expected"]))
+        if spec_mode is not None:
+            eng.spec_begin(True)                     # greedy, exactly the server's request path
+            try:
+                got = eng.generate(r["ids"], len(r["expected"]))
+            finally:
+                sp = eng.spec_end()
+        else:
+            got, sp = eng.generate(r["ids"], len(r["expected"])), None
         sync()
         t = time.time() - t0
         n = sum(1 for a, b in zip(got, r["expected"]) if a == b)
@@ -117,12 +163,18 @@ def run(cfg, log=print):
         ok_all &= state != "FAIL"
         tok += len(r["ids"]) + len(got)
         dt += t
-        log("prompt %d %-60s %s  %d/%d tokens match  (%.1fs)" % (i + 1, repr(r["prompt"])[:60], state, n, len(r["expected"]), t))
+        spec_note = ""
+        if sp and sp.get("drafted"):
+            spec_note = ", %d/%d drafts accepted" % (sp.get("accepted", 0), sp.get("drafted", 0))
+        log("prompt %d %-60s %s  %d/%d tokens match  (%.1fs%s)" % (
+            i + 1, repr(r["prompt"])[:60], state, n, len(r["expected"]), t, spec_note))
         if not ok:
             log("   first difference at token %d%s" % (j, " (llama.cpp top-2 gap there %.4f)" % gap if gap is not None else ""))
+    where = " with KINDI_SPEC=%s" % spec_mode if spec_mode is not None else " (speculation off)"
     if ok_all and ties:
-        log("PASS: %d of %d prompts token-exact, %d end at a llama.cpp tie, 0 fail - %.1f tokens/s over the run" % (
-            len(ref["prompts"]) - ties, len(ref["prompts"]), ties, tok / dt))
+        log("PASS%s: %d of %d prompts token-exact, %d end at a llama.cpp tie, 0 fail - %.1f tokens/s over the run" % (
+            where, len(ref["prompts"]) - ties, len(ref["prompts"]), ties, tok / dt))
     else:
-        log("%s - %.1f tokens/s over the run" % ("ALL PASS: token-exact with llama.cpp" if ok_all else "FAIL", tok / dt))
+        log("%s%s - %.1f tokens/s over the run" % ("ALL PASS: token-exact with llama.cpp" if ok_all else "FAIL",
+                                                    where, tok / dt))
     return 0 if ok_all else 1

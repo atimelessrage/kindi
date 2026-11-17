@@ -80,6 +80,22 @@
   the state count, `Grammar.states` exposes the compiled size, and `docs/API.md` records the
   numbers and the default limit's practical reach (~130 enumerated copies).
 
+### Added
+
+- **`kindi verify --spec <mode>` gates speculation against the reference** — verify always built an
+  engine with speculation off, so `docs/MTP.md`'s "the output of every mode was the same as without
+  speculation" had never been checked by anything. The flag sets the mode for the run (its own
+  variables, `KINDI_MTP_HEAD` / `KINDI_SPEC_PACK` / `KINDI_SPEC_DRAFT_HEAD`, stay as set), the first
+  line reports `speculation: requested …, effective …, head …`, every prompt line adds
+  `N/M drafts accepted`, and the summary names the mode. A mode whose drafter did not attach exits 2
+  with the reason instead of quietly verifying the plain engine; `auto` alone may settle elsewhere.
+  Measured 2026-11-17 on the 2B / RTX 4060 Ti (4 prompts x 40 greedy tokens): plain 4/4 at 279.0
+  tok/s, `ngram` 4/4, `mtp` 4/4 at 203.5 (mode A is token-exact, 98/248 drafts accepted), `draft2b`
+  4/4, `both` 4/4 - the last two with the same 2B as target and drafter, so they prove the path but
+  not the 27B pairing. `dspine` still has no cell (no weights on this host;
+  `docs/MANUAL-HELP-NEEDED.md` row 7). The plain output gains only the mode line and a summary
+  suffix; the `PASS` and `tokens/s` lines `tools/verify_matrix.py` parses are unchanged.
+
 ### Fixed
 
 - **`/health`, the startup log and `kindi info` report the speculation that is running, not the one

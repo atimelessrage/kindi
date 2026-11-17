@@ -220,6 +220,9 @@ def cmd_fast_head(cfg, a):
 
 
 def cmd_verify(cfg, a):
+    spec = getattr(a, "spec", None)
+    if spec:
+        os.environ["KINDI_SPEC"] = spec          # the mode's own variables (KINDI_MTP_HEAD, KINDI_SPEC_PACK) stay as set
     _setup_gpu_env(cfg)
     from .verify import run
     return run(cfg, log=log)
@@ -490,6 +493,10 @@ def main(argv=None):
     s.add_argument("--iters", type=int, default=12)
     s = sub.add_parser("verify", help="check against llama.cpp's reference output")
     _tandem_args(s)
+    s.add_argument("--spec", default=None, choices=("ngram", "mtp", "draft2b", "both", "dspine", "auto", "0"),
+                   help="verify under this speculation mode (same as KINDI_SPEC; the mode's own variables, "
+                        "KINDI_MTP_HEAD or KINDI_SPEC_PACK, are read as usual); the effective mode is printed "
+                        "and a drafter that did not attach exits non-zero")
     s = sub.add_parser("bench", help="measure speed")
     _tandem_args(s)
     s.add_argument("--json", default=None, metavar="FILE", help="also record the numbers in a machine-readable JSON file")

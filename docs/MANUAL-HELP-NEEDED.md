@@ -135,6 +135,16 @@ commands and interpret the output. Each row states the gate it unlocks.
   `docs/ROADMAP.md` Agent API bullet): these are product calls recorded in
   the same place.
 
+## 7. Put the DSpine weights on this host (the `dspine` verify cell)
+
+- **State:** blocked 2026-11-17, waiting on the owner.
+- **What:** the DSpine drafter directory (`config.json` + `model.safetensors`) for the 27B, i.e.
+  `KINDI_DSPINE=DIR` as `docs/DSPINE.md` describes.
+- **Why blocked:** there is no `dspine` directory under `~/.kindi` (checked 2026-11-17), and the
+  weights are a separate download from the model packs.
+- **Unblocks:** `kindi verify --spec dspine` (REQ-0025 A3), the one shippable speculation mode with
+  no exactness cell; `ngram`, `mtp`, `draft2b` and `both` are measured on the 2B (`docs/MTP.md`).
+
 ## Done
 
 - **Nanbeige corrupt-file deletion** (2026-11-16): the 13.1 GB corrupt GGUF
