@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-only
-"""The cold-expert file reader: exact bytes, read-ahead, and the accounting behind the gate."""
+"""The cold-expert file reader: exact bytes, coalescing, prefetch and the accounting behind the gate."""
 import numpy as np
 import pytest
 import types
@@ -124,14 +124,14 @@ def test_the_engine_splits_each_layer_host_tier_before_loading():
 def test_read_many_returns_exact_bytes_and_accounts_for_them(tmp_path):
     path, data = _file(tmp_path)
     spans = [(123, 17), (4100, 33), (9000, 11)]
-    reader = cold_experts.ColdExpertReader(path, read_ahead=0)
+    reader = cold_experts.ColdExpertReader(path, coalesce=0)
     try:
         got = reader.read_many(spans)
         assert got == [data[o:o + n] for o, n in spans]
         stats = reader.stats()
         assert stats["requested_bytes"] == sum(n for _, n in spans)
         assert stats["read_bytes"] >= stats["requested_bytes"]
-        assert stats["readahead_bytes"] + stats["alignment_bytes"] == \
+        assert stats["coalesced_bytes"] + stats["alignment_bytes"] == \
             stats["read_bytes"] - stats["requested_bytes"]
         assert stats["unbuffered"] in (True, False)
         assert stats["method"] in ("O_DIRECT", "FILE_FLAG_NO_BUFFERING") or \
@@ -146,26 +146,52 @@ def test_read_many_returns_exact_bytes_and_accounts_for_them(tmp_path):
         reader.close()
 
 
-def test_read_ahead_merges_neighbouring_ranges_into_one_read(tmp_path):
+def test_coalescing_merges_neighbouring_ranges_into_one_read(tmp_path):
     path, data = _file(tmp_path)
     spans = [(0, 16), (4096, 16)]
-    reader = cold_experts.ColdExpertReader(path, read_ahead=1)
+    reader = cold_experts.ColdExpertReader(path, coalesce=1)
     try:
         got = reader.read_many(spans)
         assert got == [data[0:16], data[4096:4112]]
         stats = reader.stats()
         assert stats["reads"] == 1
         assert stats["requested_bytes"] == 32
-        assert stats["read_bytes"] == 2 * 4096      # first block + the read-ahead block
-        assert stats["readahead_bytes"] == 2 * 4096 - 32 - stats["alignment_bytes"]
+        assert stats["read_bytes"] == 2 * 4096      # first block + the coalesced block
+        assert stats["coalesced_bytes"] == 2 * 4096 - 32 - stats["alignment_bytes"]
     finally:
         reader.close()
 
 
-def test_a_gap_larger_than_the_ahead_window_is_not_read(tmp_path):
+def test_prefetch_queue_serves_later_demand_without_another_read(tmp_path):
+    """A queued range was fetched before demand; the later read consumes those bytes, not the file."""
+    path, data = _file(tmp_path)
+    spans = [(4096, 16), (8192, 16)]
+    reader = cold_experts.ColdExpertReader(path, coalesce=0, prefetch_bytes=4096)
+    try:
+        assert reader.prefetch(spans) == 2
+        before = reader.stats()
+        assert before["prefetched_bytes"] == 32
+        assert before["prefetch_cached_bytes"] == 32
+        assert before["reads"] == 2
+        assert reader.read_many(spans) == [data[o:o + n] for o, n in spans]
+        after = reader.stats()
+        assert after["reads"] == before["reads"]       # no second file read for the demand
+        assert after["prefetch_hits"] == 2
+        assert after["prefetch_used_bytes"] == 32
+        assert after["prefetch_cached_bytes"] == 0
+        assert after["read_bytes"] == before["read_bytes"]  # the bytes were already in the queue
+        assert after["requested_bytes"] == 32
+        assert after["read_bytes"] == (after["requested_bytes"] + after["coalesced_bytes"]
+                                       + after["alignment_bytes"] + after["prefetched_bytes"]
+                                       - after["prefetch_used_bytes"])
+    finally:
+        reader.close()
+
+
+def test_a_gap_larger_than_the_coalesce_window_is_not_read(tmp_path):
     path, data = _file(tmp_path)
     spans = [(0, 16), (2 * 4096, 16)]
-    reader = cold_experts.ColdExpertReader(path, read_ahead=0)
+    reader = cold_experts.ColdExpertReader(path, coalesce=0)
     try:
         assert reader.read_many(spans) == [data[0:16], data[8192:8208]]
         assert reader.stats()["reads"] == 2
@@ -177,7 +203,7 @@ def test_a_gap_larger_than_the_ahead_window_is_not_read(tmp_path):
 def test_spans_are_returned_in_input_order_after_offset_sorting(tmp_path):
     path, data = _file(tmp_path)
     spans = [(8192, 5), (0, 7), (4096, 9)]
-    reader = cold_experts.ColdExpertReader(path, read_ahead=0)
+    reader = cold_experts.ColdExpertReader(path, coalesce=0)
     try:
         assert reader.read_many(spans) == [data[o:o + n] for o, n in spans]
     finally:
@@ -245,9 +271,34 @@ class _SpanReader(object):
         self.blob = blob
         self.spans = []
 
-    def read_many(self, spans, read_ahead=1):
+    def read_many(self, spans, **kwargs):
         self.spans.extend(spans)
         return [self.blob[o:o + n] for o, n in spans]
+
+
+class _PrefetchReader(object):
+    """Just records queued spans; the real queue's consumption is tested above."""
+
+    def __init__(self):
+        self.spans = []
+
+    def prefetch(self, spans):
+        self.spans.extend(spans)
+        return len(spans)
+
+
+def test_the_engine_queues_the_next_cold_layers_likely_experts():
+    def tensor(raw_off):
+        return types.SimpleNamespace(hcold=(1, 2, 3), raw_off=raw_off, raw_stride=10, raw_bytes=10)
+
+    eng = lightning.Engine.__new__(lightning.Engine)
+    eng.cold_reader = _PrefetchReader()
+    eng.layers = [{"cold": True, "up": tensor(0), "down": tensor(100)},
+                  {"cold": True, "up": tensor(200), "down": tensor(300)}]
+    eng.s = types.SimpleNamespace(n_used=2)
+    eng.cold_order = {1: [3, 1, 2]}              # the next layer's measured order
+    eng._cold_prefetch(0)
+    assert eng.cold_reader.spans == [(230, 10), (330, 10), (210, 10), (310, 10)]
 
 
 def _stage_tensor(hoff, warm, cold, codes, scales, raw_off):

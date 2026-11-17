@@ -109,7 +109,8 @@ class Engine(object):
         # stay pinned under KINDI_LT_HOST_MB and only the overflow is read from the pack on demand;
         # see `_split_host_tiers` / `_cold_setup` / `_cold_prepare`.
         cold = cold_enabled()
-        self.cold_reader = ColdExpertReader(path, read_ahead=1, log=log) if cold else None
+        self.cold_reader = (ColdExpertReader(path, coalesce=1, prefetch_bytes=64 << 20, log=log)
+                            if cold else None)
         self.host_budget = host_budget_bytes() if cold else 0
         self.host_warm, self.host_cold, self.host_tier_stats = {}, {}, {}
         self.cold_active = False
@@ -333,6 +334,8 @@ class Engine(object):
         warm, cold, stats = split_host_tiers(hosts, order, self.host_budget,
                                              self._expert_bytes(), counts)
         self.host_warm, self.host_cold, self.host_tier_stats = warm, cold, stats
+        self.cold_order = {il: [e for e in order.get(il, ()) if e in set(cold[il])]
+                           for il in cold}
         self.cold_experts = stats["disk_experts"]
         self.cold_active = bool(self.cold_experts)
 
@@ -379,7 +382,8 @@ class Engine(object):
                 ps[e] = w.hmem.ptr + len(warm) * cw + i * sw
         else:
             w.hmem = None
-        # where this expert stack lives in the pack: `_cold_prepare` preads one expert at a time
+        # where this expert stack lives in the pack: `_cold_prepare` reads it on demand and
+        # `_cold_prefetch` queues the next cold layer's likely experts ahead of its router
         w.raw_off = self.g.data_start + tensor_off
         w.raw_stride = per * nb * 18
         w.raw_bytes = w.raw_stride
@@ -535,7 +539,7 @@ class Engine(object):
                         warm[len(w.hwarm) * w.cw + j * w.sw:len(w.hwarm) * w.cw + (j + 1) * w.sw]
             cold = [(i, e) for i, e in enumerate(w.hoff) if e in w.hcold]
             spans = [self._cold_span(w, e) for _, e in cold]
-            for (i, e), raw in zip(cold, self.cold_reader.read_many(spans, read_ahead=1)):
+            for (i, e), raw in zip(cold, self.cold_reader.read_many(spans, coalesce=1)):
                 codes, scales = split_q2(raw, w.rows, w.cols // 64)
                 host[base + i * w.cw:base + (i + 1) * w.cw] = codes
                 host[base + nh * w.cw + i * w.sw:base + nh * w.cw + (i + 1) * w.sw] = scales
@@ -544,9 +548,27 @@ class Engine(object):
         self.cp.cuda.runtime.memcpyAsync(self.stage[b].data.ptr, self.stage_host[b].ptr, total, 1, cs.ptr)
         self.ev_staged[b].record(cs)
 
+    def _cold_prefetch(self, il):
+        """Queue the next cold MoE layer's most-used cold experts before that layer asks for them."""
+        if self.cold_reader is None or not hasattr(self.cold_reader, "prefetch"):
+            return 0
+        nxt = next((j for j in range(il + 1, len(self.layers)) if self.layers[j].get("cold")), None)
+        if nxt is None:
+            return 0
+        L = self.layers[nxt]
+        cold = set(L["up"].hcold)
+        order = [e for e in getattr(self, "cold_order", {}).get(nxt, ()) if e in cold]
+        order += [e for e in sorted(cold) if e not in order]
+        picked = order[:self.s.n_used]
+        if not picked:
+            return 0
+        spans = [self._cold_span(L[key], e) for e in picked for key in ("up", "down")]
+        return self.cold_reader.prefetch(spans)
+
     def _cold_prepare(self, il):
         """Before a decode layer's slot kernel: fetch only cold experts that are not already in a warm
-        device slot. A warm slot takes no file read and no page fault."""
+        device slot. A warm slot takes no file read and no page fault; the next cold layer's
+        likely experts are queued for the following call."""
         L = self.layers[il]
         if not L.get("cold"):
             return 0
@@ -555,12 +577,13 @@ class Engine(object):
         owners = np.asarray(self.downer[L["dci"]].get(), np.int32).reshape(-1)
         need = cold_misses(ids, owners, L["up"].hcold)
         if not need:
+            self._cold_prefetch(il)
             return 0
         spans = []
         for e in need:
             for key in ("up", "down"):
                 spans.append(self._cold_span(L[key], e))
-        raw = self.cold_reader.read_many(spans, read_ahead=1)
+        raw = self.cold_reader.read_many(spans, coalesce=1)
         for slot, e in enumerate(need):
             for p, key in enumerate(("up", "down")):
                 self._cold_copy(L[key], e, slot, raw[2 * slot + p])
@@ -569,6 +592,7 @@ class Engine(object):
             w.tc.set(w.ptr_c, stream=self.stream)
             w.ts.set(w.ptr_s, stream=self.stream)
         self.cold_read_experts += len(need)
+        self._cold_prefetch(il)
         return len(need)
 
     def cold_stats(self):

@@ -4,6 +4,13 @@
 
 ### Added
 
+- **The cold-expert reader has a real lookahead prefetch queue** — the old `read_ahead` knob only
+  merged adjacent ranges. `ColdExpertReader` now names that behavior `coalesce`, and `prefetch`
+  reads exact ranges into a bounded queue before demand; a later `read_many` consumes those bytes
+  without a second file read. The Lightning decode path queues the next cold MoE layer's most-used
+  cold experts in `_cold_prefetch`. A test prefetches two ranges, then proves the demand read
+  returns the same bytes with the reader's read count unchanged; another pins the next-layer
+  queue selection. Checks are in `tests/test_cold_experts.py`.
 - **`kindi plan` and `kindi autotune` reuse a saved `kindi io` report** — `kindi io --json FILE`
   writes the probe report, and `--io-report FILE` (or `KINDI_IO_REPORT`) feeds it to either command
   through the same normalizer as a fresh probe, so the 64 MiB disk probe is not repeated. A missing,
@@ -93,13 +100,12 @@
   The split uses measured expert use when `kindi/lightning-experts.json` has counts, so the hot
   tier is not lost. A prompt stages a layer's host block through a pinned buffer; a decode step
   reads only routed cold experts that are not already in a warm device slot. `kindi/cold_experts.py`
-  issues aligned `O_DIRECT`/`FILE_FLAG_NO_BUFFERING` reads where available, merges neighbouring
-  ranges into a read-ahead window, and separates requested expert bytes from bytes actually
+  issues aligned `O_DIRECT`/`FILE_FLAG_NO_BUFFERING` reads where available, coalesces neighbouring
+  ranges into one aligned read, and separates requested expert bytes from bytes actually
   transferred; `Engine.cold_stats()` exposes requested/transferred bytes plus exact pinned and
   disk tier bytes. The decode graph is disabled only on this opt-in path because the read follows
-  the router, and warm slots take no file read. Fourteen CPU tests cover the flag, the host/disk
-  split and byte accounting, exact bytes, read-ahead merging, order, warm-slot skips and short
-  reads. **No larger-than-RAM pack, GPU run, tok/s or verify result is claimed**; those are the
+  the router, and warm slots take no file read. CPU tests cover the flag, the host/disk split and
+  byte accounting, exact bytes, coalescing, prefetch, order, warm-slot skips and short reads. **No larger-than-RAM pack, GPU run, tok/s or verify result is claimed**; those are the
   open gate in `docs/ROADMAP.md`.
 - **`kindi plan` and `kindi autotune` now consume the `kindi io` rates** — the Lightning report
   normalizes the measured RAM, disk and PCIe numbers into bytes/s, predicts one token's slot

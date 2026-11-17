@@ -5,19 +5,23 @@ The host expert tier in `kindi/lightning.py` is pinned RAM. Without this module 
 set is a RAM requirement. With the opt-in cold tier the hottest host experts stay pinned up to a
 host byte budget and only the overflow is file-backed. This module is the file side of that tier:
 it reads the Q2_0 bytes of a selected expert range with an unbuffered read where the OS allows one
-(``O_DIRECT`` on Linux, ``FILE_FLAG_NO_BUFFERING`` on Windows), and coalesces neighbouring ranges
-into one read-ahead window. It also owns the pure host/disk split so the engine, tests and reports
-use the same accounting. It does not allocate VRAM, run a kernel, or decide which expert is needed;
-the engine owns those parts.
+(``O_DIRECT`` on Linux, ``FILE_FLAG_NO_BUFFERING`` on Windows), coalesces neighbouring ranges into
+one aligned read, and keeps a bounded lookahead queue for ranges requested ahead of demand. It
+also owns the pure host/disk split so the engine, tests and reports use the same accounting. It
+does not allocate VRAM, run a kernel, or decide which expert is needed; the engine owns those
+parts.
 
 Every read is accounted for separately:
 
 * ``requested_bytes``: the exact expert bytes the caller asked for;
-* ``read_bytes``: bytes actually transferred, including alignment and read-ahead gaps;
-* ``readahead_bytes``: the gap bytes fetched by merging neighbouring ranges;
+* ``read_bytes``: bytes actually transferred, including alignment, coalesced gaps and prefetches;
+* ``coalesced_bytes``: the gap bytes fetched by coalescing neighbouring ranges;
+* ``prefetched_bytes``: the exact bytes fetched by the lookahead queue;
+* ``prefetch_used_bytes``: prefetched bytes later returned to a demand read;
 * ``alignment_bytes``: block padding added by aligned reads.
 
-``read_bytes == requested_bytes + readahead_bytes + alignment_bytes`` for every completed read.
+``read_bytes == requested_bytes + coalesced_bytes + alignment_bytes + prefetched_bytes - prefetch_used_bytes``
+for every completed read: a cached prefetch is charged once when fetched, not again on demand.
 
 A buffered fallback is reported as such. It is still correct, but its number is a page-cache rate,
 not the device's, so a throughput claim must never use it silently.
@@ -25,6 +29,7 @@ not the device's, so a throughput claim must never use it silently.
 import ctypes
 import mmap
 import os
+from collections import OrderedDict
 
 import numpy as np
 
@@ -164,22 +169,32 @@ def split_q2(raw, rows, cols_blocks):
 
 
 class ColdExpertReader(object):
-    """Read byte ranges from one file, unbuffered and with a bounded read-ahead merge.
+    """Read byte ranges from one file, unbuffered, with bounded coalescing and prefetch.
 
     The file is opened lazily on the first read so a pack with no cold experts (for example, one
-    that fits the card) never opens it. `read_many` sorts ranges by offset and merges ranges whose
-    gap is at most ``read_ahead * alignment``; that is the read-ahead. If unbuffered I/O cannot be
-    opened or used, the reader falls back to an ordinary unbuffered Python file and labels it.
+    that fits the card) never opens it. `read_many` sorts ranges by offset and coalesces ranges
+    whose gap is at most ``coalesce * alignment`` into one aligned read. `prefetch` reads exact
+    ranges into a bounded lookahead queue; a later `read_many` consumes those bytes before it
+    touches the file. If unbuffered I/O cannot be opened or used, the reader falls back to an
+    ordinary unbuffered Python file and labels it.
     """
 
-    def __init__(self, path, alignment=ALIGN, read_ahead=1, log=None):
+    def __init__(self, path, alignment=ALIGN, coalesce=1, log=None,
+                 prefetch_bytes=64 << 20, read_ahead=None):
         if int(alignment) < 512:
             raise ValueError("cold read alignment must be at least 512 bytes")
-        if int(read_ahead) < 0:
-            raise ValueError("cold read-ahead must not be negative")
+        if read_ahead is not None:                 # temporary compatibility with the old name
+            if coalesce != 1:
+                raise ValueError("pass coalesce, not both coalesce and read_ahead")
+            coalesce = read_ahead
+        if int(coalesce) < 0:
+            raise ValueError("cold coalesce blocks must not be negative")
+        if int(prefetch_bytes) < 0:
+            raise ValueError("cold prefetch bytes must not be negative")
         self.path = os.fspath(path)
         self.alignment = int(alignment)
-        self.read_ahead = int(read_ahead)
+        self.coalesce = int(coalesce)
+        self.prefetch_bytes = int(prefetch_bytes)
         self.log = log
         self.closed = False
         self.unbuffered = None
@@ -187,8 +202,14 @@ class ColdExpertReader(object):
         self.reads = 0
         self.requested_bytes = 0
         self.read_bytes = 0
-        self.readahead_bytes = 0
+        self.coalesced_bytes = 0
         self.alignment_bytes = 0
+        self.prefetch_requests = 0
+        self.prefetched_bytes = 0
+        self.prefetch_used_bytes = 0
+        self.prefetch_hits = 0
+        self._prefetch = OrderedDict()
+        self._prefetch_cached = 0
         self._fd = None
         self._handle = None
         self._k32 = None
@@ -346,17 +367,10 @@ class ColdExpertReader(object):
         spans = self.read_many([(offset, size)])
         return spans[0]
 
-    def read_many(self, spans, read_ahead=None):
-        """Read ranges in file order, merging gaps up to ``read_ahead * alignment``.
-
-        Returns one ``bytes`` object per input span, in input order. Merged reads are the
-        read-ahead: a neighbouring expert or the alignment tail is fetched in the same syscall,
-        while ``requested_bytes`` still counts only what the caller asked for.
-        """
-        spans = [(int(o), int(n)) for o, n in spans]
+    def _read_spans(self, spans, ahead):
+        """Read exact spans, coalescing gaps up to ``ahead * alignment``; no demand accounting."""
         if not spans:
             return []
-        ahead = self.read_ahead if read_ahead is None else max(0, int(read_ahead))
         order = sorted(range(len(spans)), key=lambda i: (spans[i][0], i))
         out = [None] * len(spans)
         i = 0
@@ -373,21 +387,93 @@ class ColdExpertReader(object):
                 else:
                     break
             asked = sum(spans[q][1] for q in order[i:j])
-            self.readahead_bytes += max(0, (end - start) - asked)
+            self.coalesced_bytes += max(0, (end - start) - asked)
             data = self._read_range(start, end - start)
             for q in order[i:j]:
                 off, size = spans[q]
                 out[q] = data[off - start:off - start + size]
-                self.requested_bytes += size
             i = j
+        return out
+
+    def _cache_put(self, span, data):
+        """Put one exact span in the bounded lookahead queue, evicting oldest first."""
+        if not data or len(data) > self.prefetch_bytes or span in self._prefetch:
+            return False
+        while self._prefetch and self._prefetch_cached + len(data) > self.prefetch_bytes:
+            _, old = self._prefetch.popitem(last=False)
+            self._prefetch_cached -= len(old)
+        self._prefetch[span] = data
+        self._prefetch_cached += len(data)
+        return True
+
+    def prefetch(self, spans):
+        """Fetch exact ranges into the lookahead queue for a later ``read_many``.
+
+        Returns the number of newly queued spans. Already queued spans are not read again, and
+        the queue drops its oldest entries when ``prefetch_bytes`` is full. This is real
+        lookahead: the bytes are read now and a demand read later consumes them without another
+        file read.
+        """
+        spans = [(int(o), int(n)) for o, n in spans if int(n) > 0]
+        if not spans or self.prefetch_bytes <= 0:
+            return 0
+        seen, missing = set(), []
+        for span in spans:
+            if span in seen or span in self._prefetch:
+                continue
+            seen.add(span)
+            missing.append(span)
+        if not missing:
+            return 0
+        got = self._read_spans(missing, self.coalesce)
+        self.prefetch_requests += len(missing)
+        self.prefetched_bytes += sum(n for _, n in missing)
+        return sum(1 for span, raw in zip(missing, got) if self._cache_put(span, raw))
+
+    def read_many(self, spans, coalesce=None, read_ahead=None):
+        """Read ranges in file order, consuming queued prefetches and coalescing adjacent gaps.
+
+        Returns one ``bytes`` object per input span, in input order. ``coalesce`` is the gap
+        window in alignment blocks (the old ``read_ahead`` keyword is accepted for callers that
+        have not migrated). Queued prefetch bytes are used first, so a demand read that follows
+        ``prefetch`` does not touch the file again.
+        """
+        spans = [(int(o), int(n)) for o, n in spans]
+        if not spans:
+            return []
+        if coalesce is None:
+            ahead = self.coalesce if read_ahead is None else max(0, int(read_ahead))
+        else:
+            ahead = max(0, int(coalesce))
+        out = [None] * len(spans)
+        missing = []
+        for i, span in enumerate(spans):
+            if span in self._prefetch:
+                out[i] = self._prefetch.pop(span)
+                self._prefetch_cached -= len(out[i])
+                self.prefetch_hits += 1
+                self.prefetch_used_bytes += len(out[i])
+            else:
+                missing.append(i)
+        if missing:
+            got = self._read_spans([spans[i] for i in missing], ahead)
+            for i, raw in zip(missing, got):
+                out[i] = raw
+        self.requested_bytes += sum(n for _, n in spans)
         return out
 
     def stats(self):
         """The byte accounting a benchmark or a test may quote."""
         return {"path": self.path, "method": self.method, "unbuffered": self.unbuffered,
-                "alignment": self.alignment, "read_ahead_blocks": self.read_ahead,
+                "alignment": self.alignment, "coalesce_blocks": self.coalesce,
+                "prefetch_limit_bytes": self.prefetch_bytes,
+                "prefetch_cached_bytes": self._prefetch_cached,
+                "prefetch_requests": self.prefetch_requests,
+                "prefetched_bytes": self.prefetched_bytes,
+                "prefetch_used_bytes": self.prefetch_used_bytes,
+                "prefetch_hits": self.prefetch_hits,
                 "reads": self.reads, "requested_bytes": self.requested_bytes,
-                "read_bytes": self.read_bytes, "readahead_bytes": self.readahead_bytes,
+                "read_bytes": self.read_bytes, "coalesced_bytes": self.coalesced_bytes,
                 "alignment_bytes": self.alignment_bytes}
 
     def close(self):

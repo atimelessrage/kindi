@@ -86,9 +86,10 @@ available host RAM less 10% or 1 GiB, whichever is larger), and only their overf
 the pack. The split uses measured pick counts when the usage file has them, otherwise the measured
 order. A prompt stages a layer's full host block through a pinned host buffer, and a decode step
 fetches only routed cold experts whose slots are not already warm. `kindi/cold_experts.py`
-performs the unbuffered aligned read and coalesces neighbouring ranges into one read-ahead window;
-each read is accounted as requested expert bytes versus bytes actually transferred, and the split
-reports exact pinned and disk expert bytes. The engine disables the decode CUDA graph while this
+performs the unbuffered aligned read, coalesces neighbouring ranges into one aligned read, and
+keeps a bounded lookahead prefetch queue; a decode step queues the next cold layer's most-used
+experts for the following call. Each read is accounted as requested expert bytes versus bytes
+actually transferred, and the split reports exact pinned and disk expert bytes. The engine disables the decode CUDA graph while this
 tier is active, because a cold miss needs a host read after the router. Warm slots take no file
 read and no page fault. `kindi plan` applies the same split to its planned host set: with
 `KINDI_LT_COLD=1`, the `host ram` line names the pinned and file-backed expert counts and bytes
@@ -402,7 +403,7 @@ Implemented, model-free:
 | `kindi/moe_tandem.py` | one execution unit's expert split over the cache and a placement: `card` / `copy` / `cpu` lanes, opt-in CPU lane with a deterministic `cpu_share` throttle, router or expert-id combine order kept separate from scheduling, plan metrics; no tensors, copies or kernels |
 | `kindi/plan.py` | `kindi plan` on a `kindi_lightning` pack: expert tiers, the decode-slot trade, and with `--moe-chunk N` what `MoeTandem` would do for an N-token sample prompt chunk (lane split, distinct copies, copy bytes) from the header and `--usage`; no weights read, no bytes moved |
 | `kindi/expert_chunk.py` | multi-token prefill planner over the cache: deduped copy list in first-need order, hit/coalesced/miss report, chunk rollback when a token does not fit; no tensors or engine wiring |
-| `kindi/cold_experts.py` | opt-in Lightning host tier: hottest-first host/disk split under a byte budget, aligned unbuffered reads, read-ahead merge, Q2_0 de-interleave and requested/transferred/ tier byte accounting; no VRAM allocation or kernel |
+| `kindi/cold_experts.py` | opt-in Lightning host tier: hottest-first host/disk split under a byte budget, aligned unbuffered reads, coalesced gaps, a bounded lookahead prefetch queue, Q2_0 de-interleave and requested/transferred/ tier byte accounting; no VRAM allocation or kernel |
 | `tests/test_moe_cache.py` | synthetic-slot tests for transitions, eviction, pinning, transient slots, failed copies and metrics |
 | `tests/test_moe_cache_properties.py` | 32 seeded randomized route/acquire traces; checks capacity, pin ownership, slot states, atomic rejects and metrics after every operation |
 
@@ -443,8 +444,8 @@ Expose at least:
 coalesced loads, evictions, cache/transient admissions, copy bytes, pins, rejects and slot-state
 counts. It does no copy or compute, so it cannot provide H2D wait, CPU/GPU seconds, VRAM/RSS or
 disk counters; the backend must add those before operational metrics are complete. The Lightning
-cold path exposes `Engine.cold_stats()`: requested bytes, transferred bytes, read-ahead bytes,
-reads, method and the number of cold experts; it makes no throughput claim.
+cold path exposes `Engine.cold_stats()`: requested bytes, transferred bytes, coalesced bytes,
+prefetched/used bytes, reads, method and the number of cold experts; it makes no throughput claim.
 
 `/health` must report the fitted cache and the mode (`copy` or parity-passed `cpu`). `/metrics` must
 carry counters. A cache error, failed copy, partial expert or parity failure is a hard error, not a
@@ -485,8 +486,9 @@ the lane is disabled and this phase is a documented no-go, not a support claim.
 
 ### M3 — overlap and prefetch
 
-Run H2D, GPU hits and CPU misses concurrently; add a fixed-order combine barrier; measure a
-lookahead predictor separately from demand misses.
+Run H2D, GPU hits and CPU misses concurrently; add a fixed-order combine barrier. The Lightning
+cold reader now has a bounded lookahead queue and queues the next cold layer's most-used experts;
+measure that prefetch separately from demand misses.
 
 **Gate:** no output change versus M1; measured copy wait, CPU wait and hit-rate trade-off; no
 starvation of the current token.
