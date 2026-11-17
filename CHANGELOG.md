@@ -51,6 +51,19 @@
 
 ### Changed
 
+- **The kernel launch contract now covers every graph call site, not one kernel** — `k_rmsfold_qT`'s
+  missing `hp` was caught for one kernel only after four releases of silent breakage. `tests/test_kernel_arity.py`
+  now reads every `__global__` declaration in `kindi/*.cu` (including `__launch_bounds__` forms and the
+  generated `k_*_T` token-batched wrappers from `kindi/chunk.py::_wrappers`, whose signature is
+  `params + int T_ + one stride per pointer`) and checks **71 launches** across `kindi/spec.py` (26),
+  `dspine.py` (4), `mtp.py` (3) and `tp.py` (38). **71** further sites cannot be resolved statically
+  (a kernel held in a variable, list element, dict lookup, `getattr` or conditional; an argument tuple
+  assembled at run time) and are now pinned in `UNRESOLVED_SITES` with a reason each, so a new dynamic
+  launch fails the test until it is classified, and the measured count is pinned so a silent coverage
+  drop fails too. Every measured site is proven by mutating a copy of its module and requiring the
+  checker to catch it (drop-last argument first, empty tuple where a dual-arity kernel such as
+  `k_tc_q8` — 7 parameters on HIP/Pascal, 8 on CUDA — makes the drop land legally).
+  Tracked as [REQ-0023](docs/development/requirements/REQ-0023.md); the grid/block half stays open.
 - **A structured request compiles its grammar once, not twice** — validation has to build the
   automaton to answer an invalid schema or grammar with a 400 before the engine runs, and the
   decode path then built the same one again. Validation now parks the compiled object on the
