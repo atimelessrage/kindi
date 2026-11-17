@@ -1,9 +1,13 @@
 # Current worktree vs stock Kindi 0.6.0
 
-Report date: **2026-11-16** (refresh of the 2026-11-15 report; §36–§37 record
-the T4.2 Gemma 4/DeepSeek port + engine-gateway audit, the Lightning gate
+Report date: **2026-11-17** (refresh of the 2026-11-16 report; §40 records every
+round since §39 — the repo consolidation, the 9B tandem measurement, the GBNF
+rule-cache result, the first real Windows installer run, the evaluation triage,
+the vision-gate/grammar-compile fixes, `kindi caps` + `kindi autotune`, and the
+verified full-suite state of `main`). §36–§37 keep the T4.2 Gemma 4/DeepSeek
+port + engine-gateway audit, the Lightning gate
 block, Lightning/Nanbeige structured output, and the True-MoE roadmap
-labels). This file is the successor to
+labels. This file is the successor to
 `CURRENT-VS-KINDI-0.5.md` §25: that file's §§1–24 are the history against
 0.5.0 and §25 is the first evaluation against 0.6.0; this file carries the
 current one. It separates verified behavior from recorded evidence,
@@ -14,14 +18,17 @@ everything described here has been re-run on current hardware.
 
 Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
 head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-HEAD `5b8330b`:
+`main` at `899a110` (the state this refresh measured):
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD   # yes
 git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 348 commits
-git diff --shortstat v0.6.0..HEAD          # 402 files, +54,482/-1021
+git log --oneline v0.6.0..HEAD | wc -l     # 430 commits (was 348 at the 2026-11-16 report)
+git diff --shortstat v0.6.0..HEAD          # 443 files, +64,541/-1,094 (was 402, +54,482/-1,021)
 git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
+git ls-tree -r --name-only v0.6.0 | wc -l  # 169 upstream files
+git ls-files | wc -l                       # 556 tracked files here
+ls docs/development/requirements/REQ-*.md | wc -l   # 22 numbered requirements
 ```
 
 The 0.6.0 merge landed on 2026-11-14 (commit `f635513`, 18 conflicted files
@@ -31,12 +38,13 @@ and the fork adds behavior on top of it. The −993 in the shortstat are line
 deletions inside files, not file deletions (the name-only check above is
 empty).
 
-Full suite at `dd605e3`: **760 passed, 11 skipped, 0 failed, 0 errors**
-(with the host's clang 18.1.8 on PATH for the `libkcpu` build only). Without
-clang on PATH the same run is 748 passed + 1 failure (a stale generated
-config reference, fixed by regenerating in `dd605e3`) + 2 setup errors in
-`test_server_cpu.py` (the CPU-library build needs `clang`; environmental,
-not a code bug — the two tests pass with clang present).
+Full suite on `main` at `899a110` (this refresh): **1026 passed, 28 skipped,
+0 failed** (109 s), with `project_memory --check`, `config_reference --check`
+and `support_matrix --check` all clean. The skip count is the hardware/model /
+clang-only set, so the CPU and stub-engine surface is the part that grew
+(760 passed at `dd605e3` on 2026-11-15, 986 at `84068d2` on 2026-11-17 before
+the later rounds). Read the passing count as breadth, not as a claim that the
+GPU or model paths re-ran.
 
 ## 2. What 0.6.0 brought that 0.5.0 did not have (now in the tree)
 
@@ -77,6 +85,11 @@ not a code bug — the two tests pass with clang present).
 | **Config reference scans subpackages** (`kindi/config_reference.py`) | 2026-11-15: `env_vars()` scans `kindi/**/*.py`, so env vars read in subpackages (`KINDI_BACKEND_MODULES` in `kindi/backends/`) appear in the generated reference with subpackage site paths. Audit triage of `Buffy_ReviewAudit_202611141517.txt`: the rest of its findings (N1-N6, D1/D3/D4, M3/M4) were verified fixed on the current tree; M1/M2 stay hardware-bound |
 | Audit dispositions (2026-11-15) | the 202611150853 audit verified item-by-item on the current tree: handoff-guard findings already fixed, coverage floors already landed, hardware items already recorded unverified; hash-bump hook declined by design, fork gap unfixable (push 403) |
 | Audit fixes: optional-accelerator degradation, `kindi_cache_*` telemetry, reference-config section | 2026-11-14 audit round (N1/N3–N5/D3/D4) |
+| **`kindi caps`: per-card and per-CPU capability report** (`kindi/caps.py`, REQ-0022) | 2026-11-17: nvidia-smi → pynvml → CuPy layered identification (name, UUID, PCI bus, compute capability, total/free VRAM, driver), hardware facts kept apart from the Kindi paths they enable, unknown capacity reported as unknown; CPU half reuses the engine probe plus model name, cores, L2/L3, AVX-512/AMX and the CPU-build toolchain. On Windows the AVX/AVX2/AVX-512F flags come from `kernel32.IsProcessorFeaturePresent` (no compiler needed). `tests/test_caps.py` 19 tests; live run on the 4060 Ti rig |
+| **`kindi autotune`: measured placements** (`kindi/autotune.py`, REQ-0022) | 2026-11-17: candidates from the hardware report + pack manifest (full card, two-card TP split, tandem `auto`/`gdn:N`, Lightning decode cache, CPU), each one a real `kindi bench --sample-vram` child run, ranked by decode tok/s with reduced-context runs ranked below full-context ones and failed runs unscored. Live 2B/ctx-8192 run: 97.4–97.8 tok/s decode, 111.7–113.0 read, 3,050 MiB peak; `tandem-auto` refused as unnecessary and `tandem-gdn:8` blocked by a missing compiler, both reported as such. `tests/test_autotune.py` 18 tests |
+| **Image input is refused, not silently dropped** (`kindi/server.py`) | 2026-11-17: a pack manifest that declares `vision`/`mmproj` no longer unlocks acceptance — no build implements a projector, so an image part or Ollama `images` is always an enveloped 400, and the message names the missing projector when a pack claims one. Pinned by an app-level test built on a vision-declaring manifest |
+| **One grammar compile per structured request** (`kindi/server.py`) | 2026-11-17: validation already built the automaton to answer an invalid schema/grammar with a 400; the decode path built it again. The compiled object is now parked on the request and reused (GBNF and `json_schema`), so a structured request compiles once: llama.cpp's canonical `json.gbnf` at nesting 2 is 7,936 states / 7.8 ms median build, ~15.6 → ~7.8 ms per request. Pinned by a call-counting test |
+| **GBNF size honesty** (`kindi/gbnf.py`) | 2026-11-17: `Grammar.states` exposes the compiled size, and the over-budget refusal names `*`/`+` and `json_schema` instead of only a state count. Measured: exact per-use expansion costs ~143 states per enumerated copy (a 40-pair record referencing `ws` 82 times is 5,915 states / ~6 ms), the loop form is ~330 states at any length, and the default 20,000-state cap holds ~130 enumerated copies. The pre-`221d652` rule cache was 20× smaller because it widened the language (an "exactly 3" grammar accepted 0–5 copies) |
 
 ## 4. What is worse, missing, or unverified vs stock 0.6.0
 
@@ -92,7 +105,9 @@ Nothing upstream was deleted. Deliberate divergences kept from the fork:
 Still real and orderable against 0.6.0:
 
 - The 0.6 backends (MoE / DeepSeek / DSpine) have **no GPU run record in this session** — first check with real hardware: `kindi verify` with `KINDI_USING=dsv41`, `KINDI_BACKEND=lightning`, `KINDI_DRAFTER=dspine` on the rig. **Lightning closed 2026-11-16 (§38); the other three are blocked on weights/corrupt uploads, not code.**
-- `install.ps1` has never been run on Windows hardware.
+- `install.ps1` **has now been run for real, but not to completion on a clean box**: 2026-11-17, isolated on `S:` with `-AppName`/`-Distro`/`-DistroDir` set apart from the installed engine, `-DockerMode skip -NoBridge -NoDesktopShortcut -Yes -LinuxArgs --dry-run` (94 s). Real: PC checks, Ubuntu 24.04 rootfs download with Canonical SHA256SUMS match, `wsl --import`, systemd, the GPU check inside WSL, Start-menu items, the HKCU uninstall entry. Not covered: Docker integration, the model download and a served request. Two findings recorded: the published `install.sh` reports 0.6.1 while `install.ps1` and this tree say 0.6.0, and the in-WSL disk check reports the vhdx capacity (954.5 GB) while the host drive had 22 GB free. See `docs/WINDOWS.md`.
+- `kindi autotune`'s two-card and MoE candidates are **unit-tested, not measured**: this host has one card and no Lightning pack, so `tp-2-auto`/`tp-2-equal` and `dcache-*` have no recorded number, and a placement-changing winner still needs `kindi verify` before it is served.
+- The CPU engine has no AVX-512 or AMX kernel: the 2026-11-09 draft's AVX-512 kernels stay archived because no host here can compile or verify them. `kindi caps` reports the flags; it does not imply a kernel exists.
 - Tandem is still slower than GPU-only on 1 GPU (24K decode ~8 vs ~31–34 tok/s equivalent rows at 8K/24K); the overlap step-0 (re-measured 2026-11-15) puts the head (17.6 ms/token) and boundary transfers (3.09 ms) ahead of any worker thread.
 - FP8 K/V (#8) is measured **lossy, not lossless** (KLD ~9–14× q8_0, verify 3/4) — an experimental opt-in, not a default; #9 (Windows unbuffered load) measured NOT met; #6's ≤1.2× clause recorded unsatisfiable with the dedupe rule.
 - Dense standard-attention llama/qwen GGUFs are refused (no engine): see §5.
@@ -731,3 +746,33 @@ Run on the RTX 4060 Ti rig (`NVIDIA GeForce RTX 4060 Ti`, 8188 MiB, driver 617.4
 
 Two fork surfaces verified on the rig in earlier rounds remain unchanged: `kindi plan`
 (model-free) and the MoE scheduler reports, which move no bytes.
+
+## 40. What changed in the 2026-11-17 rounds (refresh)
+
+Nine rounds landed after §39, all committed on `main` (`899a110` at this refresh).
+The first two are measurements that changed what we say; the rest are features,
+fixes and record-keeping. Every row names the evidence, not the intention.
+
+| round | commit | what it changed | evidence |
+|---|---|---|---|
+| Repo consolidation (branches, worktrees, uncommitted state) | `70336f6` | `main` == session branch == both worktrees; every remote ref an ancestor; the two `wip/main-interrupted-*` branches and `clean/kindi-0.5` audited file by file and kept archival (their unique content is the async-tandem WIP measured unnecessary, an AVX-512 draft, `pair_ok` analysis fixed as `pair_fits`, and 0.4.0-era planning docs) | `AGENTS.md` "Consolidation audit"; 0 commits missing from `main` |
+| 9B tandem vs full GPU at comparable contexts | `8990d5f` | **The split buys headroom, never context, on a pack that fits.** Full GPU holds every request up to 131,072 tokens (5,149 MiB peak); `gdn:8` saves 486–488 MiB at 2.8–3.0× decode cost, `gdn:16` 872–874 MiB at 4.5–4.6×, flat across 8K–131K. The 27B stays the only pack here that needs the split | `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-tandem-9b/RESULTS.md` |
+| GBNF rule-cache result | `6d2a956` | Dropping the pre-`221d652` rule cache is not a regression: sharing a rule widened the language (an "exactly 3" grammar accepted 0–5 pairs) and the cache was 20× smaller *because of that* (302 vs 5,915 states). Added `Grammar.states`, an actionable over-budget refusal naming `*`/`+` and `json_schema`, and the measured ladder in `docs/API.md` | `tests/test_gbnf.py` (40-pair grammar accepts exactly 40, rejects 39/41; loop form ~330 states; 200-copy refusal) |
+| First real Windows installer run | `48e875d` | `install.ps1` executed on Windows 10 19045, isolated on `S:` with its own `-AppName`/`-Distro`/`-DistroDir`: real rootfs download with Canonical SHA256SUMS match, `wsl --import` (ext4.vhdx 1.3 GB), systemd, `nvidia-smi` seeing the 4060 Ti inside WSL, Start-menu items, HKCU uninstall entry, transcript and state in `%LOCALAPPDATA%\KindiInstallerTest` (85 KB). Docker, the model download and a served request were deliberately skipped. Findings: published `install.sh` is 0.6.1 vs 0.6.0 here; in-WSL disk check reports vhdx capacity, not host free space | `docs/WINDOWS.md` "Verified installer run"; `Ubuntu`/`docker-desktop` distros, Docker settings mtime and port 8093 verified untouched |
+| Evaluation ideas triage | `5c6cc6d` | Fifteen proposed measurements triaged against the tree: seven accepted with their gate written first (task-level equivalence suite, failure-mode catalog, KV/peak table generator, vision-gate honesty, quant comparison, pack licence table, queueing curve, cold-start table), six already tracked and not duplicated, one not this repo's shape. The triage itself found two real gaps | `docs/ROADMAP.md` "Evaluation ideas review (2026-11-17)" |
+| Vision gate made honest + one grammar compile | `c7b55a0` | A manifest `vision`/`mmproj` flag used to be the only thing between an image request and a text-only engine, and nothing writes that field or runs a projector — image input is now always a 400 that names the missing projector when a pack claims one. Validation's compiled grammar is now reused by the decode path, so a structured request compiles once (~15.6 → ~7.8 ms on canonical `json.gbnf` at nesting 2, 7,936 states) | `tests/test_server.py` 72 passed, incl. the vision-declaring-manifest 400 and the call-counting test |
+| `kindi caps` + `kindi autotune` (REQ-0022) | `9e6405f` | Solid identification and a measured placement search: see §3 rows. Live on the rig: `sm_89`, 8188/6994 MiB, driver 617.42, i7-8086K 6/12, L3 12 MiB; autotune 2B/ctx-8192 `gpu0` 97.4–97.8 tok/s decode / 111.7–113.0 read / 3,050 MiB peak, with the two tandem candidates refused/blocked and reported as such | `docs/AUTOTUNE.md`; `tests/test_caps.py` 19 + `tests/test_autotune.py` 18 |
+| Windows CPU flags without a compiler | `78fb27f` | Took over the detection half of the archived 2026-11-09 CPUID draft: `kernel32.IsProcessorFeaturePresent(39/40/41)` answers AVX/AVX2/AVX-512F and is merged only where the engine probe has no answer. Measured on the i7-8086K: `AVX=yes, AVX2=yes, AVX-512=no` (was three `unknown`s); FMA3/F16C have no kernel32 constant and stay unknown with a note naming `KINDI_CC`. The draft's AVX-512 kernels stay archived — no host here can compile or verify them | `kindi/caps.py:windows_features`; `tests/test_caps.py` (kernel32, no-kernel32, merge-precedence) |
+| Verification round (this report's baseline) | `893bacd`, `899a110` | `main` verified end to end: **1026 passed, 28 skipped, 0 failed** (109 s) plus the three generated-artifact gates. The run caught two real defects: a stale `docs/CONFIGURATION-REFERENCE.md` (the new `KINDI_CC` probe moved a recorded line) and a handoff table lagging its commit | run log in the round's commit message; `docs/CONFIGURATION-REFERENCE.md` regenerated |
+
+Delta against stock `v0.6.0` at this refresh: **430 commits, 443 files changed,
++64,541 / −1,094 lines, 556 tracked files (169 upstream), zero file deletions,
+22 numbered requirements**, full suite 1026 passed / 28 skipped. Everything in
+§4 that was open before this refresh is still open, with two exceptions: the
+Windows installer has now been exercised for real (one step short of a complete
+install, as recorded there), and the image-input loophole is closed.
+
+The measurement that would most change this report is still the same one: a
+second card (two-card TP and Lightning cache rows in `kindi autotune`), an
+AVX-512 host, and a Metal/HIP rig for the calibration clause. None is
+addressable from this machine.
