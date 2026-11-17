@@ -1,11 +1,11 @@
-# Current worktree vs stock Kindi 0.6.0 / 0.6.1
+# Current worktree vs official Kindi 0.6.1
 
-Report date: **2026-11-17**. §41 is the newest section: stock moved to `v0.6.1`
-(`7fececb`, fetched 2026-11-17) after this report's §40 refresh, and one of its
-fixes is a bug this fork had too — the MTP head's CUDA graph did not build, so
-mode A speculation was silently dead. §41 records that port, the measured
-result, and the six rounds since §40. (The earlier 2026-11-16 refresh; §40
-records every round since §39 — the repo consolidation, the 9B tandem measurement, the GBNF
+Report date: **2026-11-17**. §42 is the newest section: GitHub published
+**Kindi 0.6.1** on 2026-11-16 (`7fececb`), with release notes, three GHCR
+images, a source tarball and installer hashes. §41 keeps the tag-level history
+of the MTP fix and the path to `f934a55`; §42 refreshes that against the published
+release and `main` at `e66471f`. (The earlier 2026-11-16 refresh; §40 records
+every round since §39 — the repo consolidation, the 9B tandem measurement, the GBNF
 rule-cache result, the first real Windows installer run, the evaluation triage,
 the vision-gate/grammar-compile fixes, `kindi caps` + `kindi autotune`, and the
 verified full-suite state of `main`). §36–§37 keep the T4.2 Gemma 4/DeepSeek
@@ -18,36 +18,43 @@ current one. It separates verified behavior from recorded evidence,
 incomplete features, and release-hygiene problems. It is not a claim that
 everything described here has been re-run on current hardware.
 
-§4 was re-based at `fdae7f4` (2026-11-17): worse, missing and unverified are separate tables with a
-closure condition per row, and it corrects §41's claim that the fork ships no compose files -
-`compose.yaml`, `compose.amd.yaml` and `docs/CONTAINERS.md` are present from `dce89df`, and v0.6.1
-only changes their example image tags.
+§4 was re-based at `e66471f` (2026-11-17): worse, missing and unverified are separate tables with a
+closure condition per row. It corrects the earlier claim that the fork ships no compose files:
+`compose.yaml`, `compose.amd.yaml` and `docs/CONTAINERS.md` are present from `dce89df`; the official
+v0.6.1 release changes `compose.yaml`, the Dockerfiles and docs, and publishes the `0.6.1-cuda`,
+`0.6.1-rocm6` and `0.6.1-rocm7` images.
 
 ## 1. Baseline
 
-Upstream: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream
-head `dce89df` (container-registry docs, 2026-11-13). Both are ancestors of
-`main` at `899a110` (the state this refresh measured):
+Official upstream: **Kindi 0.6.1**, tag `v0.6.1` (`7fececb`, 2026-11-16). The
+GitHub release was published 2026-11-16T21:49:20Z; its notes name the 2B MTP
+fix, the `0.6.1-cuda` / `0.6.1-rocm6` / `0.6.1-rocm7` images and the install
+scripts. §42 records the release assets and hashes. `v0.6.0` (`179710c`) is an
+ancestor of `main`; `v0.6.1` is one commit past the shared base `dce89df` and is
+not an ancestor of this fork. The comparison base for this refresh is `main` at
+`e66471f` (2026-11-17):
 
 ```sh
-git merge-base --is-ancestor v0.6.0 HEAD   # yes
-git merge-base --is-ancestor origin/main HEAD  # yes
-git log --oneline v0.6.0..HEAD | wc -l     # 430 commits (was 348 at the 2026-11-16 report)
-git diff --shortstat v0.6.0..HEAD          # 443 files, +64,541/-1,094 (was 402, +54,482/-1,021)
-git diff --diff-filter=D --name-only v0.6.0..HEAD  # (empty: zero file deletions)
-git ls-tree -r --name-only v0.6.0 | wc -l  # 169 upstream files
-git ls-files | wc -l                       # 556 tracked files here
-ls docs/development/requirements/REQ-*.md | wc -l   # 22 numbered requirements
+git merge-base --is-ancestor v0.6.0 HEAD       # yes
+git merge-base --is-ancestor v0.6.1 HEAD       # no: v0.6.1 is one commit past dce89df
+git merge-base v0.6.1 HEAD                     # dce89df
+git log --oneline v0.6.1..HEAD | wc -l         # 504 commits
+git diff --shortstat v0.6.1..HEAD              # 522 files, +74,828/-1,190
+git diff --diff-filter=D --name-only v0.6.1..HEAD  # (empty: zero file deletions)
+git ls-tree -r --name-only v0.6.1 | wc -l      # 172 upstream files
+git ls-files | wc -l                           # 632 tracked files here
+ls docs/development/requirements/REQ-*.md | wc -l  # 28 numbered requirements
 ```
 
 The 0.6.0 merge landed on 2026-11-14 (commit `f635513`, 18 conflicted files
 over 172 diverged upstream commits) and has been carried forward since. The
-tree vs `v0.6.0` is a **strict superset**: every upstream file is present,
-and the fork adds behavior on top of it. The line-count drop in the shortstat is edits inside files, not file deletions (the name-only check above is
-empty).
+tree vs `v0.6.0` is a **strict superset**: every upstream file is present, and
+the zero-deletion check against `v0.6.1` shows that none of its paths was dropped
+either. The line-count drop in a shortstat is edits inside files, not file
+deletions.
 
-Full suite on `main` at `899a110` (this refresh): **1026 passed, 28 skipped,
-0 failed** (109 s), with `project_memory --check`, `config_reference --check`
+Full suite on `main` at `e66471f` (this refresh): **1164 passed, 28 skipped,
+0 failed** (170 s), with `project_memory --check`, `config_reference --check`
 and `support_matrix --check` all clean. The skip count is the hardware/model /
 clang-only set, so the CPU and stub-engine surface is the part that grew
 (760 passed at `dd605e3` on 2026-11-15, 986 at `84068d2` on 2026-11-17 before
@@ -66,7 +73,7 @@ GPU or model paths re-ran.
 | Turn-save cache (`turn_keep`, `turn_disk_mb`), priority scheduler, `/v1/tokenize` + `/detokenize`, `dry_run` | present (merged) | CPU-tested; no Windows install run |
 | New card classes (M5000 sm_52 fix, Lightning offers, DSpine profile) | present (merged) | rig-measured cards remain `not measured` except the 4060 Ti (§4) |
 
-## 3. What this fork has *beyond* stock 0.6.0 (better, verified)
+## 3. What this fork has *beyond* stock 0.6.0 / 0.6.1 (better, verified)
 
 | fork item | evidence |
 |---|---|
@@ -99,18 +106,20 @@ GPU or model paths re-ran.
 | **One grammar compile per structured request** (`kindi/server.py`) | 2026-11-17: validation already built the automaton to answer an invalid schema/grammar with a 400; the decode path built it again. The compiled object is now parked on the request and reused (GBNF and `json_schema`), so a structured request compiles once: llama.cpp's canonical `json.gbnf` at nesting 2 is 7,936 states / 7.8 ms median build, ~15.6 → ~7.8 ms per request. Pinned by a call-counting test |
 | **GBNF size honesty** (`kindi/gbnf.py`) | 2026-11-17: `Grammar.states` exposes the compiled size, and the over-budget refusal names `*`/`+` and `json_schema` instead of only a state count. Measured: exact per-use expansion costs ~143 states per enumerated copy (a 40-pair record referencing `ws` 82 times is 5,915 states / ~6 ms), the loop form is ~330 states at any length, and the default 20,000-state cap holds ~130 enumerated copies. The pre-`221d652` rule cache was 20× smaller because it widened the language (an "exactly 3" grammar accepted 0–5 copies) |
 
-## 4. What is worse, missing, or unverified vs stock 0.6.0
+## 4. What is worse, missing, or unverified vs official Kindi 0.6.1
 
-Re-derived at `fdae7f4` (2026-11-17) against `v0.6.0` (`179710c` plus the post-tag `dce89df`) and
-`v0.6.1` (`7fececb`). The title folds three different questions together, so they are separate below;
-each row ends with what would move it, and §39–§41 hold the dated runs behind them.
+Re-derived at `e66471f` (2026-11-17) against the official `v0.6.1` release (`7fececb`, published
+2026-11-16), with `v0.6.0` (`179710c` plus the post-tag `dce89df`) kept for the historical rows. The
+title folds three different questions together, so they are separate below; each row ends with what
+would move it, and §39–§42 hold the dated runs behind them.
 
-**The short answer.** Nothing upstream is deleted or unported: every file of `v0.6.0` is still present
-(`git diff --diff-filter=D --name-only v0.6.0..HEAD` is empty), and `v0.6.1`'s two code changes are in
-`f934a55`, with its version and container-tag strings deliberately not adopted until this fork has a
-release. What remains open is **evidence**: measurements that need weights, a second card, another ISA
-or a clean Windows box. The one measured "worse" than the simpler path is mode A speculation, and it
-is off by default.
+**The short answer.** Nothing upstream is deleted or unported: every file of `v0.6.1` is still present
+(`git diff --diff-filter=D --name-only v0.6.1..HEAD` is empty), and the release's two code changes are
+in `f934a55`. The official release now publishes `0.6.1-cuda`, `0.6.1-rocm6` and `0.6.1-rocm7` plus
+the source and installer hashes; this fork deliberately keeps its 0.6.0 version and container tags
+until it has a matching release. What remains open is **evidence**: measurements that need weights, a
+second card, another ISA or a clean Windows box. The one measured "worse" than the simpler path is
+mode A speculation, and it is off by default.
 
 ### 4.1 Worse than the simpler path (measured; not a regression against stock)
 
@@ -122,13 +131,13 @@ is off by default.
 | FP8 E4M3 K/V (`KINDI_KV=fp8`) | KLD **2.48e-06** (2K) / **2.80e-06** (8K), ~9–14x q8_0, verify 3/4, same cache size as q8_0 (8.5 bits/value) | experimental opt-in, never a default | a lossless 8-bit format; keep it off otherwise |
 | Recursive GBNF (`KINDI_GBNF_MAX_DEPTH`) | opt-in and bounded: llama.cpp's `json.gbnf` reaches array nesting 2 inside the 20,000-state cap, and depth 7 is 398,268 states; `json_schema` is the unbounded path | exact expansion is what keeps the accepted language honest (the old rule cache was 20x smaller by widening it) | shared states or a token-class mask (REQ-0027) |
 
-### 4.2 Missing vs stock 0.6.0 / 0.6.1
+### 4.2 Missing vs official 0.6.1
 
-| item | stock | here | consequence / closure |
+| item | official release | here | consequence / closure |
 |---|---|---|---|
-| Version identity | `0.6.1` | `0.6.0` in `kindi/__init__.py`; `install.sh` pins the published v0.6.0 archive (sha256 `613f7320…`) | Settings > Apps shows 0.6.0 for a distribution installed by the published 0.6.1 `install.sh` (2026-11-17 Windows run). A fork release, not an engine change; `docs/MANUAL-HELP-NEEDED.md` §5 |
-| 0.6.1 container packaging | compose files and `docs/CONTAINERS.md` reference `0.6.1-cuda` / `0.6.1-rocm7` | the files are **present from `dce89df`**; v0.6.1's change to them is only those example tags | no 0.6.1 images exist from this fork, so pointing at them would be false; publish images with a fork release. (§41's "ships no compose files" was wrong; corrected there and here) |
-| Upstream code | `kindi/mtp.py`'s `hp` argument and `kindi/spec.py`'s graph diagnostic | both ported in `f934a55`; the remaining v0.6.1 changes are version strings, docs, Dockerfiles, compose and install scripts | nothing to port; no file of the `v0.6.1` tree is missing here |
+| Version identity | `0.6.1`; `install.sh` sha256 `31c4a860…` | `0.6.0` in `kindi/__init__.py`; `install.sh` pins the v0.6.0 archive (sha256 `613f7320…`) | the official v0.6.1 installer now exists; this fork still reports and installs 0.6.0. A fork release, not an engine change; `docs/MANUAL-HELP-NEEDED.md` §5 |
+| 0.6.1 container packaging | `ghcr.io/ahtx/kindi:0.6.1-cuda`, `0.6.1-rocm6`, `0.6.1-rocm7`; compose/Docker docs updated | `compose.yaml`, `compose.amd.yaml` and `docs/CONTAINERS.md` are present from `dce89df`; the 0.6.1 commit changes `compose.yaml`, the three Dockerfiles and docs; `compose.amd.yaml` came in with `dce89df` | no 0.6.1 images exist from this fork, so pointing at them would be false; publish matching images with a fork release |
+| Upstream code | `kindi/mtp.py`'s `hp` argument and `kindi/spec.py`'s graph diagnostic | both ported in `f934a55`; the remaining v0.6.1 changes are version strings, docs, `compose.yaml`, the Dockerfiles and install scripts | nothing to port; no file of the `v0.6.1` tree is missing here |
 | Not-behind-stock absences | stock lacks them too | dense standard-attention llama/qwen engines; an image projector (an image part is an enveloped 400); the llama.cpp proxy (REQ-0019 T4.4) and real concurrency (T4.5), whose positioning is an open maintainer call (MANUAL-HELP §6); Metal | listed so "missing" is not read as "behind stock" |
 | MoE expert-cache tandem | stock had no such path | **not a backend**: `kindi/expert_cache.py` is a model-free slot/LRU prototype, with no router, pack, GPU copy path or measured inference (`docs/MOE-TANDEM.md`) | Raon-1 mini R0 reference goldens or the Gemma 4 26B contract, plus a GPU copy path; until then no support claim |
 
@@ -149,7 +158,7 @@ is off by default.
 | 11 | PQ2_0 / Q2_0 4B/9B/27B import | only the 2B variants are on this host | MANUAL-HELP §2 downloads |
 | 12 | Arbitrary-draft-GGUF speculation | generalized harness not built | that harness's gate |
 | 13 | Two-card TP and mixed-card pairs | one card only | a second card, same or mixed vendor |
-| 14 | Same-settings A/B against stock `v0.6.0` | the comparison is code-level (strict superset); §39's performance check used 2026-11-09 rows with different settings, so it rules out a gross regression but is not an A/B | run `v0.6.0` and this tree on the same pack, flags and card |
+| 14 | Same-settings A/B against official `v0.6.1` | the comparison is code-level (zero v0.6.1 path deletions); §39's performance check used 2026-11-09 rows with different settings, so it rules out a gross regression but is not an A/B | run `v0.6.1` and this tree on the same pack, flags and card |
 | 15 | GPU CI (the agreed-cards gate) | hand-run and hand-recorded; the runner is not registered | the runner registration in `docs/CI.md` §5.1 |
 
 ### 4.4 Deliberate divergences (not defects)
@@ -158,9 +167,9 @@ is off by default.
 |---|---|
 | `presence_penalty` stays a config float key (upstream moved validation to the server; config defaults and `profiles.py` still read it) | local coherence; documented in the merge commit |
 | Server stats keep the fork's superset keys; `/health` unions both queue views and `drafting` | documented merge resolution |
-| Installer pins the published v0.6.0 tarball sha256 `613f7320…` | the fork cannot republish upstream's artifact; the installer release asset itself is still unpublished (release-owner step) |
+| Installer pins the published v0.6.0 tarball sha256 `613f7320…` | the official v0.6.1 tarball is now published (`kindi-0.6.1.tar.gz`, 2,013,311 bytes, sha256 `63f20abf…`); the fork cannot republish upstream's artifact, so a fork installer release remains a release-owner step |
 | Turn-save entries' stored rows live under different keys than `Turns` blocks | cosmetic; no upstream rows are read by this fork |
-| The fork's version stays `0.6.0` while upstream is `0.6.1` | a version bump is a release-owner decision; claiming 0.6.1 without a published artifact would be a false version, and `kindi __version__` would disagree with the installer pin |
+| The fork's version stays `0.6.0` while official Kindi is `0.6.1` | a version bump is a release-owner decision; claiming 0.6.1 without a fork artifact would be a false version, and `kindi __version__` would disagree with the installer pin |
 
 ### 4.5 The measurements that would change the ranking
 
@@ -168,7 +177,7 @@ In order of how much of this table they would move: a **second card** (two-card 
 autotune `tp-2-*` rows, tandem-vs-GPU on a pair), **weights** (a clean Nanbeige upload, DeepSeek shards,
 Gemma 4 E4B, the DSpine profile, a Raon/Gemma MoE pack), an **AVX-512 host** (the CPU half tops out at AVX2
 today), a **HIP or Metal rig** (the calibration clause and a non-CUDA backend), and one **same-settings
-A/B against stock `v0.6.0`**. None is addressable from this machine, which is why
+A/B against official `v0.6.1`**. None is addressable from this machine, which is why
 `docs/MANUAL-HELP-NEEDED.md` lists them as owner actions rather than planned work.
 
 ## 5. Model and hardware status
@@ -822,16 +831,22 @@ fixes and record-keeping. Every row names the evidence, not the intention.
 
 ## 41. Stock moved to v0.6.1 — and its MTP fix was our bug too (2026-11-17)
 
-Upstream `v0.6.1` (`7fececb`, fetched 2026-11-17) landed after the §40 refresh at `899a110`. It is
-16 files, +336/−43: container packaging (`compose.yaml`, `compose.amd.yaml`,
-`docs/CONTAINERS.md`), the Docker/install docs, the 0.6.1 version strings, a graph-build diagnostic
-in `kindi/spec.py`, and one real code fix in `kindi/mtp.py`.
+Official upstream `v0.6.1` (`7fececb`) was published 2026-11-16 and fetched here on 2026-11-17.
+The published range `v0.6.0..v0.6.1` is **16 files, +336/−43**: it includes `dce89df`'s container
+packaging commit (which adds `compose.yaml` and `compose.amd.yaml`) and `a6f4891`'s README
+acknowledgement as well as the 0.6.1 commit. The 0.6.1 commit itself (`dce89df..v0.6.1`) is **15
+files, +52/−36**: `compose.yaml`, the three Dockerfiles, `docs/CONTAINERS.md`, the Docker/install
+docs, README/NOTICE/CHANGELOG, the 0.6.1 version strings, `install.sh`/`install.ps1`, a graph-build
+diagnostic in `kindi/spec.py`, and one real code fix in `kindi/mtp.py`. It does **not** change
+`compose.amd.yaml`; that file came in with `dce89df`. An earlier version of this section gave the
+16-file total but attributed it to the 0.6.1 commit and listed `compose.amd.yaml` as its change,
+both corrected here.
 
 | 0.6.1 item | our status |
 |---|---|
 | `kindi/mtp.py` passes `k_rmsfold_qT`'s `hp` argument | **we had the bug; fixed in `f934a55`.** `k_rmsfold_qT` took a trailing `hp` in 0.5.0; `spec.py` and `dspine.py` were updated, `mtp.py` was not. With `KINDI_TC=1` and `KINDI_MTP_HEAD` set, the head's graph failed (`cuGraphAddKernelNode failed (1)`) and the engine logged `speculation off: the MTP head ... did not load` — mode A did not run at all on the tensor-core layout for four releases, and a short argument tuple is not a Python error. Reproduced on the rig before the fix; after it: `MTP head attached: kindi-mtp-2b-v1.npz (61 MB, window 64)` |
 | `kindi/spec.py` names node, grid, block and argument count on a graph-build failure | **ported in `f934a55`** — that diagnostic is what makes a missing argument visible instead of `failed (1)` |
-| container packaging (`compose.yaml`, `compose.amd.yaml`, `docs/CONTAINERS.md`) | **already here** (from `dce89df`); the 0.6.1 delta is only the example image tags (`0.6.1-cuda` / `0.6.1-rocm7`) in `compose.yaml` and `docs/CONTAINERS.md`, which need a fork release that publishes those images. §4 is corrected accordingly; the earlier "ships no compose files" was wrong |
+| container packaging (`compose.yaml`, the Dockerfiles, `docs/CONTAINERS.md`, docs) | **already here** (from `dce89df`); the 0.6.1 delta is the version/image-tag strings and docs, while the official release publishes `0.6.1-cuda`, `0.6.1-rocm6` and `0.6.1-rocm7` images. A fork release would need to publish matching images; §4 is corrected accordingly. `compose.amd.yaml` is not part of the 0.6.1 commit; it came in with `dce89df` |
 | version strings now `0.6.1` upstream | ours stay `0.6.0` plus this changelog: the installer pins upstream's published artifact, so a fork version bump needs a fork release |
 
 The fix revives a documented feature but does not make it a win here. Measured on the i7-8086K +
@@ -859,13 +874,13 @@ Rounds since §40 (`899a110` → `f934a55`):
 | Secret scans: history and synced paths | `84aecd4`, `b710b1e` | `tools/check_secret_history.py` gates every commit's diff against a counted baseline; a synced-folder path now counts as personal data, which removed the knowledge-base path from the tree |
 | MTP head graph (this section) | `f934a55` | the 0.6.1 `hp` port, its diagnostic, and the arity test |
 
-Delta against stock `v0.6.1` at `f934a55`: **440 commits, 468 files changed,
-+67,156 / −1,125 lines, 579 tracked files (172 upstream)**, full suite 1059 passed / 28 skipped.
-Against `v0.6.0` the same tree is 442 commits, 467 files, +67,420 / −1,096, 579 tracked files,
-zero file deletions, 22 numbered requirements. `v0.6.1` is one commit past the shared base
-`dce89df` and is not an ancestor of the fork, so the 440 is `v0.6.1..f934a55` - the same as
-`dce89df..f934a55`. Everything in
-§4 that was open before this refresh is still open, with two exceptions: the
+Delta against official `v0.6.1` at the report base `e66471f`: **504 commits, 522 files changed,
++74,828 / −1,190 lines, 632 tracked files (172 upstream), 28 numbered requirements**, full suite
+1164 passed / 28 skipped. At `f934a55` the same comparison was 440 commits, 468 files,
++67,156 / −1,125 lines, 579 tracked files and 22 requirements. `v0.6.1` is one commit past the
+shared base `dce89df` and is not an ancestor of the fork, so the commit count is
+`v0.6.1..HEAD`; the zero-deletion check is `git diff --diff-filter=D --name-only v0.6.1..HEAD`.
+Everything in §4 that was open before this refresh is still open, with two exceptions: the
 Windows installer has now been exercised for real (one step short of a complete
 install, as recorded there), and the image-input loophole is closed.
 
@@ -873,3 +888,47 @@ The measurement that would most change this report is still the same one: a
 second card (two-card TP and Lightning cache rows in `kindi autotune`), an
 AVX-512 host, and a Metal/HIP rig for the calibration clause. None is
 addressable from this machine.
+
+## 42. Official v0.6.1 release published (2026-11-17)
+
+The GitHub release was published **2026-11-16T21:49:20Z** (`published_at` in the
+release API). This section uses the release page and its assets as the baseline,
+not only the tag. The notes say the release fixes the 2B with its MTP head on
+tensor-core cards: 0.5.0 and 0.6.0 failed `kindi verify` and stopped the
+installer's "Ternary-Bonsai-2 2B" setup on NVIDIA compute capability 8.0 or
+later with 9.5 GB or more (`--model 2b`). The recommended 27B setup did not use
+the MTP head and was unaffected.
+
+| release item | value |
+|---|---|
+| tag / commit | `v0.6.1` / `7fececbff13adc88bf21b8f07dea4e1c91996a9d` |
+| published | 2026-11-16T21:49:20Z (not a draft or prerelease) |
+| container images | `ghcr.io/ahtx/kindi:0.6.1-cuda`, `0.6.1-rocm6`, `0.6.1-rocm7`; the notes say each passed `kindi verify` on a real card |
+| source tarball | `kindi-0.6.1.tar.gz`, 2,013,311 bytes, sha256 `63f20abfbba55ebe8cc341b56ea15758325b59d1c84a40ed71ec3b05fadebe41` |
+| installers | `install.sh` sha256 `31c4a86025c4c25303b94ba7ff7436a34b2486de0621ac44a57f4b805f0a5a1c`; `install.ps1` sha256 `00d83e0dfbc54f46b99b8612d71044c97ba621e871b10fd47fdd7f913e3a7b23` |
+| documentation asset | `How-To-Get-Work-Done-with-Kindi-0.6.0.pdf`, 4,163,915 bytes, sha256 `14d670b383bff4aa980511b367f700d7da0a1e7af6680ed2c19914a65a1ac523`; the filename still says 0.6.0 |
+
+The release does not add engine behavior beyond the two v0.6.1 code changes already
+recorded in §41: the MTP `hp` argument fix and the graph-build diagnostic. The
+remaining release differences are version strings, `compose.yaml`, the three
+Dockerfiles, Docker/install docs and installer scripts.
+
+Against the official release, `main` at `e66471f` is **504 commits and 522 files
+ahead** (`+74,828 / −1,190`, zero file deletions), with **632 tracked files** (172
+in the v0.6.1 tree), **28 numbered requirements**, and the full suite at **1164
+passed / 28 skipped**. The MTP fix is ported in `f934a55`; no newer official
+kernel or engine path is missing. This fork does not publish a 0.6.1 image or
+installer, still reports `0.6.0`, and its installer still pins the v0.6.0 source
+archive (sha256 `613f7320…`). Those are release-owner differences, not engine
+ones.
+
+What changed in this update: the baseline is the official release, not only the
+tag; §41 now separates the 16-file `v0.6.0..v0.6.1` range from the 15-file 0.6.1 commit and attributes `compose.amd.yaml` to `dce89df`; `0.6.1-rocm6`
+is added; §4's missing/divergence rows and the installer pin now name the
+published tarball and installer hashes; and the local HTML preview was
+regenerated from this report.
+
+Not independently verified here: no official 0.6.1 image was pulled or run, and
+the official tarball was not installed. The release notes' image-verification
+statement is recorded as the publisher's claim, not as a local run. No fork
+release artifact exists.
