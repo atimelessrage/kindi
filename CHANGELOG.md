@@ -15,9 +15,10 @@
   measured rates get `expert-cache-<MiB>` beside the decode-slot candidates. It sets both engine
   settings the cache needs (`KINDI_LT_COLD=1` and `KINDI_LT_HOST_MB`) and sizes the budget from the
   same rate-sized working set as the slots (`n_used` plus the RAM/disk/PCIe lookahead, times the
-  MoE layer count and expert bytes), capped by the host tier's experts. Tests cover the env pair,
-  the host-tier cap and the missing-rate/no-host-tier cases. No Lightning pack is available here,
-  so this is an arithmetic candidate, not a measured cache optimum.
+  MoE layer count and expert bytes), capped by the host tier's experts and by the host's currently
+  available RAM after the same 10% / 1 GiB headroom as the default host budget. Tests cover the env
+  pair, both caps and the missing-rate/no-host-tier cases. No Lightning pack is available here, so
+  this is an arithmetic candidate, not a measured cache optimum.
 - **The Lightning plan's follow-up bench command carries its planned slot count** — a rate-sized
   `dcache` was shown in the report but the printed command let the child engine fall back to
   `KINDI_LT_DCACHE`'s default 10. The MoE command now prefixes `KINDI_LT_DCACHE=<planned>` (also for

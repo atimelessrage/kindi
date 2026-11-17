@@ -69,7 +69,15 @@ def _expert_cache_mib(moe, rates):
     slots = ltfit.rate_slots(n_used, host_per_layer, eb, rates)
     if not slots:
         return None
-    return max(1, int(math.ceil(slots * n_moe * eb / 2 ** 20)))
+    mib = max(1, int(math.ceil(slots * n_moe * eb / 2 ** 20)))
+    # Never propose more pinned memory than this host can spare now. Use the engine's automatic
+    # budget (available RAM less max(1 GiB, 10%)); passing an empty environment ignores an explicit
+    # KINDI_LT_HOST_MB, which is the setting this candidate itself proposes.
+    from .cold_experts import host_budget_bytes
+    host_mib = host_budget_bytes(environ={}) >> 20
+    if host_mib < 1:
+        return None
+    return min(mib, host_mib)
 
 
 def candidates(report, manifest, ctx, max_runs=6, include_cpu=False, rates=None, moe=None):

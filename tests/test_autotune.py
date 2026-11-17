@@ -120,6 +120,18 @@ def test_moe_cache_candidate_is_capped_by_the_host_tier():
     assert option["name"] == "expert-cache-32"       # 8 host experts/layer, not 16
 
 
+def test_moe_cache_candidate_is_capped_by_available_host_ram(monkeypatch):
+    # A 2 GiB host leaves 1 GiB after the default headroom (max(1 GiB, 10%)); the rate-sized
+    # working set below would otherwise ask for 2 GiB.
+    monkeypatch.setattr("kindi.hostram.available", lambda: 2 << 30)
+    options = autotune.candidates(ONE_CARD, LIGHTNING, 8192, max_runs=10, rates=RATES,
+                                  moe={"dcache": 16, "n_used": 4, "n_exp": 32, "n_moe": 4,
+                                       "n_card": 16, "expert_bytes": 32 << 20, "fit": True})
+    option = next(item for item in options if item["name"].startswith("expert-cache-"))
+    assert option["name"] == "expert-cache-1024"
+    assert option["env"]["KINDI_LT_HOST_MB"] == "1024"
+
+
 def test_moe_cache_candidate_needs_measured_rates_and_a_host_tier():
     moe = {"dcache": 16, "n_used": 4, "n_exp": 32, "n_moe": 4, "n_card": 16,
            "expert_bytes": 1 << 20, "fit": True}
