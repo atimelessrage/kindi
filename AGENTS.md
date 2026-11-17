@@ -10,12 +10,13 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ## Current state (live — read this first)
 
-- **HEAD:** `7e94156` on `freebuff/tandem-cpu-recovery` (`main` receives the parent-of-this-commit bump and FF at handoff; guarded by `tests/test_agents_handoff.py`). Full suite last measured 2026-11-17 on `main` at `899a110`: **1026 passed, 28 skipped, 0 failed (108.8 s)**, with `project_memory --check`, `config_reference --check` and `support_matrix --check` all clean; GPU grammar/JSON-schema gate closed on the 2B (§39); recursive GBNF is now opt-in (`KINDI_GBNF_MAX_DEPTH`, bounded unroll cross-checked against an independent matcher - see the newest rows in `docs/development/AGENTS-HISTORY.md`). Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset; comparison report in `CURRENT-VS-KINDI-0.6.md`. The numbers those docs quote are no longer prose: `python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (12 gates, 45 numbers across `docs/claims/*.json`, 4 citations listed as reasoned debt), and refuses a benchmark citation no claim accounts for - schema and procedure in `docs/claims/README.md`. Owner actions pending: Nanbeige 33B GGUF replacement, Gemma 4 E4B pack, DeepSeek V4.1 shards/gate data, PQ2_0/Q2_0 quant downloads, a pinned llama-server, other-hardware test rigs, push/installer/CI publications, T4.4/T4.5 + D3/D5 decisions — `docs/MANUAL-HELP-NEEDED.md`.
+- **HEAD:** `d2b124a` on `freebuff/tandem-cpu-recovery` (`main` receives the parent-of-this-commit bump and FF at handoff; guarded by `tests/test_agents_handoff.py`). Full suite measured 2026-11-17: **1048 passed, 28 skipped, 0 failed (113.5 s)** before the handoff bump; the coverage gate `python tools/check_coverage.py` passes on 26 modules from a measured run (`coverage run --branch --source=kindi -m pytest` -> `coverage json`, since `pytest-cov` hangs on this host), and `tests/test_no_secrets.py` now scans untracked files too (pinned by `test_untracked_files_are_scanned`), with `project_memory --check`, `config_reference --check` and `support_matrix --check` all clean; GPU grammar/JSON-schema gate closed on the 2B (§39); recursive GBNF is now opt-in (`KINDI_GBNF_MAX_DEPTH`, bounded unroll cross-checked against an independent matcher - see the newest rows in `docs/development/AGENTS-HISTORY.md`). Upstream `v0.6.0` (`179710c`) + `origin/main` head (`dce89df`) both contained; vs `v0.6.0` the tree is a strict superset; comparison report in `CURRENT-VS-KINDI-0.6.md`. The numbers those docs quote are no longer prose: `python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (12 gates, 45 numbers across `docs/claims/*.json`, 4 citations listed as reasoned debt), and refuses a benchmark citation no claim accounts for - schema and procedure in `docs/claims/README.md`. Owner actions pending: Nanbeige 33B GGUF replacement, Gemma 4 E4B pack, DeepSeek V4.1 shards/gate data, PQ2_0/Q2_0 quant downloads, a pinned llama-server, other-hardware test rigs, push/installer/CI publications, T4.4/T4.5 + D3/D5 decisions — `docs/MANUAL-HELP-NEEDED.md`.
 - **Shipped on main:** dense tandem runtime (2B/4B/9B/27B rate, peak and exactness at
   512/4K/8K; 2B CPU-layer sweep; joint checkpoint 149.6 MiB on the 27B at 54.5-61.5 ms
   save), owned-slice CPU load, `kindi bench --sample-vram` sampled-peak VRAM, multi-ISA CPU
   dispatch, FP8 `mma.sync` kernels (no real model), MoE expert-cache prototype (no backend),
-  rate limiting, JSON access log, coverage floor, perf-baseline gate, CI static analysis.
+  rate limiting, JSON access log, coverage floor (per-module, including `engine.py` at its
+  CPU-reachable coverage and every `kindi/backends/*` module), perf-baseline gate, CI static analysis.
 - **Open gates:** installer pin/version (release owner), tandem-beats-GPU (tuning), a
   device where full-GPU cannot run yet a split can (on the 4060 Ti the loader reduces the 27B to
   ~37K full-GPU / ~30K tandem tokens, so the split buys headroom, not context; the 9B never
@@ -58,8 +59,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `7e94156` | main checkout; clean |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `7e94156` | this session; fast-forwarded into `main` at the end of each round |
+| `T:/kindi` | `main` | `d2b124a` | main checkout; clean |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `d2b124a` | this session; fast-forwarded into `main` at the end of each round |
 
 The main worktree has a bridge note at `T:/kindi/AGENTS.md`; it is not merged into this worktree.
 Read it before editing a shared file.

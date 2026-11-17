@@ -1,4 +1,4 @@
-"""Fail when a tracked file contains a credential or a local home path.
+"""Fail when a scanned (tracked or untracked) file contains a credential or a local home path.
 
 This is a cheap, dependency-free guard for the common accident: a key, token or local path is
 added to a source file or doc. It scans `git ls-files`, skips binary files, and reports only the file, line and detector name,
@@ -10,6 +10,7 @@ Run `detect-secrets` over the unpushed diff before a release.
 """
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -99,9 +100,26 @@ def test_the_local_drive_path_rule_is_not_vacuous():
     assert not drive.search("the T:/kindi worktree")
 
 
+def test_untracked_files_are_scanned(tmp_path, monkeypatch):
+    """A credential pasted into a brand-new file used to be invisible until `git add`: the guard
+    said ALL PASS while the secret sat in the working tree. `findings()` must list it with no
+    commit and no `git add` at all."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=str(repo), check=True)
+    (repo / "committed.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "committed.py"], cwd=str(repo), check=True)
+    (repo / "fresh.py").write_text('AWS = "AKIA' + "A" * 16 + '"\n', encoding="utf-8")
+    monkeypatch.setattr(sys.modules[__name__], "ROOT", repo)
+
+    found = list(findings())
+    assert ("fresh.py", 1, "AWS access key") in found, found
+    assert not any(rel == "committed.py" for rel, _line, _name in found)
+
+
 def test_no_credentials_or_home_paths_in_tracked_files():
     bad = list(findings())
-    assert not bad, "possible secrets/personal data in tracked files:\n" + "\n".join(
+    assert not bad, "possible secrets/personal data in scanned files:\n" + "\n".join(
         "%s:%d: %s" % item for item in bad[:40])
 
 

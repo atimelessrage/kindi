@@ -27,13 +27,16 @@ and do not exclude hardware modules merely to make the number look better.
 
 On top of the total floor, the CPU job runs `tools/check_coverage.py` against
 `tests/coverage_floors.json` (audit M4): a per-module floor for every module the CPU suite
-can actually reach (server, cache, bench, tandem, vram, expert_cache, tokenizer, config,
-hostram, catalog, sched, sampling, spm, lookup, profiles, gpudrv). A total floor alone lets a
-CPU-exercised module rot while the total holds; the per-module floors pin the modules the
-requirement tests cover. The heavy CUDA modules (`engine.py`, `spec.py`, `tp.py`) are
-deliberately excluded — they are verified by `kindi verify` on hardware, and a floor for them
-needs GPU coverage first (the GPU lane above). Floors sit ~15 points below the measured value
-so platform variance does not make CI noisy; re-record with `--update` only after a measured run.
+can actually reach (`engine.py`, `kindi/backends/*`, server, cache, bench, tandem, vram,
+expert_cache, tokenizer, config, hostram, catalog, sched, sampling, spm, lookup, profiles,
+gpudrv). A total floor alone lets a CPU-exercised module rot while the total holds; the
+per-module floors pin the modules the requirement tests cover. `engine.py` is listed at its
+CPU-reachable coverage only (module-level code, planner and CPU-side helpers); its CUDA paths,
+and all of `spec.py` and `tp.py`, are verified by `kindi verify` on hardware and have no floor
+until the GPU lane above measures them. The `engine.py` and `backends/*` floors are set 5 points below their measured value
+(`2026-11-17`, `coverage run --branch --source=kindi -m pytest`), the same slack the rest of
+the file carries, so platform variance does not make CI noisy; raise a floor only after a
+measured run.
 
 The performance half of the roadmap gate is `tools/check_perf_baseline.py`: it compares the
 recorded `docs/benchmarks/CROSS-MODE.csv` against `docs/benchmarks/perf-baseline.json` and fails
