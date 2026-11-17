@@ -101,8 +101,16 @@ def _response_format_schema(response_format):
     return js
 
 
-def _response_format_grammar(response_format):
-    """Build the decode grammar for a response_format (assumes `_validate_request` passed)."""
+def _response_format_grammar(response_format, req=None):
+    """Build the decode grammar for a response_format (assumes `_validate_request` passed).
+
+    Validation already compiled the automaton to answer an invalid grammar with a 400 before the
+    engine runs, so it parks the result on the request (`_grammar`) and generation reuses that
+    object instead of building the same automaton a second time.
+    """
+    parked = req.get("_grammar") if isinstance(req, dict) else None
+    if parked is not None:
+        return parked
     from .jsongrammar import grammar_from_schema, json_object_grammar
 
     if response_format.get("type") == "json_object":
@@ -256,6 +264,18 @@ async def _read_json_body(request):
 
 
 _IMAGE_UNSUPPORTED = "this pack has no vision weights; image input is not supported"
+_IMAGE_NO_PROJECTOR = ("this pack declares vision weights (mmproj), but no Kindi build implements a "
+                       "vision projector yet; image input is not supported")
+
+
+def _image_error(pack):
+    """The 400 text for an image request, which no Kindi build can serve.
+
+    A manifest that declares vision weights does not unlock acceptance: there is no projector in
+    any build, so accepting the request would hand a text-only engine an image request and answer
+    about an image it never saw. The message says which of the two situations the caller is in.
+    """
+    return _IMAGE_NO_PROJECTOR if _pack_has_vision(pack) else _IMAGE_UNSUPPORTED
 
 
 def _pack_has_vision(pack):
@@ -276,7 +296,7 @@ def _is_image_part(part):
             or "image_url" in part or "image" in part)
 
 
-def _validate_request(req, has_vision=False):
+def _validate_request(req, image_error=_IMAGE_UNSUPPORTED):
     """Check the OpenAI request shape before it reaches the engine or the prompt cache.
 
     The server takes a raw Request, so this is the boundary that turns a typo or a wrong JSON type into a
@@ -298,14 +318,14 @@ def _validate_request(req, has_vision=False):
         content = m.get("content")
         if content is not None and not isinstance(content, (str, list)):
             _request_error("messages[%d].content must be a string or a list" % i)
-        if not has_vision and m.get("images"):
-            _request_error("%s (messages[%d].images)" % (_IMAGE_UNSUPPORTED, i))
+        if m.get("images"):
+            _request_error("%s (messages[%d].images)" % (image_error, i))
         if isinstance(content, list):
             for j, part in enumerate(content):
                 if not isinstance(part, dict):
                     _request_error("messages[%d].content[%d] must be an object" % (i, j))
-                if not has_vision and _is_image_part(part):
-                    _request_error("%s (messages[%d].content[%d])" % (_IMAGE_UNSUPPORTED, i, j))
+                if _is_image_part(part):
+                    _request_error("%s (messages[%d].content[%d])" % (image_error, i, j))
                 if "text" in part and not isinstance(part["text"], str):
                     _request_error("messages[%d].content[%d].text must be a string" % (i, j))
         if role == "assistant":
@@ -366,7 +386,7 @@ def _validate_request(req, has_vision=False):
                 from .gbnf import Grammar
 
                 try:
-                    Grammar.from_string(grammar_text)
+                    req["_grammar"] = Grammar.from_string(grammar_text)
                 except ValueError as e:
                     _request_error("invalid grammar: %s" % e, param="response_format")
             if rtype == "json_schema":
@@ -378,7 +398,7 @@ def _validate_request(req, has_vision=False):
                 from .jsongrammar import grammar_from_schema
 
                 try:
-                    grammar_from_schema(schema)
+                    req["_grammar"] = grammar_from_schema(schema)
                 except ValueError as e:
                     _request_error("invalid JSON schema: %s" % e, param="response_format")
     if req.get("stream") is not None and not isinstance(req["stream"], bool):
@@ -615,7 +635,7 @@ class Kindi(object):
         jgrammar=jstate=None
         rf=req.get("response_format") or {}
         if is_structured(rf):
-            jgrammar=_response_format_grammar(rf); jstate=jgrammar.start()
+            jgrammar=_response_format_grammar(rf, req); jstate=jgrammar.start()
             thinking_open=False     # a structured reply is the whole reply: it never enters a thought channel
         else:
             thinking_open=prompt.endswith(gemma4_tools.THINK_OPEN+"thought\n")   # after a tool response, thinking on
@@ -837,7 +857,7 @@ class Kindi(object):
         grammar = None
         rf = req.get("response_format")
         if is_structured(rf):
-            grammar = _response_format_grammar(rf)
+            grammar = _response_format_grammar(rf, req)
             gstate = grammar.start()
             if not hasattr(self, "_grammar_texts"):
                 self._grammar_texts = [self.tok.decode_bytes(i).decode("utf-8", "replace")
@@ -1220,7 +1240,7 @@ def create_app(cfg, log=print):
         raise
     log("[kindi] engine ready for %s" % cfg.get("model_name", "model"))
     model_id = cfg["model_name"]
-    has_vision = _pack_has_vision(cfg.get("pack"))
+    image_error = _image_error(cfg.get("pack"))
     if not cfg.get("api_key") and not _is_loopback(cfg.get("host", "127.0.0.1")):
         log("warning: serving on %s without api_key; /health details are loopback-only - use loopback or set api_key"
             % cfg.get("host"))
@@ -1356,7 +1376,7 @@ def create_app(cfg, log=print):
                       ("presence_penalty", "presence_penalty"),
                       ("seed", "seed"), ("num_predict", "max_tokens"), ("stop", "stop"))
 
-    def _ollama_req(body, prompt_mode, has_vision):
+    def _ollama_req(body, prompt_mode, image_error):
         """Map an Ollama request to the internal one; validate it before it reaches the engine or the cache."""
         if not isinstance(body, dict):
             raise RequestError("the body must be a JSON object")
@@ -1366,8 +1386,8 @@ def create_app(cfg, log=print):
         opts = body.get("options") or {}
         if not isinstance(opts, dict):
             raise RequestError("options must be an object")
-        if not has_vision and body.get("images"):
-            raise RequestError(_IMAGE_UNSUPPORTED)
+        if body.get("images"):
+            raise RequestError(image_error)
         if prompt_mode:
             prompt = body.get("prompt")
             if not isinstance(prompt, str) or not prompt:
@@ -1388,7 +1408,7 @@ def create_app(cfg, log=print):
             req.pop("max_tokens")                # Ollama's -1 means "until the context is full"
         if body.get("tools") is not None:
             req["tools"] = body["tools"]
-        _validate_request(req, has_vision)
+        _validate_request(req, image_error)
         return req, stream
 
     def _ollama_line(info, created, prompt_mode, final=False):
@@ -1447,7 +1467,7 @@ def create_app(cfg, log=print):
         except RequestError as e:
             return _err(400, str(e), param=getattr(e, "param", None))
         try:
-            req, stream = _ollama_req(body, prompt_mode, has_vision)
+            req, stream = _ollama_req(body, prompt_mode, image_error)
         except RequestError as e:
             return _err(400, str(e), param=getattr(e, "param", None))
         try:
@@ -1864,7 +1884,7 @@ def create_app(cfg, log=print):
         except RequestError as e:
             return _err(400, str(e), param=getattr(e, "param", None))
         try:
-            _validate_request(req, has_vision)
+            _validate_request(req, image_error)
         except RequestError as e:
             return _err(400, str(e), param=getattr(e, "param", None))
         if req.get("logprobs") and not getattr(K, "supports_logprobs", False):

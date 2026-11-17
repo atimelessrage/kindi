@@ -18,6 +18,13 @@
 
 ### Changed
 
+- **A structured request compiles its grammar once, not twice** — validation has to build the
+  automaton to answer an invalid schema or grammar with a 400 before the engine runs, and the
+  decode path then built the same one again. Validation now parks the compiled object on the
+  request and generation reuses it, so a large GBNF is paid once per request instead of twice:
+  llama.cpp's canonical `json.gbnf` at nesting 2 is 7,936 states and a 7.8 ms median build (five
+  runs, this host), so a structured request with that grammar drops from ~15.6 ms to ~7.8 ms of
+  compile before its first token.
 - **A refused GBNF grammar now says why it is large and what to write instead** — the rule cache
   dropped on 2026-11-17 (it let every use share one copy of a rule, which made an "exactly 3"
   repetition accept 0-5 copies) was 20x smaller because it changed the language. With exact
@@ -29,6 +36,13 @@
 
 ### Fixed
 
+- **An image request can no longer reach a text-only engine through a manifest flag** — the server
+  accepted image content parts and Ollama `images` for any pack whose manifest named `vision` or
+  `mmproj`, but no converter writes that field and no build implements a projector, so such a
+  request would have been answered about an image the engine never saw. Image input is now always
+  a 400: the message is the existing "no vision weights" one for a text pack, and a new one naming
+  the missing projector (`mmproj`) for a pack that claims vision. Pinned by a test that builds an
+  app with a vision-declaring manifest and still gets the 400.
 - **The tokenize and detokenize routes ignored the documented body cap** — they called
   `await request.json()` instead of the capped reader the chat routes use, so on a `--lan`
   bind a client could make the process allocate an unbounded body before the API key or the

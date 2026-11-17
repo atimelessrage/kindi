@@ -1001,6 +1001,70 @@ def test_image_part_is_400_without_vision_weights(app_client, stream):
     assert good.json()["usage"]["prompt_tokens_details"]["cached_tokens"] == 3
 
 
+def test_an_image_part_is_400_even_when_the_pack_declares_vision(monkeypatch, tmp_path):
+    """A manifest flag must not unlock acceptance: no build has a projector to serve it."""
+    pack = tmp_path / "vision-pack"
+    pack.mkdir()
+    (pack / "kindi_pack.json").write_text('{"model": "bonsai2-2b", "vision": true}',
+                                           encoding="utf-8")
+    K = _FakeKindi()
+    monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
+    app = server.create_app({"model_name": "bonsai2-2b", "api_key": "", "pack": str(pack)},
+                            log=lambda *a: None)
+    with TestClient(app) as client:
+        bad = client.post("/v1/chat/completions", json={
+            "messages": [{"role": "user", "content": [
+                {"type": "text", "text": "Describe this image."},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAAA"}},
+            ]}],
+        })
+    assert bad.status_code == 400, bad.text
+    message = bad.json()["error"]["message"]
+    assert "projector" in message, message
+    assert "mmproj" in message, message
+    assert K.last_req is None
+
+
+def test_a_validated_grammar_is_reused_instead_of_compiled_twice(monkeypatch):
+    """Validation compiles the automaton to answer a bad grammar early; generation reuses it."""
+    from kindi import gbnf, jsongrammar
+
+    compiled = []
+    real_from_string = gbnf.Grammar.from_string.__func__
+
+    def counting_from_string(cls, text):
+        compiled.append(text)
+        return real_from_string(cls, text)
+
+    monkeypatch.setattr(gbnf.Grammar, "from_string", classmethod(counting_from_string))
+    req = {"messages": [{"role": "user", "content": "hello"}],
+           "response_format": {"type": "grammar", "grammar": 'root ::= "a"'}}
+    server._validate_request(req)
+    assert compiled == ['root ::= "a"']
+    grammar = server._response_format_grammar(req["response_format"], req)
+    assert compiled == ['root ::= "a"'], "the decode path compiled the same grammar again"
+    assert grammar is req["_grammar"]
+
+    schemas = []
+    real_schema = jsongrammar.grammar_from_schema
+
+    def counting_schema(schema):
+        schemas.append(schema)
+        return real_schema(schema)
+
+    monkeypatch.setattr(jsongrammar, "grammar_from_schema", counting_schema)
+    req = {"messages": [{"role": "user", "content": "hello"}],
+           "response_format": {"type": "json_schema", "json_schema": {
+               "schema": {"type": "object",
+                          "properties": {"a": {"type": "integer"}},
+                          "required": ["a"]}}}}
+    server._validate_request(req)
+    assert len(schemas) == 1
+    schema_grammar = server._response_format_grammar(req["response_format"], req)
+    assert len(schemas) == 1, "the decode path built the schema automaton again"
+    assert schema_grammar is req["_grammar"]
+
+
 def test_ollama_images_are_400_without_vision_weights(app_client):
     client, K = app_client
     cases = (
