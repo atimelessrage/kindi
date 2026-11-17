@@ -61,6 +61,20 @@ def test_a_zero_host_budget_makes_every_host_expert_file_backed():
     assert stats["host_bytes"] == 0 and stats["disk_bytes"] == 600
 
 
+def test_the_split_accounts_for_different_expert_sizes_per_layer():
+    """Byte accounting is per expert, not per layer: two layers of different size fill the budget
+    exactly and the two tiers still add up to every host expert."""
+    host = {0: (0, 1, 2), 1: (0, 1)}
+    order = {0: [0, 1, 2], 1: [0, 1]}
+    counts = {0: [9, 5, 1], 1: [8, 2]}
+    warm, cold, stats = cold_experts.split_host_tiers(host, order, 250, {0: 100, 1: 150}, counts)
+    assert warm == {0: (0,), 1: (0,)}          # the hottest expert of each layer, 100 + 150
+    assert cold == {0: (1, 2), 1: (1,)}
+    assert stats == {"budget_bytes": 250, "host_bytes": 250, "disk_bytes": 350,
+                     "host_experts": 2, "disk_experts": 3}
+    assert stats["host_bytes"] + stats["disk_bytes"] == 3 * 100 + 2 * 150 == 600
+
+
 def test_host_budget_without_counts_keeps_the_usage_order_hot():
     host = {0: (3, 4), 1: (5, 6)}
     order = {0: [4, 3], 1: [6, 5]}
@@ -199,3 +213,92 @@ def test_short_reads_are_an_error_not_a_silent_truncation(tmp_path):
             reader.read(8190, 16)
     finally:
         reader.close()
+
+
+class _Pinned(bytearray):
+    """A pinned host allocation the engine reads back as a numpy buffer."""
+
+    def __init__(self, size, ptr):
+        bytearray.__init__(self, size)
+        self.ptr = ptr
+
+
+class _Stream(object):
+    ptr = 0x9000
+
+    def wait_event(self, ev):
+        return None
+
+    def synchronize(self):
+        return None
+
+
+class _Event(object):
+    def record(self, stream):
+        return None
+
+
+class _SpanReader(object):
+    """Serves a byte blob and records the spans asked for, so a warm read would show up."""
+
+    def __init__(self, blob):
+        self.blob = blob
+        self.spans = []
+
+    def read_many(self, spans, read_ahead=1):
+        self.spans.extend(spans)
+        return [self.blob[o:o + n] for o, n in spans]
+
+
+def _stage_tensor(hoff, warm, cold, codes, scales, raw_off):
+    """One Q2_0 expert stack: 16 code bytes and 2 scale bytes per expert, as `_q2` lays it out."""
+    mem = _Pinned(len(warm) * 18, 0x1000 + raw_off)
+    for j, e in enumerate(warm):
+        mem[j * 16:(j + 1) * 16] = codes[e]
+        mem[len(warm) * 16 + j * 2:len(warm) * 16 + (j + 1) * 2] = scales[e]
+    return types.SimpleNamespace(
+        cw=16, sw=2, rows=1, cols=64, hoff=tuple(hoff), hwarm=tuple(warm), hcold=tuple(cold),
+        hpos={e: j for j, e in enumerate(warm)}, hbytes=len(hoff) * 18, hmem=mem,
+        raw_off=raw_off, raw_stride=18, raw_bytes=18)
+
+
+def test_a_staged_host_block_puts_each_pinned_expert_at_its_host_slot():
+    """Warm and cold experts interleave in expert-id order and the prompt staging block is laid out
+    in `hoff` order, so a pinned expert's bytes must go to its hoff slot, not its warm-list slot."""
+    hoff, warm, cold = (0, 1, 2, 3), (0, 2), (1, 3)
+    codes = {e: bytes([0xA0 + e]) * 16 for e in hoff}
+    scales = {e: bytes([0x10 + e, 0x00]) for e in hoff}
+    up = _stage_tensor(hoff, warm, cold, codes, scales, 1000)
+    down = _stage_tensor(hoff, warm, cold, codes, scales, 2000)
+    blob = bytearray(4000)
+    for base, w in ((1000, up), (2000, down)):
+        for e in cold:                              # GGUF block: 2 scale bytes, then 16 code bytes
+            blob[base + e * 18:base + (e + 1) * 18] = scales[e] + codes[e]
+    total = up.hbytes + down.hbytes
+    stage, host = _Pinned(total, 0x3000), _Pinned(total, 0x2000)
+    buffers = {stage.ptr: stage, host.ptr: host}
+
+    def memcpy_async(dst, src, n, kind, stream):
+        buffers[dst][:n] = buffers[src][:n]
+
+    eng = lightning.Engine.__new__(lightning.Engine)
+    eng.layers = [{"up": up, "down": down, "stage": 0}]
+    eng.stage_host = [host]
+    eng.stage = [types.SimpleNamespace(data=types.SimpleNamespace(ptr=stage.ptr))]
+    eng.stage_n = total
+    eng.copy_stream, eng.ev_used, eng.ev_staged = _Stream(), [_Event()], [_Event()]
+    eng.cold_reader = _SpanReader(blob)
+    eng.cp = types.SimpleNamespace(
+        cuda=types.SimpleNamespace(runtime=types.SimpleNamespace(memcpyAsync=memcpy_async)))
+    eng._stage_cold(0)
+
+    expect = bytearray(total)
+    for base, w in ((0, up), (up.hbytes, down)):
+        for i, e in enumerate(hoff):
+            expect[base + i * w.cw:base + (i + 1) * w.cw] = codes[e]
+            expect[base + len(hoff) * w.cw + i * w.sw:
+                   base + len(hoff) * w.cw + (i + 1) * w.sw] = scales[e]
+    assert bytes(stage) == bytes(expect)
+    # Only the overflow is file-backed: two cold experts on each tensor, and no warm id is read.
+    assert eng.cold_reader.spans == [(1018, 18), (1054, 18), (2018, 18), (2054, 18)]
+    assert sum(n for _, n in eng.cold_reader.spans) == len(cold) * 2 * 18

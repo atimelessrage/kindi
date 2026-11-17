@@ -527,12 +527,12 @@ class Engine(object):
             w = L[key]
             nh = len(w.hoff)
             warm = np.frombuffer(w.hmem, np.uint8, len(w.hwarm) * (w.cw + w.sw)) if w.hmem is not None else None
-            for e in w.hoff:
-                i = w.hpos.get(e)
-                if i is not None:
-                    host[base + i * w.cw:base + (i + 1) * w.cw] = warm[i * w.cw:(i + 1) * w.cw]
+            for i, e in enumerate(w.hoff):          # the block is laid out in hoff order, so a pinned expert
+                j = w.hpos.get(e)                   # goes at its hoff slot, not at its warm-list slot
+                if j is not None:
+                    host[base + i * w.cw:base + (i + 1) * w.cw] = warm[j * w.cw:(j + 1) * w.cw]
                     host[base + nh * w.cw + i * w.sw:base + nh * w.cw + (i + 1) * w.sw] = \
-                        warm[len(w.hwarm) * w.cw + i * w.sw:len(w.hwarm) * w.cw + (i + 1) * w.sw]
+                        warm[len(w.hwarm) * w.cw + j * w.sw:len(w.hwarm) * w.cw + (j + 1) * w.sw]
             cold = [(i, e) for i, e in enumerate(w.hoff) if e in w.hcold]
             spans = [self._cold_span(w, e) for _, e in cold]
             for (i, e), raw in zip(cold, self.cold_reader.read_many(spans, read_ahead=1)):
