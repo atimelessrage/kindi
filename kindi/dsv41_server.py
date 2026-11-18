@@ -68,6 +68,46 @@ RESERVE = 8                                             # positions kept free af
 # while nothing else is sent (waiting for the engine, reading a long prompt), a stream gets an SSE comment this often
 KEEPALIVE_S = float(os.environ.get("KINDI_KEEPALIVE_S", "10"))
 
+# the same body cap as kindi/server.py: this server can be bound to 0.0.0.0, so an
+# unbounded `rfile.read(Content-Length)` is a memory-pressure bug, not just a slow request
+MAX_BODY_MB = 16
+_BODY_MB_RAW = os.environ.get("KINDI_MAX_BODY_MB", "16")
+try:
+    MAX_BODY_MB = int(_BODY_MB_RAW)
+except (TypeError, ValueError):
+    raise SystemExit("kindi.dsv41_server: KINDI_MAX_BODY_MB must be an integer (got %r)" % _BODY_MB_RAW)
+if MAX_BODY_MB < 1:
+    raise SystemExit("kindi.dsv41_server: KINDI_MAX_BODY_MB must be at least 1 (got %d)" % MAX_BODY_MB)
+MAX_BODY_BYTES = MAX_BODY_MB << 20
+
+
+class BodyTooLarge(ValueError):
+    """The request body exceeds MAX_BODY_BYTES: an HTTP 413, not a request-shape error."""
+
+
+def read_json_body(headers, rfile, limit=MAX_BODY_BYTES):
+    """Read and parse a JSON body with a hard size cap.
+
+    A declared Content-Length over the cap is refused before the body is read; a missing header
+    keeps the old empty-body behavior. The reader never asks for more than the cap, so a lying
+    length cannot make this allocate beyond it either.
+    """
+    declared = headers.get("Content-Length")
+    if declared is None:
+        return {}
+    try:
+        length = int(declared)
+    except (TypeError, ValueError):
+        raise ValueError("invalid Content-Length")
+    if length < 0:
+        raise ValueError("invalid Content-Length")
+    if length > limit:
+        raise BodyTooLarge("the request body is larger than %d bytes" % limit)
+    try:
+        return json.loads(rfile.read(length) or b"{}")
+    except (TypeError, ValueError, UnicodeDecodeError):
+        raise ValueError("the body is not JSON")
+
 
 PRIO_CHAT, PRIO_BACKGROUND = 0, 1
 _PRIO_NAMES = {"chat": PRIO_CHAT, "interactive": PRIO_CHAT, "high": PRIO_CHAT,
@@ -933,11 +973,13 @@ def make_handler(E):
                                        "code": "context_length_exceeded"}})
 
         def _body(self):
-            return json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))) or b"{}")
+            return read_json_body(self.headers, self.rfile)
 
         def _tokenize(self):
             try:
                 req = self._body()
+            except BodyTooLarge as e:
+                return self._err(413, str(e), "request_too_large")
             except Exception:
                 return self._err(400, "invalid JSON")
             ctx = E.model.ctx
@@ -956,6 +998,8 @@ def make_handler(E):
         def _detokenize(self):
             try:
                 ids = [int(i) for i in self._body().get("tokens") or []]
+            except BodyTooLarge as e:
+                return self._err(413, str(e), "request_too_large")
             except Exception:
                 return self._err(400, "send tokens: a list of token ids")
             text = b"".join(E.model.tok.decode_bytes(i) for i in ids).decode("utf-8", "replace")
@@ -991,7 +1035,12 @@ def make_handler(E):
                 return
             if self.path.rstrip("/") == "/v1/kindi/warm":
                 try:
-                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))) or b"{}")
+                    body = self._body()
+                except BodyTooLarge as e:
+                    return self._err(413, str(e), "request_too_large")
+                except Exception:
+                    return self._err(400, "invalid JSON")
+                try:
                     with E.lock:
                         E.state.update(busy=True, since=time.strftime("%H:%M:%S"))
                         try:
@@ -1017,6 +1066,8 @@ def make_handler(E):
                 return self._err(404, "not found")
             try:
                 req = self._body()
+            except BodyTooLarge as e:
+                return self._err(413, str(e), "request_too_large")
             except Exception:
                 return self._err(400, "invalid JSON")
             cid = "chatcmpl-" + uuid.uuid4().hex[:24]

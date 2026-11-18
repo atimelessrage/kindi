@@ -170,6 +170,49 @@ def cold_misses(ids, owners, cold):
     return out
 
 
+def cold_slot_plan(ids, cold, owners, ages=None, tick=0):
+    """Decode-step plan for the pinned cold slots: (expert, slot, load) per routed cold expert.
+
+    `owners` is the pinned-slot table (an expert id per slot, -1 for a free slot) and `ages` the
+    step each slot was last used. A routed expert whose slot still owns it is a hit and takes no
+    read; a miss takes a free slot, else the least-recently-used slot whose owner is not routed
+    this step, so a routed expert's slot is never stolen and its pointer cannot go stale.
+    Returns `(plan, owners, ages, tick)` with new owner/age lists; `tick` counts the calls.
+    """
+    owners = [int(e) for e in owners]
+    ages = [int(a) for a in ages] if ages is not None else [0] * len(owners)
+    if len(ages) != len(owners):
+        raise ValueError("cold slot ages must match the owners table")
+    cold = {int(e) for e in cold}
+    tick = int(tick) + 1
+    routed = []
+    for e in ids:
+        e = int(e)
+        if e in cold and e not in routed:
+            routed.append(e)
+    wanted = set(routed)
+    hits = {e: slot for slot, e in enumerate(owners) if e in wanted}
+    free = [slot for slot, e in enumerate(owners) if e < 0]
+    evictable = sorted((slot for slot, e in enumerate(owners) if e >= 0 and e not in wanted),
+                       key=lambda slot: (ages[slot], slot))
+    plan = []
+    for e in routed:
+        slot = hits.get(e)
+        if slot is None:
+            if free:
+                slot = free.pop(0)
+            elif evictable:
+                slot = evictable.pop(0)
+            else:
+                raise ValueError("cold slot plan has no slot for expert %d" % e)
+            owners[slot] = e
+            plan.append((e, slot, True))
+        else:
+            plan.append((e, slot, False))
+        ages[slot] = tick
+    return plan, owners, ages, tick
+
+
 def split_q2(raw, rows, cols_blocks):
     """Split the interleaved Q2_0 expert bytes into packed codes and fp16 scales.
 

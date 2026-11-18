@@ -85,7 +85,7 @@ On a `kindi_lightning` pack the opt-in cold tier is now a real file path, not on
 available host RAM less 10% or 1 GiB, whichever is larger), and only their overflow is read from
 the pack. The split uses measured pick counts when the usage file has them, otherwise the measured
 order. A prompt stages a layer's full host block through a pinned host buffer, and a decode step
-fetches only routed cold experts whose slots are not already warm. `kindi/cold_experts.py`
+fetches only routed cold experts whose pinned slots are not already warm. `kindi/cold_experts.py`
 performs the unbuffered aligned read, coalesces neighbouring ranges into one aligned read, and
 keeps a bounded lookahead prefetch queue; a decode step queues the next cold layer's most-used
 experts for the following call. Each read is accounted as requested expert bytes versus bytes
@@ -95,14 +95,18 @@ read and no page fault. `kindi plan` applies the same split to its planned host 
 `KINDI_LT_COLD=1`, the `host ram` line names the pinned and file-backed expert counts and bytes
 under the same `KINDI_LT_HOST_MB` (or automatic) budget, and the report's `host_tier` object
 carries those stats. This is a start, not a gate result: no larger-than-RAM pack, no tok/s and
-no GPU run are claimed. Two risks stay open until that run exists. First, `_cold_prepare` still
-performs a full compute-stream synchronize and a blocking read for the current layer's misses;
-the lookahead queue hides some next-layer bytes but does not overlap the current miss, so the cold
-path's decode latency is not claimed to beat the mmap-fault path. Second, `_cold_copy` rewrites the
-per-expert pointer entries for the slot assigned in that step; no test exercises pointer reuse
-after an eviction on a real card. A gate run must check the returned tokens with cold, warm and
-forced-eviction experts, and must show a warm slot never reads the file, before this path is
-described as a throughput improvement or enabled by default.
+no GPU run are claimed. Decode now keeps a pinned slot cache per layer: a routed cold expert whose
+slot still owns it is served without a read, and a miss takes a free slot or the least-recently-used
+slot whose owner is not routed in the same step, so a routed expert's slot and pointer are never
+stolen (`cold_experts.cold_slot_plan`, unit-tested). `cold_stats()` reports `slot_hits` beside
+`experts_read`. The prompt path uses its own `tcp`/`tsp` staging tables, so prompt staging and
+the decode slot cache do not overwrite each other's pointers. One risk stays open until that run exists: `_cold_prepare` still performs a full
+compute-stream synchronize and a blocking read for the current layer's misses; the lookahead queue
+hides some next-layer bytes but does not overlap the current miss, so the cold path's decode
+latency is not claimed to beat the mmap-fault path. A gate run must check the returned tokens with
+cold, warm, forced-eviction and reloaded experts, record reads and slot hits per token, and show a
+warm slot never reads the file, before this path is described as a throughput improvement or
+enabled by default.
 
 `kindi plan` can show that plan before a backend exists: on a `kindi_lightning` pack,
 `--moe-chunk N` (with `--usage`, `--moe-cache-mib` and `--dcache` as usual) builds the placement,

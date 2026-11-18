@@ -96,7 +96,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_ATT_TC` | `0` | `kindi/chunk.py:442` (+1 more) |
 | `KINDI_BACKEND_MODULES` | (empty) | `kindi/backends/__init__.py:56` (+1 more) |
 | `KINDI_BATCH` | `4` | `kindi/spec.py:1929` (+1 more) |
-| `KINDI_BENCH_ATTN` | (unset) | `kindi/dsv41.py:1202` |
+| `KINDI_BENCH_ATTN` | (unset) | `kindi/dsv41.py:1219` |
 | `KINDI_BLOCKING_SYNC` | `1` | `kindi/chunk.py:474` (+7 more) |
 | `KINDI_CACHE_TIMING` | (unset) | `kindi/cache.py:1141` |
 | `KINDI_CALIB_DIR` | (unset) | `kindi/calib.py:31` |
@@ -126,22 +126,22 @@ variables, and are therefore not listed twice here.
 | `KINDI_DSPINE_K` | `str(_dsp.BLOCK - 1)` | `kindi/spec.py:1337` |
 | `KINDI_DSPINE_MB` | `1400` | `kindi/dspine.py:52` |
 | `KINDI_DSPINE_NARROW` | (unset) | `kindi/dspine.py:160` |
-| `KINDI_DSV_CPUS0` | (unset) | `kindi/dsv41.py:392` |
-| `KINDI_DSV_CPUS1` | (unset) | `kindi/dsv41.py:393` |
-| `KINDI_DSV_ENCODING` | (unset) | `kindi/dsv41_server.py:194` |
-| `KINDI_DSV_GATE` | `os.path.expanduser("~/.cache/kindi/dsv41-gate")` | `kindi/dsv41.py:867` |
+| `KINDI_DSV_CPUS0` | (unset) | `kindi/dsv41.py:408` |
+| `KINDI_DSV_CPUS1` | (unset) | `kindi/dsv41.py:409` |
+| `KINDI_DSV_ENCODING` | (unset) | `kindi/dsv41_server.py:234` |
+| `KINDI_DSV_GATE` | `os.path.expanduser("~/.cache/kindi/dsv41-gate")` | `kindi/dsv41.py:883` |
 | `KINDI_DSV_GPU` | `0` | `kindi/dsv41.py:165` (+1 more) |
 | `KINDI_DSV_GPU2` | `1` | `kindi/dsv41.py:167` |
 | `KINDI_DSV_GPU2_DEVS` | (unset) | `kindi/dsv41.py:88` (+1 more) |
 | `KINDI_DSV_GPU2_LIBS` | (unset) | `kindi/dsv41.py:168` (+1 more) |
 | `KINDI_DSV_GPU_LIB` | (unset) | `kindi/dsv41.py:165` (+1 more) |
-| `KINDI_DSV_PLACE` | `same` | `kindi/dsv41.py:389` |
-| `KINDI_DSV_SHARE0` | `0.667` | `kindi/dsv41.py:395` |
-| `KINDI_DSV_SNAP_DIR` | `/dev/shm/kindi-dsv41` | `kindi/dsv41.py:452` |
-| `KINDI_DS_LOG` | (unset) | `kindi/dsv41.py:1078` (+1 more) |
-| `KINDI_DS_NGRAM` | (unset) | `kindi/dsv41.py:642` |
-| `KINDI_DS_STATS` | `0` | `kindi/dsv41.py:643` (+1 more) |
-| `KINDI_DS_UNION` | `1` | `kindi/dsv41.py:630` |
+| `KINDI_DSV_PLACE` | `same` | `kindi/dsv41.py:405` |
+| `KINDI_DSV_SHARE0` | `0.667` | `kindi/dsv41.py:411` |
+| `KINDI_DSV_SNAP_DIR` | `/dev/shm/kindi-dsv41` | `kindi/dsv41.py:468` |
+| `KINDI_DS_LOG` | (unset) | `kindi/dsv41.py:1095` (+1 more) |
+| `KINDI_DS_NGRAM` | (unset) | `kindi/dsv41.py:658` |
+| `KINDI_DS_STATS` | `0` | `kindi/dsv41.py:659` (+1 more) |
+| `KINDI_DS_UNION` | `1` | `kindi/dsv41.py:646` |
 | `KINDI_FD` | `0` | `kindi/spec.py:171` (+6 more) |
 | `KINDI_FD_CH` | (empty) or `str(FD_CH)` | `kindi/spec.py:133` (+1 more) |
 | `KINDI_FF` | (empty) or `1` | `kindi/spec.py:179` (+1 more) |
@@ -186,33 +186,33 @@ variables, and are therefore not listed twice here.
 | `KINDI_LEGACY_ENGINE_PATH` | (unset) | `kindi/engine.py:761` |
 | `KINDI_LLVM` | (unset) | `kindi/cpu.py:91` |
 | `KINDI_LOG_RAW` | (unset) | `kindi/lightning_gen.py:378` (+2 more) |
-| `KINDI_LT_CHUNK` | (unset) | `kindi/lightning.py:157` |
+| `KINDI_LT_CHUNK` | (unset) | `kindi/lightning.py:158` |
 | `KINDI_LT_COLD` | (empty) | `kindi/cold_experts.py:45` |
 | `KINDI_LT_DCACHE` | `str(DCACHE_DEFAULT)` | `kindi/bench.py:109` (+3 more) |
-| `KINDI_LT_DGRP` | `mvdg` | `kindi/lightning.py:978` |
-| `KINDI_LT_GRAPH` | `1` | `kindi/lightning.py:1097` |
+| `KINDI_LT_DGRP` | `mvdg` | `kindi/lightning.py:985` |
+| `KINDI_LT_GRAPH` | `1` | `kindi/lightning.py:1104` |
 | `KINDI_LT_HOST_MB` | (empty) | `kindi/cold_experts.py:61` |
-| `KINDI_LT_K35` | (unset) | `kindi/lightning.py:128` |
+| `KINDI_LT_K35` | (unset) | `kindi/lightning.py:129` |
 | `KINDI_LT_K35_EXACT` | (unset) | `kindi/lightning.py:40` |
 | `KINDI_LT_KBLAS` | `1` | `kindi/lightning.py:38` |
-| `KINDI_LT_KGRP` | `mmk32` or `mvkg` | `kindi/lightning.py:745` (+1 more) |
+| `KINDI_LT_KGRP` | `mmk32` or `mvkg` | `kindi/lightning.py:752` (+1 more) |
 | `KINDI_LT_NSPLIT` | `32` | `kindi/lightning.py:29` |
 | `KINDI_LT_NSPLIT_TC` | `64` | `kindi/lightning.py:30` |
-| `KINDI_LT_PRE6` | `"1" if self.cc >= 60 else "0"` | `kindi/lightning.py:142` |
+| `KINDI_LT_PRE6` | `"1" if self.cc >= 60 else "0"` | `kindi/lightning.py:143` |
 | `KINDI_LT_RESERVE_MB` | `350` | `kindi/autotune.py:298` (+2 more) |
 | `KINDI_LT_SELFCHECK` | `1` | `kindi/lightning_gen.py:241` |
-| `KINDI_LT_SM75` | (unset) | `kindi/lightning.py:145` |
-| `KINDI_LT_TC` | `1` | `kindi/lightning.py:140` |
+| `KINDI_LT_SM75` | (unset) | `kindi/lightning.py:146` |
+| `KINDI_LT_TC` | `1` | `kindi/lightning.py:141` |
 | `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:452` |
 | `KINDI_MEM_RESERVE_MB` | `96` or `256` or `32` | `kindi/engine.py:306` (+4 more) |
 | `KINDI_MODEL` | (empty) | `kindi/container.py:240` |
-| `KINDI_MOE_COPY` | `0` | `kindi/dsv41.py:400` |
+| `KINDI_MOE_COPY` | `0` | `kindi/dsv41.py:416` |
 | `KINDI_MOE_CPUS0` | `0-19` | `kindi/dsv41.py:125` (+2 more) |
 | `KINDI_MOE_CPUS1` | `20-23,32-39` | `kindi/dsv41.py:125` (+2 more) |
-| `KINDI_MOE_DROP_CACHE` | `1` | `kindi/dsv41.py:406` |
-| `KINDI_MOE_IDLE` | `1` | `kindi/dsv41.py:391` |
-| `KINDI_MOE_SHARE0` | `0.667` | `kindi/dsv41.py:394` (+2 more) |
-| `KINDI_MOE_WEIGHTED` | `1` | `kindi/lightning.py:281` (+2 more) |
+| `KINDI_MOE_DROP_CACHE` | `1` | `kindi/dsv41.py:422` |
+| `KINDI_MOE_IDLE` | `1` | `kindi/dsv41.py:407` |
+| `KINDI_MOE_SHARE0` | `0.667` | `kindi/dsv41.py:410` (+2 more) |
+| `KINDI_MOE_WEIGHTED` | `1` | `kindi/lightning.py:282` (+2 more) |
 | `KINDI_MTP_HEAD_ALLOW_UNREGISTERED` | `0` | `kindi/mtp_heads.py:50` |
 | `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:665` |
 | `KINDI_NB_CPUF` | `0.55` | `kindi/nanbeige.py:34` |
@@ -241,7 +241,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_P100_FP16_PROMPT` | (empty) | `kindi/chunk.py:95` |
 | `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:973` (+1 more) |
 | `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:974` |
-| `KINDI_PIPE` | `1` | `kindi/dsv41.py:487` |
+| `KINDI_PIPE` | `1` | `kindi/dsv41.py:503` |
 | `KINDI_PROMPT_CACHE` | `1` | `kindi/cache.py:766` (+1 more) |
 | `KINDI_Q8X2` | `1` | `kindi/chunk.py:272` |
 | `KINDI_SAMPLER_ORDER` | `llama` | `kindi/sampling.py:19` |

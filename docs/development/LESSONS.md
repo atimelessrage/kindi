@@ -147,3 +147,18 @@ label test (L-0008) caught the six real mismatches on its first honest run.
 **Practice:** before promoting files to satisfy an audit, open the citing line and classify it —
 command example, stale label, or WIP-branch reference. Two of the three need an edit to the
 sentence, not a new file; the third needs a clarification line saying the file is not in this tree.
+## L-0010: A cache-hit check must use the table the cache actually updates
+
+**Observation:** The opt-in cold-expert decode path asked `downer` whether a routed expert was
+"already warm", but `downer` is written by `lt_cache_dec`, which skips every cold expert
+(`hidx[e] < 0`). The hit set was therefore always empty, and every routed cold expert was read
+and re-pointed on every token: a pinned slot cache that never hit.
+
+**Evidence:** `kindi/lightning.cu`'s `lt_cache_dec` skips cold experts before slot selection;
+`kindi/lightning.py::_cold_prepare` passed that table to `cold_misses`. The replacement,
+`cold_experts.cold_slot_plan`, keeps its own per-layer owner/age table and is pinned by five
+tests in `tests/test_cold_experts.py` (hit, free slot, LRU eviction, routed-slot safety, dedupe).
+
+**Practice:** A cache needs its own ownership table, updated by the same code that fills it, and
+a test whose second lookup must hit. Do not derive "already cached" from a table another
+subsystem owns unless that subsystem stores the same keys.

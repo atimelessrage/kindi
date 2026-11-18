@@ -104,6 +104,7 @@ def test_the_engine_reports_pinned_and_disk_bytes_without_a_gpu():
     eng.cold_active = True
     eng.cold_experts = 4
     eng.cold_read_experts = 2
+    eng.cold_slot_hits = 5
     eng.host_budget = 250
     eng.layers = [{"up": type("W", (), {"cw": 100, "sw": 20, "hwarm": (0, 1),
                                         "hcold": (2, 3)})(),
@@ -112,6 +113,7 @@ def test_the_engine_reports_pinned_and_disk_bytes_without_a_gpu():
     stats = eng.cold_stats()
     assert stats["host_experts"] == 2          # {0, 1}: unique pinned experts, not up 2 + down 1
     assert stats["cold_experts"] == 4
+    assert stats["slot_hits"] == 5              # a routed expert served from its unchanged slot
     assert stats["host_bytes"] == 3 * 120      # up 2 + down 1, each matrix counted once
     assert stats["cold_bytes"] == 4 * 120
     assert stats["host_budget_bytes"] == 250
@@ -230,6 +232,39 @@ def test_warm_slots_are_not_reread_and_duplicates_read_once():
     assert cold_experts.cold_misses([1, 2, 9, 1, 3], [2, -1, -1], cold) == [1, 3]
     assert cold_experts.cold_misses([2], [2, -1], cold) == []
     assert cold_experts.cold_misses([1], [], cold) == [1]
+
+
+def test_a_cold_slot_plan_keeps_hits_and_only_evicts_unrouted_owners():
+    plan, owners, ages, tick = cold_experts.cold_slot_plan([1, 2, 3], {1, 2, 3}, [1, -1, 3])
+    assert plan == [(1, 0, False), (2, 1, True), (3, 2, False)]
+    assert owners == [1, 2, 3]
+    assert ages == [1, 1, 1] and tick == 1
+
+
+def test_a_cold_slot_plan_never_steals_a_routed_experts_slot():
+    # 1 is routed and stays in slot 0; 4 takes the slot of 2, which is not routed this step.
+    plan, owners, _ages, _tick = cold_experts.cold_slot_plan([1, 4], {1, 4}, [1, 2, 3])
+    assert plan == [(1, 0, False), (4, 1, True)]
+    assert owners == [1, 4, 3]
+
+
+def test_a_cold_slot_plan_evicts_the_least_recently_used_unrouted_slot():
+    plan, owners, ages, tick = cold_experts.cold_slot_plan([8], {5, 6, 7, 8}, [5, 6, 7], [1, 3, 2], tick=9)
+    assert plan == [(8, 0, True)]          # slot 0 has age 1, the oldest of the three
+    assert owners == [8, 6, 7] and ages == [10, 3, 2] and tick == 10
+
+
+def test_a_cold_slot_plan_dedupes_and_ignores_non_cold_experts():
+    plan, owners, _ages, _tick = cold_experts.cold_slot_plan([1, 2, 1, 9], {1, 2}, [1, -1])
+    assert plan == [(1, 0, False), (2, 1, True)]
+    assert owners == [1, 2]
+
+
+def test_a_cold_slot_plan_refuses_a_table_too_small_for_the_route():
+    with pytest.raises(ValueError, match="no slot"):
+        cold_experts.cold_slot_plan([1, 2], {1, 2}, [])
+    with pytest.raises(ValueError, match="ages"):
+        cold_experts.cold_slot_plan([1], {1}, [1], [])
 
 
 def test_q2_split_keeps_codes_and_scales_separate():

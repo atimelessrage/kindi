@@ -4,6 +4,22 @@
 
 ### Added
 
+- **The cold-expert decoder keeps its pinned slots across steps** — the decode hit test asked the
+  host device-slot table (`lightning.downer`) whether an expert was "already warm", but that table
+  is written by `lt_cache_dec`, which skips every cold expert (`hidx[e] < 0`). The hit set could
+  never contain a cold expert, so every routed cold expert was read and re-pointed on every token.
+  A per-layer slot table now follows `cold_experts.cold_slot_plan`: a repeated expert is served
+  from its unchanged slot, a miss takes a free slot or the least-recently-used slot whose owner is
+  not routed in that step, and a routed expert's slot is never stolen (so its pointer cannot go
+  stale). The prompt path already uses its own `tcp`/`tsp` staging tables, so it does not touch the
+  decode table. `cold_stats()` reports `slot_hits` beside `experts_read`. No GPU run, larger-than-RAM
+  pack or tok/s claim; the per-layer stream sync and blocking current-layer read stay open (C9).
+- **The standalone DSV4.1 server caps request bodies** — `kindi/dsv41_server.py` read
+  `Content-Length` with no limit on every endpoint, unlike `kindi/server.py`'s 16 MiB default. It
+  now shares the `KINDI_MAX_BODY_MB` setting (16 MiB default), refuses an over-cap body with HTTP
+  413 `request_too_large` before reading it, and returns 400 for a malformed length or JSON (the
+  warm endpoint used to answer a parse failure with 500). `tests/test_dsv41_server.py` pins the
+  helper, the exact-cap boundary and both handler responses.
 - **A direct 27B speculation A/B compares outputs byte for byte** — `tools/spec_ab.py` builds one
   27B tensor-core engine with the 2B drafter and its head, then generates the same prompts plain
   and under `ngram`, `draft2b` and `both`, comparing token ids and decoded bytes without consulting

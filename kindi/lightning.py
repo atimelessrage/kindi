@@ -17,7 +17,7 @@ import time
 import numpy as np
 
 from . import ltfit
-from .cold_experts import (ColdExpertReader, cold_enabled, cold_misses, host_budget_bytes,
+from .cold_experts import (ColdExpertReader, cold_enabled, cold_slot_plan, host_budget_bytes,
                            split_host_tiers, split_q2)
 from .gguf import GGUF
 from .moe import MoESpec, Usage, plan
@@ -116,6 +116,7 @@ class Engine(object):
         self.cold_active = False
         self.cold_experts = 0          # host experts in the file-backed tier
         self.cold_read_experts = 0     # decode misses actually fetched
+        self.cold_slot_hits = 0        # routed cold experts served from an unchanged pinned slot
         self.tinfo = {n: (ne, ty, off) for n, ne, ty, off in g.tensors}
         f = open(path, "rb")
         self.mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
@@ -507,6 +508,9 @@ class Engine(object):
             w.cold_s = cp.cuda.alloc_pinned_memory(n * w.sw)
             w.cold_cnp = np.frombuffer(w.cold_c, np.uint8, n * w.cw)
             w.cold_snp = np.frombuffer(w.cold_s, np.uint8, n * w.sw)
+        L["cold_owner"] = [-1] * n     # expert id per pinned slot, -1 for a free slot
+        L["cold_age"] = [0] * n        # the decode step that used each slot last
+        L["cold_tick"] = 0
         L["cold"] = True
 
     @staticmethod
@@ -577,26 +581,28 @@ class Engine(object):
             return 0
         self.stream.synchronize()
         ids = np.asarray(self.ids.get(), np.int32).reshape(-1)[:self.s.n_used]
-        owners = np.asarray(self.downer[L["dci"]].get(), np.int32).reshape(-1)
-        need = cold_misses(ids, owners, L["up"].hcold)
-        if not need:
+        plan, L["cold_owner"], L["cold_age"], L["cold_tick"] = cold_slot_plan(
+            ids, L["up"].hcold, L["cold_owner"], L["cold_age"], L["cold_tick"])
+        loads = [(e, slot) for e, slot, load in plan if load]
+        self.cold_slot_hits += len(plan) - len(loads)
+        if not loads:
             self._cold_prefetch(il)
             return 0
         spans = []
-        for e in need:
+        for e, _slot in loads:
             for key in ("up", "down"):
                 spans.append(self._cold_span(L[key], e))
         raw = self.cold_reader.read_many(spans, coalesce=1)
-        for slot, e in enumerate(need):
+        for i, (e, slot) in enumerate(loads):
             for p, key in enumerate(("up", "down")):
-                self._cold_copy(L[key], e, slot, raw[2 * slot + p])
+                self._cold_copy(L[key], e, slot, raw[2 * i + p])
         for key in ("up", "down"):
             w = L[key]
             w.tc.set(w.ptr_c, stream=self.stream)
             w.ts.set(w.ptr_s, stream=self.stream)
-        self.cold_read_experts += len(need)
+        self.cold_read_experts += len(loads)
         self._cold_prefetch(il)
-        return len(need)
+        return len(loads)
 
     def cold_stats(self):
         """Byte accounting for the opt-in cold tier; no throughput is implied by these numbers."""
@@ -618,6 +624,7 @@ class Engine(object):
         out.update({"active": self.cold_active, "experts": self.cold_experts,
                     "cold_experts": self.cold_experts,
                     "experts_read": self.cold_read_experts,
+                    "slot_hits": getattr(self, "cold_slot_hits", 0),
                     "host_experts": host_experts, "host_bytes": host_bytes,
                     "cold_bytes": cold_bytes, "host_budget_bytes": self.host_budget})
         return out
