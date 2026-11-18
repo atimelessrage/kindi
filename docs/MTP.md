@@ -26,7 +26,7 @@ Kindi has one head: `kindi-mtp-2b-v1.npz` (61 MB), for Ternary-Bonsai-2-2B. It i
 
 ## Which cards
 
-MTP runs only on the tensor-core path: NVIDIA sm_80 and later, with `KINDI_TC=1`. Without that switch the server's `/health` `drafting` block reports `enabled: false` with a reason naming the missing tensor-core path, not a null one.
+MTP runs only on the tensor-core path: NVIDIA sm_80 and later, with `KINDI_TC=1`. Without that switch the server logs `warning: speculation off: KINDI_SPEC=... requires the tensor-core plan engine: set KINDI_TC=1 (and do not set KINDI_TP=0)` at startup, and its `/health` `drafting` block reports `enabled: false` with the same reason, not a null one.
 
 On cards before sm_80 (for example the Quadro K1200 and the GTX 1080), Kindi does not use MTP. On these cards, a pass over T tokens costs almost T single steps, so a
 draft cannot save time. These are the measurements for T = 2, 3 and 4 tokens per pass (pass time / step time):

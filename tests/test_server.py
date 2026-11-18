@@ -784,6 +784,22 @@ def test_health_explains_mtp_needs_the_tensor_core_path(monkeypatch):
     assert "tensor-core" in d["reason"] and "KINDI_TC=1" in d["reason"]
 
 
+@pytest.mark.parametrize("requested", ("mtp", "draft2b"))
+def test_startup_warns_when_spec_needs_the_tensor_core_path(monkeypatch, requested):
+    """A server with KINDI_SPEC set but no KINDI_TC=1 must say so while starting, not only when
+    /health is queried. The warning and the health reason come from the same helper, so they match."""
+    monkeypatch.setenv("KINDI_SPEC", requested)
+    K = _SpecKindi(False)
+    K.eng = _FakeEngine()                 # the KINDI_TC=0 engine: no spec_begin patch
+    monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
+    logs = []
+    app = server.create_app({"model_name": "bonsai2-2b", "api_key": ""}, log=logs.append)
+    reason = server._tensor_core_spec_reason(requested)
+    assert "warning: speculation off: %s" % reason in logs
+    with TestClient(app) as client:
+        assert client.get("/health").json()["drafting"]["reason"] == reason
+
+
 @pytest.mark.parametrize("loaded", [True, False], ids=["head-loaded", "head-refused"])
 def test_health_reports_the_effective_speculation_state(monkeypatch, loaded):
     """REQ-0024 A1: KINDI_SPEC=mtp is the request; /health answers what is running. With the head

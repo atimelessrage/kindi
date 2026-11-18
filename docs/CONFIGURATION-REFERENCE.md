@@ -157,7 +157,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_G4_PAD` | `1` | `kindi/gemma4.py:599` |
 | `KINDI_G4_PARK_MAX` | `4` | `kindi/gemma4_cache.py:35` |
 | `KINDI_G4_PLE_HOST` | `auto` | `kindi/gemma4.py:482` |
-| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:699` |
+| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:705` |
 | `KINDI_G4_PROMPT_CACHE` | `1` | `kindi/gemma4_cache.py:33` |
 | `KINDI_G4_Q5_DP4A` | `1` | `kindi/gemma4.py:80` |
 | `KINDI_G4_RESERVE_MB` | `1024` | `kindi/gemma4.py:543` |
@@ -246,7 +246,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_Q8X2` | `1` | `kindi/chunk.py:272` |
 | `KINDI_SAMPLER_ORDER` | `llama` | `kindi/sampling.py:19` |
 | `KINDI_SM2` | (empty) | `kindi/spec.py:746` |
-| `KINDI_SPEC` | `0` | `kindi/__main__.py:225` (+12 more) |
+| `KINDI_SPEC` | `0` | `kindi/__main__.py:225` (+13 more) |
 | `KINDI_SPEC_B0_K2_MAX` | `1024` | `kindi/spec.py:58` |
 | `KINDI_SPEC_B2_MAX` | `0` | `kindi/spec.py:59` |
 | `KINDI_SPEC_CTX` | (unset) | `kindi/spec.py:1958` |

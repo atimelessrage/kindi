@@ -4,6 +4,11 @@
 
 ### Added
 
+- **The server warns at startup when `KINDI_SPEC` has no tensor-core path** — `KINDI_SPEC` without
+  `KINDI_TC=1` used to start silently until `/health` was queried. `create_app` now logs
+  `warning: speculation off: ...` with the same tensor-core-path reason `/health` reports, built by
+  one helper. A parameterized test captures the startup line and compares it with `/health` for
+  `mtp` and `draft2b`.
 - **`drafting.last` names the speculation mode that produced its drafts** — the last-request block
   now includes `method`, recorded from the engine's per-request effective `spec_mode` when
   generation ends. A client can attribute `passes`/`drafted`/`accepted` without borrowing the

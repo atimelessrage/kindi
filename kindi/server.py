@@ -503,6 +503,12 @@ UNSERVED_BACKENDS = {
 }
 
 
+def _tensor_core_spec_reason(requested):
+    """The one wording `/health` and the startup warning use for a requested mode with no TC path."""
+    return ("KINDI_SPEC=%s requires the tensor-core plan engine: set "
+            "KINDI_TC=1 (and do not set KINDI_TP=0)" % requested)
+
+
 def served_backend(man):
     """The manifest family this server can serve, or a clear refusal.
 
@@ -882,8 +888,7 @@ class Kindi(object):
         elif not self.native and requested not in ("", "0", "off"):
             # without KINDI_TC=1, spec.install() never patches spec_begin onto the engine, so there is
             # no effective state to resolve; name the missing path instead of returning a null reason.
-            out["reason"] = ("KINDI_SPEC=%s requires the tensor-core plan engine: set "
-                             "KINDI_TC=1 (and do not set KINDI_TP=0)" % requested)
+            out["reason"] = _tensor_core_spec_reason(requested)
         if last and last.get("drafted"):
             out["last"] = {"method": last.get("method") or out["method"],
                            "passes": last.get("passes", 0), "drafted": last["drafted"],
@@ -1292,6 +1297,12 @@ def create_app(cfg, log=print):
         log("[kindi] engine construction failed")
         raise
     log("[kindi] engine ready for %s" % cfg.get("model_name", "model"))
+    requested_spec = os.environ.get("KINDI_SPEC", "0") or "0"
+    if (requested_spec not in ("", "0", "off")
+            and getattr(K, "nanbeige", None) is None
+            and not getattr(K, "native", False)
+            and not hasattr(getattr(K, "eng", None), "spec_begin")):
+        log("warning: speculation off: %s" % _tensor_core_spec_reason(requested_spec))
     model_id = cfg["model_name"]
     image_error = _image_error(cfg.get("pack"))
     if not cfg.get("api_key") and not _is_loopback(cfg.get("host", "127.0.0.1")):
