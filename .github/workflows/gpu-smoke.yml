@@ -40,6 +40,11 @@ on:
         required: false
         default: "24576"
         type: string
+      mtp_head:
+        description: Absolute path to an MTP head (.npz) on the runner (optional; enables the MTP head smoke)
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -79,6 +84,37 @@ jobs:
         with:
           name: kindi-gpu-server-log
           path: ${{ runner.temp }}/kindi-server.log
+
+  mtp-head:
+    name: GPU MTP head smoke
+    if: ${{ inputs.mtp_head != '' }}
+    runs-on: [self-hosted, gpu]
+    timeout-minutes: 30
+    env:
+      KINDI_PACK: ${{ inputs.pack }}
+      KINDI_MTP_HEAD: ${{ inputs.mtp_head }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: python -m pip install -r tests/requirements-test.txt
+      - name: Run the MTP head smoke
+        run: >
+          python tools/mtp_smoke.py
+          --pack "$KINDI_PACK"
+          --head "$KINDI_MTP_HEAD"
+          --ctx 4096
+          --spec-k 4
+          --log "$RUNNER_TEMP/mtp-smoke.log"
+      - name: Upload the MTP smoke server log on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: kindi-gpu-mtp-smoke-log
+          path: ${{ runner.temp }}/mtp-smoke.log
+          if-no-files-found: warn
 
   token-exactness-and-performance:
     name: GPU token exactness and performance regression

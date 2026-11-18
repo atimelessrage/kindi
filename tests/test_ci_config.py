@@ -34,6 +34,16 @@ def test_static_analysis_job_invokes_the_harness():
     assert (ROOT / "tests" / "static" / "run_static_analysis.py").exists()
 
 
+def test_gpu_smoke_offers_the_optional_mtp_head_job():
+    """The MTP smoke is dispatches only with a head path; without one it must stay skipped."""
+    gpu = (ROOT / ".github" / "workflows" / "gpu-smoke.yml").read_text(encoding="utf-8")
+    assert "mtp_head:" in gpu
+    assert "mtp-head:" in gpu
+    assert "${{ inputs.mtp_head != '' }}" in gpu
+    assert "python tools/mtp_smoke.py" in gpu
+    assert '--head "$KINDI_MTP_HEAD"' in gpu
+
+
 def test_cpu_job_runs_the_documentation_and_generated_reference_gates():
     """The handoff names these as gates; before this check they could only fail by hand."""
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")

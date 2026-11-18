@@ -118,7 +118,7 @@ match.
 - `gpu`
 
 The runner needs a working NVIDIA driver, the CuPy version used by the chosen image, and one or
-more converted Kindi packs. The workflow has three independent jobs:
+more converted Kindi packs. The workflow has four independent jobs:
 
 1. **GPU verify and server boundary** starts from the `pack` input, runs `python -m kindi verify`,
    then starts the server, waits for `/health` and sends one greedy chat request.
@@ -131,6 +131,11 @@ more converted Kindi packs. The workflow has three independent jobs:
    the `pack` input with `--ctx 24576`. It fails unless the engine reports at least the requested
    context and the 24,000-token generation cell exists with non-zero throughput. Change `ctx`
    when testing a different long-context size.
+4. **GPU MTP head smoke** is skipped unless the optional `mtp_head` input names an existing
+   `.npz` head. It runs [tools/mtp_smoke.py](../tools/mtp_smoke.py) with the `pack` input at
+   context 4096 and `KINDI_SPEC_K=4`, then checks the attached method, the per-request
+   `drafting.last.method`, the draft/accept counters and a greedy completion. Its server log is
+   uploaded when the job fails.
 
 The default matrix is `models: 2b,4b,9b`, `modes: plain`. Add `tc` explicitly when the card and
 packs are known to support it: a 9B tc refusal is a valid recorded result and deliberately makes
