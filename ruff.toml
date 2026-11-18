@@ -1,0 +1,10 @@
+# Correctness-focused Python linting. The repository predates a lint gate, so the
+# current findings are recorded in tools/python_quality_baseline.json and may only
+# shrink. Style-only rules (line wrapping, semicolons, quote style) are deliberately
+# not selected: this ratchet is for likely bugs, not a formatting rewrite.
+target-version = "py310"
+line-length = 120
+extend-exclude = ["bench-logs", "__pycache__", ".pytest_cache"]
+
+[lint]
+select = ["F", "E9", "B", "I"]

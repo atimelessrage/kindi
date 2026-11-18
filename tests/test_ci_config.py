@@ -22,7 +22,7 @@ def test_test_requirements_are_bounded():
     reqs = _reqs()
     assert reqs, "requirements file must list dependencies"
     for line in reqs:
-        assert ">=" in line and "<" in line, "unbounded dependency spec: %s" % line
+        assert "==" in line or (">=" in line and "<" in line), "unbounded dependency spec: %s" % line
     by_name = {line.split(">=")[0].strip() for line in reqs}
     assert {"pytest", "pytest-cov", "fastapi", "pydantic", "httpx", "numpy"} <= by_name
 
@@ -42,6 +42,16 @@ def test_gpu_smoke_offers_the_optional_mtp_head_job():
     assert "${{ inputs.mtp_head != '' }}" in gpu
     assert "python tools/mtp_smoke.py" in gpu
     assert '--head "$KINDI_MTP_HEAD"' in gpu
+
+
+def test_cpu_job_runs_the_python_quality_ratchet():
+    """F9: lint/type findings are allowed to shrink, never grow, and the tools are pinned."""
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert "python tools/check_python_quality.py" in ci
+    reqs = "\n".join(_reqs())
+    assert "ruff==0.16.0" in reqs
+    assert "mypy==2.4.0" in reqs
+    assert (ROOT / "tools" / "python_quality_baseline.json").is_file()
 
 
 def test_cpu_job_runs_the_documentation_and_generated_reference_gates():

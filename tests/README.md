@@ -9,12 +9,18 @@ Run from the repository root:
 
 ```sh
 python -m compileall -q kindi
+python tools/check_python_quality.py
 python -m pytest tests/ -q
 # Optional local coverage gate (matches the CPU CI job):
 python -m pytest tests/ -q --cov=kindi --cov-branch --cov-report=term --cov-report=json:coverage.json --cov-fail-under=27
 python tools/check_coverage.py
 bash -n install.sh
 ```
+
+The Python-quality gate ratchets Ruff 0.16.0 (`F`, `E9`, `B`, `I`) and mypy 2.4.0 against
+`tools/python_quality_baseline.json`: existing debt is recorded, and only a new or increased finding
+fails. Ruff covers the Python tree; mypy covers production code. `--update` lowers the baseline only
+after review.
 
 The suite uses stub engines and stand-in CuPy where needed. It covers config precedence, the chat
 template and tool-call round trips, tokenizer behavior, sampling, cache decisions, the HTTP boundary

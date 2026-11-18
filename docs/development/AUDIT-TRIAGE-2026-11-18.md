@@ -26,9 +26,9 @@ limitation, with what would close it; **owner** = needs an action this environme
 | M1-M3 | CI gates, one dispatch point, coverage floors | **closed** | see C1, C2/C3, C4. |
 | M4 | cold-tier hardware gate | **owner/hardware** | larger-than-RAM Lightning pack, `kindi verify` 4/4, decode tok/s against the mmap-fault path and flash MiB/token; R1/C9 checks belong in the same run. |
 | M5 | history-exposure decision | **owner** | rewrite the 128 baseline rows or publish with them and say so; the old -> new hash mapping of the 33 re-hashed commits is not recorded in the tree. |
-| M6 | lint, type check, dependency scan | **open** | no linter or type checker is configured; a ratchet needs a measured baseline first. |
+| M6 | lint, type check, dependency scan | **lint/type closed, dependency scan open** | `tools/check_python_quality.py` ratchets Ruff 0.16.0 (`F`, `E9`, `B`, `I`) over the Python tree and mypy 2.4.0 over first-party production code. Baseline: **334 Ruff findings / 59 mypy errors**, recorded per file and rule/code in `tools/python_quality_baseline.json`; CI runs the gate and `tests/test_python_quality.py` pins the comparison. Existing debt is intentionally tolerated, not fixed. Dependency scanning is still open. |
 | M7 | GPU CI runner | **owner** | steps are in `docs/CI.md` §5.1. |
-| M8 | DSV4.1 server parity, lint/type/deps | **body cap closed, rest open** | `KINDI_MAX_BODY_MB` (16 MiB default), 413 `request_too_large`, and 400 on malformed JSON are pinned by `tests/test_dsv41_server.py`; lint/type/pins remain with M6. |
+| M8 | DSV4.1 server parity, lint/type/deps | **body cap and lint/type closed, dependency scan open** | `KINDI_MAX_BODY_MB` (16 MiB default), 413 `request_too_large`, and 400 on malformed JSON are pinned by `tests/test_dsv41_server.py`; lint/type use the M6 ratchet. Dependency scanning/pins remain open. |
 
 ## Changed in this triage (2026-11-18)
 

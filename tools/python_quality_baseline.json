@@ -1,0 +1,570 @@
+{
+  "mypy": {
+    "findings": {
+      "bridge/kindi_bridge/runtime.py": {
+        "var-annotated": 1
+      },
+      "kindi/backends/bonsai.py": {
+        "assignment": 1
+      },
+      "kindi/backends/dsv41.py": {
+        "assignment": 1
+      },
+      "kindi/backends/fake.py": {
+        "assignment": 1
+      },
+      "kindi/backends/gemma4.py": {
+        "assignment": 1
+      },
+      "kindi/backends/lightning.py": {
+        "assignment": 1
+      },
+      "kindi/backends/nanbeige.py": {
+        "assignment": 1
+      },
+      "kindi/backends/registry.py": {
+        "var-annotated": 2
+      },
+      "kindi/calib.py": {
+        "var-annotated": 1
+      },
+      "kindi/cpu.py": {
+        "assignment": 1
+      },
+      "kindi/dspine.py": {
+        "var-annotated": 1
+      },
+      "kindi/dsv41_tokenizer.py": {
+        "var-annotated": 1
+      },
+      "kindi/gemma4_chat.py": {
+        "var-annotated": 1
+      },
+      "kindi/lightning_chat.py": {
+        "var-annotated": 1
+      },
+      "kindi/lightning_tokenizer.py": {
+        "var-annotated": 1
+      },
+      "kindi/server.py": {
+        "assignment": 2
+      },
+      "kindi/spec.py": {
+        "assignment": 1,
+        "misc": 1
+      },
+      "kindi/tokenizer.py": {
+        "var-annotated": 1
+      },
+      "kindi/tp.py": {
+        "attr-defined": 3,
+        "method-assign": 1
+      },
+      "tools/bonsai_gaps.py": {
+        "arg-type": 1,
+        "return-value": 1
+      },
+      "tools/grammar_cost_serve.py": {
+        "arg-type": 1,
+        "union-attr": 2
+      },
+      "tools/measure_split_ratio.py": {
+        "index": 2,
+        "union-attr": 6
+      },
+      "tools/project_memory.py": {
+        "attr-defined": 2,
+        "dict-item": 1
+      },
+      "tools/verify_matrix.py": {
+        "arg-type": 2,
+        "assignment": 5,
+        "call-overload": 1,
+        "index": 1,
+        "misc": 1,
+        "return-value": 1,
+        "type-var": 1,
+        "var-annotated": 1
+      },
+      "tools/verify_p106.py": {
+        "attr-defined": 2,
+        "index": 3
+      }
+    },
+    "total": 59,
+    "version": "2.4.0"
+  },
+  "ruff": {
+    "findings": {
+      "bridge/kindi_bridge/agents.py": {
+        "F401": 1,
+        "I001": 2
+      },
+      "bridge/kindi_bridge/cli.py": {
+        "F401": 1,
+        "I001": 3
+      },
+      "bridge/kindi_bridge/dialogs.py": {
+        "F401": 1
+      },
+      "bridge/kindi_bridge/evaluate_learning.py": {
+        "F401": 1
+      },
+      "bridge/kindi_bridge/kindi.py": {
+        "I001": 1
+      },
+      "bridge/kindi_bridge/knowledge.py": {
+        "B905": 2,
+        "I001": 1
+      },
+      "bridge/kindi_bridge/menus.py": {
+        "F401": 2,
+        "I001": 3
+      },
+      "bridge/kindi_bridge/native.py": {
+        "F401": 1,
+        "I001": 1
+      },
+      "bridge/kindi_bridge/panels.py": {
+        "B905": 1,
+        "I001": 1
+      },
+      "bridge/kindi_bridge/runtime.py": {
+        "B904": 1,
+        "F401": 1,
+        "I001": 1
+      },
+      "bridge/kindi_bridge/store.py": {
+        "I001": 1
+      },
+      "bridge/kindi_bridge/system.py": {
+        "F401": 1,
+        "I001": 1
+      },
+      "bridge/kindi_bridge/tui.py": {
+        "F401": 3,
+        "I001": 3
+      },
+      "bridge/kindi_bridge/workbench.py": {
+        "B904": 2,
+        "F401": 1,
+        "F841": 1,
+        "I001": 2
+      },
+      "docs/benchmarks/build_cross_mode.py": {
+        "B905": 4
+      },
+      "docs/benchmarks/raon-r0/build_manifest.py": {
+        "B007": 2,
+        "F401": 2
+      },
+      "docs/benchmarks/tandem-cache/run_check.py": {
+        "B905": 1
+      },
+      "examples/prompt_cache_bench.py": {
+        "I001": 1
+      },
+      "kindi/__main__.py": {
+        "B904": 3,
+        "I001": 1
+      },
+      "kindi/backends/__init__.py": {
+        "I001": 1
+      },
+      "kindi/backends/fake.py": {
+        "F401": 1,
+        "I001": 1
+      },
+      "kindi/backends/registry.py": {
+        "B904": 1
+      },
+      "kindi/bench.py": {
+        "B023": 1,
+        "B904": 1
+      },
+      "kindi/cache.py": {
+        "B905": 10,
+        "I001": 2
+      },
+      "kindi/calibrate.py": {
+        "F841": 1,
+        "I001": 1
+      },
+      "kindi/caps.py": {
+        "B007": 1,
+        "B905": 1
+      },
+      "kindi/cascade.py": {
+        "B007": 4
+      },
+      "kindi/catalog.py": {
+        "F401": 1
+      },
+      "kindi/chat.py": {
+        "I001": 1
+      },
+      "kindi/chunk.py": {
+        "B905": 2,
+        "F841": 2,
+        "I001": 1
+      },
+      "kindi/chunk1.py": {
+        "I001": 2
+      },
+      "kindi/cold_experts.py": {
+        "B904": 1,
+        "B905": 2
+      },
+      "kindi/config.py": {
+        "B904": 3
+      },
+      "kindi/config_reference.py": {
+        "B905": 1
+      },
+      "kindi/container.py": {
+        "B904": 4
+      },
+      "kindi/convert.py": {
+        "B904": 1
+      },
+      "kindi/cpu.py": {
+        "B904": 1
+      },
+      "kindi/dspine.py": {
+        "I001": 1
+      },
+      "kindi/dsv41.py": {
+        "B007": 1,
+        "B904": 3,
+        "B905": 6,
+        "I001": 1
+      },
+      "kindi/dsv41_server.py": {
+        "B904": 3
+      },
+      "kindi/engine.py": {
+        "F841": 1,
+        "I001": 2
+      },
+      "kindi/expert_cache.py": {
+        "B904": 4
+      },
+      "kindi/expert_chunk.py": {
+        "B904": 1,
+        "F401": 2,
+        "I001": 1
+      },
+      "kindi/gbnf.py": {
+        "B904": 1
+      },
+      "kindi/gemma4.py": {
+        "B007": 1,
+        "F401": 1,
+        "F841": 3,
+        "I001": 5
+      },
+      "kindi/gemma4_cache.py": {
+        "B905": 2,
+        "F401": 1
+      },
+      "kindi/gemma4_chat.py": {
+        "B904": 1,
+        "I001": 1
+      },
+      "kindi/gemma4_tokenizer.py": {
+        "B905": 1
+      },
+      "kindi/gemma4_tp.py": {
+        "F401": 1,
+        "I001": 1
+      },
+      "kindi/intel.py": {
+        "F401": 1
+      },
+      "kindi/kld.py": {
+        "I001": 1
+      },
+      "kindi/lightning.py": {
+        "B007": 2,
+        "B905": 1,
+        "I001": 1
+      },
+      "kindi/lightning_chat.py": {
+        "B904": 1
+      },
+      "kindi/lightning_tokenizer.py": {
+        "B905": 1
+      },
+      "kindi/moe.py": {
+        "B007": 1,
+        "B904": 3
+      },
+      "kindi/moe_compat.py": {
+        "F841": 1
+      },
+      "kindi/moe_tandem.py": {
+        "B904": 2,
+        "B905": 2
+      },
+      "kindi/mtp.py": {
+        "F401": 1,
+        "I001": 1
+      },
+      "kindi/nanbeige.py": {
+        "B905": 2,
+        "I001": 3
+      },
+      "kindi/nanbeige_cli.py": {
+        "I001": 1
+      },
+      "kindi/nanbeige_gen.py": {
+        "I001": 4
+      },
+      "kindi/plan.py": {
+        "B904": 1,
+        "F401": 1,
+        "I001": 1
+      },
+      "kindi/sampling.py": {
+        "I001": 1
+      },
+      "kindi/server.py": {
+        "B904": 2,
+        "F841": 1,
+        "I001": 2
+      },
+      "kindi/sessions.py": {
+        "B007": 1
+      },
+      "kindi/spec.py": {
+        "B007": 2,
+        "B023": 1,
+        "B905": 9,
+        "F841": 2,
+        "I001": 1
+      },
+      "kindi/support_matrix.py": {
+        "B904": 2,
+        "B905": 3
+      },
+      "kindi/tandem.py": {
+        "B904": 2,
+        "F401": 1,
+        "F841": 2,
+        "I001": 1
+      },
+      "kindi/tokenizer.py": {
+        "B904": 1,
+        "B905": 1
+      },
+      "kindi/tp.py": {
+        "B002": 2,
+        "B007": 2,
+        "B023": 15,
+        "B905": 2,
+        "I001": 1
+      },
+      "kindi/verify.py": {
+        "B905": 2,
+        "I001": 1
+      },
+      "tests/api/test_error_envelope.py": {
+        "F401": 1
+      },
+      "tests/backends/test_registry.py": {
+        "B905": 1,
+        "F401": 1,
+        "F811": 2,
+        "I001": 3
+      },
+      "tests/static/run_static_analysis.py": {
+        "I001": 1
+      },
+      "tests/test_bench_json.py": {
+        "B007": 1,
+        "F401": 1,
+        "I001": 2
+      },
+      "tests/test_cascade.py": {
+        "F401": 1,
+        "F841": 1
+      },
+      "tests/test_check_coverage.py": {
+        "F401": 1
+      },
+      "tests/test_check_long_context.py": {
+        "I001": 1
+      },
+      "tests/test_cold_experts.py": {
+        "B007": 1,
+        "I001": 1
+      },
+      "tests/test_cpu_layers.py": {
+        "F401": 1
+      },
+      "tests/test_dspine_gate.py": {
+        "F401": 1
+      },
+      "tests/test_gbnf.py": {
+        "I001": 1
+      },
+      "tests/test_gbnf_recursion.py": {
+        "I001": 1
+      },
+      "tests/test_gemma4_cache.py": {
+        "B007": 2
+      },
+      "tests/test_gpudrv.py": {
+        "I001": 1
+      },
+      "tests/test_hostram_limit.py": {
+        "F401": 2
+      },
+      "tests/test_installer_grub.py": {
+        "B905": 1
+      },
+      "tests/test_jsongrammar.py": {
+        "F401": 1
+      },
+      "tests/test_kernel_arity.py": {
+        "B905": 1,
+        "F401": 1
+      },
+      "tests/test_kld.py": {
+        "F401": 1,
+        "I001": 1
+      },
+      "tests/test_lt_fit_equivalence.py": {
+        "I001": 1
+      },
+      "tests/test_moe_cache.py": {
+        "F401": 1,
+        "I001": 1
+      },
+      "tests/test_moe_cache_properties.py": {
+        "B011": 1,
+        "B905": 1,
+        "I001": 1
+      },
+      "tests/test_moe_chunk.py": {
+        "F841": 1,
+        "I001": 1
+      },
+      "tests/test_moe_tandem.py": {
+        "I001": 1
+      },
+      "tests/test_mtp_head.py": {
+        "F401": 1
+      },
+      "tests/test_no_secrets.py": {
+        "F401": 2
+      },
+      "tests/test_ollama_links.py": {
+        "B008": 1
+      },
+      "tests/test_plan_engine.py": {
+        "B017": 1
+      },
+      "tests/test_secret_scan.py": {
+        "I001": 1
+      },
+      "tests/test_server.py": {
+        "B905": 1,
+        "I001": 1
+      },
+      "tests/test_server_cpu.py": {
+        "I001": 1
+      },
+      "tests/test_server_sessions.py": {
+        "F401": 1
+      },
+      "tests/test_sessions.py": {
+        "F841": 1,
+        "I001": 1
+      },
+      "tests/test_spec_ab.py": {
+        "I001": 1
+      },
+      "tests/test_tc_turing_reference.py": {
+        "B905": 1
+      },
+      "tests/test_tokenizer.py": {
+        "I001": 1
+      },
+      "tests/test_tool_call_conformance.py": {
+        "I001": 1
+      },
+      "tests/test_verify_bench_contracts.py": {
+        "F401": 1
+      },
+      "tests/test_verify_blackwell_fp8.py": {
+        "I001": 1
+      },
+      "tests/test_verify_matrix.py": {
+        "F401": 1,
+        "I001": 1
+      },
+      "tests/test_verify_p106.py": {
+        "F401": 1,
+        "I001": 1
+      },
+      "tools/bonsai_gaps.py": {
+        "B905": 1
+      },
+      "tools/check_claims.py": {
+        "B904": 5
+      },
+      "tools/check_coverage.py": {
+        "F401": 1
+      },
+      "tools/check_long_context.py": {
+        "I001": 1
+      },
+      "tools/check_perf_baseline.py": {
+        "F401": 1
+      },
+      "tools/check_secret_baseline.py": {
+        "B904": 3,
+        "I001": 1
+      },
+      "tools/check_secret_history.py": {
+        "F841": 1
+      },
+      "tools/grammar_cost.py": {
+        "I001": 1
+      },
+      "tools/mtp_context_bench.py": {
+        "I001": 1
+      },
+      "tools/mtp_smoke.py": {
+        "B904": 5
+      },
+      "tools/spec_ab.py": {
+        "B905": 2
+      },
+      "tools/verify_blackwell_fp8.py": {
+        "F401": 1
+      },
+      "tools/verify_matrix.py": {
+        "B904": 2,
+        "F841": 1,
+        "I001": 2
+      },
+      "tools/verify_p106.py": {
+        "B905": 1
+      }
+    },
+    "total": 334,
+    "version": "0.16.0"
+  },
+  "schema": 1,
+  "scope": {
+    "mypy_targets": [
+      "kindi",
+      "tools",
+      "examples",
+      "bridge/kindi_bridge"
+    ],
+    "ruff_rules": "F,E9,B,I"
+  }
+}

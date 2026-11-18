@@ -4,7 +4,7 @@ The normal GitHub-hosted workflow is
 [.github/workflows/ci.yml](../.github/workflows/ci.yml):
 
 - `CPU tests`: the CPU-only pytest suite on Ubuntu, with line and branch coverage for `kindi` and a
-  27% regression floor;
+  27% regression floor, plus the Python lint/type ratchet;
 - `CPU engine build and smoke`: compiles `kindi/kcpu.c` with AVX2/FMA/F16C and loads it;
 - `Windows CPU and config boundary`: the Windows-safe config, CPU, startup and tokenizer tests;
 - `Installer shell checks`: `bash -n` and ShellCheck on the committed LF installer.
@@ -66,6 +66,31 @@ without an owner. Schema, check kinds and the add/change procedure are in
 and the checker's own failure modes (a drifted doc number, a moved artifact, untracked evidence, an
 unregistered citation).
 
+## Python lint and type-check ratchet
+
+Audit F9's Python quality gate is `python tools/check_python_quality.py`, run by the `CPU tests`
+job. A gate that failed on every existing finding would block all work, so it starts from a measured
+baseline:
+
+- **Ruff 0.16.0** checks the whole Python tree with correctness rules `F`, `E9`, `B` and `I`
+  (`ruff.toml`). The baseline records **334 findings across 126 files**; style-only rules are not
+  selected, so this is not a formatting freeze.
+- **mypy 2.4.0** checks first-party production code (`kindi`, `tools`, `examples` and
+  `bridge/kindi_bridge`) with missing third-party imports ignored (`mypy.ini`). The baseline records
+  **59 errors across 25 files**. The test tree is not type-checked: its deliberately dynamic
+  fixtures and duplicate `conftest.py` module names make that signal noisy.
+
+`tools/python_quality_baseline.json` stores the counts per file and rule/error code. The gate fails
+when a count grows or a new file/rule pair appears, and passes when debt shrinks. Fix findings
+normally; after a reviewed cleanup, lower the baseline deliberately with
+`python tools/check_python_quality.py --update`. Ruff and mypy are exact-pinned in
+`tests/requirements-test.txt` so the measured counts are reproducible. The baseline is **not** a
+claim that the existing findings are acceptable: it is a ratchet against regression, and the
+remaining debt stays visible. Dependency scanning is a separate open audit item.
+
+`tests/test_python_quality.py` pins the comparison and baseline shape, and
+`tests/test_ci_config.py` pins the CI step and tool versions.
+
 ## CUDA static analysis
 
 The `static-analysis` job installs `cppcheck` and `clang-tidy-18` on the hosted runner and runs
@@ -79,7 +104,8 @@ Validated locally (tools absent): the Turing TU builds and the script skips clea
 
 `tests/requirements-test.txt` is deliberately bounded (`pytest>=7,<10`, `fastapi>=0.100,<1`,
 `pydantic>=2,<3`, …): the suite is verified on those majors, and an open-ended spec would let
-CI break with no commit. `tests/test_ci_config.py` pins both contracts.
+CI break with no commit. Ruff and mypy are exact-pinned because the Python-quality baseline counts
+change with analyser versions. `tests/test_ci_config.py` pins both contracts.
 
 ## Secret baseline and local hook
 
