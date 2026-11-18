@@ -962,6 +962,10 @@ def make_handler(E):
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(b)))
+            # A body error can leave unread request bytes in rfile; tell the client not to reuse
+            # the connection instead of letting the next request parse those bytes.
+            if getattr(self, "close_connection", False):
+                self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(b)
 
@@ -979,8 +983,10 @@ def make_handler(E):
             try:
                 req = self._body()
             except BodyTooLarge as e:
+                self.close_connection = True
                 return self._err(413, str(e), "request_too_large")
             except Exception:
+                self.close_connection = True
                 return self._err(400, "invalid JSON")
             ctx = E.model.ctx
             if req.get("messages") is not None:   # a chat request: the whole prompt, as the chat endpoint builds it
@@ -999,8 +1005,10 @@ def make_handler(E):
             try:
                 ids = [int(i) for i in self._body().get("tokens") or []]
             except BodyTooLarge as e:
+                self.close_connection = True
                 return self._err(413, str(e), "request_too_large")
             except Exception:
+                self.close_connection = True
                 return self._err(400, "send tokens: a list of token ids")
             text = b"".join(E.model.tok.decode_bytes(i) for i in ids).decode("utf-8", "replace")
             return self._json(200, {"prompt": text, "content": text})
@@ -1037,8 +1045,10 @@ def make_handler(E):
                 try:
                     body = self._body()
                 except BodyTooLarge as e:
+                    self.close_connection = True
                     return self._err(413, str(e), "request_too_large")
                 except Exception:
+                    self.close_connection = True
                     return self._err(400, "invalid JSON")
                 try:
                     with E.lock:
@@ -1067,8 +1077,10 @@ def make_handler(E):
             try:
                 req = self._body()
             except BodyTooLarge as e:
+                self.close_connection = True
                 return self._err(413, str(e), "request_too_large")
             except Exception:
+                self.close_connection = True
                 return self._err(400, "invalid JSON")
             cid = "chatcmpl-" + uuid.uuid4().hex[:24]
             created = int(time.time())

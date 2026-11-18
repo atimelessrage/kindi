@@ -225,20 +225,13 @@ the saved agents from the Agents menu. The service does not stop other agents an
 python -m unittest discover -s tests -v
 ```
 
-The tests include:
+The bundled smoke tests cover duration and time parsing, the SQLite state store, agent
+add/roster/status, and the documented jobs parser. They need only Python and never start a
+process.
 
-- the target of each prompt, exact prompts, and a delete at the same time as a delivery;
-- completion evidence and limited retries;
-- documents that change or are deleted, and read errors;
-- real ports, protection against a reused PID, and the stop of child processes that Bridge owns;
-- a real RPC subprocess, screen changes and terminal sizes in a PTY;
-- Kindi server discovery and checks against a local HTTP server, and the pi provider that Bridge writes.
-
-The tests never stop processes that are not theirs.
-
-To test the native pi integration against a local HTTP server (no live model calls), run
-`BRIDGE_TEST_PI=/path/to/pi python -m unittest discover -s tests -v`. This also tests the protection of the editor
-text, the scheduled turns, the side panels across pages, and the narrow and wide layouts.
+The full UI/PTY/RPC suite, including the pi integration test, is not part of this source
+distribution; `BRIDGE_TEST_PI=/path/to/pi` applies when that suite is present. Any broader suite
+must keep the same rule: it never stops processes that are not its own.
 
 Limits of this version:
 

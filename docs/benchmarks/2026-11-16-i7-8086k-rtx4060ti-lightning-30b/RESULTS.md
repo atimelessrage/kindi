@@ -6,7 +6,7 @@ Lightning 30B-A3B (Nemotron-H MoE, `nemotron_h_moe`, Q2_0).
 The earlier local copy was discarded: its size matched the catalog
 (9,472,656,320 bytes) but the catalog/local/manifest SHA-256 values
 disagreed and the GGUF reader rejected it. A clean re-download to
-`L:/kindi-lightning-clean/models/Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf`
+`<kindi-model-root>/kindi-lightning-clean/models/Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf`
 now checks out exactly:
 
 - size: `9472656320` bytes
@@ -15,15 +15,15 @@ now checks out exactly:
 - `kindi.gguf.GGUF`: arch `nemotron_h_moe`, name `Nemotron-3.5-Lightning-30B-A3B Nota-Ternary (MLX 2-bit) -> Q2_0`, 401 tensors
 
 Fresh pack (manifest only; weights stay in the GGUF):
-`L:/kindi-lightning-clean/packs/nemotron-lightning-30b`.
+`<kindi-model-root>/kindi-lightning-clean/packs/nemotron-lightning-30b`.
 
 Commands:
 
 ```powershell
-python -m kindi convert L:/kindi-lightning-clean/models/Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf --out L:/kindi-lightning-clean/packs/nemotron-lightning-30b --force
-python -m kindi --pack L:/kindi-lightning-clean/packs/nemotron-lightning-30b plan --ctx 8192
-python -m kindi --pack L:/kindi-lightning-clean/packs/nemotron-lightning-30b verify
-python -m kindi --pack L:/kindi-lightning-clean/packs/nemotron-lightning-30b --ctx 8192 bench --sample-vram
+python -m kindi convert <kindi-model-root>/kindi-lightning-clean/models/Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf --out <kindi-model-root>/kindi-lightning-clean/packs/nemotron-lightning-30b --force
+python -m kindi --pack <kindi-model-root>/kindi-lightning-clean/packs/nemotron-lightning-30b plan --ctx 8192
+python -m kindi --pack <kindi-model-root>/kindi-lightning-clean/packs/nemotron-lightning-30b verify
+python -m kindi --pack <kindi-model-root>/kindi-lightning-clean/packs/nemotron-lightning-30b --ctx 8192 bench --sample-vram
 ```
 
 ## Plan

@@ -42,4 +42,14 @@ limitation, with what would close it; **owner** = needs an action this environme
 - Lesson L-0010 records the cache-ownership mistake; `docs/MOE-TANDEM.md` and
   `docs/EXTERNAL-ENGINES.md` describe the slot cache and the still-open C9 bound.
 
+- `kindi/dsv41_server.py` now closes the HTTP/1.1 connection after an over-cap or unparseable body;
+  the refused bytes must not be parsed as the next request on a reused socket. The 413/400 tests pin
+  the close flag and `Connection: close`.
+- The optional Bridge has a dependency-free smoke suite and CI job; its missing-directory path now
+  raises `ValueError` rather than leaking `FileNotFoundError` from `Path.resolve(strict=True)`.
+- The forward-slash drive-root gap is closed for current-facing files (tracked docs/evidence plus
+  benchmark logs), with a current-tree guard; the historical baseline is unchanged.
+- The action-pin guard covers every workflow, and AGENTS.md labels 1204/28 as the last recorded full
+  gate rather than a run at the current HEAD.
+
 No GPU, larger-than-RAM pack or tok/s measurement is claimed by any of these changes.

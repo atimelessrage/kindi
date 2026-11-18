@@ -10,6 +10,10 @@ The normal GitHub-hosted workflow is
 - `Installer shell checks`: `bash -n` and ShellCheck on the committed LF installer.
 - `Secret scan`: detect-secrets 1.5.0 scans every tracked file against `.secrets.baseline`, and
   [tools/check_secret_baseline.py](../tools/check_secret_baseline.py) rejects a stale baseline.
+- `Bridge smoke tests`: the optional Bridge component's dependency-free suite runs from
+  `bridge/` (`python -m unittest discover -s tests -v`). It covers time parsing, the SQLite
+  store, agent status and the CLI parser; the broader UI/PTY/RPC suite is not in this source
+  distribution.
 
 These jobs do **not** run CUDA kernels, a model pack or `kindi verify` on a real card.
 

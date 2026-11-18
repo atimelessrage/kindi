@@ -10,6 +10,7 @@ invisible). It does not replace the history scan: commit metadata and deleted li
 scope, which is what `tools/check_secret_history.py` covers. `.secrets.baseline` /
 `tools/check_secret_baseline.py` are the entropy-based pass over the same tracked tree.
 """
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -56,6 +57,50 @@ def findings():
         for lineno, line in enumerate(text.splitlines(), 1):
             for name in hits_in_line(line):
                 yield rel, lineno, name
+
+
+MACHINE_DRIVE = re.compile(r"(?i)\b[A-Z]:/+[A-Za-z0-9_.$~-]+/")
+
+
+def forward_roots(line):
+    """Forward-slash drive roots in current-facing text, excluding the repository's T:/kindi form."""
+    for match in MACHINE_DRIVE.finditer(line):
+        root = match.group(0)
+        if not root.lower().startswith("t:/kindi/"):
+            yield root
+
+
+def test_the_forward_slash_machine_root_rule_is_not_vacuous():
+    assert list(forward_roots("pack at D:/models/bonsai")) == ["D:/models/"]
+    assert list(forward_roots("the T:/kindi worktree")) == []
+    assert list(forward_roots("pack at T:/kindi-packs/bonsai")) == ["T:/kindi-packs/"]
+
+
+def test_no_forward_slash_machine_roots_in_current_facing_files():
+    """The backslash-only scanner missed D:/ and L:/ roots in current docs and benchmark evidence.
+
+    Historical lease rows are still scanned too; they were redacted rather than exempted. Tests are
+    skipped because they deliberately contain path-shaped fixtures (for example a CuPy warning
+    string), not machine layout.
+    """
+    bad = []
+    for rel in scanned_files():
+        if rel.startswith("tests/"):
+            continue
+        if Path(rel).suffix.lower() in SKIP:
+            continue
+        try:
+            raw = (ROOT / rel).read_bytes()
+        except OSError:
+            continue
+        if b"\x00" in raw:
+            continue
+        text = raw.decode("utf-8", "replace")
+        for lineno, line in enumerate(text.splitlines(), 1):
+            if list(forward_roots(line)):
+                bad.append((rel, lineno))
+    assert not bad, "forward-slash machine roots remain:\n" + "\n".join(
+        "%s:%d" % item for item in bad[:40])
 
 
 def test_the_local_drive_path_rule_is_not_vacuous():

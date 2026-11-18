@@ -162,3 +162,16 @@ jobs:
           git ls-files -z | xargs -0 detect-secrets-hook --baseline .secrets.baseline
       - name: Scan git history for credentials and personal data
         run: python tools/check_secret_history.py
+
+  bridge-smoke:
+    name: Bridge smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.11"
+      - name: Run the bundled Bridge smoke suite
+        working-directory: bridge
+        run: python -m unittest discover -s tests -v

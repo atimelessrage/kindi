@@ -372,7 +372,7 @@ PATH, so the libkcpu tests skip); 3.6 grammar OK; `project_memory
 
 The Lightning T4.2 gate is **closed on this host**, superseding §34, §35 and
 §37(1). A clean re-download to
-`L:/kindi-lightning-clean/models/Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf`
+`<kindi-model-root>/kindi-lightning-clean/models/Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf`
 matches the catalog exactly: 9,472,656,320 bytes, SHA-256
 `38854de649212dc2761006b75afbc41412e7531f763c3ff965bd31f969bb14f3`, valid
 GGUF magic, `nemotron_h_moe` with 401 tensors. A fresh pack was converted

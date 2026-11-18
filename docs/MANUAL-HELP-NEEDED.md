@@ -8,9 +8,9 @@ state line — tick it off when done.
 ## Automated tasks (no owner action)
 
 - ~~The Lightning T4.2 GPU gate is **the agent's**, not the owner's: do not
-  use the old `L:/kindi-lightning/models/...` file whose three hashes
+  use the old `<kindi-model-root>/kindi-lightning/models/...` file whose three hashes
   disagreed.~~ **Done 2026-11-16:** a clean re-download to
-  `L:/kindi-lightning-clean/models/Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf`
+  `<kindi-model-root>/kindi-lightning-clean/models/Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf`
   matches the catalog size/SHA-256/GGUF magic; a fresh pack was built and
   `kindi verify` on the RTX 4060 Ti is 5 exact + 7 ties, 0 fail, with bench
   read 788.3–821.3 tok/s and write 165.96–167.41 tok/s at ctx 8192.
@@ -34,7 +34,7 @@ state line — tick it off when done.
 - **Options:** (a) report the broken file to the repo author / wait for a
   fixed upload, then download with `kindi use nanbeige-33b` (note: `C:` has
   ~13 GB free, so put the pack on a bigger drive, e.g. `L:` with
-  `--pack L:/kindi-nb/packs/nanbeige-33b`); (b) use bartowski's
+  `--pack <kindi-model-root>/kindi-nb/packs/nanbeige-33b`); (b) use bartowski's
   `Nanbeige_Nanbeige4.3-33B-IQ3_XXS.gguf` (14.49 GB) from
   `bartowski/Nanbeige_Nanbeige4.3-33B-GGUF` — but that is a different quant,
   so the shipped `kindi/reference-nanbeige-33b*.json` will not reproduce and
@@ -148,5 +148,5 @@ commands and interpret the output. Each row states the gate it unlocks.
 ## Done
 
 - **Nanbeige corrupt-file deletion** (2026-11-16): the 13.1 GB corrupt GGUF
-  and `L:/kindi-nb` were removed at the owner's request; the adapter port and
+  and `<kindi-model-root>/kindi-nb` were removed at the owner's request; the adapter port and
   the gate are recorded so the download (§1) resumes cleanly.

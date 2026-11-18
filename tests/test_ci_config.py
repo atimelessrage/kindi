@@ -56,8 +56,12 @@ def test_cpu_job_runs_the_documentation_and_generated_reference_gates():
 
 
 def test_workflow_actions_are_pinned_to_shas():
-    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-    for line in ci.splitlines():
-        if "uses:" in line:
-            ref = line.split("uses:")[-1].strip().split()[0]
-            assert "@" in ref and len(ref.rsplit("@", 1)[-1]) >= 40, "unpinned action: %s" % ref
+    """Every workflow's actions are immutable: CPU CI alone is not the attack surface a push adds."""
+    workflows = sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+    assert workflows, "no workflow files found"
+    for workflow in workflows:
+        for line in workflow.read_text(encoding="utf-8").splitlines():
+            if "uses:" in line:
+                ref = line.split("uses:")[-1].strip().split()[0]
+                assert "@" in ref and len(ref.rsplit("@", 1)[-1]) >= 40, (
+                    "unpinned action in %s: %s" % (workflow.name, ref))

@@ -7,7 +7,7 @@ need the GGUF path, so this script reads those manifests and makes one link per
 model, named after the manifest:
 
     python tools/ollama_links.py                     # $OLLAMA_MODELS, else ~/.ollama/models
-    python tools/ollama_links.py -m D:/ollama/models -o ~/.kindi/models/ollamaLinks
+    python tools/ollama_links.py -m <ollama-root>/models -o ~/.kindi/models/ollamaLinks
     python tools/ollama_links.py --dry-run
 
 Nothing is copied and nothing is downloaded. A symbolic link is used when the

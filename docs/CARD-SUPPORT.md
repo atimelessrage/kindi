@@ -122,7 +122,7 @@ python tools/verify_matrix.py \
   --models 27b --modes tc \
   --spec-models 27b --spec-modes ngram,draft2b,both \
   --pack-dir ~/.kindi/packs \
-  --pack-27b D:/kindi-27b/packs/bonsai-27b \
+  --pack-27b <kindi-model-root>/kindi-27b/packs/bonsai-27b \
   --spec-pack ~/.kindi/packs/bonsai-2b \
   --mtp-head ~/.kindi/models/kindi-mtp-2b-v1.npz \
   --out bench-logs/verify-matrix/27b-spec-gate \

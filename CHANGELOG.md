@@ -19,7 +19,20 @@
   now shares the `KINDI_MAX_BODY_MB` setting (16 MiB default), refuses an over-cap body with HTTP
   413 `request_too_large` before reading it, and returns 400 for a malformed length or JSON (the
   warm endpoint used to answer a parse failure with 500). `tests/test_dsv41_server.py` pins the
-  helper, the exact-cap boundary and both handler responses.
+  helper, the exact-cap boundary and both handler responses. A body error also closes the HTTP/1.1
+  connection now: the refused body was not read, so reusing the socket would parse its bytes as the
+  next request. The tests pin the close flag and the `Connection: close` response header.
+- **The optional Bridge component has a runnable smoke suite and CI job** — `bridge/tests` now
+  covers duration/time parsing, the SQLite settings/agent store, agent status and the documented
+  jobs parser with only the standard library. `bridge/README.md` no longer claims the full
+  UI/PTY/RPC suite is in this source distribution, and `ci.yml` runs the smoke suite.
+- **Machine roots are gone from current-facing docs and benchmark evidence** — the forward-slash
+  `D:/`/`L:/` roots that the backslash-only secret rule missed are redacted to portable placeholders,
+  including the tracked 27B median logs. A new current-tree guard catches forward-slash drive roots
+  while still allowing the repository's `T:/kindi` form; the historical secret baseline is unchanged.
+- **Every workflow's actions are SHA-pinned** — the existing CI guard now checks every
+  `.github/workflows/*.yml`, not only `ci.yml`, so a GPU or Blackwell workflow cannot add a mutable
+  action unnoticed.
 - **A direct 27B speculation A/B compares outputs byte for byte** — `tools/spec_ab.py` builds one
   27B tensor-core engine with the 2B drafter and its head, then generates the same prompts plain
   and under `ngram`, `draft2b` and `both`, comparing token ids and decoded bytes without consulting

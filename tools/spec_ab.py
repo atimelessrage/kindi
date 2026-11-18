@@ -13,7 +13,7 @@ The engine is the tensor-core plan path at the verifier's 1,024-token context. T
 caller's shell cannot silently make the A/B run another engine. It needs a tensor-core GPU, the 27B
 pack, the 2B drafter pack and the registered draft head.
 
-    python tools/spec_ab.py --pack D:/kindi-27b/packs/bonsai-27b \\
+    python tools/spec_ab.py --pack <kindi-model-root>/kindi-27b/packs/bonsai-27b \\
       --drafter ~/.kindi/packs/bonsai-2b \\
       --head ~/.kindi/models/kindi-mtp-2b-v1.npz \\
       --json docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-27b-spec-ab/results.json

@@ -6,11 +6,11 @@
 [kindi 22:17:01] card 0: 5.60 GB of weights, streamed (4s)
 [kindi 22:17:02] card 0: weights repacked for the tensor cores (0.5s)
 [kindi 22:17:02] tensor-core plans ready: T = 1 .. 4, 724 nodes per decode token (0.3s; 627 MiB free on the card)
-[kindi 22:17:02] speculative draft model attached: C:\Users\ICH\.kindi\packs\bonsai-2b, ctx 8192
+[kindi 22:17:02] speculative draft model attached: <local-home>\.kindi\packs\bonsai-2b, ctx 8192
 [kindi 22:17:02] MTP head attached: kindi-mtp-2b-v1.npz (61 MB, window 64, sha256 1b5c0c790a59)
 [kindi 22:17:02] speculation: requested both, effective both
 [kindi 22:17:02] plan engine ready: 1 card, ctx 1024, K/V q8_0, weights 5-trit lane (6.6s)
-[kindi 22:17:02] kindi: D:\kindi-27b\packs\bonsai-27b -> the bonsai backend (bonsai2-27b)
+[kindi 22:17:02] kindi: <machine-path>bonsai-27b -> the bonsai backend (bonsai2-27b)
 [kindi 22:17:02] speculation: requested both, effective both, head kindi-mtp-2b-v1.npz sha256 1b5c0c790a59
 [kindi 22:17:03] prompt 1 'The sky is blue because'                                    TIE  14/40 tokens match  (0.8s, 21/57 drafts accepted)
 [kindi 22:17:03]    first difference at token 14 (llama.cpp top-2 gap there 0.0064)
@@ -18,5 +18,5 @@
 [kindi 22:17:05] prompt 3 'Water boils at a lower temperature on mountains because'    PASS  40/40 tokens match  (0.9s, 20/60 drafts accepted)
 [kindi 22:17:05] prompt 4 'def add_two_numbers('                                       PASS  40/40 tokens match  (0.6s, 24/46 drafts accepted)
 [kindi 22:17:05] PASS with KINDI_SPEC=both: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 62.3 tokens/s over the run
-C:\Users\ICH\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+<local-home>\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
   warnings.warn(

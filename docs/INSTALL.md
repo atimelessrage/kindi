@@ -170,7 +170,7 @@ without copying or downloading anything:
 ```sh
 python tools/ollama_links.py --dry-run    # list what it would link
 python tools/ollama_links.py              # $OLLAMA_MODELS, else ~/.ollama/models
-python tools/ollama_links.py -m D:/ollama/models -o D:/kindi-links
+python tools/ollama_links.py -m <ollama-root>/models -o <ollama-links>
 ```
 
 It links into `~/.kindi/models/ollamaLinks` by default, named after the manifest (`gemma3/4b` ->

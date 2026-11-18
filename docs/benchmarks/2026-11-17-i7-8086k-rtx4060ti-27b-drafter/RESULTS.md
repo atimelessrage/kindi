@@ -1,7 +1,7 @@
 # 27B verify matrix with the 2B drafter (2026-11-17)
 
 Host: i7-8086K + RTX 4060 Ti (8,188 MiB), driver 617.42, Windows, CuPy 14.2.0, CUDA runtime
-12090. Target: `bonsai-27b` on `D:/kindi-27b/packs/bonsai-27b`, source sha256
+12090. Target: `bonsai-27b` on `<kindi-model-root>/kindi-27b/packs/bonsai-27b`, source sha256
 `53107f53...`, Hadamard block 1024. Drafter: `~/.kindi/packs/bonsai-2b`, source sha256
 `36061ad4...`, plus the registered `kindi-mtp-2b-v1.npz` head (sha256 `1b5c0c79...`) for `both`.
 The engine is the tensor-core plan path (`KINDI_TC=1`, `KINDI_TP=1`, `KINDI_FD=1`,
@@ -14,7 +14,7 @@ python tools/verify_matrix.py \
   --models 27b --modes tc \
   --spec-models 27b --spec-modes ngram,draft2b,both \
   --pack-dir ~/.kindi/packs \
-  --pack-27b D:/kindi-27b/packs/bonsai-27b \
+  --pack-27b <kindi-model-root>/kindi-27b/packs/bonsai-27b \
   --spec-pack ~/.kindi/packs/bonsai-2b \
   --mtp-head ~/.kindi/models/kindi-mtp-2b-v1.npz \
   --out docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-27b-drafter \
@@ -63,7 +63,7 @@ python tools/verify_matrix.py \
   --models 27b --modes tc \
   --spec-models 27b --spec-modes ngram,draft2b,both \
   --pack-dir ~/.kindi/packs \
-  --pack-27b D:/kindi-27b/packs/bonsai-27b \
+  --pack-27b <kindi-model-root>/kindi-27b/packs/bonsai-27b \
   --spec-pack ~/.kindi/packs/bonsai-2b \
   --mtp-head ~/.kindi/models/kindi-mtp-2b-v1.npz \
   --out bench-logs/verify-matrix/27b-spec-gate \

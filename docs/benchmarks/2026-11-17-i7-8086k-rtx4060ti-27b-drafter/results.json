@@ -3,7 +3,7 @@
   "git_revision": "53003a9",
   "python": "3.13.6",
   "packs_dir": "~/.kindi/packs",
-  "pack_27b": "D:/kindi-27b/packs/bonsai-27b",
+  "pack_27b": "<kindi-model-root>/kindi-27b/packs/bonsai-27b",
   "cards": 1,
   "timeout_s": 900.0,
   "environment": {
@@ -22,7 +22,7 @@
     "cuda_runtime": 12090,
     "packs": [
       {
-        "path": "D:/kindi-27b/packs/bonsai-27b",
+        "path": "<kindi-model-root>/kindi-27b/packs/bonsai-27b",
         "source_sha256": "53107f530aa52eb00912263ab1ee29bd199261c87cd7b4ad4ca1318c1fe33ee3",
         "hadamard_block": 1024,
         "model": "Hf",
@@ -92,7 +92,7 @@
         "-m",
         "kindi",
         "--pack",
-        "D:/kindi-27b/packs/bonsai-27b",
+        "<kindi-model-root>/kindi-27b/packs/bonsai-27b",
         "verify"
       ]
     },
@@ -157,7 +157,7 @@
         "-m",
         "kindi",
         "--pack",
-        "D:/kindi-27b/packs/bonsai-27b",
+        "<kindi-model-root>/kindi-27b/packs/bonsai-27b",
         "verify",
         "--spec",
         "ngram"
@@ -225,7 +225,7 @@
         "-m",
         "kindi",
         "--pack",
-        "D:/kindi-27b/packs/bonsai-27b",
+        "<kindi-model-root>/kindi-27b/packs/bonsai-27b",
         "verify",
         "--spec",
         "draft2b"
@@ -294,7 +294,7 @@
         "-m",
         "kindi",
         "--pack",
-        "D:/kindi-27b/packs/bonsai-27b",
+        "<kindi-model-root>/kindi-27b/packs/bonsai-27b",
         "verify",
         "--spec",
         "both"

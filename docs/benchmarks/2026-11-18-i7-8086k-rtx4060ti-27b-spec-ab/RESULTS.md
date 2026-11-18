@@ -1,7 +1,7 @@
 # 27B speculation A/B: plain output versus ngram, draft2b and both (2026-11-18)
 
 Host: i7-8086K + RTX 4060 Ti (8,188 MiB), driver 617.42, Windows, CuPy 14.2.0, CUDA runtime
-12090. Target: `bonsai-27b` on `D:/kindi-27b/packs/bonsai-27b`, source sha256
+12090. Target: `bonsai-27b` on `<kindi-model-root>/kindi-27b/packs/bonsai-27b`, source sha256
 `53107f53...`, Hadamard block 1024. Drafter: `~/.kindi/packs/bonsai-2b`, source sha256
 `36061ad4...`, plus the registered `kindi-mtp-2b-v1.npz` head (sha256 `1b5c0c79...`).
 
@@ -14,7 +14,7 @@ settings, then compares the generated token ids and the decoded output bytes.
 
 ```sh
 python tools/spec_ab.py \
-  --pack D:/kindi-27b/packs/bonsai-27b \
+  --pack <kindi-model-root>/kindi-27b/packs/bonsai-27b \
   --drafter ~/.kindi/packs/bonsai-2b \
   --head ~/.kindi/models/kindi-mtp-2b-v1.npz \
   --json docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-27b-spec-ab/results.json

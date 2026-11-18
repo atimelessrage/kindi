@@ -118,7 +118,7 @@ machine's own setup is untouched:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1 `
   -AppName KindiInstallerTest -Distro KindiInstallerTest `
-  -DistroDir 'S:\KindiInstallerTest\wsl' `
+  -DistroDir '<wsl-root>\wsl' `
   -DockerMode skip -NoBridge -NoDesktopShortcut -Yes -LinuxArgs '--dry-run'
 ```
 
@@ -130,7 +130,7 @@ image, the distribution, systemd, the GPU check, the Windows items) ran for real
 |---|---|
 | PC check | Windows 10 Pro build 19045 x86-64, virtualization on, 12 threads, 32 GB RAM, 22 GB free on `S:`, RTX 4060 Ti on driver 617.42, no proxy, WSL2 on; noted that 22 GB is under the 15-40 GB guidance and that Docker setup was skipped |
 | Ubuntu image | downloaded from `cloud-images.ubuntu.com/wsl/releases/24.04/current`, **sha256 `8251e27f…` matched Canonical's SHA256SUMS**, then deleted from the cache |
-| distribution | `wsl --import KindiInstallerTest S:\KindiInstallerTest\wsl` (WSL2), a Linux user named after the Windows account, `systemd=on` and that user as the default written to `/etc/wsl.conf`, distro restarted (other distributions kept running) |
+| distribution | `wsl --import KindiInstallerTest <wsl-root>\wsl` (WSL2), a Linux user named after the Windows account, `systemd=on` and that user as the default written to `/etc/wsl.conf`, distro restarted (other distributions kept running) |
 | resources | WSL memory 16 GB of 32 (the script says `-WslMemoryGB 24` is the way to raise it) |
 | GPU in WSL | `nvidia-smi -L` inside the distribution: `GPU 0: NVIDIA GeForce RTX 4060 Ti (UUID: GPU-78de4e15…)` — the Windows driver reaches WSL2 as documented |
 | Linux installer | the *published* `install.sh` reports **0.6.1**, checked the machine (GPU 0 sm_89, 8188 MiB), listed the supported setups and picked setup 1 (27B on GPU 0, context 65536, profile `pascal8`, `kindi` container on port 8093), then stopped at its own `--dry-run` before building the image |
@@ -141,7 +141,7 @@ Where it wrote, and nowhere else:
 
 | location | contents |
 |---|---|
-| `S:\KindiInstallerTest\wsl\ext4.vhdx` | the distribution's disk, 1.3 GB after provisioning |
+| `<wsl-root>\ext4.vhdx` | the distribution's disk, 1.3 GB after provisioning |
 | `%LOCALAPPDATA%\KindiInstallerTest\` | `state.json` (172 B: distro, `createdDistro`, `dockerMode`, user, `bridge: false`), `install.log` (the transcript, 3.8 KB), a copy of `install.ps1`, `kindi-console.ps1`, empty `download\` cache, `wsl-scripts\`; 85 KB total |
 | `%APPDATA%\Microsoft\Windows\Start Menu\Programs\KindiInstallerTest\` | the three shortcuts (1.2-1.7 KB each) |
 | `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\KindiInstallerTest` | `DisplayName KindiInstallerTest (WSL2)`, `DisplayVersion 0.6.0`, `InstallLocation` = the state folder, `UninstallString` = `install.ps1 -Uninstall -AppName … -Distro …` |
