@@ -2,6 +2,9 @@
 """The standalone DSV4.1 server caps a request body before parsing, like `kindi.server`."""
 import io
 import json
+import socket
+import threading
+from http.server import ThreadingHTTPServer
 
 import pytest
 
@@ -90,3 +93,64 @@ def test_the_error_response_announces_the_close():
     h._json(413, {"error": {"message": "too large"}})
     assert ("status", 413) in sent
     assert ("Connection", "close") in sent
+
+
+class _SocketEngine:
+    class model:
+        ctx = 1024
+
+        class tok:
+            @staticmethod
+            def encode(text):
+                return list(text.encode())
+
+    class a:
+        api_key = ""
+
+
+def _post(body):
+    return (b"POST /v1/tokenize HTTP/1.1\r\nHost: test\r\nContent-Type: application/json\r\n"
+            b"Connection: keep-alive\r\nContent-Length: " + str(len(body)).encode() +
+            b"\r\n\r\n" + body)
+
+
+def test_an_oversized_body_does_not_hide_the_413_or_leak_into_the_next_request(monkeypatch):
+    """A real socket: 1 MiB declared against a small test cap, then a valid pipelined request.
+
+    Closing with that unread body used to reset the connection before the client read the 413
+    (zero bytes on Windows). The response must arrive, the connection must close, and the valid
+    request must not be served on the same socket.
+    """
+    cap = 64
+    real = dsv41_server.read_json_body
+    monkeypatch.setattr(dsv41_server, "read_json_body",
+                        lambda headers, rfile: real(headers, rfile, limit=cap))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dsv41_server.make_handler(_SocketEngine()))
+    server.daemon_threads = True
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    sock = None
+    try:
+        host, port = server.server_address
+        sock = socket.create_connection((host, port), timeout=5)
+        sock.sendall(_post(b"x" * (1 << 20)) + _post(b'{"content":"ok"}'))
+        raw = b""
+        try:
+            while True:
+                chunk = sock.recv(65536)
+                if not chunk:
+                    break
+                raw += chunk
+        except ConnectionError:
+            pass
+        assert b"HTTP/1.1 413" in raw, raw[:200]
+        assert b'"type": "request_too_large"' in raw
+        assert b"Connection: close" in raw
+        assert raw.count(b"HTTP/1.1 ") == 1, raw[:400]
+        assert b'"count"' not in raw
+    finally:
+        if sock is not None:
+            sock.close()
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)

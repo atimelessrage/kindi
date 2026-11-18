@@ -22,13 +22,13 @@ limitation, with what would close it; **owner** = needs an action this environme
 | R1 | cold pointer table can carry stale entries | **closed in code, GPU gate open** | a routed expert's slot is never evicted (`cold_experts.cold_slot_plan` + tests), and the prompt path uses separate `tcp`/`tsp` staging tables, so decode and prompt pointers cannot overwrite each other. Still needs the cold/warm/forced-eviction token check on a card. |
 | R2 | two levels of proof in one tree | **open, documented** | `docs/ROADMAP.md`, `CURRENT-VS-KINDI-0.6.md` and the open gates in `AGENTS.md` say which paths have measured evidence; the claims gate now runs in CI. |
 | R3 | AGENTS.md "Current state" is one very long bullet | **open** | generated/sectioned handoff is a follow-up; `tests/test_agents_handoff.py` only checks the mechanical HEAD/table parts. |
-| R4 | a second HTTP stack (`dsv41_server`) | **partly closed** | body size cap, 413/400 shapes and parse-error handling now match `kindi/server.py` (2026-11-18); unifying the two servers remains a design decision. |
+| R4 | a second HTTP stack (`dsv41_server`) | **partly closed** | body size cap, 413/400 shapes and parse-error handling now match `kindi/server.py` (2026-11-18); its body-error close is now orderly, and a real-socket test pins the 413 before a pipelined valid request. Unifying the two servers remains a design decision. |
 | M1-M3 | CI gates, one dispatch point, coverage floors | **closed** | see C1, C2/C3, C4. |
 | M4 | cold-tier hardware gate | **owner/hardware** | larger-than-RAM Lightning pack, `kindi verify` 4/4, decode tok/s against the mmap-fault path and flash MiB/token; R1/C9 checks belong in the same run. |
 | M5 | history-exposure decision | **owner** | rewrite the 128 baseline rows or publish with them and say so; the old -> new hash mapping of the 33 re-hashed commits is not recorded in the tree. |
 | M6 | lint, type check, dependency scan | **lint/type closed, dependency scan open** | `tools/check_python_quality.py` ratchets Ruff 0.16.0 (`F`, `E9`, `B`, `I`) over the Python tree and mypy 2.4.0 over first-party production code. Baseline: **334 Ruff findings / 59 mypy errors**, recorded per file and rule/code in `tools/python_quality_baseline.json`; CI runs the gate and `tests/test_python_quality.py` pins the comparison. Existing debt is intentionally tolerated, not fixed. Dependency scanning is still open. |
 | M7 | GPU CI runner | **owner** | steps are in `docs/CI.md` §5.1. |
-| M8 | DSV4.1 server parity, lint/type/deps | **body cap and lint/type closed, dependency scan open** | `KINDI_MAX_BODY_MB` (16 MiB default), 413 `request_too_large`, and 400 on malformed JSON are pinned by `tests/test_dsv41_server.py`; lint/type use the M6 ratchet. Dependency scanning/pins remain open. |
+| M8 | DSV4.1 server parity, lint/type/deps | **body cap and lint/type closed, dependency scan open** | `KINDI_MAX_BODY_MB` (16 MiB default), 413 `request_too_large`, 400 on malformed JSON and the socket-level close are pinned by `tests/test_dsv41_server.py`; lint/type use the M6 ratchet. Dependency scanning/pins remain open. |
 
 ## Changed in this triage (2026-11-18)
 
@@ -42,9 +42,11 @@ limitation, with what would close it; **owner** = needs an action this environme
 - Lesson L-0010 records the cache-ownership mistake; `docs/MOE-TANDEM.md` and
   `docs/EXTERNAL-ENGINES.md` describe the slot cache and the still-open C9 bound.
 
-- `kindi/dsv41_server.py` now closes the HTTP/1.1 connection after an over-cap or unparseable body;
-  the refused bytes must not be parsed as the next request on a reused socket. The 413/400 tests pin
-  the close flag and `Connection: close`.
+- `kindi/dsv41_server.py` now half-closes the response direction and drains a bounded prefix after
+  an over-cap or unparseable body before the final close; the refused bytes must not be parsed as
+  the next request, and unread bytes must not turn the response into a TCP reset. A real-socket test
+  sends an oversized body followed by a valid request and pins one 413, `Connection: close` and no
+  second response.
 - The optional Bridge has a dependency-free smoke suite and CI job; its missing-directory path now
   raises `ValueError` rather than leaking `FileNotFoundError` from `Path.resolve(strict=True)`.
 - The forward-slash drive-root gap is closed for current-facing files (tracked docs/evidence plus

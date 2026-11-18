@@ -34,8 +34,11 @@
   413 `request_too_large` before reading it, and returns 400 for a malformed length or JSON (the
   warm endpoint used to answer a parse failure with 500). `tests/test_dsv41_server.py` pins the
   helper, the exact-cap boundary and both handler responses. A body error also closes the HTTP/1.1
-  connection now: the refused body was not read, so reusing the socket would parse its bytes as the
-  next request. The tests pin the close flag and the `Connection: close` response header.
+  connection: the refused body was not read, so reusing the socket would parse its bytes as the
+  next request. The close now half-closes the response direction and drains a bounded prefix of the
+  refused bytes before the final close, so the 413/400 cannot be lost to a TCP reset; a socket-level
+  test sends a 1 MiB body against a small test cap followed by a valid request and pins one 413,
+  `Connection: close`, and no second response.
 - **The optional Bridge component has a runnable smoke suite and CI job** — `bridge/tests` now
   covers duration/time parsing, the SQLite settings/agent store, agent status and the documented
   jobs parser with only the standard library. `bridge/README.md` no longer claims the full

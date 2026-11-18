@@ -1215,3 +1215,9 @@ file points here.
   as external Apple-Silicon quantizations, not llama.cpp/NVIDIA artifacts or Q0 shortcuts, and
   keeps the pinned-GGUF Q0 gate in front of any asymmetric-precision experiment
   (`docs/ROADMAP.md`).
+
+### DSV4.1 413 close lease (2026-11-18)
+
+| task | worktree | branch | shared files | state |
+|---|---|---|---|---|
+| DSV4.1 413 close | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/dsv41_server.py`, `tests/test_dsv41_server.py`, `AGENTS.md`, `CHANGELOG.md`, `docs/development/AUDIT-TRIAGE-2026-11-18.md`, `docs/development/AGENTS-HISTORY.md` | done at `b16d8f5`+. The 413/400 body-error path now half-closes and drains a bounded prefix before the final close, so a refused body plus a pipelined valid request cannot reset the connection before the error is read. `tests/test_dsv41_server.py` **9 passed** (1 MiB body against a 64-byte test cap followed by a valid request); quality 334/59 baseline; docs/handoff **7 passed**; `project_memory --check`, `git diff --check`; real 16 MiB-cap socket run one 413 and no second response. No full-suite or GPU run. |

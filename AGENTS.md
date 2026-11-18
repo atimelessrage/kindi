@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `df6cdc8` on `freebuff/tandem-cpu-recovery` (**main** is fast-forwarded to this branch at handoff; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `b16d8f5` on `freebuff/tandem-cpu-recovery` (**main** is fast-forwarded to this branch at handoff; guarded by `tests/test_agents_handoff.py`).
 
 ### Python quality ratchet
 
@@ -35,8 +35,9 @@ post-request guard: a `drafting.last` block with `method="ngram"` raises
 
 ### Audit follow-up
 
-The 2026-11-18 audit follow-up moved local machine roots out of tracked docs/evidence and benchmark logs, closed the DSV4.1 body-error keep-alive path, added a
-Bridge smoke suite plus CI job, and pinned every workflow's actions.
+The 2026-11-18 audit follow-up moved local machine roots out of tracked docs/evidence and benchmark logs, closed the DSV4.1 body-error keep-alive path (the
+413 now half-closes and drains a bounded prefix before closing; a socket-level test sends an oversized body followed by a valid request), added a Bridge smoke
+suite plus CI job, and pinned every workflow's actions.
 
 ### Full CPU gate
 
@@ -230,8 +231,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `df6cdc8` | main checkout; clean; fast-forwarded to this branch |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `df6cdc8` | this session; checked out here |
+| `T:/kindi` | `main` | `b16d8f5` | main checkout; clean; fast-forwarded to this branch |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `b16d8f5` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.

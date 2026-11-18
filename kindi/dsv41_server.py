@@ -79,6 +79,10 @@ except (TypeError, ValueError):
 if MAX_BODY_MB < 1:
     raise SystemExit("kindi.dsv41_server: KINDI_MAX_BODY_MB must be at least 1 (got %d)" % MAX_BODY_MB)
 MAX_BODY_BYTES = MAX_BODY_MB << 20
+# A body error closes the connection. Drain only this much of the refused request (plus any
+# pipelined bytes) before the final close: enough to keep the 413/400 from turning into a TCP
+# reset, while a multi-gigabyte Content-Length cannot hold the handler open indefinitely.
+CLOSE_DRAIN_BYTES = MAX_BODY_BYTES + (64 << 10)
 
 
 class BodyTooLarge(ValueError):
@@ -959,6 +963,8 @@ def make_handler(E):
 
         def _json(self, code, obj):
             b = json.dumps(obj).encode()
+            if getattr(self, "_body_error", False):
+                self.close_connection = True
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(b)))
@@ -968,6 +974,8 @@ def make_handler(E):
                 self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(b)
+            if getattr(self, "_body_error", False):
+                self._close_body_error()
 
         def _err(self, code, msg, typ="invalid_request_error"):
             self._json(code, {"error": {"message": msg, "type": typ, "code": typ}})
@@ -977,7 +985,38 @@ def make_handler(E):
                                        "code": "context_length_exceeded"}})
 
         def _body(self):
-            return read_json_body(self.headers, self.rfile)
+            try:
+                return read_json_body(self.headers, self.rfile)
+            except Exception:
+                self._body_error = True
+                raise
+
+        def _close_body_error(self):
+            """Half-close after the error, then discard a bounded prefix before the socket closes.
+
+            A plain close with the refused body still in the receive buffer can reset the
+            connection before the client reads the 413/400. SHUT_WR delivers the response first;
+            draining what the peer already sent (including a pipelined next request) makes the
+            final close orderly without trusting a declared length that is over the cap.
+            """
+            try:
+                self.wfile.flush()
+                self.connection.shutdown(socket.SHUT_WR)
+            except (AttributeError, OSError):
+                return
+            limit = CLOSE_DRAIN_BYTES
+            try:
+                self.connection.settimeout(0.1)
+            except (AttributeError, OSError):
+                return
+            while limit > 0:
+                try:
+                    chunk = self.rfile.read1(min(65536, limit))
+                except (AttributeError, OSError, ValueError):
+                    break
+                if not chunk:
+                    break
+                limit -= len(chunk)
 
         def _tokenize(self):
             try:
