@@ -290,18 +290,37 @@ Q0-ineligible.
 
 **Qwen3.6-35B-A3B ternary community builds (external, checked 2026-11-17):** the official model
 uses the `qwen35moe` architecture, and these are real third-party quantizations, but they are not
-Q0 artifacts.
-[russellwmy/qwen3.6-35b-a3b-ternary](https://huggingface.co/russellwmy/qwen3.6-35b-a3b-ternary) stores 9.1 GB of 2-bit ternary expert codes plus 2.3 GB of
-the rest and runs only through ironbark on Apple Silicon; its card says it is not loadable by
-`transformers` or MLX-LM. [manjunathshiva/Qwen3.6-35B-A3B-tq3a-tqTe-down4-g64](https://huggingface.co/manjunathshiva/Qwen3.6-35B-A3B-tq3a-tqTe-down4-g64) is 12.6 GB of
-3-bit attention, ternary gate/up experts and 4-bit down experts in the TurboQuant-MLX format,
-also Apple Silicon only. The cards report a 9.4 GB pure-ternary sibling and a quality split on
-one agentic task (0/4 pure ternary, 3/3 asymmetric down4), which is a hypothesis about asymmetric
-expert precision, not a Kindi measurement. Neither file is a llama.cpp-compatible GGUF or has an
-NVIDIA kernel path, so neither replaces the pinned-GGUF Q0 gate or gives this repository a 16 GB
-fit today. A later, separate experiment may test ternary gate/up plus a higher-bit down
-projection, but only after a byte-pinned GGUF export (or a converter with bit-level dequant
-tests) and a token-exact `kindi verify` plus the existing KLD/PPL quality gate.
+Q0 artifacts. Both are listed in the [ternary-MoE census](#ternary-moe-census-2026-11-18), which
+records their formats and why neither is a llama.cpp-compatible candidate yet.
+[russellwmy/qwen3.6-35b-a3b-ternary](#ternary-moe-census-2026-11-18) stores 9.1 GB of 2-bit
+ternary expert codes plus 2.3 GB of the rest and runs only through ironbark on Apple Silicon; its
+card says it is not loadable by `transformers` or MLX-LM.
+[manjunathshiva/Qwen3.6-35B-A3B-tq3a-tqTe-down4-g64](#ternary-moe-census-2026-11-18) is 12.6 GB
+of 3-bit attention, ternary gate/up experts and 4-bit down experts in the TurboQuant-MLX format,
+also Apple Silicon only. Its card reports a separate 9.4 GB pure-ternary sibling and a quality
+split on one agentic task (0/4 pure ternary, 3/3 asymmetric down4), which is a hypothesis about
+asymmetric expert precision, not a Kindi measurement. Neither file replaces the pinned-GGUF Q0 gate or gives
+this repository a 16 GB fit today. A later, separate experiment may test ternary gate/up plus a
+higher-bit down projection, but only after a byte-pinned GGUF export (or a converter with
+bit-level dequant tests) and a token-exact `kindi verify` plus the existing KLD/PPL quality gate.
+
+### Ternary-MoE census (2026-11-18)
+
+The two ternary MoE builds reviewed so far both target `qwen35moe`. "llama.cpp-compatible
+candidate" below means a file with a standard GGUF `general.architecture = qwen35moe` tensor
+layout that upstream llama.cpp can load and that can be pinned for the Q0 reference gate; neither
+qualifies.
+
+| build | contents | format and runtime | why it cannot count as a llama.cpp candidate yet |
+|---|---|---|---|
+| [russellwmy/qwen3.6-35b-a3b-ternary](https://huggingface.co/russellwmy/qwen3.6-35b-a3b-ternary) | 9.1 GB of 2-bit ternary expert codes plus 2.3 GB of the rest; a bundle, not a runnable checkpoint | ironbark pack for Apple Silicon; its card says it is not loadable by `transformers`, `mlx-lm` or `mlx-vlm` | custom safetensors bundle and ironbark trit-pack format, not GGUF; no `qwen35moe` tensor inventory; no byte-level dequant/export test here; no upstream llama.cpp loader or NVIDIA kernel path; no pinned llama.cpp reference or token-exact `kindi verify` |
+| [manjunathshiva/Qwen3.6-35B-A3B-tq3a-tqTe-down4-g64](https://huggingface.co/manjunathshiva/Qwen3.6-35B-A3B-tq3a-tqTe-down4-g64) | 12.6 GB: 3-bit attention, ternary gate/up experts and 4-bit down experts; its separate pure-ternary sibling is 9.4 GB | TurboQuant-MLX safetensors for Apple Silicon | not GGUF; the mixed 3-bit/ternary/4-bit expert layout needs a converter with bit-level dequant tests (none in this repository); no upstream llama.cpp loader or NVIDIA path; the 0/4 vs 3/3 quality split is one agentic task, not a token-exact reference |
+
+Both stay out of the Q0 candidate set until one of two things exists: a byte-pinned standard GGUF
+with the `qwen35moe` tensor inventory, or a converter whose dequant is tested bit-for-bit. Either
+route then needs the same token-exact `kindi verify` against the pinned llama.cpp reference and the
+existing KLD/PPL gate. The 16 GB route above uses the ordinary Unsloth `UD-IQ2`/`UD-IQ3` GGUFs;
+neither Apple-only bundle changes that.
 
 **Not an MoE (local Ollama candidate):** Granite 4.1 30B (`granite`, 64 blocks,
 131,072 context) is a dense 30B GGUF, so it is not part of the small-MoE recognition table.
