@@ -204,6 +204,45 @@ def test_prefetch_queue_serves_later_demand_without_another_read(tmp_path):
         reader.close()
 
 
+def test_prefetch_queue_evicts_oldest_and_duplicate_prefetches_do_not_reread(tmp_path):
+    """A duplicate prefetch is free; overflowing the byte limit drops the oldest span."""
+    path, data = _file(tmp_path)
+    spans = [(0, 16), (4096, 16), (8192, 16)]
+    reader = cold_experts.ColdExpertReader(path, coalesce=0, prefetch_bytes=32)
+    try:
+        assert reader.prefetch([spans[0]]) == 1
+        assert reader.prefetch([spans[1]]) == 1
+        before = reader.stats()
+        assert before["prefetch_cached_bytes"] == 32
+        assert before["reads"] == 2
+
+        # Re-requesting both queued spans, including a duplicate in one call, reads nothing.
+        assert reader.prefetch([spans[0], spans[1], spans[0]]) == 0
+        after = reader.stats()
+        assert after["reads"] == before["reads"]
+        assert after["prefetch_requests"] == before["prefetch_requests"]
+        assert after["prefetched_bytes"] == before["prefetched_bytes"]
+        assert after["prefetch_cached_bytes"] == 32
+
+        # A third span fits only by evicting the oldest one (spans[0]).
+        assert reader.prefetch([spans[2]]) == 1
+        assert reader.stats()["prefetch_cached_bytes"] == 32
+        assert reader.stats()["reads"] == 3
+
+        # The evicted span goes back to the file; the two newer spans do not.
+        reads = reader.stats()["reads"]
+        assert reader.read_many([spans[0]]) == [data[0:16]]
+        assert reader.stats()["reads"] == reads + 1
+        reads = reader.stats()["reads"]
+        assert reader.read_many([spans[1], spans[2]]) == [data[4096:4112], data[8192:8208]]
+        final = reader.stats()
+        assert final["reads"] == reads
+        assert final["prefetch_hits"] == 2
+        assert final["prefetch_cached_bytes"] == 0
+    finally:
+        reader.close()
+
+
 def test_a_gap_larger_than_the_coalesce_window_is_not_read(tmp_path):
     path, data = _file(tmp_path)
     spans = [(0, 16), (2 * 4096, 16)]
