@@ -216,6 +216,9 @@ def test_nanbeige_generate_feeds_each_token_at_its_own_position():
     tokens = [e.token_id for e in events if e.kind == "token"]
     assert tokens == [100, 101, 101]
     assert events[-1].kind == "done"
+    # the adapter's contract is non-drafting: its capabilities and done event must agree
+    assert NanbeigeBackend.capabilities.supports_speculation is False
+    assert events[-1].drafted == 0 and events[-1].accepted == 0
     # prefill occupies 0..2; generated tokens are fed at 3, 4, 5
     assert backend.engine.calls == [
         ("prefill", [10, 11, 12], 0),

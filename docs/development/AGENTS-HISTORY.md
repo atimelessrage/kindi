@@ -1251,3 +1251,9 @@ file points here.
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
 | Final full CPU gate (2026-11-18) | this worktree | `freebuff/tandem-cpu-recovery` | `AGENTS.md`, `docs/development/AGENTS-HISTORY.md` | done. `python -m pytest -q` at `539a504` (`main` == HEAD, both worktrees clean) is **1,241 passed, 28 skipped, 0 failed** in 227.62 s, exit 0; one CuPy warning about an undetected CUDA path, no failures to fix. Plain run, no coverage plugin (`pytest-cov` hangs on this host); the 1,231 / 46.2% coverage run stays recorded above and in `tests/README.md`. No GPU, model pack or larger-than-RAM run. |
+
+### Nanbeige gateway is non-drafting (2026-11-18)
+
+| task | worktree | branch | shared files | state |
+|---|---|---|---|---|
+| C2 follow-up: Nanbeige non-drafting gateway (2026-11-18) | this worktree | `freebuff/tandem-cpu-recovery` | `kindi/{backends/nanbeige,nanbeige,nanbeige_cli,nanbeige_gen,engine,verify,bench}.py`, `tests/{test_served_engines.py,backends/test_registry.py}`, `AGENTS.md`, `CHANGELOG.md`, `docs/{CONFIGURATION.md,BACKENDS.md}`, `docs/development/{AUDIT-TRIAGE-2026-11-18.md,AGENTS-HISTORY.md}` | done. Corrects the previous row's decision: the registry gateway is a non-drafting path, so it does not load the serve-only `mtp_head`, and `make_engine` no longer accepts the key. `nanbeige_gen.NanbeigeBackend` alone loads the head and drafts with `lookup` + head; `nanbeige_cli._engine` (verify/bench) builds the base engine. `supports_speculation=False` already matched the adapter's `drafted=0`/`accepted=0` done event and now matches the loaded state too. `tests/test_served_engines.py` pins that only serve attaches the head and that `make_engine` has no `mtp_head` parameter; `tests/backends/test_registry.py` pins the zero-draft event and the capability. C2's evidence is narrowed to the shared base engine. Checks: focused **128 passed**, `compileall`, `git diff --check`. No GPU run. |

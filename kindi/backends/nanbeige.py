@@ -11,6 +11,12 @@ to the legacy builder (which has no Nanbeige branch, so Nanbeige serve still
 needs the adapter to load anything at all). The engine object is the same
 class the legacy path built, so serve/verify/bench keep their numbers.
 
+This adapter is the non-drafting gateway path: ``generate()`` runs one token per
+step and reports ``drafted=0``/``accepted=0``, and ``supports_speculation`` is
+False. The server's draft sources (``lookup`` and ``mtp_head``) belong to
+``nanbeige_gen.NanbeigeBackend``'s check-pass loop, so this adapter does not load
+them; `kindi verify`/`bench`, which build the same base engine, do not either.
+
 A pack is optional at ``load`` time: without one the backend stays unloaded
 (no GPU touched), so the contract tests can exercise lifecycle/info without
 a model. Tokenize/generate raise BackendUnavailable until a pack loads.
@@ -66,7 +72,6 @@ class NanbeigeBackend(Backend):
         self.tok = None
         self.man = None
         self.pack = None
-        self.mtp = False
         self.ctx = 0
         self.stop_ids = set()
         self.log = print
@@ -88,7 +93,7 @@ class NanbeigeBackend(Backend):
             raise registry.BackendUnavailable("no Nanbeige pack directory at %r" % (pack,))
 
         from ..gguf import GGUF
-        from ..nanbeige import Engine, attach_mtp
+        from ..nanbeige import Engine
         from ..spm import SPM
 
         self.pack = pack
@@ -99,8 +104,6 @@ class NanbeigeBackend(Backend):
             self.man["model_path"], ctx=self.ctx,
             kv=config.get("kv_cache"), log=self.log,
         )
-        # the config's draft head is engine state: serve loads it, so this path must too
-        self.mtp = attach_mtp(self.engine, config, self.log)
         self.tok = SPM(GGUF(self.man["model_path"]).kv)
         # every control token ends the turn, as llama.cpp's end-of-generation
         # set does (same rule as nanbeige_gen.NanbeigeBackend)
@@ -115,7 +118,6 @@ class NanbeigeBackend(Backend):
         self.tok = None
         self.man = None
         self.pack = None
-        self.mtp = False
         self.loaded = False
 
     def info(self):
@@ -130,7 +132,6 @@ class NanbeigeBackend(Backend):
             out["model"] = str((self.man or {}).get("model") or "")
             out["vocab"] = len(self.tok.tokens) if self.tok else 0
             out["ctx"] = self.ctx
-            out["mtp"] = bool(self.mtp)
         return out
 
     def reference_gguf(self):

@@ -143,7 +143,9 @@ ids or GGUF architectures it serves instead of relying on an engine path.
   is ported 2026-11-16, but its GPU gate is blocked: the catalog's ahtx GGUF is
   corrupt as served by Hugging Face (SHA mismatch, garbled tensor infos), so
   no verify/bench parity is claimed; the owner action is in
-  `docs/MANUAL-HELP-NEEDED.md`. The Lightning adapter
+  `docs/MANUAL-HELP-NEEDED.md`. Its `generate()` is deliberately non-drafting
+  (`supports_speculation=False`, `drafted=0`); the serve wrapper's `lookup`/`mtp_head` draft
+  sources stay in `nanbeige_gen`. The Lightning adapter
   (`kindi/backends/lightning.py`, registered `nemotron-lightning-30b`) is
   ported 2026-11-16 and now GPU-gated on the RTX 4060 Ti with a clean
   catalog download (size/SHA-256/GGUF all match, fresh pack): `kindi verify`

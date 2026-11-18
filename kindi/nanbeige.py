@@ -239,9 +239,9 @@ class Card(object):
 def attach_mtp(eng, cfg, log=print):
     """Load the config's ``mtp_head`` onto ``eng``; True when a head is attached.
 
-    The head is engine state, so every path that builds a Nanbeige engine calls this one
-    helper: the serve wrapper, the ``kindi_nanbeige`` verify/bench builder and the registry
-    gateway. A path that skips it runs the same pack with a different draft source (C2).
+    The serve wrapper's generation loop is the only caller: it drafts with this head and the
+    ``lookup`` source. The registry gateway and verify/bench build the non-drafting base
+    engine, so they do not load a head they never use (C2).
     """
     hp = os.path.expanduser((cfg or {}).get("mtp_head") or "")
     if not hp:

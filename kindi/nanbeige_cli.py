@@ -41,10 +41,10 @@ def convert(g, gguf_path, out_dir, version, pack_format, sha256, log=print):
 
 
 def _engine(cfg, man, ctx, log):
-    from .nanbeige import Engine, attach_mtp
-    eng = Engine(man["model_path"], ctx=ctx, kv=(cfg or {}).get("kv_cache"), log=log)
-    attach_mtp(eng, cfg, log)        # the same head `kindi serve` loads for this pack
-    return eng
+    # the non-drafting base engine: the server's draft sources (`lookup`, `mtp_head`)
+    # stay in nanbeige_gen, so verify/bench do not load a head they never use
+    from .nanbeige import Engine
+    return Engine(man["model_path"], ctx=ctx, kv=(cfg or {}).get("kv_cache"), log=log)
 
 
 def _reference(here, man, kv):

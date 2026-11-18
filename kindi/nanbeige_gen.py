@@ -153,8 +153,8 @@ class NanbeigeBackend(object):
         # prompt-lookup drafting (config key lookup): up to this many drafted tokens per check pass, 0: off
         self.lookup = max(0, min(7, int(cfg.get("lookup") or 0)))
         self.lk_stats = [0] * 6     # this request: check passes, drafted tokens, kept tokens (lookup; MTP head)
-        # config key mtp_head: an MTP head file, a draft source (the one loader serve,
-        # verify/bench and the engine gateway share)
+        # config key mtp_head: an MTP head file, a serve-only draft source (the gateway and
+        # verify/bench are non-drafting, so this wrapper is the only path that loads it)
         self.mtp = attach_mtp(self.eng, cfg, log)
         if os.environ.get("KINDI_NB_SELFCHECK", "1") != "0":
             self.selfcheck()

@@ -6,6 +6,7 @@ branch; verify/bench use `make_engine` -> the backend registry. These stubs reco
 constructor both paths call, so a wrapper that drifts to another class or loses a config value
 fails here instead of only on the card.
 """
+import inspect
 import json
 
 import pytest
@@ -91,17 +92,20 @@ def test_served_family_engine_matches_the_registry_gateway(tmp_path, monkeypatch
     cfg = {"pack": str(pack), "ctx": 2048, "kv_cache": "q8_0", "head": "exact",
            "mtp_head": str(head)}
     server.Kindi(cfg, log=LOG)
-    engine_mod.make_engine(str(pack), ctx=2048, kv_cache=cfg["kv_cache"],
-                           mtp_head=cfg["mtp_head"], log=LOG)
+    engine_mod.make_engine(str(pack), ctx=2048, kv_cache=cfg["kv_cache"], log=LOG)
 
     assert len(calls) == 2
     assert calls[0] == calls[1], "serve and the registry gateway built different engines"
-    assert heads == ([str(head)] * 2 if family == "kindi_nanbeige" else [])
+    # the draft head is a serve-only source; the gateway is a non-drafting path
+    assert heads == ([str(head)] if family == "kindi_nanbeige" else [])
 
 
-def test_the_nanbeige_mtp_head_reaches_serve_verify_bench_and_the_gateway(tmp_path, monkeypatch):
-    """`kindi verify`/`kindi bench` build this family in `nanbeige_cli`, not through
-    `make_engine`, so the head has to be attached there too or the three paths differ again."""
+def test_the_nanbeige_draft_sources_stay_in_the_serve_wrapper(tmp_path, monkeypatch):
+    """The registry gateway is a non-drafting path: only serve loads `mtp_head` and uses `lookup`.
+
+    A head the adapter's one-token-per-step `generate()` never drafts with would cost VRAM and
+    imply a capability the contract denies, so the gateway and the verify/bench builder stay on
+    the base engine and this test pins that split."""
     pack = tmp_path / "pack"
     pack.mkdir()
     manifest = {"backend": "kindi_nanbeige", "model_path": str(tmp_path / "model.gguf")}
@@ -114,16 +118,20 @@ def test_the_nanbeige_mtp_head_reaches_serve_verify_bench_and_the_gateway(tmp_pa
     monkeypatch.setattr("kindi.spm.SPM", _FakeSPM)
     monkeypatch.setattr("kindi.nanbeige.Engine", _record_engine(calls, heads))
 
-    cfg = {"pack": str(pack), "ctx": 2048, "kv_cache": "q8_0", "mtp_head": str(head)}
-    server.Kindi(cfg, log=LOG)                                             # serve
-    engine_mod.make_engine(str(pack), ctx=2048, kv_cache=cfg["kv_cache"],
-                           mtp_head=cfg["mtp_head"], log=LOG)              # the gateway
+    cfg = {"pack": str(pack), "ctx": 2048, "kv_cache": "q8_0", "mtp_head": str(head),
+           "lookup": 3}
+    kindi = server.Kindi(cfg, log=LOG)                                     # serve
+    engine_mod.make_engine(str(pack), ctx=2048, kv_cache=cfg["kv_cache"], log=LOG)  # gateway
     from kindi import nanbeige_cli
     nanbeige_cli._engine(cfg, manifest, 2048, LOG)                         # verify / bench
 
     assert len(calls) == 3
     assert calls[0] == calls[1] == calls[2]
-    assert heads == [str(head)] * 3
+    assert heads == [str(head)], "only the serve wrapper may load a draft head"
+    assert kindi.nanbeige.mtp is True
+    from kindi.backends.nanbeige import NanbeigeBackend
+    assert NanbeigeBackend.capabilities.supports_speculation is False
+    assert "mtp_head" not in inspect.signature(engine_mod.make_engine).parameters
 
 
 def test_a_missing_nanbeige_mtp_head_is_one_warning_not_a_failure(tmp_path, monkeypatch):

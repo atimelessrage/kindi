@@ -737,7 +737,7 @@ def adapter_model_id(man):
 
 
 def make_engine(pack, ctx=4096, clusters=None, log=print, tandem="off", cpu_layers=None, gpu=None,
-                kv_cache=None, mtp_head=None):
+                kv_cache=None):
     """Engine on one GPU (or the tandem engine): the T4.2 gateway.
 
     A pack whose manifest names a family resolves through that family's adapter in the backend
@@ -752,9 +752,9 @@ def make_engine(pack, ctx=4096, clusters=None, log=print, tandem="off", cpu_laye
     pack took: a dense pack whose own adapter does not claim it (a placeholder `model`, the "Hf"
     27B case) is the one fallback that stays valid but must be visible.
 
-    ``kv_cache`` and ``mtp_head`` are config values the family adapters need (``mtp_head`` is
-    Nanbeige's draft head), so a caller such as verify/bench builds the engine `kindi serve`
-    would build for the same pack.
+    ``kv_cache`` is a config value the family adapters need, so a caller such as verify/bench
+    builds the base engine `kindi serve` would build for the same pack. The server's draft
+    sources (``lookup``, ``mtp_head``) are not gateway inputs: this path does not draft.
     """
     man = None
     try:
@@ -793,7 +793,7 @@ def make_engine(pack, ctx=4096, clusters=None, log=print, tandem="off", cpu_laye
                 model_id,
                 config=dict(
                     pack=pack, ctx=ctx, clusters=clusters, log=log, tandem=tandem,
-                    cpu_layers=cpu_layers, gpu=gpu, kv_cache=kv_cache, mtp_head=mtp_head,
+                    cpu_layers=cpu_layers, gpu=gpu, kv_cache=kv_cache,
                 ),
             )
             log("kindi: %s -> the %s backend (%s)" % (pack, backend.capabilities.name, model_id))

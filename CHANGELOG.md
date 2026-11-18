@@ -267,15 +267,14 @@
   gateway now forwards `kv_cache` from verify, bench and calibrate, and
   `tests/test_served_engines.py` records the engine constructor from both paths for the Nanbeige,
   Lightning and Gemma 4 serve families, so a wrapper cannot drift to another class or argument again.
-- **A configured Nanbeige MTP head is now engine state on every build path** — only the serve
-  wrapper read the `mtp_head` config key; `make_engine`'s Nanbeige adapter and `nanbeige_cli`
-  (which `kindi verify` and `kindi bench` actually use for this family, not the gateway) built the
-  engine without it, so the same pack ran with different draft state and a lower memory footprint
-  outside the server. `kindi.nanbeige.attach_mtp` is now the one loader, called by serve, the
-  verify/bench builder and the adapter; `make_engine` takes `mtp_head` and forwards it, and
-  `tests/test_served_engines.py` records the head load on all three paths plus the one-warning
-  fallback for a missing file. C2's closure claim now covers the head instead of only the
-  constructor arguments.
+- **The Nanbeige gateway path is explicitly non-drafting** — the registry adapter and
+  `nanbeige_cli` (the verify/bench builder) load the base engine only. `mtp_head` and `lookup`
+  are the serve wrapper's draft sources, so a head that the adapter's one-token-per-step
+  `generate()` never drafts with is no longer loaded there, and `make_engine` no longer takes it.
+  `supports_speculation` stays False and now matches the code and tests: the adapter's done event
+  reports `drafted=0`/`accepted=0`, verify/bench do not pass `mtp_head`, and
+  `tests/test_served_engines.py` pins that only serve attaches the head. C2's claim is narrowed to
+  the base engine the paths share; the missing-head warning for serve is unchanged.
 - **`kindi plan`'s follow-up commands survive a spaced path** — the printed `bench` lines formatted
   the interpreter and pack with `%s`, so `C:\Program Files\Python 313\python.exe` or
   `/mnt/my packs/bonsai` split into several arguments when pasted. Both builders now quote the argv
