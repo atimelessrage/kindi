@@ -71,9 +71,24 @@ record is the counts from the server's last-request block, not a fully specified
 shape is consistent with the engine default `KINDI_SPEC_K=4` (four drafts per pass) but not with
 the smoke tool's default `--spec-k 1`, which can draft at most one token per pass. The number of
 requests the session served was also not recorded: `drafting.last` describes one request, not a
-one-request session. This is not a throughput or token-exactness measurement. The smoke tool above
-is the repeatable form of the check; pass `--spec-k 4` to reproduce the drafts-per-pass shape, and
-keep `--log FILE` so the context, pack, head and command are recorded next time.
+one-request session. This is not a throughput or token-exactness measurement.
+
+The smoke tool above is the repeatable form of the check. A repeat at the settings the counts
+imply (`KINDI_SPEC_K=4`) and the tool's default 4,096-token context passed on the same RTX 4060 Ti
+(sm_89), pack `bonsai-2b`, head sha256 `1b5c0c79...`:
+
+```bash
+python tools/mtp_smoke.py \
+  --pack ~/.kindi/packs/bonsai-2b \
+  --head ~/.kindi/models/kindi-mtp-2b-v1.npz \
+  --ctx 4096 --spec-k 4 --max-tokens 16 \
+  --log bench-logs/mtp-smoke/followup-k4-20261118.log
+```
+
+It exited 0 and printed `drafting.last: passes=2 drafted=8 accepted=3`, with
+`kindi_spec_drafted_tokens_total=8` and `kindi_spec_accepted_tokens_total=3`, five completion
+tokens ("Red Blue Green"). The fixed prompt and 16-token cap make this a reproduction of the
+attached-and-drafting path, not of the earlier request's 3/12/8 counts.
 
 ## Measured speed
 
