@@ -91,7 +91,16 @@ first-pass values as the baseline and passed at 48.3/73.3/64.7 against
 
 The baseline now stores the medians, not one run. That makes the gate compare a
 typical pass with a typical pass; the first-pass values sat only 6.6-9.0% above
-the medians and left less headroom than the 10% limit implied.
+the medians and left less headroom than the 10% limit implied. Its provenance
+follows the medians: `started_utc` (`2026-11-17T21:15:21Z`) is the first
+`median-rN` pass, `git_revision` (`cf81a82`) is the revision all three passes
+ran at, and each cell's `duration_s` is the median of its three pass durations.
+That matters because the gate's `comparison.json` copies the baseline's
+`started_utc`/`git_revision` into `baseline_started_utc`/`baseline_git_revision`;
+before this, the receipt paired the medians with the earlier single pass's
+`53003a9`/`17:57:48Z`. The rows' `log` fields still name the first pass's
+verifier transcript; the median passes' raw logs stayed in
+`bench-logs/verify-matrix/27b-spec-median/`.
 
 ## Artifacts
 

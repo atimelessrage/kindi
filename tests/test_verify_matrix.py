@@ -330,8 +330,8 @@ def test_2b_gate_fails_closed_when_the_optional_head_and_pack_are_absent(
 
 def test_27b_drafter_baseline_has_the_three_spec_cells():
     mod = load()
-    baseline = mod.load_baseline(
-        ROOT / "docs" / "benchmarks" / "2026-11-17-i7-8086k-rtx4060ti-27b-drafter" / "verify-baseline.json")
+    page = ROOT / "docs" / "benchmarks" / "2026-11-17-i7-8086k-rtx4060ti-27b-drafter"
+    baseline = mod.load_baseline(page / "verify-baseline.json")
     cells = {(row["model"], row["mode"]): row for row in baseline["results"]}
     assert set(cells) == {("27b", "tc-ngram"), ("27b", "tc-draft2b"), ("27b", "tc-both")}
     for row in cells.values():
@@ -339,6 +339,22 @@ def test_27b_drafter_baseline_has_the_three_spec_cells():
         assert (row["prompts_pass"], row["prompts_tie"], row["prompts_fail"]) == (3, 1, 0)
         assert isinstance(row["tokens_per_second"], (int, float)) and row["tokens_per_second"] > 0
         assert row["spec_requested"] == row["spec_effective"]
+
+    # The throughput is a three-pass median, so the file's identity and durations must name the
+    # median set too: the gate copies started_utc/git_revision into baseline_started_utc/
+    # baseline_git_revision, and results.json is the earlier single pass at another revision.
+    runs = [json.loads((page / ("median-r%d-results.json" % n)).read_text(encoding="utf-8"))
+            for n in (1, 2, 3)]
+    assert [run["git_revision"] for run in runs] == [baseline["git_revision"]] * 3
+    assert baseline["started_utc"] == runs[0]["started_utc"]
+    for key, row in cells.items():
+        measured = [next(r for r in run["results"] if (r["model"], r["mode"]) == key)
+                    for run in runs]
+        assert row["tokens_per_second"] == sorted(r["tokens_per_second"] for r in measured)[1]
+        assert row["duration_s"] == sorted(r["duration_s"] for r in measured)[1]
+        assert baseline["git_revision"] in row["summary"]
+        assert "median" in row["summary"]
+    assert "median" in baseline["throughput_basis"]
 
 
 def test_fail_on_regression_needs_a_baseline(tmp_path):
