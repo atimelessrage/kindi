@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `8163188` on `freebuff/tandem-cpu-recovery` (**main** is fast-forwarded to this branch at handoff; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `539a504` on `freebuff/tandem-cpu-recovery` (**main** is fast-forwarded to this branch at handoff; guarded by `tests/test_agents_handoff.py`).
 
 ### Python quality ratchet
 
@@ -42,7 +42,7 @@ suite plus CI job, and pinned every workflow's actions. The forward-slash drive-
 ### Full CPU gate
 
 The post-Usage/plan full CPU rerun is **1,231 passed, 28 skipped, 0 failed** in 243.91 s at **46.2%** line+branch coverage; the first pass was **1 failed, 1,230
-passed, 28 skipped** because `docs/CONFIGURATION-REFERENCE.md` was stale, then it was regenerated.
+passed, 28 skipped** because `docs/CONFIGURATION-REFERENCE.md` was stale, then it was regenerated. The final 2026-11-18 run at `539a504` (main) is **1,241 passed, 28 skipped, 0 failed** in 227.62 s with plain `pytest -q` (no coverage plugin; `pytest-cov` hangs on this host).
 
 ### Upstream v0.6.1 and comparison
 
@@ -106,7 +106,7 @@ requirements history and in `docs/claims/` now names the rewritten commit.
 
 ### Suite and recent additions
 
-The current full suite is **1,231 passed, 28 skipped, 0 failed** in 243.91 s, including two new kernel-arity resolver checks (only tables rooted at `self` are
+The coverage-measured full suite is **1,231 passed, 28 skipped, 0 failed** in 243.91 s (the final plain run at `539a504` is 1,241 / 28 / 0 in 227.62 s), including two new kernel-arity resolver checks (only tables rooted at `self` are
 followed; every branch of a conditional kernel must accept the call's argument count) and the two CLI comma-value checks (unknown
 `--split-at`/`--tandem-cpu-layers` tokens are rejected at parse time with the valid forms; the full suite re-ran after the generated reference was refreshed),
 and the newest twenty-six being seven saved-I/O-report checks (save/reload, missing and unusable fallback, and the plan/autotune wiring) plus the Lightning
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `8163188` | main checkout; clean; fast-forwarded to this branch |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `8163188` | this session; checked out here |
+| `T:/kindi` | `main` | `539a504` | main checkout; clean; fast-forwarded to this branch |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `539a504` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.

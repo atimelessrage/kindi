@@ -1245,3 +1245,9 @@ file points here.
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
 | Bridge smoke harness guard (2026-11-18) | this worktree | `freebuff/tandem-cpu-recovery` | `tests/test_ci_config.py`, `AGENTS.md`, `docs/development/AGENTS-HISTORY.md` | done. Audit F6 (`Buffy_ReviewAudit_202611180958.txt`) found `bridge/README.md` naming a tests directory the tree did not carry and no Bridge job in CI; `0dbff91` (23 minutes later) added the tracked 8-test `bridge/tests/test_smoke.py`, rewrote the README claims to what it covers, added the `bridge-smoke` job, and listed the job in `docs/CI.md`. Re-verified on this tree: `git ls-tree HEAD bridge/tests` lists both files, the README command is the job's command, and the suite passes in a bare venv with no third-party packages. Added `tests/test_ci_config.py::test_bridge_smoke_job_runs_the_readme_command`, which pins the job name, its `working-directory: bridge`, the exact README command in both files, and the suite file. No README correction was needed. Checks: `test_ci_config.py` **7 passed**, Bridge suite **8 passed** in a clean venv, `compileall`, `git diff --check`. |
+
+### Final full CPU gate at main (2026-11-18)
+
+| task | worktree | branch | shared files | state |
+|---|---|---|---|---|
+| Final full CPU gate (2026-11-18) | this worktree | `freebuff/tandem-cpu-recovery` | `AGENTS.md`, `docs/development/AGENTS-HISTORY.md` | done. `python -m pytest -q` at `539a504` (`main` == HEAD, both worktrees clean) is **1,241 passed, 28 skipped, 0 failed** in 227.62 s, exit 0; one CuPy warning about an undetected CUDA path, no failures to fix. Plain run, no coverage plugin (`pytest-cov` hangs on this host); the 1,231 / 46.2% coverage run stays recorded above and in `tests/README.md`. No GPU, model pack or larger-than-RAM run. |
