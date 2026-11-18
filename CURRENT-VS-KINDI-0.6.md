@@ -208,11 +208,35 @@ inside ranges that overlap across the same passes (stock 52.0-92.7, fork 56.2-89
 so this run does not establish a reading difference in either direction. The spread
 is why the row is recorded as ranges rather than a single figure.
 
-This does not measure the fork's plan engine, tensor cores, speculation, tandem,
-server/cache paths or token exactness; it compares the shared plain-engine bench path
-on one card, with the stock tree still on the loader shim. Evidence:
+The fork's **default tensor-core plan path** was measured separately on the same two
+packs at the same context. This is a **different configuration, not a same-settings
+row**: stock has no plan engine or tensor-core path, and the fork used
+`KINDI_TC=1 KINDI_TP=1 KINDI_FD=1 KINDI_ATT_TC=1 KINDI_TC_TMAX=4`, its q8_0 K/V
+default and the exact head; the 9B automatically selects `KINDI_TC_HP=1` for its
+Hadamard-4096 pack. No speculation, tandem, cache or split request was enabled. Five
+interleaved passes per model (2026-11-18):
+
+| model | engine | prompt reading | gen @100 | @2,000 | @8,000 |
+|---|---|---:|---:|---:|---:|
+| 2B | stock v0.6.1 (reference, 2026-11-17) | 215.5 | 180.5 | 182.9 | 176.4 |
+| 2B | **this fork, tc plan - different configuration** | 484.9 | 354.9 | 333.8 | 331.0 |
+| 9B | stock v0.6.1 (reference, 2026-11-17) | 83.9 | 83.8 | 81.3 | 77.4 |
+| 9B | **this fork, tc plan - different configuration** | 137.2 | 118.3 | 115.2 | 111.8 |
+
+These are absolute rates for the TC path against the same bench cells, not a
+controlled estimate of what tensor cores or the plan engine change; the fork's plain
+rows above are the controlled comparison. The stock rows are repeated from the
+table above, not re-run in the TC capture. Ranges and per-run records are in the
+TC benchmark page.
+
+The same-settings rows above do not measure the fork's plan engine or tensor cores;
+the separate TC rows do, but they are intentionally not presented as same-settings
+numbers. Neither table measures speculation, tandem, server/cache paths or token
+exactness. Evidence:
 `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-ab-0.6.1/RESULTS.md` (20 logs, 10 fork
-JSONs, `summarize.py` -> `ab.json`).
+JSONs, `summarize.py` -> `ab.json`) and
+`docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/RESULTS.md` (10 logs,
+JSONs, `summary.json`).
 
 ## 5. Model and hardware status
 
