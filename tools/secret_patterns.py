@@ -1,4 +1,4 @@
-"""The one pattern set behind both secret guards.
+"""The shared pattern rules behind both secret guards.
 
 `tests/test_no_secrets.py` scans the files that exist now (tracked and untracked);
 `tools/check_secret_history.py` scans every commit's diff, so a credential that was committed
@@ -7,9 +7,9 @@ both report only the file, line and detector name - never the matched text.
 
 Categories, on purpose:
   * credentials: key material and provider token shapes;
-  * machine data: a Windows home path, a Unix home path, a backslash drive path, a cloud
-    storage folder (a synced Dropbox or OneDrive account: the account name and the folder tree
-    are personal even when no file inside is sensitive);
+  * machine data: a Windows home path, a Unix home path, a backslash drive path, a forward-slash
+    drive root, a cloud storage folder (a synced Dropbox or OneDrive account: the account name
+    and the folder tree are personal even when no file inside is sensitive);
   * identifiers: an email address, unless it is a documented placeholder or a no-reply
     address of a hosting forge.
 """
@@ -49,6 +49,23 @@ PATTERNS = [
     ("cloud storage path", re.compile(r"(?i)\b(?:dropbox|onedrive|google\s*drive|icloud\s*drive|nextcloud|owncloud|seafile)[\\/]+[^\s\"'<>|)]+")),
     ("email address", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
 ]
+
+# Forward-slash drive roots (a drive letter, then `/` and at least one directory) are the same
+# machine-local layout as the backslash form above, which the 2026-11-18 audit found was missed.
+# The rule is separate from
+# PATTERNS on purpose: PATTERNS also drives the history gate, whose reviewed baseline predates
+# these paths and must not grow for a current-tree cleanup. The repository's own checkout
+# (`T:/kindi/`) stays allowed; a neighbouring directory whose name merely starts with the same
+# letters does not.
+FORWARD_DRIVE_ROOT = re.compile(r"(?i)\b[A-Z]:/+[A-Za-z0-9_.$~-]+/")
+REPO_DRIVE_ROOT = re.compile(r"(?i)^t:/kindi/")
+
+
+def forward_roots(line):
+    """Forward-slash drive roots outside the repository's own `T:/kindi/` (a tuple)."""
+    roots = (match.group(0) for match in FORWARD_DRIVE_ROOT.finditer(line))
+    return tuple(root for root in roots if not REPO_DRIVE_ROOT.match(root))
+
 
 # Assignments with a long literal value, excluding the common placeholders and hashes.
 GENERIC = re.compile(r"(?i)\b(api[_-]?key|secret|token|password|passwd)\b\s*[:=]\s*['\"]?([A-Za-z0-9_\-]{20,})")
