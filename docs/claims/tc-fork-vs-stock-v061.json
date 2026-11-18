@@ -7,7 +7,9 @@
   "notes": "Different configuration, not a same-settings A/B: the stock reference rows in CURRENT-VS §4.6 come from the 2026-11-17 plain-engine run, while these rows are the fork's tensor-core plan path (q8_0 K/V, exact head, 9B auto HP). No stock process was run in this capture. The numbers are absolute TC-path rates against the same bench cells.",
   "evidence": [
     "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/RESULTS.md",
-    "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/summary.json"
+    "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/summary.json",
+    "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/tc-2b-r1.log",
+    "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/tc-9b-r1.log"
   ],
   "numbers": [
     {"id": "2b-tc-read", "display": "484.9", "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],

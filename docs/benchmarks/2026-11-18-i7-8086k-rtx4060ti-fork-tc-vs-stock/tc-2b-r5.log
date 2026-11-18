@@ -1,0 +1,16 @@
+# fork tc plan, ctx 8192, exact head, pass 5 of 5
+# KINDI_TC=1 KINDI_TP=1 KINDI_FD=1 KINDI_ATT_TC=1 KINDI_TC_TMAX=4 KINDI_HEAD=exact KINDI_SPEC=0 python -m kindi --pack ~/.kindi/packs/bonsai-2b --ctx 8192 bench --split-at off --json tc-2b-r5.json
+<python>\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+[kindi 02:30:51] blocking sync: card 0 primary context flags 0x4 (set: 0)
+[kindi 02:30:52] card 0: 0.41 GB of weights, streamed (0s)
+[kindi 02:30:52] card 0: weights repacked for the tensor cores (0.0s)
+[kindi 02:30:52] tensor-core plans ready: T = 1 .. 4, 274 nodes per decode token (0.1s; 6515 MiB free on the card)
+[kindi 02:30:52] plan engine ready: 1 card, ctx 8192, K/V q8_0, weights 5-trit lane (1.3s)
+[kindi 02:30:52] kindi: ~/.kindi/packs/bonsai-2b -> the bonsai backend (bonsai2-2b)
+[kindi 02:30:52] GPU memory: 6515 MiB free of 8188 with a 8192-token context
+[kindi 02:30:52] prompt reading:       485.9 tokens/s
+[kindi 02:30:52] generation (exact head) at position   100: 362.5 tokens/s
+[kindi 02:30:53] generation (exact head) at position  2000: 333.0 tokens/s
+[kindi 02:30:53] generation (exact head) at position  8000: 346.2 tokens/s
+[kindi 02:30:53] wrote bench-logs/tc-fork-ab-20261118/2b-r5.json
