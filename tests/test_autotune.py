@@ -132,6 +132,18 @@ def test_moe_cache_candidate_is_capped_by_available_host_ram(monkeypatch):
     assert option["env"]["KINDI_LT_HOST_MB"] == "1024"
 
 
+def test_moe_cache_candidate_is_omitted_when_host_ram_is_unknown(monkeypatch):
+    """No free-RAM figure means no safe cap, so the candidate is not proposed at all."""
+    monkeypatch.setattr("kindi.hostram.available", lambda: None)
+    options = autotune.candidates(ONE_CARD, LIGHTNING, 8192, max_runs=10, rates=RATES,
+                                  moe={"dcache": 16, "n_used": 4, "n_exp": 32, "n_moe": 4,
+                                       "n_card": 16, "expert_bytes": 1 << 20, "fit": True})
+    assert not [item for item in options if item["name"].startswith("expert-cache-")]
+    assert not [item for item in options
+                if (item.get("env") or {}).get("KINDI_LT_HOST_MB")]
+    assert "gpu0" in _names(options)           # the rest of the candidate list remains
+
+
 def test_moe_cache_candidate_uses_the_plans_room_and_charges_its_slots():
     """The cache is sized from the same fit the engine uses, so a tight room lowers the proposal.
 
