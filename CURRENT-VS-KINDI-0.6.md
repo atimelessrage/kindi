@@ -191,22 +191,29 @@ tensor-core, speculation, tandem or cache setting was enabled on either side. St
 still needs the native-Windows `libcuda.so.1` -> `nvcuda.dll` loader shim recorded on
 the earlier stock page; it changes no engine path.
 
-Five interleaved passes per cell, medians (tok/s):
+Five interleaved passes per cell, medians (tok/s), except the 9B prompt-reading
+cells marked `‡`, which are the 20-pass 2026-11-18 recheck:
 
 | model | engine | prompt reading | gen @100 | @2,000 | @8,000 |
 |---|---|---:|---:|---:|---:|
 | 2B | stock v0.6.1 | 215.5 | 180.5 | 182.9 | 176.4 |
 | 2B | this fork | 211.1 | 178.8 | 179.9 | 178.6 |
-| 9B | stock v0.6.1 | 83.9 | 83.8 | 81.3 | 77.4 |
-| 9B | this fork | 72.4 | 81.7 | 81.5 | 77.2 |
+| 9B | stock v0.6.1 | 70.7 `‡` | 83.8 | 81.3 | 77.4 |
+| 9B | this fork | 75.7 `‡` | 81.7 | 81.5 | 77.2 |
 
 Decode is the same on both models: every fork median is within 2.6% of stock's, and
 the five-pass ranges overlap (the 2B at position 8,000 is 176.4 with a 148.2-182.1
-range against 178.6 with 174.0-180.9). Prompt reading is not resolved: the 2B medians
-are 215.5 and 211.1 with overlapping ranges, and the 9B medians (83.9 and 72.4) sit
-inside ranges that overlap across the same passes (stock 52.0-92.7, fork 56.2-89.7),
-so this run does not establish a reading difference in either direction. The spread
-is why the row is recorded as ranges rather than a single figure.
+range against 178.6 with 174.0-180.9). The 2B prompt-reading cell is still not
+resolved: 215.5 and 211.1 with overlapping ranges. The 9B five-pass values were
+**83.9** stock and **72.4** fork; their ranges overlapped (stock 52.0-92.7, fork
+56.2-89.7), and the gap did not reproduce. The `‡` recheck used 20 fresh-process
+passes per side with alternating order: 70.7 stock vs 75.7 fork, a paired
+stock-minus-fork median of **-1.4 tok/s**, a 95% bootstrap interval spanning zero,
+and an exact sign test of **p = 0.648**. The read window is a sub-second, 20-token
+burst; 50 ms telemetry found it mostly in P5/P8 at low clock/power, while generation
+reached the boost clock, and the second run in each pair was faster on median. The
+9B prompt-reading gap is therefore **closed as noise**; no reading difference is
+claimed. Details and the 40 clock logs are in the recheck page.
 
 The fork's **default tensor-core plan path** was measured separately on the same two
 packs at the same context. This is a **different configuration, not a same-settings
@@ -226,17 +233,20 @@ interleaved passes per model (2026-11-18):
 These are absolute rates for the TC path against the same bench cells, not a
 controlled estimate of what tensor cores or the plan engine change; the fork's plain
 rows above are the controlled comparison. The stock rows are repeated from the
-table above, not re-run in the TC capture. Ranges and per-run records are in the
-TC benchmark page.
+table above, not re-run in the TC capture; the stock 9B reading reference is the
+five-pass value, while the same-settings row above is the 20-pass recheck. Ranges
+and per-run records are in the TC benchmark page.
 
 The same-settings rows above do not measure the fork's plan engine or tensor cores;
 the separate TC rows do, but they are intentionally not presented as same-settings
 numbers. Neither table measures speculation, tandem, server/cache paths or token
 exactness. Evidence:
 `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-ab-0.6.1/RESULTS.md` (20 logs, 10 fork
-JSONs, `summarize.py` -> `ab.json`) and
+JSONs, `summarize.py` -> `ab.json`),
 `docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/RESULTS.md` (10 logs,
-JSONs, `summary.json`).
+JSONs, `summary.json`) and
+`docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-9b-reading/RESULTS.md` (40 logs, 40
+clock CSVs, `summary.json`, `runs.json`).
 
 ## 5. Model and hardware status
 
