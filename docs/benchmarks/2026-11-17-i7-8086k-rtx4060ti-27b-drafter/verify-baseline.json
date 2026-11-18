@@ -1,7 +1,7 @@
 {
   "started_utc": "2026-11-17T21:15:21Z",
   "git_revision": "cf81a82",
-  "throughput_basis": "three-pass medians from median-r1..r3-results.json (started 2026-11-17T21:15:21Z at cf81a82); started_utc, git_revision and each duration_s (the median of that cell's three pass durations) name that median set, not the earlier single-pass results.json (53003a9, 2026-11-17T17:57:48Z); the rows' log fields still name the first pass's verifier transcript",
+  "throughput_basis": "three-pass medians from median-r1..r3-results.json (started 2026-11-17T21:15:21Z at cf81a82); started_utc, git_revision and each duration_s (the median of that cell's three pass durations) name that median set, not the earlier single-pass results.json (53003a9, 2026-11-17T17:57:48Z); each row's log names the pass whose tokens/s is the row's median and logs lists all three transcripts under logs/median-rN/ (the first pass's transcripts remain at logs/27b-tc*.log)",
   "python": "3.13.6",
   "packs_dir": "~/.kindi/packs",
   "pack_27b": "D:/kindi-27b/packs/bonsai-27b",
@@ -75,7 +75,12 @@
       "drafts_accepted": 35,
       "drafts_drafted": 148,
       "summary": "three-pass median at cf81a82: PASS with KINDI_SPEC=ngram: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 45.7 tokens/s over the 12.6 s median pass",
-      "log": "logs/27b-tc-ngram.log",
+      "log": "logs/median-r2/27b-tc-ngram.log",
+      "logs": [
+        "logs/median-r1/27b-tc-ngram.log",
+        "logs/median-r2/27b-tc-ngram.log",
+        "logs/median-r3/27b-tc-ngram.log"
+      ],
       "config": {
         "KINDI_DEVICE": "gpu",
         "KINDI_HEAD": "exact",
@@ -142,7 +147,12 @@
       "drafts_accepted": 112,
       "drafts_drafted": 162,
       "summary": "three-pass median at cf81a82: PASS with KINDI_SPEC=draft2b: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 71.0 tokens/s over the 12.6 s median pass",
-      "log": "logs/27b-tc-draft2b.log",
+      "log": "logs/median-r1/27b-tc-draft2b.log",
+      "logs": [
+        "logs/median-r1/27b-tc-draft2b.log",
+        "logs/median-r2/27b-tc-draft2b.log",
+        "logs/median-r3/27b-tc-draft2b.log"
+      ],
       "config": {
         "KINDI_DEVICE": "gpu",
         "KINDI_HEAD": "exact",
@@ -210,7 +220,12 @@
       "drafts_accepted": 90,
       "drafts_drafted": 211,
       "summary": "three-pass median at cf81a82: PASS with KINDI_SPEC=both: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 62.0 tokens/s over the 13.0 s median pass",
-      "log": "logs/27b-tc-both.log",
+      "log": "logs/median-r1/27b-tc-both.log",
+      "logs": [
+        "logs/median-r1/27b-tc-both.log",
+        "logs/median-r2/27b-tc-both.log",
+        "logs/median-r3/27b-tc-both.log"
+      ],
       "config": {
         "KINDI_DEVICE": "gpu",
         "KINDI_HEAD": "exact",

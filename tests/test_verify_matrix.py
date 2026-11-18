@@ -354,6 +354,15 @@ def test_27b_drafter_baseline_has_the_three_spec_cells():
         assert row["duration_s"] == sorted(r["duration_s"] for r in measured)[1]
         assert baseline["git_revision"] in row["summary"]
         assert "median" in row["summary"]
+        # The transcripts are part of the record, not decoration: each row names all three
+        # median passes and its `log` is the pass whose tok/s is the row's median, not the
+        # earlier single pass. A first-pass transcript would not carry this number.
+        assert isinstance(row.get("logs"), list) and len(row["logs"]) == 3
+        assert row["log"] in row["logs"] and len(set(row["logs"])) == 3
+        for rel in row["logs"]:
+            assert (page / rel).is_file(), rel
+        text = (page / row["log"]).read_text(encoding="utf-8", errors="replace")
+        assert "%.1f tokens/s" % row["tokens_per_second"] in text
     assert "median" in baseline["throughput_basis"]
 
 

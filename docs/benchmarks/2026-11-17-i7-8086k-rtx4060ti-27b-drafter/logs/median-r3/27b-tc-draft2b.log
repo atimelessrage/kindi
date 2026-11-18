@@ -1,0 +1,21 @@
+[kindi 22:17:35] blocking sync: card 0 primary context flags 0x4 (set: 0)
+[kindi 22:17:36] draft: card 0: 0.41 GB of weights, streamed (0s)
+[kindi 22:17:36] draft: card 0: weights repacked for the tensor cores (0.0s)
+[kindi 22:17:36] draft: tensor-core plans ready: T = 1 .. 4, 274 nodes per decode token (0.1s; 6515 MiB free on the card)
+[kindi 22:17:36] draft: plan engine ready: 1 card, ctx 8192, K/V q8_0, weights 5-trit lane (1.4s)
+[kindi 22:17:41] card 0: 5.60 GB of weights, streamed (4s)
+[kindi 22:17:42] card 0: weights repacked for the tensor cores (0.5s)
+[kindi 22:17:42] tensor-core plans ready: T = 1 .. 4, 724 nodes per decode token (0.3s; 619 MiB free on the card)
+[kindi 22:17:42] speculative draft model attached: C:\Users\ICH\.kindi\packs\bonsai-2b, ctx 8192
+[kindi 22:17:42] speculation: requested draft2b, effective draft2b
+[kindi 22:17:42] plan engine ready: 1 card, ctx 1024, K/V q8_0, weights 5-trit lane (6.2s)
+[kindi 22:17:43] kindi: D:\kindi-27b\packs\bonsai-27b -> the bonsai backend (bonsai2-27b)
+[kindi 22:17:43] speculation: requested draft2b, effective draft2b
+[kindi 22:17:44] prompt 1 'The sky is blue because'                                    TIE  14/40 tokens match  (0.7s, 27/45 drafts accepted)
+[kindi 22:17:44]    first difference at token 14 (llama.cpp top-2 gap there 0.0064)
+[kindi 22:17:44] prompt 2 'The capital of France is'                                   PASS  40/40 tokens match  (0.5s, 30/33 drafts accepted)
+[kindi 22:17:45] prompt 3 'Water boils at a lower temperature on mountains because'    PASS  40/40 tokens match  (0.8s, 26/45 drafts accepted)
+[kindi 22:17:45] prompt 4 'def add_two_numbers('                                       PASS  40/40 tokens match  (0.6s, 29/39 drafts accepted)
+[kindi 22:17:45] PASS with KINDI_SPEC=draft2b: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 70.7 tokens/s over the run
+C:\Users\ICH\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(

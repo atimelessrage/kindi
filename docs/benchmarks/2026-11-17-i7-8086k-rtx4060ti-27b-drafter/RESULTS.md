@@ -98,9 +98,12 @@ ran at, and each cell's `duration_s` is the median of its three pass durations.
 That matters because the gate's `comparison.json` copies the baseline's
 `started_utc`/`git_revision` into `baseline_started_utc`/`baseline_git_revision`;
 before this, the receipt paired the medians with the earlier single pass's
-`53003a9`/`17:57:48Z`. The rows' `log` fields still name the first pass's
-verifier transcript; the median passes' raw logs stayed in
-`bench-logs/verify-matrix/27b-spec-median/`.
+`53003a9`/`17:57:48Z`. Each row's `log` now names the transcript of the pass whose
+tokens/s is that row's median (r2 for `ngram`, r1 for `draft2b` and `both`), and
+its `logs` list names all three; the nine transcripts are tracked under
+`logs/median-r{1,2,3}/`. `duration_s` is the median duration independently, so
+it can come from a different pass than `log` (the `ngram` and `both` rows do).
+The first pass's transcripts remain at `logs/27b-tc*.log` for the record.
 
 ## Artifacts
 
@@ -112,7 +115,12 @@ verifier transcript; the median passes' raw logs stayed in
 - `median-r{1,2,3}-results.json` — the three repeat matrices behind the table's
   medians (all four cells each, with config, packs and draft counts). Raw logs
   stayed in `bench-logs/verify-matrix/27b-spec-median/`.
-- `logs/27b-tc*.log` — the four raw verifier logs, including the tie location and attached files.
+- `logs/27b-tc*.log` — the first pass's four raw verifier logs (41.5/49.8/75.7/67.1
+  tok/s), kept as the record of the superseded single pass, including the tie location
+  and attached files.
+- `logs/median-r{1,2,3}/27b-tc-{ngram,draft2b,both}.log` — the nine transcripts behind
+  the medians; each baseline row points its `log` at the pass whose tokens/s is the
+  median and lists all three in `logs`.
 
 ## Not verified
 
