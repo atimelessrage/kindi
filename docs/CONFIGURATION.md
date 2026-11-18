@@ -113,7 +113,7 @@ do not use them yet.
 |---|---|---|
 | `repeat_stop` | `0` | `1` stops a reply caught in a repeating loop. A loop while thinking closes the thinking block early and lets the model answer |
 | `lookup` | `5` | Nanbeige prompt-lookup drafting, up to this many tokens per check; `0` turns it off |
-| `mtp_head` | (empty) | Nanbeige MTP head file, a second draft source; empty = none |
+| `mtp_head` | (empty) | Nanbeige MTP head file, a second draft source; the server, `kindi verify`/`bench` and the engine gateway all load it; empty = none |
 | `reasoning_effort` | (empty) | 27B template: `xhigh`, `medium` or `low`; empty = the template default (`xhigh`) |
 | `sampling_profile` | `default` | `default` or `publisher`; the publisher profile is described above |
 

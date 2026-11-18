@@ -236,6 +236,23 @@ class Card(object):
         self.graph = {}
 
 
+def attach_mtp(eng, cfg, log=print):
+    """Load the config's ``mtp_head`` onto ``eng``; True when a head is attached.
+
+    The head is engine state, so every path that builds a Nanbeige engine calls this one
+    helper: the serve wrapper, the ``kindi_nanbeige`` verify/bench builder and the registry
+    gateway. A path that skips it runs the same pack with a different draft source (C2).
+    """
+    hp = os.path.expanduser((cfg or {}).get("mtp_head") or "")
+    if not hp:
+        return False
+    if not os.path.exists(hp):
+        log("Nanbeige: no MTP head file at %s; drafting without it" % hp)
+        return False
+    eng.load_mtp(hp)
+    return True
+
+
 class Engine(object):
     def __init__(self, path, ctx=4096, devices=None, split=None, keep=None, reserve_mb=None, kv=None, log=print):
         import cupy as cp

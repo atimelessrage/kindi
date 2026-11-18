@@ -66,6 +66,7 @@ class NanbeigeBackend(Backend):
         self.tok = None
         self.man = None
         self.pack = None
+        self.mtp = False
         self.ctx = 0
         self.stop_ids = set()
         self.log = print
@@ -87,7 +88,7 @@ class NanbeigeBackend(Backend):
             raise registry.BackendUnavailable("no Nanbeige pack directory at %r" % (pack,))
 
         from ..gguf import GGUF
-        from ..nanbeige import Engine
+        from ..nanbeige import Engine, attach_mtp
         from ..spm import SPM
 
         self.pack = pack
@@ -98,6 +99,8 @@ class NanbeigeBackend(Backend):
             self.man["model_path"], ctx=self.ctx,
             kv=config.get("kv_cache"), log=self.log,
         )
+        # the config's draft head is engine state: serve loads it, so this path must too
+        self.mtp = attach_mtp(self.engine, config, self.log)
         self.tok = SPM(GGUF(self.man["model_path"]).kv)
         # every control token ends the turn, as llama.cpp's end-of-generation
         # set does (same rule as nanbeige_gen.NanbeigeBackend)
@@ -112,6 +115,7 @@ class NanbeigeBackend(Backend):
         self.tok = None
         self.man = None
         self.pack = None
+        self.mtp = False
         self.loaded = False
 
     def info(self):
@@ -126,6 +130,7 @@ class NanbeigeBackend(Backend):
             out["model"] = str((self.man or {}).get("model") or "")
             out["vocab"] = len(self.tok.tokens) if self.tok else 0
             out["ctx"] = self.ctx
+            out["mtp"] = bool(self.mtp)
         return out
 
     def reference_gguf(self):

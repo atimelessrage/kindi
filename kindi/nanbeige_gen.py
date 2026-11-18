@@ -142,7 +142,7 @@ class NanbeigeBackend(object):
     def __init__(self, man, cfg, log=print):
         from .gguf import GGUF
         from .spm import SPM
-        from .nanbeige import Engine
+        from .nanbeige import Engine, attach_mtp
         self.log = log
         self.tok = SPM(GGUF(man["model_path"]).kv)
         # every control token ends the turn (</s>, <|im_end|>, <|endoftext|>, a new <|im_start|>), as llama.cpp's
@@ -153,13 +153,9 @@ class NanbeigeBackend(object):
         # prompt-lookup drafting (config key lookup): up to this many drafted tokens per check pass, 0: off
         self.lookup = max(0, min(7, int(cfg.get("lookup") or 0)))
         self.lk_stats = [0] * 6     # this request: check passes, drafted tokens, kept tokens (lookup; MTP head)
-        self.mtp = False            # config key mtp_head: an MTP head file, a draft source
-        hp = os.path.expanduser(cfg.get("mtp_head") or "")
-        if hp and os.path.exists(hp):
-            self.eng.load_mtp(hp)
-            self.mtp = True
-        elif hp:
-            log("Nanbeige: no MTP head file at %s; drafting without it" % hp)
+        # config key mtp_head: an MTP head file, a draft source (the one loader serve,
+        # verify/bench and the engine gateway share)
+        self.mtp = attach_mtp(self.eng, cfg, log)
         if os.environ.get("KINDI_NB_SELFCHECK", "1") != "0":
             self.selfcheck()
 
