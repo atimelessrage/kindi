@@ -818,6 +818,14 @@ class Kindi(object):
             with self.lock:
                 r.turn_end()
 
+    def _record_last_spec(self, sp):
+        """Remember the last request's stats with the effective mode that produced them."""
+        if not sp:
+            return
+        last = dict(sp)
+        last["method"] = getattr(self.eng, "spec_mode", None)
+        self.last_spec = last
+
     def drafting(self):
         """speculative drafting, for /health (Kindi Bridge shows it): what is actually attached, not
         what KINDI_SPEC asked for - the effective mode, why it differs from the request, the loaded
@@ -845,7 +853,9 @@ class Kindi(object):
             out["reason"] = ("KINDI_SPEC=%s requires the tensor-core plan engine: set "
                              "KINDI_TC=1 (and do not set KINDI_TP=0)" % requested)
         if last and last.get("drafted"):
-            out["last"] = {"passes": last.get("passes", 0), "drafted": last["drafted"], "accepted": last.get("accepted", 0),
+            out["last"] = {"method": last.get("method") or out["method"],
+                           "passes": last.get("passes", 0), "drafted": last["drafted"],
+                           "accepted": last.get("accepted", 0),
                            "acceptance": round(last.get("accepted", 0) / float(last["drafted"]), 3)}
         return out
 
@@ -1062,7 +1072,7 @@ class Kindi(object):
             if hasattr(self.runner, "idle"):
                 self.runner.idle()                            # (KINDI_CKPT_VRAM: checkpoint host copies now)
         if sp:
-            self.last_spec = dict(sp)
+            self._record_last_spec(sp)
         if sp and sp["passes"]:
             self.log("speculative: %d tokens in %d passes, %d of %d drafted tokens accepted" % (
                 len(gen), sp["passes"], sp["accepted"], sp["drafted"]))

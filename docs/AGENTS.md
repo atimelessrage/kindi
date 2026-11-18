@@ -55,7 +55,9 @@ Besides `/v1`, Kindi serves what an agent host needs to observe and to connect a
   `api_key` is set, the detailed view - `queue.waiting`, `queue.max`, `queue.rejected`, `busy`, `stats`,
   `uptime_s` and GPU free/total MiB - requires `Authorization: Bearer <api_key>`. With no key, the detailed
   view is loopback-only; a non-loopback bind gets only liveness. Keep `/health` on loopback unless a proxy
-  protects the detailed view.
+  protects the detailed view. The detailed view's `drafting.last` block carries its own `method`:
+  the effective speculation mode that produced those drafts (`mtp`, `ngram`, `draft2b`, `both` or
+  `dspine`), alongside `passes`, `drafted`, `accepted` and `acceptance`.
 - `POST /v1/completions` and `/v1/embeddings` are not implemented and return 404; use
   `POST /v1/chat/completions` for text generation.
 - Image input is rejected with HTTP 400 when the selected pack has no vision weights. The current packs are

@@ -4,6 +4,12 @@
 
 ### Added
 
+- **`drafting.last` names the speculation mode that produced its drafts** — the last-request block
+  now includes `method`, recorded from the engine's per-request effective `spec_mode` when
+  generation ends. A client can attribute `passes`/`drafted`/`accepted` without borrowing the
+  sibling `drafting.method`, which describes the current effective state rather than necessarily
+  the mode of the last request. `/health` docs are updated, and a focused server test pins a last
+  block whose method differs from the sibling field.
 - **An opt-in GPU smoke test covers the 2B MTP server path** — `tools/mtp_smoke.py` boots the
   real `kindi serve` process with the registered `kindi-mtp-2b-v1.npz` head, sends one greedy
   completion, and fails unless `/health` says `drafting.method=mtp`, both `drafting.last.drafted`

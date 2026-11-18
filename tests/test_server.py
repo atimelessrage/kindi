@@ -741,6 +741,7 @@ class _SpecEngine(_FakeEngine):
 class _SpecKindi(_FakeKindi):
     """The real `Kindi.drafting` on a stub engine: /health must report what attached, not KINDI_SPEC."""
     drafting = server.Kindi.drafting
+    _record_last_spec = server.Kindi._record_last_spec
     native = False
     nanbeige = None
 
@@ -783,6 +784,20 @@ def test_health_reports_the_effective_speculation_state(monkeypatch, loaded):
         assert d["enabled"] is False and d["method"] is None
         assert "does not match kindi/mtp_heads.json" in d["reason"]
         assert d["head"] is None and d["head_sha256"] is None
+
+
+def test_health_last_drafts_name_the_mode_that_produced_them(monkeypatch):
+    """The `last` block names its own effective mode, not the sibling `method`, which describes
+    the current effective state and can change between requests (for example in auto mode)."""
+    monkeypatch.setenv("KINDI_SPEC", "mtp")
+    K = _SpecKindi(True)
+    K.eng.spec_mode = "ngram"
+    K._record_last_spec({"passes": 2, "drafted": 7, "accepted": 5})
+    d = K.drafting()
+    assert d["method"] == "mtp"
+    assert d["last"]["method"] == "ngram"
+    assert d["last"]["passes"] == 2
+    assert d["last"]["drafted"] == 7 and d["last"]["accepted"] == 5
 
 
 @pytest.mark.parametrize("loaded, requested, expected", [
