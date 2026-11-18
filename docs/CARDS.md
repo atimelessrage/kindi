@@ -316,12 +316,18 @@ Current single-card 4060 Ti results:
 | 4B tc | pass | 3 exact + 1 tie (FD fallback; forced FD was 2/4) | 164.6 tokens/s |
 | 9B tc | refused | — | — |
 | 27B tc | pass | 3 exact + 1 tie (token 14, gap 0.0064) | 38.9 one-pass; **38.1 median** over three runs |
+| 27B tc-ngram | pass | 3 exact + 1 tie (token 14, gap 0.0064) | **45.7 median** over three runs |
+| 27B tc-draft2b | pass | 3 exact + 1 tie (token 14, gap 0.0064) | **71.0 median** over three runs |
+| 27B tc-both | pass | 3 exact + 1 tie (token 14, gap 0.0064) | **62.0 median** over three runs |
 | 4B plain | pass | 4/4 | 114.9 tokens/s |
 | 9B plain | pass | 4/4 (13/13 on prompt 3) | 72.5 tokens/s |
 
 The 27B tc three-run repeat was **38.2 / 38.1 / 36.7 tokens/s** (median 38.1, range 1.5,
 4.1%), with the same exactness in every run. The older 2026-11-10 **40.5** rerun was not
 reproduced; 40.5 is also the separate 24K benchmark's prompt-read rate, not verify throughput.
+The three speculation rows use the 2B drafter and head and are the tracked verify-matrix
+baseline; the command, per-run ranges and `verify-baseline.json` are on the
+[27B drafter baseline page](benchmarks/2026-11-17-i7-8086k-rtx4060ti-27b-drafter/RESULTS.md).
 The full workflow and qualifications are in [CARD-SUPPORT.md](CARD-SUPPORT.md#verify-matrix).
 
 ## AH-Nanbeige4.3-33B IQ3_XXS
