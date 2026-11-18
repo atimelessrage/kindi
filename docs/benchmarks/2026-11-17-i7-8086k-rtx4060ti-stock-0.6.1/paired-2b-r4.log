@@ -1,0 +1,24 @@
+# stock v0.6.1 (7fececb), ctx 8192, paired stock bench then pos512 harness, pass 4 of 5
+# python run_stock.py --pack ~/.kindi/packs/bonsai-2b --ctx 8192 bench
+# python pos512_stock.py ~/.kindi/packs/bonsai-2b 8192
+===== 2b pass 4 stock bench =====
+<python>\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+[kindi 02:14:47] blocking sync: card 0 primary context flags 0x4 (set: 0)
+[kindi 02:14:47] GPU: NVIDIA GeForce RTX 4060 Ti, sm_89, 34 SMs, 8187 MiB
+[kindi 02:14:49] engine ready: ctx 8192, head plain (1.7s)
+[kindi 02:14:49] GPU memory: 6411 MiB free of 8188 with a 8192-token context
+[kindi 02:14:49] prompt reading:       230.9 tokens/s
+[kindi 02:14:49] generation (exact head) at position   100: 191.9 tokens/s
+[kindi 02:14:49] generation (exact head) at position  2000: 190.9 tokens/s
+[kindi 02:14:49] generation (exact head) at position  8000: 150.8 tokens/s
+===== 2b pass 4 pos512 harness =====
+<python>\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+blocking sync: card 0 primary context flags 0x4 (set: 0)
+GPU: NVIDIA GeForce RTX 4060 Ti, sm_89, 34 SMs, 8187 MiB
+engine ready: ctx 8192, head plain (1.7s)
+GPU memory: 6411 MiB free of 8188 with a 8192-token context
+stock v0.6.1 position harness (separate from the bench sweep)
+generation (exact head) at position   100: 190.8 tokens/s
+generation (exact head) at position   512: 191.6 tokens/s

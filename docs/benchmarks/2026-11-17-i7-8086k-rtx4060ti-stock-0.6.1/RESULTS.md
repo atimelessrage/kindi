@@ -87,20 +87,28 @@ fidelity anchor) and 512. The context is 8192 because position 512 plus the ten
 timed steps does not fit in a 512-token K/V cache. This is a separate harness,
 not a change to `kindi bench`, and the sweep table above is unchanged.
 
-Five passes per model, same host and loader shim, medians (range = five-pass
-min-max):
+Five paired passes per model, same host and loader shim: in each pass the stock
+bench ran immediately before the harness, and the medians below are over the
+five harness rows (range = five-pass min-max):
 
 | model | position | median tok/s | range |
 |---|---:|---:|---|
-| 2B | 512 | 171.2 | 159.2-175.0 |
-| 9B | 512 | 80.7 | 76.3-83.3 |
+| 2B | 512 | 190.3 | 184.8-191.6 |
+| 9B | 512 | 84.5 | 84.4-85.6 |
 
-The position-100 anchor measured 170.0 (130.3-182.3) on the 2B and 81.7
-(78.5-84.4) on the 9B. It is lower than the sweep's three-pass position-100
-medians at ctx 8192 (187.8 and 84.1), so the harness is used only for the 512
-row and not to restate 100; the drift is the same GPU-clock spread visible in
-the sweep's ranges. The 512 row is therefore a median with a range,
-not a precise rate, and it is not a row in the sweep table.
+The position-100 anchor measured 191.3 (185.4-192.4) on the 2B and 86.3
+(85.6-86.5) on the 9B, against the immediately preceding stock bench medians of
+189.1 (183.0-191.9) and 86.3 (86.2-86.6). The median pairwise differences are
++2.3 (+1.2%) on the 2B and 0.0 (0.0%) on the 9B, so the harness is not biased
+downward when the GPU is warm.
+
+The earlier five standalone harness passes reported 171.2 (159.2-175.0) on the
+2B and 80.7 (76.3-83.3) on the 9B, with anchors 170.0 and 81.7. Those runs
+started from a cold GPU and are **superseded**: the same harness immediately
+after the bench matches the bench's position-100 row. Keep the old
+`pos512-{2b,9b}-r{1..5}.log` files as the historical cold-start evidence, but do
+not use their medians. Run the harness only after a stock bench (or an
+equivalent warm-up).
 
 ```sh
 cp docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-stock-0.6.1/pos512_stock.py \
@@ -121,8 +129,12 @@ python pos512_stock.py ~/.kindi/packs/bonsai-9b 8192
   the unmodified-stock loader failure, not a benchmark result.
 - [`run_stock.py`](run_stock.py): the loader shim used for the runs.
 - [`pos512_stock.py`](pos512_stock.py): the separate position-512 harness.
-- `pos512-{2b,9b}-r{1..5}.log`: the ten harness passes, each with its command
-  and the position-100 anchor plus the position-512 row.
+- `paired-{2b,9b}-r{1..5}.log`: the ten paired 2026-11-18 passes, each running
+  the stock bench immediately before the harness; these carry the corrected
+  position-100 anchors and position-512 rows.
+- `pos512-{2b,9b}-r{1..5}.log`: the ten earlier standalone harness passes, each
+  with its position-100 anchor plus the position-512 row. These are the
+  historical cold-start runs whose medians are superseded.
 
 Logs are verbatim except that local Python and pack prefixes were replaced
 with `<python>` and `~/.kindi`; timings and engine lines are unchanged.

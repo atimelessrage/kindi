@@ -11,6 +11,10 @@ It is not part of `kindi bench` and its rows are reported separately. No stock
 module, kernel, plan or engine decision is patched: the only Windows change is
 the same `libcuda.so.1` -> `nvcuda.dll` name shim `run_stock.py` uses.
 
+Run it immediately after the stock bench, not cold: a standalone cold run can
+underreport both rows (the 2026-11-17 standalone passes measured a 170.0 anchor
+on the 2B, while five paired 2026-11-18 passes matched the bench).
+
 Usage: python pos512_stock.py PACK [CTX]
 """
 import ctypes

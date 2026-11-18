@@ -277,10 +277,12 @@ head. The commands, logs and loader qualification are in the
   52.3-93.9), so no reading shape is claimed. Stock's fixed position sweep prints
   only positions that fit, so the 512-context runs have only position 100.
 - A separate five-pass harness ([`pos512_stock.py`](benchmarks/2026-11-17-i7-8086k-rtx4060ti-stock-0.6.1/pos512_stock.py))
-  fills the literal position-512 gap for both models at ctx 8192: **171.2 tok/s**
-  (2B) and **80.7 tok/s** (9B), medians. It is not a bench-sweep row, it uses the
-  bench's own `step(token, pos)` timing, and the loader-shim qualification still
-  applies; ranges and the position-100 anchor are in the [benchmark record](benchmarks/2026-11-17-i7-8086k-rtx4060ti-stock-0.6.1/RESULTS.md).
+  fills the literal position-512 gap for both models at ctx 8192: **190.3 tok/s**
+  (2B) and **84.5 tok/s** (9B), medians from five paired bench-then-harness passes.
+  Its position-100 anchor matched the immediately preceding bench (191.3 vs 189.1
+  on the 2B, 86.3 vs 86.3 on the 9B), so no downward harness offset is applied. The
+  earlier standalone medians (171.2/80.7) were cold-clock runs and are superseded;
+  ranges and the full anchor table are in the [benchmark record](benchmarks/2026-11-17-i7-8086k-rtx4060ti-stock-0.6.1/RESULTS.md).
 - Unmodified stock v0.6.1 stops on native Windows at `libcuda.so.1`; the measured
   runs use a loader shim that maps that one name to `nvcuda.dll`. No Kindi module,
   kernel or engine decision is changed. The failed unmodified run is in the benchmark
