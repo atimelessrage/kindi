@@ -1,139 +1,243 @@
 {
   "gate": "upstream-delta",
   "title": "The fork's delta against official Kindi v0.6.1, re-derived from the tags",
-  "measured": "2026-11-17",
-  "commit": "e66471f",
-  "command": "git rev-list --count / git diff --numstat / git diff --diff-filter=D --name-only / git ls-tree -r --name-only against official tag v0.6.1 (7fececb), its parent dce89df, and v0.6.0 (179710c); release metadata from the GitHub release API",
-  "notes": "CURRENT-VS-KINDI-0.6.md now uses the official v0.6.1 release, not only the tag. Re-derived on 2026-11-17: the published v0.6.0..v0.6.1 range is 16 files, +336/-43 because it includes dce89df's container commit and a6f4891's README acknowledgement; the 0.6.1 commit itself (dce89df..v0.6.1) is 15 files, +52/-36. The earlier section gave the 16-file total but attributed it to the 0.6.1 commit and listed compose.amd.yaml as its change; compose.amd.yaml came in with dce89df, not the 0.6.1 commit. v0.6.1..e66471f is 504 commits and 522 files, with zero file deletions; the v0.6.1 tree has 172 files and the current tree has 632 tracked files and 28 requirements. The v0.6.1..f934a55 figures are kept as the historical §41 delta. v0.6.1 is one commit past the shared base dce89df and is not an ancestor of the fork, so v0.6.1..HEAD is the correct comparison range.",
+  "measured": "2026-11-18",
+  "commit": "0184bb8",
+  "command": "git rev-list --count / git diff --numstat / git diff --diff-filter=D --name-only / git ls-tree -r --name-only against official tag v0.6.1 (7fececb), its parent dce89df, v0.6.0 (179710c) and HEAD 0184bb8; release metadata from the GitHub release API",
+  "notes": "CURRENT-VS-KINDI-0.6.md now uses the official v0.6.1 release, not only the tag. The published v0.6.0..v0.6.1 range is 16 files, +336/-43 because it includes dce89df's container commit and a6f4891's README acknowledgement; the 0.6.1 commit itself (dce89df..v0.6.1) is 15 files, +52/-36. v0.6.1..0184bb8 is 576 commits and 704 files, +93,047/-1,229, with zero file deletions; the v0.6.1 tree has 172 files and the current tree has 812 tracked files and 28 requirements. v0.6.1 is one commit past the shared base dce89df and is not an ancestor of the fork, so v0.6.1..HEAD is the correct comparison range. The superseded f934a55 figures and the historical d1-* claims moved out with the round history to detailed-fork-changelog.md and are no longer claimed here.",
   "evidence": [
     "ref:v0.6.0",
     "ref:v0.6.1",
     "ref:dce89df",
-    "ref:e66471f",
+    "ref:0184bb8",
     "ref:f934a55"
   ],
   "numbers": [
     {
       "id": "v061-files",
       "display": "16 files",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.0", "v0.6.1"], "field": "files", "expect": 16}
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "git",
+        "op": "diffstat",
+        "revs": [
+          "v0.6.0",
+          "v0.6.1"
+        ],
+        "field": "files",
+        "expect": 16
+      }
     },
     {
       "id": "v061-insertions",
       "display": "+336",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.0", "v0.6.1"], "field": "insertions", "expect": 336}
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "git",
+        "op": "diffstat",
+        "revs": [
+          "v0.6.0",
+          "v0.6.1"
+        ],
+        "field": "insertions",
+        "expect": 336
+      }
     },
     {
       "id": "v061-deletions",
       "display": "−43",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.0", "v0.6.1"], "field": "deletions", "expect": 43}
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "git",
+        "op": "diffstat",
+        "revs": [
+          "v0.6.0",
+          "v0.6.1"
+        ],
+        "field": "deletions",
+        "expect": 43
+      }
     },
     {
       "id": "v061-commit-files",
       "display": "15 files",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "diffstat", "revs": ["dce89df", "v0.6.1"], "field": "files", "expect": 15}
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "git",
+        "op": "diffstat",
+        "revs": [
+          "dce89df",
+          "v0.6.1"
+        ],
+        "field": "files",
+        "expect": 15
+      }
     },
     {
       "id": "v061-commit-insertions",
       "display": "+52",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "diffstat", "revs": ["dce89df", "v0.6.1"], "field": "insertions", "expect": 52}
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "git",
+        "op": "diffstat",
+        "revs": [
+          "dce89df",
+          "v0.6.1"
+        ],
+        "field": "insertions",
+        "expect": 52
+      }
     },
     {
       "id": "v061-commit-deletions",
       "display": "−36",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "diffstat", "revs": ["dce89df", "v0.6.1"], "field": "deletions", "expect": 36}
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "git",
+        "op": "diffstat",
+        "revs": [
+          "dce89df",
+          "v0.6.1"
+        ],
+        "field": "deletions",
+        "expect": 36
+      }
     },
     {
       "id": "base-commits",
-      "display": "504 commits",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "commits", "revs": ["v0.6.1", "e66471f"], "expect": 504}
+      "display": "576 commits",
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "git",
+        "op": "commits",
+        "revs": [
+          "v0.6.1",
+          "0184bb8"
+        ],
+        "expect": 576
+      }
     },
     {
       "id": "base-files",
-      "display": "522 files",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.1", "e66471f"], "field": "files", "expect": 522}
+      "display": "704 files",
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "git",
+        "op": "diffstat",
+        "revs": [
+          "v0.6.1",
+          "0184bb8"
+        ],
+        "field": "files",
+        "expect": 704
+      }
     },
     {
       "id": "base-insertions",
-      "display": "74,828",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.1", "e66471f"], "field": "insertions", "expect": 74828}
+      "display": "93,047",
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "git",
+        "op": "diffstat",
+        "revs": [
+          "v0.6.1",
+          "0184bb8"
+        ],
+        "field": "insertions",
+        "expect": 93047
+      }
     },
     {
       "id": "base-deletions",
-      "display": "1,190",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.1", "e66471f"], "field": "deletions", "expect": 1190}
+      "display": "1,229",
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "git",
+        "op": "diffstat",
+        "revs": [
+          "v0.6.1",
+          "0184bb8"
+        ],
+        "field": "deletions",
+        "expect": 1229
+      }
     },
     {
       "id": "base-tracked",
-      "display": "632 tracked files",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "treefiles", "rev": "e66471f", "expect": 632}
+      "display": "812 tracked files",
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "git",
+        "op": "treefiles",
+        "rev": "0184bb8",
+        "expect": 812
+      }
     },
     {
       "id": "v061-tracked",
       "display": "172 upstream",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "treefiles", "rev": "v0.6.1", "expect": 172}
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "git",
+        "op": "treefiles",
+        "rev": "v0.6.1",
+        "expect": 172
+      }
     },
     {
       "id": "base-requirements",
       "display": "28 numbered requirements",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "treefiles", "rev": "e66471f",
-                "path": "docs/development/requirements", "match": "REQ-*.md", "expect": 28}
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "git",
+        "op": "treefiles",
+        "rev": "0184bb8",
+        "path": "docs/development/requirements",
+        "match": "REQ-*.md",
+        "expect": 28
+      }
     },
     {
       "id": "base-zero-deletions",
       "display": "zero file deletions",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "deleted", "revs": ["v0.6.1", "e66471f"], "expect": 0}
-    },
-    {
-      "id": "d1-commits",
-      "display": "440 commits",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "commits", "revs": ["v0.6.1", "f934a55"], "expect": 440}
-    },
-    {
-      "id": "d1-files",
-      "display": "468 files",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.1", "f934a55"], "field": "files", "expect": 468}
-    },
-    {
-      "id": "d1-insertions",
-      "display": "+67,156",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.1", "f934a55"], "field": "insertions", "expect": 67156}
-    },
-    {
-      "id": "d1-deletions",
-      "display": "−1,125",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "diffstat", "revs": ["v0.6.1", "f934a55"], "field": "deletions", "expect": 1125}
-    },
-    {
-      "id": "d1-tracked",
-      "display": "579 tracked files",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "treefiles", "rev": "f934a55", "expect": 579}
-    },
-    {
-      "id": "d1-requirements",
-      "display": "22 requirements",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
-      "check": {"kind": "git", "op": "treefiles", "rev": "f934a55",
-                "path": "docs/development/requirements", "match": "REQ-*.md", "expect": 22}
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "git",
+        "op": "deleted",
+        "revs": [
+          "v0.6.1",
+          "0184bb8"
+        ],
+        "expect": 0
+      }
     }
   ]
 }
