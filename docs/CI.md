@@ -34,9 +34,10 @@ A total floor alone lets a CPU-exercised module rot while the total holds; the p
 floors pin the modules the requirement tests cover. The graph builders (`spec.py`, `dspine.py`,
 `mtp.py`, `tp.py`) are listed at their measured CPU-reachable coverage only; their CUDA paths
 are verified by `kindi verify` on hardware and need the GPU lane above for a higher floor.
-The new floors and `engine.py` (20%) are set 10 points below the 2026-11-18 full-suite run
-(`coverage run --branch --source=kindi -m pytest`, 1,196 passed, 28 skipped), so platform
-variance does not make CI noisy; raise a floor only after a measured run. `moe_cpu.py` stays
+The new floors sit 10 points below the 2026-11-18 full-suite run (`coverage run --branch
+--source=kindi -m pytest`, 1,196 passed, 28 skipped, 45.4% total), and `engine.py` moves from
+19% to 20% against its measured 24.3%, so platform variance does not make CI noisy; raise a
+floor only after a measured run. `moe_cpu.py` stays
 out until its C library is built in CI.
 
 The performance half of the roadmap gate is `tools/check_perf_baseline.py`: it compares the
