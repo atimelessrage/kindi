@@ -243,6 +243,11 @@
   `ValueError`), and the calibration pairs were split into floats when the engine started; all four
   now exit 2 before a model or native library is touched, naming the valid set. `tests/test_dsv41_cli.py`
   pins the parsers and both CLI rejection paths.
+- **`python -m kindi.dsv41 --range` validates the prompt-id range at argparse time** —
+  `--range` now requires `a-b` with two non-negative integers and `a <= b` (e.g. `0-9`); a
+  malformed, reversed or single-id value exits 2 before the model or the prompt file is touched,
+  where `generate` and `specbench` used to split the string bare and raise `ValueError` after the
+  model loaded. `tests/test_dsv41_cli.py` pins the parser and the CLI rejection path.
 - **The 27B median evidence no longer carries machine paths** — the three tracked median JSONs
   kept the local Python path and the `~/.kindi` pack/head paths from their run commands. They now
   record `<python>/python.exe` and `~/.kindi/...`, and the history baseline records the seven

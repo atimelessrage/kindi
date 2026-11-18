@@ -30,9 +30,20 @@ def test_server_context_is_a_positive_integer():
             dsv41._positive_int(bad)
 
 
+def test_prompt_range_is_two_non_negative_ordered_integers():
+    assert dsv41._range_arg("0-3") == (0, 3)
+    assert dsv41._range_arg(" 10 - 20 ") == (10, 20)
+    assert dsv41._range_arg("7-7") == (7, 7)
+    for bad in ("1", "1-", "-1", "1-2-3", "1-fast", "3-1", "", "1,2"):
+        with pytest.raises(argparse.ArgumentTypeError,
+                           match=r"non-negative integers a-b with a <= b.*0-9"):
+            dsv41._range_arg(bad)
+
+
 @pytest.mark.parametrize("argv, expected", [
     (["bench", "model.gguf", "--ctx", "8192,fast"], "comma-separated positive integers"),
     (["specbench", "model.gguf", "--auto", "1,fast"], "two comma-separated finite numbers"),
+    (["generate", "model.gguf", "--prompts", "p.jsonl", "--range", "3-1"], "non-negative integers"),
 ])
 def test_dsv41_rejects_bad_values_before_loading(argv, expected, capsys):
     with pytest.raises(SystemExit) as exc:

@@ -264,6 +264,22 @@ def _cal_arg(text):
     return values
 
 
+def _range_arg(text):
+    """A prompt id range a-b: two non-negative integers with a <= b (e.g. 0-9)."""
+    parts = [part.strip() for part in str(text).split("-")]
+    try:
+        if len(parts) != 2 or any(not part for part in parts):
+            raise ValueError
+        lo, hi = int(parts[0]), int(parts[1])
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            "prompt id range must be non-negative integers a-b with a <= b, e.g. 0-9 (got %r)" % (text,))
+    if lo < 0 or hi < 0 or lo > hi:
+        raise argparse.ArgumentTypeError(
+            "prompt id range must be non-negative integers a-b with a <= b, e.g. 0-9 (got %r)" % (text,))
+    return (lo, hi)
+
+
 def _cpus(text):
     out = []
     for part in text.split(","):
@@ -950,7 +966,8 @@ def main(argv=None):
     ap.add_argument("--gen", type=int, default=32)
     ap.add_argument("--prompts", default=None)
     ap.add_argument("--ids", default=None, help="file of token ids (instead of --prompt)")
-    ap.add_argument("--range", default=None, help="prompt ids a-b (with --prompts)")
+    ap.add_argument("--range", type=_range_arg, default=None,
+                    help="prompt ids a-b: non-negative integers a <= b (with --prompts)")
     ap.add_argument("--out", default=None)
     ap.add_argument("--ref", default=None, help="teacher: reference continuations, one line per prompt: "
                     "GEN tok:margin ...")
@@ -1061,7 +1078,7 @@ def main(argv=None):
         model.dspark_load(a.dspark)
     if a.cmd == "specbench":
         # each prompt: plain greedy, then prompt-lookup speculation from the same start; the tokens must be equal
-        p0, p1 = (int(x) for x in a.range.split("-")) if a.range else (0, 1 << 30)
+        p0, p1 = a.range if a.range else (0, 1 << 30)
         tot = {"plain_s": 0.0, "spec_s": 0.0, "tokens": 0}
         for j in map(json.loads, open(a.prompts, encoding="utf-8")):
             if not p0 <= j["id"] <= p1:
@@ -1143,7 +1160,7 @@ def main(argv=None):
         return
     if a.cmd == "generate":
         if a.prompts:
-            p0, p1 = (int(x) for x in a.range.split("-")) if a.range else (0, 1 << 30)
+            p0, p1 = a.range if a.range else (0, 1 << 30)
             fo = open(a.out, "w", encoding="utf-8") if a.out else sys.stdout
             for line in open(a.prompts, encoding="utf-8"):
                 j = json.loads(line)
