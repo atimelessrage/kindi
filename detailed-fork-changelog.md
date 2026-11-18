@@ -723,3 +723,47 @@ Not independently verified here: no official 0.6.1 image was pulled or run, and
 the official tarball was not installed. The release notes' image-verification
 statement is recorded as the publisher's claim, not as a local run. No fork
 release artifact exists.
+
+## 43. Audit follow-up, full-suite rerun and report refresh (2026-11-18)
+
+This section records the audit/release refresh that follows the v0.6.1 release
+notes in §42. The live comparison is `CURRENT-VS-KINDI-0.6.md`; this is its dated
+history.
+
+- **Latest official release checked.** The GitHub releases API still reports
+  **v0.6.1** as `latest` on 2026-11-18. The annotated tag `v0.6.1` (`116532a`)
+  peels to commit `7fececb`, published 2026-11-16T21:49:20Z. No newer official
+  release or tag exists in `origin`.
+- **Comparison moved from `0184bb8` to current `main` at `296a03d`.** Against
+  `v0.6.1` that is **622 commits and 721 files**, **+94,507/−1,248**, with
+  **zero file deletions**. The current tree has **827 tracked files** (172 in
+  the v0.6.1 tree) and **28 numbered requirements**. The extra commits after
+  `0184bb8` are documentation, handoff and generated-reference updates, not
+  engine changes.
+- **Audit follow-up (`0dbff91`).** DSV4.1 body errors now close the HTTP/1.1
+  connection; current-facing docs and tracked benchmark evidence lost their
+  local drive/profile roots; the forward-slash machine-root guard was added;
+  the optional Bridge got a dependency-free smoke suite and CI job (with a
+  clear missing-directory `ValueError`); and the action-pin guard now covers
+  every workflow. `25bd587` recorded the handoff.
+- **Main/worktree consolidation.** `main` was fast-forwarded through
+  `0dc79e0` (handoff table), `a884397` (regenerated requirements history and
+  REQ-0019's moved last-modified commit) and `77a3f84` (the stale main-worktree
+  "bridge note" correction). Both worktrees are clean at the same commit; the
+  `clean/kindi-0.5` and `wip/main-interrupted-*` branches remain archival and
+  were not merged.
+- **Full CPU gate after the Usage/plan edits.** `coverage run --branch
+  --source=kindi -m pytest -q` first returned **1 failed, 1,230 passed, 28
+  skipped** in 246.53 s: `test_config_reference` caught the generated
+  `docs/CONFIGURATION-REFERENCE.md` stale. After regeneration the rerun returned
+  **1,231 passed, 28 skipped, 0 failed** in 243.91 s, with **46.2186%**
+  line+branch coverage (23,467 statements, 8,386 branches). `tools/check_coverage.py`
+  passed all **46** per-module floors. The failed first pass is kept in the
+  current docs; it is not replaced by the older clean 1,196/45.4% figure.
+- **No GPU claim.** None of this round's changes ran CUDA, a model pack or a
+  cold-tier pack; the live comparison's hardware and model sections are
+  unchanged.
+
+The comparison's old `0184bb8`/576-commit/704-file figures are retained only in
+earlier history above this section; the live report and its claims now name
+`296a03d`, 622 commits, 721 files and 827 tracked files.

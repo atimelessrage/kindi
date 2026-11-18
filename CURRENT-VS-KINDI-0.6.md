@@ -1,11 +1,11 @@
 # Current worktree vs official Kindi 0.6.1
 
 Report date: **2026-11-18**. Baseline: official **Kindi 0.6.1** (tag `v0.6.1`, commit
-`7fececb`, published 2026-11-16T21:49:20Z) against this fork's `main` at `0184bb8`.
+`7fececb`, published 2026-11-16T21:49:20Z) against this fork's `main` at `296a03d`.
 This page keeps the current comparison only; the round-by-round history has moved
 verbatim to `detailed-fork-changelog.md`.
 
-**Short answer.** This fork is **576 commits and 704 files ahead** of `v0.6.1`, with
+**Short answer.** This fork is **622 commits and 721 files ahead** of `v0.6.1`, with
 **zero file deletions** against the official tree. The measured advantages are the
 fork's own plan engine and tensor-core path, the tandem memory split, the KLD quality
 gate, `kindi plan` / `kindi caps` / `kindi autotune`, and the session and API work. The
@@ -16,7 +16,7 @@ both code changes in 0.6.1 are ported.
 
 | question | answer |
 |---|---|
-| **What is different** | 576 commits / 704 files ahead at `0184bb8`, 812 tracked files at the baseline against 172 upstream; 28 numbered requirements; no upstream file deleted. The fork adds its own runtime, commands, API surface and tests rather than changing 0.6.1's structure. |
+| **What is different** | 622 commits / 721 files ahead at `296a03d`, 827 tracked files at the baseline against 172 upstream; 28 numbered requirements; no upstream file deleted. The fork adds its own runtime, commands, API surface and tests rather than changing 0.6.1's structure. |
 | **Better, measured** | Dense tandem + plan-owner placement; the default tensor-core plan path (2B and 9B generation far ahead of stock's plain engine, in the separate TC configuration); 2B/9B same-settings decode parity; 27B peak reduced 7,721 -> 6,091 MiB; KLD quality gate; adaptive draft policy (+15.8% on the 2B, parity on the 27B); physical-core thread count. Details in §3 and §4.6. |
 | **New here** | `kindi plan`, `kindi kld`, `kindi caps`, `kindi autotune`, `kindi io`; sessions store/CLI/HTTP/resume/prune/stats; backend plugin contract + adapters; OpenAI error envelope and conformance harness; JSON-schema/GBNF constrained decoding; Windows install and CPU capability paths. |
 | **Worse** | Version identity stays 0.6.0 while official is 0.6.1, and there are no fork 0.6.1 images or fork installer artifact; mode A MTP speculation costs **0.66x** at its default k (off by default); the tandem split is **~8 vs ~31-34 tok/s** at 24K but buys memory, not speed; FP8 K/V is lossy; recursive GBNF is expensive by design. Details in §4.1-§4.4. |
@@ -24,22 +24,25 @@ both code changes in 0.6.1 are ported.
 
 ## 1. Baseline
 
-Official upstream: **Kindi 0.6.1**, tag `v0.6.1` (`7fececb`, 2026-11-16), GitHub
-release published 2026-11-16T21:49:20Z. The release notes name the 2B MTP fix and
+Official upstream: **Kindi 0.6.1**, tag `v0.6.1` (annotated tag `116532a`, peeled to
+`7fececb`, 2026-11-16), GitHub release published 2026-11-16T21:49:20Z. The GitHub
+release API was checked again on 2026-11-18; **v0.6.1 remains the latest official
+release**. The release notes name the 2B MTP fix and
 the `0.6.1-cuda` / `0.6.1-rocm6` / `0.6.1-rocm7` images. `v0.6.0` (`179710c`) is an
 ancestor of `main`; `v0.6.1` is one commit past the shared base `dce89df` and is not
-an ancestor of this fork. The comparison range is therefore `v0.6.1..0184bb8`, the last code and
-evidence commit; this report and its handoff commit add only documentation.
+an ancestor of this fork. The comparison range is therefore `v0.6.1..296a03d`, current
+`main`; the commits after `0184bb8` are documentation, handoff and generated-reference
+updates, not engine changes.
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD       # yes
 git merge-base --is-ancestor v0.6.1 HEAD       # no: v0.6.1 is one commit past dce89df
 git merge-base v0.6.1 HEAD                     # dce89df
-git log --oneline v0.6.1..0184bb8 | wc -l       # 576 commits
-git diff --shortstat v0.6.1..0184bb8           # 704 files, +93,047/-1,229
-git diff --diff-filter=D --name-only v0.6.1..0184bb8  # (empty: zero file deletions)
+git log --oneline v0.6.1..296a03d | wc -l       # 622 commits
+git diff --shortstat v0.6.1..296a03d           # 721 files, +94,507/-1,248
+git diff --diff-filter=D --name-only v0.6.1..296a03d  # (empty: zero file deletions)
 git ls-tree -r --name-only v0.6.1 | wc -l      # 172 upstream files
-git ls-tree -r --name-only 0184bb8 | wc -l     # 812 tracked files at the baseline
+git ls-tree -r --name-only 296a03d | wc -l     # 827 tracked files at the baseline
 ls docs/development/requirements/REQ-*.md | wc -l  # 28 numbered requirements
 ```
 
@@ -59,9 +62,10 @@ The 0.6.0 merge landed on 2026-11-14 (commit `f635513`, 18 conflicted files over
 zero-deletion check against `v0.6.1` shows none of its paths was dropped either.
 A line-count drop in a shortstat is edits inside files, not file deletions.
 
-Full suite at `0184bb8` (this refresh): **1204 passed, 28 skipped, 0 failed**, with
-`project_memory --check`, `config_reference --check` and `support_matrix --check`
-all clean. The skip count is the hardware/model/clang-only set, so the CPU and
+Full suite at `296a03d` (this refresh): **1,231 passed, 28 skipped, 0 failed**, after the
+first pass found the generated config reference stale (**1 failed, 1,230 passed, 28 skipped**)
+and it was regenerated; with `project_memory --check`, `config_reference --check` and
+`support_matrix --check` all clean. The skip count is the hardware/model/clang-only set, so the CPU and
 stub-engine surface is the part measured; the GPU and model paths were not re-run
 here. `python tools/check_claims.py` re-derives **17 gates / 95 numbers** from
 tracked evidence. The preview's HEAD chip includes the documentation commit that
@@ -115,13 +119,13 @@ above.
 
 ## 4. What is worse, missing, or unverified vs official Kindi 0.6.1
 
-Re-derived at `0184bb8` (2026-11-18) against the official `v0.6.1` release (`7fececb`, published
+Re-derived at `296a03d` (2026-11-18) against the official `v0.6.1` release (`7fececb`, published
 2026-11-16), with `v0.6.0` (`179710c` plus the post-tag `dce89df`) kept for the release ancestry. The
 title folds three different questions together, so they are separate below; each row ends with what
 would move it, and the linked benchmark pages and `docs/MTP.md` hold the dated runs behind them.
 
 **The short answer.** Nothing upstream is deleted or unported: every file of `v0.6.1` is still present
-(`git diff --diff-filter=D --name-only v0.6.1..0184bb8` is empty), and the release's two code changes are
+(`git diff --diff-filter=D --name-only v0.6.1..296a03d` is empty), and the release's two code changes are
 in `f934a55`. The official release now publishes `0.6.1-cuda`, `0.6.1-rocm6` and `0.6.1-rocm7` plus
 the source and installer hashes; this fork deliberately keeps its 0.6.0 version and container tags
 until it has a matching release. What remains open is **evidence**: measurements that need weights, a
@@ -293,7 +297,8 @@ arbitrary-draft-GGUF harness stays a separate gate.
   `diff --shortstat`, `diff --diff-filter=D`, `ls-tree`, `ls-files`).
 - Focused checks at this refresh: `python tools/check_claims.py` (17 gates / 95 numbers),
   `python -m pytest -q tests/test_claims.py tests/test_docs_links.py tests/test_agents_handoff.py`.
-- Full suite at `0184bb8`: **1204 passed, 28 skipped, 0 failed**; generated-artifact checks
+- Full suite at `296a03d`: **1,231 passed, 28 skipped, 0 failed** after the stale-reference
+  first pass was regenerated; generated-artifact checks
   (`project_memory --check`, `config_reference --check`, `support_matrix --check`) clean.
 - Claims registry and procedure: `docs/claims/README.md`, `docs/claims/REGISTRY.json`.
 - Requirement evidence: `docs/development/REQUIREMENTS-HISTORY.md`; live handoff and leases:
