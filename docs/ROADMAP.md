@@ -306,10 +306,10 @@ bit-level dequant tests) and a token-exact `kindi verify` plus the existing KLD/
 
 ### Ternary-MoE census (2026-11-18)
 
-The two ternary MoE builds reviewed so far both target `qwen35moe`. "llama.cpp-compatible
-candidate" below means a file with a standard GGUF `general.architecture = qwen35moe` tensor
-layout that upstream llama.cpp can load and that can be pinned for the Q0 reference gate; neither
-qualifies.
+The two ternary MoE builds reviewed so far are quantizations of Qwen3.6-35B-A3B; neither card's
+base-architecture label is asserted here for both. "llama.cpp-compatible candidate" below means a
+file with a standard GGUF `general.architecture = qwen35moe` tensor layout that upstream llama.cpp
+can load and that can be pinned for the Q0 reference gate; neither qualifies.
 
 | build | contents | format and runtime | why it cannot count as a llama.cpp candidate yet |
 |---|---|---|---|
