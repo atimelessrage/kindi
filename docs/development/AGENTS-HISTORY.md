@@ -1216,6 +1216,12 @@ file points here.
   keeps the pinned-GGUF Q0 gate in front of any asymmetric-precision experiment
   (`docs/ROADMAP.md`).
 
+### Coverage README re-derive lease (2026-11-18)
+
+| task | worktree | branch | shared files | state |
+|---|---|---|---|---|
+| Coverage README re-derive | this worktree | `freebuff/tandem-cpu-recovery` | `tests/README.md`, `AGENTS.md`, `docs/development/AGENTS-HISTORY.md` | done at `7325617`+. Re-derived the per-module rows from the 1,231-test run's `.coverage` data: `tandem`/`vram`/`expert_cache` 90/89/89, `bench`/`cache`/`server` 75/52/69, `engine`/`spec`/`tp`/`mtp` 24/20/13/19, `convert`/`gemma4_tp` 16/11. Corrected only the changed rows; the 46.2186% total and all 46 floors are untouched. Checks: handoff/docs **7 passed**, `project_memory --check`, `check_coverage` with the generated report 46 modules at/above floor, `git diff --check`. No full-suite or GPU run. |
+
 ### DSV4.1 413 close lease (2026-11-18)
 
 | task | worktree | branch | shared files | state |

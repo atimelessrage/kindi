@@ -60,10 +60,10 @@ covers the modules it can reach, and the heavy GPU modules are covered by `kindi
 
 | module | cover | who checks it |
 |---|---|---|
-| `tandem.py`, `vram.py`, `expert_cache.py` | 90%, 89%, 88% | the CPU suite (byte accounting, device mapping, cache state machine) |
-| `bench.py`, `cache.py`, `server.py` | 67%, 56%, 46% | the CPU suite plus the HTTP boundary tests |
+| `tandem.py`, `vram.py`, `expert_cache.py` | 90%, 89%, 89% | the CPU suite (byte accounting, device mapping, cache state machine) |
+| `bench.py`, `cache.py`, `server.py` | 75%, 52%, 69% | the CPU suite plus the HTTP boundary tests |
 | `engine.py`, `spec.py`, `tp.py`, `small mtp.py` | 24%, 20%, 13%, 19% | `kindi verify` (token-exact against llama.cpp) and the perf gate; pytest reaches the loaders, guards and CPU-side helpers |
-| `convert.py`, `gemma4_tp.py` | 18%, 0% | `kindi convert` plus the mixer/support tests; the CUDA half needs a card |
+| `convert.py`, `gemma4_tp.py` | 16%, 11% | `kindi convert` plus the mixer/support tests; the CUDA half needs a card |
 
 The 27% total floor is the noisy-gate guard. On top of it, `tests/coverage_floors.json`
 pins a per-module floor for **46** modules the CPU suite reaches (audit M4), including the
