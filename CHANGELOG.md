@@ -4,6 +4,11 @@
 
 ### Added
 
+- **A direct 27B speculation A/B compares outputs byte for byte** — `tools/spec_ab.py` builds one
+  27B tensor-core engine with the 2B drafter and its head, then generates the same prompts plain
+  and under `ngram`, `draft2b` and `both`, comparing token ids and decoded bytes without consulting
+  a reference verdict. The 2026-11-18 run is **12/12 prompt/mode pairs identical** (4 prompts x
+  3 modes, 40 greedy tokens each); `docs/MTP.md` links the command and hashes.
 - **The server warns at startup when `KINDI_SPEC` has no tensor-core path** — `KINDI_SPEC` without
   `KINDI_TC=1` used to start silently until `/health` was queried. `create_app` now logs
   `warning: speculation off: ...` with the same tensor-core-path reason `/health` reports, built by

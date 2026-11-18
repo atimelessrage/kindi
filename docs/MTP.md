@@ -173,7 +173,12 @@ The same drafter and almost the same acceptance give opposite answers. A draft p
 pass is far more expensive than a drafter step *and* the accepted run is long enough to cover the verify
 pass (about 2.3 plain steps at T = 4 here). At 41-43% acceptance that holds for the 27B and not for the
 9B, so the installer offers the 2B drafter to the 27B only. Do not add it to the 9B without measuring
-acceptance first. Output was byte-identical in every run: speculation changes the speed, never a token.
+acceptance first. A direct A/B on 2026-11-18 compared the 27B plain output with `ngram`,
+`draft2b` and `both` from the same engine and prompt, byte for byte: **12/12 prompt/mode pairs were
+identical** (4 prompts x 3 modes, 40 greedy tokens each), with matching token ids and decoded byte
+hashes. The harness is `tools/spec_ab.py`; the command and per-prompt hashes are in
+[RESULTS](benchmarks/2026-11-18-i7-8086k-rtx4060ti-27b-spec-ab/RESULTS.md). Speculation changes
+the speed, never a token.
 The recorded [27B drafter exactness matrix](benchmarks/2026-11-17-i7-8086k-rtx4060ti-27b-drafter/RESULTS.md)
 backs that for `tc-ngram`, `tc-draft2b` and `tc-both`: each matches the no-speculation cell's
 verdict (3 exact + 1 accepted llama.cpp tie, 0 fail).
