@@ -348,6 +348,32 @@ def test_the_planned_bench_command_carries_the_planned_context(tmp_path):
     assert argv[-3:] == ["bench", "--dcache", str(rep["dcache"])]
 
 
+def test_the_emitted_bench_command_is_accepted_by_the_real_cli(tmp_path, monkeypatch):
+    """The parent-before-child `--ctx` is not only printed in that order: the real argparse path
+    accepts the emitted line and the bench stub receives the planned context, pack and slots."""
+    from kindi import __main__ as cli
+
+    pack = make_lightning_pack(tmp_path)
+    posix_pack = pack.as_posix()            # /-separated so a POSIX split round-trips on Windows too
+    monkeypatch.setattr(_plan, "_WINDOWS", False)
+    monkeypatch.setattr(_plan.sys, "executable", "/usr/bin/python3")
+    rep = _plan.describe(posix_pack, 3072, None, assume_vram_gib=0.5, assume_ram_gib=4,
+                         assume_cores=2, reserve_mib=0, rates=RATES)
+    argv = shlex.split(rep["command"])
+    assert argv[:3] == ["/usr/bin/python3", "-m", "kindi"]
+    cli_argv = argv[3:]
+    assert cli_argv.index("--ctx") < cli_argv.index("bench")
+
+    seen = []
+    monkeypatch.setattr(cli, "cmd_bench", lambda cfg, a: seen.append((cfg, a)) or 0)
+    assert cli.main(cli_argv) == 0
+    assert len(seen) == 1
+    cfg, args = seen[0]
+    assert cfg["ctx"] == 3072
+    assert cfg["dcache"] == rep["dcache"]
+    assert Path(cfg["pack"]) == pack
+
+
 def test_run_measures_rates_for_a_lightning_pack(tmp_path, monkeypatch, capsys):
     pack = make_lightning_pack(tmp_path)
     monkeypatch.setattr(_plan, "_io_rates", lambda: RATES)
