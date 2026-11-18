@@ -251,6 +251,43 @@ it has been observed to differ (`ssm_dt` without `.bias`, `rope.dimension_sectio
 use a Bartowski/Unsloth llama.cpp-compatible GGUF, or normalize those two deltas in a Kindi
 converter with byte-level tests first.
 
+**Standard llama.cpp GGUF route for a 16 GB NVIDIA card (checked 2026-11-18):**
+[unsloth/Qwen3.6-35B-A3B-GGUF](https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF) publishes ordinary
+llama.cpp files whose `general.architecture` is `qwen35moe`; upstream llama.cpp has a loader and
+model implementation for it
+([src/models/qwen35moe.cpp](https://github.com/ggml-org/llama.cpp/blob/master/src/models/qwen35moe.cpp)),
+so this is the path a 16 GB card can run today, unlike the Apple-only ternary builds below. The
+repository's published sizes are decimal GB and cover weights only; a 16 GiB card has at most 17.2
+decimal GB of VRAM before the driver reserve, so context/KV and runtime overhead come out of the
+difference.
+
+| Unsloth file | published GB | decimal GB left on a 16 GiB card |
+|---|---:|---:|
+| `UD-IQ2_XXS` | 10.8 | 6.4 |
+| `UD-IQ2_M` | 11.5 | 5.7 |
+| `UD-Q2_K_XL` | 12.3 | 4.9 |
+| `UD-IQ3_XXS` | 13.2 | 4.0 |
+| `UD-IQ3_S` | 13.7 | 3.5 |
+| `UD-Q3_K_S` | 15.4 | 1.8 |
+| `UD-Q3_K_M` | 16.6 | 0.6 |
+| `UD-Q3_K_XL` | 16.8 | 0.4 |
+
+The IQ2 files leave 4.9-6.4 GB and the IQ3 files 3.5-4.0 GB for the GDN state, the ten
+full-attention layers' K/V and the runtime reserve. `UD-Q3_K_S` leaves only 1.8 GB, and
+`UD-Q3_K_M`/`UD-Q3_K_XL` are already 16.6/16.8 GB, so those two need partial CPU offload
+(`-ngl` below every layer) and are not whole-GPU candidates. A starting point for the IQ2 route is
+stock `llama-server -m Qwen3.6-35B-A3B-UD-IQ2_M.gguf -ngl 99 -c 8192` (or `UD-IQ3_S` for a
+longer context budget check); the llama.cpp build must include `qwen35moe` support.
+
+This is a llama.cpp route, not a Kindi one. Kindi still recognizes `qwen35moe` and refuses it
+because it has no such backend, so none of these GGUFs can be served or verified by Kindi yet. The
+still-missing gate is the backend itself: the Q0 pinned-GGUF/reference artifact and the GDN,
+full-attention and MoE milestones in the table above, not another quantization. For the 16 GB
+target, choose `UD-IQ2_M` (11.5 GB) as the byte-pinned artifact; the Q4_K_M file is an optional
+quality reference, not a second required pin. Until that backend lands, the concrete 16 GB/NVIDIA recommendation
+is stock llama.cpp with an IQ2 or IQ3 file, and the ternary community builds below remain
+Q0-ineligible.
+
 **Qwen3.6-35B-A3B ternary community builds (external, checked 2026-11-17):** the official model
 uses the `qwen35moe` architecture, and these are real third-party quantizations, but they are not
 Q0 artifacts.
