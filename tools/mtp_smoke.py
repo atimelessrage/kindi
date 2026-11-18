@@ -216,6 +216,17 @@ def _wait_for_drafted(base, proc, timeout):
     raise SmokeError("drafting.last did not show drafted tokens after the request (last=%r)" % (last,))
 
 
+def _check_last_method(last):
+    """Reject a post-request block that reports a mode other than MTP.
+
+    The pre-request health check can show `mtp` while the request itself falls back
+    to another drafter; the last block is the evidence that mode A actually ran.
+    """
+    if last.get("method") != "mtp":
+        raise SmokeError("drafting.last.method is %r, not mtp (last=%r)"
+                         % (last.get("method"), last))
+
+
 def _metric(text, name):
     match = re.search(r"(?m)^%s(?:\{[^}]*\})?\s+([0-9]+(?:\.[0-9]+)?)\s*$" % re.escape(name), text)
     if not match:
@@ -356,9 +367,7 @@ def _run(args, temp_dir):
             raise SmokeError("%s is %d after one greedy completion" % (METRIC_DRAFTED, drafted))
         if accepted < 0 or accepted > drafted:
             raise SmokeError("inconsistent spec counters: drafted=%d accepted=%d" % (drafted, accepted))
-        if last.get("method") != "mtp":
-            raise SmokeError("drafting.last.method is %r, not mtp (last=%r)"
-                             % (last.get("method"), last))
+        _check_last_method(last)
         last_drafted = int(last.get("drafted") or 0)
         last_accepted = int(last.get("accepted") or 0)
         if last_drafted <= 0:
