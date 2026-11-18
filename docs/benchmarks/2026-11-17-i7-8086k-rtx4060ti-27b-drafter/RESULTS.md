@@ -82,14 +82,16 @@ below the saved tok/s. New cells and faster runs pass. The per-cell status,
 exactness and signed throughput deltas are written to `comparison.csv` and
 `comparison.json` under `--out`.
 
-Run against the saved baseline on 2026-11-17, the command passed: all three
-cells stayed `3/1/0` and requested their mode, at 48.3/73.3/64.7 tok/s
-(-3.0%, -3.2% and -3.6% against 49.8/75.7/67.1), with no missing cells.
+Run against the saved baseline on 2026-11-18 after switching it to the three-pass
+medians, the command passed: all three cells stayed `3/1/0` and requested their
+mode, at 49.8/75.7/66.9 tok/s (+9.0%, +6.6% and +7.9% against
+45.7/71.0/62.0), with no missing cells. The earlier 2026-11-17 run used the
+first-pass values as the baseline and passed at 48.3/73.3/64.7 against
+49.8/75.7/67.1.
 
-The baseline keeps that first pass's one-run values. The three-pass medians are
-6.6-9.0% below them, inside the 10% limit, so a typical run passes with less
-headroom than the first-pass figures suggest; a regression gate at 10% therefore
-still separates a real drop from the spread observed here.
+The baseline now stores the medians, not one run. That makes the gate compare a
+typical pass with a typical pass; the first-pass values sat only 6.6-9.0% above
+the medians and left less headroom than the 10% limit implied.
 
 ## Artifacts
 

@@ -100,13 +100,14 @@
 - **The 27B drafter speculation cells are a tracked verify-matrix baseline** —
   `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-27b-drafter/verify-baseline.json`
   freezes `tc-ngram`, `tc-draft2b` and `tc-both` (all pass, 3 exact + 1 tie;
-  one-pass 49.8/75.7/67.1 tok/s) and the exact
+  three-pass medians 45.7/71.0/62.0 tok/s) and the exact
   `--baseline ... --fail-on-regression --max-tps-drop-pct 10` command is in that
-  page and `docs/CARD-SUPPORT.md`. The first gate run passed with exactness
-  unchanged and throughput -3.0/-3.2/-3.6%; a missing cell, a lost exact prompt
-  or a drop over 10% exits 1. Three repeat passes give medians of
-  45.7/71.0/62.0 tok/s (ranges 44.5-46.7, 70.7-71.1, 61.3-62.3), which the 27B
-  benchmark page now reports; the one-pass values are marked superseded.
+  page and `docs/CARD-SUPPORT.md`. The 2026-11-18 gate re-run after switching the
+  baseline from the first pass to those medians passed with exactness unchanged
+  and throughput +9.0/+6.6/+7.9% (49.8/75.7/66.9 tok/s); a missing cell, a lost
+  exact prompt or a drop over 10% exits 1. The repeat passes ranged
+  44.5-46.7, 70.7-71.1 and 61.3-62.3; the first pass's 49.8/75.7/67.1 values are
+  superseded.
 - **`kindi io` measures this host's memory tiers** — a RAM copy, an unbuffered disk read and pinned
   PCIe copies both ways, as text or `--json` (`--mib`, `--disk-dir`, `--skip`). The disk probe writes
   a temporary file and reads it with `O_DIRECT` (Linux) or `FILE_FLAG_NO_BUFFERING` (Windows) so it
