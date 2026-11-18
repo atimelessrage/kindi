@@ -800,6 +800,21 @@ def test_startup_warns_when_spec_needs_the_tensor_core_path(monkeypatch, request
         assert client.get("/health").json()["drafting"]["reason"] == reason
 
 
+def test_startup_does_not_warn_when_the_engine_has_the_spec_path(monkeypatch):
+    """The negative of the warning test: with KINDI_SPEC set and a tensor-core engine attached,
+    startup stays quiet. Otherwise the warning would fire on the supported configuration too."""
+    monkeypatch.setenv("KINDI_SPEC", "mtp")
+    K = _SpecKindi(True)                  # _SpecEngine defines spec_begin, so the path is attached
+    assert hasattr(K.eng, "spec_begin")
+    monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
+    logs = []
+    app = server.create_app({"model_name": "bonsai2-2b", "api_key": ""}, log=logs.append)
+    assert not [line for line in logs if line.startswith("warning: speculation off:")]
+    with TestClient(app) as client:
+        d = client.get("/health").json()["drafting"]
+    assert d["enabled"] is True and d["method"] == "mtp" and d["reason"] is None
+
+
 @pytest.mark.parametrize("loaded", [True, False], ids=["head-loaded", "head-refused"])
 def test_health_reports_the_effective_speculation_state(monkeypatch, loaded):
     """REQ-0024 A1: KINDI_SPEC=mtp is the request; /health answers what is running. With the head
