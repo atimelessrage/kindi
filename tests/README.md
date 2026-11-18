@@ -43,8 +43,11 @@ self-hosted GPU lane is described in [docs/CI.md](../docs/CI.md); it is not run 
 
 ## Coverage: where the 27% floor comes from
 
-Measured on 2026-11-18 (Windows, 1,196 passed, 28 skipped, line+branch): **45.4% total**. The floor
-in CI stays 27%, not 45%, because the number moves with the platform and a gate that fails on a
+Measured on 2026-11-18 (Windows, line+branch): **1,231 passed, 28 skipped, 0 failed; 46.2% total**
+(46.2186%; 23,467 statements and 8,386 branches). The first post-Usage/plan run failed
+`test_config_reference` with **1 failed, 1,230 passed, 28 skipped** because
+`docs/CONFIGURATION-REFERENCE.md` was stale; it was regenerated and the suite rerun. The floor
+in CI stays 27%, not 46%, because the number moves with the platform and a gate that fails on a
 fresh Linux checkout is worse than a loose gate. The distribution is what matters: the CPU suite
 covers the modules it can reach, and the heavy GPU modules are covered by `kindi verify` and
 `kindi bench` on hardware, not by pytest.
@@ -64,7 +67,7 @@ CPU-exercised module cannot rot while the total holds. The new floors sit 10 poi
 measured value; the graph builders (`spec.py`, `dspine.py`, `mtp.py`, `tp.py`) get only a low
 CPU-reachable floor, because their CUDA paths are `kindi verify`'s job on hardware. A GPU run
 should raise those floors, not a hand edit. `moe_cpu.py` stays out until its C library is built
-in CI. Do not read "45%" as "the engine is half-tested"; read the table.
+in CI. Do not read "46%" as "the engine is half-tested"; read the table.
 
 ## Turing reference suite (optional)
 

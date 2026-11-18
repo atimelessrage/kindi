@@ -4,6 +4,12 @@
 
 ### Added
 
+- **The full CPU gate was rerun after the Usage/plan edits** — the first pass found the generated
+  configuration reference stale: **1 failed, 1,230 passed, 28 skipped** in 246.53 s. After
+  regenerating `docs/CONFIGURATION-REFERENCE.md`, the rerun is **1,231 passed, 28 skipped, 0 failed**
+  in 243.91 s at **46.2186%** line+branch coverage (23,467 statements, 8,386 branches). This
+  supersedes the older 1,196-pass / 45.4% figure, which predates these edits and also had a stale
+  reference in its first pass.
 - **The cold-expert decoder keeps its pinned slots across steps** — the decode hit test asked the
   host device-slot table (`lightning.downer`) whether an expert was "already warm", but that table
   is written by `lt_cache_dec`, which skips every cold expert (`hidx[e] < 0`). The hit set could
@@ -277,8 +283,9 @@
 - **The documentation/support gates run in CI** — `check_claims.py`, `project_memory --check`,
   `config_reference --check` and `support_matrix --check` are now one CPU-job step, pinned by
   `tests/test_ci_config.py`.
-- **Per-module coverage floors now cover 46 modules** — the measured 2026-11-18 full-suite run
-  (1,196 passed, 28 skipped, 45.4% total) added floors for the planner, MoE policy, grammar and
+- **Per-module coverage floors now cover 46 modules** — the historical 2026-11-18 full-suite run
+  (1,196 passed, 28 skipped, 45.4% total; its first pass had the then-stale generated reference)
+  added floors for the planner, MoE policy, grammar and
   chat parsers, CLIs, the new cold/I/O/autotune modules, and low CPU-reachable floors for the
   graph builders (`spec.py`, `dspine.py`, `mtp.py`, `tp.py`); `engine.py` moves from 19% to 20%.
   The floors sit 10 points below the measured values, and `moe_cpu.py` stays out until its C
