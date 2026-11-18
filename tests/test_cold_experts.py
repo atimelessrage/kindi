@@ -205,19 +205,28 @@ def test_prefetch_queue_serves_later_demand_without_another_read(tmp_path):
 
 
 def test_prefetch_queue_evicts_oldest_and_duplicate_prefetches_do_not_reread(tmp_path):
-    """A duplicate prefetch is free; overflowing the byte limit drops the oldest span."""
+    """An in-call duplicate of an uncached span costs one read; overflow drops the oldest span."""
     path, data = _file(tmp_path)
     spans = [(0, 16), (4096, 16), (8192, 16)]
     reader = cold_experts.ColdExpertReader(path, coalesce=0, prefetch_bytes=32)
     try:
-        assert reader.prefetch([spans[0]]) == 1
+        # Both copies are uncached when the call starts, so only the in-call `seen` set can
+        # keep this to one read and one queued span. (An already-queued span is filtered by
+        # the cache membership check first, which is the path the old test exercised.)
+        assert reader.prefetch([spans[0], spans[0]]) == 1
+        first = reader.stats()
+        assert first["reads"] == 1
+        assert first["prefetch_requests"] == 1
+        assert first["prefetched_bytes"] == 16
+        assert first["prefetch_cached_bytes"] == 16      # exactly one span is queued
+
         assert reader.prefetch([spans[1]]) == 1
         before = reader.stats()
         assert before["prefetch_cached_bytes"] == 32
         assert before["reads"] == 2
 
-        # Re-requesting both queued spans, including a duplicate in one call, reads nothing.
-        assert reader.prefetch([spans[0], spans[1], spans[0]]) == 0
+        # Re-requesting spans that are already queued reads nothing (the cache path).
+        assert reader.prefetch([spans[0], spans[1]]) == 0
         after = reader.stats()
         assert after["reads"] == before["reads"]
         assert after["prefetch_requests"] == before["prefetch_requests"]
