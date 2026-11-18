@@ -273,10 +273,12 @@ difference.
 | `UD-Q3_K_XL` | 16.8 | 0.4 |
 
 The IQ2 files leave 4.9-6.4 GB and the IQ3 files 3.5-4.0 GB for the GDN state, the ten
-full-attention layers' K/V and the runtime reserve. `UD-Q3_K_S` leaves only 1.8 GB, and
-`UD-Q3_K_M`/`UD-Q3_K_XL` are already 16.6/16.8 GB, so those two need partial CPU offload
-(`-ngl` below every layer) and are not whole-GPU candidates. A starting point for the IQ2 route is
-stock `llama-server -m Qwen3.6-35B-A3B-UD-IQ2_M.gguf -ngl 99 -c 8192` (or `UD-IQ3_S` for a
+full-attention layers' K/V and the runtime reserve. `UD-Q3_K_S` leaves only 1.8 GB.
+`UD-Q3_K_M`/`UD-Q3_K_XL` do fit within the 16 GiB card (16.6/16.8 decimal GB of weights), but
+leave only 0.6/0.4 decimal GB for context, K/V and runtime overhead, so useful-context runs need
+partial CPU offload (`-ngl` below every layer) and are not whole-GPU candidates. A starting point
+for the IQ2 route is stock `llama-server -m Qwen3.6-35B-A3B-UD-IQ2_M.gguf -ngl 99 -c 8192` (or
+`UD-IQ3_S` for a
 longer context budget check); the llama.cpp build must include `qwen35moe` support.
 
 This is a llama.cpp route, not a Kindi one. Kindi still recognizes `qwen35moe` and refuses it

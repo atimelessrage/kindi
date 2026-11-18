@@ -1281,3 +1281,9 @@ file points here.
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
 | Ternary-MoE census expansion (2026-11-18) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/ROADMAP.md`, `AGENTS.md`, `docs/development/AGENTS-HISTORY.md` | done. Added six published ternary-MoE builds outside the Qwen3.6 pair: Nota/boro64 Nemotron 30B-A3B (already the `lightning-30b` catalog model), DeepGrove Maple-Preview, Schackay3 Qwen3-Next-80B, kabcpc Flint 40B, ToxeH Qwen3-Coder Ternary2x, and micro-terse. Kept MoTE, ButterflyMoE and Nota's on-request checkpoint as unread leads with reasons; recorded UlukaDev (dense base + LoRA), TC-MoE (routing, not weights) and Ternary-Bonsai (dense) as checked and not counted. Checks: `tests/test_docs_links.py` **3 passed**, `check_claims.py` OK, `git diff --check`. |
+
+### Q3_K_M/XL 16 GiB wording corrected (2026-11-18)
+
+| task | worktree | branch | shared files | state |
+|---|---|---|---|---|
+| Q3_K_M/XL 16 GiB wording (2026-11-18) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/ROADMAP.md`, `AGENTS.md`, `docs/development/AGENTS-HISTORY.md` | done. The sentence said the 16.6/16.8 GB files "are already" that size, implying they exceed 16 GiB; they fit (16 GiB is 17.2 decimal GB), but leave only 0.6/0.4 decimal GB for context/KV/overhead, which is why useful-context runs need partial CPU offload. The decimal-GB table and the missing `qwen35moe` gate are unchanged. Checks: docs links **3 passed**, `check_claims.py` OK, `project_memory.py --check` clean, `git diff --check`. |
