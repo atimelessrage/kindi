@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `2cd4d21` on `freebuff/tandem-cpu-recovery` (**main** is fast-forwarded to this branch at handoff; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `f6e73ae` on `freebuff/tandem-cpu-recovery` (**main** is fast-forwarded to this branch at handoff; guarded by `tests/test_agents_handoff.py`).
 
 ### Python quality ratchet
 
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `2cd4d21` | main checkout; clean; fast-forwarded to this branch |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `2cd4d21` | this session; checked out here |
+| `T:/kindi` | `main` | `f6e73ae` | main checkout; clean; fast-forwarded to this branch |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `f6e73ae` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
@@ -284,7 +284,7 @@ now gitignored, and every remote ref is already contained: `origin/main` (`dce89
 merging either would import superseded or corrupt code:
 
 - `wip/main-interrupted-snapshot-20261109-045352` — and the stash-format
-  `wip/main-interrupted-backup-20261109-045352`, whose files are a subset of it — holds 40 paths that
+  `wip/main-interrupted-backup-20261109-045352`, whose files are a subset of it — holds 38 paths that
   exist nowhere else: a doorbell/async-copy `tandem_kernels.cu` plus a `tandem_new.py` placeholder, an
   AVX-512/VNNI/AMX `cpuid` detection draft, the 2026-11-07/08 planning set (`GOALS.md`,
   `IMPLEMENTATION_PLAN.md`, `docs/GPU_PROFILE_ANALYSIS.md`, `docs/PAIR-SETUPS.md`,
@@ -296,7 +296,10 @@ merging either would import superseded or corrupt code:
   `pair_fits` on 2026-11-14, and the planning docs are 0.4.0-era drafts superseded by
   `docs/ROADMAP.md`, `docs/GOALS.md`, `docs/CARDS.md`, `docs/MIXED-CARD-ROADMAP.md`,
   `docs/OLD-CARD-RIG.md` and `docs/EXTERNAL-ENGINES.md`. Nothing was merged; both stay archival.
-- `clean/kindi-0.5` (1 commit, 418 behind) is the 0.5 comparison baseline, not a candidate.
+- `clean/kindi-0.5` (1 commit, 633 behind) is the 0.5 comparison baseline, not a candidate. A
+  2026-11-18 re-check at `f6e73ae` found 38 snapshot-only paths, 13 in the backup (a subset), and
+  none in `clean/kindi-0.5`; the candidates are the same broken/unbuilt drafts, so nothing was
+  extracted and no new test was added.
 
 There is no TODO/FIXME or unfinished code path in `kindi/` or `tools/`; the open work is the
 owner/hardware-bound gate list above.
