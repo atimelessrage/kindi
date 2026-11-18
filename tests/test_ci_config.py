@@ -65,6 +65,23 @@ def test_cpu_job_runs_the_documentation_and_generated_reference_gates():
     assert "Documentation, claims and generated-reference gates" in ci
 
 
+def test_bridge_smoke_job_runs_the_readme_command():
+    """The optional Bridge suite is shipped only if CI runs the command its README documents.
+
+    The 2026-11-18 audit found bridge/README.md naming a `tests` directory this tree did not
+    carry and no Bridge job in ci.yml. Both exist now; this pins the README, the job and the
+    suite file together so one cannot drift from the others again.
+    """
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    readme = (ROOT / "bridge" / "README.md").read_text(encoding="utf-8")
+    command = "python -m unittest discover -s tests -v"
+    assert "bridge-smoke:" in ci
+    assert "working-directory: bridge" in ci
+    assert command in ci
+    assert command in readme
+    assert (ROOT / "bridge" / "tests" / "test_smoke.py").is_file()
+
+
 def test_workflow_actions_are_pinned_to_shas():
     """Every workflow's actions are immutable: CPU CI alone is not the attack surface a push adds."""
     workflows = sorted((ROOT / ".github" / "workflows").glob("*.yml"))
