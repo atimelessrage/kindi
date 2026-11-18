@@ -734,12 +734,14 @@ history.
   **v0.6.1** as `latest` on 2026-11-18. The annotated tag `v0.6.1` (`116532a`)
   peels to commit `7fececb`, published 2026-11-16T21:49:20Z. No newer official
   release or tag exists in `origin`.
-- **Comparison moved from `0184bb8` to current `main` at `296a03d`.** Against
-  `v0.6.1` that is **622 commits and 721 files**, **+94,507/−1,248**, with
+- **Comparison moved from `0184bb8` to the code/evidence snapshot at `296a03d`.**
+  Against `v0.6.1` that is **622 commits and 721 files**, **+94,507/−1,248**, with
   **zero file deletions**. The current tree has **827 tracked files** (172 in
   the v0.6.1 tree) and **28 numbered requirements**. The extra commits after
   `0184bb8` are documentation, handoff and generated-reference updates, not
-  engine changes.
+  engine changes. The later report/docs commit is documentation-only and changes
+  no code, test or benchmark evidence; the preview is rendered from that final
+  commit.
 - **Audit follow-up (`0dbff91`).** DSV4.1 body errors now close the HTTP/1.1
   connection; current-facing docs and tracked benchmark evidence lost their
   local drive/profile roots; the forward-slash machine-root guard was added;
@@ -765,5 +767,6 @@ history.
   unchanged.
 
 The comparison's old `0184bb8`/576-commit/704-file figures are retained only in
-earlier history above this section; the live report and its claims now name
-`296a03d`, 622 commits, 721 files and 827 tracked files.
+earlier history above this section; the live report and its claims now name the
+code/evidence snapshot `296a03d`, 622 commits, 721 files and 827 tracked files.
+The later report/docs commit is documentation-only.

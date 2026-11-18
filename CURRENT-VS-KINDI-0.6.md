@@ -1,8 +1,10 @@
 # Current worktree vs official Kindi 0.6.1
 
 Report date: **2026-11-18**. Baseline: official **Kindi 0.6.1** (tag `v0.6.1`, commit
-`7fececb`, published 2026-11-16T21:49:20Z) against this fork's `main` at `296a03d`.
-This page keeps the current comparison only; the round-by-round history has moved
+`7fececb`, published 2026-11-16T21:49:20Z) against this fork's code/evidence
+snapshot at **`296a03d`**. Every later report/docs commit, including the one that
+carries this text, is documentation-only and adds no engine, test or benchmark
+changes. This page keeps the current comparison only; the round-by-round history has moved
 verbatim to `detailed-fork-changelog.md`.
 
 **Short answer.** This fork is **622 commits and 721 files ahead** of `v0.6.1`, with
@@ -16,7 +18,7 @@ both code changes in 0.6.1 are ported.
 
 | question | answer |
 |---|---|
-| **What is different** | 622 commits / 721 files ahead at `296a03d`, 827 tracked files at the baseline against 172 upstream; 28 numbered requirements; no upstream file deleted. The fork adds its own runtime, commands, API surface and tests rather than changing 0.6.1's structure. |
+| **What is different** | 622 commits / 721 files ahead at the code/evidence snapshot `296a03d`, 827 tracked files at the baseline against 172 upstream; 28 numbered requirements; no upstream file deleted. The fork adds its own runtime, commands, API surface and tests rather than changing 0.6.1's structure. |
 | **Better, measured** | Dense tandem + plan-owner placement; the default tensor-core plan path (2B and 9B generation far ahead of stock's plain engine, in the separate TC configuration); 2B/9B same-settings decode parity; 27B peak reduced 7,721 -> 6,091 MiB; KLD quality gate; adaptive draft policy (+15.8% on the 2B, parity on the 27B); physical-core thread count. Details in §3 and §4.6. |
 | **New here** | `kindi plan`, `kindi kld`, `kindi caps`, `kindi autotune`, `kindi io`; sessions store/CLI/HTTP/resume/prune/stats; backend plugin contract + adapters; OpenAI error envelope and conformance harness; JSON-schema/GBNF constrained decoding; Windows install and CPU capability paths. |
 | **Worse** | Version identity stays 0.6.0 while official is 0.6.1, and there are no fork 0.6.1 images or fork installer artifact; mode A MTP speculation costs **0.66x** at its default k (off by default); the tandem split is **~8 vs ~31-34 tok/s** at 24K but buys memory, not speed; FP8 K/V is lossy; recursive GBNF is expensive by design. Details in §4.1-§4.4. |
@@ -30,9 +32,11 @@ release API was checked again on 2026-11-18; **v0.6.1 remains the latest officia
 release**. The release notes name the 2B MTP fix and
 the `0.6.1-cuda` / `0.6.1-rocm6` / `0.6.1-rocm7` images. `v0.6.0` (`179710c`) is an
 ancestor of `main`; `v0.6.1` is one commit past the shared base `dce89df` and is not
-an ancestor of this fork. The comparison range is therefore `v0.6.1..296a03d`, current
-`main`; the commits after `0184bb8` are documentation, handoff and generated-reference
-updates, not engine changes.
+an ancestor of this fork. The comparison range is therefore `v0.6.1..296a03d`, the
+**code/evidence snapshot**; every git figure and measured result below is taken at
+`296a03d`. The commits after `0184bb8` are documentation, handoff and generated-reference
+updates, not engine changes, and the later report/docs commit that carries this text is
+documentation-only as well.
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD       # yes
@@ -68,9 +72,9 @@ and it was regenerated; with `project_memory --check`, `config_reference --check
 `support_matrix --check` all clean. The skip count is the hardware/model/clang-only set, so the CPU and
 stub-engine surface is the part measured; the GPU and model paths were not re-run
 here. `python tools/check_claims.py` re-derives **17 gates / 95 numbers** from
-tracked evidence. The preview's HEAD chip includes the documentation commit that
-follows this snapshot, so its shortstat can be slightly larger than the numbers
-above.
+tracked evidence. The preview is rendered from the final documentation-only commit,
+so its HEAD chip and shortstat include that docs commit; the numbers above remain
+the comparison at `296a03d`.
 
 ## 2. Upstream 0.6.x features present here
 
