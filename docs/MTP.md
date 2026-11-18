@@ -58,6 +58,15 @@ needs a tensor-core GPU and the registered head, and fails before starting the s
 is missing. It is a `tools/` script, not a `tests/test_*.py` file, so the CPU-only pytest suite does
 not collect it.
 
+### Live result: attached is not the same as drafted (2026-11-18)
+
+A live 2B server run with the head attached reported `drafting.method: "mtp"` and
+`drafting.last` `passes: 3, drafted: 12, accepted: 8`. The method is the attached state; the
+non-zero drafted count is the part that says the head actually produced draft tokens for this
+request rather than `KINDI_SPEC=mtp` being echoed back, and the eight accepted drafts say the
+target verified them. This is one request, not a throughput or token-exactness measurement; the
+smoke tool above is the repeatable form of the check.
+
 ## Measured speed
 
 These measurements used greedy decoding, 128 tokens (2B: 512 tokens, the median of 3 runs), and the same text on
