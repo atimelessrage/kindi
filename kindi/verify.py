@@ -125,7 +125,7 @@ def run(cfg, log=print):
     cl = os.path.join(pack, "head_clusters.npz")
     eng = make_engine(pack, ctx=1024, clusters=dict(np.load(cl)) if os.path.exists(cl) else None, log=log,
                        tandem=cfg.get("tandem", "off"), cpu_layers=cfg.get("tandem_cpu_layers"),
-                       gpu=cfg.get("tandem_gpu"))
+                       gpu=cfg.get("tandem_gpu"), kv_cache=cfg.get("kv_cache"))
     # the first line names the mode that will generate, so a PASS is never read as the plain engine's
     # when speculation was on - or the reverse (REQ-0025 A1); a drafter that did not attach stops here (A4)
     spec_mode, spec_line, refusal = spec_state(eng)

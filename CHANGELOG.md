@@ -223,6 +223,12 @@
 
 ### Fixed
 
+- **`kindi verify`/`bench` now pass the configured Nanbeige K/V cache through the engine gateway** —
+  `make_engine` did not put `kv_cache` in the adapter config, so a pack served by `kindi serve`
+  used the configured cache while verify/bench's registry path fell back to the engine default. The
+  gateway now forwards `kv_cache` from verify, bench and calibrate, and
+  `tests/test_served_engines.py` records the engine constructor from both paths for the Nanbeige,
+  Lightning and Gemma 4 serve families, so a wrapper cannot drift to another class or argument again.
 - **`kindi plan`'s follow-up commands survive a spaced path** — the printed `bench` lines formatted
   the interpreter and pack with `%s`, so `C:\Program Files\Python 313\python.exe` or
   `/mnt/my packs/bonsai` split into several arguments when pasted. Both builders now quote the argv

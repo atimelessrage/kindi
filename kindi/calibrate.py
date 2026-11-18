@@ -29,7 +29,8 @@ def run(cfg, log=print):
         log("kindi calibrate: the pack manifest names no source_sha256; calibration keys on the pack hash")
         return 2
 
-    eng = make_engine(pack, ctx=cfg.get("ctx", 24576), log=log)   # times + stores the g5 configs
+    eng = make_engine(pack, ctx=cfg.get("ctx", 24576), log=log,
+                      kv_cache=cfg.get("kv_cache"))   # times + stores the g5 configs
     saved = calib.read(gpu, pack_sha) or {}
     shapes = len((saved.get("g5") or {}).get("lane") or {}) + len((saved.get("g5") or {}).get("row") or {})
     log("kindi calibrate: 5-trit configs for %d shapes stored" % shapes)

@@ -736,7 +736,8 @@ def adapter_model_id(man):
     return _resolve(man)
 
 
-def make_engine(pack, ctx=4096, clusters=None, log=print, tandem="off", cpu_layers=None, gpu=None):
+def make_engine(pack, ctx=4096, clusters=None, log=print, tandem="off", cpu_layers=None, gpu=None,
+                kv_cache=None):
     """Engine on one GPU (or the tandem engine): the T4.2 gateway.
 
     A pack whose manifest names a family resolves through that family's adapter in the backend
@@ -788,7 +789,7 @@ def make_engine(pack, ctx=4096, clusters=None, log=print, tandem="off", cpu_laye
                 model_id,
                 config=dict(
                     pack=pack, ctx=ctx, clusters=clusters, log=log, tandem=tandem,
-                    cpu_layers=cpu_layers, gpu=gpu,
+                    cpu_layers=cpu_layers, gpu=gpu, kv_cache=kv_cache,
                 ),
             )
             log("kindi: %s -> the %s backend (%s)" % (pack, backend.capabilities.name, model_id))
