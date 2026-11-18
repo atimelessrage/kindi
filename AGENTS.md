@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `063a2e8` on `freebuff/tandem-cpu-recovery` (**main** is fast-forwarded to this branch at handoff; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `da4edb5` on `freebuff/tandem-cpu-recovery` (**main** is fast-forwarded to this branch at handoff; guarded by `tests/test_agents_handoff.py`).
 
 ### Python quality ratchet
 
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `063a2e8` | main checkout; clean; fast-forwarded to this branch |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `063a2e8` | this session; checked out here |
+| `T:/kindi` | `main` | `da4edb5` | main checkout; clean; fast-forwarded to this branch |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `da4edb5` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.

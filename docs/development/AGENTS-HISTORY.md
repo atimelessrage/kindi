@@ -1275,3 +1275,9 @@ file points here.
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
 | Ternary-MoE census architecture label (2026-11-18) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/ROADMAP.md`, `AGENTS.md`, `docs/development/AGENTS-HISTORY.md` | done. The census opened with "both builds target `qwen35moe`", but the manjunathshiva card labels its base architecture `qwen3_5_moe`. The sentence now says only that both are Qwen3.6-35B-A3B quantizations and does not assert one base-architecture label for both; `qwen35moe` remains only in the definition of a llama.cpp-compatible Q0 candidate. No link, number or table row changed. Checks: `tests/test_docs_links.py` **3 passed**, `check_claims.py` 17 gates / 95 numbers, `git diff --check`. |
+
+### Ternary-MoE census expanded with other published builds (2026-11-18)
+
+| task | worktree | branch | shared files | state |
+|---|---|---|---|---|
+| Ternary-MoE census expansion (2026-11-18) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/ROADMAP.md`, `AGENTS.md`, `docs/development/AGENTS-HISTORY.md` | done. Added six published ternary-MoE builds outside the Qwen3.6 pair: Nota/boro64 Nemotron 30B-A3B (already the `lightning-30b` catalog model), DeepGrove Maple-Preview, Schackay3 Qwen3-Next-80B, kabcpc Flint 40B, ToxeH Qwen3-Coder Ternary2x, and micro-terse. Kept MoTE, ButterflyMoE and Nota's on-request checkpoint as unread leads with reasons; recorded UlukaDev (dense base + LoRA), TC-MoE (routing, not weights) and Ternary-Bonsai (dense) as checked and not counted. Checks: `tests/test_docs_links.py` **3 passed**, `check_claims.py` OK, `git diff --check`. |
