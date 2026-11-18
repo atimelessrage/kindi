@@ -95,7 +95,14 @@ read and no page fault. `kindi plan` applies the same split to its planned host 
 `KINDI_LT_COLD=1`, the `host ram` line names the pinned and file-backed expert counts and bytes
 under the same `KINDI_LT_HOST_MB` (or automatic) budget, and the report's `host_tier` object
 carries those stats. This is a start, not a gate result: no larger-than-RAM pack, no tok/s and
-no GPU run are claimed.
+no GPU run are claimed. Two risks stay open until that run exists. First, `_cold_prepare` still
+performs a full compute-stream synchronize and a blocking read for the current layer's misses;
+the lookahead queue hides some next-layer bytes but does not overlap the current miss, so the cold
+path's decode latency is not claimed to beat the mmap-fault path. Second, `_cold_copy` rewrites the
+per-expert pointer entries for the slot assigned in that step; no test exercises pointer reuse
+after an eviction on a real card. A gate run must check the returned tokens with cold, warm and
+forced-eviction experts, and must show a warm slot never reads the file, before this path is
+described as a throughput improvement or enabled by default.
 
 `kindi plan` can show that plan before a backend exists: on a `kindi_lightning` pack,
 `--moe-chunk N` (with `--usage`, `--moe-cache-mib` and `--dcache` as usual) builds the placement,

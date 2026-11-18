@@ -34,6 +34,17 @@ def test_static_analysis_job_invokes_the_harness():
     assert (ROOT / "tests" / "static" / "run_static_analysis.py").exists()
 
 
+def test_cpu_job_runs_the_documentation_and_generated_reference_gates():
+    """The handoff names these as gates; before this check they could only fail by hand."""
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    for command in ("python tools/check_claims.py",
+                    "python tools/project_memory.py --check",
+                    "python -m kindi.config_reference --check",
+                    "python -m kindi.support_matrix --check"):
+        assert command in ci, command
+    assert "Documentation, claims and generated-reference gates" in ci
+
+
 def test_workflow_actions_are_pinned_to_shas():
     ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
     for line in ci.splitlines():

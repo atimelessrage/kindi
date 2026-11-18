@@ -102,7 +102,25 @@ def split_host_tiers(host, order, budget, expert_bytes, counts=None):
         eb = {il: int(expert_bytes) for il in host}
     budget = max(0, int(budget))
     counts = counts or {}
-    use_counts = bool(host) and all(il in counts and counts[il] for il in host)
+    parsed = {}
+    for il in host:
+        row = counts.get(il)
+        if not isinstance(row, (list, tuple)) or not row:
+            continue
+        if any(int(e) < 0 or int(e) >= len(row) for e in host[il]):
+            continue
+        try:
+            values = [float(v) for v in row]
+        except (TypeError, ValueError):
+            continue
+        if any(v < 0 or v != v or v in (float("inf"), float("-inf")) for v in values):
+            continue
+        if sum(values) > 0:
+            parsed[il] = values
+    counted = len(parsed)
+    use_counts = bool(host) and counted == len(host)
+    if use_counts:
+        counts = parsed
     candidates = []
     for il in host:
         hs = [int(e) for e in host[il]]
@@ -133,7 +151,8 @@ def split_host_tiers(host, order, budget, expert_bytes, counts=None):
     cold_bytes = sum(len(cold[il]) * eb[il] for il in host)
     stats = {"budget_bytes": budget, "host_bytes": host_bytes, "disk_bytes": cold_bytes,
              "host_experts": sum(len(v) for v in warm.values()),
-             "disk_experts": sum(len(v) for v in cold.values())}
+             "disk_experts": sum(len(v) for v in cold.values()),
+             "counted_layers": counted, "counts_used": use_counts}
     return warm, cold, stats
 
 

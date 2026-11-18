@@ -26,17 +26,18 @@ uncovered because hosted CI has no GPU or model pack. Raise the floor only with 
 and do not exclude hardware modules merely to make the number look better.
 
 On top of the total floor, the CPU job runs `tools/check_coverage.py` against
-`tests/coverage_floors.json` (audit M4): a per-module floor for every module the CPU suite
-can actually reach (`engine.py`, `kindi/backends/*`, server, cache, bench, tandem, vram,
+`tests/coverage_floors.json` (audit M4): a per-module floor for **46** modules the measured
+CPU suite reaches (`engine.py`, `kindi/backends/*`, server, cache, bench, tandem, vram,
 expert_cache, tokenizer, config, hostram, catalog, sched, sampling, spm, lookup, profiles,
-gpudrv). A total floor alone lets a CPU-exercised module rot while the total holds; the
-per-module floors pin the modules the requirement tests cover. `engine.py` is listed at its
-CPU-reachable coverage only (module-level code, planner and CPU-side helpers); its CUDA paths,
-and all of `spec.py` and `tp.py`, are verified by `kindi verify` on hardware and have no floor
-until the GPU lane above measures them. The `engine.py` and `backends/*` floors are set 5 points below their measured value
-(`2026-11-17`, `coverage run --branch --source=kindi -m pytest`), the same slack the rest of
-the file carries, so platform variance does not make CI noisy; raise a floor only after a
-measured run.
+gpudrv, the planner/MoE policy, grammar/chat parsers, CLIs and the cold/I/O/autotune modules).
+A total floor alone lets a CPU-exercised module rot while the total holds; the per-module
+floors pin the modules the requirement tests cover. The graph builders (`spec.py`, `dspine.py`,
+`mtp.py`, `tp.py`) are listed at their measured CPU-reachable coverage only; their CUDA paths
+are verified by `kindi verify` on hardware and need the GPU lane above for a higher floor.
+The new floors and `engine.py` (20%) are set 10 points below the 2026-11-18 full-suite run
+(`coverage run --branch --source=kindi -m pytest`, 1,196 passed, 28 skipped), so platform
+variance does not make CI noisy; raise a floor only after a measured run. `moe_cpu.py` stays
+out until its C library is built in CI.
 
 The performance half of the roadmap gate is `tools/check_perf_baseline.py`: it compares the
 recorded `docs/benchmarks/CROSS-MODE.csv` against `docs/benchmarks/perf-baseline.json` and fails

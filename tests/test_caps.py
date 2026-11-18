@@ -50,6 +50,14 @@ def test_card_features_gate_on_compute_capability():
     assert caps.card_features("10.0")["fp4"] is True
 
 
+def test_card_features_are_silicon_facts_not_library_algorithms():
+    """The hardware table may say the silicon has FP8; it must not report an algorithm such as
+    FlashAttention-2, which belongs to the usable-path half (`kindi_paths`) instead."""
+    feats = caps.card_features("8.9")
+    assert set(feats) == {"tensor_cores", "bf16", "tf32", "fp8", "fp4", "async_copy"}
+    assert "flash_attention_2_class" not in feats
+
+
 def test_card_features_refuses_to_guess_without_a_capability():
     assert caps.card_features(None) is None
     assert caps.card_features("") is None

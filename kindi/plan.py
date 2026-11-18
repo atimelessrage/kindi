@@ -449,10 +449,13 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
                 "fit": False,
                 "command": _moe_bench_command(pack, ctx, dcache)}
     # weighted placement, mirroring lightning._plan_weighted's candidate scan
-    usage_path = usage_path or os.environ.get("KINDI_LT_USAGE") or os.path.join(
+    requested_usage = usage_path or os.environ.get("KINDI_LT_USAGE")
+    usage_path = requested_usage or os.path.join(
         os.path.dirname(__file__), "lightning-experts.json")
     spec = MoESpec(moe_layers, s.n_exp, s.n_used, eb, shared=True)
-    usage = Usage.load(spec, usage_path)
+    # An explicit file must fit this pack; the bundled file measured another model is tolerated
+    # (its counts simply do not apply), because the plan can still use its order.
+    usage = Usage.load(spec, usage_path, strict=bool(requested_usage))
     placement = placement_no_slots = None
     if usage.has_counts() and os.environ.get("KINDI_MOE_WEIGHTED", "1") != "0":
         room2 = free_bytes - dense - kv - state - _lt_buf_bytes(s, 512) - reserve

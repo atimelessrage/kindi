@@ -43,8 +43,8 @@ self-hosted GPU lane is described in [docs/CI.md](../docs/CI.md); it is not run 
 
 ## Coverage: where the 27% floor comes from
 
-Measured on 2026-11-14 (Windows, 538 passed, 10 skipped, line+branch): **31% total**. The floor in CI
-is 27%, not 31%, because the number moves a few points with the platform and a gate that fails on a
+Measured on 2026-11-18 (Windows, 1,196 passed, 28 skipped, line+branch): **45.4% total**. The floor
+in CI stays 27%, not 45%, because the number moves with the platform and a gate that fails on a
 fresh Linux checkout is worse than a loose gate. The distribution is what matters: the CPU suite
 covers the modules it can reach, and the heavy GPU modules are covered by `kindi verify` and
 `kindi bench` on hardware, not by pytest.
@@ -53,16 +53,18 @@ covers the modules it can reach, and the heavy GPU modules are covered by `kindi
 |---|---|---|
 | `tandem.py`, `vram.py`, `expert_cache.py` | 90%, 89%, 88% | the CPU suite (byte accounting, device mapping, cache state machine) |
 | `bench.py`, `cache.py`, `server.py` | 67%, 56%, 46% | the CPU suite plus the HTTP boundary tests |
-| `engine.py`, `spec.py`, `tp.py`, `small mtp.py` | 18%, 15%, 12%, 14% | `kindi verify` (token-exact against llama.cpp) and the perf gate; pytest only reaches the loaders and guards |
+| `engine.py`, `spec.py`, `tp.py`, `small mtp.py` | 24%, 20%, 13%, 19% | `kindi verify` (token-exact against llama.cpp) and the perf gate; pytest reaches the loaders, guards and CPU-side helpers |
 | `convert.py`, `gemma4_tp.py` | 18%, 0% | `kindi convert` plus the mixer/support tests; the CUDA half needs a card |
 
 The 27% total floor is the noisy-gate guard. On top of it, `tests/coverage_floors.json`
-pins a per-module floor for every module the CPU suite can actually reach (audit M4);
+pins a per-module floor for **46** modules the CPU suite reaches (audit M4), including the
+planner, MoE policy, grammar/chat parsers, CLIs and the new cold/I/O/autotune modules.
 `tools/check_coverage.py` fails when one of those modules drops below its floor, so a
-CPU-exercised module cannot rot while the total holds. Floors sit ~15 points below the
-measured value for platform variance. A per-module floor for `engine.py`/`tp.py` still needs
-GPU coverage first, so those stay out of the floors file. Do not read "31%" as "the engine is
-half-tested"; read the table.
+CPU-exercised module cannot rot while the total holds. The new floors sit 10 points below the
+measured value; the graph builders (`spec.py`, `dspine.py`, `mtp.py`, `tp.py`) get only a low
+CPU-reachable floor, because their CUDA paths are `kindi verify`'s job on hardware. A GPU run
+should raise those floors, not a hand edit. `moe_cpu.py` stays out until its C library is built
+in CI. Do not read "45%" as "the engine is half-tested"; read the table.
 
 ## Turing reference suite (optional)
 

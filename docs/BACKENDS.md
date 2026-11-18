@@ -1,8 +1,9 @@
 # Backends
 
 Kindi's inference backends sit behind one plugin contract, so adding a model is
-a contained change: one backend module plus docs, with no edits to the server
-or the CLI. This page covers the contract (T4.1). The adapter ports of the
+a contained engine-path change: one backend module plus docs, with no edits to
+the CLI. Serving it over HTTP is a separate integration (see "Serving boundary"
+below). This page covers the contract (T4.1). The adapter ports of the
 existing engines (T4.2) are ported — the dense Bonsai, Nanbeige, Nemotron
 Lightning, Gemma 4 and DeepSeek V4.1 adapters (`kindi/backends/bonsai.py`,
 `nanbeige.py`, `lightning.py`, `gemma4.py`, `dsv41.py`) are registered. Cascade 2
@@ -13,6 +14,18 @@ Today the registry resolves the fake backend, those five adapters and
 externally registered backends, and `resolve` says so when asked for
 anything else. There is no generic-GGUF claim yet: an arbitrary GGUF cannot
 be served today.
+
+## Serving boundary
+
+`kindi serve` is not yet a generic host for every registry backend. It serves the dense family and
+the three built-in families with a server-specific generation path (Nanbeige, Lightning and
+Gemma 4), and each of those has a registry adapter so `kindi verify`/`kindi bench` resolve the same
+engine family. A manifest for Cascade 2, DeepSeek V4.1 or an external `KINDI_BACKEND_MODULES`
+family is refused at startup with an actionable message rather than falling into the dense branch
+and failing in tokenizer setup. Adding a backend module therefore makes it resolvable by the engine
+gateway, not automatically servable over HTTP; an HTTP integration must supply the prompt cache,
+chat template, streaming and metrics contract this server uses. `kindi/dsv41_server.py` remains a
+separate stack for that family (audit C2/R4); do not describe an external backend as served.
 
 ## The contract
 

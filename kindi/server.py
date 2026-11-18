@@ -490,6 +490,39 @@ def _two_cards():
     return two_cards()
 
 
+# Families with a server-specific generation path. Every one also has a registry adapter, so
+# `kindi verify`/`kindi bench` resolve the same family. A manifest whose `backend` is outside this
+# set is refused instead of falling through to the dense engine: `make_engine` would resolve an
+# external adapter, and this HTTP loop does not know its engine contract.
+SERVED_BACKENDS = ("kindi_nanbeige", "kindi_lightning", "kindi_gemma4")
+UNSERVED_BACKENDS = {
+    "kindi_cascade": "the Cascade backend is converter/validator only; GPU K-quant Nemotron-H "
+                     "kernels are pending, so it cannot be served yet",
+    "kindi_dsv41": "DeepSeek V4.1 runs under `python -m kindi.dsv41_server`; its release gate is "
+                    "dsv41.verify and this server does not drive that engine",
+}
+
+
+def served_backend(man):
+    """The manifest family this server can serve, or a clear refusal.
+
+    `None`/``""`` is the dense Bonsai family. The built-in special families are listed here once;
+    an external `KINDI_BACKEND_MODULES` family has a registry adapter but no server contract, so it
+    is refused rather than built as a dense engine and failing later in tokenizer setup.
+    """
+    family = man.get("backend") if isinstance(man, dict) else None
+    if family in (None, ""):
+        return None
+    if family in SERVED_BACKENDS:
+        return family
+    if family in UNSERVED_BACKENDS:
+        raise SystemExit("kindi: %s" % UNSERVED_BACKENDS[family])
+    raise SystemExit(
+        "kindi: %r is not a family the HTTP server serves (built-ins: dense, %s). An external "
+        "KINDI_BACKEND_MODULES adapter can be resolved by the engine gateway, but its generation "
+        "contract is not wired into kindi serve." % (family, ", ".join(SERVED_BACKENDS)))
+
+
 class Kindi(object):
     """Engine + tokenizer + cache + sampler, shared by the HTTP layer and `kindi chat`."""
 
@@ -505,19 +538,18 @@ class Kindi(object):
         if not os.path.exists(os.path.join(pack, "kindi_pack.json")):
             raise SystemExit("kindi: no model pack at %s - run: kindi convert <model.gguf>" % pack)
         man = json.load(open(os.path.join(pack, "kindi_pack.json")))
+        family = served_backend(man)
         self.pack_id = (man.get("source_sha256") or "pack")[:12]
-        self.native = man.get("backend") == "kindi_gemma4"
+        self.native = family == "kindi_gemma4"
         self.busy = {"active": False, "phase": "", "prompt_tokens": 0, "cached": 0, "read": 0, "generated": 0,
                      "started": 0.0}
         self.nanbeige = None
-        if man.get("backend") == "kindi_nanbeige":        # llama-arch K/I-quant GGUF (Nanbeige 4.3 33B)
+        if family == "kindi_nanbeige":        # llama-arch K/I-quant GGUF (Nanbeige 4.3 33B)
             from .nanbeige_gen import NanbeigeBackend
             self.variant = "nanbeige"
             self.nanbeige = NanbeigeBackend(man, cfg, log=log)
             self.eng, self.tok, self.runner, self.sample = self.nanbeige.eng, self.nanbeige.tok, None, None
-        elif man.get("backend") == "kindi_cascade":        # Nemotron Cascade 2: converter/validator only so far
-            raise SystemExit("kindi: Nemotron Cascade 2 is converter/validator only; GPU K-quant Nemotron-H kernels are pending, so it cannot be served yet")
-        elif man.get("backend") == "kindi_lightning":     # Nemotron-H MoE GGUF (Nemotron 3.5 Lightning 30B-A3B)
+        elif family == "kindi_lightning":     # Nemotron-H MoE GGUF (Nemotron 3.5 Lightning 30B-A3B)
             from .lightning_gen import LightningBackend
             self.variant = "lightning"
             self.nanbeige = LightningBackend(man, cfg, log=log)   # (the same backend interface as Nanbeige's)

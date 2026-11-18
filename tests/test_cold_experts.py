@@ -46,7 +46,8 @@ def test_the_hottest_host_experts_stay_pinned_and_the_overflow_goes_cold():
     assert warm == {0: (0, 1), 1: (0,)}
     assert cold == {0: (2, 3), 1: (1, 2, 3)}
     assert stats == {"budget_bytes": 350, "host_bytes": 300, "disk_bytes": 500,
-                     "host_experts": 3, "disk_experts": 5}
+                     "host_experts": 3, "disk_experts": 5,
+                     "counted_layers": 2, "counts_used": True}
     # The pinned set is exact, under budget, and the tier bytes add up to the whole host tier.
     assert stats["host_bytes"] <= stats["budget_bytes"]
     assert stats["host_bytes"] + stats["disk_bytes"] == 8 * 100
@@ -71,16 +72,29 @@ def test_the_split_accounts_for_different_expert_sizes_per_layer():
     assert warm == {0: (0,), 1: (0,)}          # the hottest expert of each layer, 100 + 150
     assert cold == {0: (1, 2), 1: (1,)}
     assert stats == {"budget_bytes": 250, "host_bytes": 250, "disk_bytes": 350,
-                     "host_experts": 2, "disk_experts": 3}
+                     "host_experts": 2, "disk_experts": 3,
+                     "counted_layers": 2, "counts_used": True}
     assert stats["host_bytes"] + stats["disk_bytes"] == 3 * 100 + 2 * 150 == 600
 
 
 def test_host_budget_without_counts_keeps_the_usage_order_hot():
     host = {0: (3, 4), 1: (5, 6)}
     order = {0: [4, 3], 1: [6, 5]}
-    warm, cold, _stats = cold_experts.split_host_tiers(host, order, 100, 100)
+    warm, cold, stats = cold_experts.split_host_tiers(host, order, 100, 100)
     assert warm == {0: (4,), 1: ()}       # rank 0 of the first layer wins the tie
     assert cold == {0: (3,), 1: (5, 6)}
+    assert stats["counts_used"] is False and stats["counted_layers"] == 0
+
+
+def test_a_partial_or_malformed_count_map_is_reported_and_falls_back_to_order():
+    host = {0: (3, 4), 1: (5, 6)}
+    order = {0: [4, 3], 1: [6, 5]}
+    for counts in ({0: [9, 1]},                       # layer 1 missing
+                   {0: [9, 1], 1: [1]},               # layer 1 too short for its ids
+                   {0: [9, 1], 1: [1, "bad"]}):       # non-numeric row
+        warm, cold, stats = cold_experts.split_host_tiers(host, order, 100, 100, counts)
+        assert stats["counts_used"] is False and stats["counted_layers"] < 2, counts
+        assert warm == {0: (4,), 1: ()} and cold == {0: (3,), 1: (5, 6)}
 
 
 def test_the_engine_reports_pinned_and_disk_bytes_without_a_gpu():

@@ -30,6 +30,14 @@ jobs:
           python -m pip install -r tests/requirements-test.txt
       - name: Compile every module
         run: python -m compileall -q kindi
+      - name: Documentation, claims and generated-reference gates
+        # These four are the CPU-only gates the handoff names but CI did not run. Keep them in
+        # this job: a stale generated reference or an unclaimed benchmark number must fail here.
+        run: |
+          python tools/check_claims.py
+          python tools/project_memory.py --check
+          python -m kindi.config_reference --check
+          python -m kindi.support_matrix --check
       - name: Run the CPU-only suite with coverage floor
         run: >
           python -m pytest tests/ -q

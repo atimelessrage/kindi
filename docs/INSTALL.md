@@ -8,47 +8,47 @@ This installer is **Linux-only**. Windows users can follow [WINDOWS.md](WINDOWS.
 verified native CPU path; native Windows GPU execution is not validated, and GPU work should use
 the Linux Docker image or WSL2.
 
-```bash
-curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh | bash
-```
+## Install (Linux x86-64)
 
-On Windows 10 or 11, use the PowerShell installer instead. It sets up WSL2 and then runs this installer inside it
-(see [WINDOWS.md](WINDOWS.md)):
-
-```powershell
-irm https://amirhusain.com/kindi/install.ps1 | iex
-```
-For Docker Compose, Podman, servers and automated installs, there are also ready-made images (no build):
-[CONTAINERS.md](CONTAINERS.md). The installer builds the same images on your computer.
-
-To see each step and each command before anything changes, do a dry run first:
-
-```bash
-curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh | bash -s -- --dry-run
-```
-
-## Install with a checksum check
-
-Download the script, compare its sha256 with the value below, read it, and then run it:
+Download the script, compare its sha256 with the value below, read it, and then run it. This is
+the path the project supports: the checksum covers the file you actually execute.
 
 ```bash
 curl -fsSLO https://amirhusain.com/kindi/install.sh
 echo "070508a00c1b67d99692360c7e0d61289486a043a639203d6819f4e02ef8bb46  install.sh" | sha256sum -c -
-bash install.sh --dry-run
+bash install.sh --dry-run     # show every step and command first
 bash install.sh
 ```
+
+`curl ... | bash` is convenient but verifies nothing; if you use that form, it runs the hosted file
+without the checksum block. The GitHub release tag used by older copies of this page
+(`v0.5.0-installer`) predates the 0.6.0 script, so **do not use that tag's `install.sh`** until the
+release owner republishes it (tracked in [MANUAL-HELP-NEEDED.md](MANUAL-HELP-NEEDED.md) §5).
+
+On Windows 10 or 11, use the PowerShell installer. It sets up WSL2 and then runs this installer
+inside it (see [WINDOWS.md](WINDOWS.md)). No checksum is published for the hosted PowerShell file
+yet, so download it and inspect it before running rather than piping it straight into `iex`:
+
+```powershell
+Invoke-WebRequest https://amirhusain.com/kindi/install.ps1 -OutFile install.ps1
+Get-FileHash install.ps1      # record it; compare with a reviewed copy before running
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+For Docker Compose, Podman, servers and automated installs, there are also ready-made images (no build):
+[CONTAINERS.md](CONTAINERS.md). The installer builds the same images on your computer.
 
 | File | sha256 |
 |---|---|
 | `install.sh` (Kindi 0.6.0, fork-merged tree) | `070508a00c1b67d99692360c7e0d61289486a043a639203d6819f4e02ef8bb46` |
 
 **What that value hashes.** It is the `install.sh` in the repository root of this tree
-(`KINDI_VERSION="0.6.0"`). The GitHub release tag used by the one-liners above
-(`v0.5.0-installer`) was published before this script existed, so its asset does **not**
-hash to this value: a mismatch there means a stale artifact, not tampering. Until the
-release owner republishes the tag (tracked in `MANUAL-HELP-NEEDED.md` §5), take the file
-from the URL in this checksum block, or from a clone of this repository, and compare
-against a copy you fetched over TLS from a source you trust.
+(`KINDI_VERSION="0.6.0"`). The older GitHub release tag `v0.5.0-installer` was published
+before this script existed, so its asset does **not** hash to this value: a mismatch there
+means a stale artifact, not tampering. Until the release owner republishes the tag
+(tracked in `MANUAL-HELP-NEEDED.md` §5), take the file from the URL in this checksum
+block, or from a clone of this repository, and compare against a copy you fetched over
+TLS from a source you trust.
 
 If `sha256sum -c` does not print `install.sh: OK`, do not run the script. The checksum is for the fork-merged
 `install.sh` in the repository root (upstream 0.6.0 plus the fork's pinned source archive, card classes and

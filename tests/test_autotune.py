@@ -132,6 +132,25 @@ def test_moe_cache_candidate_is_capped_by_available_host_ram(monkeypatch):
     assert option["env"]["KINDI_LT_HOST_MB"] == "1024"
 
 
+def test_moe_cache_candidate_uses_the_plans_room_and_charges_its_slots():
+    """The cache is sized from the same fit the engine uses, so a tight room lowers the proposal.
+
+    With 100 MiB for experts, four MoE layers and 1 MiB experts, the staging buffers and seven
+    slots per layer leave room for the four selected experts; an eighth slot does not. The host
+    cache therefore covers seven host experts per layer (28 MiB), not the rate-only 16 (64 MiB).
+    """
+    moe = {"dcache": 16, "n_used": 4, "n_exp": 32, "n_moe": 4, "n_card": 16,
+           "expert_bytes": 1 << 20, "room": 100 << 20, "fit": True}
+    option = next(item for item in autotune.candidates(ONE_CARD, LIGHTNING, 8192, max_runs=10,
+                                                      rates=RATES, moe=moe)
+                  if item["name"].startswith("expert-cache-"))
+    assert option["name"] == "expert-cache-28"
+    assert option["env"]["KINDI_LT_HOST_MB"] == "28"
+    assert not [item for item in autotune.candidates(ONE_CARD, LIGHTNING, 8192, max_runs=10,
+                                                     rates=RATES, moe=dict(moe, room=24 << 20))
+                if item["name"].startswith("expert-cache-")]
+
+
 def test_moe_cache_candidate_needs_measured_rates_and_a_host_tier():
     moe = {"dcache": 16, "n_used": 4, "n_exp": 32, "n_moe": 4, "n_card": 16,
            "expert_bytes": 1 << 20, "fit": True}

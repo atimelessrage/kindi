@@ -91,7 +91,6 @@ def card_features(compute_cap):
         "fp8": cc >= 89,                   # Ada (8.9), Hopper (9.0), Blackwell (10.0/12.0)
         "fp4": cc >= 100,                  # Blackwell microscaling formats
         "async_copy": cc >= 80,
-        "flash_attention_2_class": cc >= 80,
     }
 
 
@@ -366,7 +365,7 @@ def render(report):
             lines.append("           hardware features: unknown (the driver reports no compute capability)")
         else:
             names = [name for name in ("tensor_cores", "bf16", "tf32", "fp8", "fp4",
-                                       "async_copy", "flash_attention_2_class") if feats.get(name)]
+                                       "async_copy") if feats.get(name)]
             missing = [name for name in ("tensor_cores", "bf16", "tf32", "fp8", "fp4")
                        if not feats.get(name)]
             lines.append("           hardware: %s%s" %

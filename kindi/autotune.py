@@ -66,10 +66,15 @@ def _expert_cache_mib(moe, rates):
     if n_used <= 0 or n_moe <= 0 or eb <= 0 or host_per_layer < n_used:
         return None
     from . import ltfit
-    slots = ltfit.rate_slots(n_used, host_per_layer, eb, rates)
+    # Size against the full expert count and the plan's room, so `rate_slots` charges the same
+    # staging buffers and decode slots as `fit_experts`. Without the room it could name a slot
+    # count the engine's own planner would refuse. The cache itself covers only the non-card
+    # experts, so its size is capped by the host tier after that fit.
+    slots = ltfit.rate_slots(n_used, n_exp, eb, rates, room=m.get("room"), n_moe=n_moe)
     if not slots:
         return None
-    mib = max(1, int(math.ceil(slots * n_moe * eb / 2 ** 20)))
+    host_slots = min(host_per_layer, slots)
+    mib = max(1, int(math.ceil(host_slots * n_moe * eb / 2 ** 20)))
     # Never propose more pinned memory than this host can spare now. Use the engine's automatic
     # budget (available RAM less max(1 GiB, 10%)); passing an empty environment ignores an explicit
     # KINDI_LT_HOST_MB, which is the setting this candidate itself proposes.

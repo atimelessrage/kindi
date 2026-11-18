@@ -76,7 +76,7 @@ Example on this host (RTX 4060 Ti, i7-8086K, Windows 10):
 GPU: 1 card (identified with nvidia-smi)
   card 0: NVIDIA GeForce RTX 4060 Ti  [sm_89]
            8188 MiB total, 6994 MiB free, driver 617.42, PCI 00000000:01:00.0, UUID GPU-…
-           hardware: tensor_cores, bf16, tf32, fp8, async_copy, flash_attention_2_class (no fp4)
+           hardware: tensor_cores, bf16, tf32, fp8, async_copy (no fp4)
            Kindi can use: 5-trit kernels, dense CPU+GPU tandem split, plan engine (tensor-core MMA),
                           FP8 Gemma 4 path (on by default, KINDI_G4_FP8=0 disables)
 CPU: Intel(R) Core(TM) i7-8086K CPU @ 4.00GHz, 6 physical / 12 logical threads

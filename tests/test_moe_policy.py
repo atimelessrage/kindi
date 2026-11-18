@@ -4,6 +4,8 @@ The module is model-free on purpose, so these tests pin the numbers `kindi plan`
 engine report: the share of routed picks a tier serves, and the top-n coverage the decode-slot line
 compares against residency.
 """
+import json
+
 import pytest
 
 from kindi.moe import MoESpec, Usage, plan
@@ -28,6 +30,42 @@ def test_coverage_makes_no_claim_without_counts():
     assert Usage(spec).coverage(2) is None                    # order only (an older usage file)
     # one layer without counts is enough to withhold the number: has_counts() needs every layer
     assert Usage(spec, {0: [1] * 8}).coverage(2) is None
+
+
+def test_a_malformed_usage_file_is_refused_with_its_path(tmp_path):
+    """A short or non-numeric count row changes the tier split silently; refuse it at load."""
+    spec = _spec()
+    path = tmp_path / "usage.json"
+    for counts in ({0: [1] * 7}, {0: [1, 2, 3, 4, 5, 6, 7, -1]},
+                   {0: [1, 2, 3, 4, 5, 6, 7, "x"]}):
+        path.write_text(json.dumps({"counts": counts}), encoding="utf-8")
+        with pytest.raises(ValueError, match="bad expert usage file"):
+            Usage.load(spec, str(path))
+
+
+def test_a_malformed_order_is_refused_too():
+    spec = _spec()
+    for order in ({0: [0, 1, 8]}, {0: [0, 0]}, {0: [0, "x"]}, {9: [0]}):
+        with pytest.raises(ValueError):
+            Usage(spec, order=order)
+
+
+def test_a_partial_count_map_and_a_partial_order_are_valid():
+    """Only the shape is mandatory: an older file may carry one layer's counts or a top-k order."""
+    spec = _spec()
+    usage = Usage(spec, {0: [3, 2, 1, 0, 0, 0, 0, 0]}, {1: [7, 6]})
+    assert usage.counts[0][1] == 2.0
+    assert usage.order(1)[:2] == [7, 6] and len(usage.order(1)) == 8
+
+
+def test_a_usage_file_for_another_model_keeps_only_this_specs_layers(tmp_path):
+    """A bundled 128-expert file read against a 32-expert test pack is not corrupt: those rows
+    simply do not describe this pack, so they are ignored rather than indexing a short list."""
+    spec = _spec()
+    path = tmp_path / "usage.json"
+    path.write_text(json.dumps({"counts": {"0": [1] * 8, "9": [1] * 128}}), encoding="utf-8")
+    usage = Usage.load(spec, str(path))
+    assert set(usage.counts) == {0}
 
 
 def test_a_card_budget_that_holds_everything_puts_every_expert_on_the_card():

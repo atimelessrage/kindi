@@ -66,6 +66,16 @@ def test_a_pack_whose_family_has_no_adapter_is_refused_not_built_dense(tmp_path,
         engine.make_engine(pack)
 
 
+def test_every_server_served_family_has_a_registry_adapter():
+    """The server's special families must also be resolvable by verify/bench, or the two paths
+    could exercise different implementations of the same pack."""
+    for family, model_id in (("kindi_nanbeige", "nanbeige-33b"),
+                             ("kindi_lightning", "nemotron-lightning-30b"),
+                             ("kindi_gemma4", "gemma4-e4b"),
+                             ("kindi_dsv41", "deepseek-v41-flash")):
+        assert engine.adapter_model_id({"backend": family}) == model_id
+
+
 def test_the_gemma4_and_deepseek_families_route_through_their_adapters(tmp_path, monkeypatch):
     seen = _recording_resolve(monkeypatch)
     for manifest, model_id in (({"backend": "kindi_gemma4", "model_path": "g.gguf"}, "gemma4-e4b"),

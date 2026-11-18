@@ -101,7 +101,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_CACHE_TIMING` | (unset) | `kindi/cache.py:1141` |
 | `KINDI_CALIB_DIR` | (unset) | `kindi/calib.py:31` |
 | `KINDI_CARDS` | (unset) | `kindi/spec.py:1953` (+4 more) |
-| `KINDI_CC` | `clang` or `"clang" if os.name == "nt" else "gcc"` or `"gcc" if os.name != "nt" else "clang"` | `kindi/caps.py:280` (+4 more) |
+| `KINDI_CC` | `clang` or `"clang" if os.name == "nt" else "gcc"` or `"gcc" if os.name != "nt" else "clang"` | `kindi/caps.py:279` (+4 more) |
 | `KINDI_CHUNK` | `256` or `"512" if all(f16_prompt(s.card) for s in eng.cards) else "256"` or `"256" if major >= 5 else "128"` | `kindi/chunk.py:160` (+2 more) |
 | `KINDI_CHUNK_ATT` | `flash` | `kindi/chunk.py:438` |
 | `KINDI_CHUNK_MIN` | `32` | `kindi/chunk.py:500` (+1 more) |
@@ -157,7 +157,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_G4_PAD` | `1` | `kindi/gemma4.py:599` |
 | `KINDI_G4_PARK_MAX` | `4` | `kindi/gemma4_cache.py:35` |
 | `KINDI_G4_PLE_HOST` | `auto` | `kindi/gemma4.py:482` |
-| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:667` |
+| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:699` |
 | `KINDI_G4_PROMPT_CACHE` | `1` | `kindi/gemma4_cache.py:33` |
 | `KINDI_G4_Q5_DP4A` | `1` | `kindi/gemma4.py:80` |
 | `KINDI_G4_RESERVE_MB` | `1024` | `kindi/gemma4.py:543` |
@@ -189,17 +189,17 @@ variables, and are therefore not listed twice here.
 | `KINDI_LT_CHUNK` | (unset) | `kindi/lightning.py:157` |
 | `KINDI_LT_COLD` | (empty) | `kindi/cold_experts.py:45` |
 | `KINDI_LT_DCACHE` | `str(DCACHE_DEFAULT)` | `kindi/bench.py:109` (+3 more) |
-| `KINDI_LT_DGRP` | `mvdg` | `kindi/lightning.py:975` |
-| `KINDI_LT_GRAPH` | `1` | `kindi/lightning.py:1094` |
+| `KINDI_LT_DGRP` | `mvdg` | `kindi/lightning.py:978` |
+| `KINDI_LT_GRAPH` | `1` | `kindi/lightning.py:1097` |
 | `KINDI_LT_HOST_MB` | (empty) | `kindi/cold_experts.py:61` |
 | `KINDI_LT_K35` | (unset) | `kindi/lightning.py:128` |
 | `KINDI_LT_K35_EXACT` | (unset) | `kindi/lightning.py:40` |
 | `KINDI_LT_KBLAS` | `1` | `kindi/lightning.py:38` |
-| `KINDI_LT_KGRP` | `mmk32` or `mvkg` | `kindi/lightning.py:742` (+1 more) |
+| `KINDI_LT_KGRP` | `mmk32` or `mvkg` | `kindi/lightning.py:745` (+1 more) |
 | `KINDI_LT_NSPLIT` | `32` | `kindi/lightning.py:29` |
 | `KINDI_LT_NSPLIT_TC` | `64` | `kindi/lightning.py:30` |
 | `KINDI_LT_PRE6` | `"1" if self.cc >= 60 else "0"` | `kindi/lightning.py:142` |
-| `KINDI_LT_RESERVE_MB` | `350` | `kindi/autotune.py:293` (+2 more) |
+| `KINDI_LT_RESERVE_MB` | `350` | `kindi/autotune.py:298` (+2 more) |
 | `KINDI_LT_SELFCHECK` | `1` | `kindi/lightning_gen.py:241` |
 | `KINDI_LT_SM75` | (unset) | `kindi/lightning.py:145` |
 | `KINDI_LT_TC` | `1` | `kindi/lightning.py:140` |
@@ -266,7 +266,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_TANDEM_DEBUG_TIMING` | `0` | `kindi/tandem.py:653` |
 | `KINDI_TANDEM_GPU` | `auto` | `kindi/plan.py:185` (+2 more) |
 | `KINDI_TANDEM_RATIO` | (unset) | `kindi/tandem.py:322` |
-| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/plan.py:647` (+2 more) |
+| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/plan.py:650` (+2 more) |
 | `KINDI_TC` | `0` | `kindi/spec.py:81` (+3 more) |
 | `KINDI_TC_B2` | (empty) | `kindi/tc.py:51` |
 | `KINDI_TC_DP4A` | `0` | `kindi/tc.py:74` |

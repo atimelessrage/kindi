@@ -19,6 +19,25 @@ from gbnf_fixtures import CANONICAL_JSON
 from kindi import server
 
 
+def test_the_server_names_only_families_it_can_serve():
+    for family in server.SERVED_BACKENDS:
+        assert server.served_backend({"backend": family}) == family
+    assert server.served_backend({}) is None
+    assert server.served_backend({"backend": ""}) is None
+
+
+def test_the_server_refuses_dsv41_with_the_standalone_server_command():
+    with pytest.raises(SystemExit, match="kindi.dsv41_server"):
+        server.served_backend({"backend": "kindi_dsv41"})
+
+
+def test_the_server_refuses_cascade_and_external_backends_instead_of_building_dense():
+    with pytest.raises(SystemExit, match="converter/validator only"):
+        server.served_backend({"backend": "kindi_cascade"})
+    with pytest.raises(SystemExit, match="KINDI_BACKEND_MODULES"):
+        server.served_backend({"backend": "kindi_external"})
+
+
 class _FakeEngine(object):
     ctx = 4096
 

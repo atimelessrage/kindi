@@ -7,13 +7,14 @@ gate checks the modules the CPU suite can actually reach against
 ``tests/coverage_floors.json`` and fails when any of them drops below its
 floor.
 
-The floors file deliberately lists only CPU-verifiable modules (``engine.py``, backends/*, server, cache,
-bench, tandem, vram, expert_cache, tokenizer, config, hostram, catalog,
-sched, sampling and the small pure-Python modules). ``engine.py`` is listed too, at its
-measured CPU-reachable coverage: its module-level code, planner and CPU-side helpers run
-under the CPU suite. The CUDA paths inside it, and all of ``spec.py`` and ``tp.py``, are
-verified by ``kindi verify`` on hardware, not by pytest; they have no floor until the GPU
-lane (audit M1) measures them. Do not raise a floor to a number no run has measured.
+The floors file lists every module a measured CPU run reaches: the engine, every backend,
+server/cache/bench/tandem/vram, the planner and MoE policy, the grammar and chat parsers,
+the CLIs, the new cold/I/O/autotune modules, and the graph builders (``spec.py``,
+``dspine.py``, ``mtp.py``, ``tp.py``) at their measured CPU-reachable coverage. For the graph
+builders that is a low import/parse floor, not a quality claim: their CUDA paths still need
+``kindi verify`` on hardware, and the floor should stay low until the GPU lane (audit M1)
+measures more. ``moe_cpu.py`` stays out because it needs a compiled C library. Do not raise
+a floor to a number no run has measured.
 
 Usage (from the repository root), after a pytest run with
 ``--cov=kindi --cov-report=json``::

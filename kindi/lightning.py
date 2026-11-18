@@ -333,6 +333,9 @@ class Engine(object):
                     hosts[il] = tuple(sorted(host))
         warm, cold, stats = split_host_tiers(hosts, order, self.host_budget,
                                              self._expert_bytes(), counts)
+        if counts and not stats["counts_used"]:
+            self.log("kindi: cold-tier split: usable counts cover %d of %d host layers; "
+                     "using the usage order for the rest" % (stats["counted_layers"], len(hosts)))
         self.host_warm, self.host_cold, self.host_tier_stats = warm, cold, stats
         self.cold_order = {il: [e for e in order.get(il, ()) if e in set(cold[il])]
                            for il in cold}

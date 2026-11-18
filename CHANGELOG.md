@@ -196,6 +196,35 @@
 
 ### Fixed
 
+- **`kindi serve` refuses backends it cannot drive instead of building a dense engine** — a
+  DeepSeek V4.1 pack now exits with the documented `python -m kindi.dsv41_server` command, Cascade
+  keeps its converter-only message, and an external `KINDI_BACKEND_MODULES` family is refused
+  because the HTTP generation loop has no contract for it. The server's built-in family list is one
+  table, and a gateway test pins a registry adapter for every served family.
+- **Expert usage counts are validated before they steer an expert tier** — `Usage` now refuses a
+  count row that is not a full `n_exp` list of finite, non-negative numbers, and a bad order id
+  (out of range, duplicate, non-integer). A partial map stays valid, but `split_host_tiers` reports
+  `counts_used`/`counted_layers` and the Lightning engine logs when it had to fall back to the
+  usage order. An explicit plan file is strict; the bundled file measured on another expert count
+  is ignored rather than indexing a short list.
+- **The autotune cold-cache candidate uses the engine's own fit** — `expert-cache-<MiB>` now sizes
+  slots from the full expert count and the plan's room (including staging buffers and decode
+  slots), then caps the cache by the host tier. A tight room lowers the proposal instead of naming
+  a slot count the planner would refuse.
+- **`kindi caps` no longer reports FlashAttention-2 as a hardware fact** — the feature table is
+  silicon-only again; FA2 is a library algorithm and does not belong beside tensor cores and FP8.
+- **The documentation/support gates run in CI** — `check_claims.py`, `project_memory --check`,
+  `config_reference --check` and `support_matrix --check` are now one CPU-job step, pinned by
+  `tests/test_ci_config.py`.
+- **Per-module coverage floors now cover 46 modules** — the measured 2026-11-18 full-suite run
+  (1,196 passed, 28 skipped, 45.4% total) added floors for the planner, MoE policy, grammar and
+  chat parsers, CLIs, the new cold/I/O/autotune modules, and low CPU-reachable floors for the
+  graph builders (`spec.py`, `dspine.py`, `mtp.py`, `tp.py`); `engine.py` moves from 19% to 20%.
+  The floors sit 10 points below the measured values, and `moe_cpu.py` stays out until its C
+  library is built in CI.
+- **The installer docs lead with the checksum-verified file** — the stale
+  `v0.5.0-installer` one-liners are gone; Linux downloads, verifies, inspects and runs the 0.6.0
+  script, and Windows downloads `install.ps1` for review instead of piping it into `iex`.
 - **The standalone DSV4.1 CLIs reject malformed comma values at argparse time** —
   `python -m kindi.dsv41 --ctx` requires one or more positive integers (e.g. `2048,8192`), its
   `--auto` and the server's `--cal` require exactly two finite `a,b` numbers, and the server's

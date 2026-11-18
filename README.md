@@ -72,8 +72,9 @@ irm https://amirhusain.com/kindi/install.ps1 | iex
 
 The installer finds your cards and shows the setups that they support, the recommended setup first. It downloads
 the model, checks its sha256, runs `kindi verify` and starts the server on `127.0.0.1:8093`. Add `--dry-run` to see
-each step first ([docs/INSTALL.md](docs/INSTALL.md), [docs/WINDOWS.md](docs/WINDOWS.md)). DeepSeek-V4.1-Flash has
-its own installer ([docs/DEEPSEEK.md](docs/DEEPSEEK.md)).
+each step first. For the checksum-verified download-and-run form (and the Windows reviewed-download step), use
+[docs/INSTALL.md](docs/INSTALL.md); Windows details are in [docs/WINDOWS.md](docs/WINDOWS.md).
+DeepSeek-V4.1-Flash has its own installer ([docs/DEEPSEEK.md](docs/DEEPSEEK.md)).
 
 ### Links
 
