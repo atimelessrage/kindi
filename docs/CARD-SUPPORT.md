@@ -100,7 +100,9 @@ Verified fail-closed on 2026-11-17: pointing `--mtp-head` and `--spec-pack` at a
 `2b/tc-mtp`, `2b/tc-draft2b` and `2b/tc-both` as skipped, reported each as a missing baseline
 cell, and exited 1. `ngram` needs no optional file and still ran; deselecting it
 (`--spec-modes mtp,draft2b,both`) makes the same gate report all four baseline cells missing,
-including `2b/tc-ngram`, and exit 1.
+including `2b/tc-ngram`, and exit 1. This is pinned by
+`tests/test_verify_matrix.py::test_2b_gate_fails_closed_when_the_optional_head_and_pack_are_absent`,
+which runs the gate with both optional paths absent and `ngram` deselected.
 
 Measured 2026-11-17 on the RTX 4060 Ti: seven cells saved, all `pass` (4/4 prompts each);
 `tc-ngram`, `tc-mtp`, `tc-draft2b` and `tc-both` reported their requested mode as effective

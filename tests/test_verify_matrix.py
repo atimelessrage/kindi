@@ -274,6 +274,60 @@ def test_fail_on_regression_cli_exits_nonzero(tmp_path, capsys, monkeypatch):
     assert "25.0% drop" in output
 
 
+def test_2b_gate_fails_closed_when_the_optional_head_and_pack_are_absent(
+        tmp_path, capsys, monkeypatch):
+    """The documented 2B gate must not silently pass when the optional files disappear. With
+    `ngram` deselected, all four saved spec cells are missing from the run; `--fail-on-regression`
+    must name every one of them and exit 1. This is the executable form of the CARD-SUPPORT proof."""
+    mod = load()
+    packs = tmp_path / "packs"
+    pack = packs / "bonsai-2b"
+    pack.mkdir(parents=True)
+    (pack / "kindi_pack.json").write_text("{}", encoding="utf-8")
+
+    baseline = tmp_path / "baseline.json"
+    baseline_rows = []
+    for mode in ("plain", "tc", "tc-hp", "tc-ngram", "tc-mtp", "tc-draft2b", "tc-both"):
+        row = _row(status="pass", tps=40.0, passes=4, ties=0, fails=0)
+        row["model"], row["mode"] = "2b", mode
+        baseline_rows.append(row)
+    baseline.write_text(json.dumps({"results": baseline_rows}), encoding="utf-8")
+
+    def fake_run_cell(model, mode, *args, **kwargs):
+        row = _row(status="pass", tps=40.0, passes=4, ties=0, fails=0)
+        row["model"], row["mode"] = model, mode
+        return row
+
+    monkeypatch.setattr(mod, "run_cell", fake_run_cell)
+    out = tmp_path / "out"
+    rc = mod.main([
+        "--models", "2b", "--modes", "plain,tc,tc-hp",
+        "--spec-models", "2b", "--spec-modes", "mtp,draft2b,both",
+        "--pack-dir", str(packs),
+        "--mtp-head", str(tmp_path / "absent-head.npz"),
+        "--spec-pack", str(tmp_path / "absent-pack"),
+        "--out", str(out), "--no-serve", "--no-bench",
+        "--baseline", str(baseline), "--fail-on-regression", "--max-tps-drop-pct", "10",
+    ])
+
+    assert rc == 1
+    comparison = json.loads((out / "comparison.json").read_text(encoding="utf-8"))
+    missing = {(row["model"], row["mode"]) for row in comparison["baseline_only"]}
+    assert missing == {
+        ("2b", "tc-ngram"), ("2b", "tc-mtp"), ("2b", "tc-draft2b"), ("2b", "tc-both"),
+    }
+    assert len(comparison["regressions"]) == 4
+    for mode in ("tc-ngram", "tc-mtp", "tc-draft2b", "tc-both"):
+        assert "2b/%s: baseline cell missing from this run" % mode in comparison["regressions"]
+
+    output = capsys.readouterr().out
+    assert "regression gate: FAIL" in output
+    assert "2b tc-ngram: skipped" not in output
+    assert "2b tc-mtp: skipped (no MTP head" in output
+    assert "2b tc-draft2b: skipped (no 2B drafter pack" in output
+    assert "2b tc-both: skipped (no draft head" in output
+
+
 def test_27b_drafter_baseline_has_the_three_spec_cells():
     mod = load()
     baseline = mod.load_baseline(
