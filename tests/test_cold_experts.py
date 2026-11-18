@@ -375,6 +375,37 @@ class _PrefetchReader(object):
         return len(spans)
 
 
+class _Ids(object):
+    def __init__(self, ids):
+        self.ids = np.asarray(ids, np.int32)
+
+    def get(self):
+        return self.ids
+
+
+class _Setter(object):
+    def __init__(self):
+        self.calls = []
+
+    def set(self, ptr, stream=None):
+        self.calls.append((ptr, stream))
+
+
+def _cold_tensor(raw_off, cold):
+    """A one-row Q2_0 expert stack with room for two decode slots."""
+    n = 2
+    w = types.SimpleNamespace(
+        hcold=tuple(cold), raw_off=raw_off, raw_stride=18, raw_bytes=18,
+        cw=16, sw=2, rows=1, cols=64,
+        cold_c=_Pinned(n * 16, 0x3000 + raw_off), cold_s=_Pinned(n * 2, 0x4000 + raw_off),
+        tc=_Setter(), ts=_Setter())
+    w.cold_cnp = np.frombuffer(w.cold_c, np.uint8, n * 16)
+    w.cold_snp = np.frombuffer(w.cold_s, np.uint8, n * 2)
+    w.ptr_c = [0] * n
+    w.ptr_s = [0] * n
+    return w
+
+
 def test_the_engine_queues_the_next_cold_layers_likely_experts():
     def tensor(raw_off):
         return types.SimpleNamespace(hcold=(1, 2, 3), raw_off=raw_off, raw_stride=10, raw_bytes=10)
@@ -386,7 +417,50 @@ def test_the_engine_queues_the_next_cold_layers_likely_experts():
     eng.s = types.SimpleNamespace(n_used=2)
     eng.cold_order = {1: [3, 1, 2]}              # the next layer's measured order
     eng._cold_prefetch(0)
+    eng._join_prefetch()
     assert eng.cold_reader.spans == [(230, 10), (330, 10), (210, 10), (310, 10)]
+
+
+def test_a_prefetched_engine_span_is_consumed_without_a_second_read(tmp_path):
+    """The background lookahead fills the queue; the next cold layer's demand read uses it."""
+    path, data = _file(tmp_path)
+    reader = cold_experts.ColdExpertReader(path, coalesce=0, prefetch_bytes=4096)
+    try:
+        def layer(up_off, down_off):
+            return {"cold": True, "up": _cold_tensor(up_off, {1}),
+                    "down": _cold_tensor(down_off, {1}),
+                    "cold_owner": [-1, -1], "cold_age": [0, 0], "cold_tick": 0}
+
+        first, second = layer(100, 200), layer(300, 400)
+        eng = lightning.Engine.__new__(lightning.Engine)
+        eng.cold_reader = reader
+        eng.layers = [first, second]
+        eng.s = types.SimpleNamespace(n_used=2)
+        eng.cold_order = {1: [1]}
+        eng.ids = _Ids([1, 1])
+        eng.stream = _Stream()
+        eng.cold_slot_hits = 0
+        eng.cold_read_experts = 0
+
+        assert eng._cold_prefetch(0) == 2      # expert 1's up and down spans
+        assert eng._cold_prepare(1) == 1       # joins the lookahead, then consumes its spans
+        stats = reader.stats()
+        assert stats["reads"] == 2             # the prefetch's two reads; the demand adds none
+        assert stats["prefetch_hits"] == 2
+        assert stats["prefetch_used_bytes"] == 36
+        assert stats["prefetch_cached_bytes"] == 0
+        assert eng.cold_read_experts == 1
+
+        codes, scales = cold_experts.split_q2(data[318:336], 1, 1)   # expert 1, up, slot 0
+        assert bytes(second["up"].cold_cnp[:16]) == codes.tobytes()
+        assert bytes(second["up"].cold_snp[:2]) == scales.tobytes()
+        codes, scales = cold_experts.split_q2(data[418:436], 1, 1)   # expert 1, down, slot 0
+        assert bytes(second["down"].cold_cnp[:16]) == codes.tobytes()
+        assert bytes(second["down"].cold_snp[:2]) == scales.tobytes()
+        assert second["up"].ptr_c[1] == second["up"].cold_c.ptr
+        assert second["down"].ptr_s[1] == second["down"].cold_s.ptr
+    finally:
+        reader.close()
 
 
 def _stage_tensor(hoff, warm, cold, codes, scales, raw_off):

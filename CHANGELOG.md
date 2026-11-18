@@ -223,6 +223,14 @@
 
 ### Fixed
 
+- **The cold-expert lookahead read now overlaps the current layer's GPU work** — Lightning's
+  `_cold_prefetch` read the next cold layer's spans synchronously before the current layer's
+  kernels, so the lookahead added file latency instead of hiding it. It now starts the read on a
+  daemon thread; `/health`/`cold_stats`, prompt staging and the next cold layer's demand read join
+  it before touching the queue, and a prefetch error is re-raised on the caller's thread. The reader
+  queue and its byte accounting are unchanged. A new engine-level test queues a span and calls
+  `_cold_prepare` without a manual join, proving the demand read consumes both queued spans with no
+  second file read. No tok/s, GPU or larger-than-RAM run is claimed; C9/R1 stay open.
 - **`kindi verify`/`bench` now pass the configured Nanbeige K/V cache through the engine gateway** —
   `make_engine` did not put `kv_cache` in the adapter config, so a pack served by `kindi serve`
   used the configured cache while verify/bench's registry path fell back to the engine default. The

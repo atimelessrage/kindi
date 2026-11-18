@@ -12,6 +12,7 @@ chunks: the MoE layers group the chunk's tokens by expert."""
 import json
 import mmap
 import os
+import threading
 import time
 
 import numpy as np
@@ -545,6 +546,7 @@ class Engine(object):
                     host[base + nh * w.cw + i * w.sw:base + nh * w.cw + (i + 1) * w.sw] = \
                         warm[len(w.hwarm) * w.cw + j * w.sw:len(w.hwarm) * w.cw + (j + 1) * w.sw]
             cold = [(i, e) for i, e in enumerate(w.hoff) if e in w.hcold]
+            self._join_prefetch()             # a decode lookahead may still be filling the queue
             spans = [self._cold_span(w, e) for _, e in cold]
             for (i, e), raw in zip(cold, self.cold_reader.read_many(spans, coalesce=1)):
                 codes, scales = split_q2(raw, w.rows, w.cols // 64)
@@ -555,10 +557,27 @@ class Engine(object):
         self.cp.cuda.runtime.memcpyAsync(self.stage[b].data.ptr, self.stage_host[b].ptr, total, 1, cs.ptr)
         self.ev_staged[b].record(cs)
 
+    def _join_prefetch(self):
+        """Wait for the lookahead reader thread and re-raise its error on the caller's thread."""
+        thread = getattr(self, "_prefetch_thread", None)
+        if thread is not None:
+            thread.join()
+            self._prefetch_thread = None
+        error = getattr(self, "_prefetch_error", None)
+        if error is not None:
+            self._prefetch_error = None
+            raise error
+
     def _cold_prefetch(self, il):
-        """Queue the next cold MoE layer's most-used cold experts before that layer asks for them."""
+        """Queue the next cold MoE layer's most-used cold experts in the background.
+
+        The read runs on a daemon thread while this layer's kernels execute; the next cold
+        layer's ``_cold_prepare`` joins it before its demand read. Returns the number of spans
+        submitted (not the number newly queued, which is only known after the join).
+        """
         if self.cold_reader is None or not hasattr(self.cold_reader, "prefetch"):
             return 0
+        self._join_prefetch()
         nxt = next((j for j in range(il + 1, len(self.layers)) if self.layers[j].get("cold")), None)
         if nxt is None:
             return 0
@@ -570,12 +589,23 @@ class Engine(object):
         if not picked:
             return 0
         spans = [self._cold_span(L[key], e) for e in picked for key in ("up", "down")]
-        return self.cold_reader.prefetch(spans)
+        self._prefetch_error = None
+
+        def run(reader=self.cold_reader, spans=spans):
+            try:
+                reader.prefetch(spans)
+            except BaseException as exc:       # surfaced by `_join_prefetch` on the caller
+                self._prefetch_error = exc
+
+        thread = threading.Thread(target=run, name="kindi-cold-prefetch", daemon=True)
+        self._prefetch_thread = thread
+        thread.start()
+        return len(spans)
 
     def _cold_prepare(self, il):
         """Before a decode layer's slot kernel: fetch only cold experts that are not already in a warm
         device slot. A warm slot takes no file read and no page fault; the next cold layer's
-        likely experts are queued for the following call."""
+        likely experts are queued in the background while this layer runs."""
         L = self.layers[il]
         if not L.get("cold"):
             return 0
@@ -588,6 +618,7 @@ class Engine(object):
         if not loads:
             self._cold_prefetch(il)
             return 0
+        self._join_prefetch()             # the next layer's bytes must be queued before demand
         spans = []
         for e, _slot in loads:
             for key in ("up", "down"):
@@ -608,6 +639,7 @@ class Engine(object):
         """Byte accounting for the opt-in cold tier; no throughput is implied by these numbers."""
         if self.cold_reader is None:
             return {"active": False, "experts": 0}
+        self._join_prefetch()
         out = self.cold_reader.stats()
         host_bytes = cold_bytes = host_experts = 0
         for L in self.layers:
