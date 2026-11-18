@@ -62,10 +62,18 @@ not collect it.
 
 A live 2B server run with the head attached reported `drafting.method: "mtp"` and
 `drafting.last` `passes: 3, drafted: 12, accepted: 8`. The method is the attached state; the
-non-zero drafted count is the part that says the head actually produced draft tokens for this
-request rather than `KINDI_SPEC=mtp` being echoed back, and the eight accepted drafts say the
-target verified them. This is one request, not a throughput or token-exactness measurement; the
-smoke tool above is the repeatable form of the check.
+non-zero drafted count is the part that says the head actually produced draft tokens for the
+recorded request rather than `KINDI_SPEC=mtp` being echoed back, and the eight accepted drafts say
+the target verified them.
+
+The run's context, `KINDI_SPEC_K`, pack, head and exact launch command were not captured, so the
+record is the counts from the server's last-request block, not a fully specified reproduction. The
+shape is consistent with the engine default `KINDI_SPEC_K=4` (four drafts per pass) but not with
+the smoke tool's default `--spec-k 1`, which can draft at most one token per pass. The number of
+requests the session served was also not recorded: `drafting.last` describes one request, not a
+one-request session. This is not a throughput or token-exactness measurement. The smoke tool above
+is the repeatable form of the check; pass `--spec-k 4` to reproduce the drafts-per-pass shape, and
+keep `--log FILE` so the context, pack, head and command are recorded next time.
 
 ## Measured speed
 
