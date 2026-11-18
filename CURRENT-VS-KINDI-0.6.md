@@ -16,7 +16,7 @@ both code changes in 0.6.1 are ported.
 
 | question | answer |
 |---|---|
-| **What is different** | 576 commits / 704 files ahead, 812 tracked files here against 172 upstream; 28 numbered requirements; no upstream file deleted. The fork adds its own runtime, commands, API surface and tests rather than changing 0.6.1's structure. |
+| **What is different** | 576 commits / 704 files ahead at `0184bb8`, 812 tracked files at the baseline against 172 upstream; 28 numbered requirements; no upstream file deleted. The fork adds its own runtime, commands, API surface and tests rather than changing 0.6.1's structure. |
 | **Better, measured** | Dense tandem + plan-owner placement; the default tensor-core plan path (2B and 9B generation far ahead of stock's plain engine, in the separate TC configuration); 2B/9B same-settings decode parity; 27B peak reduced 7,721 -> 6,091 MiB; KLD quality gate; adaptive draft policy (+15.8% on the 2B, parity on the 27B); physical-core thread count. Details in §3 and §4.6. |
 | **New here** | `kindi plan`, `kindi kld`, `kindi caps`, `kindi autotune`, `kindi io`; sessions store/CLI/HTTP/resume/prune/stats; backend plugin contract + adapters; OpenAI error envelope and conformance harness; JSON-schema/GBNF constrained decoding; Windows install and CPU capability paths. |
 | **Worse** | Version identity stays 0.6.0 while official is 0.6.1, and there are no fork 0.6.1 images or fork installer artifact; mode A MTP speculation costs **0.66x** at its default k (off by default); the tandem split is **~8 vs ~31-34 tok/s** at 24K but buys memory, not speed; FP8 K/V is lossy; recursive GBNF is expensive by design. Details in §4.1-§4.4. |
@@ -28,17 +28,18 @@ Official upstream: **Kindi 0.6.1**, tag `v0.6.1` (`7fececb`, 2026-11-16), GitHub
 release published 2026-11-16T21:49:20Z. The release notes name the 2B MTP fix and
 the `0.6.1-cuda` / `0.6.1-rocm6` / `0.6.1-rocm7` images. `v0.6.0` (`179710c`) is an
 ancestor of `main`; `v0.6.1` is one commit past the shared base `dce89df` and is not
-an ancestor of this fork. The comparison range is therefore `v0.6.1..HEAD`:
+an ancestor of this fork. The comparison range is therefore `v0.6.1..0184bb8`, the last code and
+evidence commit; this report and its handoff commit add only documentation.
 
 ```sh
 git merge-base --is-ancestor v0.6.0 HEAD       # yes
 git merge-base --is-ancestor v0.6.1 HEAD       # no: v0.6.1 is one commit past dce89df
 git merge-base v0.6.1 HEAD                     # dce89df
-git log --oneline v0.6.1..HEAD | wc -l         # 576 commits
-git diff --shortstat v0.6.1..HEAD              # 704 files, +93,047/-1,229
-git diff --diff-filter=D --name-only v0.6.1..HEAD  # (empty: zero file deletions)
+git log --oneline v0.6.1..0184bb8 | wc -l       # 576 commits
+git diff --shortstat v0.6.1..0184bb8           # 704 files, +93,047/-1,229
+git diff --diff-filter=D --name-only v0.6.1..0184bb8  # (empty: zero file deletions)
 git ls-tree -r --name-only v0.6.1 | wc -l      # 172 upstream files
-git ls-files | wc -l                           # 812 tracked files here
+git ls-tree -r --name-only 0184bb8 | wc -l     # 812 tracked files at the baseline
 ls docs/development/requirements/REQ-*.md | wc -l  # 28 numbered requirements
 ```
 
@@ -120,7 +121,7 @@ title folds three different questions together, so they are separate below; each
 would move it, and the linked benchmark pages and `docs/MTP.md` hold the dated runs behind them.
 
 **The short answer.** Nothing upstream is deleted or unported: every file of `v0.6.1` is still present
-(`git diff --diff-filter=D --name-only v0.6.1..HEAD` is empty), and the release's two code changes are
+(`git diff --diff-filter=D --name-only v0.6.1..0184bb8` is empty), and the release's two code changes are
 in `f934a55`. The official release now publishes `0.6.1-cuda`, `0.6.1-rocm6` and `0.6.1-rocm7` plus
 the source and installer hashes; this fork deliberately keeps its 0.6.0 version and container tags
 until it has a matching release. What remains open is **evidence**: measurements that need weights, a
