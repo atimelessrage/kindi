@@ -351,16 +351,25 @@ def test_27b_drafter_baseline_has_the_three_spec_cells():
         measured = [next(r for r in run["results"] if (r["model"], r["mode"]) == key)
                     for run in runs]
         assert row["tokens_per_second"] == sorted(r["tokens_per_second"] for r in measured)[1]
-        assert row["duration_s"] == sorted(r["duration_s"] for r in measured)[1]
+        # The throughput is a median, but the duration and summary must describe the actual pass
+        # that produced it, not a median duration taken from a different pass.
+        median_pass = next(r for r in measured if r["tokens_per_second"] == row["tokens_per_second"])
+        index = measured.index(median_pass)
+        assert row["duration_s"] == median_pass["duration_s"]
         assert baseline["git_revision"] in row["summary"]
         assert "median" in row["summary"]
         # The transcripts are part of the record, not decoration: each row names all three
         # median passes and its `log` is the pass whose tok/s is the row's median, not the
         # earlier single pass. A first-pass transcript would not carry this number.
         assert isinstance(row.get("logs"), list) and len(row["logs"]) == 3
-        assert row["log"] in row["logs"] and len(set(row["logs"])) == 3
+        assert len(set(row["logs"])) == 3
+        assert row["log"] == "logs/median-r%d/%s" % (
+            index + 1, median_pass["log"].rsplit("/", 1)[-1])
+        assert row["log"] == row["logs"][index]
         for rel in row["logs"]:
             assert (page / rel).is_file(), rel
+        assert "r%d pass" % (index + 1) in row["summary"]
+        assert "%.1f s" % row["duration_s"] in row["summary"]
         text = (page / row["log"]).read_text(encoding="utf-8", errors="replace")
         assert "%.1f tokens/s" % row["tokens_per_second"] in text
     assert "median" in baseline["throughput_basis"]

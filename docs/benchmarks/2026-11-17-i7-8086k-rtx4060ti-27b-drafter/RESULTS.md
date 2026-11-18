@@ -94,16 +94,17 @@ typical pass with a typical pass; the first-pass values sat only 6.6-9.0% above
 the medians and left less headroom than the 10% limit implied. Its provenance
 follows the medians: `started_utc` (`2026-11-17T21:15:21Z`) is the first
 `median-rN` pass, `git_revision` (`cf81a82`) is the revision all three passes
-ran at, and each cell's `duration_s` is the median of its three pass durations.
-That matters because the gate's `comparison.json` copies the baseline's
-`started_utc`/`git_revision` into `baseline_started_utc`/`baseline_git_revision`;
-before this, the receipt paired the medians with the earlier single pass's
-`53003a9`/`17:57:48Z`. Each row's `log` now names the transcript of the pass whose
-tokens/s is that row's median (r2 for `ngram`, r1 for `draft2b` and `both`), and
-its `logs` list names all three; the nine transcripts are tracked under
-`logs/median-r{1,2,3}/`. `duration_s` is the median duration independently, so
-it can come from a different pass than `log` (the `ngram` and `both` rows do).
-The first pass's transcripts remain at `logs/27b-tc*.log` for the record.
+ran at. Each row's `tokens_per_second` is the three-pass median and equals the
+tok/s of its named pass; its `duration_s` is that same pass's duration, not a
+median of durations, and `summary` names the same pass (r2 for `ngram`, r1 for
+`draft2b` and `both`). Throughput, duration, transcript and summary therefore
+describe one actual pass instead of pairing a median tok/s with another pass's
+median duration. That matters because the gate's `comparison.json` copies the
+baseline's `started_utc`/`git_revision` into
+`baseline_started_utc`/`baseline_git_revision`; before this, the receipt paired
+the medians with the earlier single pass's `53003a9`/`17:57:48Z`. Each row's
+`logs` lists all three transcripts, tracked under `logs/median-r{1,2,3}/`; the
+first pass's transcripts remain at `logs/27b-tc*.log` for the record.
 
 ## Artifacts
 
