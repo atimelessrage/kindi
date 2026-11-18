@@ -73,6 +73,11 @@ the smoke tool's default `--spec-k 1`, which can draft at most one token per pas
 requests the session served was also not recorded: `drafting.last` describes one request, not a
 one-request session. This is not a throughput or token-exactness measurement.
 
+`tools/mtp_smoke.py` now closes that gap for future runs: it prints and writes a run record at the
+top of its `--log` with the pack, the head and its digest, the context, `KINDI_SPEC_K`, the GPU,
+the exact serve command and its `KINDI_*` environment, and the request count. A later smoke's
+output or log is therefore a fully specified record, not counts with missing provenance.
+
 The smoke tool above is the repeatable form of the check. A repeat at the settings the counts
 imply (`KINDI_SPEC_K=4`) and the tool's default 4,096-token context passed on the same RTX 4060 Ti
 (sm_89), pack `bonsai-2b`, head sha256 `1b5c0c79...`:

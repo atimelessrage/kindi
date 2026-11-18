@@ -14,7 +14,9 @@ views agree that the head drafted tokens:
 It is a tool, not a `tests/test_*.py` file, so the CPU-only suite (`pytest.ini` sets
 `testpaths = tests`) never collects it. The child server gets a clean `KINDI_*` environment, an
 empty config file, a temporary state directory and a loopback-only port; `--log FILE` keeps the
-server log after the run.
+server log after the run, with a run record at the top: the pack, the head and its digest, the
+context, `KINDI_SPEC_K`, the GPU, the exact serve command with its `KINDI_*` environment, and the
+request count. The same record is printed, so a log or a transcript is enough evidence on its own.
 
 Example (on a tensor-core GPU host):
 
@@ -27,6 +29,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import socket
 import subprocess
 import sys
@@ -298,6 +301,51 @@ def _env(pack, head, state_dir, ctx, spec_k):
     return env
 
 
+def _run_record(pack, manifest, head, head_info, ctx, spec_k, gpu, command, env, requests):
+    """The provenance a future MTP claim needs, independent of the terminal transcript."""
+    return {
+        "pack": pack,
+        "model": manifest.get("model") or manifest.get("model_id") or "unknown",
+        "head": head,
+        "head_sha256": head_info.get("sha256") or "",
+        "head_bytes": int(head_info.get("bytes") or 0),
+        "ctx": int(ctx),
+        "spec_k": int(spec_k),
+        "gpu": gpu,
+        "serve_argv": [str(part) for part in command],
+        "serve_env": {key: str(value) for key, value in env.items() if key.startswith("KINDI_")},
+        "requests": int(requests),
+    }
+
+
+def _serve_command(record):
+    """The serve argv with the run's KINDI_* environment, in POSIX shell form."""
+    parts = ["%s=%s" % (key, shlex.quote(value))
+             for key, value in sorted(record["serve_env"].items())]
+    parts.extend(shlex.quote(part) for part in record["serve_argv"])
+    return " ".join(parts)
+
+
+def _record_lines(record):
+    return [
+        "pack: %s (%s)" % (record["pack"], record["model"]),
+        "head: %s sha256 %s (%d bytes, registered)" % (
+            record["head"], record["head_sha256"], record["head_bytes"]),
+        "ctx: %d" % record["ctx"],
+        "KINDI_SPEC_K: %d" % record["spec_k"],
+        "gpu: %s" % record["gpu"],
+        "requests: %d" % record["requests"],
+        "serve command: %s" % _serve_command(record),
+    ]
+
+
+def _record_header(record):
+    """The comment block written at the top of the server log."""
+    return ("# mtp_smoke run record\n"
+            + "".join("# %s\n" % line for line in _record_lines(record))
+            + "# end record\n")
+
+
 def _run(args, temp_dir):
     pack = _path(args.pack)
     head = _path(args.head)
@@ -319,18 +367,19 @@ def _run(args, temp_dir):
         env = _env(pack, head, state_dir, args.ctx, args.spec_k)
         command = [sys.executable, "-m", "kindi", "--config", empty_config,
                    "serve", "--host", "127.0.0.1", "--port", str(port)]
+        record = _run_record(pack, manifest, head, head_info, args.ctx, args.spec_k, gpu,
+                             command, env, requests=1)
+        print("mtp_smoke: run record")
+        for line in _record_lines(record):
+            print("  %s" % line)
         log = open(log_path, "wb")
         try:
+            log.write(_record_header(record).encode("utf-8"))
+            log.flush()
             proc = subprocess.Popen(command, cwd=ROOT, env=env, stdin=subprocess.DEVNULL,
                                     stdout=log, stderr=subprocess.STDOUT)
         finally:
             log.close()
-
-        print("mtp_smoke: pack %s (%s)" % (pack, manifest.get("model") or "unknown"))
-        print("mtp_smoke: head %s sha256 %s (%d bytes, registered)" % (
-            head_info["file"], head_info["sha256"][:12], int(head_info["bytes"])))
-        print("mtp_smoke: GPU %s; serving with KINDI_SPEC=mtp KINDI_SPEC_K=%d ctx=%d"
-              % (gpu, args.spec_k, args.ctx))
 
         health = _wait_health(base, proc, args.timeout)
         draft = health.get("drafting") or {}
@@ -419,7 +468,8 @@ def main(argv=None):
     parser.add_argument("--timeout", type=_positive_float, default=180.0,
                         help="seconds allowed for server startup and the request (default: 180)")
     parser.add_argument("--log", default=None,
-                        help="keep the server log at this path (default: a temporary file)")
+                        help="keep the server log at this path, with the run record at the top "
+                             "(default: a temporary file)")
     args = parser.parse_args(argv)
 
     if not args.pack:

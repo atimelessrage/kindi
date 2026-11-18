@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `6e2753a` on `freebuff/tandem-cpu-recovery` (**main** is fast-forwarded to this branch at handoff; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `c32b2dc` on `freebuff/tandem-cpu-recovery` (**main** is fast-forwarded to this branch at handoff; guarded by `tests/test_agents_handoff.py`).
 
 ### Python quality ratchet
 
@@ -31,7 +31,7 @@ remains open. The prior test task is below.
 post-request guard: a `drafting.last` block with `method="ngram"` raises
 `SmokeError`, naming the method and `not mtp`. The guard is
 `tools/mtp_smoke.py:_check_last_method`, so it is testable without a GPU;
-`python -m pytest tests/test_mtp_smoke.py -q` **1 passed**; no GPU run.
+`python -m pytest tests/test_mtp_smoke.py -q` **3 passed**; no GPU run. The tool also prints and writes a run record (pack, head and digest, ctx, `KINDI_SPEC_K`, GPU, serve command with its `KINDI_*` environment, request count) at the top of `--log`.
 
 ### Audit follow-up
 
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `6e2753a` | main checkout; clean; fast-forwarded to this branch |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `6e2753a` | this session; checked out here |
+| `T:/kindi` | `main` | `c32b2dc` | main checkout; clean; fast-forwarded to this branch |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `c32b2dc` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
