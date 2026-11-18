@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `7325617` on `freebuff/tandem-cpu-recovery` (**main** is fast-forwarded to this branch at handoff; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `2cd4d21` on `freebuff/tandem-cpu-recovery` (**main** is fast-forwarded to this branch at handoff; guarded by `tests/test_agents_handoff.py`).
 
 ### Python quality ratchet
 
@@ -150,7 +150,8 @@ json`, since `pytest-cov` hangs on this host; the 2026-11-18 historical run 1,19
 28 / 0 failed at 46.2% after its stale-reference first pass), and `tests/test_no_secrets.py` now scans untracked files too (pinned by
 `test_untracked_files_are_scanned`), with `project_memory --check`, `config_reference --check` and `support_matrix --check` all clean.
 The per-module rows in `tests/README.md` were re-derived from that run's `.coverage` data; the total and
-per-module floors are unchanged.
+per-module floors are unchanged. Its tracked revision, command and counts are in
+[docs/benchmarks/2026-11-18-i7-8086k-windows-cpu/full-suite.json](docs/benchmarks/2026-11-18-i7-8086k-windows-cpu/full-suite.json).
 
 ### Grammar and claims
 
@@ -233,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `7325617` | main checkout; clean; fast-forwarded to this branch |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `7325617` | this session; checked out here |
+| `T:/kindi` | `main` | `2cd4d21` | main checkout; clean; fast-forwarded to this branch |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `2cd4d21` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.

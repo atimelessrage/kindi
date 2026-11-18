@@ -1216,6 +1216,12 @@ file points here.
   keeps the pinned-GGUF Q0 gate in front of any asymmetric-precision experiment
   (`docs/ROADMAP.md`).
 
+### Full-suite evidence artifact lease (2026-11-18)
+
+| task | worktree | branch | shared files | state |
+|---|---|---|---|---|
+| Full-suite evidence artifact | this worktree | `freebuff/tandem-cpu-recovery` | `tests/README.md`, `docs/CI.md`, `docs/benchmarks/2026-11-18-i7-8086k-windows-cpu/full-suite.json`, `AGENTS.md`, `docs/development/AGENTS-HISTORY.md` | done at `2cd4d21`+. Added the tracked artifact with revision `296a03d`, command `python -m coverage run --branch --source=kindi -m pytest`, counts 1,231 passed / 28 skipped / 0 failed in 243.91 s, and 46.2186% line+branch coverage (23,467 statements, 8,386 branches); linked it from `tests/README.md` and `docs/CI.md`. Checks: docs/handoff/claims **23 passed**, `check_claims.py` 17 gates / 95 numbers, `project_memory --check`, `git diff --check`. No full-suite rerun; the artifact records the existing 2026-11-18 run. |
+
 ### Coverage README re-derive lease (2026-11-18)
 
 | task | worktree | branch | shared files | state |

@@ -1,0 +1,23 @@
+{
+  "run": "full CPU suite with line+branch coverage",
+  "measured": "2026-11-18",
+  "revision": "296a03d",
+  "revision_full": "296a03d1ec1bb5c146ab502669b00e05dfc9a3f4",
+  "command": "python -m coverage run --branch --source=kindi -m pytest",
+  "platform": "Windows",
+  "coverage_tool": "coverage.py 7.16.1",
+  "counts": {
+    "passed": 1231,
+    "skipped": 28,
+    "failed": 0,
+    "total": 1259,
+    "duration_s": 243.91
+  },
+  "coverage": {
+    "mode": "line+branch",
+    "percent": 46.2186,
+    "statements": 23467,
+    "branches": 8386
+  },
+  "notes": "Clean rerun after regenerating docs/CONFIGURATION-REFERENCE.md; the first pass was 1 failed, 1,230 passed, 28 skipped."
+}

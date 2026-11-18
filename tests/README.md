@@ -56,7 +56,8 @@ Measured on 2026-11-18 (Windows, line+branch): **1,231 passed, 28 skipped, 0 fai
 in CI stays 27%, not 46%, because the number moves with the platform and a gate that fails on a
 fresh Linux checkout is worse than a loose gate. The distribution is what matters: the CPU suite
 covers the modules it can reach, and the heavy GPU modules are covered by `kindi verify` and
-`kindi bench` on hardware, not by pytest.
+`kindi bench` on hardware, not by pytest. The run is recorded with its revision, command and
+counts in [full-suite.json](../docs/benchmarks/2026-11-18-i7-8086k-windows-cpu/full-suite.json).
 
 | module | cover | who checks it |
 |---|---|---|

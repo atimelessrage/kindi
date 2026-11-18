@@ -41,7 +41,8 @@ are verified by `kindi verify` on hardware and need the GPU lane above for a hig
 The new floors sit 10 points below the 2026-11-18 full-suite run (`coverage run --branch
 --source=kindi -m pytest`, **1,231 passed, 28 skipped, 0 failed, 46.2% total**). The first
 post-Usage/plan pass found the generated reference stale at **1 failed, 1,230 passed, 28 skipped**;
-regenerating it produced the clean rerun. `engine.py` moves from
+regenerating it produced the clean rerun. The run's revision, command and counts are tracked in
+[full-suite.json](benchmarks/2026-11-18-i7-8086k-windows-cpu/full-suite.json). `engine.py` moves from
 19% to 20% against its measured 24.3%, so platform variance does not make CI noisy; raise a
 floor only after a measured run. `moe_cpu.py` stays
 out until its C library is built in CI.
