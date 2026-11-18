@@ -8,7 +8,8 @@ views agree that the head drafted tokens:
 
 * `/health` reports `drafting.enabled`, `drafting.method == "mtp"` and a head before the request;
 * `/metrics` reports a non-zero `kindi_spec_drafted_tokens_total`;
-* `/health`'s `drafting.last.drafted` is non-zero after the request.
+* `/health`'s `drafting.last.method` is `mtp` and `drafting.last.drafted` is non-zero after the
+  request.
 
 It is a tool, not a `tests/test_*.py` file, so the CPU-only suite (`pytest.ini` sets
 `testpaths = tests`) never collects it. The child server gets a clean `KINDI_*` environment, an
@@ -355,6 +356,9 @@ def _run(args, temp_dir):
             raise SmokeError("%s is %d after one greedy completion" % (METRIC_DRAFTED, drafted))
         if accepted < 0 or accepted > drafted:
             raise SmokeError("inconsistent spec counters: drafted=%d accepted=%d" % (drafted, accepted))
+        if last.get("method") != "mtp":
+            raise SmokeError("drafting.last.method is %r, not mtp (last=%r)"
+                             % (last.get("method"), last))
         last_drafted = int(last.get("drafted") or 0)
         last_accepted = int(last.get("accepted") or 0)
         if last_drafted <= 0:
@@ -367,8 +371,8 @@ def _run(args, temp_dir):
         if len(preview) > 100:
             preview = preview[:97] + "..."
         print("mtp_smoke: PASS")
-        print("  drafting.last: passes=%s drafted=%d accepted=%d"
-              % (last.get("passes"), last_drafted, last_accepted))
+        print("  drafting.last: method=%s passes=%s drafted=%d accepted=%d"
+              % (last.get("method"), last.get("passes"), last_drafted, last_accepted))
         print("  metrics: %s=%d %s=%d" % (METRIC_DRAFTED, drafted, METRIC_ACCEPTED, accepted))
         print("  completion: %s tokens, %r" % (usage.get("completion_tokens", "?"), preview))
         if args.log:

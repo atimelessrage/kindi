@@ -41,8 +41,8 @@ draft cannot save time. These are the measurements for T = 2, 3 and 4 tokens per
 `tools/mtp_smoke.py` is the server-level check for this mode. It starts a real `kindi serve`
 process with the registered head and `KINDI_SPEC=mtp`, waits for `/health`, sends one greedy chat
 completion, and reads the result back from both `/health` and `/metrics`. It exits non-zero unless
-`drafting.enabled` is true, the effective method is `mtp`, `drafting.last.drafted` is above zero,
-and `kindi_spec_drafted_tokens_total` is above zero. The engine is not a stand-in: this is the same
+`drafting.enabled` is true, the effective method is `mtp`, `drafting.last.method` is `mtp`,
+`drafting.last.drafted` is above zero, and `kindi_spec_drafted_tokens_total` is above zero. The engine is not a stand-in: this is the same
 server path a client uses.
 
 ```bash
@@ -85,10 +85,12 @@ python tools/mtp_smoke.py \
   --log bench-logs/mtp-smoke/followup-k4-20261118.log
 ```
 
-It exited 0 and printed `drafting.last: passes=2 drafted=8 accepted=3`, with
+It exited 0 and printed `drafting.last: method=mtp passes=2 drafted=8 accepted=3`, with
 `kindi_spec_drafted_tokens_total=8` and `kindi_spec_accepted_tokens_total=3`, five completion
-tokens ("Red Blue Green"). The fixed prompt and 16-token cap make this a reproduction of the
-attached-and-drafting path, not of the earlier request's 3/12/8 counts.
+tokens ("Red Blue Green"). The tool now refuses a last-request block whose `method` is not `mtp`,
+so the per-request record is checked as well as the attached state. The fixed prompt and 16-token
+cap make this a reproduction of the attached-and-drafting path, not of the earlier request's
+3/12/8 counts.
 
 ## Measured speed
 
