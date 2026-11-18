@@ -1099,3 +1099,119 @@ go.
 | Qwen3.6 16 GB llama.cpp GGUF route (2026-11-18) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/ROADMAP.md`, `AGENTS.md`, `docs/development/AGENTS-HISTORY.md` | done at `680dcdf`. Extended the Qwen3.6 roadmap note with the standard llama.cpp route: Unsloth publishes ordinary `qwen35moe` GGUFs and upstream llama.cpp implements that architecture; the UD-IQ2 files are 10.8-12.3 GB and the UD-IQ3 files 13.2-15.4 GB, with a 16 GiB card budget table after context/KV/overhead; UD-Q3_K_M/XL (16.6/16.8 GB) need partial CPU offload. The note keeps Kindi's missing `qwen35moe` backend gate explicit (Q0 reference plus GDN/full-attention/MoE milestones), names `UD-IQ2_M` as the 16 GB byte-pinned target, and leaves Q4_K_M as an optional quality reference. Published sizes came from the Hugging Face model card/API and llama.cpp's `qwen35moe` implementation; no file was downloaded or run. Checks: docs links **3 passed**, `check_claims.py` 17 gates / 95 numbers, `git diff --check`. |
 | Ternary-MoE census for the Qwen3.6 Apple-only builds (2026-11-18) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/ROADMAP.md`, `AGENTS.md`, `docs/development/AGENTS-HISTORY.md` | done at `9531f9a`. Added a `### Ternary-MoE census (2026-11-18)` table under the small-MoE section with both builds linked, their contents (russellwmy 9.1 GB experts + 2.3 GB rest; manjunathshiva 12.6 GB mixed 3-bit/ternary/4-bit plus its separate 9.4 GB pure-ternary sibling) and why neither counts as a llama.cpp-compatible candidate: custom safetensors/ironbark or TurboQuant-MLX formats rather than a `qwen35moe` GGUF, no tensor inventory, no bit-level dequant/export test here, no upstream llama.cpp loader or NVIDIA path, and no pinned llama.cpp reference/token-exact `kindi verify`. The Qwen3.6 note now links both names to the census; the 9.4 GB sibling is attributed to manjunathshiva, not both cards. Checks: docs links **3 passed**, `check_claims.py` 17 gates / 95 numbers, `git diff --check`. |
 | Audit follow-up: HTTP close, Bridge smoke, path/handoff guards (2026-11-18) | this worktree | `freebuff/tandem-cpu-recovery` | `AGENTS.md`, `kindi/dsv41_server.py`, `tests/test_dsv41_server.py`, `tests/test_no_secrets.py`, `tests/test_ci_config.py`, `.github/workflows/ci.yml`, `bridge/**`, `docs/**`, `tools/**` | done at `0dbff91`. (1) DSV4.1 `_json()` sends `Connection: close` when a body-error path set `close_connection`, and every 413/400 body-error catch sets it; the refused bytes must not be parsed as a reused socket's next request. (2) The forward-slash drive-root gap is closed in 16 current-facing docs/tools and 11 tracked 27B benchmark logs; `tests/test_no_secrets.py` now scans non-test tracked files for `D:/`/`L:/`-style roots, accepts the repository's `T:/kindi` form, and proves the rule is not vacuous. (3) The optional Bridge has a standard-library smoke suite (`bridge/tests`, 8 tests), `Store.add_agent` turns a missing directory into `ValueError` instead of `FileNotFoundError`, the README no longer claims the absent UI/PTY/RPC suite is bundled, and `ci.yml` runs the suite. (4) The CI action-pin guard covers all `.github/workflows/*.yml`; every action was already SHA-pinned. (5) AGENTS.md labels 1204/28 the last recorded full gate, not a run at this HEAD, and keeps the table out of a stale number. Checks: focused pytest **26 passed**, Bridge **8 passed**, `check_claims.py` **17 gates / 95 numbers**, `project_memory --check`, `compileall` and `git diff --check` green. No full-suite rerun, GPU run, larger-than-RAM pack, or main fast-forward while another lease is active. |
+
+## Current-state bullets moved from AGENTS.md (2026-11-18)
+
+These dated bullets were moved verbatim from `AGENTS.md`'s live `Current state` section
+on 2026-11-18, so the live handoff stays navigable and under its 450-line guard. The live
+file points here.
+
+- **Latest:** The latest evidence is at `0184bb8`. A direct 27B A/B grounds the byte-identical
+  claim: `tools/spec_ab.py` builds one 27B tensor-core engine with the 2B drafter and head,
+  generates the four reference prompts plain and under `ngram`, `draft2b` and `both`, and compares
+  token ids and decoded bytes directly. The run is **12/12 prompt/mode pairs identical** (40 greedy
+  tokens each, no mismatch), recorded in `docs/MTP.md` and
+  `docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-27b-spec-ab/`. The tracked 27B verify baseline now
+  stores the three-pass medians (45.7/71.0/62.0 tok/s) instead of the faster first pass, and its
+  `started_utc` (`2026-11-17T21:15:21Z`) and `git_revision` (`cf81a82`) name that median set,
+  while each cell's `duration_s` and summary name the actual pass whose tok/s is the median
+  (not a median duration from another pass), so a gate receipt copies the medians' revision
+  instead of the first pass's `53003a9`; the 2026-11-18 median-baseline gate passed at 49.8/75.7/66.9 tok/s
+  (+9.0/+6.6/+7.9%), with all four matrix cells passing.
+  Checks: `tests/test_spec_ab.py` + `tests/test_verify_matrix.py` **43 passed**,
+  `tests/test_verify_matrix.py` + docs/links/claims **58 passed**, docs/claims/memory **24 passed**,
+  direct A/B exit 0, `check_claims` 16 gates / 97 numbers, `project_memory --check`, `compileall`,
+  `git diff --check` green. The same three median rows are now in `docs/CARDS.md`'s RTX 4060 Ti
+  verify-matrix table, linked to the baseline page; the current full CPU gate is **1,231 passed, 28 skipped, 0 failed** (46.2%; the first post-Usage/plan pass found the stale config reference at **1 failed / 1,230 passed / 28 skipped**)
+  and the docs/handoff/memory checks **12 passed**. The stock position-512 harness was rechecked on
+  2026-11-18 with five paired bench-then-harness passes: its position-100 anchor was 191.3 vs 189.1
+  on the 2B and 86.3 vs 86.3 on the 9B, so the earlier 171.2/80.7 standalone medians were cold-clock
+  runs and are superseded by **190.3/84.5 tok/s** at position 512. §4.6 now also carries
+  separate, explicitly non-same-settings tensor-core rows: 2B 484.9 read / 354.9 @100 / 333.8 @2000 /
+  331.0 @8000; 9B 137.2 / 118.3 / 115.2 / 111.8, with the stock reference rows repeated and all
+  ten raw logs force-added past the `*.log` rule. The five-pass 9B reading gap (83.9 vs 72.4) is
+  now closed as noise: 20 alternating-order pairs give 70.7 stock vs 75.7 fork, a paired median of
+  -1.4 tok/s, and an exact sign test of p=0.648; the 40 raw clock/power logs are tracked in the
+  reading recheck page. The full gate then found ten TC JSONs carrying a double-escaped local pack
+  path; they are sanitized at `0184bb8`, with the historical occurrence recorded in the reviewed
+  secret baseline. The prior task is below.
+- **Previous:** The 2B gate's fail-closed proof is now a test, not prose, at `ae9c861`:
+  `tests/test_verify_matrix.py::test_2b_gate_fails_closed_when_the_optional_head_and_pack_are_absent`
+  runs the documented gate with `--mtp-head`/`--spec-pack` absent and `ngram` deselected; the three
+  optional cells are skipped, all four baseline spec cells (including `tc-ngram`) are reported
+  missing, and the gate exits 1. `tests/test_verify_matrix.py` **39 passed**; docs/claims/memory
+  **24 passed**; `compileall`, `git diff --check` green. No GPU run. The prior task is below.
+- **Earlier:** A server started with `KINDI_SPEC` set but without `KINDI_TC=1` now logs
+  `warning: speculation off: KINDI_SPEC=... requires the tensor-core plan engine...` at startup,
+  built by the same helper as `/health`, so the gap is visible before anything queries health. At
+  `6ea3524`: `tests/test_server.py` **86 passed**, including the warning test over `mtp` and
+  `draft2b`; `config_reference` regenerated (198 environment reads) and checked; docs/claims/memory
+  **24 passed**; `compileall` and `git diff --check` green. No GPU run. The prior task is below.
+- **Older:** The open audit findings are closed at `2b41b31` where the code/tree owns them, and
+  recorded as open hardware risks where it does not. `kindi serve` now has one family table: Nanbeige,
+  Lightning and Gemma 4 are served, dsv41 directs to `python -m kindi.dsv41_server`, Cascade keeps its
+  converter-only message, and an external `KINDI_BACKEND_MODULES` family is refused instead of falling
+  into the dense builder; tests pin a registry adapter for every served family. `Usage` validates
+  count/order shape and `split_host_tiers` reports when it falls back to the usage order; autotune's
+  `expert-cache-<MiB>` candidate now sizes through `rate_slots(room=..., n_moe=...)` and the host-tier
+  cap; `card_features()` is silicon-only again (FA2 dropped). CI runs `check_claims`, `project_memory
+  --check`, `config_reference --check` and `support_matrix --check`; coverage floors grew from 26 to
+  the measured **46** modules (`engine.py` 20%; `spec/tp/dspine/mtp` only at CPU-reachable levels) from
+  a **1,196 passed / 28 skipped / 45.4%** historical full run whose only failure was the then-stale generated
+  reference (regenerated; gate green); the later post-Usage/plan rerun is **1,231 passed / 28 skipped /
+  0 failed at 46.2%**, after its own first pass caught the reference stale at **1 failed / 1,230 passed
+  / 28 skipped**. The installer docs lead with the checksum path and a reviewed
+  Windows download. C9/R1 (cold-tier sync/blocking reads and pointer freshness) and R2-R4 stay open
+  and are now stated in `docs/MOE-TANDEM.md`/`docs/BACKENDS.md`; no GPU or cold-tier run is claimed.
+  Focused tests after those older edits: **253 passed**; the later post-Usage/plan full rerun is
+  recorded above. The follow-up at `e2879de` records a live 2B check: `drafting.method` `mtp` with
+  `drafting.last` 3 passes / 12 drafted / 8 accepted, in `docs/MTP.md` and REQ-0024, so the
+  attached-versus-drafted distinction is durable. That run's context, `KINDI_SPEC_K`, pack/head
+  and command were not captured; four drafts per pass fits the engine default k=4 and rules out
+  the smoke's k=1, and the session's request count is unknown (`drafting.last` covers one request).
+  A 2026-11-18 repeat with `tools/mtp_smoke.py --ctx 4096 --spec-k 4` passed on the same 2B/head,
+  printing `drafting.last.method=mtp` with 2 passes / 8 drafted / 3 accepted (metrics 8/3, five
+  tokens): the tool now asserts the per-request method too, and the run reproduces the
+  attached-and-drafting path, not the earlier counts. The prior task is below.
+- **Older still:** `drafting.last` now names the effective speculation mode that produced its drafts. The
+  engine's per-request `spec_mode` is copied into the last-request record when generation ends, and
+  `/health` exposes it as `last.method` alongside `passes`/`drafted`/`accepted`/`acceptance`; the
+  sibling `method` still describes what is effective now. At `d9f3fe3`: focused server tests
+  **8 passed** (81 in `tests/test_server.py`), full suite **1185 passed, 28 skipped**; no GPU run
+  for this field. `docs/AGENTS.md` and `CHANGELOG.md` document it. The prior task is below.
+- **Oldest:** The 2B MTP server check is now `tools/mtp_smoke.py`. It boots a real `kindi serve`
+  child with the registered head, a clean `KINDI_*` environment, an empty config, a temporary
+  state directory and a free loopback port; it sends one greedy completion and fails unless
+  `drafting.method` is `mtp`, `drafting.last.drafted` and `kindi_spec_drafted_tokens_total` are both
+  above zero, and the accepted counters are consistent. At `f958a1f` on the RTX 4060 Ti (sm_89),
+  pack `bonsai-2b`, head sha256 `1b5c0c790a59`, ctx 4096, k=1: PASS with `drafting.last` 3 passes /
+  3 drafted / 2 accepted and the same 3/2 metrics, completion 5 tokens. It is not under `tests/`,
+  so the CPU suite does not collect it; full suite **1184 passed, 28 skipped**. The prior task is
+  below.
+- **Older still:** The cold-expert reader now separates coalescing from a real lookahead prefetch
+  queue: `prefetch()` fills a bounded exact-span cache, a later `read_many()` consumes those
+  bytes with no second file read, and Lightning queues the next cold MoE layer's most-used
+  experts after preparing the current one (`tests/test_cold_experts.py`). `kindi bench --dcache N`
+  applies the Lightning plan's slot count to one run (and
+  restores the caller's `KINDI_LT_DCACHE`), while `kindi plan` now emits that portable flag instead
+  of a POSIX-only `KINDI_LT_DCACHE=` prefix (`tests/test_bench_json.py`, `tests/test_plan.py`). The
+  Lightning plan's follow-up now also carries its planned context as the global `--ctx N` before
+  `bench`, so the fit and slot count are reproduced at the same context (`tests/test_plan.py`).
+  With `KINDI_LT_COLD` set, the plan's `host ram` line and `host_tier` report show pinned versus
+  file-backed host experts under the same budget as the engine (`tests/test_plan.py`). The
+  kernel-arity resolver checks every branch of a conditional argument tuple, so a
+  6-arg branch cannot pass a 7-parameter kernel on the 7-arg branch (`tests/test_kernel_arity.py`, 8
+  tests; coverage unchanged at 105 measured / 37 pinned). The full-suite rerun also found local
+  machine paths in the three tracked 27B median JSONs; they are placeholder-only now and the
+  reviewed history hits are in `tools/secret_history_baseline.json`. The standalone DSV4.1 CLIs now
+  reject malformed values at argparse time: `--ctx` is a positive-integer list, `--auto` and
+  `--cal` are finite `a,b` pairs, server `--ctx` is a positive integer, and `--range` is two
+  non-negative integers `a-b` with `a <= b`, instead of a bare split after the model loads
+  (`tests/test_dsv41_cli.py`), and `python -m kindi.dsv41_server` caps request bodies at
+  `KINDI_MAX_BODY_MB` (16 MiB default) with a 413 (`tests/test_dsv41_server.py`). The autotune
+  expert-cache proposal is capped by the host's currently
+  available RAM after the same 10% / 1 GiB headroom as the default `KINDI_LT_HOST_MB` budget
+  (`tests/test_autotune.py`). The Qwen3.6 roadmap row now records both community ternary builds
+  as external Apple-Silicon quantizations, not llama.cpp/NVIDIA artifacts or Q0 shortcuts, and
+  keeps the pinned-GGUF Q0 gate in front of any asymmetric-precision experiment
+  (`docs/ROADMAP.md`).
