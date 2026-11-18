@@ -223,6 +223,13 @@
 
 ### Fixed
 
+- **`kindi plan`'s follow-up commands survive a spaced path** — the printed `bench` lines formatted
+  the interpreter and pack with `%s`, so `C:\Program Files\Python 313\python.exe` or
+  `/mnt/my packs/bonsai` split into several arguments when pasted. Both builders now quote the argv
+  for the host shell (`shlex.join` on POSIX, cmd.exe's `subprocess.list2cmdline` rules on Windows),
+  leaving the flags unchanged. A focused test parses the POSIX forms back with `shlex` and pins the
+  Windows double quotes; PowerShell still needs its `&` call operator when the quoted executable
+  comes first.
 - **`kindi serve` refuses backends it cannot drive instead of building a dense engine** — a
   DeepSeek V4.1 pack now exits with the documented `python -m kindi.dsv41_server` command, Cascade
   keeps its converter-only message, and an external `KINDI_BACKEND_MODULES` family is refused

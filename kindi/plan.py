@@ -11,6 +11,8 @@ hardware exists. Always exits 0; a placement that fits nothing is reported, not 
 """
 import json
 import os
+import shlex
+import subprocess
 import sys
 
 import numpy as np
@@ -262,20 +264,35 @@ def describe(pack, ctx, spec, mode="cpu-first", gpu_kind=None,
     return out
 
 
+_WINDOWS = os.name == "nt"
+
+
+def _pasteable(argv):
+    """One command string quoted for the host shell, so a spaced path stays one argument.
+
+    The command is printed for a human to paste; Kindi never runs it through a shell. POSIX uses
+    `shlex.join`; Windows uses cmd.exe's own `subprocess.list2cmdline` rules (double quotes).
+    A PowerShell user still needs its `&` call operator when the quoted executable comes first.
+    """
+    argv = [str(a) for a in argv]
+    return subprocess.list2cmdline(argv) if _WINDOWS else shlex.join(argv)
+
+
 def _command(pack, mode, spec):
-    tail = " bench --tandem %s --tandem-cpu-layers %s" % (mode, spec or "auto")
-    return "%s -m kindi --pack %s%s" % (sys.executable, pack, tail)
+    return _pasteable([sys.executable, "-m", "kindi", "--pack", pack, "bench",
+                       "--tandem", mode, "--tandem-cpu-layers", spec or "auto"])
 
 
 def _moe_bench_command(pack, ctx, dcache):
     """The Lightning follow-up: carry the planned context and slot count into the child engine.
 
     ``--ctx`` is a global option, so it must precede the ``bench`` subcommand; ``--dcache`` is a
-    bench option. Both are ordinary flags (no POSIX ``KINDI_LT_DCACHE=...`` prefix), so the command
-    runs in cmd.exe/PowerShell and a POSIX shell.
+    bench option. Both are ordinary flags (no POSIX ``KINDI_LT_DCACHE=...`` prefix), and each
+    argument is shell-quoted for this host, so a pack or interpreter path with spaces stays one
+    argument when pasted.
     """
-    return "%s -m kindi --pack %s --ctx %d bench --dcache %d" % (
-        sys.executable, pack, int(ctx), int(dcache))
+    return _pasteable([sys.executable, "-m", "kindi", "--pack", pack, "--ctx", int(ctx),
+                       "bench", "--dcache", int(dcache)])
 
 
 _Q2, _Q8, _F32 = 42, 8, 0                     # lightning.py's tensor-type ids

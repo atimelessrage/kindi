@@ -5,6 +5,7 @@ The fake pack carries only the manifest and the two tensor indexes the planners 
 code path opened a weight file the test would fail with a missing-file error instead of passing.
 """
 import json
+import shlex
 from pathlib import Path
 
 import pytest
@@ -301,6 +302,36 @@ def test_the_planned_bench_command_reproduces_the_rate_sized_slot_count(tmp_path
     assert rep["command"].split()[-5:] == ["--ctx", "2048", "bench", "--dcache",
                                            str(rep["dcache"])]
     assert "KINDI_LT_DCACHE=" not in rep["command"]
+
+
+def test_follow_up_commands_quote_a_spaced_pack_and_interpreter(tmp_path, monkeypatch):
+    """A spaced pack or interpreter path must stay one argument when the command is pasted.
+
+    POSIX is parsed back with `shlex`; Windows must carry the cmd.exe double quotes.
+    """
+    pack = tmp_path / "my packs" / "bonsai 2b"
+    pack.mkdir(parents=True)
+    monkeypatch.setattr(_plan, "_WINDOWS", False)
+    monkeypatch.setattr(_plan.sys, "executable", "/opt/my python/bin/python3")
+    posix = _plan._moe_bench_command(str(pack), 2048, 16)
+    assert shlex.split(posix) == [
+        "/opt/my python/bin/python3", "-m", "kindi", "--pack", str(pack),
+        "--ctx", "2048", "bench", "--dcache", "16"]
+    tandem = _plan._command(str(pack), "cpu-first", None)
+    assert shlex.split(tandem) == [
+        "/opt/my python/bin/python3", "-m", "kindi", "--pack", str(pack),
+        "bench", "--tandem", "cpu-first", "--tandem-cpu-layers", "auto"]
+
+    monkeypatch.setattr(_plan, "_WINDOWS", True)
+    monkeypatch.setattr(_plan.sys, "executable", r"C:\Program Files\Python 313\python.exe")
+    win_pack = r"C:\my packs\bonsai 2b"
+    win = _plan._moe_bench_command(win_pack, 2048, 16)
+    assert win == ('"C:\\Program Files\\Python 313\\python.exe" -m kindi --pack '
+                   '"C:\\my packs\\bonsai 2b" --ctx 2048 bench --dcache 16')
+    win_tandem = _plan._command(win_pack, "cpu-first", None)
+    assert win_tandem == ('"C:\\Program Files\\Python 313\\python.exe" -m kindi --pack '
+                          '"C:\\my packs\\bonsai 2b" bench --tandem cpu-first '
+                          '--tandem-cpu-layers auto')
 
 
 def test_the_planned_bench_command_carries_the_planned_context(tmp_path):

@@ -73,7 +73,10 @@ probes as `kindi io`, sizes the decode slots from the measured refill path, and 
 rates in a `rates:` line and in the slot explanation. Its follow-up `bench` command passes the
 planned context as `--ctx <tokens>` (the global flag, before `bench`) and the planned count as
 `--dcache <count>`, so the child engine uses the same context and slot count instead of falling back
-to a configured default or the slot default 10; both are portable to cmd.exe and PowerShell. `kindi plan` and `kindi autotune` also accept `--io-report FILE` (or
+to a configured default or the slot default 10. The printed command quotes the interpreter, pack
+and flags for the host shell (`shlex.join` on POSIX, cmd.exe rules on Windows), so a path with
+spaces stays one argument; PowerShell needs its `&` call operator only when the quoted executable
+comes first. `kindi plan` and `kindi autotune` also accept `--io-report FILE` (or
 `KINDI_IO_REPORT`) to reuse a saved `kindi io --json FILE` report instead of running the probe
 again; a missing or unusable report falls back to one probe. `kindi autotune` also proposes an
 `expert-cache-<MiB>` cold-tier budget (`KINDI_LT_COLD=1` + `KINDI_LT_HOST_MB`) sized from the same
