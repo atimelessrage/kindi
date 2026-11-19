@@ -4,6 +4,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "tools" / "verify_matrix.py"
@@ -210,9 +212,11 @@ def test_save_baseline_and_compare_cli(tmp_path, capsys, monkeypatch):
     out = tmp_path / "out"
     baseline = tmp_path / "baseline.json"
     saved = tmp_path / "saved.json"
+    old_logs = ["logs/median-r1/27b-tc.log", "logs/median-r2/27b-tc.log",
+                "logs/median-r3/27b-tc.log"]
     baseline.write_text(json.dumps({
         "started_utc": "old", "git_revision": "old",
-        "results": [_row(status="pass", tps=40.5)],
+        "results": [{**_row(status="pass", tps=40.5), "logs": old_logs}],
     }), encoding="utf-8")
 
     current = _row(status="pass", tps=38.1)
@@ -228,11 +232,54 @@ def test_save_baseline_and_compare_cli(tmp_path, capsys, monkeypatch):
     assert row["status_change"] == "same"
     assert row["tokens_per_second_delta"] == -2.4
     assert (out / "comparison.csv").exists()
-    assert json.loads(saved.read_text(encoding="utf-8"))["results"][0]["tokens_per_second"] == 38.1
+    saved_row = json.loads(saved.read_text(encoding="utf-8"))["results"][0]
+    assert saved_row["tokens_per_second"] == 38.1
+    assert saved_row["logs"] == old_logs          # the median provenance is not dropped
     output = capsys.readouterr().out
     assert "comparison vs" in output
     assert "-2.4" in output
     assert "saved baseline" in output
+
+
+def test_save_baseline_preserves_logs_from_an_existing_target(tmp_path):
+    mod = load()
+    logs = ["logs/median-r1/27b-tc.log", "logs/median-r2/27b-tc.log",
+            "logs/median-r3/27b-tc.log"]
+    target = tmp_path / "baseline.json"
+    target.write_text(json.dumps({"results": [{**_row(), "logs": logs}]}), encoding="utf-8")
+    source = tmp_path / "results.json"
+    source.write_text(json.dumps({"results": [_row()]}), encoding="utf-8")
+
+    mod.save_baseline(source, target)
+
+    saved = json.loads(target.read_text(encoding="utf-8"))["results"][0]
+    assert saved["logs"] == logs
+
+
+def test_save_baseline_refuses_to_drop_a_logs_row(tmp_path):
+    mod = load()
+    logs = ["logs/median-r1/27b-tc-both.log", "logs/median-r2/27b-tc-both.log",
+            "logs/median-r3/27b-tc-both.log"]
+    kept = {**_row(), "logs": logs}
+    dropped = {**_row(), "mode": "tc-both", "logs": logs}
+    target = tmp_path / "baseline.json"
+    target.write_text(json.dumps({"results": [kept, dropped]}), encoding="utf-8")
+    source = tmp_path / "results.json"
+    source.write_text(json.dumps({"results": [_row()]}), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="has logs provenance.*no row in this run"):
+        mod.save_baseline(source, target)
+
+
+def test_save_baseline_refuses_to_overwrite_an_unreadable_target(tmp_path):
+    mod = load()
+    target = tmp_path / "baseline.json"
+    target.write_text("{not json", encoding="utf-8")
+    source = tmp_path / "results.json"
+    source.write_text(json.dumps({"results": [_row()]}), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="refusing to replace baseline"):
+        mod.save_baseline(source, target)
 
 
 def test_dry_run_uses_27b_override(tmp_path, capsys):

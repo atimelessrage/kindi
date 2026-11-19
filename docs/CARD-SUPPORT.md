@@ -47,7 +47,9 @@ capabilities, not claims that Kindi uses them; the 5060 Ti’s native FP4 is not
 `tools/verify_matrix.py` is the recorded matrix runner. Each selected cell is a fresh
 `python -m kindi --pack ... verify` process with a clean `KINDI_*` environment; the runner
 writes `results.csv`, `results.json` and raw logs. Use `--save-baseline PATH` to copy a
-run's `results.json` as a reference, then `--baseline PATH` on later runs. The comparison
+run's `results.json` as a reference, then `--baseline PATH` on later runs. Saving over an
+existing baseline carries each cell's `logs` provenance list forward and refuses to drop a
+cell or overwrite an unreadable old file. The comparison
 is keyed by `(model, mode)` and writes `comparison.csv`/`comparison.json` with pass/fail
 status transitions, exactness transitions, and signed throughput deltas. Both flags can
 be combined to compare against the old baseline and replace it in one run. The process

@@ -293,7 +293,8 @@ head. The commands, logs and loader qualification are in the
 `tools/verify_matrix.py` runs each selected model/mode cell as a fresh
 `python -m kindi --pack ... verify` process with a clean `KINDI_*` environment. It writes
 `results.csv`, `results.json` and raw logs. `--save-baseline PATH` copies a run's
-`results.json` as a reference; `--baseline PATH` loads that file on a later run and writes
+`results.json` as a reference, keeping each cell's `logs` provenance from a baseline it
+replaces and refusing to drop one; `--baseline PATH` loads that file on a later run and writes
 `comparison.csv`/`comparison.json` with status and exactness transitions plus signed
 throughput deltas. The process exit status still reflects the current run's pass/fail;
 the comparison itself is diagnostic.

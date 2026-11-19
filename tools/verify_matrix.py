@@ -37,8 +37,9 @@ Examples:
 
 A saved baseline is a copy of one run's results.json. Pass it with --baseline
 on a later run to print status transitions and throughput deltas; use
---save-baseline to write the new run as the next baseline. Both may be combined
-to compare against the old baseline and replace it in one command. Add
+--save-baseline to write the new run as the next baseline; a row's `logs`
+provenance list is carried over from the baseline being replaced. Both may be
+combined to compare against the old baseline and replace it in one command. Add
 --fail-on-regression to make a status/exactness loss, a missing baseline cell
 or a throughput drop beyond --max-tps-drop-pct exit non-zero.
 """
@@ -942,12 +943,63 @@ def _write_comparison(out_dir: Path, comparisons: list[dict], baseline_only: lis
     return csv_path, json_path
 
 
-def save_baseline(results_json: Path, target: Path) -> Path:
-    """Copy one run's results.json to the user's baseline path."""
+def _logs_by_cell(payload: dict, where: str) -> dict:
+    """The `logs` lists in one baseline, keyed by model/mode; malformed lists refuse."""
+    found = {}
+    for row in payload.get("results", []) if isinstance(payload, dict) else []:
+        if not isinstance(row, dict) or "logs" not in row:
+            continue
+        logs = row["logs"]
+        if (not isinstance(logs, list) or not logs
+                or not all(isinstance(item, str) for item in logs)):
+            raise SystemExit("refusing to save baseline: %s has an invalid logs list for %s/%s"
+                             % (where, row.get("model"), row.get("mode")))
+        found[(row.get("model"), row.get("mode"))] = logs
+    return found
+
+
+def save_baseline(results_json: Path, target: Path, previous: dict | None = None) -> Path:
+    """Copy one run's results.json, preserving the replaced baseline's `logs` provenance.
+
+    A fresh run has one `log` per cell, not the `logs` list that records all three median
+    passes. Replacing a baseline must not silently drop that list: merge it from the
+    explicit `--baseline` and/or the target being overwritten, unless the new row already
+    carries its own `logs`. An unreadable or malformed old baseline refuses instead of
+    being overwritten blindly.
+    """
     target = Path(target).expanduser()
+    payload = json.loads(Path(results_json).read_text(encoding="utf-8"))
+    if not isinstance(payload, dict) or not isinstance(payload.get("results"), list):
+        raise SystemExit("refusing to save baseline: %s has no results list" % results_json)
+
+    prior = {}
+    if target.is_file():
+        try:
+            prior.update(_logs_by_cell(load_baseline(target), str(target)))
+        except SystemExit as exc:
+            raise SystemExit("refusing to replace baseline %s: %s" % (target, exc)) from None
+    if previous is not None:
+        prior.update(_logs_by_cell(previous, "the comparison baseline"))
+
+    current = set()
+    for row in payload["results"]:
+        if not isinstance(row, dict):
+            raise SystemExit("refusing to save baseline: a result is not an object")
+        current.add((row.get("model"), row.get("mode")))
+        if "logs" in row:
+            _logs_by_cell({"results": [row]}, "this run")
+            continue
+        old = prior.get((row.get("model"), row.get("mode")))
+        if old is not None:
+            row["logs"] = list(old)
+    for key in sorted(prior, key=lambda item: (str(item[0]), str(item[1]))):
+        if key not in current:
+            raise SystemExit(
+                "refusing to save baseline: %s/%s has logs provenance in the replaced "
+                "baseline but no row in this run" % (key[0], key[1]))
+
     target.parent.mkdir(parents=True, exist_ok=True)
-    if target.resolve() != Path(results_json).resolve():
-        target.write_bytes(Path(results_json).read_bytes())
+    target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="\n")
     return target
 
 
@@ -1042,7 +1094,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--baseline", type=Path, default=None,
                     help="compare against a saved results.json baseline")
     ap.add_argument("--save-baseline", type=Path, default=None,
-                    help="save this run's results.json as a baseline")
+                    help="save this run's results.json as a baseline (keeps each cell's logs)")
     ap.add_argument("--fail-on-regression", action="store_true",
                     help="exit non-zero when the baseline comparison regresses (needs --baseline)")
     ap.add_argument("--max-tps-drop-pct", type=float, default=None,
@@ -1179,7 +1231,7 @@ def main(argv: list[str] | None = None) -> int:
     print("\nsummary: " + ", ".join("%s=%d" % (k, counts[k]) for k in sorted(counts)))
     print("wrote %s and %s" % (csv_path, json_path))
     if args.save_baseline is not None:
-        saved = save_baseline(json_path, args.save_baseline)
+        saved = save_baseline(json_path, args.save_baseline, baseline_payload)
         print("saved baseline %s" % saved)
     if args.fail_on_regression and regressions:
         return 1
