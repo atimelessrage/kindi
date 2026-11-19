@@ -48,6 +48,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import os
 import platform
 import re
@@ -1018,6 +1019,42 @@ def _print_table(rows: list[dict]) -> None:
                row["prompts_tie"], row["prompts_fail"], tps, spec, drafts, row["log"]))
 
 
+def _positive_int(text: str) -> int:
+    """A positive integer, rejected at argparse time."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = 0
+    if value <= 0:
+        raise argparse.ArgumentTypeError(
+            "must be a positive integer (got %r)" % (text,))
+    return value
+
+
+def _positive_float(text: str) -> float:
+    """A finite positive number, rejected at argparse time."""
+    try:
+        value = float(str(text).strip())
+    except (TypeError, ValueError):
+        value = float("nan")
+    if not math.isfinite(value) or value <= 0:
+        raise argparse.ArgumentTypeError(
+            "must be a finite positive number (got %r)" % (text,))
+    return value
+
+
+def _non_negative_float(text: str) -> float:
+    """A finite non-negative number, rejected at argparse time."""
+    try:
+        value = float(str(text).strip())
+    except (TypeError, ValueError):
+        value = float("nan")
+    if not math.isfinite(value) or value < 0:
+        raise argparse.ArgumentTypeError(
+            "must be a finite non-negative number (got %r)" % (text,))
+    return value
+
+
 def _split_choice(value: str, allowed: tuple[str, ...], what: str) -> list[str]:
     wanted = {part.strip().lower() for part in value.split(",") if part.strip()}
     unknown = sorted(wanted - set(allowed))
@@ -1085,10 +1122,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="2B pack used as the drafter for draft2b/both (default: <pack-dir>/bonsai-2b)")
     ap.add_argument("--draft-head", type=Path, default=None,
                     help="2B MTP head for both (default: --mtp-head)")
-    ap.add_argument("--cards", type=int, default=1,
-                    help="KINDI_CARDS for every cell (default: 1)")
-    ap.add_argument("--timeout", type=float, default=900.0,
-                    help="per-cell timeout in seconds (default: 900)")
+    ap.add_argument("--cards", type=_positive_int, default=1,
+                    help="KINDI_CARDS for every cell, a positive integer (default: 1)")
+    ap.add_argument("--timeout", type=_positive_float, default=900.0,
+                    help="finite positive per-cell timeout in seconds (default: 900)")
     ap.add_argument("--out", type=Path, default=ROOT / "bench-logs" / "verify-matrix",
                     help="output directory (default: bench-logs/verify-matrix)")
     ap.add_argument("--baseline", type=Path, default=None,
@@ -1097,8 +1134,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="save this run's results.json as a baseline (keeps each cell's logs)")
     ap.add_argument("--fail-on-regression", action="store_true",
                     help="exit non-zero when the baseline comparison regresses (needs --baseline)")
-    ap.add_argument("--max-tps-drop-pct", type=float, default=None,
-                    help="fail when throughput drops by more than this percentage (needs --baseline)")
+    ap.add_argument("--max-tps-drop-pct", type=_non_negative_float, default=None,
+                    help="fail when throughput drops by more than this finite non-negative percentage "
+                         "(needs --baseline)")
     ap.add_argument("--dry-run", action="store_true",
                     help="print the commands and exit without running or writing")
     ap.add_argument("--serve", action=argparse.BooleanOptionalAction, default=True,
@@ -1107,17 +1145,10 @@ def main(argv: list[str] | None = None) -> int:
                     help="also record a measured bench row per model (criterion 5; default on)")
     args = ap.parse_args(argv)
 
-    if args.cards < 1:
-        raise SystemExit("--cards must be at least 1")
-    if args.timeout <= 0:
-        raise SystemExit("--timeout must be positive")
     if args.fail_on_regression and args.baseline is None:
         raise SystemExit("--fail-on-regression needs --baseline")
-    if args.max_tps_drop_pct is not None:
-        if args.max_tps_drop_pct < 0:
-            raise SystemExit("--max-tps-drop-pct must not be negative")
-        if args.baseline is None:
-            raise SystemExit("--max-tps-drop-pct needs --baseline")
+    if args.max_tps_drop_pct is not None and args.baseline is None:
+        raise SystemExit("--max-tps-drop-pct needs --baseline")
     models = _split_choice(args.models, MODELS, "model")
     modes = _split_choice(args.modes, MODES, "mode")
     spec_models = _split_optional(args.spec_models, MODELS, "spec model")

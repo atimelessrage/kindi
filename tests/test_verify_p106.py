@@ -6,6 +6,7 @@ in-process hit, restart, invalid request, metrics) without a GPU or model pack.
 The hardware and verify-evidence tests pin the rules that keep a one-card or
 non-P106 run from being recorded as a P106 result.
 """
+import argparse
 import importlib.util
 import json
 import subprocess
@@ -29,6 +30,22 @@ CARDS_TEXT = """0, NVIDIA P106-100, 6077, 5900, 6.1, 3.0, 16, 580.88
 1, NVIDIA P106-100, 6077, 6000, 6.1, 3.0, 16, 580.88
 2, NVIDIA GeForce RTX 4060 Ti, 8188, 7000, 8.9, 4.0, 8, 580.88
 """
+
+
+def test_numeric_arguments_are_validated_at_argparse_time():
+    mod = load()
+    for bad in ("0", "-1", "fast"):
+        with pytest.raises(argparse.ArgumentTypeError, match="positive integer"):
+            mod._positive_int(bad)
+    for bad in ("0", "-1", "nan", "inf", "fast"):
+        with pytest.raises(argparse.ArgumentTypeError, match="finite positive number"):
+            mod._positive_float(bad)
+    for bad in ("1000", "1023"):
+        with pytest.raises(argparse.ArgumentTypeError, match="at least 1024"):
+            mod._context(bad)
+    for bad in ("0", "-1", "fast"):
+        with pytest.raises(argparse.ArgumentTypeError, match="positive integer"):
+            mod._context(bad)
 
 
 def test_parse_card_rows_keeps_the_p106_fields_and_no_identifiers():

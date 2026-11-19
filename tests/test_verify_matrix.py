@@ -1,4 +1,5 @@
 """The tc/plain matrix must construct deterministic cells and parse verify output without a GPU."""
+import argparse
 import importlib.util
 import json
 import sys
@@ -16,6 +17,20 @@ def load():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
+
+
+def test_numeric_arguments_are_validated_at_argparse_time():
+    mod = load()
+    for bad in ("0", "-1", "fast"):
+        with pytest.raises(argparse.ArgumentTypeError, match="positive integer"):
+            mod._positive_int(bad)
+    for bad in ("0", "-1", "nan", "inf", "fast"):
+        with pytest.raises(argparse.ArgumentTypeError, match="finite positive number"):
+            mod._positive_float(bad)
+    for bad in ("-0.1", "nan", "inf", "fast"):
+        with pytest.raises(argparse.ArgumentTypeError,
+                           match="finite non-negative number"):
+            mod._non_negative_float(bad)
 
 
 def test_mode_env_is_explicit_and_complete():

@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -58,12 +59,24 @@ def check(current: dict, baseline: dict, tolerance: float) -> list:
     return problems
 
 
+def _tolerance(text):
+    """A finite non-negative relative tolerance, rejected at argparse time."""
+    try:
+        value = float(str(text).strip())
+    except (TypeError, ValueError):
+        value = float("nan")
+    if not math.isfinite(value) or value < 0:
+        raise argparse.ArgumentTypeError(
+            "must be a finite non-negative number (got %r)" % (text,))
+    return value
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--csv", type=Path, default=DEFAULT_CSV)
     ap.add_argument("--baseline", type=Path, default=DEFAULT_BASELINE)
-    ap.add_argument("--tolerance", type=float, default=0.15,
-                    help="allowed relative regression (default 0.15)")
+    ap.add_argument("--tolerance", type=_tolerance, default=0.15,
+                    help="allowed relative regression, a finite non-negative number (default 0.15)")
     ap.add_argument("--update", action="store_true",
                     help="re-record the baseline from the current CSV instead of gating")
     a = ap.parse_args(argv)

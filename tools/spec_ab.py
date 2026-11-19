@@ -64,6 +64,32 @@ def compare_outputs(plain_ids, spec_ids, plain_bytes, spec_bytes):
     }
 
 
+def _positive_int(text):
+    """A positive integer, rejected at argparse time before the engine is built."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = 0
+    if value <= 0:
+        raise argparse.ArgumentTypeError(
+            "must be a positive integer (got %r)" % (text,))
+    return value
+
+
+def _modes(text):
+    """Comma-separated modes from MODES, rejected at argparse time."""
+    modes = list(dict.fromkeys(mode.strip().lower() for mode in str(text).split(",")
+                               if mode.strip()))
+    unknown = sorted(set(modes) - set(MODES))
+    if unknown:
+        raise argparse.ArgumentTypeError(
+            "unknown mode(s): %s (choose from %s)" % (", ".join(unknown), ", ".join(MODES)))
+    if not modes:
+        raise argparse.ArgumentTypeError(
+            "at least one mode is required (choose from %s)" % ", ".join(MODES))
+    return modes
+
+
 def _require(path, what):
     if not path:
         raise SystemExit("spec_ab: no %s" % what)
@@ -94,21 +120,15 @@ def main(argv=None):
     ap.add_argument("--reference", default=os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "kindi", "reference-27b.json"),
         help="reference prompt file (default: kindi/reference-27b.json)")
-    ap.add_argument("--ctx", type=int, default=1024, help="context (default: 1024, the verifier's)")
-    ap.add_argument("--modes", default=",".join(MODES),
-                    help="comma-separated modes (default: %s)" % ",".join(MODES))
+    ap.add_argument("--ctx", type=_positive_int, default=1024,
+                    help="context (a positive integer; default: 1024, the verifier's)")
+    ap.add_argument("--modes", type=_modes, default=",".join(MODES),
+                    help="comma-separated modes from %s (default: %s)" % (
+                        ", ".join(MODES), ", ".join(MODES)))
     ap.add_argument("--json", default=None, help="write the result rows here")
     args = ap.parse_args(argv)
 
-    modes = [m.strip().lower() for m in args.modes.split(",") if m.strip()]
-    unknown = sorted(set(modes) - set(MODES))
-    if unknown:
-        raise SystemExit("spec_ab: unknown mode(s): %s (choose from %s)" % (
-            ", ".join(unknown), ", ".join(MODES)))
-    if not modes:
-        raise SystemExit("spec_ab: no modes selected")
-    if args.ctx < 1:
-        raise SystemExit("spec_ab: --ctx must be positive")
+    modes = args.modes
 
     pack = _require(args.pack, "27B pack")
     drafter = _require(args.drafter, "2B drafter pack")

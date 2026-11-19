@@ -1,7 +1,10 @@
 """The long-context gate must fail on a clamped context or a missing deep cell."""
+import argparse
 import importlib.util
 import json
 from pathlib import Path
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,6 +16,16 @@ def load():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
+
+
+def test_numeric_arguments_are_validated_at_argparse_time():
+    mod = load()
+    for bad in ("0", "-1", "fast"):
+        with pytest.raises(argparse.ArgumentTypeError, match="positive integer"):
+            mod._positive_int(bad)
+    for bad in ("0", "-1", "nan", "inf", "fast"):
+        with pytest.raises(argparse.ArgumentTypeError, match="finite positive number"):
+            mod._positive_float(bad)
 
 
 def test_required_position_tracks_the_context():

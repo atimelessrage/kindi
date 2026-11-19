@@ -1,6 +1,9 @@
 """The direct 27B A/B compares generation paths, not reference verdicts."""
+import argparse
 import importlib.util
 from pathlib import Path
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,6 +15,17 @@ def load():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
+
+
+def test_modes_are_validated_at_argparse_time():
+    mod = load()
+    assert mod._modes("NGRAM, BOTH") == ["ngram", "both"]
+    for bad in ("fast", "", ","):
+        with pytest.raises(argparse.ArgumentTypeError):
+            mod._modes(bad)
+    for bad in ("0", "-1", "fast"):
+        with pytest.raises(argparse.ArgumentTypeError, match="positive integer"):
+            mod._positive_int(bad)
 
 
 def test_identical_tokens_and_bytes_are_reported_as_identical():

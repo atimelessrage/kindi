@@ -51,12 +51,24 @@ def post(url, payload, timeout=300):
     return time.perf_counter() - t0, json.loads(raw)
 
 
+def _positive_int(text):
+    """A positive integer, rejected at argparse time."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = 0
+    if value <= 0:
+        raise argparse.ArgumentTypeError(
+            "must be a positive integer (got %r)" % (text,))
+    return value
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("url", nargs="?", default="http://127.0.0.1:8102")
     ap.add_argument("--doc", choices=("short", "long"), default="short")
-    ap.add_argument("--tokens", type=int, default=None,
-                    help="max_tokens (default: 20 short, 200 long)")
+    ap.add_argument("--tokens", type=_positive_int, default=None,
+                    help="positive max_tokens (default: 20 short, 200 long)")
     ap.add_argument("--tight", action="store_true",
                     help="long only: measure the whitespace-free grammar instead of the pair. A "
                          "grammar that permits whitespace lets the greedy 2B spend the whole budget "

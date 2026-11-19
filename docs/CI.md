@@ -74,7 +74,7 @@ job. A gate that failed on every existing finding would block all work, so it st
 baseline:
 
 - **Ruff 0.16.0** checks the whole Python tree with correctness rules `F`, `E9`, `B` and `I`
-  (`ruff.toml`). The baseline records **334 findings across 126 files**; style-only rules are not
+  (`ruff.toml`). The baseline records **332 findings across 125 files**; style-only rules are not
   selected, so this is not a formatting freeze.
 - **mypy 2.4.0** checks first-party production code (`kindi`, `tools`, `examples` and
   `bridge/kindi_bridge`) with missing third-party imports ignored (`mypy.ini`). The baseline records
@@ -82,7 +82,7 @@ baseline:
   fixtures and duplicate `conftest.py` module names make that signal noisy.
 - **Pyright 1.1.414** checks the same first-party production targets (`pyrightconfig.json`) in
   `basic` mode for all platforms, with missing third-party imports ignored. The baseline records
-  **1,035 errors across 65 files**.
+  **1,035 errors across 64 files**.
 - **Pylint 4.1.3** checks the same production targets for errors and fatal messages only (`E`, `F`),
   with `import-error` disabled. The baseline records **255 findings across 33 files**.
 

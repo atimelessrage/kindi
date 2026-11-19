@@ -15,6 +15,18 @@ def load():
     return mod
 
 
+def test_probe_one_rejects_bad_counts_before_building_an_engine(monkeypatch):
+    mod = load()
+    called = []
+    monkeypatch.setattr(mod, "probe_one", lambda *args: called.append(args) or 0)
+    for argv in (["--probe-one", "pack", "0", "512", "30"],
+                 ["--probe-one", "pack", "12", "fast", "30"],
+                 ["--probe-one", "pack", "12", "512"]):
+        with pytest.raises(SystemExit):
+            mod.main(argv)
+    assert called == []
+
+
 def test_predicted_rate_falls_with_the_cpu_layer_count():
     mod = load()
     slow = mod.predicted_tok_s(0.0, 8.0, 0.5, 0.2, 64, 16, 24576)

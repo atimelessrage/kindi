@@ -12,14 +12,14 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `364814a` on `freebuff/tandem-cpu-recovery` (**main** is fast-forwarded to this branch at handoff; guarded by `tests/test_agents_handoff.py`); `--save-baseline` now carries each cell's `logs` list from the replaced baseline and refuses to drop one (`tests/test_verify_matrix.py` **42 passed**); the DSV4.1 CLI now validates its remaining paths and counts before loading (`tests/test_dsv41_cli.py` **13 passed**).
+- **HEAD:** `7310590` on `freebuff/tandem-cpu-recovery` (**main** is fast-forwarded to this branch at handoff; guarded by `tests/test_agents_handoff.py`); `--save-baseline` now carries each cell's `logs` list from the replaced baseline and refuses to drop one (`tests/test_verify_matrix.py` **42 passed**); the DSV4.1 CLI now validates its remaining paths and counts before loading, and the standalone server/dspark/tool audit moved its late numeric parsing to argparse (`tests/test_dsv41_cli.py` **24 passed**; focused suites **101 passed**).
 
 ### Python quality ratchet
 
 Audit F9's Python quality ratchet is `tools/check_python_quality.py`: Ruff 0.16.0 (`F`, `E9`, `B`, `I`)
 over the Python tree, mypy 2.4.0 over first-party production
 code, Pyright 1.1.414 (`basic`, all platforms) and Pylint 4.1.3 (`E`, `F`, import-error
-disabled) over the same production targets, recorded as **334 Ruff findings / 59 mypy
+disabled) over the same production targets, recorded as **332 Ruff findings / 59 mypy
 errors / 1,035 Pyright errors / 255 Pylint findings** in
 `tools/python_quality_baseline.json`. CI runs it; a new or increased file/rule count fails, while
 existing debt is tolerated and `--update` lowers the baseline after review.
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `364814a` | main checkout; clean; fast-forwarded to this branch |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `364814a` | this session; checked out here |
+| `T:/kindi` | `main` | `7310590` | main checkout; clean; fast-forwarded to this branch |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `7310590` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.

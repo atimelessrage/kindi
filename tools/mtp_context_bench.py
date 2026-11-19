@@ -41,6 +41,36 @@ def _prompt_text(path=None):
     return "\n".join(text)
 
 
+def _positive_int(text):
+    """A positive integer, rejected at argparse time before the engine is built."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = 0
+    if value <= 0:
+        raise argparse.ArgumentTypeError(
+            "must be a positive integer (got %r)" % (text,))
+    return value
+
+
+def _positions(text):
+    """Comma-separated positive prompt lengths, e.g. 8192,24576."""
+    parts = [part.strip() for part in str(text).split(",")]
+    try:
+        if not parts or any(not part for part in parts):
+            raise ValueError
+        values = [int(part) for part in parts]
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            "positions must be comma-separated positive integers, e.g. 8192,24576 (got %r)"
+            % (text,)) from None
+    if any(value <= 0 for value in values):
+        raise argparse.ArgumentTypeError(
+            "positions must be comma-separated positive integers, e.g. 8192,24576 (got %r)"
+            % (text,))
+    return values
+
+
 def _generate(eng, ids, n, sync):
     """`tp.generate` without the plain shortcut: the prompt is fed, then `n` steps are timed."""
     eng.reset()
@@ -65,10 +95,14 @@ def main(argv=None):
     ap.add_argument("--pack", required=True)
     ap.add_argument("--head", default=os.environ.get("KINDI_MTP_HEAD"),
                     help="the registered MTP head (default: KINDI_MTP_HEAD)")
-    ap.add_argument("--ctx", type=int, default=24576, help="requested context (the loader may reduce it)")
-    ap.add_argument("--positions", default="8192,24576", help="prompt lengths to measure")
-    ap.add_argument("--tokens", type=int, default=128, help="new greedy tokens per run")
-    ap.add_argument("--runs", type=int, default=2)
+    ap.add_argument("--ctx", type=_positive_int, default=24576,
+                    help="requested context (a positive integer; the loader may reduce it)")
+    ap.add_argument("--positions", type=_positions, default="8192,24576",
+                    help="comma-separated positive prompt lengths to measure (default: 8192,24576)")
+    ap.add_argument("--tokens", type=_positive_int, default=128,
+                    help="new greedy tokens per run (a positive integer; default: 128)")
+    ap.add_argument("--runs", type=_positive_int, default=2,
+                    help="runs per mode and position (a positive integer; default: 2)")
     ap.add_argument("--text", default=None, help="a text file for the prompt (default: docs/*.md)")
     ap.add_argument("--json", default=None, help="also write the rows here")
     a = ap.parse_args(argv if argv is not None else sys.argv[1:])
@@ -81,6 +115,7 @@ def main(argv=None):
     os.environ.setdefault("KINDI_TC", "1")
 
     import cupy as cp
+
     from kindi.engine import make_engine
     from kindi.tokenizer import Tok
 
@@ -93,12 +128,12 @@ def main(argv=None):
     ids = tok.encode(_prompt_text(a.text))
     print("prompt: %d tokens available, ctx %d, %d new tokens, %d runs per mode"
           % (len(ids), eng.ctx, a.tokens, a.runs))
-    if len(ids) < max(int(p) for p in a.positions.split(",")):
+    if len(ids) < max(a.positions):
         print("mtp_context_bench: the prompt text is shorter than the deepest position", file=sys.stderr)
         return 2
     sync = cp.cuda.Device().synchronize
     rows = []
-    for pos in [int(p) for p in a.positions.split(",")]:
+    for pos in a.positions:
         prompt = ids[:pos]
         for run in range(a.runs):
             for mode in ("off", "mtp"):

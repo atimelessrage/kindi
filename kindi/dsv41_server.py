@@ -40,6 +40,7 @@ import argparse
 import codecs
 import importlib.util
 import json
+import math
 import os
 import re
 import select
@@ -230,6 +231,66 @@ class ContextOverflow(ValueError):
 
 def _log(*a):
     print(time.strftime("%H:%M:%S"), *a, file=sys.stderr, flush=True)
+
+
+def _positive_int(text):
+    """A single positive integer, rejected at argparse time."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = 0
+    if value <= 0:
+        raise argparse.ArgumentTypeError(
+            "must be a positive integer (got %r)" % (text,))
+    return value
+
+
+def _non_negative_int(text):
+    """A single non-negative integer, rejected at argparse time."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = -1
+    if value < 0:
+        raise argparse.ArgumentTypeError(
+            "must be a non-negative integer (got %r)" % (text,))
+    return value
+
+
+def _non_negative_float(text):
+    """A finite non-negative number, rejected at argparse time."""
+    try:
+        value = float(str(text).strip())
+    except (TypeError, ValueError):
+        value = float("nan")
+    if not math.isfinite(value) or value < 0:
+        raise argparse.ArgumentTypeError(
+            "must be a finite non-negative number (got %r)" % (text,))
+    return value
+
+
+def _port(text):
+    """A TCP port; 0 asks the OS for an ephemeral port."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = -1
+    if not 0 <= value <= 65535:
+        raise argparse.ArgumentTypeError(
+            "must be an integer 0..65535 (got %r)" % (text,))
+    return value
+
+
+def _flag(text):
+    """A 0/1 switch, rejected at argparse time."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = -1
+    if value not in (0, 1):
+        raise argparse.ArgumentTypeError(
+            "must be 0 or 1 (got %r)" % (text,))
+    return value
 
 
 def find_encoding(a):
@@ -1284,31 +1345,35 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m kindi.dsv41_server")
     ap.add_argument("model")
     ap.add_argument("--host", default="0.0.0.0")
-    ap.add_argument("--port", type=int, default=8101)
+    ap.add_argument("--port", type=_port, default=8101)
     ap.add_argument("--ctx", type=dsv41._positive_int, default=32768,
                     help="context length in tokens (a positive integer; default: 32768)")
-    ap.add_argument("--tmax", type=int, default=512)
-    ap.add_argument("--dspark", default=None, help="DSpark drafter directory (converted by kindi.dsv41_dspark)")
+    ap.add_argument("--tmax", type=_positive_int, default=512,
+                    help="prompt chunk size (a positive integer; default: 512)")
+    ap.add_argument("--dspark", type=dsv41._dspark_dir, default=None,
+                    help="DSpark drafter directory (converted by kindi.dsv41_dspark)")
     ap.add_argument("--cal", type=dsv41._cal_arg, default=(1.0, 0.0),
                     help="DSpark draft length calibration: two comma-separated finite numbers, a,b")
     ap.add_argument("--encoding", default=None,
                     help="DeepSeek-V4.1 encoding.py (encoding/encoding.py of the model release; default: "
                          "$KINDI_DSV_ENCODING, else encoding.py in the --dspark directory or next to the model)")
     ap.add_argument("--cache-dir", default=None)
-    ap.add_argument("--cache-gb", type=float, default=8.0)
-    ap.add_argument("--ckpt-min", type=int, default=512, help="save a prompt state once it took this many new tokens")
-    ap.add_argument("--slots", type=int, default=0,
+    ap.add_argument("--cache-gb", type=_non_negative_float, default=8.0)
+    ap.add_argument("--ckpt-min", type=_non_negative_int, default=512,
+                    help="save a prompt state once it took this many new tokens")
+    ap.add_argument("--slots", type=_non_negative_int, default=0,
                     help="RAM slots for other conversations: save on evict writes to --slot-dir (a tmpfs) and keeps the "
                          "newest N (0: save on evict to --cache-dir)")
     ap.add_argument("--slot-dir", default="/dev/shm/kindi-dsv41-slots")
     ap.add_argument("--sampling", choices=("auto", "off"), default="auto",
                     help="auto: a request's temperature, top_p, top_k and min_p are used; off: always greedy")
-    ap.add_argument("--temperature", type=float, default=0.0, help="the temperature of a request that sets none")
-    ap.add_argument("--repeat-stop", type=int, default=1, help="1: stop a reply caught in a repeating loop")
-    ap.add_argument("--turn-min", type=int, default=64,
+    ap.add_argument("--temperature", type=_non_negative_float, default=0.0,
+                    help="the temperature of a request that sets none")
+    ap.add_argument("--repeat-stop", type=_flag, default=1, help="1: stop a reply caught in a repeating loop; 0: off")
+    ap.add_argument("--turn-min", type=_non_negative_int, default=64,
                     help="after each answer, save the state of a conversation this long or longer, in the background "
                          "(0: off; needs --cache-dir)")
-    ap.add_argument("--max-tokens", type=int, default=0,
+    ap.add_argument("--max-tokens", type=_non_negative_int, default=0,
                     help="max_tokens of a request that sets none (0: up to the remaining context)")
     ap.add_argument("--no-prompt-cache", action="store_true", help="compute every prompt from the start")
     ap.add_argument("--keep-system-tail", action="store_true",

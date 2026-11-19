@@ -207,11 +207,26 @@ def effective_cpu_ms(probe: dict, gpu_layer_ms: float, nl: int) -> float | None:
     return round(slope, 3)
 
 
+def _probe_int(text: str, name: str) -> int:
+    """A positive internal probe count, rejected before the engine is built."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = 0
+    if value <= 0:
+        raise SystemExit("--probe-one %s must be a positive integer (got %r)" % (name, text))
+    return value
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if "--probe-one" in argv:
         i = argv.index("--probe-one")
-        return probe_one(argv[i + 1], int(argv[i + 2]), int(argv[i + 3]), int(argv[i + 4]))
+        if len(argv) < i + 5:
+            raise SystemExit("--probe-one needs PACK N FEED_TOKENS STEPS")
+        return probe_one(argv[i + 1], _probe_int(argv[i + 2], "N"),
+                         _probe_int(argv[i + 3], "FEED_TOKENS"),
+                         _probe_int(argv[i + 4], "STEPS"))
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--pack", default="~/.kindi/packs/bonsai-27b")
     ap.add_argument("--json", default=None, help="also write the calibration JSON here")

@@ -901,7 +901,6 @@
         "I001": 1
       },
       "tests/test_verify_p106.py": {
-        "F401": 1,
         "I001": 1
       },
       "tools/bonsai_gaps.py": {
@@ -929,9 +928,6 @@
       "tools/grammar_cost.py": {
         "I001": 1
       },
-      "tools/mtp_context_bench.py": {
-        "I001": 1
-      },
       "tools/mtp_smoke.py": {
         "B904": 5
       },
@@ -950,7 +946,7 @@
         "B905": 1
       }
     },
-    "total": 334,
+    "total": 332,
     "version": "0.16.0"
   },
   "schema": 2,

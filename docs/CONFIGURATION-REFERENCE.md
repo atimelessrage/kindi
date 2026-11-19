@@ -128,7 +128,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_DSPINE_NARROW` | (unset) | `kindi/dspine.py:160` |
 | `KINDI_DSV_CPUS0` | (unset) | `kindi/dsv41.py:520` |
 | `KINDI_DSV_CPUS1` | (unset) | `kindi/dsv41.py:521` |
-| `KINDI_DSV_ENCODING` | (unset) | `kindi/dsv41_server.py:238` |
+| `KINDI_DSV_ENCODING` | (unset) | `kindi/dsv41_server.py:299` |
 | `KINDI_DSV_GATE` | `os.path.expanduser("~/.cache/kindi/dsv41-gate")` | `kindi/dsv41.py:995` |
 | `KINDI_DSV_GPU` | `0` | `kindi/dsv41.py:165` (+1 more) |
 | `KINDI_DSV_GPU2` | `1` | `kindi/dsv41.py:167` |
@@ -179,7 +179,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_HIP_LIB` | `libamdhip64.so` | `kindi/gpudrv.py:28` |
 | `KINDI_HOST_RAM_CHECK` | `1` | `kindi/hostram.py:93` |
 | `KINDI_IO_REPORT` | (unset) | `kindi/autotune.py:40` (+1 more) |
-| `KINDI_KEEPALIVE_S` | `10` | `kindi/dsv41_server.py:69` (+1 more) |
+| `KINDI_KEEPALIVE_S` | `10` | `kindi/dsv41_server.py:70` (+1 more) |
 | `KINDI_KEXPF` | (empty) or `0` | `kindi/spec.py:154` (+1 more) |
 | `KINDI_KV` | (empty) or `q8_0` | `kindi/engine.py:76` (+6 more) |
 | `KINDI_KV_EXPERIMENTAL` | `0` | `kindi/kld.py:92` (+5 more) |

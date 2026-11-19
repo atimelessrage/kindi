@@ -8,6 +8,7 @@ The drafter only proposes tokens; the main model checks every one, so its weight
 
 usage: python -m kindi.dsv41_dspark convert DSPARK_DIR      (writes DSPARK_DIR/kindi-dspark.bin + .json)
        python -m kindi.dsv41_dspark check DSPARK_DIR        (FP4 repack vs a direct dequantization)"""
+import argparse
 import json
 import os
 import struct
@@ -17,6 +18,19 @@ import numpy as np
 
 SHARDS = ["model-00044-of-00048.safetensors", "model-00045-of-00048.safetensors", "model-00046-of-00048.safetensors"]
 NSTAGE, NEXP = 3, 128
+
+
+def _checkpoint_dir(text):
+    """The DSpark checkpoint directory with all three source shards."""
+    path = os.path.expanduser(str(text))
+    missing = [name for name in SHARDS
+               if not os.path.isfile(os.path.join(path, name))
+               or not os.access(os.path.join(path, name), os.R_OK)]
+    if not os.path.isdir(path) or missing:
+        raise argparse.ArgumentTypeError(
+            "must be a DSpark checkpoint directory with %s (got %r)"
+            % (", ".join(SHARDS), text))
+    return path
 FP4 = np.array([0, 0.5, 1, 1.5, 2, 3, 4, 6, -0.0, -0.5, -1, -1.5, -2, -3, -4, -6], np.float32)
 
 
@@ -168,5 +182,15 @@ def check(d):
     print("dspark check: FP8 -> Q8_0 (wq_a) relative RMS error %.2e (drafter only)" % err)
 
 
+def main(argv=None):
+    ap = argparse.ArgumentParser(prog="python -m kindi.dsv41_dspark")
+    ap.add_argument("cmd", choices=("convert", "check"))
+    ap.add_argument("directory", type=_checkpoint_dir,
+                    help="DSpark checkpoint directory with the three model shards")
+    a = ap.parse_args(argv)
+    {"convert": convert, "check": check}[a.cmd](a.directory)
+    return 0
+
+
 if __name__ == "__main__":
-    {"convert": convert, "check": check}[sys.argv[1]](sys.argv[2])
+    sys.exit(main())

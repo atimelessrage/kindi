@@ -12,11 +12,24 @@
   non-negative `-n`, positive `--tmax`/`--gen`/`--spec` values and a finite `--conf`; commands that need
   `--prompts` or `--ref` (and `verify`'s default gate files) fail with their required set before
   any model load. `tests/test_dsv41_cli.py` pins the helpers and the pre-load exits.
+- **The other standalone CLIs validate late user values before loading** — `python -m
+  kindi.dsv41_server` now parses `--tmax`, `--port`, `--cache-gb`, `--ckpt-min`, `--slots`,
+  `--temperature`, `--repeat-stop`, `--turn-min`, `--max-tokens` and `--dspark` with bounded argparse
+  types instead of bare `int`/`float` or a path opened after the model. `python -m
+  kindi.dsv41_dspark` now uses argparse (`convert`/`check`) and requires the three source shards
+  before `Shards` maps anything, instead of indexing raw `sys.argv`. `tools/mtp_context_bench.py`
+  parses `--ctx`, `--tokens`, `--runs` and comma-separated `--positions` before building the engine,
+  where positions used to be split after the engine existed. `tools/spec_ab.py` validates `--modes`
+  and `--ctx` at argparse time, and `tools/measure_split_ratio.py` validates its internal probe
+  counts before building a split. The gate and harness scripts (`check_long_context`,
+  `check_perf_baseline`, `dsv41_hotplan`, `grammar_cost_serve`, `verify_matrix`, `verify_p106`) now
+  reject non-finite, negative or zero values for their numeric options at parse time; values already
+  validated before loading keep the same valid sets. Tests pin the parsers and the pre-load exits.
 - **Python lint and type checking now ship as a measured ratchet** — `tools/check_python_quality.py`
   runs Ruff 0.16.0 with correctness rules `F`, `E9`, `B` and `I` over the Python tree, mypy 2.4.0,
   Pyright 1.1.414 (`basic`, all platforms) and Pylint 4.1.3 (`E`, `F`, import-error disabled) over
   first-party production code (`kindi`, `tools`, `examples` and `bridge/kindi_bridge`). The legacy
-  baseline is **334 Ruff findings / 59 mypy errors / 1,035 Pyright errors / 255 Pylint findings**,
+  baseline is **332 Ruff findings / 59 mypy errors / 1,035 Pyright errors / 255 Pylint findings**,
   stored per file and rule/error code in `tools/python_quality_baseline.json`; the gate fails only
   on a new or increased finding, so existing debt does not block work. CI runs it,
   `tests/test_python_quality.py` pins the comparison and parser shape, and `tests/test_ci_config.py`

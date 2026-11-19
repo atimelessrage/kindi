@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import re
 import subprocess
@@ -175,21 +176,41 @@ def _git_revision() -> str | None:
         return None
 
 
+def _positive_int(text: str) -> int:
+    """A positive integer, rejected at argparse time before the bench runs."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = 0
+    if value <= 0:
+        raise argparse.ArgumentTypeError(
+            "must be a positive integer (got %r)" % (text,))
+    return value
+
+
+def _positive_float(text: str) -> float:
+    """A finite positive timeout, rejected at argparse time."""
+    try:
+        value = float(str(text).strip())
+    except (TypeError, ValueError):
+        value = float("nan")
+    if not math.isfinite(value) or value <= 0:
+        raise argparse.ArgumentTypeError(
+            "must be a finite positive number (got %r)" % (text,))
+    return value
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--pack", type=Path, required=True,
                     help="converted pack directory on the GPU runner")
-    ap.add_argument("--ctx", type=int, default=24576,
-                    help="context requested from the engine (default: 24576)")
-    ap.add_argument("--timeout", type=float, default=1800.0,
-                    help="bench timeout in seconds (default: 1800)")
+    ap.add_argument("--ctx", type=_positive_int, default=24576,
+                    help="context requested from the engine, a positive integer (default: 24576)")
+    ap.add_argument("--timeout", type=_positive_float, default=1800.0,
+                    help="finite positive bench timeout in seconds (default: 1800)")
     ap.add_argument("--out", type=Path, default=ROOT / "bench-logs" / "ci-long-context",
                     help="output directory (default: bench-logs/ci-long-context)")
     args = ap.parse_args(argv)
-    if args.ctx <= 0:
-        raise SystemExit("--ctx must be positive")
-    if args.timeout <= 0:
-        raise SystemExit("--timeout must be positive")
     if required_position(args.ctx) is None:
         raise SystemExit("--ctx %d has no benchmark position" % args.ctx)
 

@@ -4,7 +4,7 @@ import argparse
 
 import pytest
 
-from kindi import dsv41, dsv41_server
+from kindi import dsv41, dsv41_dspark, dsv41_server
 
 
 def test_context_sizes_are_positive_comma_separated_integers():
@@ -58,6 +58,16 @@ def test_dsv41_rejects_bad_values_before_loading(tmp_path, argv, expected, capsy
 @pytest.mark.parametrize("argv, expected", [
     (["model.gguf", "--ctx", "0"], "positive integer"),
     (["model.gguf", "--cal", "1,fast"], "two comma-separated finite numbers"),
+    (["model.gguf", "--tmax", "0"], "positive integer"),
+    (["model.gguf", "--port", "70000"], "0..65535"),
+    (["model.gguf", "--cache-gb", "nan"], "finite non-negative number"),
+    (["model.gguf", "--ckpt-min", "-1"], "non-negative integer"),
+    (["model.gguf", "--slots", "-1"], "non-negative integer"),
+    (["model.gguf", "--temperature", "inf"], "finite non-negative number"),
+    (["model.gguf", "--repeat-stop", "2"], "0 or 1"),
+    (["model.gguf", "--turn-min", "-1"], "non-negative integer"),
+    (["model.gguf", "--max-tokens", "-1"], "non-negative integer"),
+    (["model.gguf", "--dspark", "/missing/dspark"], "DSpark directory"),
 ])
 def test_dsv41_server_rejects_bad_values_before_loading(argv, expected, capsys):
     with pytest.raises(SystemExit) as exc:
@@ -101,6 +111,28 @@ def test_file_and_number_validators_reject_bad_values(tmp_path):
     (dspark / "config.json").unlink()
     with pytest.raises(argparse.ArgumentTypeError, match="DSpark directory"):
         dsv41._dspark_dir(str(dspark))
+
+
+def test_dsv41_dspark_requires_an_existing_checkpoint_before_loading(tmp_path):
+    with pytest.raises(SystemExit) as exc:
+        dsv41_dspark.main(["convert", str(tmp_path / "missing")])
+    assert exc.value.code == 2
+
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    with pytest.raises(SystemExit) as exc:
+        dsv41_dspark.main(["check", str(empty)])
+    assert exc.value.code == 2
+
+    complete = tmp_path / "complete"
+    complete.mkdir()
+    for name in dsv41_dspark.SHARDS:
+        (complete / name).write_bytes(b"")
+    assert dsv41_dspark._checkpoint_dir(str(complete)) == str(complete)
+
+    with pytest.raises(SystemExit) as exc:
+        dsv41_dspark.main(["unknown", str(complete)])
+    assert exc.value.code == 2
 
 
 def test_number_validators_accept_their_valid_sets():

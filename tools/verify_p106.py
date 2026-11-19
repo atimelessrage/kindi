@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import platform
 import re
@@ -649,6 +650,39 @@ def write_results(out_dir: Path, payload: dict) -> tuple[Path, Path]:
     return json_path, md_path
 
 
+def _positive_int(text: str) -> int:
+    """A positive integer, rejected at argparse time."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = 0
+    if value <= 0:
+        raise argparse.ArgumentTypeError(
+            "must be a positive integer (got %r)" % (text,))
+    return value
+
+
+def _positive_float(text: str) -> float:
+    """A finite positive number, rejected at argparse time."""
+    try:
+        value = float(str(text).strip())
+    except (TypeError, ValueError):
+        value = float("nan")
+    if not math.isfinite(value) or value <= 0:
+        raise argparse.ArgumentTypeError(
+            "must be a finite positive number (got %r)" % (text,))
+    return value
+
+
+def _context(text: str) -> int:
+    """The P106 server/two-card context: an integer of at least 1024."""
+    value = _positive_int(text)
+    if value < 1024:
+        raise argparse.ArgumentTypeError(
+            "must be at least 1024 (got %r)" % (text,))
+    return value
+
+
 def _split_models(value: str) -> list[str]:
     wanted = {part.strip().lower() for part in value.split(",") if part.strip()}
     unknown = sorted(wanted - set(MODELS))
@@ -696,10 +730,11 @@ def main(argv: list[str] | None = None) -> int:
                     help="single-card models (default: 2b,4b,9b)")
     ap.add_argument("--server-model", choices=MODELS, default="2b",
                     help="model served for the cache check (default: 2b)")
-    ap.add_argument("--ctx", type=int, default=24576,
-                    help="requested context for the server and the two-card verify (default: 24576)")
-    ap.add_argument("--timeout", type=float, default=1800.0,
-                    help="per-command timeout in seconds (default: 1800)")
+    ap.add_argument("--ctx", type=_context, default=24576,
+                    help="requested context for the server and the two-card verify, at least 1024 "
+                         "(default: 24576)")
+    ap.add_argument("--timeout", type=_positive_float, default=1800.0,
+                    help="finite positive per-command timeout in seconds (default: 1800)")
     ap.add_argument("--out", type=Path, default=ROOT / "bench-logs" / "p106-verify",
                     help="output directory (default: bench-logs/p106-verify)")
     ap.add_argument("--visible-devices", default=None,
@@ -712,10 +747,6 @@ def main(argv: list[str] | None = None) -> int:
                     help="print the commands without running or writing")
     args = ap.parse_args(argv)
 
-    if args.ctx < 1024:
-        raise SystemExit("--ctx must be at least 1024")
-    if args.timeout <= 0:
-        raise SystemExit("--timeout must be positive")
     args.models = _split_models(args.models)
     args.pack_dir = args.pack_dir.expanduser().resolve()
     args.out = args.out.expanduser().resolve()

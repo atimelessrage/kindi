@@ -6,9 +6,12 @@ GPU-only cells. The original 2026-11-12 single tandem runs were 4B read 62.5 and
 at position 100 28.5 tok/s; the gate flagged them as 21%/17% optimistic once the
 medians were recorded, and the baseline was re-adopted.
 """
+import argparse
 import importlib.util
 import json
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "tools" / "check_perf_baseline.py"
@@ -19,6 +22,16 @@ def load():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
+
+
+def test_tolerance_rejects_non_finite_and_negative_values():
+    mod = load()
+    assert mod._tolerance("0") == 0.0
+    assert mod._tolerance("0.2") == 0.2
+    for bad in ("-0.1", "nan", "inf", "fast"):
+        with pytest.raises(argparse.ArgumentTypeError,
+                           match="finite non-negative number"):
+            mod._tolerance(bad)
 
 
 def test_recorded_baseline_passes_the_gate():

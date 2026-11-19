@@ -7,6 +7,7 @@ usage: python tools/dsv41_hotplan.py OUT.txt --card-gb G [--usage-out U.json] (-
   --prompt: count prompt tokens of the traces too (decode routing follows the same experts)
   --usage-out: also save the counts as a moe.Usage JSON (the installer and Kindi's other MoE engines read this format)"""
 import argparse
+import math
 import os
 import sys
 
@@ -42,10 +43,23 @@ def counts_from_list(path):
     return c
 
 
+def _card_gb(text):
+    """A finite non-negative card budget, rejected at argparse time."""
+    try:
+        value = float(str(text).strip())
+    except (TypeError, ValueError):
+        value = float("nan")
+    if not math.isfinite(value) or value < 0:
+        raise argparse.ArgumentTypeError(
+            "must be a finite non-negative number of GB (got %r)" % (text,))
+    return value
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("out")
-    ap.add_argument("--card-gb", type=float, required=True)
+    ap.add_argument("--card-gb", type=_card_gb, required=True,
+                    help="finite non-negative VRAM budget for hot experts, in GB")
     ap.add_argument("--trace", nargs="*", default=[])
     ap.add_argument("--list", default=None)
     ap.add_argument("--prompt", action="store_true")
