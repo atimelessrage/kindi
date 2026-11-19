@@ -4,6 +4,14 @@
 
 ### Added
 
+- **The DSV4.1 CLI rejects unreadable paths and invalid counts before loading a model** —
+  `python -m kindi.dsv41` accepted `--prompts`, `--ids`, `--out`, `--ref`, `--dspark` and
+  `--dump` values unchecked until after the model was mapped, and parsed `--free1` inside the
+  `numa` branch. Argparse types now require readable input files, a writable output parent, a
+  complete DSpark directory, token ids in `0..129279`, a finite non-negative `--free1`, a
+  non-negative `-n`, positive `--tmax`/`--gen`/`--spec` values and a finite `--conf`; commands that need
+  `--prompts` or `--ref` (and `verify`'s default gate files) fail with their required set before
+  any model load. `tests/test_dsv41_cli.py` pins the helpers and the pre-load exits.
 - **Python lint and type checking now ship as a measured ratchet** — `tools/check_python_quality.py`
   runs Ruff 0.16.0 with correctness rules `F`, `E9`, `B` and `I` over the Python tree, and mypy 2.4.0
   over first-party production code (`kindi`, `tools`, `examples` and `bridge/kindi_bridge`). The

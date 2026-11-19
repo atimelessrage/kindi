@@ -280,6 +280,118 @@ def _range_arg(text):
     return (lo, hi)
 
 
+def _readable_file(text):
+    """An existing readable file, e.g. prompts.jsonl."""
+    path = os.path.expanduser(str(text))
+    try:
+        if not path or not os.path.isfile(path):
+            raise OSError
+        with open(path, "rb"):
+            pass
+    except OSError:
+        raise argparse.ArgumentTypeError(
+            "must be an existing readable file, e.g. prompts.jsonl (got %r)" % (text,)) from None
+    return path
+
+
+def _ids_arg(text):
+    """A readable file of whitespace-separated token ids in 0..VOCAB-1."""
+    try:
+        path = _readable_file(text)
+    except argparse.ArgumentTypeError:
+        raise argparse.ArgumentTypeError(
+            "must be a readable file of whitespace-separated token ids 0..%d (got %r)"
+            % (VOCAB - 1, text)) from None
+    try:
+        with open(path, encoding="utf-8") as fh:
+            ids = [int(token) for token in fh.read().split()]
+    except (OSError, ValueError):
+        ids = []
+    if not ids or any(token < 0 or token >= VOCAB for token in ids):
+        raise argparse.ArgumentTypeError(
+            "must be a readable file of whitespace-separated token ids 0..%d (got %r)"
+            % (VOCAB - 1, text))
+    return ids
+
+
+def _out_arg(text):
+    """A file path whose parent directory exists and is writable."""
+    path = os.path.expanduser(str(text))
+    parent = os.path.dirname(os.path.abspath(path))
+    invalid = (not path or path.endswith(("/", "\\")) or os.path.isdir(path)
+               or not os.path.isdir(parent) or not os.access(parent, os.W_OK)
+               or (os.path.exists(path) and not os.access(path, os.W_OK)))
+    if invalid:
+        raise argparse.ArgumentTypeError(
+            "must be a file path in an existing writable directory, e.g. out/results.jsonl (got %r)"
+            % (text,))
+    return path
+
+
+def _dspark_dir(text):
+    """A DSpark directory with the three files dspark_load opens."""
+    path = os.path.expanduser(str(text))
+    names = ("kindi-dspark.bin", "kindi-dspark.bin.json", "config.json")
+    try:
+        if not os.path.isdir(path):
+            raise OSError
+        for name in names:
+            with open(os.path.join(path, name), "rb"):
+                pass
+    except OSError:
+        raise argparse.ArgumentTypeError(
+            "must be a DSpark directory with kindi-dspark.bin, kindi-dspark.bin.json and "
+            "config.json (got %r)" % (text,)) from None
+    return path
+
+
+def _free_gb_arg(text):
+    """A finite non-negative number of GB, e.g. 12 or 0.5."""
+    try:
+        value = float(str(text).strip())
+    except (TypeError, ValueError):
+        value = -1.0
+    if not math.isfinite(value) or value < 0:
+        raise argparse.ArgumentTypeError(
+            "must be a finite non-negative number of GB, e.g. 12 or 0.5 (got %r)" % (text,))
+    return value
+
+
+def _positive_count_arg(text):
+    """A positive integer count, 1 or more."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = 0
+    if value <= 0:
+        raise argparse.ArgumentTypeError(
+            "must be a positive integer, 1 or more (got %r)" % (text,))
+    return value
+
+
+def _non_negative_int_arg(text):
+    """A non-negative integer, 0 or more."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = -1
+    if value < 0:
+        raise argparse.ArgumentTypeError(
+            "must be a non-negative integer, 0 or more (got %r)" % (text,))
+    return value
+
+
+def _finite_float_arg(text):
+    """A finite number (nan and inf are rejected)."""
+    try:
+        value = float(str(text).strip())
+    except (TypeError, ValueError):
+        value = float("nan")
+    if not math.isfinite(value):
+        raise argparse.ArgumentTypeError("must be a finite number (got %r)" % (text,))
+    return value
+
+
 def _cpus(text):
     out = []
     for part in text.split(","):
@@ -949,9 +1061,13 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m kindi.dsv41")
     ap.add_argument("cmd", choices=["generate", "bench", "tokens", "bench-dense", "teacher", "verify", "numa", "gpucmp",
                                     "specbench", "cachetest"])
-    ap.add_argument("--spec", type=int, default=4, help="specbench: positions per verify step (1 + drafts)")
-    ap.add_argument("--dspark", default=None, help="specbench: DSpark drafter directory (converted)")
-    ap.add_argument("--conf", type=float, default=0.0, help="specbench --dspark: draft while confidence logit >= this")
+    ap.add_argument("--spec", type=_positive_count_arg, default=4,
+                    help="specbench: positions per verify step (1 + drafts); a positive integer")
+    ap.add_argument("--dspark", type=_dspark_dir, default=None,
+                    help="specbench: DSpark drafter directory with kindi-dspark.bin, "
+                         "kindi-dspark.bin.json and config.json")
+    ap.add_argument("--conf", type=_finite_float_arg, default=0.0,
+                    help="specbench --dspark: draft while confidence logit >= this (a finite number)")
     ap.add_argument("--auto", type=_cal_arg, default=None, help="specbench --dspark: choose k by expected tokens per ms; "
                     "calibration a,b (two finite comma-separated numbers) of p = sigmoid(a * conf + b)")
     ap.add_argument("model")
@@ -959,26 +1075,46 @@ def main(argv=None):
     ap.add_argument("--system", default=None)
     ap.add_argument("--chat", action="store_true", help="wrap the prompt in the chat format")
     ap.add_argument("--think", action="store_true")
-    ap.add_argument("-n", type=int, default=64)
+    ap.add_argument("-n", type=_non_negative_int_arg, default=64,
+                    help="tokens to generate (a non-negative integer; default: 64)")
     ap.add_argument("--ctx", type=_ctx_arg, default=[8192],
                     help="context length(s): comma-separated positive integers (default: 8192)")
-    ap.add_argument("--tmax", type=int, default=64)
-    ap.add_argument("--gen", type=int, default=32)
-    ap.add_argument("--prompts", default=None)
-    ap.add_argument("--ids", default=None, help="file of token ids (instead of --prompt)")
+    ap.add_argument("--tmax", type=_positive_count_arg, default=64,
+                    help="chunk size (a positive integer; default: 64)")
+    ap.add_argument("--gen", type=_positive_count_arg, default=32,
+                    help="bench decode steps (a positive integer; default: 32)")
+    ap.add_argument("--prompts", type=_readable_file, default=None,
+                    help="JSONL prompts file (an existing readable file; required for tokens, "
+                         "specbench, cachetest and teacher)")
+    ap.add_argument("--ids", type=_ids_arg, default=None,
+                    help="file of whitespace-separated token ids in 0..%d (instead of --prompt)" % (VOCAB - 1))
     ap.add_argument("--range", type=_range_arg, default=None,
                     help="prompt ids a-b: non-negative integers a <= b (with --prompts)")
-    ap.add_argument("--out", default=None)
-    ap.add_argument("--ref", default=None, help="teacher: reference continuations, one line per prompt: "
-                    "GEN tok:margin ...")
-    ap.add_argument("--dump", default=None, help="write per-layer tensors to this file")
+    ap.add_argument("--out", type=_out_arg, default=None,
+                    help="write JSONL here; the parent directory must exist and be writable")
+    ap.add_argument("--ref", type=_readable_file, default=None,
+                    help="teacher/verify: reference continuations, one line per prompt: GEN tok:margin ... "
+                         "(an existing readable file; required for teacher)")
+    ap.add_argument("--dump", type=_out_arg, default=None,
+                    help="write per-layer tensors to this file; the parent directory must exist and be writable")
     ap.add_argument("--flags", type=int, default=None)
     ap.add_argument("--sha", action="store_true", help="verify: also check every shard's sha256 first (slow)")
-    ap.add_argument("--free1", default="12", help="numa: GB to keep free on node 1")
+    ap.add_argument("--free1", type=_free_gb_arg, default=12.0,
+                    help="numa: GB to keep free on node 1 (a finite non-negative number; default: 12)")
     ap.add_argument("--interleave", action="store_true", help="numa: spread the expert shards 2:1 over the nodes")
     ap.add_argument("--rowsplit", action="store_true", help="numa: each expert's first rows on node 0, the rest on node 1 "
                     "(the rows each node's threads compute; share KINDI_MOE_SHARE0)")
     a = ap.parse_args(argv)
+    if a.cmd in ("tokens", "cachetest", "specbench", "teacher") and not a.prompts:
+        ap.error("--prompts FILE.jsonl is required for %s" % a.cmd)
+    if a.cmd == "teacher" and not a.ref:
+        ap.error("--ref FILE is required for teacher")
+    if a.cmd == "verify":
+        for flag, path in (("--prompts", a.prompts or os.path.join(GATE_DIR, "gate_prompts.jsonl")),
+                           ("--ref", a.ref or os.path.join(GATE_DIR, "gate_ref.txt"))):
+            if not os.path.isfile(path) or not os.access(path, os.R_OK):
+                ap.error("%s gate file not found or unreadable: %s (pass --prompts/--ref or set KINDI_DSV_GATE)"
+                         % (flag, path))
     ctxs = a.ctx
     if a.cmd == "numa":
         # make room on NUMA node 1 for the node-bound dense weights: move page-cache pages of the model (largest
@@ -987,7 +1123,7 @@ def main(argv=None):
             for line in open("/sys/devices/system/node/node1/meminfo"):
                 if "MemFree" in line:
                     return int(line.split()[-2]) * 1024
-        need = int(float(a.free1) * 2**30)
+        need = int(a.free1 * 2**30)
         if a.rowsplit:
             share0 = float(os.environ.get("KINDI_MOE_SHARE0", "0.667"))
             gu_rows = int(round(2304 // 4 * share0)) * 4      # the split of moe_layer_direct (lroundf of the groups)
@@ -1180,7 +1316,7 @@ def main(argv=None):
                       file=sys.stderr)
             return
         if a.ids:
-            ids = [int(x) for x in open(a.ids).read().split()]
+            ids = a.ids
         else:
             ids = model.tok.encode(chat_prompt(a.prompt, a.system, a.think) if a.chat else a.prompt)
 
