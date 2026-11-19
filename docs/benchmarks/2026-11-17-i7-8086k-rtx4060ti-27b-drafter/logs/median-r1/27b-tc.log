@@ -1,0 +1,15 @@
+[kindi 22:15:23] blocking sync: card 0 primary context flags 0x4 (set: 0)
+[kindi 22:15:28] card 0: 5.60 GB of weights, streamed (4s)
+[kindi 22:15:29] card 0: weights repacked for the tensor cores (0.4s)
+[kindi 22:15:29] tensor-core plans ready: T = 1 .. 4, 724 nodes per decode token (0.2s; 1107 MiB free on the card)
+[kindi 22:15:29] plan engine ready: 1 card, ctx 1024, K/V q8_0, weights 5-trit lane (6.4s)
+[kindi 22:15:29] kindi: <machine-path>bonsai-27b -> the bonsai backend (bonsai2-27b)
+[kindi 22:15:29] speculation: off (KINDI_SPEC=0)
+[kindi 22:15:30] prompt 1 'The sky is blue because'                                    TIE  14/40 tokens match  (1.2s)
+[kindi 22:15:30]    first difference at token 14 (llama.cpp top-2 gap there 0.0064)
+[kindi 22:15:32] prompt 2 'The capital of France is'                                   PASS  40/40 tokens match  (1.2s)
+[kindi 22:15:33] prompt 3 'Water boils at a lower temperature on mountains because'    PASS  40/40 tokens match  (1.3s)
+[kindi 22:15:34] prompt 4 'def add_two_numbers('                                       PASS  40/40 tokens match  (1.2s)
+[kindi 22:15:34] PASS (speculation off): 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 38.8 tokens/s over the run
+<local-home>\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(

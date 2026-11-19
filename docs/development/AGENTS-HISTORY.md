@@ -1293,3 +1293,9 @@ file points here.
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
 | Plan follow-up shell round-trip (2026-11-18) | this worktree | `freebuff/tandem-cpu-recovery` | `tests/test_plan.py`, `AGENTS.md`, `docs/development/AGENTS-HISTORY.md` | done. Ran a generated `kindi plan` MoE follow-up through real cmd.exe and Git Bash with a pack directory containing spaces, using a stand-in `kindi` package that prints `sys.argv`; both children received the full `--pack` path and identical argv. Extended `test_follow_up_commands_quote_a_spaced_pack_and_interpreter` with the same round-trip: cmd.exe on Windows, `bash`/`sh` wherever one is on PATH, so Linux CI covers the POSIX half. Checks: focused test passed, `tests/test_plan.py` **30 passed**, `git diff --check`. |
+
+### Median base-cell transcripts linked (2026-11-18)
+
+| task | worktree | branch | shared files | state |
+|---|---|---|---|---|
+| Median base-cell transcripts (2026-11-18) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-27b-drafter/median-r{1,2,3}-results.json`, its `logs/median-r{1,2,3}/27b-tc.log`, `tests/test_verify_matrix.py`, `AGENTS.md`, `docs/development/AGENTS-HISTORY.md` | done. Copied the three base-cell (`tc`) pass logs from `bench-logs/verify-matrix/27b-spec-median/rN/logs/` with the same `<machine-path>`/`<local-home>` redactions as the tracked speculation logs, repointed every row in the three median results files at its `logs/median-rN/` transcript, and extended the baseline test to require all four median cells per pass, each log's existence, and its row's tok/s. Checks: focused test passed, `tests/test_verify_matrix.py` **39 passed**, `check_claims.py` OK, `git diff --check`. The unrelated secret scan still flags the pre-existing `tests/test_mtp_smoke.py:45` (`/home/x`) fixture; the three new transcripts scan clean. |

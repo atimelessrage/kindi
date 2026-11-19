@@ -372,6 +372,19 @@ def test_27b_drafter_baseline_has_the_three_spec_cells():
         assert "%.1f s" % row["duration_s"] in row["summary"]
         text = (page / row["log"]).read_text(encoding="utf-8", errors="replace")
         assert "%.1f tokens/s" % row["tokens_per_second"] in text
+
+    # The three median result files are the raw record behind the baseline. Every row must
+    # name its own pass's transcript, not the earlier single-pass page log, and that transcript
+    # must carry the row's tok/s (the base cell included).
+    for n, run in enumerate(runs, 1):
+        assert {(r["model"], r["mode"]) for r in run["results"]} == {
+            ("27b", "tc"), ("27b", "tc-ngram"), ("27b", "tc-draft2b"), ("27b", "tc-both")}
+        for row in run["results"]:
+            expected = "logs/median-r%d/%s" % (n, Path(row["log"]).name)
+            assert row["log"] == expected
+            assert (page / row["log"]).is_file(), row["log"]
+            text = (page / row["log"]).read_text(encoding="utf-8", errors="replace")
+            assert "%.1f tokens/s" % row["tokens_per_second"] in text
     assert "median" in baseline["throughput_basis"]
 
 

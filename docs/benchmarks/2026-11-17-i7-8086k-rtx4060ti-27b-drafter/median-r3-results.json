@@ -74,7 +74,7 @@
       "drafts_accepted": null,
       "drafts_drafted": null,
       "summary": "[kindi 22:17:21] PASS (speculation off): 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 38.7 tokens/s over the run",
-      "log": "logs/27b-tc.log",
+      "log": "logs/median-r3/27b-tc.log",
       "config": {
         "KINDI_DEVICE": "gpu",
         "KINDI_HEAD": "exact",
@@ -139,7 +139,7 @@
       "drafts_accepted": 35,
       "drafts_drafted": 148,
       "summary": "[kindi 22:17:33] PASS with KINDI_SPEC=ngram: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 44.5 tokens/s over the run",
-      "log": "logs/27b-tc-ngram.log",
+      "log": "logs/median-r3/27b-tc-ngram.log",
       "config": {
         "KINDI_DEVICE": "gpu",
         "KINDI_HEAD": "exact",
@@ -206,7 +206,7 @@
       "drafts_accepted": 112,
       "drafts_drafted": 162,
       "summary": "[kindi 22:17:45] PASS with KINDI_SPEC=draft2b: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 70.7 tokens/s over the run",
-      "log": "logs/27b-tc-draft2b.log",
+      "log": "logs/median-r3/27b-tc-draft2b.log",
       "config": {
         "KINDI_DEVICE": "gpu",
         "KINDI_HEAD": "exact",
@@ -274,7 +274,7 @@
       "drafts_accepted": 90,
       "drafts_drafted": 211,
       "summary": "[kindi 22:17:58] PASS with KINDI_SPEC=both: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 61.3 tokens/s over the run",
-      "log": "logs/27b-tc-both.log",
+      "log": "logs/median-r3/27b-tc-both.log",
       "config": {
         "KINDI_DEVICE": "gpu",
         "KINDI_HEAD": "exact",
