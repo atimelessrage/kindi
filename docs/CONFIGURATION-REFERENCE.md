@@ -157,7 +157,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_G4_PAD` | `1` | `kindi/gemma4.py:599` |
 | `KINDI_G4_PARK_MAX` | `4` | `kindi/gemma4_cache.py:35` |
 | `KINDI_G4_PLE_HOST` | `auto` | `kindi/gemma4.py:482` |
-| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:712` |
+| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:711` |
 | `KINDI_G4_PROMPT_CACHE` | `1` | `kindi/gemma4_cache.py:33` |
 | `KINDI_G4_Q5_DP4A` | `1` | `kindi/gemma4.py:80` |
 | `KINDI_G4_RESERVE_MB` | `1024` | `kindi/gemma4.py:543` |
@@ -185,7 +185,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_KV_EXPERIMENTAL` | `0` | `kindi/kld.py:92` (+5 more) |
 | `KINDI_LEGACY_ENGINE_PATH` | (unset) | `kindi/engine.py:768` |
 | `KINDI_LLVM` | (unset) | `kindi/cpu.py:92` |
-| `KINDI_LOG_RAW` | (unset) | `kindi/lightning_gen.py:386` (+2 more) |
+| `KINDI_LOG_RAW` | (unset) | `kindi/lightning_gen.py:384` (+2 more) |
 | `KINDI_LT_CHUNK` | (unset) | `kindi/lightning.py:161` |
 | `KINDI_LT_COLD` | (empty) | `kindi/cold_experts.py:46` |
 | `KINDI_LT_DCACHE` | `str(DCACHE_DEFAULT)` | `kindi/bench.py:109` (+3 more) |
