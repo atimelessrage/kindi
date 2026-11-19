@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `3002a40` on `freebuff/tandem-cpu-recovery` (**main** is at `7310590`; guarded by `tests/test_agents_handoff.py`); `--save-baseline` now carries each cell's `logs` list from the replaced baseline only when it names the cell's `log`, and refuses to drop one; the 27B baseline summaries quote the median pass's duration to two decimals, so a one-decimal look-alike from another pass cannot stand in (`tests/test_verify_matrix.py` **48 passed**); the DSV4.1 CLI now validates its remaining paths, counts, prompt JSONL and reference continuations before loading, and the standalone server/dspark/tool audit moved its late numeric parsing to argparse (`tests/test_dsv41_cli.py` **45 passed**).
+- **HEAD:** `b893157` on `freebuff/tandem-cpu-recovery` (**main** is at `b893157`; guarded by `tests/test_agents_handoff.py`); `--save-baseline` now carries each cell's `logs` list from the replaced baseline only when it names the cell's `log`, and refuses to drop one; the 27B baseline summaries quote the median pass's duration to two decimals, so a one-decimal look-alike from another pass cannot stand in (`tests/test_verify_matrix.py` **48 passed**); the DSV4.1 CLI now validates its remaining paths, counts, prompt JSONL and reference continuations before loading, and the standalone server/dspark/tool audit moved its late numeric parsing to argparse (`tests/test_dsv41_cli.py` **45 passed**).
 
 ### Python quality ratchet
 
@@ -31,7 +31,7 @@ existing debt is tolerated and `--update` lowers the baseline after review.
 post-request guard: a `drafting.last` block with `method="ngram"` raises
 `SmokeError`, naming the method and `not mtp`. The guard is
 `tools/mtp_smoke.py:_check_last_method`, so it is testable without a GPU;
-`python -m pytest tests/test_mtp_smoke.py -q` **3 passed**; a record-bearing GPU smoke passed on 2026-11-19 (RTX 4060 Ti, ctx 4096, k=4, 2 passes / 8 drafted / 3 accepted, one request; `docs/MTP.md`). The tool also prints and writes a run record (pack, head and digest, ctx, `KINDI_SPEC_K`, GPU, serve command with its `KINDI_*` environment, request count) at the top of `--log`.
+`python -m pytest tests/test_mtp_smoke.py -q` **3 passed**; record-bearing GPU smokes passed on 2026-11-19 (RTX 4060 Ti, ctx 4096; k=4 2 passes / 8 drafted / 3 accepted and k=1 3/3/2, one request each; `docs/MTP.md`). The tool also prints and writes a run record (pack, head and digest, ctx, `KINDI_SPEC_K`, GPU, serve command with its `KINDI_*` environment, request count) at the top of `--log`.
 
 ### Audit follow-up
 
@@ -41,7 +41,7 @@ suite plus CI job, and pinned every workflow's actions. The forward-slash drive-
 
 ### Full CPU gate
 
-The final coverage run at `539a504` is **1,241 passed, 28 skipped, 0 failed** in 277.17 s at **46.36%** line+branch coverage (23,504 statements and 8,394 branches); the plain suite at that commit is 1,241 / 28 / 0 in 227.62 s. The current 2026-11-19 worktree (`3002a40` plus local changes) is **1,312 passed, 28 skipped, 0 failed** in 217.78 s with `pytest -q -rs`, and every skip is inventoried by node ID and exact reason in `tests/README.md`.
+The final coverage run at `539a504` is **1,241 passed, 28 skipped, 0 failed** in 277.17 s at **46.36%** line+branch coverage (23,504 statements and 8,394 branches); the plain suite at that commit is 1,241 / 28 / 0 in 227.62 s. The committed 2026-11-19 tree at `b893157` is **1,312 passed, 28 skipped, 0 failed** in 225.81 s with `pytest -q -rs`, and every skip is inventoried by node ID and exact reason in `tests/README.md`.
 
 ### Upstream v0.6.1 and comparison
 
@@ -50,7 +50,7 @@ Stock moved to upstream `v0.6.1` (`7fececb`, fetched 2026-11-17) and one of its 
 `tests/test_kernel_arity.py`); measured after the fix, mode A at the old default `KINDI_SPEC_K=4` costs 0.66x on the 2B; at
 `KINDI_SPEC_K=1` it is 1.12-1.13x at 512 and 24K tokens of context and a wash at 8K (4-run medians, 2026-11-17, `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-mtp-context/RESULTS.md`), so mode A now
 defaults to k=1 (`docs/MTP.md`), and `CURRENT-VS-KINDI-0.6.md` records the current official v0.6.1 comparison (649-commit / 736-file
-delta at `3002a40`; the dirty 2026-11-19 worktree adds MTP k=1, the Q2 expert lane, the controlled 9B pair and the chunk sweep and is reported separately; upstream `main` now points at the release commit `7fececb` (no post-release commit to port); round history in
+delta at `b893157`; the 2026-11-19 round adds MTP k=1, the Q2 expert lane, the controlled 9B pair and the chunk sweep; upstream `main` now points at the release commit `7fececb` (no post-release commit to port); round history in
 `detailed-fork-changelog.md`); §4.6 closes the same-settings A/B with stock `v0.6.1` (tag source, loader shim) and this
 tree at `a79137f` on the same 2B/9B packs at ctx 8192, plain engine and exact head, five passes each: every decode median is within 2.6% and the ranges overlap,
 while the 9B prompt-reading gap (83.9 vs 72.4) was rechecked at 20 passes and closed as noise (70.7 vs 75.7; paired -1.4, p=0.648); a separate stock harness
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `7310590` | main checkout; clean; behind this branch |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `3002a40` | this session; checked out here |
+| `T:/kindi` | `main` | `b893157` | main checkout; clean; same commit as this branch |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `b893157` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.

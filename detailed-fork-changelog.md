@@ -874,3 +874,7 @@ the worktree.
 - **Preview.** `bench-logs/render_comparison.py` now shows the official v0.6.1 baseline, the
   committed `3002a40` shortstat and the current worktree shortstat as separate chips. The
   rendered page remains a local preview, not a tracked artifact.
+- **Committed.** The round above was committed as `b893157` and `main` was fast-forwarded to
+  it on 2026-11-19. The live report now names `b893157` as its baseline: **650 commits, 768
+  files, +101,646/−1,289**, zero file deletions and **871 tracked files** against `v0.6.1`.
+  The worktree counts above are kept as the pre-commit history of this section.

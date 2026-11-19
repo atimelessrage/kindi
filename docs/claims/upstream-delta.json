@@ -2,14 +2,14 @@
   "gate": "upstream-delta",
   "title": "The fork's delta against official Kindi v0.6.1, re-derived from the tags",
   "measured": "2026-11-19",
-  "commit": "3002a40",
-  "command": "git rev-list --count / git diff --numstat / git diff --diff-filter=D --name-only / git ls-tree -r --name-only against official tag v0.6.1 (7fececb), its parent dce89df, v0.6.0 (179710c) and HEAD 3002a40; release metadata from the GitHub release API",
-  "notes": "CURRENT-VS-KINDI-0.6.md now uses the official v0.6.1 release, not only the tag. The published v0.6.0..v0.6.1 range is 16 files, +336/-43 because it includes dce89df's container commit and a6f4891's README acknowledgement; the 0.6.1 commit itself (dce89df..v0.6.1) is 15 files, +52/-36. v0.6.1..3002a40 is 649 commits and 736 files, +97,703/-1,283, with zero file deletions; the v0.6.1 tree has 172 files and the current tree has 839 tracked files and 28 requirements. v0.6.1 is one commit past the shared base dce89df and is not an ancestor of the fork, so v0.6.1..HEAD is the correct comparison range. The superseded f934a55 figures and the historical d1-* claims moved out with the round history to detailed-fork-changelog.md and are no longer claimed here.",
+  "commit": "b893157",
+  "command": "git rev-list --count / git diff --numstat / git diff --diff-filter=D --name-only / git ls-tree -r --name-only against official tag v0.6.1 (7fececb), its parent dce89df, v0.6.0 (179710c) and HEAD b893157; release metadata from the GitHub release API",
+  "notes": "CURRENT-VS-KINDI-0.6.md now uses the official v0.6.1 release, not only the tag. The published v0.6.0..v0.6.1 range is 16 files, +336/-43 because it includes dce89df's container commit and a6f4891's README acknowledgement; the 0.6.1 commit itself (dce89df..v0.6.1) is 15 files, +52/-36. v0.6.1..b893157 is 650 commits and 768 files, +101,646/-1,289, with zero file deletions; the v0.6.1 tree has 172 files and the current tree has 871 tracked files and 28 requirements. v0.6.1 is one commit past the shared base dce89df and is not an ancestor of the fork, so v0.6.1..HEAD is the correct comparison range. The superseded f934a55 figures and the historical d1-* claims moved out with the round history to detailed-fork-changelog.md and are no longer claimed here.",
   "evidence": [
     "ref:v0.6.0",
     "ref:v0.6.1",
     "ref:dce89df",
-    "ref:3002a40",
+    "ref:b893157",
     "ref:f934a55"
   ],
   "numbers": [
@@ -117,7 +117,7 @@
     },
     {
       "id": "base-commits",
-      "display": "649 commits",
+      "display": "650 commits",
       "quoted_in": [
         "CURRENT-VS-KINDI-0.6.md"
       ],
@@ -126,14 +126,14 @@
         "op": "commits",
         "revs": [
           "v0.6.1",
-          "3002a40"
+          "b893157"
         ],
-        "expect": 649
+        "expect": 650
       }
     },
     {
       "id": "base-files",
-      "display": "736 files",
+      "display": "768 files",
       "quoted_in": [
         "CURRENT-VS-KINDI-0.6.md"
       ],
@@ -142,15 +142,15 @@
         "op": "diffstat",
         "revs": [
           "v0.6.1",
-          "3002a40"
+          "b893157"
         ],
         "field": "files",
-        "expect": 736
+        "expect": 768
       }
     },
     {
       "id": "base-insertions",
-      "display": "97,703",
+      "display": "101,646",
       "quoted_in": [
         "CURRENT-VS-KINDI-0.6.md"
       ],
@@ -159,15 +159,15 @@
         "op": "diffstat",
         "revs": [
           "v0.6.1",
-          "3002a40"
+          "b893157"
         ],
         "field": "insertions",
-        "expect": 97703
+        "expect": 101646
       }
     },
     {
       "id": "base-deletions",
-      "display": "1,283",
+      "display": "1,289",
       "quoted_in": [
         "CURRENT-VS-KINDI-0.6.md"
       ],
@@ -176,23 +176,23 @@
         "op": "diffstat",
         "revs": [
           "v0.6.1",
-          "3002a40"
+          "b893157"
         ],
         "field": "deletions",
-        "expect": 1283
+        "expect": 1289
       }
     },
     {
       "id": "base-tracked",
-      "display": "839 tracked files",
+      "display": "871 tracked files",
       "quoted_in": [
         "CURRENT-VS-KINDI-0.6.md"
       ],
       "check": {
         "kind": "git",
         "op": "treefiles",
-        "rev": "3002a40",
-        "expect": 839
+        "rev": "b893157",
+        "expect": 871
       }
     },
     {
@@ -217,7 +217,7 @@
       "check": {
         "kind": "git",
         "op": "treefiles",
-        "rev": "3002a40",
+        "rev": "b893157",
         "path": "docs/development/requirements",
         "match": "REQ-*.md",
         "expect": 28
@@ -234,7 +234,7 @@
         "op": "deleted",
         "revs": [
           "v0.6.1",
-          "3002a40"
+          "b893157"
         ],
         "expect": 0
       }
