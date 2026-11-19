@@ -40,20 +40,22 @@ Each routed slot has its own down input, quantized by the card's own
 `lt_quant` and stacked the way `lt_mv_q2_down` reads it (`hq` holds one block of
 `runs * 8` words per slot). The reference is one `lt_mv_q2_down` launch with
 `ids = [0, 1, 2, 3]`, four gateway weights and the shared weights. The mixed
-path is host partials for slots 0 and 2, `lt_mv_q2_down_parts` for slots 1 and
-3, `lt_q2_shared_parts` for the shared expert, and one `lt_q2_combine`.
+path is one `lt_mv_q2_down_parts` call over all four slots (which exercises the
+`[nslot][rows][32]` output), the CPU slots compared with the host partials and
+then replaced by them, `lt_q2_shared_parts` for the shared expert, and one
+`lt_q2_combine`.
 
 | check | differing elements |
 |---|---:|
 | mixed vs `lt_mv_q2_down`, `x = 0` | **0 / 2688** |
 | mixed vs `lt_mv_q2_down`, non-zero residual `x` | **0 / 2688** |
 | shared-only combine vs `lt_mv_q2_down` with no routed slots | **0 / 2688** |
-| host partials vs `lt_mv_q2_down_parts`, slots 0 and 2 | **0 / 86,016 per slot** |
+| host partials vs the multi-slot `lt_mv_q2_down_parts` output, slots 0 and 2 | **0 / 86,016 per slot** |
 
 The zero-residual case compares the combined sums; the residual case also
 checks the kernel's `x[r] += tot` path. The host-partial check is independent
-of the combine: it runs the card's parts kernel for the same CPU experts and
-compares every lane. The shared-only branch was also exercised through the same
+of the combine: it compares every lane of the host result with the same slot
+from the card's multi-slot parts call. The shared-only branch was also exercised through the same
 combine and matches the reference's shared contribution.
 
 ## Blocker and scope

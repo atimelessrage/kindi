@@ -143,26 +143,20 @@ def main(argv=None):
                  gq, gd, gs, x))
     cp.cuda.Stream.null.synchronize()
 
-    # Mixed path: host partials for CPU slots, the parts kernel for card slots, shared parts
-    # on the card, then one combine. parts is [slot][row][lane], exactly what combine reads.
-    parts = cp.zeros((EXPERTS, a.hidden, 32), np.float32)
+    # Mixed path: one parts call for all four slots exercises the [nslot][row][lane]
+    # output, then the CPU slots are replaced by the host's partials after comparison.
+    # Card slots stay as the parts kernel wrote them. This is exactly what combine reads.
+    parts = cp.empty((EXPERTS, a.hidden, 32), np.float32)
+    mv_parts(((a.hidden + 3) // 4,), (128,),
+             (ptr_dn, ptr_ds, ids_all, np.int32(EXPERTS), np.int32(a.hidden), np.int32(a.ff),
+              hq, hd, hs, parts))
+    cp.cuda.Stream.null.synchronize()
     host_parts = {}
     host_diff = {}
     for slot in CPU_SLOTS:
         host_parts[slot] = down.partials(slot, host_hq[slot], host_hd[slot], host_hs[slot])
+        host_diff[slot] = int(np.sum(_bits(cp.asnumpy(parts[slot])) != _bits(host_parts[slot])))
         parts[slot] = cp.asarray(host_parts[slot])
-        card_copy = cp.empty((a.hidden, 32), np.float32)
-        mv_parts(((a.hidden + 3) // 4,), (128,),
-                 (ptr_dn, ptr_ds, cp.asarray(np.array([slot], np.int32)), np.int32(1),
-                  np.int32(a.hidden), np.int32(a.ff), dev_hq[slot], dev_hd[slot], dev_hs[slot],
-                  card_copy))
-        cp.cuda.Stream.null.synchronize()
-        host_diff[slot] = int(np.sum(_bits(cp.asnumpy(card_copy)) != _bits(host_parts[slot])))
-    for slot in CARD_SLOTS:
-        mv_parts(((a.hidden + 3) // 4,), (128,),
-                 (ptr_dn, ptr_ds, cp.asarray(np.array([slot], np.int32)), np.int32(1),
-                  np.int32(a.hidden), np.int32(a.ff), dev_hq[slot], dev_hd[slot], dev_hs[slot],
-                  parts[slot]))
     shparts = cp.empty((a.hidden, 32), np.float32)
     mv_shared(((a.hidden + 3) // 4,), (128,),
               (dev_sh, dev_ssh, np.int32(a.hidden), np.int32(2 * a.ff), gq, gd, gs, shparts))
