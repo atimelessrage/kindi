@@ -2,7 +2,7 @@
   "gate": "q2-expert-lane-20261119",
   "title": "Lightning Q2_0 expert lanes: CPU parity, host-mapped GPU read and copy-lane cost",
   "measured": "2026-11-19",
-  "commit": "bfb4604",
+  "commit": "e4ea7ab",
   "command": "for i in 1 2 3; do python tools/q2_expert_lane.py --passes 7 --json \"bench-logs/q2-host-mapped-20261119-run$i.json\"; done; then merge the three per-process medians into the tracked results.json as RESULTS.md describes",
   "notes": "The parity check compares the host lane against the real lt_mv_q2/lt_mv_q2_down kernels on synthetic Q2_0 weights at hidden 2688 and expert width 1856, both with device-resident weights and through the engine's pinned host pointer tables from lightning.py:_q2 (0 differing elements in both paths). The top-level CPU/copy-lane totals are sums of component medians, so the table adds up; results.json records each per-process row and the additive definition. The CPU lane is not adopted: the direct host-mapped GPU read is 1.18x faster than the copy lane and 3.62x faster than the CPU lane. The model row is blocked: no kindi_lightning pack exists on this host, so no verify/tok/s is claimed.",
   "evidence": [
