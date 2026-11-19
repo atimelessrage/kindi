@@ -1,15 +1,15 @@
 # Current fork vs official Kindi 0.6.1
 
 Report date: **2026-11-19**. Baseline: official **Kindi 0.6.1** (tag `v0.6.1`, commit
-`7fececb`, published 2026-11-16T21:49:20Z) against this fork's comparison baseline, **`53198e5`** (the last engine/test/evidence commit; the report-only handoff after it adds no runtime change).
+`7fececb`, published 2026-11-16T21:49:20Z) against this fork's comparison baseline, **`3fed704`** (the round-3 audit commit; the later report update is documentation-only).
 Upstream `main` still points at the release commit itself (`7fececb`), so there is no
 post-release upstream commit left to port. This page keeps the current comparison only;
 the round-by-round history has moved verbatim to `detailed-fork-changelog.md`. The
-2026-11-19 engine, test and evidence round is committed in `53198e5` (listed in §1), so
-every git figure below includes it.
+The 2026-11-19 engine/test/evidence round is committed through `53198e5`, and the round-3 audit fixes are in `3fed704`, so
+every git figure below includes both.
 
-**Short answer.** This fork is **664 commits and 827 files ahead** of `v0.6.1` at commit
-`53198e5` (**+106,882/−1,320** lines), with **zero file deletions** against the official tree.
+**Short answer.** This fork is **666 commits and 827 files ahead** of `v0.6.1` at commit
+`3fed704` (**+107,317/−1,370** lines), with **zero file deletions** against the official tree.
 The measured advantages are the fork's own plan engine and tensor-core path, the tandem
 memory split, the KLD quality gate, mode A's corrected k=1 default, `kindi plan` /
 `kindi caps` / `kindi autotune`, and the session and API work. The real disadvantages are
@@ -19,7 +19,7 @@ machine does not have. Nothing upstream is missing: both code changes in 0.6.1 a
 
 | question | answer |
 |---|---|
-| **What is different** | 664 commits / 827 files ahead at `53198e5`, 929 tracked files against 172 upstream; 28 numbered requirements; no upstream file deleted. The committed 2026-11-19 round adds the k=1 default, the Q2_0 expert lane, the chunk sweep and the controlled 9B pair. The fork adds its own runtime, commands, API surface and tests rather than changing 0.6.1's structure. |
+| **What is different** | 666 commits / 827 files ahead at `3fed704`, 929 tracked files against 172 upstream; 28 numbered requirements; no upstream file deleted. The committed 2026-11-19 round adds the k=1 default, the Q2_0 expert lane, the chunk sweep and the controlled 9B pair, plus the round-3 cold-reader teardown and quality-ratchet fixes. The fork adds its own runtime, commands, API surface and tests rather than changing 0.6.1's structure. |
 | **Better, measured** | Dense tandem + plan-owner placement; the default tensor-core plan path (2B and 9B generation far ahead of stock's plain engine, in the separate TC configuration); 2B/9B same-settings decode parity; 27B peak reduced 7,721 -> 6,091 MiB; KLD quality gate; adaptive draft policy (+15.8% on the 2B, parity on the 27B); mode A's new k=1 default (4/4 token-exact on the live 2B check); physical-core thread count. Details in §3 and §4.6. |
 | **New here** | `kindi plan`, `kindi kld`, `kindi caps`, `kindi autotune`, `kindi io`; sessions store/CLI/HTTP/resume/prune/stats; backend plugin contract + adapters; OpenAI error envelope and conformance harness; JSON-schema/GBNF constrained decoding; Windows install and CPU capability paths; a bit-identical Q2_0 CPU expert-lane gate (not wired). |
 | **Worse** | Version identity stays 0.6.0 while official is 0.6.1, and there are no fork 0.6.1 images or fork installer artifact; an explicit `KINDI_SPEC_K=4` still costs **0.66x**, but it is no longer the default (mode A now defaults to k=1, measured 1.12-1.13x at 512/24K); the tandem split remains a memory feature, not a speed win; FP8 K/V is lossy; recursive GBNF is expensive by design. Details in §4.1-§4.4. |
@@ -33,7 +33,7 @@ release API was checked again on 2026-11-19; **v0.6.1 remains the latest officia
 release**. Upstream `origin/main` now points at `7fececb`, the release commit itself,
 so there is no post-release upstream commit left to port; `v0.6.0` (`179710c`) is still
 an ancestor of `main`, and the shared base remains `dce89df`. The comparison range is
-therefore `v0.6.1..53198e5`; every git figure below is taken at `53198e5`, the committed
+therefore `v0.6.1..3fed704`; every git figure below is taken at `3fed704`, the committed
 baseline this report names. The 42 commits after the previous `296a03d` snapshot
 are the 2026-11-18/19 rounds (quality ratchet, CLI input validation, DSV4.1 body handling,
 Nanbeige/MTP wiring, coverage and baseline provenance, the Q2 expert lane and this
@@ -44,11 +44,11 @@ consolidated round); they are code, test, evidence and documentation work, and
 git merge-base --is-ancestor v0.6.0 HEAD       # yes
 git merge-base --is-ancestor v0.6.1 HEAD       # no: v0.6.1 is one commit past dce89df
 git merge-base v0.6.1 HEAD                     # dce89df
-git log --oneline v0.6.1..53198e5 | wc -l       # 664 commits
-git diff --shortstat v0.6.1..53198e5           # 827 files, +106,882/-1,320
-git diff --diff-filter=D --name-only v0.6.1..53198e5  # (empty: zero file deletions)
+git log --oneline v0.6.1..3fed704 | wc -l       # 666 commits
+git diff --shortstat v0.6.1..3fed704           # 827 files, +107,317/-1,370
+git diff --diff-filter=D --name-only v0.6.1..3fed704  # (empty: zero file deletions)
 git ls-tree -r --name-only v0.6.1 | wc -l      # 172 upstream files
-git ls-tree -r --name-only 53198e5 | wc -l     # 929 tracked files at the baseline
+git ls-tree -r --name-only 3fed704 | wc -l     # 929 tracked files at the baseline
 ls docs/development/requirements/REQ-*.md | wc -l  # 28 numbered requirements
 ```
 
@@ -68,7 +68,7 @@ The 0.6.0 merge landed on 2026-11-14 (commit `f635513`, 18 conflicted files over
 zero-deletion check against `v0.6.1` shows none of its paths was dropped either.
 A line-count drop in a shortstat is edits inside files, not file deletions.
 
-The 2026-11-19 round is committed through `53198e5`. `f75253b` adds DSV4.1 request-shape
+The 2026-11-19 round is committed through `53198e5`; the round-3 audit fixes are in `3fed704`. `f75253b` adds DSV4.1 request-shape
 validation and the batched Windows secret scan; `84b6686` commits the controlled 2B/4B/9B pairs,
 the 9B chunk sweep, the context-growth and ternary-MoE pages and the Q2_0 expert-lane/combine
 evidence. The lane module is `tools/moe_expert_lane.py`, an experiment that is not wired into the
@@ -129,7 +129,7 @@ The preview chips are computed at render time from the report baseline and the c
 | **Image input is refused, not silently dropped** (`kindi/server.py`) | 2026-11-17: a pack manifest that declares `vision`/`mmproj` no longer unlocks acceptance — no build implements a projector, so an image part or Ollama `images` is always an enveloped 400, and the message names the missing projector when a pack claims one. Pinned by an app-level test built on a vision-declaring manifest |
 | **One grammar compile per structured request** (`kindi/server.py`) | 2026-11-17: validation already built the automaton to answer an invalid schema/grammar with a 400; the decode path built it again. The compiled object is now parked on the request and reused (GBNF and `json_schema`), so a structured request compiles once: llama.cpp's canonical `json.gbnf` at nesting 2 is 7,936 states / 7.8 ms median build, ~15.6 → ~7.8 ms per request. Pinned by a call-counting test |
 | **GBNF size honesty** (`kindi/gbnf.py`) | 2026-11-17: `Grammar.states` exposes the compiled size, and the over-budget refusal names `*`/`+` and `json_schema` instead of only a state count. Measured: exact per-use expansion costs ~143 states per enumerated copy (a 40-pair record referencing `ws` 82 times is 5,915 states / ~6 ms), the loop form is ~330 states at any length, and the default 20,000-state cap holds ~130 enumerated copies. The pre-`221d652` rule cache was 20× smaller because it widened the language (an "exactly 3" grammar accepted 0–5 copies) |
-| **Python quality ratchet** (`tools/check_python_quality.py`, audit M6) | 2026-11-18/19: Ruff 0.16.0 (`F`, `E9`, `B`, `I`) over the Python tree, mypy 2.4.0, Pyright 1.1.414 (`basic`, all platforms) and Pylint 4.1.3 (`E`, `F`, import-error off) over production code, currently **316 Ruff / 59 mypy / 1,035 Pyright / 255 Pylint** findings, against a `tools/python_quality_baseline.json` that allows 321 Ruff; CI fails only on a new or increased finding, so existing debt is measured rather than hidden. `tests/test_python_quality.py` + `tests/test_ci_config.py` pin the comparison, parser shape and exact tool versions. Dependency scanning stays open |
+| **Python quality ratchet** (`tools/check_python_quality.py`, audit M6) | 2026-11-18/19: Ruff 0.16.0 (`F`, `E9`, `B`, `I`) over the Python tree, mypy 2.4.0, Pyright 1.1.414 (`basic`, all platforms) and Pylint 4.1.3 (`E`, `F`, import-error off) over production code, currently **315 Ruff / 59 mypy / 1,035 Pyright / 255 Pylint** findings, against a `tools/python_quality_baseline.json` that allows 321 Ruff; CI fails only on a new or increased finding, so existing debt is measured rather than hidden. `tests/test_python_quality.py` + `tests/test_ci_config.py` pin the comparison, parser shape and exact tool versions. Dependency scanning stays open |
 | **Every standalone CLI validates before a model is mapped** (`kindi/dsv41*.py`, `tools/*`, 2026-11-19) | `python -m kindi.dsv41`, `dsv41_server`, `dsv41_dspark` and the gate/harness tools now require readable inputs, a writable output parent, a complete DSpark directory, token ids in range and finite/positive counts at argparse time; commands that need `--prompts`/`--ref` fail with their required set first. `tests/test_dsv41_cli.py` (24 tests) pins the parsers and every pre-load exit |
 | **DSV4.1 server body cap** (`kindi/dsv41_server.py`, 2026-11-18) | the standalone server shares `KINDI_MAX_BODY_MB` (16 MiB), refuses an over-cap body with 413 `request_too_large` before reading it, answers 400 for a malformed length/JSON, and half-closes plus drains the refused body so the 413 cannot be lost to a reset; a socket-level test sends a 1 MiB body past a small cap followed by a valid request |
 | **Cold-expert slots stay pinned across decode steps** (`kindi/cold_experts.py`, 2026-11-18) | the decode hit test now uses a per-layer slot table from `cold_slot_plan`: a repeated expert is served from its unchanged slot, a routed expert's slot is never stolen, and `cold_stats()` reports `slot_hits`. Unit-tested only; the per-layer stream sync and blocking current-layer read stay open (C9), with no GPU, larger-than-RAM pack or tok/s claim |
@@ -138,13 +138,13 @@ The preview chips are computed at render time from the report baseline and the c
 
 ## 4. What is worse, missing, or unverified vs official Kindi 0.6.1
 
-Re-derived at `53198e5` (2026-11-19) against the official `v0.6.1` release (`7fececb`, published
+Re-derived at `3fed704` (2026-11-19) against the official `v0.6.1` release (`7fececb`, published
 2026-11-16), with `v0.6.0` (`179710c`) and the shared base `dce89df` kept for the release ancestry. The
 title folds three different questions together, so they are separate below; each row ends with what
 would move it, and the linked benchmark pages and `docs/MTP.md` hold the dated runs behind them.
 
 **The short answer.** Nothing upstream is deleted or unported: every file of `v0.6.1` is still present
-(`git diff --diff-filter=D --name-only v0.6.1..53198e5` is empty), and the release's two code changes are
+(`git diff --diff-filter=D --name-only v0.6.1..3fed704` is empty), and the release's two code changes are
 in `f934a55`. The official release now publishes `0.6.1-cuda`, `0.6.1-rocm6` and `0.6.1-rocm7` plus
 the source and installer hashes; this fork deliberately keeps its 0.6.0 version and container tags
 until it has a matching release. What remains open is **evidence**: measurements that need weights, a

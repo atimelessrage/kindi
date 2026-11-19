@@ -918,8 +918,9 @@ engine or evidence changes behind it. `CURRENT-VS-KINDI-0.6.md` and
 
 ## 47. Round-3 audit disposition (2026-11-19)
 
-The round-3 review was written against `f984962`; this worktree is at `8c3b083`, which is 14
-commits later, so every finding was re-checked by function name as well as line number.
+The round-3 review was written against `f984962`; the fixes landed in `3fed704` (based on
+`8c3b083`, 14 commits after the review), so every finding was re-checked by function name as
+well as line number.
 
 - **N1/N5 (cold reader teardown) — closed.** `lightning.Engine` created a `ColdExpertReader`
   and a daemon lookahead thread but never closed either. `Engine.close()` now joins the thread and
@@ -946,6 +947,7 @@ commits later, so every finding was re-checked by function name as well as line 
   it, and another rewrite needs a new signed review and owner authorization.
 - **R4/M5 (worktree behind main) — resolved.** `main` and `freebuff/tandem-cpu-recovery` were
   the same commit (`8c3b083`) before this round; the audit's `f984962` observation was stale.
+  The fixes are now in `3fed704`.
 - **M1/M2 (cold-tier hardware gate, GPU CI) — open and unmeasured.** No larger-than-RAM pack,
   `kindi verify` 4/4, tok/s or flash MiB/token is claimed, and the CUDA-graph/kernel-arity gates
   remain local-only facts.
