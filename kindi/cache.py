@@ -24,6 +24,9 @@ import threading
 import time
 
 import numpy as np
+
+from .jsonio import load_json
+
 try:
     import cupy as cp
 except ImportError:               # the CPU engine (no VRAM checkpoint slot)
@@ -164,7 +167,7 @@ class Openings(object):
             for key in os.listdir(root):
                 d = os.path.join(root, key)
                 try:
-                    meta = json.load(open(os.path.join(d, "meta.json")))
+                    meta = load_json(os.path.join(d, "meta.json"))
                     if self.fp is not None and meta.get("engine") != self.fp[0]:
                         continue                  # made by another engine configuration
                     if meta["p"] < eng.ctx:
@@ -254,7 +257,7 @@ class Openings(object):
         p = self.entries[key]["p"]
         if not isinstance(p, int) or isinstance(p, bool) or not 0 <= p < eng.ctx:
             raise ValueError("saved opening %s has invalid prefix length %r" % (key, p))
-        meta = json.load(open(os.path.join(d, "meta.json")))
+        meta = load_json(os.path.join(d, "meta.json"))
         if not isinstance(meta, dict):
             raise ValueError("saved opening %s has invalid metadata" % key)
         if self.fp is not None and meta.get("engine") != self.fp[0]:
@@ -370,7 +373,7 @@ class Turns(object):
             for key in os.listdir(os.path.join(root, "turns")):
                 d = os.path.join(root, "turns", key)
                 try:
-                    meta = json.load(open(os.path.join(d, "meta.json")))
+                    meta = load_json(os.path.join(d, "meta.json"))
                     if self.fp is not None and meta.get("engine") != self.fp[0]:
                         continue
                     if meta["p"] >= eng.ctx or any(b not in self.blocks for b in meta["blocks"]):
@@ -707,7 +710,7 @@ class _State(object):
 
 
 def _ram_bytes():
-    from kindi import hostram                  # the real total on Linux, WSL2 and native Windows (issue #4)
+    from kindi import hostram  # the real total on Linux, WSL2 and native Windows (issue #4)
     return hostram.total() or 8 * 2 ** 30
 
 

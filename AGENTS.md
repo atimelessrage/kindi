@@ -19,11 +19,11 @@ line of evidence (command + result). A task must be resumable from this file alo
 Audit F9's Python quality ratchet is `tools/check_python_quality.py`: Ruff 0.16.0 (`F`, `E9`, `B`, `I`)
 over the Python tree, mypy 2.4.0 over first-party production
 code, Pyright 1.1.414 (`basic`, all platforms) and Pylint 4.1.3 (`E`, `F`, import-error
-disabled) at Python 3.10 over the same production targets, recorded as **332 Ruff findings / 59 mypy
+disabled) at Python 3.10 over the same production targets, recorded as **321 Ruff findings / 59 mypy
 errors / 1,035 Pyright errors / 255 Pylint findings** in
 `tools/python_quality_baseline.json`. CI runs it; a new or increased file/rule count fails, while
 existing debt is tolerated and `--update` lowers the baseline after review.
-`tests/test_python_quality.py` + `tests/test_ci_config.py` **14 passed**; no full-suite or GPU run. Dependency scanning remains open. The prior test task is below.
+`tests/test_python_quality.py` + `tests/test_ci_config.py` **14 passed**; no full-suite or GPU run. Dependency scanning is report-only in CI (`tools/check_dependencies.py`, `requirements-runtime.txt`); the gate waits for a reviewed baseline. The prior test task is below.
 
 ### MTP smoke guard
 

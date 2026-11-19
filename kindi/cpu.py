@@ -19,7 +19,6 @@ returns the greedy token from the residual left by the last layer. The whole-mod
 single-region path; the per-layer calls are for handing one block to or from another backend."""
 import ctypes
 import hashlib
-import json
 import os
 import platform
 import shutil
@@ -29,6 +28,8 @@ import sys
 import time
 
 import numpy as np
+
+from .jsonio import load_json
 
 VOCAB = 248320
 DEFAULT_DIMS = {"layers": 24, "width": 2048, "ffn": 6144, "heads": 8, "kv_heads": 2,
@@ -535,7 +536,7 @@ class Engine(object):
         self.lib = _lib()
         self.isa = getattr(self.lib, "kindi_isa", "native")
         self.ctx = int(ctx)
-        man = json.load(open(os.path.join(pack, "kindi_pack.json")))
+        man = load_json(os.path.join(pack, "kindi_pack.json"))
         d = self.dims = dict(DEFAULT_DIMS, **man.get("dimensions", {}))
         self.HB = int(man.get("hadamard_block", 512))
         self.head_name = man.get("head", "token_embd.weight")
@@ -558,8 +559,8 @@ class Engine(object):
         NV = d["gdn_inner"] // HK
         CC = 2 * NK * HK + NV * HK
         interval = d["full_attention_interval"]
-        idx = json.load(open(os.path.join(pack, "index.json")))["tensors"]
-        bi = json.load(open(os.path.join(pack, "bcodes_index.json")))["tensors"]
+        idx = load_json(os.path.join(pack, "index.json"))["tensors"]
+        bi = load_json(os.path.join(pack, "bcodes_index.json"))["tensors"]
         bc = np.memmap(os.path.join(pack, "bcodes.bin"), dtype=np.uint8, mode="r")
         dp = np.memmap(os.path.join(pack, "dpm.bin"), dtype=np.float16, mode="r")
         self.keep = []                    # every array the C side points at
@@ -659,7 +660,7 @@ class Engine(object):
         self.hidden = np.ctypeslib.as_array(m.h, shape=(D,))   # in-place residual for a tandem handoff
         self.hsl, self.shortlist = None, 0
         self.shortlist = 0
-        self.vocab = json.load(open(os.path.join(pack, "vocab.json")))
+        self.vocab = load_json(os.path.join(pack, "vocab.json"))
         (log or (lambda *a: None))("kindi-cpu ready: %s, %s, %s threads, ctx %d (%.1fs)" % (
             man.get("model"), self.isa, self.threads, self.ctx, time.time() - t0))
 

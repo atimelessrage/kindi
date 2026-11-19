@@ -601,7 +601,7 @@ def _reserve_card(eng, s):
                   for il in gl}
         # split products: the parts buffer for the largest sp x T x R of the tuned configs
         mx = 0
-        for name, (_, _, R, C) in s.w.items():
+        for _name, (_, _, R, C) in s.w.items():
             nw, sp = (8, lane_sp(s, int(R), int(C))) if getattr(s, "tc_lane", False) else tune(s, int(R), int(C))
             if sp > 1:
                 mx = max(mx, sp * T * int(R))
@@ -892,7 +892,7 @@ def build_draft(s, k, M0, C0):
     _copies(P, SK, list(zip(s.M, M0)) + list(zip(s.conv, C0)))
     for i in range(k):
         Pi = build_plan(s, 1, True, 1, aout=b["AOUT"][i:], tokp=None if i == 0 else b["AOUT"][i - 1:])
-        for h, d in Pi.dyn:
+        for _h, d in Pi.dyn:
             if d.var == "pos":
                 d.a += d.b * i
         P.segs[-1].extend(e for seg in Pi.segs for e in seg)

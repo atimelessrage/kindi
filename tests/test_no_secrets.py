@@ -86,6 +86,15 @@ def test_no_forward_slash_machine_roots_in_current_facing_files():
         "%s:%d" % item for item in bad[:40])
 
 
+def test_openai_key_shape_has_a_word_boundary():
+    """The token shape must not flag ordinary prose. `ta(sk-oriented)` used to match
+    `sk-[A-Za-z0-9]{8,}`; the current 32-character shape with `\\b` keeps the key
+    detector while leaving a docstring like this alone."""
+    key = "sk-" + "a" * 40
+    assert hits_in_line("Borland-style task-oriented dialogs") == ()
+    assert "OpenAI key" in hits_in_line("api_key=" + key)
+
+
 def test_the_local_drive_path_rule_is_not_vacuous():
     """A scanner rule that has never matched would have passed the drive-letter paths the audit
     found, so the shape is pinned here: JSON-escaped and prose forms both match."""

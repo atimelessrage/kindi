@@ -1206,7 +1206,7 @@ def main(argv=None):
             for f in shards(a.model):
                 g = GGUF(f)
                 offs, lens, nodes = [], [], []
-                for name, ne, ty, off in g.tensors:
+                for name, ne, _ty, off in g.tensors:
                     if not name.endswith("_exps.weight"):
                         continue
                     cols, rows, ne_ = ne[0], ne[1], ne[2]

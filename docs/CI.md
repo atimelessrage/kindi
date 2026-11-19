@@ -73,7 +73,7 @@ job. A gate that failed on every existing finding would block all work, so it st
 baseline:
 
 - **Ruff 0.16.0** checks the whole Python tree with correctness rules `F`, `E9`, `B` and `I`
-  (`ruff.toml`). The baseline records **332 findings across 125 files**; style-only rules are not
+  (`ruff.toml`). The baseline records **321 findings across 125 files**; style-only rules are not
   selected, so this is not a formatting freeze.
 - **mypy 2.4.0** checks first-party production code (`kindi`, `tools`, `examples` and
   `bridge/kindi_bridge`) with missing third-party imports ignored (`mypy.ini`). The baseline records
@@ -95,6 +95,45 @@ remaining debt stays visible. Dependency scanning is a separate open audit item.
 
 `tests/test_python_quality.py` pins the comparison and baseline shape, and
 `tests/test_ci_config.py` pins the CI step and tool versions.
+
+### Debt burn-down
+
+The baseline still tolerates **143 bugbear (`B`) findings**: 60 `B904` (raise without `from`),
+55 `B905` (`zip()` without `strict=`), 17 `B023` (closure over a loop variable), 9 `B007`
+(unused loop control variable) and 2 `B002` (the unary-prefix-decrement pattern). The 2026-11-19
+pass renamed six unused loop variables and left the tuple-unpacking cases for a per-site review.
+`B905` is
+blocked by the supported Python floor, `B023` needs a per-site review to confirm the closure is
+not intentional, and the two `B002` sites are arithmetic double-negations, not decrements. Burn
+one family down per session: fix it, run the focused tests, then lower the baseline with
+`python tools/check_python_quality.py --update`. Do not add `# noqa` or weaken the rule to make the
+number move.
+
+## Dependency audit
+
+`tools/check_dependencies.py` parses `pip-audit` JSON reports into `package advisory` pairs and
+compares them with the reviewed baseline in
+`docs/development/dependency-audit-baseline.json`. The `dependency-audit` job is **report-only**:
+it audits the test requirements and attempts the legacy CUDA 10.2 runtime pins in
+`requirements-runtime.txt`, then prints findings without failing the build. `--no-deps` skips
+dependency resolution, but pip-audit still installs the pinned distributions in a temporary
+environment; a 2022 pin with no wheel for the runner can leave the runtime report missing, which
+`--allow-missing` reports as a skip rather than a false green. Audit that legacy set in a Python
+3.8 / CUDA 10.2 container for a complete report; do not replace the pins just to make it run.
+
+To make it gating, review a report, record it and remove `--report-only` from the workflow:
+
+```sh
+pip-audit -r requirements-runtime.txt --no-deps --format json --output runtime-audit.json
+python tools/check_dependencies.py --report runtime-audit.json --update
+python tools/check_dependencies.py --report runtime-audit.json
+```
+
+`--update` is a reviewed security decision, not routine maintenance; the baseline is an allowlist
+of accepted, understood findings. Do not upgrade the deliberately old CUDA 10.2 pins just to make
+the report shorter. The 2022-era web stack (FastAPI/Pydantic/Uvicorn) needs its own upgrade pass
+because the current pins are API-compatible with the server code; that is a feature change, not a
+security patch.
 
 ## CUDA static analysis
 

@@ -318,7 +318,7 @@ def plan(spec, usage, card_bytes, host_bytes=None, min_card=None, weighted=None)
         # the most used non-card experts (by share of their layer's picks) stay in host memory; the rest go to disk
         rest = sorted((((usage.counts[il][e] / (sum(usage.counts[il]) or 1.0)) if usage.has_counts() else 0.0),
                        -il, -e) for il in L for e in range(n) if tier[il][e] == "host")
-        for share, nil, ne in reversed(rest):
+        for _share, nil, ne in reversed(rest):
             il, e = -nil, -ne
             if eb(il) <= room:
                 room -= eb(il)

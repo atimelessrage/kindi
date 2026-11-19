@@ -411,7 +411,7 @@ def inspect_model(path):
     prefix="gemma4."
     dims={k[len(prefix):]:v for k,v in g.kv.items() if k.startswith(prefix)}
     counts,seen={},set()
-    for name,ne,ty,off in g.tensors:
+    for name,ne,ty,_off in g.tensors:
         if ty not in _QUANTS: raise ValueError("kindi: unsupported GGUF tensor type %d in %s" % (ty,name))
         block,size=_QUANTS[ty]; n=1
         for d in ne: n*=d

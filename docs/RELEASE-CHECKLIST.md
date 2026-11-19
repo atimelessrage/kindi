@@ -157,6 +157,8 @@ change the documented hash to the old file.
   this is a new patch release, bump both and add the changelog entry in the same release commit.
 - Tag only from the release commit, and only after the artifact hash is fixed.
 - Do not force-push or move an existing release tag.
+- Read [SECURITY.md](SECURITY.md) before any push. The remotes still hold pre-redaction objects; a
+  stale fast-forward can republish them even when the working tree is clean.
 
 ## 6. Publish atomically
 

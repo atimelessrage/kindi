@@ -1,0 +1,9 @@
+# Runtime pins for the CUDA 10.2 / legacy-card install path (docs/INSTALL.md).
+# The test environment uses tests/requirements-test.txt; this file is the deterministic
+# target for the dependency audit, not a replacement for a distribution's own pins.
+numpy==1.19.5
+fastrlock==0.8.3
+cupy-cuda102==9.6.0
+fastapi==0.79.1
+uvicorn==0.16.0
+pydantic==1.9.2

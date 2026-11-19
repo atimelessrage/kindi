@@ -94,7 +94,15 @@ commands and interpret the output. Each row states the gate it unlocks.
 - **Push the tree:** `git push origin` is 403 from this environment (house
   rule is also never-push). The fork (`myfork/main`) is behind; the owner
   must push. This is the single easiest owner action with the biggest
-  unblock value (CI, installer refresh, ever).
+  unblock value (CI, installer refresh, ever). Read
+  [SECURITY.md](SECURITY.md) first: the remotes still hold pre-redaction
+  objects, so a plain fast-forward can republish what the 2026-11-17 rewrite
+  removed.
+- **Run the offsite backup:** the repository and its evidence are on one
+  volume, and pushing has never succeeded. Run
+  `python tools/backup_bundle.py --out <second-medium>/kindi-backups`, then
+  copy the bundle and its `.sha256` off this machine. See
+  [BACKUP.md](BACKUP.md).
 - **Refresh the published installer** (`fd54148` → current HEAD, see
   `docs/RELEASE-CHECKLIST.md`): publish the source archive, recompute
   `SOURCE_COMMIT`/`SOURCE_SHA256`/`KINDI_VERSION`, update `docs/INSTALL.md`,

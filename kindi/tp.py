@@ -28,13 +28,13 @@ import math
 import os
 import time
 
-import numpy as np
 import cupy as cp
+import numpy as np
 
 from . import calib as _calib
-from . import hostram
-from . import layout
-from .engine import Kernels, DEFAULT_DIMS, VOCAB
+from . import hostram, layout
+from .engine import DEFAULT_DIMS, VOCAB, Kernels
+from .jsonio import load_json
 
 rt = cp.cuda.runtime
 i32, f32t = np.int32, np.float32
@@ -549,7 +549,7 @@ class Shard(object):
             # build, or a run with dual off) left HIP prompts token by token (780M 27B read 10.8 tok/s)
             # a cache without one of this card's tensors (made before the tied-head alias: the 2B / 4B's output.weight)
             # is made again
-            stale = os.path.exists(ipath) and not set(tern) <= set(json.load(open(ipath)))
+            stale = os.path.exists(ipath) and not set(tern) <= set(load_json(ipath))
             if stale or not (os.path.exists(cpath) and os.path.exists(ipath)) or \
                     ((self.g5l or dual) and not os.path.exists(lpath)):
                 # one tensor at a time, from the pack's memory maps to the cache files (the row layout, and the 16-row
@@ -586,7 +586,7 @@ class Shard(object):
                     fl.close()
                     os.replace(lpath + ".tmp", lpath)
                 json.dump(offs, open(ipath, "w"))
-            offs = {n: tuple(v) for n, v in json.load(open(ipath)).items()}
+            offs = {n: tuple(v) for n, v in load_json(ipath).items()}
             lane = self.g5l and os.path.exists(lpath)
             if self.g5l and not lane:
                 raise SystemExit("kindi: the lane-layout cache %s is missing; delete %s to rebuild both" % (lpath, cpath))
@@ -1131,7 +1131,7 @@ class TPEngine(object):
             raise SystemExit("kindi: the plan engine runs on 1 or 2 cards (%d found)" % rt.getDeviceCount())
         if layers is not None and self.W != 1:
             raise SystemExit("kindi: a tandem GPU owner runs on one card; set KINDI_CARDS=1")
-        man = self.man = json.load(open(os.path.join(pack, "kindi_pack.json")))
+        man = self.man = load_json(os.path.join(pack, "kindi_pack.json"))
         self.pack = pack
         self.dims = dict(DEFAULT_DIMS, **man.get("dimensions", {}))
         self.HB = int(man.get("hadamard_block", 512))
@@ -1239,8 +1239,8 @@ class TPEngine(object):
                                  "attn_q": self.attn_q, "attn_kv": self.attn_kv,
                                  "ffn_rows": self.ffn_rows, "ffn_cols": self.ffn_cols,
                                  "head_split": self.head_split}
-        self.idx = json.load(open(os.path.join(pack, "index.json")))
-        self.bi = json.load(open(os.path.join(pack, "bcodes_index.json")))["tensors"]
+        self.idx = load_json(os.path.join(pack, "index.json"))
+        self.bi = load_json(os.path.join(pack, "bcodes_index.json"))["tensors"]
         self.tied_head = "output.weight" not in self.bi   # tied embeddings (2B, 4B): the head is token_embd
         if self.tied_head:
             self.bi["output.weight"] = self.bi["token_embd.weight"]
@@ -1249,7 +1249,7 @@ class TPEngine(object):
         self.flm = np.memmap(os.path.join(pack, "f32.bin"), dtype=np.float32, mode="r")
         self.signs = {w: np.fromfile(os.path.join(pack, "signs_%d.f32" % w), dtype=np.float32)
                       for w in (self.D, self.NVg * self.HK, self.NHg * self.HD, self.NFFg)}
-        self.vocab = json.load(open(os.path.join(pack, "vocab.json")))
+        self.vocab = load_json(os.path.join(pack, "vocab.json"))
         self._host_buffers()
         self.emb = None
         if self.need_embed:

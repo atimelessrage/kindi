@@ -221,7 +221,7 @@ class Engine(object):
         s = self.s
         free = _free_bytes(self.cp, [self.dev.id])[0]
         dense = 0
-        for n, (ne, ty, off) in self.tinfo.items():
+        for n, (ne, ty, _off) in self.tinfo.items():
             if "_exps" in n or n == "token_embd.weight":
                 continue
             dense += int(np.prod(ne)) // 64 * 18 if ty == Q2_0 else int(np.prod(ne)) // 32 * 34 if ty == Q8_0 \
