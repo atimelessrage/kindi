@@ -5,7 +5,11 @@ The fake pack carries only the manifest and the two tensor indexes the planners 
 code path opened a weight file the test would fail with a missing-file error instead of passing.
 """
 import json
+import os
 import shlex
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -307,8 +311,11 @@ def test_the_planned_bench_command_reproduces_the_rate_sized_slot_count(tmp_path
 def test_follow_up_commands_quote_a_spaced_pack_and_interpreter(tmp_path, monkeypatch):
     """A spaced pack or interpreter path must stay one argument when the command is pasted.
 
-    POSIX is parsed back with `shlex`; Windows must carry the cmd.exe double quotes.
+    POSIX is parsed back with `shlex`; Windows must carry the cmd.exe double quotes. The
+    generated line is then run through the host shells with a stand-in `kindi` that prints
+    its argv, so the child itself proves the full spaced `--pack` path arrived intact.
     """
+    real_python = sys.executable
     pack = tmp_path / "my packs" / "bonsai 2b"
     pack.mkdir(parents=True)
     monkeypatch.setattr(_plan, "_WINDOWS", False)
@@ -332,6 +339,39 @@ def test_follow_up_commands_quote_a_spaced_pack_and_interpreter(tmp_path, monkey
     assert win_tandem == ('"C:\\Program Files\\Python 313\\python.exe" -m kindi --pack '
                           '"C:\\my packs\\bonsai 2b" bench --tandem cpu-first '
                           '--tandem-cpu-layers auto')
+
+    # Round-trip through the real shell: a fake `kindi` package echoes the argv it received.
+    # cmd.exe runs only on Windows; a POSIX shell runs wherever one is on PATH (Git Bash
+    # included), so the same test covers Linux and a Windows checkout with bash installed.
+    fake_root = tmp_path / "fake root"
+    fake_pkg = fake_root / "kindi"
+    fake_pkg.mkdir(parents=True)
+    (fake_pkg / "__init__.py").write_text("")
+    (fake_pkg / "__main__.py").write_text(
+        "import json, sys\nprint(json.dumps(sys.argv[1:]))\n")
+    child_cwd = tmp_path / "child cwd"
+    child_cwd.mkdir()
+    env = dict(os.environ, PYTHONPATH=str(fake_root))
+    expected = ["--pack", str(pack), "--ctx", "2048", "bench", "--dcache", "16"]
+
+    monkeypatch.setattr(_plan.sys, "executable", real_python)
+    monkeypatch.setattr(_plan, "_WINDOWS", False)
+    posix_shell = shutil.which("bash") or shutil.which("sh")
+    if posix_shell:
+        posix_cmd = _plan._moe_bench_command(str(pack), 2048, 16)
+        proc = subprocess.run([posix_shell, "-c", posix_cmd], cwd=child_cwd, env=env,
+                              text=True, capture_output=True)
+        assert proc.returncode == 0, (posix_cmd, proc.stdout, proc.stderr)
+        assert json.loads(proc.stdout.strip().splitlines()[-1]) == expected
+
+    if os.name == "nt":
+        monkeypatch.setattr(_plan, "_WINDOWS", True)
+        win_cmd = _plan._moe_bench_command(str(pack), 2048, 16)
+        proc = subprocess.run(win_cmd, shell=True, cwd=child_cwd, env=env, text=True,
+                              capture_output=True,
+                              executable=os.environ.get("COMSPEC", "cmd.exe"))
+        assert proc.returncode == 0, (win_cmd, proc.stdout, proc.stderr)
+        assert json.loads(proc.stdout.strip().splitlines()[-1]) == expected
 
 
 def test_the_planned_bench_command_carries_the_planned_context(tmp_path):

@@ -1287,3 +1287,9 @@ file points here.
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
 | Q3_K_M/XL 16 GiB wording (2026-11-18) | this worktree | `freebuff/tandem-cpu-recovery` | `docs/ROADMAP.md`, `AGENTS.md`, `docs/development/AGENTS-HISTORY.md` | done. The sentence said the 16.6/16.8 GB files "are already" that size, implying they exceed 16 GiB; they fit (16 GiB is 17.2 decimal GB), but leave only 0.6/0.4 decimal GB for context/KV/overhead, which is why useful-context runs need partial CPU offload. The decimal-GB table and the missing `qwen35moe` gate are unchanged. Checks: docs links **3 passed**, `check_claims.py` OK, `project_memory.py --check` clean, `git diff --check`. |
+
+### Plan follow-up shell round-trip (2026-11-18)
+
+| task | worktree | branch | shared files | state |
+|---|---|---|---|---|
+| Plan follow-up shell round-trip (2026-11-18) | this worktree | `freebuff/tandem-cpu-recovery` | `tests/test_plan.py`, `AGENTS.md`, `docs/development/AGENTS-HISTORY.md` | done. Ran a generated `kindi plan` MoE follow-up through real cmd.exe and Git Bash with a pack directory containing spaces, using a stand-in `kindi` package that prints `sys.argv`; both children received the full `--pack` path and identical argv. Extended `test_follow_up_commands_quote_a_spaced_pack_and_interpreter` with the same round-trip: cmd.exe on Windows, `bash`/`sh` wherever one is on PATH, so Linux CI covers the POSIX half. Checks: focused test passed, `tests/test_plan.py` **30 passed**, `git diff --check`. |
