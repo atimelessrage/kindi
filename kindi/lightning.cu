@@ -254,6 +254,91 @@ extern "C" __global__ void __launch_bounds__(128) lt_mv_q2_down(const u32* const
     if (lane == 0) x[r] += tot;
 }
 
+/* Per-expert pre-tree lane partials for the MoE down projection. The caller combines the slots with
+   lt_q2_combine; every lane holds the same h = lane, lane + 32, ... FMA order as lt_mv_q2_down. */
+extern "C" __global__ void __launch_bounds__(128) lt_mv_q2_down_parts(
+                                         const u32* const* __restrict__ codes,
+                                         const __half* const* __restrict__ sc, const int* __restrict__ ids,
+                                         int nslot, int rows, int cols, const int* __restrict__ hq,
+                                         const float* __restrict__ hd, const int* __restrict__ hs,
+                                         float* __restrict__ parts) {
+    const int lane = threadIdx.x & 31, wp = threadIdx.x >> 5;
+    const int r = blockIdx.x * 4 + wp;
+    if (r >= rows) return;
+    const int runs = cols >> 5, nb = cols >> 6;
+    const uint2* wr[8];
+    const __half* sr[8];
+    float a[8];
+#pragma unroll
+    for (int k = 0; k < 8; k++) {
+        if (k < nslot) {
+            const int e = ids[k];
+            wr[k] = reinterpret_cast<const uint2*>(codes[e]) + (long long)r * runs;
+            sr[k] = sc[e] + (long long)r * nb;
+        }
+        a[k] = 0.0f;
+    }
+    for (int h = lane; h < runs; h += 32) {
+        uint2 w[8];
+        float f[8];
+#pragma unroll
+        for (int k = 0; k < 8; k++)
+            if (k < nslot) { w[k] = __ldg(wr[k] + h); f[k] = __half2float(sr[k][h >> 1]); }
+#pragma unroll
+        for (int k = 0; k < 8; k++)
+            if (k < nslot) {
+                const int i = k * runs + h;
+                const int4 qa = __ldg(reinterpret_cast<const int4*>(hq + i * 8));
+                const int4 qb = __ldg(reinterpret_cast<const int4*>(hq + i * 8) + 1);
+                const int q[8] = {qa.x, qa.y, qa.z, qa.w, qb.x, qb.y, qb.z, qb.w};
+                a[k] += f[k] * __ldg(hd + i) * (float)(lt_run_q2(w[k].x, w[k].y, q) - __ldg(hs + i));
+            }
+    }
+#pragma unroll
+    for (int k = 0; k < 8; k++)
+        if (k < nslot) parts[((long long)k * rows + r) * 32 + lane] = a[k];
+}
+
+/* Per-lane pre-tree partials of the shared expert's down projection, matching the b loop in
+   lt_mv_q2_down. */
+extern "C" __global__ void __launch_bounds__(128) lt_q2_shared_parts(
+                                         const u32* __restrict__ csh, const __half* __restrict__ ssh, int rows,
+                                         int colsh, const int* __restrict__ gq, const float* __restrict__ gd,
+                                         const int* __restrict__ gs, float* __restrict__ parts) {
+    const int lane = threadIdx.x & 31, wp = threadIdx.x >> 5;
+    const int r = blockIdx.x * 4 + wp;
+    if (r >= rows) return;
+    const int rsh = colsh >> 5;
+    const uint2* wsh = reinterpret_cast<const uint2*>(csh) + (long long)r * rsh;
+    const __half* ssr = ssh + (long long)r * (colsh >> 6);
+    float b = 0.0f;
+    for (int h = lane; h < rsh; h += 32) {
+        const uint2 w = __ldg(wsh + h);
+        const int4 qa = __ldg(reinterpret_cast<const int4*>(gq + h * 8));
+        const int4 qb = __ldg(reinterpret_cast<const int4*>(gq + h * 8) + 1);
+        const int q[8] = {qa.x, qa.y, qa.z, qa.w, qb.x, qb.y, qb.z, qb.w};
+        b += __half2float(ssr[h >> 1]) * __ldg(gd + h) * (float)(lt_run_q2(w.x, w.y, q) - __ldg(gs + h));
+    }
+    parts[r * 32 + lane] = b;
+}
+
+/* Combine pre-tree lane partials exactly as lt_mv_q2_down does: per lane, start from the shared
+   expert's partial, add gw[k] * parts[k], then run the same warp XOR tree and accumulate into x. */
+extern "C" __global__ void __launch_bounds__(128) lt_q2_combine(
+                                         const float* __restrict__ parts, int nslot,
+                                         const float* __restrict__ gw, const float* __restrict__ shparts,
+                                         int rows, float* __restrict__ x) {
+    const int lane = threadIdx.x & 31, wp = threadIdx.x >> 5;
+    const int r = blockIdx.x * 4 + wp;
+    if (r >= rows) return;
+    float tot = shparts[r * 32 + lane];
+#pragma unroll
+    for (int k = 0; k < 8; k++)
+        if (k < nslot) tot += gw[k] * parts[((long long)k * rows + r) * 32 + lane];
+    tot = warp_sum(tot);
+    if (lane == 0) x[r] += tot;
+}
+
 /* logits = W x for the Q8_0 output head (lane-order int8 weights, fp16 scales per run). One warp per row. */
 extern "C" __global__ void lt_mv_q8(const int* __restrict__ wq, const __half* __restrict__ sc, int rows, int cols,
                                     const int* __restrict__ xq, const float* __restrict__ dx, float* y) {

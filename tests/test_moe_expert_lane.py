@@ -33,12 +33,12 @@ def _random(experts=2, rows=32, cols=64, seed=5):
     return codes, scales, xq.reshape(-1), dx, sx, q
 
 
-def _reference(codes, scales, xq, dx, sx, rows, cols, expert):
+def _reference_partials(codes, scales, xq, dx, sx, rows, cols, expert):
     runs, nb = cols // 32, cols // 64
     c = np.asarray(codes).reshape(-1, rows, runs * 2)[expert]
     s = np.asarray(scales, np.float32).reshape(-1, rows, nb)[expert]
     q = np.asarray(xq, np.int32).reshape(runs, 8)
-    out = np.empty(rows, np.float32)
+    out = np.empty((rows, 32), np.float32)
     for r in range(rows):
         acc = [np.float32(0.0)] * 32
         for h in range(runs):
@@ -56,14 +56,24 @@ def _reference(codes, scales, xq, dx, sx, rows, cols, expert):
             x = np.float32(idot - int(sx[h]))
             t = np.float32(s[r, h // 2]) * np.float32(dx[h])
             acc[h % 32] = np.float32(math.fma(float(t), float(x), float(acc[h % 32])))
-        step = 16
-        while step:
-            old = list(acc)
-            for i in range(32):
-                acc[i] = np.float32(old[i] + old[i ^ step])
-            step >>= 1
-        out[r] = acc[0]
+        out[r] = acc
     return out
+
+
+def _tree(acc):
+    acc = np.array(acc, np.float32)
+    step = 16
+    while step:
+        old = acc.copy()
+        for i in range(32):
+            acc[i] = np.float32(old[i] + old[i ^ step])
+        step >>= 1
+    return acc[0]
+
+
+def _reference(codes, scales, xq, dx, sx, rows, cols, expert):
+    parts = _reference_partials(codes, scales, xq, dx, sx, rows, cols, expert)
+    return np.array([_tree(parts[r]) for r in range(rows)], np.float32)
 
 
 def test_the_lane_matches_a_python_fma_reference():
@@ -72,6 +82,26 @@ def test_the_lane_matches_a_python_fma_reference():
         got = lane.Q2Matrix(codes, scales, 32, 64, experts=2).matvec(expert, xq, dx, sx)
         want = _reference(codes, scales, xq, dx, sx, 32, 64, expert)
         assert np.array_equal(got.view(np.int32), want.view(np.int32)), expert
+
+
+def test_partials_match_the_python_fma_reference():
+    codes, scales, xq, dx, sx, _q = _random()
+    matrix = lane.Q2Matrix(codes, scales, 32, 64, experts=2)
+    for expert in (0, 1):
+        got = matrix.partials(expert, xq, dx, sx)
+        want = _reference_partials(codes, scales, xq, dx, sx, 32, 64, expert)
+        assert got.shape == (32, 32) and got.dtype == np.float32
+        assert np.array_equal(got.view(np.int32), want.view(np.int32)), expert
+
+
+def test_partials_reduce_to_the_same_value_as_matvec():
+    codes, scales, xq, dx, sx, _q = _random()
+    matrix = lane.Q2Matrix(codes, scales, 32, 64, experts=2)
+    for expert in (0, 1):
+        parts = matrix.partials(expert, xq, dx, sx)
+        reduced = np.array([_tree(parts[r]) for r in range(32)], np.float32)
+        direct = matrix.matvec(expert, xq, dx, sx)
+        assert np.array_equal(reduced.view(np.int32), direct.view(np.int32)), expert
 
 
 def test_expert_bytes_are_the_q2_block_bytes():

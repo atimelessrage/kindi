@@ -29,7 +29,8 @@ NULL = np.uint64(0)
 CHUNK = 512                                                 # prompt tokens per pass (Engine.chunk)
 NSPLIT = int(os.environ.get("KINDI_LT_NSPLIT", "32"))           # decode attention: position ranges per K/V head
 NSPLIT_TC = int(os.environ.get("KINDI_LT_NSPLIT_TC", "64"))     # the same for lt_fa_dec (tensor cores)
-KERNELS = ("lt_embed", "lt_rms_quant", "lt_quant", "lt_mv_q2", "lt_mv_q2_down", "lt_mv_q8", "lt_argmax_part",
+KERNELS = ("lt_embed", "lt_rms_quant", "lt_quant", "lt_mv_q2", "lt_mv_q2_down", "lt_mv_q2_down_parts",
+           "lt_q2_shared_parts", "lt_q2_combine", "lt_mv_q8", "lt_argmax_part",
            "lt_argmax_final", "lt_router", "lt_topk", "lt_conv", "lt_ssm", "lt_gnorm_quant", "lt_kv_store",
            "lt_attn_dec", "lt_attn_merge", "lt_attn_pre", "lt_mm_q2", "lt_moe_lists", "lt_moe_combine", "lt_advance",
            "lt_set", "lt_mmd_q2", "lt_mmd32_q2", "lt_attn_pre8", "lt_attn_pre6", "lt_mvdg_q2", "lt_stage_dec", "lt_cand",

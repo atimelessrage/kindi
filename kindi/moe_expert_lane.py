@@ -28,10 +28,12 @@ floating point, so activations must come from the card's own ``lt_quant`` (as
 ``xq``/``dx``/``sx``). Everything this module computes from those runs is
 bit-identical to the kernel's expert output.
 
-It is not wired into ``kindi.lightning.Engine``: the first exact consumer is the
-MoE tandem CPU lane (``docs/MOE-TANDEM.md`` M2), and the engine still needs the
-combine contract for a layer that mixes card and CPU experts. No model tok/s is
-claimed.
+It is not wired into ``kindi.lightning.Engine`` yet. The mixed-layer combine
+contract is implemented separately: ``Q2Matrix.partials`` returns the host
+side's pre-tree lane partials, ``lt_mv_q2_down_parts`` and
+``lt_q2_shared_parts`` produce the card side's, and ``lt_q2_combine`` performs
+the same per-lane weighted sum and warp tree as ``lt_mv_q2_down``. No model
+tok/s is claimed; the engine wiring needs a pack.
 """
 import numpy as np
 
@@ -127,6 +129,37 @@ if _HAVE:
             out[r] = acc[0]
         return out
 
+    @njit(parallel=True, fastmath=False)
+    def _partials_impl(codes, scales, xq, dx, sx, rows, runs, nb, expert):
+        """The same per-run accumulators, kept per lane instead of reduced to one value."""
+        out = np.empty((rows, 32), np.float32)
+        cbase = expert * rows * runs * 2
+        sbase = expert * rows * nb
+        for r in prange(rows):  # pylint: disable=not-an-iterable
+            acc = np.zeros(32, np.float32)
+            row = cbase + r * runs * 2
+            srow = sbase + r * nb
+            for h in range(runs):
+                idot = 0
+                for grp in range(8):
+                    word = np.uint32(codes[row + 2 * h + (0 if grp < 4 else 1)])
+                    shift = 2 * (grp % 4)
+                    qv = np.int32(xq[h * 8 + grp])
+                    for j in range(4):
+                        code = np.int32((word >> np.uint32(shift + 8 * j)) & np.uint32(3))
+                        b = (qv >> (8 * j)) & 255
+                        if b >= 128:
+                            b -= 256
+                        idot += code * b
+                value = np.float32(idot - sx[h])
+                scale = scales[srow + h // 2] * dx[h]
+                lane = h % 32
+                acc[lane] = _fma32(scale, value, acc[lane])  # type: ignore  # pylint: disable=no-value-for-parameter
+            for lane in range(32):
+                out[r, lane] = acc[lane]
+        return out
+
+
 def _probe_fma():
     impl = globals().get("_probe_math")
     return None if impl is None else impl()
@@ -134,6 +167,13 @@ def _probe_fma():
 
 def _matvec(*args):
     impl = globals().get("_matvec_impl")
+    if impl is None:
+        raise LaneUnavailable("the CPU expert lane needs numba with its fmaf intrinsic")
+    return impl(*args)
+
+
+def _partials(*args):
+    impl = globals().get("_partials_impl")
     if impl is None:
         raise LaneUnavailable("the CPU expert lane needs numba with its fmaf intrinsic")
     return impl(*args)
@@ -198,16 +238,32 @@ class Q2Matrix(object):
             raise ValueError("dx/sx have %d/%d runs, expected %d" % (d.size, s.size, runs))
         return q, d, s
 
-    def matvec(self, expert, xq, dx, sx):
-        """``W_expert x`` for one expert, as ``lt_mv_q2`` computes it, bit for bit."""
+    def _checked(self, expert, xq, dx, sx):
         if not available():
             raise LaneUnavailable("the CPU expert lane needs numba with its fmaf intrinsic")
         expert = int(expert)
         if expert < 0 or expert >= self.experts:
             raise ValueError("expert %r is outside 0..%d" % (expert, self.experts - 1))
         q, d, s = self.check_input(xq, dx, sx)
+        return expert, q, d, s
+
+    def matvec(self, expert, xq, dx, sx):
+        """``W_expert x`` for one expert, as ``lt_mv_q2`` computes it, bit for bit."""
+        expert, q, d, s = self._checked(expert, xq, dx, sx)
         return _matvec(self.codes, self.scales, q, d, s, self.rows, self.cols // 32,
                        self.cols // 64, expert)
+
+    def partials(self, expert, xq, dx, sx):
+        """Pre-tree lane partials for one expert: float32 ``[rows, 32]``.
+
+        These are the accumulators before the five-step XOR tree. The host side
+        of the mixed card/CPU combine contract: ``lt_q2_combine`` takes these
+        arrays, adds the shared expert's pre-tree partials and ``gw * partials``
+        per lane, then runs the same tree and accumulates into ``x``.
+        """
+        expert, q, d, s = self._checked(expert, xq, dx, sx)
+        return _partials(self.codes, self.scales, q, d, s, self.rows, self.cols // 32,
+                         self.cols // 64, expert)
 
 
 def matvec(codes, scales, rows, cols, expert, xq, dx, sx):
