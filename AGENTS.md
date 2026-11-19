@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `07f01a5` on `freebuff/tandem-cpu-recovery` (**main** is at `f984962`; guarded by `tests/test_agents_handoff.py`); the 2026-11-18 audit round, the ternary-MoE census correction and the host-mapped Q2 lane round are committed; the current task runs a fresh mode A k=1 A/B at 512/24K with `KINDI_SPEC_K` unset, archives the raw log and updates `docs/MTP.md` only if it confirms the measured row.
+- **HEAD:** `d28397f` on `freebuff/tandem-cpu-recovery` (**main** is at `f984962`; guarded by `tests/test_agents_handoff.py`); the 2026-11-18 audit round, the ternary-MoE census correction, the host-mapped Q2 lane, the fresh k=1 A/B and the mixed card/CPU Q2 combine contract are committed (`31d10cc` code, `d28397f` evidence and claim); Engine wiring and the model row remain blocked by the absent Lightning pack.
 
 ### Python quality ratchet
 
@@ -165,7 +165,7 @@ state - and at a 200-token document the average *falls* to 463 ms/token against 
 whitespace-permitting constraint lets the greedy 2B spend the whole budget on whitespace (200 tokens, 9 characters) (`docs/API.md`,
 `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/RESULTS.md`), and the two harnesses behind it are tracked as `tools/grammar_cost.py` and
 `tools/grammar_cost_serve.py` so a clean checkout re-derives the rows instead of trusting the JSON artifact. The numbers those docs quote are no longer prose:
-`python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (20 gates, 109 numbers across `docs/claims/*.json`, 4 citations
+`python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (21 gates, 116 numbers across `docs/claims/*.json`, 4 citations
 listed as reasoned debt), and refuses a benchmark citation no claim accounts for - schema and procedure in `docs/claims/README.md`.
 
 ### Dated evidence
@@ -235,7 +235,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `f984962` | main checkout; clean; one commit behind this branch |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `07f01a5` | this session; checked out here |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `d28397f` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
