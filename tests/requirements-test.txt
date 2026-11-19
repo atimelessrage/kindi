@@ -2,10 +2,13 @@
 # GPU/model-pack runs are separate and are not installed here.
 # Bounds are deliberate: the suite is verified on the pinned majors below, and an open-ended
 # spec would let CI break with no commit (e.g. a future pydantic 3 with an older FastAPI).
-# Ruff and mypy are exact-pinned because tools/check_python_quality.py records their
-# findings; a different analyser version would change the baseline without a code change.
+# Ruff, mypy, Pyright and Pylint are exact-pinned because tools/check_python_quality.py
+# records their findings; a different analyser version would change the baseline without a
+# code change.
 ruff==0.16.0
 mypy==2.4.0
+pyright==1.1.414
+pylint==4.1.3
 pytest>=7,<10
 pytest-cov>=5,<8
 fastapi>=0.100,<1

@@ -80,11 +80,16 @@ baseline:
   `bridge/kindi_bridge`) with missing third-party imports ignored (`mypy.ini`). The baseline records
   **59 errors across 25 files**. The test tree is not type-checked: its deliberately dynamic
   fixtures and duplicate `conftest.py` module names make that signal noisy.
+- **Pyright 1.1.414** checks the same first-party production targets (`pyrightconfig.json`) in
+  `basic` mode for all platforms, with missing third-party imports ignored. The baseline records
+  **1,035 errors across 65 files**.
+- **Pylint 4.1.3** checks the same production targets for errors and fatal messages only (`E`, `F`),
+  with `import-error` disabled. The baseline records **255 findings across 33 files**.
 
 `tools/python_quality_baseline.json` stores the counts per file and rule/error code. The gate fails
 when a count grows or a new file/rule pair appears, and passes when debt shrinks. Fix findings
 normally; after a reviewed cleanup, lower the baseline deliberately with
-`python tools/check_python_quality.py --update`. Ruff and mypy are exact-pinned in
+`python tools/check_python_quality.py --update`. All four tools are exact-pinned in
 `tests/requirements-test.txt` so the measured counts are reproducible. The baseline is **not** a
 claim that the existing findings are acceptable: it is a ratchet against regression, and the
 remaining debt stays visible. Dependency scanning is a separate open audit item.

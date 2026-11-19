@@ -32,7 +32,7 @@ jobs:
         run: python -m compileall -q kindi
       - name: Python lint and type-check ratchet
         # Legacy findings are recorded in tools/python_quality_baseline.json; this fails only
-        # when Ruff or mypy finds something new.
+        # when Ruff, mypy, Pyright or Pylint finds something new.
         run: python tools/check_python_quality.py
       - name: Documentation, claims and generated-reference gates
         # These four are the CPU-only gates the handoff names but CI did not run. Keep them in

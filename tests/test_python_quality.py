@@ -2,11 +2,12 @@
 """The Python lint/type ratchet: existing debt is allowed, growth is not.
 
 The gate runs the real tools in CI; these checks pin its comparison and the
-committed baseline's shape without requiring Ruff or mypy in the unit suite.
+committed baseline's shape without requiring the analyzers in the unit suite.
 """
 import importlib.util
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "tools" / "check_python_quality.py"
@@ -44,13 +45,46 @@ def test_a_new_file_or_rule_is_a_regression():
         baseline, {"kindi/a.py": {"F401": 2, "B904": 1}})[0]
 
 
+def test_pyright_parser_counts_errors_by_file_and_rule(monkeypatch):
+    mod = _load()
+    payload = {"generalDiagnostics": [
+        {"file": str(ROOT / "kindi" / "a.py"), "severity": "error",
+         "rule": "reportArgumentType"},
+        {"file": str(ROOT / "kindi" / "a.py"), "severity": "error",
+         "rule": "reportArgumentType"},
+        {"file": str(ROOT / "kindi" / "a.py"), "severity": "warning",
+         "rule": "reportUnusedImport"},
+    ]}
+    monkeypatch.setattr(mod, "_run", lambda command, what: SimpleNamespace(
+        returncode=1, stdout=json.dumps(payload), stderr=""))
+    assert mod._pyright_findings("pyright") == {
+        "kindi/a.py": {"reportArgumentType": 2}}
+
+
+def test_pylint_parser_counts_findings_by_file_and_code(monkeypatch):
+    mod = _load()
+    rows = [{"path": "tools/b.py", "message-id": "E1101"},
+            {"path": "tools/b.py", "message-id": "E1101"}]
+    monkeypatch.setattr(mod, "_run", lambda command, what: SimpleNamespace(
+        returncode=2, stdout=json.dumps(rows), stderr=""))
+    assert mod._pylint_findings("pylint") == {"tools/b.py": {"E1101": 2}}
+
+
 def test_the_committed_baseline_has_consistent_totals():
     payload = json.loads(BASELINE.read_text(encoding="utf-8"))
-    assert payload["schema"] == 1
-    assert payload["scope"] == {"ruff_rules": "F,E9,B,I",
-                                "mypy_targets": ["kindi", "tools", "examples", "bridge/kindi_bridge"]}
-    for tool in ("ruff", "mypy"):
+    assert payload["schema"] == 2
+    assert payload["scope"] == {
+        "ruff_rules": "F,E9,B,I",
+        "mypy_targets": ["kindi", "tools", "examples", "bridge/kindi_bridge"],
+        "pyright_targets": ["kindi", "tools", "examples", "bridge/kindi_bridge"],
+        "pyright_mode": "basic",
+        "pyright_platform": "All",
+        "pylint_targets": ["kindi", "tools", "examples", "bridge/kindi_bridge"],
+        "pylint_checks": "E,F (import-error disabled)",
+    }
+    for tool in ("ruff", "mypy", "pyright", "pylint"):
         findings = payload[tool]["findings"]
         assert findings, "baseline has no %s findings" % tool
+        assert payload[tool]["version"]
         assert payload[tool]["total"] == sum(
             count for by_code in findings.values() for count in by_code.values())

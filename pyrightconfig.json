@@ -1,0 +1,18 @@
+{
+  "include": [
+    "kindi",
+    "tools",
+    "examples",
+    "bridge/kindi_bridge"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "**/.pytest_cache",
+    "bench-logs"
+  ],
+  "pythonVersion": "3.10",
+  "pythonPlatform": "All",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none"
+}

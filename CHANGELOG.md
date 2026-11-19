@@ -13,13 +13,15 @@
   `--prompts` or `--ref` (and `verify`'s default gate files) fail with their required set before
   any model load. `tests/test_dsv41_cli.py` pins the helpers and the pre-load exits.
 - **Python lint and type checking now ship as a measured ratchet** — `tools/check_python_quality.py`
-  runs Ruff 0.16.0 with correctness rules `F`, `E9`, `B` and `I` over the Python tree, and mypy 2.4.0
-  over first-party production code (`kindi`, `tools`, `examples` and `bridge/kindi_bridge`). The
-  legacy baseline is **334 Ruff findings / 59 mypy errors**, stored per file and rule/error code in
-  `tools/python_quality_baseline.json`; the gate fails only on a new or increased finding, so an
-  existing debt does not block work. CI runs it, `tests/test_python_quality.py` pins the comparison,
-  and `tests/test_ci_config.py` pins the step and exact tool versions. This closes only the
-  lint/type half of audit M6; dependency scanning remains open.
+  runs Ruff 0.16.0 with correctness rules `F`, `E9`, `B` and `I` over the Python tree, mypy 2.4.0,
+  Pyright 1.1.414 (`basic`, all platforms) and Pylint 4.1.3 (`E`, `F`, import-error disabled) over
+  first-party production code (`kindi`, `tools`, `examples` and `bridge/kindi_bridge`). The legacy
+  baseline is **334 Ruff findings / 59 mypy errors / 1,035 Pyright errors / 255 Pylint findings**,
+  stored per file and rule/error code in `tools/python_quality_baseline.json`; the gate fails only
+  on a new or increased finding, so existing debt does not block work. CI runs it,
+  `tests/test_python_quality.py` pins the comparison and parser shape, and `tests/test_ci_config.py`
+  pins the step and exact tool versions. This closes only the lint/type half of audit M6;
+  dependency scanning remains open.
 - **The full CPU gate was rerun after the Usage/plan edits** — the first pass found the generated
   configuration reference stale: **1 failed, 1,230 passed, 28 skipped** in 246.53 s. After
   regenerating `docs/CONFIGURATION-REFERENCE.md`, the rerun is **1,231 passed, 28 skipped, 0 failed**

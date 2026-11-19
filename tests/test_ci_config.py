@@ -51,7 +51,10 @@ def test_cpu_job_runs_the_python_quality_ratchet():
     reqs = "\n".join(_reqs())
     assert "ruff==0.16.0" in reqs
     assert "mypy==2.4.0" in reqs
+    assert "pyright==1.1.414" in reqs
+    assert "pylint==4.1.3" in reqs
     assert (ROOT / "tools" / "python_quality_baseline.json").is_file()
+    assert (ROOT / "pyrightconfig.json").is_file()
 
 
 def test_cpu_job_runs_the_documentation_and_generated_reference_gates():

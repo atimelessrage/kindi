@@ -12,18 +12,18 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `a391e1d` on `freebuff/tandem-cpu-recovery` (**main** is fast-forwarded to this branch at handoff; guarded by `tests/test_agents_handoff.py`); `--save-baseline` now carries each cell's `logs` list from the replaced baseline and refuses to drop one (`tests/test_verify_matrix.py` **42 passed**); the DSV4.1 CLI now validates its remaining paths and counts before loading (`tests/test_dsv41_cli.py` **13 passed**).
+- **HEAD:** `364814a` on `freebuff/tandem-cpu-recovery` (**main** is fast-forwarded to this branch at handoff; guarded by `tests/test_agents_handoff.py`); `--save-baseline` now carries each cell's `logs` list from the replaced baseline and refuses to drop one (`tests/test_verify_matrix.py` **42 passed**); the DSV4.1 CLI now validates its remaining paths and counts before loading (`tests/test_dsv41_cli.py` **13 passed**).
 
 ### Python quality ratchet
 
-Audit F9's Python quality ratchet is `tools/check_python_quality.py`: Ruff 0.16.0
-(`F`, `E9`, `B`, `I`) over the Python tree and mypy 2.4.0 over first-party production
-code, recorded as **334 Ruff findings / 59 mypy errors** in
-`tools/python_quality_baseline.json`. CI runs it; a new or increased file/rule count fails,
-while existing debt is tolerated and `--update` lowers the baseline after review.
-`tests/test_python_quality.py` + `tests/test_ci_config.py` **10 passed**; no full-suite or
-GPU run. Dependency scanning
-remains open. The prior test task is below.
+Audit F9's Python quality ratchet is `tools/check_python_quality.py`: Ruff 0.16.0 (`F`, `E9`, `B`, `I`)
+over the Python tree, mypy 2.4.0 over first-party production
+code, Pyright 1.1.414 (`basic`, all platforms) and Pylint 4.1.3 (`E`, `F`, import-error
+disabled) over the same production targets, recorded as **334 Ruff findings / 59 mypy
+errors / 1,035 Pyright errors / 255 Pylint findings** in
+`tools/python_quality_baseline.json`. CI runs it; a new or increased file/rule count fails, while
+existing debt is tolerated and `--update` lowers the baseline after review.
+`tests/test_python_quality.py` + `tests/test_ci_config.py` **13 passed**; no full-suite or GPU run. Dependency scanning remains open. The prior test task is below.
 
 ### MTP smoke guard
 
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `a391e1d` | main checkout; clean; fast-forwarded to this branch |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `a391e1d` | this session; checked out here |
+| `T:/kindi` | `main` | `364814a` | main checkout; clean; fast-forwarded to this branch |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `364814a` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
@@ -393,7 +393,7 @@ Run from the repository root. The no-GPU gate is cheap and must pass before any 
 | `bash -n install.sh` | bash | the installer parses |
 | `python -m compileall -q kindi` | python | every module parses |
 | `python -m pytest -q` | `pip install -r tests/requirements-test.txt` | the whole CPU suite (`pytest.ini` sets `testpaths = tests`, so bare `pytest` is safe) |
-| `python tools/check_python_quality.py` | python, `ruff==0.16.0`, `mypy==2.4.0` | no new or increased Ruff/mypy findings against the measured baseline |
+| `python tools/check_python_quality.py` | python, `ruff==0.16.0`, `mypy==2.4.0`, `pyright==1.1.414`, `pylint==4.1.3` | no new or increased Ruff, mypy, Pyright or Pylint findings against the measured baseline |
 | `python -m pytest -q tests/test_installer_grub.py` | python, `sed` | the installer's GRUB sed keeps existing kernel parameters |
 | `python -m kindi.support_matrix --check` | python | the generated support matrix matches the code |
 | `python -m kindi.config_reference --check` | python | the generated configuration reference matches the code |
