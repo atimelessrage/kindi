@@ -4,14 +4,28 @@
 
 ### Added
 
-- **The DSV4.1 CLI rejects unreadable paths and invalid counts before loading a model** —
-  `python -m kindi.dsv41` accepted `--prompts`, `--ids`, `--out`, `--ref`, `--dspark` and
-  `--dump` values unchecked until after the model was mapped, and parsed `--free1` inside the
-  `numa` branch. Argparse types now require readable input files, a writable output parent, a
-  complete DSpark directory, token ids in `0..129279`, a finite non-negative `--free1`, a
-  non-negative `-n`, positive `--tmax`/`--gen`/`--spec` values and a finite `--conf`; commands that need
-  `--prompts` or `--ref` (and `verify`'s default gate files) fail with their required set before
-  any model load. `tests/test_dsv41_cli.py` pins the helpers and the pre-load exits.
+- **Mode A's default now follows its measured winning draft length** — explicit `KINDI_SPEC=mtp`
+  defaulted to `KINDI_SPEC_K=4`, the setting that cost 0.66-0.89x on the 2B / RTX 4060 Ti; the
+  measured k=1 row is 1.12-1.13x at 512 and 24K and a 1.01x wash at 8K. `spec_begin` now defaults
+  mode A to k=1 while the model drafter modes keep k=4, and an explicit `KINDI_SPEC_K` still wins.
+  Pinned by `tests/test_verify_spec.py`; no output token changes because verify decides every token.
+- **The Lightning Q2_0 CPU expert lane has an exactness gate** — `kindi/moe_expert_lane.py` computes
+  one routed expert with the CUDA kernel's own int32 run sums, fused multiply-add placement and XOR
+  tree; against the real `lt_mv_q2`/`lt_mv_q2_down` at hidden 2688 / width 1856 it has **0 differing
+  elements** on both matrices. It is a gate, not a backend: the CPU expert costs 2.475 ms against the
+  0.788 ms copy lane (3.14x), the lane is not wired into `lightning.Engine`, and the model row is
+  blocked by the absent Lightning pack. `tests/test_moe_expert_lane.py` pins the host arithmetic.
+- **The DSV4.1 CLI rejects unreadable paths, invalid counts and malformed prompt/reference content
+  before loading a model** — `python -m kindi.dsv41` accepted `--prompts`, `--ids`, `--out`, `--ref`,
+  `--dspark` and `--dump` values unchecked until after the model was mapped, and parsed `--free1`
+  inside the `numa` branch. Argparse types now require readable input files, parse every `--prompts`
+  JSONL line as an object with an integer `id` and a string `text`, parse every `--ref`
+  `GEN tok:margin ...` line with token ids in `0..129279` and finite margins, require a writable
+  output parent, a complete DSpark directory, token ids in `0..129279`, a finite non-negative
+  `--free1`, a non-negative `-n`, positive `--tmax`/`--gen`/`--spec` values and a finite `--conf`;
+  commands that need `--prompts` or `--ref` fail with their required set before any model load, and
+  `verify`'s default gate files are parsed by the same validators. `tests/test_dsv41_cli.py` pins the
+  helpers and the pre-load exits, including malformed JSONL and continuation content.
 - **The other standalone CLIs validate late user values before loading** — `python -m
   kindi.dsv41_server` now parses `--tmax`, `--port`, `--cache-gb`, `--ckpt-min`, `--slots`,
   `--temperature`, `--repeat-stop`, `--turn-min`, `--max-tokens` and `--dspark` with bounded argparse
@@ -276,6 +290,12 @@
 
 ### Fixed
 
+- **`--save-baseline` refuses provenance for a different measurement** — when it carried a
+  baseline's `logs` list forward, it did not require the new row's `log` to be one of those files,
+  so a fresh single pass could inherit a three-pass list it was not part of. It now refuses
+  (`SystemExit`, no write) unless the row's `log` is in the carried list; an explicit new `logs`
+  list must also contain that `log`, and a missing `log` refuses. Tests cover both carried sources,
+  explicit acceptance and refusal, and an unchanged target on refusal.
 - **The cold-expert lookahead read now overlaps the current layer's GPU work** — Lightning's
   `_cold_prefetch` read the next cold layer's spans synchronously before the current layer's
   kernels, so the lookahead added file latency instead of hiding it. It now starts the read on a
@@ -298,12 +318,13 @@
   reports `drafted=0`/`accepted=0`, verify/bench do not pass `mtp_head`, and
   `tests/test_served_engines.py` pins that only serve attaches the head. C2's claim is narrowed to
   the base engine the paths share; the missing-head warning for serve is unchanged.
-- **`kindi plan`'s follow-up commands survive a spaced path** — the printed `bench` lines formatted
-  the interpreter and pack with `%s`, so `C:\Program Files\Python 313\python.exe` or
-  `/mnt/my packs/bonsai` split into several arguments when pasted. Both builders now quote the argv
-  for the host shell (`shlex.join` on POSIX, cmd.exe's `subprocess.list2cmdline` rules on Windows),
-  leaving the flags unchanged. A focused test parses the POSIX forms back with `shlex` and pins the
-  Windows double quotes; PowerShell still needs its `&` call operator when the quoted executable
+- **`kindi plan`'s follow-up commands survive a spaced path** — the printed `bench` and `verify`
+  lines formatted the interpreter and pack with `%s`, so `C:\Program Files\Python 313\python.exe`
+  or `/mnt/my packs/bonsai` split into several arguments when pasted. The `bench` builders and the
+  `verify` builder now quote the argv for the host shell (`shlex.join` on POSIX, cmd.exe's
+  `subprocess.list2cmdline` rules on Windows), leaving the flags unchanged. A focused test parses the
+  POSIX forms back with `shlex`, pins the Windows double quotes, and runs the printed `verify` lines
+  through the host shells; PowerShell still needs its `&` call operator when the quoted executable
   comes first.
 - **`kindi serve` refuses backends it cannot drive instead of building a dense engine** — a
   DeepSeek V4.1 pack now exits with the documented `python -m kindi.dsv41_server` command, Cascade
@@ -457,10 +478,10 @@
   `deleted`, `treefiles`) and `ref:` evidence, so all 22 of these figures - including §1's baseline -
   are recomputed from the tags on every run: 14 gates, 75 numbers, four citations as debt.
 - **Mode A is a win at `KINDI_SPEC_K=1`, and the docs now say so instead of "keep it off"** — the
-  0.66x recorded on 2026-11-17 was at the default `KINDI_SPEC_K=4`. Re-measured at depth on the 2B /
+  0.66x recorded on 2026-11-17 was at the then-default `KINDI_SPEC_K=4`. Re-measured at depth on the 2B /
   RTX 4060 Ti with one harness (`tools/mtp_context_bench.py`: same engine, plain and mode A
   interleaved, prompt reading excluded): k=1 gives 1.12x at 512 tokens and 1.13x at 24K (4 runs a
-  side, 72% acceptance), a wash at 8K (1.01x), while the default k=4 still loses (0.89x / 0.66x /
+  side, 72% acceptance), a wash at 8K (1.01x), while the then-default k=4 still loses (0.89x / 0.66x /
   0.87x) and k=6 at 24K is 0.66x. `KINDI_SPEC_K=1 kindi verify --spec mtp` stays 4/4 token-exact.
   `docs/MTP.md` carries the table and the corrected advice; `auto` still cannot reach the win (it
   caps mode A at k=2 below 8K and switches it off above). Results:

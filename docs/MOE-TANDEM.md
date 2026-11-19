@@ -73,10 +73,10 @@ probes as `kindi io`, sizes the decode slots from the measured refill path, and 
 rates in a `rates:` line and in the slot explanation. Its follow-up `bench` command passes the
 planned context as `--ctx <tokens>` (the global flag, before `bench`) and the planned count as
 `--dcache <count>`, so the child engine uses the same context and slot count instead of falling back
-to a configured default or the slot default 10. The printed command quotes the interpreter, pack
-and flags for the host shell (`shlex.join` on POSIX, cmd.exe rules on Windows), so a path with
-spaces stays one argument; PowerShell needs its `&` call operator only when the quoted executable
-comes first. `kindi plan` and `kindi autotune` also accept `--io-report FILE` (or
+to a configured default or the slot default 10. The printed `bench` and `verify` commands quote the
+interpreter, pack and flags for the host shell (`shlex.join` on POSIX, cmd.exe rules on Windows),
+so a path with spaces stays one argument; PowerShell needs its `&` call operator only when the
+quoted executable comes first. `kindi plan` and `kindi autotune` also accept `--io-report FILE` (or
 `KINDI_IO_REPORT`) to reuse a saved `kindi io --json FILE` report instead of running the probe
 again; a missing or unusable report falls back to one probe. `kindi autotune` also proposes an
 `expert-cache-<MiB>` cold-tier budget (`KINDI_LT_COLD=1` + `KINDI_LT_HOST_MB`) sized from the same
@@ -416,6 +416,8 @@ Implemented, model-free:
 |---|---|
 | `kindi/expert_cache.py` | copy-only slot manager, pin-aware LRU, transient fallback and JSON-safe metrics; no tensors, GPU or engine wiring |
 | `kindi/moe_tandem.py` | one execution unit's expert split over the cache and a placement: `card` / `copy` / `cpu` lanes, opt-in CPU lane with a deterministic `cpu_share` throttle, router or expert-id combine order kept separate from scheduling, plan metrics; no tensors, copies or kernels |
+| `kindi/moe_expert_lane.py` | CPU executor for the Lightning Q2_0 expert (up, relu^2 activation from the card's `lt_quant`, down): exact int32 runs, one `fmaf` per run and the kernel's XOR tree, bit-identical to `lt_mv_q2`/`lt_mv_q2_down`; not wired into the engine |
+| `tools/q2_expert_lane.py` | the M2 gate for that format plus the copy-lane microbenchmark; refuses to pass on any differing element |
 | `kindi/plan.py` | `kindi plan` on a `kindi_lightning` pack: expert tiers, the decode-slot trade, and with `--moe-chunk N` what `MoeTandem` would do for an N-token sample prompt chunk (lane split, distinct copies, copy bytes) from the header and `--usage`; no weights read, no bytes moved |
 | `kindi/expert_chunk.py` | multi-token prefill planner over the cache: deduped copy list in first-need order, hit/coalesced/miss report, chunk rollback when a token does not fit; no tensors or engine wiring |
 | `kindi/cold_experts.py` | opt-in Lightning host tier: hottest-first host/disk split under a byte budget, aligned unbuffered reads, coalesced gaps, a bounded lookahead prefetch queue, Q2_0 de-interleave and requested/transferred/ tier byte accounting; no VRAM allocation or kernel |
@@ -492,12 +494,31 @@ the overflow; its warm-slot rows must show no file read and no page fault.
 
 ### M2 — CPU miss lane, parity-gated
 
-Implement CPU expert kernels using the same quantized dot product and accumulation order as the GPU
-expert kernel. Enable the lane only if cold and warm expert outputs are bit-identical on the pilot
-prompts.
+**Lightning Q2_0 expert gate passed 2026-11-19; layer wiring and the model row are open.**
+`kindi/moe_expert_lane.py` computes one Lightning routed expert on the host with the kernel's own
+arithmetic: the exact int32 run sums of `lt_run_q2`, one `fmaf` per run into lane `h % 32` in run
+order, and the same five-step XOR reduction. It consumes the card's `lt_quant` runs (`xq/dx/sx`)
+rather than re-quantizing, because the engine's fast-math division is not reproducible on the host.
+`tools/q2_expert_lane.py` compiles the real `lightning.cu` and compares the lane with `lt_mv_q2`
+(up, 1856 x 2688) and `lt_mv_q2_down` (down, one expert) on synthetic Q2_0 weights: **0 differing
+elements** on both matrices, so the per-expert output is bit-identical for this format.
 
-**Gate:** cold/warm/forced-eviction outputs are identical with the CPU lane enabled; if parity fails,
-the lane is disabled and this phase is a documented no-go, not a support claim.
+The lane is not wired into `lightning.Engine` yet. A layer that mixes card and CPU experts still
+needs the combine contract: `lt_mv_q2_down` sums the experts' per-lane partials before its warp
+tree, so a host-computed final vector cannot enter that reduction unchanged; either all routed
+experts move to the host or the combine kernel must take pre-tree partials.
+
+**Cost, not a win on this host.** One 2,806,272-byte expert (three fresh processes, medians): CPU
+**2.475 ms** (up 1.086 + down 1.420), H2D copy **0.646 ms** at **4.05 GiB/s**, GPU kernels
+**0.142 ms**, so the copy lane's **0.788 ms** is **3.14x** faster; including the lane's 0.412 ms of
+small transfers the lane total is 2.887 ms. The copy lane stays the default. The capacity-bound
+model row is **blocked**: no `kindi_lightning` pack exists on this host, so `kindi verify` 4/4 and
+decode tok/s are unmeasured. Evidence:
+[RESULTS.md](benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/RESULTS.md).
+
+For a Raon MXFP8 expert the M2 gate is still open: no CPU kernel exists for that format. The
+gate remains cold/warm/forced-eviction outputs identical with the lane enabled; a parity failure
+disables the lane and makes this phase a documented no-go, not a support claim.
 
 ### M3 — overlap and prefetch
 
@@ -585,7 +606,9 @@ The 16 GB row is a comparison, not a separate backend.
 - It does not claim a cache hit rate, tokens/s, VRAM figure or host-RAM figure, and the new
   cold-expert reader does not claim a larger-than-RAM speedup: that gate still needs a Lightning
   pack larger than RAM, `kindi verify` 4/4 and a recorded comparison against the mmap-fault path.
-- It does not claim that CPU miss compute is exact; only the `copy` lane is the first exact design.
+- It does not claim that CPU miss compute is exact in a running layer. The per-expert Q2_0 output
+  is bit-identical to the card's kernels (the 2026-11-19 expert gate), but a layer that mixes card
+  and CPU experts still needs the combine contract, and no model tok/s or `verify` result is claimed.
 - It does not change the dense `TandemEngine` or its joint prompt cache: the tandem only gained the
   refusal described in §1, which rejects a non-dense manifest before any backend is built.
 

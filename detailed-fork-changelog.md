@@ -767,6 +767,110 @@ history.
   unchanged.
 
 The comparison's old `0184bb8`/576-commit/704-file figures are retained only in
-earlier history above this section; the live report and its claims now name the
+earlier history above this section; §43's live report and claims named the
 code/evidence snapshot `296a03d`, 622 commits, 721 files and 827 tracked files.
 The later report/docs commit is documentation-only.
+
+## 44. Comparison refresh at `3002a40` (2026-11-19)
+
+This section re-bases the live report on the tree as it stands on 2026-11-19. It is the
+history behind `CURRENT-VS-KINDI-0.6.md`; the live report keeps only the current status.
+
+- **Latest official release checked.** The GitHub releases API still reports **v0.6.1** as
+  `latest` on 2026-11-19 (annotated tag `116532a` peeled to `7fececb`, published
+  2026-11-16T21:49:20Z). Upstream `origin/main` now points at `7fececb`, the release commit
+  itself, so unlike the 2026-11-18 check there is no post-tag upstream commit left to port.
+  The shared base is still `dce89df`; `v0.6.1` is one commit past it and is not an ancestor
+  of this fork.
+- **The fork moved from `296a03d` to `3002a40`.** Against `v0.6.1` that is **649 commits,
+  736 files changed, +97,703/−1,283**, with **zero file deletions**; **839 tracked files**
+  against 172 in the v0.6.1 tree, and **28 numbered requirements**. The 27 commits after
+  `296a03d` are the rounds below; none adds a new engine path.
+- **Rounds since §43 (27 commits).**
+  - Python quality ratchet extended from Ruff to mypy, Pyright and Pylint, with the measured
+    legacy baseline and CI wiring (`7310590`); the Pyright baseline is the 1,035-error figure
+    in `tools/python_quality_baseline.json`.
+  - DSV4.1 CLI plus standalone-server/dspark/tool input validation moved before any model is
+    mapped (`364814a`, `f069c1d`; `tests/test_dsv41_cli.py` 24 tests).
+  - DSV4.1 413/400 body handling now half-closes and drains the refused body (`7325617`).
+  - Nanbeige: the gateway path is explicitly non-drafting (`6e2753a`) while the MTP head loads
+    on every engine path (`8163188`); the MTP smoke run record carries its provenance
+    (`a1f75fd`) and REQ-0024's history is recorded at that commit (`063a2e8`).
+  - Coverage and baseline provenance: per-module floors corrected (`2cd4d21`), the coverage
+    run tracked (`f6e73ae`), three median base-cell transcripts linked with redactions
+    (`38dd284`), `--save-baseline` now carries each cell's `logs` list and refuses to drop one
+    (`a391e1d`), and the plan follow-up commands round-trip through real cmd.exe/Git Bash
+    with a spaced pack path (`e6d1762`).
+  - Correctness/doc rounds: ternary-MoE census and build wording (`c0ec5fa`, `da4edb5`,
+    `a00f314`), the forward-slash drive-root rule in the shared scanner (`9dcb21b`), the
+    Bridge smoke job pinned to its README command (`539a504`), the live handoff split into
+    sections (`b16d8f5`), the archival-branch re-check (`f803b2d`), the 27B baseline summary
+    pinned to its median pass duration (`3002a40`), and the report clarification (`6dc092a`).
+- **Full CPU gate at `3002a40` (working tree, including the uncommitted `tests/test_mtp_smoke.py` test):** **1,274 passed, 28 skipped, 2 failed** in 222.01 s. Both
+  failures are the known secret-scan findings, not engine or test-logic failures:
+  `tests/test_mtp_smoke.py`'s home-path fixture and the handoff row in
+  `docs/development/AGENTS-HISTORY.md` that quotes it. The forward-slash home rule added in
+  `9dcb21b` is what turned them into scan hits; the fixture predates it. Both were replaced with non-home values on 2026-11-19. The last clean run
+  was `539a504` (**1,241 passed / 28 skipped / 0 failed**, 227.62 s), before that handoff row
+  landed. Generated-artifact checks (`project_memory --check`, `config_reference --check`,
+  `support_matrix --check`) are clean, and `python tools/check_claims.py` reports **17 gates,
+  95 numbers, 4 benchmark citations as debt**.
+- **No GPU run.** None of the 27 commits ran CUDA, a model pack or a cold-tier pack; the
+  live report's hardware and model sections are unchanged, and no new performance claim is
+  made here.
+- **Working tree.** Uncommitted: `docs/BENCHMARKS.md`, `docs/INTEL-ARC.md`,
+  `docs/ROADMAP.md`, `docs/TANDEM-RUNTIME.md`, `docs/benchmarks/CROSS-MODE.md`,
+  `docs/benchmarks/build_cross_mode.py`, `docs/claims/README.md`,
+  `docs/claims/REGISTRY.json`, `docs/development/AI-INVENTORY-SCAN.md`,
+  `tests/test_mtp_smoke.py`, plus untracked `tests/test_cross_mode_gain.py`. They carry the
+  cross-mode tandem measurements, the tracked Intel-fork review and the 2026-11-19 roadmap
+  follow-ups. No engine code is uncommitted, and no git figure in this section counts them.
+- **Preview.** The local HTML render is regenerated from the live report. Its chips are
+  computed from the committed HEAD and `git diff --shortstat v0.6.1..HEAD` at render time,
+  so they name `3002a40` and the 736-file shortstat rather than this uncommitted section.
+
+What changed in the live report: the date is 2026-11-19 and every figure is re-based at
+`3002a40`; §1 records that upstream `main` now equals the release commit; §3 gains the
+quality ratchet, pre-load CLI validation, DSV4.1 body cap and cold-expert slot rows; §4's
+intro and zero-deletion check name the new HEAD; and §6 records the two known scan failures
+instead of the earlier clean run.
+
+## 45. Current worktree refresh: the 2026-11-19 round (2026-11-19)
+
+This section records the dirty worktree behind the live report. It is not a commit: `3002a40`
+remains HEAD, and the report keeps the committed 649-commit / 736-file figures separate from
+the worktree.
+
+- **Latest official release rechecked.** The GitHub release API and `git ls-remote --tags
+  origin` still report **v0.6.1** (`7fececb`) as latest on 2026-11-19; there is no v0.6.2, and
+  `origin/main` still points at the release commit. The baseline in `CURRENT-VS-KINDI-0.6.md`
+  is unchanged.
+- **Committed baseline.** `v0.6.1..3002a40` is still **649 commits, 736 files, +97,703/−1,283**,
+  with zero file deletions, **839 tracked files** and 28 numbered requirements.
+- **Worktree.** The tracked diff against `v0.6.1` now touches **766 files** (no deletions) and
+  the index has **869 files**, including the staged benchmark pages; one untracked
+  `tests/test_cross_mode_gain.py` and the new controlled-pair claim are outside the git
+  figures. The worktree adds engine code (`kindi/moe_expert_lane.py`, `kindi/spec.py`'s MTP
+  default, plan/DSV4.1 edits), tests, benchmark evidence and claims. No commit follows
+  `3002a40`.
+- **Mode A.** Explicit `KINDI_SPEC=mtp` now defaults to `KINDI_SPEC_K=1`; the live 2B check
+  with no K passed 4/4 prompts, 160/160 tokens, 65/94 drafts accepted at 403.3 tok/s (ctx
+  1024, RTX 4060 Ti). The 0.66x row remains only for explicit k=4.
+- **Q2_0 CPU expert lane.** The 2026-11-19 gate is bit-identical to `lt_mv_q2` and
+  `lt_mv_q2_down` (0 differing elements), but the CPU expert costs 2.475 ms against the
+  0.788 ms copy lane (3.14x), and the lane is not wired into `lightning.Engine`; the model row
+  is blocked by the absent Lightning pack. This is a passed exactness gate, not a backend.
+- **Controlled 9B CPU/tandem pair.** The same-session `cpu-first` six-layer run at ctx 24,576
+  gives 2.9 tok/s CPU-only vs 16.8 tandem at 24K (5.8x over CPU-only), and 3.0x at 100; both
+  placements verify 4/4, 133/133. This replaces the old cross-run shallow-context 4.3x and
+  keeps the split below the full-GPU 9B row. Evidence: the new
+  `docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/` page and its claim.
+- **Chunk sweep.** The 2B sweep at 4K/8K keeps `KINDI_CHUNK=256` as the measured optimum and
+  default; 128 is a real loss (22.6% at 4K, 15.9% at 8K prefill), and `KINDI_CHUNK=256` still
+  verifies 4/4. No default changed and no autotune candidate was added.
+- **Tests and gates.** The current worktree's full CPU suite is **1,312 passed, 28 skipped, 0
+  failed** in 217.78 s; the Python quality ratchet is 332/59/1,035/255 within baseline; claims
+  are **20 gates / 109 numbers**. The earlier 1,274-pass / 2-failure note is superseded.
+- **Preview.** `bench-logs/render_comparison.py` now shows the official v0.6.1 baseline, the
+  committed `3002a40` shortstat and the current worktree shortstat as separate chips. The
+  rendered page remains a local preview, not a tracked artifact.

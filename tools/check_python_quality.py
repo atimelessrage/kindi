@@ -14,7 +14,8 @@ Ruff covers the whole Python tree with correctness rules F, E9, B and I (see
 (see `mypy.ini` and `pyrightconfig.json`); the test tree is not type-checked
 because its deliberately dynamic fixtures and duplicate `conftest.py` module
 names are not a useful signal. Pylint is run on the same production targets for
-errors and fatal messages only (`E`, `F`), with optional-import errors ignored.
+errors and fatal messages only (`E`, `F`) at the other tools' Python 3.10 target, with
+optional-import errors ignored.
 
 Usage:
     python tools/check_python_quality.py
@@ -36,6 +37,7 @@ MYPY_TARGETS = ("kindi", "tools", "examples", "bridge/kindi_bridge")
 PYRIGHT_CONFIG = ROOT / "pyrightconfig.json"
 PYRIGHT_TARGETS = MYPY_TARGETS
 PYLINT_TARGETS = MYPY_TARGETS
+PYLINT_PY_VERSION = "3.10"          # Ruff/mypy/Pyright target 3.10; Pylint would otherwise use the host Python
 
 
 class QualityError(Exception):
@@ -133,6 +135,7 @@ def _pyright_findings(pyright):
 
 def _pylint_findings(pylint):
     command = [pylint, "--errors-only", "--disable=import-error",
+               "--py-version=" + PYLINT_PY_VERSION,
                "--output-format=json", "--score=n", "--reports=n"]
     command.extend(PYLINT_TARGETS)
     proc = _run(command, "pylint")
@@ -182,7 +185,8 @@ def _counts(ruff, ruff_findings, mypy_findings, pyright, pyright_findings, pylin
                   "pyright_mode": "basic",
                   "pyright_platform": "All",
                   "pylint_targets": list(PYLINT_TARGETS),
-                  "pylint_checks": "E,F (import-error disabled)"},
+                  "pylint_checks": "E,F (import-error disabled)",
+                  "pylint_py_version": PYLINT_PY_VERSION},
     }
 
 

@@ -15,7 +15,8 @@ state just before "<think>" is saved while the prompt is read. --slots N keeps t
 RAM (--slot-dir, a tmpfs) instead of the disk. kindi_priority (or X-Kindi-Priority): chat (the default) goes before
 background; a background request yields to a chat request between prompt chunks. A request's temperature, top_p,
 top_k and min_p are used (--sampling auto): with DSpark when the engine has speculative sampling, else plain sampled
-decoding. --repeat-stop stops a reply caught in a loop. /health has drafting, queue and slots.
+decoding. A malformed or non-finite max_tokens, temperature, top_p, top_k, min_p or seed is an HTTP 400 before
+generation. --repeat-stop stops a reply caught in a loop. /health has drafting, queue and slots.
 
 One request at a time (one engine); concurrent requests queue. The prompt is DeepSeek's own V4.1 encoding
 (encoding.py from the model release, --encoding), tool calls are its DSML blocks, parsed back with the same file.
@@ -194,6 +195,53 @@ def _accepts(fn, name):
         return name in inspect.signature(fn).parameters
     except (TypeError, ValueError):
         return False
+
+
+def _finite_number(value):
+    """JSON numbers only; bool is an int in Python, and NaN/Infinity are not valid JSON numbers."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except (OverflowError, TypeError):
+        return False
+
+
+def validate_request(req):
+    """Check the sampling fields at the HTTP boundary, before generation.
+
+    Mirrors `kindi.server._validate_request`: integer fields are JSON ints (a bool is not one),
+    numeric fields must be finite, `max_tokens`/`max_completion_tokens` are at least 1, `top_k`
+    is non-negative, the probabilities are in their sampler ranges and `seed` is a valid
+    RandomState seed. Raises ValueError naming the field; the caller answers 400.
+    """
+    if not isinstance(req, dict):
+        raise ValueError("the body must be a JSON object")
+    for name in ("max_tokens", "max_completion_tokens", "top_k", "seed"):
+        value = req.get(name)
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError("%s must be an integer" % name)
+        if name in ("max_tokens", "max_completion_tokens") and value < 1:
+            raise ValueError("%s must be at least 1" % name)
+        if name == "top_k" and value < 0:
+            raise ValueError("top_k must be at least 0")
+        if name == "seed" and not 0 <= value <= 2 ** 32 - 1:
+            raise ValueError("seed must be between 0 and 4294967295")
+    for name, lo, hi in (("temperature", 0.0, None), ("top_p", 0.0, 1.0), ("min_p", 0.0, 1.0)):
+        value = req.get(name)
+        if value is None:
+            continue
+        if not _finite_number(value):
+            raise ValueError("%s must be a finite number" % name)
+        if value < lo:
+            raise ValueError("%s must be at least %s" % (name, lo))
+        if hi is not None and value > hi:
+            raise ValueError("%s must be at most %s" % (name, hi))
+    if req.get("top_p") == 0:
+        raise ValueError("top_p must be greater than 0")
+    return req
 
 
 def _distribution(logits, temperature, top_p=1.0, top_k=0, min_p=0.0):
@@ -1182,6 +1230,10 @@ def make_handler(E):
             except Exception:
                 self.close_connection = True
                 return self._err(400, "invalid JSON")
+            try:
+                validate_request(req)
+            except ValueError as e:
+                return self._err(400, str(e))
             cid = "chatcmpl-" + uuid.uuid4().hex[:24]
             created = int(time.time())
             stream = bool(req.get("stream"))

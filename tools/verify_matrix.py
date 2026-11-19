@@ -38,8 +38,10 @@ Examples:
 A saved baseline is a copy of one run's results.json. Pass it with --baseline
 on a later run to print status transitions and throughput deltas; use
 --save-baseline to write the new run as the next baseline; a row's `logs`
-provenance list is carried over from the baseline being replaced. Both may be
-combined to compare against the old baseline and replace it in one command. Add
+provenance list is carried over from the baseline being replaced only when the
+row's `log` is one of those passes, and an explicit `logs` list must also name
+the row's `log`. Both may be combined to compare against the old baseline and
+replace it in one command. Add
 --fail-on-regression to make a status/exactness loss, a missing baseline cell
 or a throughput drop beyond --max-tps-drop-pct exit non-zero.
 """
@@ -959,14 +961,34 @@ def _logs_by_cell(payload: dict, where: str) -> dict:
     return found
 
 
+def _require_log_in_logs(row: dict, logs: list[str], origin: str) -> None:
+    """Refuse provenance that does not name the new row's own log.
+
+    A carried or explicitly supplied `logs` list describes measurements. If the row's
+    `log` is not one of them, the list came from a different run and must not be attached
+    to this row.
+    """
+    cell = "%s/%s" % (row.get("model"), row.get("mode"))
+    log = row.get("log")
+    if not isinstance(log, str) or not log:
+        raise SystemExit(
+            "refusing to save baseline: %s has no log to match its %s logs list"
+            % (cell, origin))
+    if log not in logs:
+        raise SystemExit(
+            "refusing to save baseline: %s log %r is not in its %s logs list"
+            % (cell, log, origin))
+
+
 def save_baseline(results_json: Path, target: Path, previous: dict | None = None) -> Path:
     """Copy one run's results.json, preserving the replaced baseline's `logs` provenance.
 
     A fresh run has one `log` per cell, not the `logs` list that records all three median
     passes. Replacing a baseline must not silently drop that list: merge it from the
     explicit `--baseline` and/or the target being overwritten, unless the new row already
-    carries its own `logs`. An unreadable or malformed old baseline refuses instead of
-    being overwritten blindly.
+    carries its own `logs`. A carried or explicit `logs` list must name the new row's own
+    `log`; otherwise it describes a different measurement and the save refuses. An
+    unreadable or malformed old baseline refuses instead of being overwritten blindly.
     """
     target = Path(target).expanduser()
     payload = json.loads(Path(results_json).read_text(encoding="utf-8"))
@@ -989,9 +1011,11 @@ def save_baseline(results_json: Path, target: Path, previous: dict | None = None
         current.add((row.get("model"), row.get("mode")))
         if "logs" in row:
             _logs_by_cell({"results": [row]}, "this run")
+            _require_log_in_logs(row, row["logs"], "explicit")
             continue
         old = prior.get((row.get("model"), row.get("mode")))
         if old is not None:
+            _require_log_in_logs(row, old, "carried")
             row["logs"] = list(old)
     for key in sorted(prior, key=lambda item: (str(item[0]), str(item[1]))):
         if key not in current:
@@ -1131,7 +1155,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--baseline", type=Path, default=None,
                     help="compare against a saved results.json baseline")
     ap.add_argument("--save-baseline", type=Path, default=None,
-                    help="save this run's results.json as a baseline (keeps each cell's logs)")
+                    help="save this run's results.json as a baseline (keeps logs that name the run log)")
     ap.add_argument("--fail-on-regression", action="store_true",
                     help="exit non-zero when the baseline comparison regresses (needs --baseline)")
     ap.add_argument("--max-tps-drop-pct", type=_non_negative_float, default=None,

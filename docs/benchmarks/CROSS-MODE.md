@@ -6,15 +6,16 @@ NVIDIA GeForce RTX 4060 Ti 8 GB, at a 24,576-token context, exact head, greedy, 
 drafting.
 
 - **CPU only:** `KINDI_DEVICE=cpu` on native Windows 10, 6 threads (one per physical core),
-  24,576-token context. One fresh-process run per model; no WSL.
+  24,576-token context. One fresh-process run per model; no WSL. The 9B row is the CPU half
+  of the 2026-11-19 controlled pair below.
 - **GPU only:** the card runs every layer; the CPU only drives the process (Windows 10, CuPy
   14.2.0). Three fresh-process runs per model; the table uses their median.
 - **GPU tensor-core (plan):** `KINDI_TP=1` `KINDI_TC=1` (plan engine, tensor cores) on the
   same card; the 9B runs with `KINDI_TC_HP=1` (4096 Hadamard blocks are refused otherwise).
   Three fresh-process runs per model; the table uses their median.
-- **GPU+CPU tandem:** the dense `TandemEngine` exists and is token-exact on the 2B/9B (`docs/TANDEM-RUNTIME.md`). All tandem rows below are measured on 2026-11-13, three fresh-process runs per
-  model; the table uses their median, like the GPU-only rows. The original 2026-11-12 single
-  runs are kept as `bench-<model>-cpu-first-24k.log` in the source folder.
+- **GPU+CPU tandem:** the dense `TandemEngine` exists and is token-exact on the 2B/9B (`docs/TANDEM-RUNTIME.md`). The 2B/4B rows are the median of three fresh-process runs (2026-11-13), like
+  the GPU-only rows; the 9B row is a same-session controlled CPU-only/tandem pair
+  from 2026-11-19 (one fresh process per placement), so its ratio is not cross-run.
 
 "Read" is the benchmark's 1,000-token prompt-reading probe. 100, 2K, 8K, 16K and 24K are
 generation at that token position in the allocated 24,576-token context. Tokens/s.
@@ -31,15 +32,17 @@ generation at that token position in the allocated 24,576-token context. Tokens/
 | 4B | GPU+CPU tandem | 49.3 | 47.0 | 43.8 | 31.7 | 23.7 | 16.7 |
 | 9B | GPU only | 90.3 | 77.8 | 76.8 | 71.6 | 67.4 | 62.3 |
 | 9B | GPU tensor-core (plan) | 133.9 | 114.7 | 111.3 | 108.7 | 103.2 | 97.0 |
-| 9B | CPU only | 9.9 | 8.7 | 7.7 | 4.9 | 3.5 | 2.6 |
-| 9B | GPU+CPU tandem | 38.1 | 37.5 | 34.7 | 25.4 | 20.5 | 15.2 |
+| 9B | CPU only | 12.7 | 11.5 | 9.6 | 6.3 | 3.9 | 2.9 |
+| 9B | GPU+CPU tandem | 43.1 | 34.2 | 36.6 | 28.1 | 20.6 | 16.8 |
 
 Sources: [2026-11-10-i7-8086k-windows-cpu](2026-11-10-i7-8086k-windows-cpu/README.md) (6 threads,
 native Windows) and [2026-11-09-i7-8086k-rtx4060ti](2026-11-09-i7-8086k-rtx4060ti/README.md). The
-CPU run is one run per cell; the GPU run is the median of three. The two blocks were not interleaved
-and the CPU block is native Windows, so the ratio is a same-machine indication, not a controlled A/B.
+CPU run is one run per cell; the GPU run is the median of three. The 2B/4B CPU block was not
+interleaved with its tandem runs, so those ratios are a same-machine indication, not a controlled
+A/B. The 9B CPU and tandem rows are the controlled pair described below.
 
 Tandem source: [2026-11-12-i7-8086k-rtx4060ti-tandem](2026-11-12-i7-8086k-rtx4060ti-tandem/README.md).
+Controlled 9B pair: [2026-11-19-i7-8086k-rtx4060ti-9b-controlled](2026-11-19-i7-8086k-rtx4060ti-9b-controlled/RESULTS.md).
 Tensor-core source: [2026-11-13-i7-8086k-rtx4060ti-tc](2026-11-13-i7-8086k-rtx4060ti-tc/README.md).
 
 ## GPU-only speedup over CPU-only
@@ -48,7 +51,9 @@ Tensor-core source: [2026-11-13-i7-8086k-rtx4060ti-tc](2026-11-13-i7-8086k-rtx40
 |---|---:|---:|---:|---:|---:|
 | 2B | 4.7x | 5.6x | 9.0x | 14.4x | 19.6x |
 | 4B | 7.0x | 7.6x | 13.4x | 20.8x | 25.7x |
-| 9B | 8.9x | 10.0x | 14.6x | 19.3x | 24.0x |
+| 9B | 6.8x | 8.0x | 11.4x | 17.3x | 21.5x |
+
+The ratio grows with depth because the CPU attention path slows down faster than the GPU path.
 
 ## Tensor-core (plan engine) speedup over GPU-only
 
@@ -58,11 +63,31 @@ Tensor-core source: [2026-11-13-i7-8086k-rtx4060ti-tc](2026-11-13-i7-8086k-rtx40
 | 4B | 1.6x | 1.7x | 1.7x | 1.6x | 1.6x |
 | 9B | 1.5x | 1.4x | 1.5x | 1.5x | 1.6x |
 
-The ratio grows with depth because the CPU attention path slows down faster than the GPU path.
+## Tandem speedup over CPU-only
+
+| Model | 100 | 2K | 8K | 16K | 24K |
+|---|---:|---:|---:|---:|---:|
+| 2B | 2.2x | 2.5x | 3.0x | 3.6x | 4.3x |
+| 4B | 3.1x | 3.3x | 4.7x | 5.5x | 5.4x |
+| 9B | 3.0x | 3.8x | 4.5x | 5.3x | 5.8x |
+
+Every measured tandem cell above is faster than CPU-only; at 24K the gain is
+**4.3x-5.8x**. The same rows are 3.7x-4.8x slower than GPU-only, so this is a
+capacity trade, not a win for a model that fits the card. The measured capacity-bound
+case is outside this table: AH-Nanbeige4.3-33B IQ3_XXS on a 12 GB Quadro K6000 keeps 13
+layers in host memory and computes 55% of their FFN rows on the CPU; it writes
+3.85/3.55/3.56 tok/s at 480/2,016/8,160 tokens against llama.cpp's 2.19/1.96/1.52, and
+4.4-5.0 against 2.5-2.7 at 1,024 (Kindi 0.4.0; [BENCHMARKS.md](../BENCHMARKS.md)). That is a
+dense 33B model, not a MoE. A big-MoE CPU-compute row still needs the CPU expert lane in
+[MOE-TANDEM.md](../MOE-TANDEM.md), which has no backend yet.
+
+The 9B row is a direct A/B: both placements passed `kindi verify` 4/4 (133/133 tokens),
+and the tandem's sampled peak was 2,864 MiB device-wide (1,939 MiB over idle), with
+5,086 MiB free after load. The CPU-only placement has no GPU allocation to sample.
 
 ## Tandem status and the gate for a number
 
-The 2B, 4B, 9B tandem cell(s) are recorded from 2026-11-12; the  cell(s) are not recorded because the same single-run throughput benchmark has not been run for those models.
+All tandem cells are recorded from 2026-11-13.
 [TANDEM-STATUS.md](../TANDEM-STATUS.md)
 requires, in order:
 
@@ -83,8 +108,8 @@ rate at each of the same positions and the peak VRAM. Until then every unmeasure
   larger models are GPU targets.
 - **CPU is native Windows, not WSL2.** The 2026-11-09 WSL2 page is kept as history; its CPU cells
   are no longer the cross-mode source.
-- **One CPU run per cell.** There is no variance or thermal control; the GPU and tensor-core
-  cells have three runs and a spread of a few percent.
+- **One run per CPU/tandem cell.** The 9B pair is one run per placement; there is no variance
+  or thermal control. The GPU and tensor-core cells have three runs and a spread of a few percent.
 - **Tensor-core cells are medians of three fresh-process runs (2026-11-13).** The 9B cell
   runs with `KINDI_TC_HP=1`; without it the engine refuses HB 4096 (see `kindi/spec.py`).
 - **24K is the deepest measured position.** The packs advertise 262,144 tokens, but no 32K/64K

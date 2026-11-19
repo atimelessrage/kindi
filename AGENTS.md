@@ -12,18 +12,18 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `f069c1d` on `freebuff/tandem-cpu-recovery` (**main** is at `7310590`; guarded by `tests/test_agents_handoff.py`); `--save-baseline` now carries each cell's `logs` list from the replaced baseline and refuses to drop one; the 27B baseline summaries quote the median pass's duration to two decimals, so a one-decimal look-alike from another pass cannot stand in (`tests/test_verify_matrix.py` **43 passed**); the DSV4.1 CLI now validates its remaining paths and counts before loading, and the standalone server/dspark/tool audit moved its late numeric parsing to argparse (`tests/test_dsv41_cli.py` **24 passed**; focused suites **101 passed**).
+- **HEAD:** `3002a40` on `freebuff/tandem-cpu-recovery` (**main** is at `7310590`; guarded by `tests/test_agents_handoff.py`); `--save-baseline` now carries each cell's `logs` list from the replaced baseline only when it names the cell's `log`, and refuses to drop one; the 27B baseline summaries quote the median pass's duration to two decimals, so a one-decimal look-alike from another pass cannot stand in (`tests/test_verify_matrix.py` **48 passed**); the DSV4.1 CLI now validates its remaining paths, counts, prompt JSONL and reference continuations before loading, and the standalone server/dspark/tool audit moved its late numeric parsing to argparse (`tests/test_dsv41_cli.py` **45 passed**).
 
 ### Python quality ratchet
 
 Audit F9's Python quality ratchet is `tools/check_python_quality.py`: Ruff 0.16.0 (`F`, `E9`, `B`, `I`)
 over the Python tree, mypy 2.4.0 over first-party production
 code, Pyright 1.1.414 (`basic`, all platforms) and Pylint 4.1.3 (`E`, `F`, import-error
-disabled) over the same production targets, recorded as **332 Ruff findings / 59 mypy
+disabled) at Python 3.10 over the same production targets, recorded as **332 Ruff findings / 59 mypy
 errors / 1,035 Pyright errors / 255 Pylint findings** in
 `tools/python_quality_baseline.json`. CI runs it; a new or increased file/rule count fails, while
 existing debt is tolerated and `--update` lowers the baseline after review.
-`tests/test_python_quality.py` + `tests/test_ci_config.py` **13 passed**; no full-suite or GPU run. Dependency scanning remains open. The prior test task is below.
+`tests/test_python_quality.py` + `tests/test_ci_config.py` **14 passed**; no full-suite or GPU run. Dependency scanning remains open. The prior test task is below.
 
 ### MTP smoke guard
 
@@ -31,7 +31,7 @@ existing debt is tolerated and `--update` lowers the baseline after review.
 post-request guard: a `drafting.last` block with `method="ngram"` raises
 `SmokeError`, naming the method and `not mtp`. The guard is
 `tools/mtp_smoke.py:_check_last_method`, so it is testable without a GPU;
-`python -m pytest tests/test_mtp_smoke.py -q` **3 passed**; no GPU run. The tool also prints and writes a run record (pack, head and digest, ctx, `KINDI_SPEC_K`, GPU, serve command with its `KINDI_*` environment, request count) at the top of `--log`.
+`python -m pytest tests/test_mtp_smoke.py -q` **3 passed**; a record-bearing GPU smoke passed on 2026-11-19 (RTX 4060 Ti, ctx 4096, k=4, 2 passes / 8 drafted / 3 accepted, one request; `docs/MTP.md`). The tool also prints and writes a run record (pack, head and digest, ctx, `KINDI_SPEC_K`, GPU, serve command with its `KINDI_*` environment, request count) at the top of `--log`.
 
 ### Audit follow-up
 
@@ -41,17 +41,17 @@ suite plus CI job, and pinned every workflow's actions. The forward-slash drive-
 
 ### Full CPU gate
 
-The post-Usage/plan full CPU rerun is **1,231 passed, 28 skipped, 0 failed** in 243.91 s at **46.2%** line+branch coverage; the first pass was **1 failed, 1,230
-passed, 28 skipped** because `docs/CONFIGURATION-REFERENCE.md` was stale, then it was regenerated. The final 2026-11-18 run at `539a504` (main) is **1,241 passed, 28 skipped, 0 failed** in 227.62 s with plain `pytest -q` (no coverage plugin; `pytest-cov` hangs on this host).
+The final coverage run at `539a504` is **1,241 passed, 28 skipped, 0 failed** in 277.17 s at **46.36%** line+branch coverage (23,504 statements and 8,394 branches); the plain suite at that commit is 1,241 / 28 / 0 in 227.62 s. The current 2026-11-19 worktree (`3002a40` plus local changes) is **1,312 passed, 28 skipped, 0 failed** in 217.78 s with `pytest -q -rs`, and every skip is inventoried by node ID and exact reason in `tests/README.md`.
 
 ### Upstream v0.6.1 and comparison
 
 Stock moved to upstream `v0.6.1` (`7fececb`, fetched 2026-11-17) and one of its fixes was a bug this fork had: `kindi/mtp.py` never passed `k_rmsfold_qT`'s
 `hp`, so the MTP head's CUDA graph did not build and mode A speculation was dead on the tensor-core layout (fixed in `f934a55`, with
-`tests/test_kernel_arity.py`); measured after the fix, mode A costs 0.66x on the 2B at the default `KINDI_SPEC_K=4`, but at `KINDI_SPEC_K=1` it is 1.12-1.13x at
-512 and 24K tokens of context and a wash at 8K (4-run medians, 2026-11-17, `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-mtp-context/RESULTS.md`), so it is off
-at the default k and a small win at k=1 (`docs/MTP.md`), and `CURRENT-VS-KINDI-0.6.md` records the current official v0.6.1 comparison (622-commit / 721-file
-delta at `296a03d`; round history in `detailed-fork-changelog.md`); §4.6 closes the same-settings A/B with stock `v0.6.1` (tag source, loader shim) and this
+`tests/test_kernel_arity.py`); measured after the fix, mode A at the old default `KINDI_SPEC_K=4` costs 0.66x on the 2B; at
+`KINDI_SPEC_K=1` it is 1.12-1.13x at 512 and 24K tokens of context and a wash at 8K (4-run medians, 2026-11-17, `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-mtp-context/RESULTS.md`), so mode A now
+defaults to k=1 (`docs/MTP.md`), and `CURRENT-VS-KINDI-0.6.md` records the current official v0.6.1 comparison (649-commit / 736-file
+delta at `3002a40`; the dirty 2026-11-19 worktree adds MTP k=1, the Q2 expert lane, the controlled 9B pair and the chunk sweep and is reported separately; upstream `main` now points at the release commit `7fececb` (no post-release commit to port); round history in
+`detailed-fork-changelog.md`); §4.6 closes the same-settings A/B with stock `v0.6.1` (tag source, loader shim) and this
 tree at `a79137f` on the same 2B/9B packs at ctx 8192, plain engine and exact head, five passes each: every decode median is within 2.6% and the ranges overlap,
 while the 9B prompt-reading gap (83.9 vs 72.4) was rechecked at 20 passes and closed as noise (70.7 vs 75.7; paired -1.4, p=0.648); a separate stock harness
 adds literal position-512 medians (190.3 on the 2B, 84.5 on the 9B) outside the bench sweep, after a 2026-11-18 paired run showed its position-100 anchor
@@ -84,9 +84,9 @@ parked ones name the measurement that would reopen them.
 ### I/O and cold tier
 
 `kindi io` now measures this host's memory tiers (RAM copy, unbuffered disk read, pinned PCIe both ways) so a cache or streaming budget is an input, not an
-assumption; the CPU-compute lane and mixed-precision tiers are parked in `docs/ROADMAP.md` "Memory-tier follow-ups (2026-11-17)"; I/O-aware slot sizing now
+assumption; the mixed-precision tiers stay parked, while the CPU-compute lane has an exact expert-level gate for the Lightning Q2_0 format and is still off by default (the copy lane won on this host, and the model row needs the absent pack) in `docs/ROADMAP.md` "Memory-tier follow-ups (2026-11-17)"; I/O-aware slot sizing now
 consumes those rates in `kindi plan`/`kindi autotune`; the plan's follow-up bench carries the planned context and count with the global `--ctx` and portable
-`--dcache` flags and a test pins both, `kindi autotune` adds an `expert-cache-<MiB>` cold-tier candidate that sets `KINDI_LT_COLD=1` + `KINDI_LT_HOST_MB` from
+`--dcache` flags and a test pins both, the printed `bench` and `verify` commands quote spaced interpreter and pack paths, `kindi autotune` adds an `expert-cache-<MiB>` cold-tier candidate that sets `KINDI_LT_COLD=1` + `KINDI_LT_HOST_MB` from
 the same rate-sized working set and caps it by the host experts, and `kindi io --json FILE` reports can be reused by either command through
 `--io-report`/`KINDI_IO_REPORT` (a missing or unusable report names itself and falls back to one probe), with the arithmetic unit-tested and its Lightning-pack
 comparison still open; the NVMe cold-expert tier is **started 2026-11-17** behind `KINDI_LT_COLD=1` (`kindi/cold_experts.py`: the hottest host experts stay
@@ -106,7 +106,7 @@ requirements history and in `docs/claims/` now names the rewritten commit.
 
 ### Suite and recent additions
 
-The coverage-measured full suite is **1,231 passed, 28 skipped, 0 failed** in 243.91 s (the final plain run at `539a504` is 1,241 / 28 / 0 in 227.62 s), including two new kernel-arity resolver checks (only tables rooted at `self` are
+The coverage-measured full suite at `539a504` is **1,241 passed, 28 skipped, 0 failed** in 277.17 s at **46.36%** (23,504 statements and 8,394 branches; the plain run is 1,241 / 28 / 0 in 227.62 s), including two new kernel-arity resolver checks (only tables rooted at `self` are
 followed; every branch of a conditional kernel must accept the call's argument count) and the two CLI comma-value checks (unknown
 `--split-at`/`--tandem-cpu-layers` tokens are rejected at parse time with the valid forms; the full suite re-ran after the generated reference was refreshed),
 and the newest twenty-six being seven saved-I/O-report checks (save/reload, missing and unusable fallback, and the plan/autotune wiring) plus the Lightning
@@ -125,7 +125,7 @@ caught in both a subject and a body with no file carrying the path).
 ### Secret guards
 
 The secret guards are now three: entropy baseline over tracked files, pattern scan over tracked+untracked files, and a history gate against
-`tools/secret_history_baseline.json` (128 rows / 3,247 legacy hits from an old benchmark dump, old AGENTS/log revisions and one commit message that names a
+`tools/secret_history_baseline.json` (160 rows / 3,318 legacy hits from an old benchmark dump, old AGENTS/log revisions, the 27B median transcripts and one commit message that names a
 cloud storage folder, recorded not endorsed; the gate scans commit messages - subject and body - with the same rules as file content, so a path in a message is
 caught instead of invisible).
 
@@ -146,11 +146,11 @@ twelve tests cover the naming, the fallbacks, the environment variable, dry run,
 ### Coverage gate
 
 The coverage gate `python tools/check_coverage.py` passes on 46 modules from a measured run (`coverage run --branch --source=kindi -m pytest` -> `coverage
-json`, since `pytest-cov` hangs on this host; the 2026-11-18 historical run 1,196 passed / 28 skipped / 45.4% total, superseded by the post-Usage/plan 1,231 /
-28 / 0 failed at 46.2% after its stale-reference first pass), and `tests/test_no_secrets.py` now scans untracked files too (pinned by
+json`, since `pytest-cov` hangs on this host; the 2026-11-18 historical run 1,196 passed / 28 skipped / 45.4% total is superseded by the final 539a504
+run: **1,241 passed, 28 skipped, 0 failed at 46.36%**, 23,504 statements and 8,394 branches), and `tests/test_no_secrets.py` now scans untracked files too (pinned by
 `test_untracked_files_are_scanned`), with `project_memory --check`, `config_reference --check` and `support_matrix --check` all clean.
-The per-module rows in `tests/README.md` were re-derived from that run's `.coverage` data; the total and
-per-module floors are unchanged. Its tracked revision, command and counts are in
+The per-module rows in `tests/README.md` were checked against the final run's `.coverage` data; their rounded figures are unchanged, and the total and
+per-module floors are untouched. Its tracked revision, command and counts are in
 [docs/benchmarks/2026-11-18-i7-8086k-windows-cpu/full-suite.json](docs/benchmarks/2026-11-18-i7-8086k-windows-cpu/full-suite.json).
 
 ### Grammar and claims
@@ -165,7 +165,7 @@ state - and at a 200-token document the average *falls* to 463 ms/token against 
 whitespace-permitting constraint lets the greedy 2B spend the whole budget on whitespace (200 tokens, 9 characters) (`docs/API.md`,
 `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/RESULTS.md`), and the two harnesses behind it are tracked as `tools/grammar_cost.py` and
 `tools/grammar_cost_serve.py` so a clean checkout re-derives the rows instead of trusting the JSON artifact. The numbers those docs quote are no longer prose:
-`python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (17 gates, 95 numbers across `docs/claims/*.json`, 4 citations
+`python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (20 gates, 109 numbers across `docs/claims/*.json`, 4 citations
 listed as reasoned debt), and refuses a benchmark citation no claim accounts for - schema and procedure in `docs/claims/README.md`.
 
 ### Dated evidence
@@ -235,7 +235,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `7310590` | main checkout; clean; behind this branch |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `f069c1d` | this session; checked out here |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `3002a40` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.

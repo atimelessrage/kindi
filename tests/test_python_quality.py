@@ -61,6 +61,16 @@ def test_pyright_parser_counts_errors_by_file_and_rule(monkeypatch):
         "kindi/a.py": {"reportArgumentType": 2}}
 
 
+def test_pylint_targets_the_other_tools_python_version(monkeypatch):
+    mod = _load()
+    seen = []
+    monkeypatch.setattr(mod, "_run", lambda command, what: (
+        seen.append(command) or SimpleNamespace(returncode=0, stdout="[]", stderr="")))
+    assert mod._pylint_findings("pylint") == {}
+    assert "--py-version=3.10" in seen[0]
+    assert mod.PYLINT_PY_VERSION == "3.10"
+
+
 def test_pylint_parser_counts_findings_by_file_and_code(monkeypatch):
     mod = _load()
     rows = [{"path": "tools/b.py", "message-id": "E1101"},
@@ -81,6 +91,7 @@ def test_the_committed_baseline_has_consistent_totals():
         "pyright_platform": "All",
         "pylint_targets": ["kindi", "tools", "examples", "bridge/kindi_bridge"],
         "pylint_checks": "E,F (import-error disabled)",
+        "pylint_py_version": "3.10",
     }
     for tool in ("ruff", "mypy", "pyright", "pylint"):
         findings = payload[tool]["findings"]

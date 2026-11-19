@@ -48,12 +48,57 @@ the AVX2/FMA/F16C tier and runs `test_cpu_build.py`, `test_cpu_threads.py` and `
 test loads the library and checks the ctypes ABI without a model pack. The manual
 self-hosted GPU lane is described in [docs/CI.md](../docs/CI.md); it is not run by hosted CI.
 
+### Skipped-test inventory (final CPU run, 2026-11-19)
+
+The final full CPU run in this worktree (`3002a40` plus the local changes) was
+`python -m pytest -q -rs`: **1,312 passed, 28 skipped, 0 failed** in 217.78 s
+(`bench-logs/full-suite-head-20261119.txt`). The 28-row inventory was captured from the preceding
+run and its JUnit/`-rs` evidence, `bench-logs/full-suite-final-20261119.{xml,txt}` (228.70 s); the
+final run reports the same 28 skips. This table lists
+every skipped node ID with pytest's exact reason and the environment category; a skip is not a
+pass, so a new or disappearing row must be reviewed instead of hidden by the aggregate count.
+
+| # | test | category | exact skip reason |
+|---:|---|---|---|
+| 1 | `tests/backends/test_contract.py::test_text_primitives_round_trip[BonsaiBackend]` | model pack | `BonsaiBackend needs a model pack to tokenize; its text primitives are verified through the kindi verify/bench gate, not this harness` |
+| 2 | `tests/backends/test_contract.py::test_text_primitives_round_trip[NanbeigeBackend]` | model pack | `NanbeigeBackend needs a model pack to tokenize; its text primitives are verified through the kindi verify/bench gate, not this harness` |
+| 3 | `tests/backends/test_contract.py::test_text_primitives_round_trip[LightningBackend]` | model pack | `LightningBackend needs a model pack to tokenize; its text primitives are verified through the kindi verify/bench gate, not this harness` |
+| 4 | `tests/backends/test_contract.py::test_text_primitives_round_trip[Gemma4Backend]` | model pack | `Gemma4Backend needs a model pack to tokenize; its text primitives are verified through the kindi verify/bench gate, not this harness` |
+| 5 | `tests/backends/test_contract.py::test_text_primitives_round_trip[DeepseekV41Backend]` | model pack | `DeepseekV41Backend needs a model pack to tokenize; its text primitives are verified through the kindi verify/bench gate, not this harness` |
+| 6 | `tests/test_calib.py::test_write_failure_is_best_effort` | platform/Windows | `chmod does not make a dir read-only on Windows` |
+| 7 | `tests/test_cpu_avx_fallback.py::test_no_fma_verify_is_token_exact[None]` | model pack | `set KINDI_CPU_AVX_PACKS to one or more Bonsai pack directories` |
+| 8 | `tests/test_cpu_avx_fallback.py::test_avx2_no_fma_verify_is_token_exact[None]` | model pack | `set KINDI_CPU_NO_FMA_PACKS to one or more Bonsai pack directories` |
+| 9 | `tests/test_cpu_build.py::test_avx_only_build_preprocesses` | optional compiler/toolchain | `neither gcc nor clang is installed` |
+| 10 | `tests/test_cpu_build.py::test_avx_only_library_builds_and_loads` | optional compiler/toolchain | `clang is not installed; set KINDI_CC to build the AVX-only fallback` |
+| 11 | `tests/test_cpu_build.py::test_avx2_f16c_without_fma_preprocesses` | optional compiler/toolchain | `neither gcc nor clang is installed` |
+| 12 | `tests/test_cpu_build.py::test_avx2_f16c_no_fma_library_builds_and_loads` | optional compiler/toolchain | `clang is not installed; set KINDI_CC to build the no-FMA AVX2 fallback` |
+| 13 | `tests/test_cpu_build.py::test_full_isa_library_builds_and_loads` | optional compiler/toolchain | `clang is not installed; set KINDI_CC to build the native path` |
+| 14 | `tests/test_cpu_build.py::test_non_avx_build_is_rejected_with_the_required_isa` | optional compiler/toolchain | `neither gcc nor clang is installed` |
+| 15 | `tests/test_cpu_build.py::test_supported_isa_source_preprocesses` | optional compiler/toolchain | `neither gcc nor clang is installed` |
+| 16 | `tests/test_cpu_build.py::test_other_avx2_variants_preprocess[flags0]` | optional compiler/toolchain | `neither gcc nor clang is installed` |
+| 17 | `tests/test_cpu_build.py::test_other_avx2_variants_preprocess[flags1]` | optional compiler/toolchain | `neither gcc nor clang is installed` |
+| 18 | `tests/test_cpu_layers.py::test_cpu_isa_tiers_agree_on_tokens_and_hidden_close` | optional compiler/toolchain | `no gcc/clang to build the ISA tier libraries` |
+| 19 | `tests/test_cpu_layers.py::test_layerwise_matches_whole_model_step` | model pack | `set KINDI_CPU_PACK to a Bonsai pack to run the real exactness check` |
+| 20 | `tests/test_cpu_smoke.py::test_compiled_library_loads_with_the_python_abi` | optional prebuilt CPU library | `set KINDI_CPU_SMOKE=1 with a prebuilt kcpu library` |
+| 21 | `tests/test_cpu_smoke.py::test_compiled_library_initializes` | optional prebuilt CPU library | `set KINDI_CPU_SMOKE=1 with a prebuilt kcpu library` |
+| 22 | `tests/test_gemma4_fp8.py::test_ops_dense_batch_dispatch[30]` | optional GPU library (cuBLASLt) | `cuBLAS is unavailable: Failure finding "known cublasLt DLL": No such file: known cublasLt DLL, No such file: known cublasLt DLL` |
+| 23 | `tests/test_gemma4_fp8.py::test_ops_dense_batch_dispatch[43]` | optional GPU library (cuBLASLt) | `cuBLAS is unavailable: Failure finding "known cublasLt DLL": No such file: known cublasLt DLL, No such file: known cublasLt DLL` |
+| 24 | `tests/test_gemma4_fp8.py::test_ops_dense_batch_dispatch[44]` | optional GPU library (cuBLASLt) | `cuBLAS is unavailable: Failure finding "known cublasLt DLL": No such file: known cublasLt DLL, No such file: known cublasLt DLL` |
+| 25 | `tests/test_gemma4_fp8_mma.py::test_ops_linear_batch_falls_back_without_the_native_kernel[43]` | optional GPU library (cuBLASLt) | `cuBLAS is unavailable: Failure finding "known cublasLt DLL": No such file: known cublasLt DLL, No such file: known cublasLt DLL` |
+| 26 | `tests/test_gemma4_fp8_mma.py::test_ops_linear_batch_falls_back_without_the_native_kernel[44]` | optional GPU library (cuBLASLt) | `cuBLAS is unavailable: Failure finding "known cublasLt DLL": No such file: known cublasLt DLL, No such file: known cublasLt DLL` |
+| 27 | `tests/test_server_cpu.py::test_cpu_server_boots_and_answers` | optional CPU library/compiler | `no cached CPU library and no gcc/clang to build it` |
+| 28 | `tests/test_server_cpu.py::test_cpu_server_reports_the_pack_in_health` | optional CPU library/compiler | `no cached CPU library and no gcc/clang to build it` |
+
+The FP8 rows are **not** a "no GPU" result: this host has an RTX 4060 Ti, but CuPy cannot load
+`cublasLt`, so the CUDA FP8 path is not exercised here. The CPU-build and CPU-server rows need a
+compiler or a cached `kcpu` library; the `KINDI_CPU_SMOKE` rows are explicit opt-ins. None of these
+skips is evidence that the corresponding GPU, model-pack or optional-dependency path passed.
+
 ## Coverage: where the 27% floor comes from
 
-Measured on 2026-11-18 (Windows, line+branch): **1,231 passed, 28 skipped, 0 failed; 46.2% total**
-(46.2186%; 23,467 statements and 8,386 branches). The first post-Usage/plan run failed
-`test_config_reference` with **1 failed, 1,230 passed, 28 skipped** because
-`docs/CONFIGURATION-REFERENCE.md` was stale; it was regenerated and the suite rerun. The floor
+Measured at final commit `539a504` (Windows, line+branch; coverage rerun 2026-11-19):
+**1,241 passed, 28 skipped, 0 failed; 46.36% total** (46.3603%; 23,504 statements and 8,394
+branches). The floor
 in CI stays 27%, not 46%, because the number moves with the platform and a gate that fails on a
 fresh Linux checkout is worse than a loose gate. The distribution is what matters: the CPU suite
 covers the modules it can reach, and the heavy GPU modules are covered by `kindi verify` and
@@ -67,7 +112,8 @@ counts in [full-suite.json](../docs/benchmarks/2026-11-18-i7-8086k-windows-cpu/f
 | `engine.py`, `spec.py`, `tp.py`, `small mtp.py` | 24%, 20%, 13%, 19% | `kindi verify` (token-exact against llama.cpp) and the perf gate; pytest reaches the loaders, guards and CPU-side helpers |
 | `convert.py`, `gemma4_tp.py` | 16%, 11% | `kindi convert` plus the mixer/support tests; the CUDA half needs a card |
 
-The 27% total floor is the noisy-gate guard. On top of it, `tests/coverage_floors.json`
+The final `539a504` coverage figures round to these same twelve module values; only the overall
+totals changed. The 27% total floor is the noisy-gate guard. On top of it, `tests/coverage_floors.json`
 pins a per-module floor for **46** modules the CPU suite reaches (audit M4), including the
 planner, MoE policy, grammar/chat parsers, CLIs and the new cold/I/O/autotune modules.
 `tools/check_coverage.py` fails when one of those modules drops below its floor, so a

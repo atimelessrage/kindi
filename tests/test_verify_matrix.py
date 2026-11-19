@@ -235,6 +235,7 @@ def test_save_baseline_and_compare_cli(tmp_path, capsys, monkeypatch):
     }), encoding="utf-8")
 
     current = _row(status="pass", tps=38.1)
+    current["log"] = old_logs[1]                  # this run is one of the saved median passes
     monkeypatch.setattr(mod, "run_cell", lambda *args, **kwargs: current)
     rc = mod.main([
         "--models", "27b", "--modes", "tc", "--pack-dir", str(packs),
@@ -263,7 +264,7 @@ def test_save_baseline_preserves_logs_from_an_existing_target(tmp_path):
     target = tmp_path / "baseline.json"
     target.write_text(json.dumps({"results": [{**_row(), "logs": logs}]}), encoding="utf-8")
     source = tmp_path / "results.json"
-    source.write_text(json.dumps({"results": [_row()]}), encoding="utf-8")
+    source.write_text(json.dumps({"results": [{**_row(), "log": logs[1]}]}), encoding="utf-8")
 
     mod.save_baseline(source, target)
 
@@ -273,14 +274,16 @@ def test_save_baseline_preserves_logs_from_an_existing_target(tmp_path):
 
 def test_save_baseline_refuses_to_drop_a_logs_row(tmp_path):
     mod = load()
-    logs = ["logs/median-r1/27b-tc-both.log", "logs/median-r2/27b-tc-both.log",
-            "logs/median-r3/27b-tc-both.log"]
-    kept = {**_row(), "logs": logs}
-    dropped = {**_row(), "mode": "tc-both", "logs": logs}
+    kept_logs = ["logs/median-r1/27b-tc.log", "logs/median-r2/27b-tc.log",
+                 "logs/median-r3/27b-tc.log"]
+    dropped_logs = ["logs/median-r1/27b-tc-both.log", "logs/median-r2/27b-tc-both.log",
+                    "logs/median-r3/27b-tc-both.log"]
+    kept = {**_row(), "logs": kept_logs}
+    dropped = {**_row(), "mode": "tc-both", "logs": dropped_logs}
     target = tmp_path / "baseline.json"
     target.write_text(json.dumps({"results": [kept, dropped]}), encoding="utf-8")
     source = tmp_path / "results.json"
-    source.write_text(json.dumps({"results": [_row()]}), encoding="utf-8")
+    source.write_text(json.dumps({"results": [{**_row(), "log": kept_logs[1]}]}), encoding="utf-8")
 
     with pytest.raises(SystemExit, match="has logs provenance.*no row in this run"):
         mod.save_baseline(source, target)
@@ -836,3 +839,73 @@ def test_dry_run_lists_the_spec_cells_commands_and_skips(tmp_path, capsys):
                    "--out", str(tmp_path / "out")])
     assert rc == 0
     assert "would skip: 2b tc-mtp" in capsys.readouterr().out
+
+
+def test_save_baseline_refuses_to_carry_logs_from_another_run(tmp_path):
+    mod = load()
+    logs = ["logs/median-r1/27b-tc.log", "logs/median-r2/27b-tc.log",
+            "logs/median-r3/27b-tc.log"]
+    target = tmp_path / "baseline.json"
+    before = json.dumps({"results": [{**_row(), "logs": logs}]})
+    target.write_text(before, encoding="utf-8")
+    source = tmp_path / "results.json"
+    source.write_text(json.dumps({"results": [_row()]}), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="not in its carried logs list"):
+        mod.save_baseline(source, target)
+    assert target.read_text(encoding="utf-8") == before
+
+
+def test_save_baseline_refuses_carried_logs_from_the_comparison_baseline(tmp_path):
+    mod = load()
+    logs = ["logs/median-r1/27b-tc.log", "logs/median-r2/27b-tc.log",
+            "logs/median-r3/27b-tc.log"]
+    previous = {"results": [{**_row(), "logs": logs}]}
+    target = tmp_path / "baseline.json"
+    source = tmp_path / "results.json"
+    source.write_text(json.dumps({"results": [_row()]}), encoding="utf-8")
+
+    with pytest.raises(SystemExit, match="not in its carried logs list"):
+        mod.save_baseline(source, target, previous)
+    assert not target.exists()
+
+
+def test_save_baseline_accepts_explicit_logs_that_include_the_new_log(tmp_path):
+    mod = load()
+    logs = ["logs/median-r1/27b-tc.log", "logs/median-r2/27b-tc.log",
+            "logs/median-r3/27b-tc.log"]
+    source = tmp_path / "results.json"
+    source.write_text(json.dumps({"results": [{**_row(), "log": logs[1], "logs": logs}]}),
+                      encoding="utf-8")
+    target = tmp_path / "baseline.json"
+
+    mod.save_baseline(source, target)
+
+    saved = json.loads(target.read_text(encoding="utf-8"))["results"][0]
+    assert saved["logs"] == logs
+
+
+def test_save_baseline_refuses_explicit_logs_that_omit_the_new_log(tmp_path):
+    mod = load()
+    logs = ["logs/median-r1/27b-tc.log", "logs/median-r2/27b-tc.log",
+            "logs/median-r3/27b-tc.log"]
+    source = tmp_path / "results.json"
+    source.write_text(json.dumps({"results": [{**_row(), "logs": logs}]}), encoding="utf-8")
+    target = tmp_path / "baseline.json"
+
+    with pytest.raises(SystemExit, match="not in its explicit logs list"):
+        mod.save_baseline(source, target)
+    assert not target.exists()
+
+
+def test_save_baseline_refuses_explicit_logs_without_a_log(tmp_path):
+    mod = load()
+    row = {**_row(), "logs": ["logs/median-r1/27b-tc.log"]}
+    del row["log"]
+    source = tmp_path / "results.json"
+    source.write_text(json.dumps({"results": [row]}), encoding="utf-8")
+    target = tmp_path / "baseline.json"
+
+    with pytest.raises(SystemExit, match="has no log to match its explicit logs list"):
+        mod.save_baseline(source, target)
+    assert not target.exists()

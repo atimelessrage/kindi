@@ -19,6 +19,15 @@ token-exact, the 4B tc plan is 3 exact + 1 tie (FD fallback), the 9B tc plan is 
 CPU+GPU tandem runtime is implemented (see [TANDEM-STATUS.md](TANDEM-STATUS.md); the Nanbeige
 host-layer back end is separate). The dual and 5060 Ti rows remain open; the 27B single-card tc path now also has a 24,576-token benchmark and a real server/cache restart cycle, while the 4B's forced-FD limitation and a longer soak remain. P1-P3 are unimplemented.
 
+The RTX 4060 Ti rows were recorded on the i7-8086K / RTX 4060 Ti host, whose native Windows 10
+install is named on their benchmark pages (for example the
+[plan-owner run](benchmarks/2026-11-14-i7-8086k-rtx4060ti-plan-owner/RESULTS.md)); they are not
+Linux numbers. A 2026-11-19 re-validation on that host passed the 2B plain and tensor-core verify
+at 4/4 prompts, an 8K bench (212.7-226.1 generation tokens/s) and one server request — see
+[WINDOWS.md](WINDOWS.md#native-windows-gpu-validation-2026-11-19). This does not widen the
+support contract above: that contract is the `install.sh` path, and the Windows run is a
+source-tree result.
+
 ## What “supported” means here
 
 A card is supported when all of these hold:
@@ -48,8 +57,11 @@ capabilities, not claims that Kindi uses them; the 5060 Ti’s native FP4 is not
 `python -m kindi --pack ... verify` process with a clean `KINDI_*` environment; the runner
 writes `results.csv`, `results.json` and raw logs. Use `--save-baseline PATH` to copy a
 run's `results.json` as a reference, then `--baseline PATH` on later runs. Saving over an
-existing baseline carries each cell's `logs` provenance list forward and refuses to drop a
-cell or overwrite an unreadable old file. The comparison
+existing baseline carries each cell's `logs` provenance list forward only when the new row's
+`log` is one of those files, and refuses a carried or explicit list that does not name that
+`log`; it also refuses to drop a cell or overwrite an unreadable old file. To replace a
+baseline with a fresh measurement, save to a new path or add an explicit `logs` list that
+names this run's `log`. The comparison
 is keyed by `(model, mode)` and writes `comparison.csv`/`comparison.json` with pass/fail
 status transitions, exactness transitions, and signed throughput deltas. Both flags can
 be combined to compare against the old baseline and replace it in one run. The process

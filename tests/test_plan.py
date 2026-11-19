@@ -312,7 +312,7 @@ def test_follow_up_commands_quote_a_spaced_pack_and_interpreter(tmp_path, monkey
     """A spaced pack or interpreter path must stay one argument when the command is pasted.
 
     POSIX is parsed back with `shlex`; Windows must carry the cmd.exe double quotes. The
-    generated line is then run through the host shells with a stand-in `kindi` that prints
+    generated lines are then run through the host shells with a stand-in `kindi` that prints
     its argv, so the child itself proves the full spaced `--pack` path arrived intact.
     """
     real_python = sys.executable
@@ -329,6 +329,14 @@ def test_follow_up_commands_quote_a_spaced_pack_and_interpreter(tmp_path, monkey
         "/opt/my python/bin/python3", "-m", "kindi", "--pack", str(pack),
         "bench", "--tandem", "cpu-first", "--tandem-cpu-layers", "auto"]
 
+    verify = _plan._verify_command(str(pack))
+    assert shlex.split(verify) == [
+        "/opt/my python/bin/python3", "-m", "kindi", "--pack", str(pack), "verify"]
+    verify_tandem = _plan._verify_command(str(pack), "cpu-first", None)
+    assert shlex.split(verify_tandem) == [
+        "/opt/my python/bin/python3", "-m", "kindi", "--pack", str(pack),
+        "verify", "--tandem", "cpu-first", "--tandem-cpu-layers", "auto"]
+
     monkeypatch.setattr(_plan, "_WINDOWS", True)
     monkeypatch.setattr(_plan.sys, "executable", r"C:\Program Files\Python 313\python.exe")
     win_pack = r"C:\my packs\bonsai 2b"
@@ -339,7 +347,13 @@ def test_follow_up_commands_quote_a_spaced_pack_and_interpreter(tmp_path, monkey
     assert win_tandem == ('"C:\\Program Files\\Python 313\\python.exe" -m kindi --pack '
                           '"C:\\my packs\\bonsai 2b" bench --tandem cpu-first '
                           '--tandem-cpu-layers auto')
-
+    win_verify = _plan._verify_command(win_pack)
+    assert win_verify == ('"%s" -m kindi --pack "%s" verify'
+                          % (_plan.sys.executable, win_pack))
+    win_verify_tandem = _plan._verify_command(win_pack, "cpu-first", None)
+    assert win_verify_tandem == ('"%s" -m kindi --pack "%s" verify --tandem cpu-first '
+                                 '--tandem-cpu-layers auto'
+                                 % (_plan.sys.executable, win_pack))
     # Round-trip through the real shell: a fake `kindi` package echoes the argv it received.
     # cmd.exe runs only on Windows; a POSIX shell runs wherever one is on PATH (Git Bash
     # included), so the same test covers Linux and a Windows checkout with bash installed.
@@ -354,6 +368,19 @@ def test_follow_up_commands_quote_a_spaced_pack_and_interpreter(tmp_path, monkey
     env = dict(os.environ, PYTHONPATH=str(fake_root))
     expected = ["--pack", str(pack), "--ctx", "2048", "bench", "--dcache", "16"]
 
+    (pack / "kindi_pack.json").write_text(json.dumps({"backend": "kindi"}), encoding="utf-8")
+
+    report = {"lines": [], "command": "bench follow-up", "strategy": "moe-expert-tiers"}
+
+    def printed_verify(strategy):
+        """Run the plan with a fake report and return the verify line it actually printed."""
+        report["strategy"] = strategy
+        lines = []
+        assert _plan.run({"pack": str(pack), "ctx": 2048}, _FakeArgs(), log=lines.append) == 0
+        return next(line.split("verify:", 1)[1].strip() for line in lines
+                    if line.startswith("verify:"))
+
+    monkeypatch.setattr(_plan, "describe", lambda *args, **kwargs: report)
     monkeypatch.setattr(_plan.sys, "executable", real_python)
     monkeypatch.setattr(_plan, "_WINDOWS", False)
     posix_shell = shutil.which("bash") or shutil.which("sh")
@@ -364,6 +391,16 @@ def test_follow_up_commands_quote_a_spaced_pack_and_interpreter(tmp_path, monkey
         assert proc.returncode == 0, (posix_cmd, proc.stdout, proc.stderr)
         assert json.loads(proc.stdout.strip().splitlines()[-1]) == expected
 
+        for strategy, expected_verify in (
+                ("moe-expert-tiers", ["--pack", str(pack), "verify"]),
+                ("tandem", ["--pack", str(pack), "verify", "--tandem", "cpu-first",
+                            "--tandem-cpu-layers", "auto"])):
+            verify_cmd = printed_verify(strategy)
+            assert shlex.split(verify_cmd) == [real_python, "-m", "kindi"] + expected_verify
+            proc = subprocess.run([posix_shell, "-c", verify_cmd], cwd=child_cwd, env=env,
+                                  text=True, capture_output=True)
+            assert proc.returncode == 0, (verify_cmd, proc.stdout, proc.stderr)
+            assert json.loads(proc.stdout.strip().splitlines()[-1]) == expected_verify
     if os.name == "nt":
         monkeypatch.setattr(_plan, "_WINDOWS", True)
         win_cmd = _plan._moe_bench_command(str(pack), 2048, 16)
@@ -372,6 +409,16 @@ def test_follow_up_commands_quote_a_spaced_pack_and_interpreter(tmp_path, monkey
                               executable=os.environ.get("COMSPEC", "cmd.exe"))
         assert proc.returncode == 0, (win_cmd, proc.stdout, proc.stderr)
         assert json.loads(proc.stdout.strip().splitlines()[-1]) == expected
+        for strategy, expected_verify in (
+                ("moe-expert-tiers", ["--pack", str(pack), "verify"]),
+                ("tandem", ["--pack", str(pack), "verify", "--tandem", "cpu-first",
+                            "--tandem-cpu-layers", "auto"])):
+            verify_cmd = printed_verify(strategy)
+            proc = subprocess.run(verify_cmd, shell=True, cwd=child_cwd, env=env, text=True,
+                                  capture_output=True,
+                                  executable=os.environ.get("COMSPEC", "cmd.exe"))
+            assert proc.returncode == 0, (verify_cmd, proc.stdout, proc.stderr)
+            assert json.loads(proc.stdout.strip().splitlines()[-1]) == expected_verify
 
 
 def test_the_planned_bench_command_carries_the_planned_context(tmp_path):

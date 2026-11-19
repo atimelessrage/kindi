@@ -127,3 +127,11 @@ no models), and the claims were checked against the tree:
 Adopted result: the I/O probe (`kindi/io_probe.py`, `kindi io`) and the gates in the two docs above.
 No speed claim was adopted, and no other engine's number became ours. The knowledge base still needs
 its path supplied before the next real incremental scan.
+
+## Check attempt 2026-11-19 (path unavailable; repository-only ranking)
+
+**Last checked:** 2026-11-19. `$KINDI_AI_INVENTORY` is unset in this session's shell, so the base was
+not read and no knowledge-base candidate is recorded. The roadmap review therefore uses only this
+repository's measurements and the tracked Intel fork; no `[M]` or `[P]` number was adopted. Gate for
+the next scan: set the variable, then follow the incremental procedure from the last recorded commit
+`1135eab` (or the base's then-current HEAD), comparing mtimes because its working tree lags git.

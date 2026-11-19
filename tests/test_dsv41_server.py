@@ -154,3 +154,71 @@ def test_an_oversized_body_does_not_hide_the_413_or_leak_into_the_next_request(m
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_valid_sampling_fields_are_accepted():
+    req = {"messages": [{"role": "user", "content": "hello"}],
+           "max_tokens": 4, "max_completion_tokens": 8, "temperature": 0.7, "top_p": 0.9,
+           "top_k": 20, "min_p": 0.05, "seed": 2 ** 32 - 1}
+    assert dsv41_server.validate_request(req) is req
+    # the default/off values are valid too
+    assert dsv41_server.validate_request({"temperature": 0, "top_p": 1, "top_k": 0, "min_p": 0})
+
+
+def test_malformed_or_non_finite_sampling_fields_are_400_before_generation():
+    """The HTTP boundary rejects the field with 400 before count() or run() is reached."""
+    class NoEngine:
+        class a:
+            api_key = ""
+
+        class model:
+            ctx = 1024
+
+        @staticmethod
+        def count(req):
+            raise AssertionError("count() ran before the request was validated")
+
+        @staticmethod
+        def run(*args, **kwargs):
+            raise AssertionError("run() ran before the request was validated")
+
+    cases = (
+        ({"max_tokens": "4"}, "max_tokens"),
+        ({"max_tokens": True}, "max_tokens"),
+        ({"max_tokens": 0}, "max_tokens"),
+        ({"max_tokens": -1}, "max_tokens"),
+        ({"max_completion_tokens": 1.5}, "max_completion_tokens"),
+        ({"max_completion_tokens": 0}, "max_completion_tokens"),
+        ({"temperature": float("nan")}, "temperature"),
+        ({"temperature": float("inf")}, "temperature"),
+        ({"temperature": -0.1}, "temperature"),
+        ({"temperature": "0.7"}, "temperature"),
+        ({"top_p": 1.1}, "top_p"),
+        ({"top_p": -0.1}, "top_p"),
+        ({"top_p": 0}, "top_p"),
+        ({"top_p": float("nan")}, "top_p"),
+        ({"top_k": 2.0}, "top_k"),
+        ({"top_k": True}, "top_k"),
+        ({"top_k": -1}, "top_k"),
+        ({"min_p": float("nan")}, "min_p"),
+        ({"min_p": 1.1}, "min_p"),
+        ({"min_p": -0.1}, "min_p"),
+        ({"seed": 1.5}, "seed"),
+        ({"seed": True}, "seed"),
+        ({"seed": -1}, "seed"),
+        ({"seed": 2 ** 32}, "seed"),
+    )
+    for extra, field in cases:
+        payload = {"messages": [{"role": "user", "content": "hello"}]}
+        payload.update(extra)
+        body = json.dumps(payload).encode()
+        h = object.__new__(dsv41_server.make_handler(NoEngine))
+        h.path = "/v1/chat/completions"
+        h.headers = {"Content-Length": str(len(body))}
+        h.rfile = io.BytesIO(body)
+        h.close_connection = False
+        sent = []
+        h._err = lambda code, msg, typ="invalid_request_error", box=sent: box.append((code, msg, typ))
+        h.do_POST()
+        assert sent and sent[0][0] == 400, (extra, sent)
+        assert field in sent[0][1], (extra, sent)

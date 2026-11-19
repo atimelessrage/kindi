@@ -64,6 +64,35 @@ def test_no_spec_request_reports_off_and_verifies_the_plain_path(monkeypatch):
     assert line == "speculation: off (KINDI_SPEC=0)"
 
 
+def test_mode_a_defaults_to_its_measured_winning_k(monkeypatch):
+    """The 2B's own head lost at the old default k=4 (0.66-0.89x) and won at k=1 (1.12-1.13x).
+    The mode A default is now that measured row; an explicit KINDI_SPEC_K still wins."""
+    import kindi.spec as spec
+    monkeypatch.setenv("KINDI_SPEC", "mtp")
+    monkeypatch.delenv("KINDI_SPEC_K", raising=False)
+    eng = _engine(mtp=object())
+    spec.spec_begin(eng, True)
+    assert eng.spec_k == 1
+
+
+def test_explicit_k_still_overrides_mode_a_default(monkeypatch):
+    import kindi.spec as spec
+    monkeypatch.setenv("KINDI_SPEC", "mtp")
+    monkeypatch.setenv("KINDI_SPEC_K", "4")
+    eng = _engine(mtp=object())
+    spec.spec_begin(eng, True)
+    assert eng.spec_k == 4
+
+
+def test_the_other_drafters_keep_the_k4_default(monkeypatch):
+    import kindi.spec as spec
+    monkeypatch.setenv("KINDI_SPEC", "draft2b")
+    monkeypatch.delenv("KINDI_SPEC_K", raising=False)
+    eng = _engine(drafter=types.SimpleNamespace(begin=lambda: None))
+    spec.spec_begin(eng, True)
+    assert eng.spec_k == 4
+
+
 def test_the_head_that_attached_is_named_with_its_digest(monkeypatch):
     """The loaded case: requested mtp, effective mtp, the head file and its sha256 prefix."""
     monkeypatch.setenv("KINDI_SPEC", "mtp")

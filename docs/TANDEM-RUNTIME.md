@@ -9,7 +9,14 @@ is a model-free state-machine prototype with a Gemma 4 26B backend adaptation in
 [MOE-TANDEM.md](MOE-TANDEM.md) and [GEMMA4-26B-MOE.md](GEMMA4-26B-MOE.md); there is no MoE backend or
 integration. This runtime only splits dense layers, so a MoE manifest is refused by name (`TandemEngine`
 and, for a `--tandem` flag, a `make_engine` log line that leaves tandem off) and points at the expert-tier
-split its own engine runs — see [MOE-TANDEM.md §1](MOE-TANDEM.md). Every split is still slower than GPU-only on this card.
+split its own engine runs — see [MOE-TANDEM.md §1](MOE-TANDEM.md). On this card every split is still
+slower than GPU-only; a capacity-bound split can still gain speed. The measured case is
+AH-Nanbeige4.3-33B IQ3_XXS on a 12 GB Quadro K6000 (13 host layers, 55% of their FFN rows on the CPU):
+3.85/3.55/3.56 tok/s at 480/2,016/8,160 tokens against llama.cpp's 2.19/1.96/1.52, and 4.4-5.0 against
+2.5-2.7 at 1,024 (Kindi 0.4.0; [BENCHMARKS.md](BENCHMARKS.md)). That is a dense 33B model, not a MoE.
+On the 4060 Ti the dense 2B/4B/9B tandem rows are 4.3-5.8x CPU-only at 24K but 4.1-4.8x slower than
+GPU-only ([CROSS-MODE.md](benchmarks/CROSS-MODE.md)). The big-MoE CPU-compute lane remains design-only in
+[MOE-TANDEM.md](MOE-TANDEM.md); no CPU expert kernel or backend exists.
 The runtime is `kindi/tandem.py`, with the per-layer GPU API in `kindi/engine.py` (plain owner) and
 `kindi/tp.py:TPEngine(layers=...)` (plan owner, the default). The recovery
 history and the cleanup gate for the interrupted branch are in [TANDEM-STATUS.md](TANDEM-STATUS.md);

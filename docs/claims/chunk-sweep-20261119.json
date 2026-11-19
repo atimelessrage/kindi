@@ -1,0 +1,27 @@
+{
+  "gate": "chunk-sweep-20261119",
+  "title": "KINDI_CHUNK prefill sweep on the 2B: 4K and 8K, chunks 128/256/512/1024",
+  "measured": "2026-11-19",
+  "commit": "3002a40",
+  "command": "python run_chunk_sweep.py --pack ~/.kindi/packs/bonsai-2b --out . (three fresh processes per chunk, each `python -m kindi bench --split-at 4096,8192 --split-generated 128 --sample-vram --json`, KINDI_CTX=8320, KINDI_CHUNK=<chunk>)",
+  "notes": "256 is the fastest cell at both prompt lengths and is already the default, so no default change and no autotune candidate. The roadmap quotes the two winning p50 cells and the two 128-token p50 cells; the page carries p95, the per-pass rows and the sampled peak.",
+  "evidence": [
+    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/RESULTS.md",
+    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/results.json",
+    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/run_chunk_sweep.py"
+  ],
+  "numbers": [
+    {"id": "chunk256-4k-prefill-p50", "display": "962.15", "quoted_in": ["docs/ROADMAP.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/results.json",
+               "pointer": "/summary/chunks/256/4096/prefill_ms_p50", "expect": 962.15}},
+    {"id": "chunk256-8k-prefill-p50", "display": "2602.72", "quoted_in": ["docs/ROADMAP.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/results.json",
+               "pointer": "/summary/chunks/256/8192/prefill_ms_p50", "expect": 2602.72}},
+    {"id": "chunk128-4k-prefill-p50", "display": "1179.81", "quoted_in": ["docs/ROADMAP.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/results.json",
+               "pointer": "/summary/chunks/128/4096/prefill_ms_p50", "expect": 1179.81}},
+    {"id": "chunk128-8k-prefill-p50", "display": "3015.29", "quoted_in": ["docs/ROADMAP.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/results.json",
+               "pointer": "/summary/chunks/128/8192/prefill_ms_p50", "expect": 3015.29}}
+  ]
+}

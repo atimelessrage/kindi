@@ -22,6 +22,10 @@
     {
       "dir": "dory-d0",
       "reason": "architecture constants from the model's own config (layer counts, tensor totals) and reference goldens, not a measured gate on this hardware"
+    },
+    {
+      "dir": "2026-11-09-i7-8086k-rtx4060ti",
+      "reason": "cited only for its environment block (Windows 10, CuPy 14.2.0, driver 617.42) as provenance for the native-Windows GPU path; the roadmap quotes no performance number from this page, so there is no measured cell to bind"
     }
   ]
 }

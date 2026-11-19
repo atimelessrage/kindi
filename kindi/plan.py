@@ -283,6 +283,18 @@ def _command(pack, mode, spec):
                        "--tandem", mode, "--tandem-cpu-layers", spec or "auto"])
 
 
+def _verify_command(pack, mode=None, spec=None):
+    """The exactness follow-up: quote the interpreter and pack for the host shell.
+
+    The MoE strategy verifies the base engine; other strategies keep the planned tandem
+    split. `_pasteable` keeps a spaced pack or interpreter path one argument when pasted.
+    """
+    argv = [sys.executable, "-m", "kindi", "--pack", pack, "verify"]
+    if mode:
+        argv += ["--tandem", mode, "--tandem-cpu-layers", spec or "auto"]
+    return _pasteable(argv)
+
+
 def _moe_bench_command(pack, ctx, dcache):
     """The Lightning follow-up: carry the planned context and slot count into the child engine.
 
@@ -669,11 +681,9 @@ def run(cfg, a, log=print):
     for choice, reason in rep["lines"]:
         log("%-11s %s" % (choice + ":", reason))
     log("follow up: %s" % rep["command"])
-    if rep.get("strategy") == "moe-expert-tiers":
-        log("verify:    %s -m kindi --pack %s verify" % (sys.executable, pack))
-    else:
-        log("verify:    %s -m kindi --pack %s verify --tandem %s --tandem-cpu-layers %s"
-            % (sys.executable, pack, med, spec or "auto"))
+    verify = (_verify_command(pack) if rep.get("strategy") == "moe-expert-tiers"
+              else _verify_command(pack, med, spec))
+    log("verify:    %s" % verify)
     if getattr(a, "json", None):
         from .bench import bench_json
         bench_json(rep, a.json)

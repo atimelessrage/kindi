@@ -958,6 +958,7 @@
       "bridge/kindi_bridge"
     ],
     "pylint_checks": "E,F (import-error disabled)",
+    "pylint_py_version": "3.10",
     "pylint_targets": [
       "kindi",
       "tools",

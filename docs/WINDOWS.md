@@ -228,8 +228,9 @@ details and the AVX/AVX-only limits are in [CPU-SUPPORT.md](CPU-SUPPORT.md).
   SDK that clang finds through `vswhere`.
 - Enough disk for the model and its converted pack. The 2B is the smallest starting point.
 
-The CPU engine does not need CUDA or CuPy. Native Windows GPU execution is not part of this
-quickstart and has not been validated.
+The CPU engine does not need CUDA or CuPy. This quickstart stays CPU-only; the native GPU
+path needs CuPy and the NVIDIA driver and is validated separately in
+[Native Windows GPU validation](#native-windows-gpu-validation-2026-11-19).
 
 ## Install the Python dependencies
 
@@ -346,13 +347,36 @@ python -m pytest -q --cov=kindi --cov-report=term --cov-fail-under=27
 
 The suite is CPU-only and uses stubs for CUDA. It does not prove that a GPU path works.
 
+## Native Windows GPU validation (2026-11-19)
+
+The GPU path runs from the source tree on native Windows with no shim: Windows 10 22H2 (build
+19045.7846), Python 3.13.6, CuPy 14.2.0 and NVIDIA driver 617.42 on an RTX 4060 Ti 8 GB
+(compute 8.9, 8,188 MiB).
+`kindi/gpudrv.py` opened the driver as `nvcuda.dll`; CuPy's `CUDA path could not be detected`
+warning is harmless because the driver loads through that name.
+
+| check | command | measured result |
+|---|---|---|
+| plain GPU verify, 2B | `python -m kindi --pack ~/.kindi/packs/bonsai-2b --ctx 4096 verify` | 4/4 prompts, 40/40 tokens each, ALL PASS; 184.5 tokens/s over the run; 24 s wall |
+| tensor-core plan verify, 2B | `KINDI_TC=1` with the same command | 4/4 prompts, 40/40 tokens each, ALL PASS; 225.7 tokens/s; 22 s wall |
+| bench, 2B | `python -m kindi --pack ~/.kindi/packs/bonsai-2b --ctx 8192 bench --split-at off` | prompt read 69.4 tokens/s; generation 226.1 at position 100, 219.2 at 2,000, 212.7 at 8,000; 6,523 MiB free |
+| server, 2B | `python -m kindi --pack ~/.kindi/packs/bonsai-2b --ctx 4096 serve`, then `POST /v1/chat/completions` | `/health` ok (ctx 4096, head `exact`); 8-token reply, `finish_reason: length`, 256.29 generation tokens/s; `/metrics` served; 6,551 MiB free |
+
+`verify` runs at its fixed 1,024-token context, so the 2B's pack load (about 18 s here) is the
+main cost. The measured scope is the 2B on this one card. **Not measured on this path:** the
+4B, 9B and 27B packs, speculation/MTP, the tandem split, cache restart, a second card, AMD,
+other NVIDIA cards, and the `install.ps1` route (it sets up WSL2, not a native CUDA install).
+
 ## Limits and non-claims
 
-- **No native Windows GPU support is claimed.** CUDA/CuPy execution on Windows has not been
-  validated here; use the Linux Docker image or WSL2 for GPU work.
+- **Native Windows GPU support is measured on one card and one model.** The 2026-11-19 run
+  above covers the 2B on an RTX 4060 Ti 8 GB from the source tree. The installer's GPU profiles,
+  other cards, and the 4B/9B/27B packs on this path are unmeasured; use the Linux Docker image
+  or WSL2 when you need a supported GPU setup.
 - **AMD graphics are not supported natively on Windows.** Use the Linux ROCm images.
 - **The Linux installer does not run on Windows.** Use `install.ps1` (above) for the WSL2 path, or run this native CPU path directly.
 - **No 27B, Nemotron or Nanbeige CPU model.** Those are GPU targets.
 - **No AVX means no CPU engine.** The installer and engine report this before building.
-- **The native GPU rows in the main support matrix are not Windows rows.** They remain Linux
-  results unless a Windows run is recorded.
+- **Support-matrix rows are per-host results.** The RTX 4060 Ti rows were recorded on this
+  native Windows host (their benchmark pages name it), and the 2026-11-19 validation above
+  re-confirms the 2B. Cards without a recorded run stay unverified.

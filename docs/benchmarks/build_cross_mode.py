@@ -12,6 +12,7 @@ or CROSS-MODE.csv is stale.
 import argparse
 import csv
 import io
+import json
 import statistics
 import sys
 from pathlib import Path
@@ -21,6 +22,7 @@ CPU_RUNS = HERE / "2026-11-10-i7-8086k-windows-cpu" / "runs.csv"
 GPU_RUNS = HERE / "2026-11-09-i7-8086k-rtx4060ti" / "runs.csv"
 TANDEM_RUNS = HERE / "2026-11-12-i7-8086k-rtx4060ti-tandem" / "runs.csv"
 TC_RUNS = HERE / "2026-11-13-i7-8086k-rtx4060ti-tc" / "runs.csv"
+CONTROLLED_RUN = HERE / "2026-11-19-i7-8086k-rtx4060ti-9b-controlled" / "runs.json"
 MD = HERE / "CROSS-MODE.md"
 CSV = HERE / "CROSS-MODE.csv"
 POSITIONS = (100, 2000, 8000, 16000, 24000)
@@ -132,13 +134,42 @@ def tc_rows():
     return out
 
 
+def controlled_9b():
+    """The 2026-11-19 same-session 9B CPU-only/tandem pair at 24,576 tokens.
+
+    The 2B/4B rows still pair a 2026-11-10 CPU run with 2026-11-13 tandem runs; the 9B pair was
+    measured back to back on the current code so its ratio is a controlled A/B.
+    """
+    try:
+        data = json.loads(CONTROLLED_RUN.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise SystemExit("%s: %s" % (CONTROLLED_RUN, exc)) from exc
+    if (data.get("ctx") != 24576 or data.get("placement") != "cpu-first"
+            or int(data.get("cpu_layers", 0)) != 6):
+        raise SystemExit("%s: expected ctx 24576, cpu-first, 6 CPU layers" % CONTROLLED_RUN)
+    out = {}
+    for mode in ("cpu", "tandem"):
+        cells = data[mode]
+        out[mode] = {"read": float(cells["read"]), "runs": 1}
+        out[mode].update({"gen_%d" % p: float(cells[str(p)]) for p in POSITIONS})
+    return out
+
+
 def matrix():
     """One row per mode and model; incomplete tandem data stays explicitly unavailable."""
     cpu, gpu, tandem, tc = cpu_rows(), gpu_rows(), tandem_rows(), tc_rows()
+    controlled = controlled_9b()
     rows = []
     for model in MODELS:
-        rows.append(dict(mode="cpu", available=1, model=model, runs=1,
-                         source="2026-11-10-i7-8086k-windows-cpu (6 threads, one run)", **cpu[model]))
+        if model == "9b":
+            c = controlled["cpu"]
+            rows.append(dict(mode="cpu", available=1, model=model, runs=1,
+                             source="2026-11-19 controlled pair (CPU-only, 1 run, same session)",
+                             **{k: c[k] for k in METRICS}))
+        else:
+            rows.append(dict(mode="cpu", available=1, model=model, runs=1,
+                             source="2026-11-10-i7-8086k-windows-cpu (6 threads, one run)",
+                             **cpu[model]))
         rows.append(dict(mode="gpu", available=1, model=model, runs=gpu[model]["runs"],
                          source="2026-11-09-i7-8086k-rtx4060ti (median of 3)",
                          **{k: gpu[model][k] for k in METRICS}))
@@ -147,7 +178,12 @@ def matrix():
                              source="2026-11-13-i7-8086k-rtx4060ti-tc (median of %d; "
                                     "9B with KINDI_TC_HP=1)" % tc[model]["runs"],
                              **{k: tc[model][k] for k in METRICS}))
-        if model in tandem:
+        if model == "9b":
+            t = controlled["tandem"]
+            rows.append(dict(mode="tandem", available=1, model=model, runs=1,
+                             source="2026-11-19 controlled pair (cpu-first, 6 CPU layers, 1 run)",
+                             **{k: t[k] for k in METRICS}))
+        elif model in tandem:
             t = tandem[model]
             rows.append(dict(
                 mode="tandem", available=1, model=model, runs=t["runs"],
@@ -177,9 +213,9 @@ def render_md(rows):
     measured_tandem = [m for m in MODELS if by[("tandem", m)]["available"] == 1]
     missing_tandem = [m for m in MODELS if m not in measured_tandem]
     if measured_tandem == list(MODELS):
-        tandem_intro = ("All tandem rows below are measured on 2026-11-13, three fresh-process runs per\n"
-                        "  model; the table uses their median, like the GPU-only rows. The original 2026-11-12 single\n"
-                        "  runs are kept as `bench-<model>-cpu-first-24k.log` in the source folder.")
+        tandem_intro = ("The 2B/4B rows are the median of three fresh-process runs (2026-11-13), like\n"
+                        "  the GPU-only rows; the 9B row is a same-session controlled CPU-only/tandem pair\n"
+                        "  from 2026-11-19 (one fresh process per placement), so its ratio is not cross-run.")
     elif measured_tandem:
         tandem_intro = ("Measured tandem rows in the table below are the median of three fresh-process runs\n"
                         "  per model (2026-11-13) (models: %s); the other tandem rows say `n/a` because they have\n"
@@ -200,7 +236,8 @@ def render_md(rows):
         "drafting.",
         "",
         "- **CPU only:** `KINDI_DEVICE=cpu` on native Windows 10, 6 threads (one per physical core),",
-        "  24,576-token context. One fresh-process run per model; no WSL.",
+        "  24,576-token context. One fresh-process run per model; no WSL. The 9B row is the CPU half",
+        "  of the 2026-11-19 controlled pair below.",
         "- **GPU only:** the card runs every layer; the CPU only drives the process (Windows 10, CuPy",
         "  14.2.0). Three fresh-process runs per model; the table uses their median.",
         "- **GPU tensor-core (plan):** `KINDI_TP=1` `KINDI_TC=1` (plan engine, tensor cores) on the",
@@ -222,11 +259,15 @@ def render_md(rows):
         "",
         "Sources: [2026-11-10-i7-8086k-windows-cpu](2026-11-10-i7-8086k-windows-cpu/README.md) (6 threads,",
         "native Windows) and [2026-11-09-i7-8086k-rtx4060ti](2026-11-09-i7-8086k-rtx4060ti/README.md). The",
-        "CPU run is one run per cell; the GPU run is the median of three. The two blocks were not interleaved",
-        "and the CPU block is native Windows, so the ratio is a same-machine indication, not a controlled A/B.",
+        "CPU run is one run per cell; the GPU run is the median of three. The 2B/4B CPU block was not",
+        "interleaved with its tandem runs, so those ratios are a same-machine indication, not a controlled",
+        "A/B. The 9B CPU and tandem rows are the controlled pair described below.",
         ""]
     if measured_tandem:
         lines.append("Tandem source: [2026-11-12-i7-8086k-rtx4060ti-tandem](2026-11-12-i7-8086k-rtx4060ti-tandem/README.md).")
+    if "9b" in measured_tandem:
+        lines.append("Controlled 9B pair: [2026-11-19-i7-8086k-rtx4060ti-9b-controlled]"
+                     "(2026-11-19-i7-8086k-rtx4060ti-9b-controlled/RESULTS.md).")
     if any(("tc", m) in by and by[("tc", m)]["available"] == 1 for m in MODELS):
         lines.append("Tensor-core source: [2026-11-13-i7-8086k-rtx4060ti-tc](2026-11-13-i7-8086k-rtx4060ti-tc/README.md).")
     lines += [
@@ -241,6 +282,8 @@ def render_md(rows):
             "%.1fx" % (g[k] / c[k]) for k in METRICS[1:])))
     lines += [
         "",
+        "The ratio grows with depth because the CPU attention path slows down faster than the GPU path.",
+        "",
         "## Tensor-core (plan engine) speedup over GPU-only",
         "",
         "| Model | 100 | 2K | 8K | 16K | 24K |",
@@ -250,10 +293,10 @@ def render_md(rows):
             g, t = by[("gpu", model)], by[("tc", model)]
             lines.append("| %s | %s |" % (model.upper(), " | ".join(
                 "%.1fx" % (t[k] / g[k]) for k in METRICS[1:])))
-    if measured_tandem == MODELS:
-        tandem_status = "All tandem cells are recorded from 2026-11-12."
+    if measured_tandem == list(MODELS):
+        tandem_status = "All tandem cells are recorded from 2026-11-13."
     elif measured_tandem:
-        tandem_status = ("The %s tandem cell(s) are recorded from 2026-11-12; the %s cell(s) are not "
+        tandem_status = ("The %s tandem cell(s) are recorded from 2026-11-13; the %s cell(s) are not "
                          "recorded because the same single-run throughput benchmark has not been run "
                          "for those models." % (", ".join(m.upper() for m in measured_tandem),
                                                 ", ".join(m.upper() for m in missing_tandem)))
@@ -261,7 +304,44 @@ def render_md(rows):
         tandem_status = "No tandem cell is recorded because no throughput benchmark has been run."
     lines += [
         "",
-        "The ratio grows with depth because the CPU attention path slows down faster than the GPU path.",
+        "## Tandem speedup over CPU-only",
+        "",
+        "| Model | 100 | 2K | 8K | 16K | 24K |",
+        "|---|---:|---:|---:|---:|---:|"]
+    tandem_gains = []
+    for model in MODELS:
+        c, t = by[("cpu", model)], by[("tandem", model)]
+        if t["available"] != 1:
+            lines.append("| %s | n/a | n/a | n/a | n/a | n/a |" % model.upper())
+            continue
+        gains = [t[k] / c[k] for k in METRICS[1:]]
+        tandem_gains.append(max(gains))
+        lines.append("| %s | %s |" % (model.upper(), " | ".join("%.1fx" % g for g in gains)))
+    if tandem_gains:
+        deep = list(measured_tandem)
+        lo = min(by[("tandem", m)]["gen_24000"] / by[("cpu", m)]["gen_24000"] for m in deep)
+        hi = max(by[("tandem", m)]["gen_24000"] / by[("cpu", m)]["gen_24000"] for m in deep)
+        gpu_lo = min(by[("gpu", m)]["gen_24000"] / by[("tandem", m)]["gen_24000"] for m in deep)
+        gpu_hi = max(by[("gpu", m)]["gen_24000"] / by[("tandem", m)]["gen_24000"] for m in deep)
+        lines += [
+            "",
+            "Every measured tandem cell above is faster than CPU-only; at 24K the gain is",
+            f"**{lo:.1f}x-{hi:.1f}x**. The same rows are {gpu_lo:.1f}x-{gpu_hi:.1f}x slower than GPU-only, so this is a",
+            "capacity trade, not a win for a model that fits the card. The measured capacity-bound",
+            "case is outside this table: AH-Nanbeige4.3-33B IQ3_XXS on a 12 GB Quadro K6000 keeps 13",
+            "layers in host memory and computes 55% of their FFN rows on the CPU; it writes",
+            "3.85/3.55/3.56 tok/s at 480/2,016/8,160 tokens against llama.cpp's 2.19/1.96/1.52, and",
+            "4.4-5.0 against 2.5-2.7 at 1,024 (Kindi 0.4.0; [BENCHMARKS.md](../BENCHMARKS.md)). That is a",
+            "dense 33B model, not a MoE. A big-MoE CPU-compute row still needs the CPU expert lane in",
+            "[MOE-TANDEM.md](../MOE-TANDEM.md), which has no backend yet.",
+        ]
+        lines += [
+            "",
+            "The 9B row is a direct A/B: both placements passed `kindi verify` 4/4 (133/133 tokens),",
+            "and the tandem's sampled peak was 2,864 MiB device-wide (1,939 MiB over idle), with",
+            "5,086 MiB free after load. The CPU-only placement has no GPU allocation to sample.",
+        ]
+    lines += [
         "",
         "## Tandem status and the gate for a number",
         "",
@@ -286,8 +366,8 @@ def render_md(rows):
         "  larger models are GPU targets.",
         "- **CPU is native Windows, not WSL2.** The 2026-11-09 WSL2 page is kept as history; its CPU cells",
         "  are no longer the cross-mode source.",
-        "- **One CPU run per cell.** There is no variance or thermal control; the GPU and tensor-core",
-        "  cells have three runs and a spread of a few percent.",
+        "- **One run per CPU/tandem cell.** The 9B pair is one run per placement; there is no variance",
+        "  or thermal control. The GPU and tensor-core cells have three runs and a spread of a few percent.",
         "- **Tensor-core cells are medians of three fresh-process runs (2026-11-13).** The 9B cell",
         "  runs with `KINDI_TC_HP=1`; without it the engine refuses HB 4096 (see `kindi/spec.py`).",
         "- **24K is the deepest measured position.** The packs advertise 262,144 tokens, but no 32K/64K",

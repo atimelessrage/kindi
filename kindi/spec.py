@@ -22,8 +22,9 @@ or through the tensor-core chunk GEMM once it exists. KINDI_TC=0 (the default) l
 Speculative decoding (greedy requests; the server calls spec_begin / spec_end around a reply):
   KINDI_SPEC = 0 (default) | ngram (prompt lookup) | draft2b (a Ternary-Bonsai-2 2B pack, KINDI_SPEC_PACK, on the
   same card, built first with context KINDI_SPEC_CTX, default 73728) | both (n-gram when it proposes 2+ tokens,
-  else the 2B); KINDI_SPEC_K = draft length (default 4, at most 7; 3 is best with the 2B). Sampled requests use
-  speculative sampling (KINDI_SPEC_SAMPLE=0: greedy requests only)."""
+  else the 2B); KINDI_SPEC_K = draft length (default 4, at most 7; 3 is best with the 2B, and mode A
+  defaults to 1 after its depth measurement). Sampled requests use speculative sampling
+  (KINDI_SPEC_SAMPLE=0: greedy requests only)."""
 import ctypes
 import json
 import os
@@ -1330,7 +1331,10 @@ def spec_begin(self, greedy, temperature=0.0, top_p=1.0, top_k=0, rng=None, min_
     self.spec_auto = requested == "auto"
     mode, _ = resolve_mode(self, requested, greedy)
     self.spec_mode = mode
-    self.spec_k = int(os.environ.get("KINDI_SPEC_K", "4")) if mode in ("ngram", "draft2b", "both", "mtp") else 0
+    # mode A's measured best on the 2B is k=1 (1.12-1.13x at 512/24K; k=4 was 0.66-0.89x), so the
+    # head's default follows that row. An explicit KINDI_SPEC_K still wins; the other modes keep 4.
+    self.spec_k = int(os.environ.get("KINDI_SPEC_K", "1" if mode == "mtp" else "4")) \
+        if mode in ("ngram", "draft2b", "both", "mtp") else 0
     if self.spec_auto and mode == "draft2b":
         self.spec_k = 3
     if mode == "dspine":                         # a whole block: the current token + BLOCK - 1 drafts (KINDI_SPEC_K is the 2B's)

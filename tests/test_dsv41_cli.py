@@ -210,3 +210,88 @@ def test_verify_rejects_missing_gate_files_before_loading(tmp_path, monkeypatch,
         dsv41.main(["verify", "model.gguf"])
     assert exc.value.code == 2
     assert "gate file not found" in capsys.readouterr().err
+
+
+def test_prompt_jsonl_and_reference_validators_accept_their_formats(tmp_path):
+    prompts = tmp_path / "prompts.jsonl"
+    prompts.write_text('{"id": 0, "text": "x", "extra": true}\n'
+                       '{"id": 7, "text": ""}\n', encoding="utf-8")
+    assert dsv41._prompts_arg(str(prompts)) == str(prompts)
+
+    ref = tmp_path / "ref.txt"
+    ref.write_text("# gate header is ignored\n"
+                   "GEN 1:0.5 2:-0.25\n"
+                   "\n", encoding="utf-8")
+    assert dsv41._ref_arg(str(ref)) == str(ref)
+
+
+@pytest.mark.parametrize("content, expected", [
+    ("not json\n", "not valid JSON"),
+    ("[]\n", "JSON object"),
+    ('{"text": "x"}\n', "integer id"),
+    ('{"id": "0", "text": "x"}\n', "integer id"),
+    ('{"id": true, "text": "x"}\n', "integer id"),
+    ('{"id": 0}\n', "string text"),
+    ('{"id": 0, "text": 5}\n', "string text"),
+    ("", "no JSON lines"),
+])
+def test_prompt_jsonl_lines_are_parsed_at_argparse_time(tmp_path, content, expected, capsys):
+    prompts = tmp_path / "prompts.jsonl"
+    prompts.write_text(content, encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        dsv41.main(["tokens", "model.gguf", "--prompts", str(prompts)])
+    assert exc.value.code == 2
+    err = capsys.readouterr().err
+    assert expected in err, err
+
+
+@pytest.mark.parametrize("content, expected", [
+    ("GEN 1\n", "token:margin"),
+    ("GEN 1:0.5:extra\n", "token:margin"),
+    ("GEN 1:fast\n", "token:margin"),
+    ("GEN -1:0.5\n", "token ids 0..129279"),
+    ("GEN 129280:0.5\n", "token ids 0..129279"),
+    ("GEN 1:nan\n", "finite margins"),
+    ("GEN 1:inf\n", "finite margins"),
+    ("GEN\n", "no continuation tokens"),
+    ("not a reference line\n", "no GEN continuation lines"),
+    ("", "no GEN continuation lines"),
+])
+def test_ref_continuations_are_parsed_at_argparse_time(tmp_path, content, expected, capsys):
+    prompts = tmp_path / "prompts.jsonl"
+    prompts.write_text('{"id": 0, "text": "x"}\n', encoding="utf-8")
+    ref = tmp_path / "ref.txt"
+    ref.write_text(content, encoding="utf-8")
+    with pytest.raises(SystemExit) as exc:
+        dsv41.main(["teacher", "model.gguf", "--prompts", str(prompts), "--ref", str(ref)])
+    assert exc.value.code == 2
+    err = capsys.readouterr().err
+    assert expected in err, err
+
+
+def test_verify_rejects_malformed_default_gate_content_before_loading(tmp_path, monkeypatch, capsys):
+    gate = tmp_path / "gate"
+    gate.mkdir()
+    (gate / "gate_prompts.jsonl").write_text('{"id": 0, "text": "x"}\n', encoding="utf-8")
+    (gate / "gate_ref.txt").write_text("GEN 1:not-a-margin\n", encoding="utf-8")
+    monkeypatch.setattr(dsv41, "GATE_DIR", str(gate))
+    with pytest.raises(SystemExit) as exc:
+        dsv41.main(["verify", "model.gguf"])
+    assert exc.value.code == 2
+    err = capsys.readouterr().err
+    assert "--ref gate file" in err
+    assert "finite margins" in err
+
+
+def test_verify_rejects_malformed_default_gate_prompts_before_loading(tmp_path, monkeypatch, capsys):
+    gate = tmp_path / "gate"
+    gate.mkdir()
+    (gate / "gate_prompts.jsonl").write_text('{"id": 0}\n', encoding="utf-8")
+    (gate / "gate_ref.txt").write_text("GEN 1:0.5\n", encoding="utf-8")
+    monkeypatch.setattr(dsv41, "GATE_DIR", str(gate))
+    with pytest.raises(SystemExit) as exc:
+        dsv41.main(["verify", "model.gguf"])
+    assert exc.value.code == 2
+    err = capsys.readouterr().err
+    assert "--prompts gate file" in err
+    assert "string text" in err

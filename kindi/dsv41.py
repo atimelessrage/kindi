@@ -294,6 +294,74 @@ def _readable_file(text):
     return path
 
 
+def _prompts_arg(text):
+    """A JSONL prompts file: every line is an object with an integer id and a string text."""
+    path = _readable_file(text)
+    count = 0
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for lineno, line in enumerate(fh, 1):
+                try:
+                    prompt = json.loads(line)
+                except ValueError:
+                    raise argparse.ArgumentTypeError(
+                        "prompts line %d is not valid JSON" % lineno) from None
+                if not isinstance(prompt, dict):
+                    raise argparse.ArgumentTypeError(
+                        "prompts line %d must be a JSON object" % lineno)
+                if isinstance(prompt.get("id"), bool) or not isinstance(prompt.get("id"), int):
+                    raise argparse.ArgumentTypeError(
+                        "prompts line %d needs an integer id" % lineno)
+                if not isinstance(prompt.get("text"), str):
+                    raise argparse.ArgumentTypeError(
+                        "prompts line %d needs a string text" % lineno)
+                count += 1
+    except (OSError, UnicodeError):
+        raise argparse.ArgumentTypeError(
+            "must be a readable UTF-8 JSONL prompts file (got %r)" % (text,)) from None
+    if not count:
+        raise argparse.ArgumentTypeError("prompts file has no JSON lines")
+    return path
+
+
+def _ref_arg(text):
+    """A reference file of GEN tok:margin ... continuation lines, parsed before loading.
+
+    Non-GEN lines are ignored, as the verify/teacher readers do (a log may carry a header);
+    a file with no GEN line, or a GEN line whose tokens/margins are malformed, is refused.
+    """
+    path = _readable_file(text)
+    count = 0
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for lineno, line in enumerate(fh, 1):
+                words = line.split()
+                if not words or words[0] != "GEN":
+                    continue
+                parts = words[1:]
+                if not parts:
+                    raise argparse.ArgumentTypeError(
+                        "reference line %d has no continuation tokens" % lineno)
+                try:
+                    for part in parts:
+                        token, margin = part.split(":")
+                        token = int(token)
+                        margin = float(margin)
+                        if not 0 <= token < VOCAB or not math.isfinite(margin):
+                            raise ValueError
+                except ValueError:
+                    raise argparse.ArgumentTypeError(
+                        "reference line %d must be GEN token:margin ... with token ids 0..%d "
+                        "and finite margins" % (lineno, VOCAB - 1)) from None
+                count += 1
+    except (OSError, UnicodeError):
+        raise argparse.ArgumentTypeError(
+            "must be a readable UTF-8 reference file (got %r)" % (text,)) from None
+    if not count:
+        raise argparse.ArgumentTypeError("reference file has no GEN continuation lines")
+    return path
+
+
 def _ids_arg(text):
     """A readable file of whitespace-separated token ids in 0..VOCAB-1."""
     try:
@@ -1031,7 +1099,7 @@ def verify(a, model, max_tie=0.75, min_agree=0.985):
     prompts = a.prompts or os.path.join(GATE_DIR, "gate_prompts.jsonl")
     ref = a.ref or os.path.join(GATE_DIR, "gate_ref.txt")
     refs = [[(int(x.split(":")[0]), float(x.split(":")[1])) for x in line.split()[1:]]
-            for line in open(ref) if line.startswith("GEN")]
+            for line in open(ref) if line.split()[:1] == ["GEN"]]
     tot = agree = 0
     worst = 0.0
     t0 = time.time()
@@ -1083,18 +1151,18 @@ def main(argv=None):
                     help="chunk size (a positive integer; default: 64)")
     ap.add_argument("--gen", type=_positive_count_arg, default=32,
                     help="bench decode steps (a positive integer; default: 32)")
-    ap.add_argument("--prompts", type=_readable_file, default=None,
-                    help="JSONL prompts file (an existing readable file; required for tokens, "
-                         "specbench, cachetest and teacher)")
+    ap.add_argument("--prompts", type=_prompts_arg, default=None,
+                    help="JSONL prompts file (each line an object with an integer id and a string "
+                         "text; required for tokens, specbench, cachetest and teacher)")
     ap.add_argument("--ids", type=_ids_arg, default=None,
                     help="file of whitespace-separated token ids in 0..%d (instead of --prompt)" % (VOCAB - 1))
     ap.add_argument("--range", type=_range_arg, default=None,
                     help="prompt ids a-b: non-negative integers a <= b (with --prompts)")
     ap.add_argument("--out", type=_out_arg, default=None,
                     help="write JSONL here; the parent directory must exist and be writable")
-    ap.add_argument("--ref", type=_readable_file, default=None,
+    ap.add_argument("--ref", type=_ref_arg, default=None,
                     help="teacher/verify: reference continuations, one line per prompt: GEN tok:margin ... "
-                         "(an existing readable file; required for teacher)")
+                         "(parsed before loading; required for teacher)")
     ap.add_argument("--dump", type=_out_arg, default=None,
                     help="write per-layer tensors to this file; the parent directory must exist and be writable")
     ap.add_argument("--flags", type=int, default=None)
@@ -1110,11 +1178,18 @@ def main(argv=None):
     if a.cmd == "teacher" and not a.ref:
         ap.error("--ref FILE is required for teacher")
     if a.cmd == "verify":
-        for flag, path in (("--prompts", a.prompts or os.path.join(GATE_DIR, "gate_prompts.jsonl")),
-                           ("--ref", a.ref or os.path.join(GATE_DIR, "gate_ref.txt"))):
+        gate = (("--prompts", a.prompts, _prompts_arg, os.path.join(GATE_DIR, "gate_prompts.jsonl")),
+                ("--ref", a.ref, _ref_arg, os.path.join(GATE_DIR, "gate_ref.txt")))
+        for flag, value, validate, default in gate:
+            path = value or default
             if not os.path.isfile(path) or not os.access(path, os.R_OK):
                 ap.error("%s gate file not found or unreadable: %s (pass --prompts/--ref or set KINDI_DSV_GATE)"
                          % (flag, path))
+            if value is None:
+                try:
+                    validate(path)
+                except argparse.ArgumentTypeError as exc:
+                    ap.error("%s gate file: %s" % (flag, exc))
     ctxs = a.ctx
     if a.cmd == "numa":
         # make room on NUMA node 1 for the node-bound dense weights: move page-cache pages of the model (largest
@@ -1188,7 +1263,7 @@ def main(argv=None):
     if a.cmd == "teacher":
         # feed the reference's greedy continuation; at every position compare Kindi's top-1 with the reference token
         refs = [[(int(x.split(":")[0]), float(x.split(":")[1])) for x in line.split()[1:]]
-                for line in open(a.ref) if line.startswith("GEN")]
+                for line in open(a.ref) if line.split()[:1] == ["GEN"]]
         fo = open(a.out, "w", encoding="utf-8") if a.out else sys.stdout
         for j, ref in zip(map(json.loads, open(a.prompts, encoding="utf-8")), refs):
             model.reset()

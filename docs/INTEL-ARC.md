@@ -1,6 +1,6 @@
 # Intel Arc A770 support: goal and implementation plan
 
-Status: **planning and architecture audit, 2026-11-10; updated 2026-11-15.** There is no Intel backend
+Status: **planning and architecture audit, 2026-11-10; updated 2026-11-19.** There is no Intel backend
 in Kindi yet. The test computer has only an NVIDIA RTX 4060 Ti; no Arc GPU is visible, `sycl-ls` and
 `clinfo` are not installed, and no Intel result has been measured. **One A770 16 GB has been purchased
 and is in transit (not installed yet)** — that unblocks M1 the day it arrives, but until then this page
@@ -311,6 +311,54 @@ The Intel goal is complete only when:
 8. no manual environment override is needed for a supported setup.
 
 Until then, `docs/CARDS.md`, the README and the installer must not list Arc as supported.
+
+## External Intel work (tracked, not used)
+
+[`red-raine/kindi-intel`](https://github.com/red-raine/kindi-intel) is an AGPL-3.0 fork of
+`ahtx/kindi`, created 2026-11-01. Its default `main` branch is stock Kindi 0.3.0 with no Intel path;
+all Intel work is on `intel-npu-gpu-acceleration-7749e` (head `ad227a8`, three `qwen.ai[bot]`
+"task snapshot" commits, last 2026-11-01), not on `main` and not merged upstream. The branch adds
+`kindi/intel.py`, `kindi/ov_build.py`, `kindi/cputune.py` and `kindi/diskp2p.py`, plus small
+engine/server/CLI hooks.
+
+- It selects an **OpenVINO** backend (`KINDI_DEVICE=intel` / `openvino`, `KINDI_OV_DEVICE=CPU` /
+  `GPU` / `NPU`, `KINDI_INTEL_GPU`/`KINDI_INTEL_NPU`), probes Intel PCI IDs and Level Zero devices,
+  and advertises Intel CPUs, integrated Arc and discrete Arc A/B-series through OpenVINO's GPU
+  plugin.
+- The ternary-pack path is not runnable: `kindi/ov_build.py`'s `build()` is a stub, and its `main()`
+  prints "weights are staged, graph emission pending" and returns 0 without writing `model.xml`.
+  `kindi export-openvino` therefore cannot produce the IR that `Engine` needs.
+- Its GGUF fallback calls `openvino-genai` (`ov_genai.LLMPipeline`) and bypasses Kindi's pack,
+  kernels, prompt cache and token-exact contract.
+- There is no test, benchmark, reference output or A770 run in the branch; its README is unchanged
+  from 0.3.0. Nothing in it is an Arc measurement or a Kindi support claim.
+
+**What to take:** the device naming, `discover()`/Level Zero probe and `KINDI_OV_DEVICE` handling are
+useful prior art for `kindi info` and the M1 checklist. **What not to take:** OpenVINO is not the SYCL/Level Zero backend
+chosen above, and an unbuilt IR or an `ov_genai` shortcut cannot pass M3/M4. Do not merge it or cite
+it as Arc support. Re-check the branch only if it gains a working IR, an A770 run and token-exact
+output.
+
+### Verdict on `diskp2p.py` and `cputune.py` (read 2026-11-19)
+
+Neither is worth adapting. Both are read-only prior art for the A770, and nothing here is merged or
+copied.
+
+- **`diskp2p.py` — no.** Its `stream_load` re-implements what `kindi/engine.py::file_to_card`
+  already does (chunked upload with `posix_fadvise(POSIX_FADV_DONTNEED)` behind each chunk;
+  `kindi/tp.py` does the same for the 5-trit cache). `pin_file`'s `MADV_WILLNEED`/`MADV_HUGEPAGE`
+  read-ahead is a Linux host-DMA micro-optimization aimed at the iGPU/NPU case and has no Arc
+  measurement, and `p2p_enable` is CUDA-only (`cuCtxEnablePeerAccess`), so it does not describe a
+  two-A770 exchange. The module's docstring also advertises a `unified_hint(dev)` helper that it
+  never implements. If M2/M3 load times turn out disk-bound, the one experiment worth running is a
+  pinned staging ring against `file_to_card` on the Arc rig — as a measurement, not an import.
+- **`cputune.py` — mostly already in Kindi.** `kindi/cpu.py` already defaults to one thread per
+  physical core, sets `OMP_PROC_BIND=close` and binds the workers, so the OpenMP block duplicates
+  existing behaviour. Two ideas survive as hypotheses, not code: disabling THP on Intel too
+  (Kindi's `engine._no_thp()` is gated on ROCm today, and host-memory compaction is what a CPU+Arc
+  tandem decode would feel), and P-core pinning through `cpu_capacity` if the Arc rig is a hybrid
+  part. The cpufreq-governor report is a diagnostic worth copying into the M1 checklist output, not
+  a runtime feature.
 
 ## References
 

@@ -299,6 +299,14 @@ single runs are kept as `bench-<model>-cpu-first-24k.log` in the same folder. Th
 tandem runtime and its current status are in [TANDEM-STATUS.md](TANDEM-STATUS.md) and
 [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md).
 
+Every tandem row is faster than CPU-only at 24K: **4.3x (2B), 5.4x (4B), 5.8x (9B)**, but each is
+4.1-4.8x slower than GPU-only, so this is a capacity trade rather than a win for a model that fits the
+card. The measured capacity-bound case is outside the 4060 Ti table: AH-Nanbeige4.3-33B IQ3_XXS on a
+12 GB Quadro K6000 keeps 13 layers in host memory and computes 55% of their FFN rows on the CPU, and
+writes 3.85/3.55/3.56 tok/s at 480/2,016/8,160 tokens against llama.cpp's 2.19/1.96/1.52 (4.4-5.0 vs
+2.5-2.7 at 1,024; Kindi 0.4.0, the K6000 section below). It is a dense 33B model. No big-MoE CPU-compute
+throughput row exists yet; that lane is design-only in [MOE-TANDEM.md](MOE-TANDEM.md).
+
 ## 2026-11-09: CPU engine · Intel Core i7-8086K
 
 WSL2 Ubuntu 24.04, GCC 13.3, i7-8086K (6 cores / 12 threads), 15 GiB visible to WSL2, 24,576-token

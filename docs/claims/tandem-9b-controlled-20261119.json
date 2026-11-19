@@ -1,0 +1,61 @@
+{
+  "gate": "tandem-9b-controlled-20261119",
+  "title": "9B CPU-only vs CPU+GPU tandem: controlled same-session pair at 24,576",
+  "measured": "2026-11-19",
+  "commit": "3002a40",
+  "command": "KINDI_DEVICE=cpu python -m kindi --pack ~/.kindi/packs/bonsai-9b --ctx 24576 bench --split-at none --json cpu.json; python -m kindi --pack ~/.kindi/packs/bonsai-9b --ctx 24576 bench --tandem cpu-first --tandem-cpu-layers 6 --sample-vram --split-at none --json tandem.json (one fresh process per placement)",
+  "notes": "This is the controlled replacement for the old cross-run 9B tandem-to-CPU ratio. It is a single fresh-process run per placement, not a full-GPU pair: the full-GPU 9B rows remain the 2026-11-17 capacity run, and no thermal or run-to-run control was applied here. Both placements verified 4/4 prompts and 133/133 tokens at the verify gate's 1,024-token context.",
+  "evidence": [
+    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs.json",
+    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/RESULTS.md",
+    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/cpu.json",
+    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/tandem.json"
+  ],
+  "numbers": [
+    {
+      "id": "cpu-24k",
+      "display": "2.9",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs.json",
+        "pointer": "/cpu/24000",
+        "expect": 2.9
+      }
+    },
+    {
+      "id": "tandem-24k",
+      "display": "16.8",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs.json",
+        "pointer": "/tandem/24000",
+        "expect": 16.8
+      }
+    },
+    {
+      "id": "ratio-24k",
+      "display": "5.8x",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {
+        "kind": "ratio",
+        "a": {"file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs.json", "pointer": "/tandem/24000"},
+        "b": {"file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs.json", "pointer": "/cpu/24000"},
+        "expect": 5.8
+      }
+    },
+    {
+      "id": "ratio-100",
+      "display": "3.0x",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {
+        "kind": "ratio",
+        "a": {"file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs.json", "pointer": "/tandem/100"},
+        "b": {"file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs.json", "pointer": "/cpu/100"},
+        "expect": 3.0
+      },
+      "tolerance": 0.01
+    }
+  ]
+}

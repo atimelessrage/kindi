@@ -34,6 +34,22 @@ def test_a_drafting_last_whose_method_is_not_mtp_is_rejected():
     assert "not mtp" in message
 
 
+def test_a_drafting_last_with_no_method_field_is_rejected():
+    smoke = _load_smoke()
+    with pytest.raises(smoke.SmokeError) as caught:
+        smoke._check_last_method({})
+    assert caught.value.code == 1
+    message = str(caught.value)
+    assert "drafting.last.method is None" in message
+    assert "not mtp" in message
+
+
+def test_a_drafting_last_whose_method_is_mtp_is_accepted():
+    smoke = _load_smoke()
+    last = {"method": "mtp", "passes": 2, "drafted": 8, "accepted": 3}
+    assert smoke._check_last_method(last) is None
+
+
 def _record(smoke):
     return smoke._run_record(
         "/packs/bonsai 2b", {"model": "Ternary-Bonsai-2-2B"},
@@ -42,7 +58,7 @@ def _record(smoke):
         ["python", "-m", "kindi", "--config", "/tmp/x y/kindi.conf", "serve",
          "--host", "127.0.0.1", "--port", "8093"],
         {"KINDI_PACK": "/packs/bonsai 2b", "KINDI_SPEC": "mtp", "KINDI_SPEC_K": "4",
-         "HOME": "/home/x"}, 1)
+         "HOME": "/srv/kindi"}, 1)
 
 
 def test_the_run_record_names_the_context_spec_k_pack_head_command_and_requests():

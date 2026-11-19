@@ -1,23 +1,23 @@
 {
   "run": "full CPU suite with line+branch coverage",
-  "measured": "2026-11-18",
-  "revision": "296a03d",
-  "revision_full": "296a03d1ec1bb5c146ab502669b00e05dfc9a3f4",
+  "measured": "2026-11-19",
+  "revision": "539a504",
+  "revision_full": "539a50434b4a8badfdd32123aad39d174f45f7ba",
   "command": "python -m coverage run --branch --source=kindi -m pytest",
   "platform": "Windows",
   "coverage_tool": "coverage.py 7.16.1",
   "counts": {
-    "passed": 1231,
+    "passed": 1241,
     "skipped": 28,
     "failed": 0,
-    "total": 1259,
-    "duration_s": 243.91
+    "total": 1269,
+    "duration_s": 277.17
   },
   "coverage": {
     "mode": "line+branch",
-    "percent": 46.2186,
-    "statements": 23467,
-    "branches": 8386
+    "percent": 46.3603,
+    "statements": 23504,
+    "branches": 8394
   },
-  "notes": "Clean rerun after regenerating docs/CONFIGURATION-REFERENCE.md; the first pass was 1 failed, 1,230 passed, 28 skipped."
+  "notes": "Coverage rerun at final commit 539a504 on 2026-11-19; one CuPy CUDA-path warning."
 }

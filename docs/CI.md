@@ -38,10 +38,9 @@ A total floor alone lets a CPU-exercised module rot while the total holds; the p
 floors pin the modules the requirement tests cover. The graph builders (`spec.py`, `dspine.py`,
 `mtp.py`, `tp.py`) are listed at their measured CPU-reachable coverage only; their CUDA paths
 are verified by `kindi verify` on hardware and need the GPU lane above for a higher floor.
-The new floors sit 10 points below the 2026-11-18 full-suite run (`coverage run --branch
---source=kindi -m pytest`, **1,231 passed, 28 skipped, 0 failed, 46.2% total**). The first
-post-Usage/plan pass found the generated reference stale at **1 failed, 1,230 passed, 28 skipped**;
-regenerating it produced the clean rerun. The run's revision, command and counts are tracked in
+The new floors sit 10 points below the final `539a504` full-suite run (`coverage run --branch
+--source=kindi -m pytest`, **1,241 passed, 28 skipped, 0 failed, 46.36% total**). The run's
+revision, command and counts are tracked in
 [full-suite.json](benchmarks/2026-11-18-i7-8086k-windows-cpu/full-suite.json). `engine.py` moves from
 19% to 20% against its measured 24.3%, so platform variance does not make CI noisy; raise a
 floor only after a measured run. `moe_cpu.py` stays
@@ -239,7 +238,9 @@ python tools/verify_matrix.py \
   --save-baseline /data/kindi/ci/gpu-baseline.json
 ```
 
-Then pass `/data/kindi/ci/gpu-baseline.json` as `baseline` on later dispatches. The default
+If that target already holds a baseline, its `logs` provenance must contain the new run's `log`;
+for a fresh baseline use a new path or add an explicit `logs` list naming that `log`. Then pass
+`/data/kindi/ci/gpu-baseline.json` as `baseline` on later dispatches. The default
 `max_tps_drop_pct` is 10%. Status, exactness and missing-cell regressions fail regardless of the
 throughput threshold. If `baseline` is empty, the job still checks token exactness but prints a
 warning and makes no performance-regression claim. The default speculation axis adds the four 2B

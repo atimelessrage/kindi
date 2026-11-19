@@ -24,6 +24,10 @@ Kindi has one head: `kindi-mtp-2b-v1.npz` (61 MB), for Ternary-Bonsai-2-2B. It i
 | B2 | B0 and `KINDI_SPEC_DRAFT_HEAD=<file>` | The 2B does one step; then the 2B's head drafts the other k - 1 tokens. |
 | auto | `KINDI_SPEC=auto` | Kindi selects the mode for each step (see below). |
 
+For explicit mode A, `KINDI_SPEC_K` now defaults to **1**; the model drafter modes keep the
+previous default of 4. An explicit `KINDI_SPEC_K` still wins. The depth run below is why: k=1
+measured 1.12-1.13x at 512/24K and 1.01x at 8K, while the old k=4 default measured 0.66-0.89x.
+
 ## Which cards
 
 MTP runs only on the tensor-core path: NVIDIA sm_80 and later, with `KINDI_TC=1`. Without that switch the server logs `warning: speculation off: KINDI_SPEC=... requires the tensor-core plan engine: set KINDI_TC=1 (and do not set KINDI_TP=0)` at startup, and its `/health` `drafting` block reports `enabled: false` with the same reason, not a null one.
@@ -68,34 +72,89 @@ the target verified them.
 
 The run's context, `KINDI_SPEC_K`, pack, head and exact launch command were not captured, so the
 record is the counts from the server's last-request block, not a fully specified reproduction. The
-shape is consistent with the engine default `KINDI_SPEC_K=4` (four drafts per pass) but not with
+shape is consistent with the then-engine default `KINDI_SPEC_K=4` (four drafts per pass) but not with
 the smoke tool's default `--spec-k 1`, which can draft at most one token per pass. The number of
 requests the session served was also not recorded: `drafting.last` describes one request, not a
 one-request session. This is not a throughput or token-exactness measurement.
 
 `tools/mtp_smoke.py` now closes that gap for future runs: it prints and writes a run record at the
 top of its `--log` with the pack, the head and its digest, the context, `KINDI_SPEC_K`, the GPU,
-the exact serve command and its `KINDI_*` environment, and the request count. A later smoke's
-output or log is therefore a fully specified record, not counts with missing provenance.
+the exact serve command and its `KINDI_*` environment, and the request count.
 
-The smoke tool above is the repeatable form of the check. A repeat at the settings the counts
-imply (`KINDI_SPEC_K=4`) and the tool's default 4,096-token context passed on the same RTX 4060 Ti
-(sm_89), pack `bonsai-2b`, head sha256 `1b5c0c79...`:
+A record-bearing run on 2026-11-19 used the settings the earlier counts imply
+(`KINDI_SPEC_K=4`) and the tool's default 4,096-token context:
 
 ```bash
 python tools/mtp_smoke.py \
   --pack ~/.kindi/packs/bonsai-2b \
   --head ~/.kindi/models/kindi-mtp-2b-v1.npz \
-  --ctx 4096 --spec-k 4 --max-tokens 16 \
-  --log bench-logs/mtp-smoke/followup-k4-20261118.log
+  --ctx 4096 --spec-k 4 --max-tokens 16 --timeout 300 \
+  --log bench-logs/mtp-smoke/runrecord-k4-20261119.log
 ```
 
-It exited 0 and printed `drafting.last: method=mtp passes=2 drafted=8 accepted=3`, with
-`kindi_spec_drafted_tokens_total=8` and `kindi_spec_accepted_tokens_total=3`, five completion
-tokens ("Red Blue Green"). The tool now refuses a last-request block whose `method` is not `mtp`,
-so the per-request record is checked as well as the attached state. The fixed prompt and 16-token
-cap make this a reproduction of the attached-and-drafting path, not of the earlier request's
-3/12/8 counts.
+It exited 0 on the RTX 4060 Ti (sm_89). The record (printed before the server started and kept at
+the top of the log) recorded the following; paths are shown with `~` and `<tmp>` here, while the
+log has the host-absolute forms:
+
+| field | value |
+|---|---|
+| pack | `~/.kindi/packs/bonsai-2b` (`Ternary-Bonsai-2-2B`; served as `bonsai2-2b`) |
+| head | `~/.kindi/models/kindi-mtp-2b-v1.npz`, registered, 60,960,552 bytes |
+| head sha256 | `1b5c0c790a594af368c3646370c527c319cdb3bb0592dd3e523e752f721a5520` |
+| ctx | 4,096 |
+| `KINDI_SPEC_K` | 4 |
+| GPU | NVIDIA GeForce RTX 4060 Ti (sm_89) |
+| requests | 1 |
+
+The serve command carried the run's full `KINDI_*` environment, including `KINDI_DEVICE=gpu`,
+`KINDI_HEAD=exact`, `KINDI_TC=1`, `KINDI_TP=1`, `KINDI_SPEC=mtp`, `KINDI_SPEC_K=4`,
+`KINDI_CTX=4096`, an empty API key and zero rate-limit/queue limits. Normalized only for the
+home directory and the throwaway temporary config/state (the log has the host paths), it was:
+
+```bash
+KINDI_API_KEY='' KINDI_CTX=4096 KINDI_DEVICE=gpu KINDI_HEAD=exact KINDI_LOG_JSON=0 \
+KINDI_MTP_HEAD="$HOME/.kindi/models/kindi-mtp-2b-v1.npz" \
+KINDI_PACK="$HOME/.kindi/packs/bonsai-2b" KINDI_PARK_MAX=0 KINDI_PREFIX_MAX=0 \
+KINDI_QUEUE_MAX=0 KINDI_RATE_LIMIT_PER_MIN=0 KINDI_SPEC=mtp KINDI_SPEC_K=4 \
+KINDI_STATE_DIR='<tmp>/state' KINDI_TC=1 KINDI_TP=1 KINDI_TURN_SAVE=0 \
+python -m kindi --config '<tmp>/kindi.conf' serve --host 127.0.0.1 --port 52176
+```
+
+The run printed `drafting.last: method=mtp passes=2 drafted=8 accepted=3` (3 of 8 drafted
+tokens accepted), with `kindi_spec_drafted_tokens_total=8` and
+`kindi_spec_accepted_tokens_total=3`. The completion was five tokens ("Red Blue Green") from 21
+prompt tokens. The tool sends exactly one completion request, and its post-request method check
+passed. This reproduces the attached-and-drafting path, not the earlier request's 3/12/8 counts;
+it is not a throughput or token-exactness measurement.
+
+### Record-bearing run at the recommended k=1 (2026-11-19)
+
+The default `--spec-k 1` - the setting the engine now selects for explicit mode A - has its own
+record-bearing run:
+
+```bash
+python tools/mtp_smoke.py \
+  --pack ~/.kindi/packs/bonsai-2b \
+  --head ~/.kindi/models/kindi-mtp-2b-v1.npz \
+  --ctx 4096 --spec-k 1 --max-tokens 16 --timeout 300 \
+  --log bench-logs/mtp-smoke/runrecord-k1-20261119.log
+```
+
+It exited 0 on the same RTX 4060 Ti (sm_89). The record at the top of the log names the pack
+`~/.kindi/packs/bonsai-2b` (`Ternary-Bonsai-2-2B`; served as `bonsai2-2b`), the registered head
+`~/.kindi/models/kindi-mtp-2b-v1.npz` (60,960,552 bytes, sha256
+`1b5c0c790a594af368c3646370c527c319cdb3bb0592dd3e523e752f721a5520`), ctx 4,096,
+`KINDI_SPEC_K` 1, the GPU and `requests: 1`. Its `KINDI_*` environment and serve command are the
+k=4 record's above with `KINDI_SPEC_K=1` and loopback port 60,585; the startup log confirms
+`MTP head attached: kindi-mtp-2b-v1.npz (61 MB, window 64, sha256 1b5c0c790a59)` and
+`speculation: requested mtp, effective mtp`.
+
+The run printed `drafting.last: method=mtp passes=3 drafted=3 accepted=2` (2 of 3 drafted tokens
+accepted), with `kindi_spec_drafted_tokens_total=3` and
+`kindi_spec_accepted_tokens_total=2`. The completion was five tokens ("Red Blue Green"), and the
+tool's post-request method check passed. At most one draft per pass is the signature of
+`KINDI_SPEC_K=1`, so 3/3 drafted is the expected shape and distinguishes this record from the
+k=4 run's 8 drafted over 2 passes. This is not a throughput or token-exactness measurement.
 
 ## Measured speed
 
@@ -154,7 +213,7 @@ greedy request repeated, temperature 0):
 | mode A (`KINDI_SPEC=mtp`) | 236.9, 239.6 tok/s | 378 of 1,680 drafted (22.5%) |
 | mode A, guard from position 0 (`KINDI_SPEC_GUARD_FROM=0`) | 230.9, 247.2, 246.6 tok/s | 115 of 520 drafted |
 
-At that default (`KINDI_SPEC_K=4`) mode A costs **0.66x** on this card, and the guard cannot rescue
+At the then-default (`KINDI_SPEC_K=4`) mode A costs **0.66x** on this card, and the guard cannot rescue
 it inside a 400-token reply: its first windows are spec windows, so the loss is paid before it can
 pause. The depth measurement below changes the conclusion for one setting: with `KINDI_SPEC_K=1`
 mode A is a win at 512 and 24K tokens of context, and a wash at 8K.
@@ -168,13 +227,13 @@ position, prompt reading excluded from the clock ([RESULTS](benchmarks/2026-11-1
 | context | `KINDI_SPEC_K` | plain tok/s | mode A tok/s | ratio | drafts accepted |
 |---:|---:|---:|---:|---:|---|
 | 512 | 1 | 335.4 | **375.6** | **1.12x** | 52/75 (69%) |
-| 512 | 4 (default) | 347.6 | 307.9 | 0.89x | 77/200 (39%) |
+| 512 | 4 (old default) | 347.6 | 307.9 | 0.89x | 77/200 (39%) |
 | 8K | 1 | 327.4 | 329.1 | 1.01x | 43/84 (51%) |
-| 8K | 4 (default) | 330.1 | 218.3 | 0.66x | 60/272 (22%) |
+| 8K | 4 (old default) | 330.1 | 218.3 | 0.66x | 60/272 (22%) |
 | 24K | 1 | 303.6 | **344.4** | **1.13x** | 53/74 (72%) |
 | 24K | 2 | 292.2 | 302.2 | 1.03x | 64/126 (51%) |
 | 24K | 3 | 293.1 | 279.2 | 0.95x | 71/168 (42%) |
-| 24K | 4 (default) | 292.1 | 254.4 | 0.87x | 75/208 (36%) |
+| 24K | 4 (old default) | 292.1 | 254.4 | 0.87x | 75/208 (36%) |
 | 24K | 6 | 292.5 | 194.1 | 0.66x | 75/312 (24%) |
 
 Acceptance does rise with depth - 72% at k=1 and 24K against 22% at k=4 and 8K - but the extra
@@ -183,9 +242,15 @@ step, while k=4 pays a 5-token verify for 1-2 accepted tokens. The 24K/k=1 row i
 (plain 301.8-304.8, mode A 338.0-345.4) and `KINDI_SPEC_K=1 kindi verify --spec mtp` is still
 **4/4 token-exact**.
 
-So on this card: **do not set `KINDI_MTP_HEAD` at the default k** - it loses 0.66-0.89x - and set it
-only with `KINDI_SPEC_K=1`, where it buys about 12-13% at 512 and 24K and nothing measurable at 8K.
-The `auto` mode cannot reach that win: it caps mode A at k=2 below 8K and switches it off above
+A 2026-11-19 check of the new default (no `KINDI_SPEC_K`; `KINDI_TC=1`, `KINDI_TP=1`,
+`KINDI_SPEC_GUARD=0`, ctx 1024, `verify --spec mtp` on the same 2B / RTX 4060 Ti) passed all four
+prompts, **160/160 tokens**, with **65/94 drafts accepted** and **403.3 tok/s** over the run. It is
+an exactness/smoke check, not a new A/B speed row.
+
+So on this card: **the engine now defaults explicit mode A to `KINDI_SPEC_K=1`** (2026-11-19), the
+measured win at 512 and 24K and a wash at 8K. An explicit `KINDI_SPEC_K=4` still loses
+0.66-0.89x; do not raise the default without a new measurement. The `auto` mode cannot reach that
+win: it caps mode A at k=2 below 8K and switches it off above
 (`AUTO_MTP_K2_MAX`), so at 24K it runs the plain engine. The drafter modes further down (a smaller
 model drafting a bigger one) are still where the large measured win is.
 

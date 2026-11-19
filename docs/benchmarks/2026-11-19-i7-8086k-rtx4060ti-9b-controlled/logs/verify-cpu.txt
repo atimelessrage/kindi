@@ -1,0 +1,10 @@
+<local-home>\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+[kindi 09:45:57] kindi-cpu ready: Ternary-Bonsai-2-9B, avx2-fma-f16c, 6 threads, ctx 1024 (107.2s)
+[kindi 09:45:58] kindi: <local-home>\.kindi\packs\bonsai-9b -> the bonsai backend (bonsai2-9b)
+[kindi 09:45:58] speculation: unavailable (this engine has no spec_begin); verifying the plain engine
+[kindi 09:46:02] prompt 1 'The sky is blue because'                                    PASS  40/40 tokens match  (3.9s)
+[kindi 09:46:06] prompt 2 'The capital of France is'                                   PASS  40/40 tokens match  (4.6s)
+[kindi 09:46:08] prompt 3 'Water boils at a lower temperature on mountains because'    PASS  13/13 tokens match  (1.8s)
+[kindi 09:46:12] prompt 4 'def add_two_numbers('                                       PASS  40/40 tokens match  (3.9s)
+[kindi 09:46:12] ALL PASS: token-exact with llama.cpp (speculation off) - 11.0 tokens/s over the run
