@@ -17,6 +17,14 @@
   for the engine's direct host-mapped GPU read (3.62x faster than the CPU lane; 1.18x faster than
   the copy lane), the lane is not wired into `lightning.Engine`, and the model row is blocked by the
   absent Lightning pack. `tests/test_moe_expert_lane.py` pins the host arithmetic.
+- **The mixed card/CPU Q2_0 expert layer has a bit-exact combine contract** — `Q2Matrix.partials`
+  returns the host experts' pre-tree lane partials, `lt_mv_q2_down_parts` and `lt_q2_shared_parts`
+  return the card side's, and `lt_q2_combine` performs `lt_mv_q2_down`'s per-lane gateway sum and
+  five-step XOR tree. `tools/q2_combine_lane.py` mixes two host and two card experts plus the
+  shared expert on synthetic Q2_0 weights and gets **0 differing elements** against one
+  `lt_mv_q2_down` launch, with zero and non-zero residuals and the shared-only branch; host
+  partials match the parts kernel. It is a gate, not Engine wiring: no Lightning pack exists here,
+  so no model verify or tok/s is claimed.
 - **The DSV4.1 CLI rejects unreadable paths, invalid counts and malformed prompt/reference content
   before loading a model** — `python -m kindi.dsv41` accepted `--prompts`, `--ids`, `--out`, `--ref`,
   `--dspark` and `--dump` values unchecked until after the model was mapped, and parsed `--free1`

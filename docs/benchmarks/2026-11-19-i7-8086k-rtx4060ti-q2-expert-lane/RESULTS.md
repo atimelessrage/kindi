@@ -77,11 +77,12 @@ PCIe link or more CPU cores could change the ratios; that is not measured.
 No `kindi_lightning` pack or Lightning GGUF exists on this host, so the
 capacity-bound model row (`kindi verify` 4/4, decode tok/s with the lane
 enabled) is **not run**. The CPU lane is also not wired into
-`kindi.lightning.Engine`: a layer that mixes card and CPU experts still needs
-the combine contract, because `lt_mv_q2_down` combines per-lane partials
-before its warp tree and a host-computed final vector cannot enter that
-reduction unchanged. This tool exercises the allocation and pointer-table
-layout from `lightning.py:_q2`; it is not a new Engine code path.
+`kindi.lightning.Engine`. The mixed-layer combine contract is now implemented
+and gated in [the combine page](../2026-11-19-i7-8086k-rtx4060ti-q2-combine/RESULTS.md):
+`Q2Matrix.partials`, `lt_mv_q2_down_parts`, `lt_q2_shared_parts` and
+`lt_q2_combine` recreate `lt_mv_q2_down`'s reduction without moving a final
+host vector into the tree. This tool still exercises the allocation and
+pointer-table layout from `lightning.py:_q2`; it is not a new Engine code path.
 
 ## Reproduce
 

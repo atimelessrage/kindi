@@ -416,8 +416,9 @@ Implemented, model-free:
 |---|---|
 | `kindi/expert_cache.py` | copy-only slot manager, pin-aware LRU, transient fallback and JSON-safe metrics; no tensors, GPU or engine wiring |
 | `kindi/moe_tandem.py` | one execution unit's expert split over the cache and a placement: `card` / `copy` / `cpu` lanes, opt-in CPU lane with a deterministic `cpu_share` throttle, router or expert-id combine order kept separate from scheduling, plan metrics; no tensors, copies or kernels |
-| `kindi/moe_expert_lane.py` | CPU executor for the Lightning Q2_0 expert (up, relu^2 activation from the card's `lt_quant`, down): exact int32 runs, one `fmaf` per run and the kernel's XOR tree, bit-identical to `lt_mv_q2`/`lt_mv_q2_down`; not wired into the engine |
+| `kindi/moe_expert_lane.py` | CPU executor for the Lightning Q2_0 expert (up, relu^2 activation from the card's `lt_quant`, down): exact int32 runs, one `fmaf` per run and the kernel's XOR tree, bit-identical to `lt_mv_q2`/`lt_mv_q2_down`; `Q2Matrix.partials` is the host side of the mixed combine contract; not wired into the engine |
 | `tools/q2_expert_lane.py` | the M2 gate for that format plus the copy-lane microbenchmark; refuses to pass on any differing element |
+| `tools/q2_combine_lane.py` | mixed card/CPU layer gate: host `partials` plus `lt_mv_q2_down_parts`/`lt_q2_shared_parts` reduced by `lt_q2_combine`, compared bit for bit with one `lt_mv_q2_down` launch |
 | `kindi/plan.py` | `kindi plan` on a `kindi_lightning` pack: expert tiers, the decode-slot trade, and with `--moe-chunk N` what `MoeTandem` would do for an N-token sample prompt chunk (lane split, distinct copies, copy bytes) from the header and `--usage`; no weights read, no bytes moved |
 | `kindi/expert_chunk.py` | multi-token prefill planner over the cache: deduped copy list in first-need order, hit/coalesced/miss report, chunk rollback when a token does not fit; no tensors or engine wiring |
 | `kindi/cold_experts.py` | opt-in Lightning host tier: hottest-first host/disk split under a byte budget, aligned unbuffered reads, coalesced gaps, a bounded lookahead prefetch queue, Q2_0 de-interleave and requested/transferred/ tier byte accounting; no VRAM allocation or kernel |
@@ -504,10 +505,15 @@ rather than re-quantizing, because the engine's fast-math division is not reprod
 device-resident weights and then through the engine's pinned host pointer tables: **0 differing
 elements** on both matrices in both paths, so the per-expert output is bit-identical for this format.
 
-The lane is not wired into `lightning.Engine` yet. A layer that mixes card and CPU experts still
-needs the combine contract: `lt_mv_q2_down` sums the experts' per-lane partials before its warp
-tree, so a host-computed final vector cannot enter that reduction unchanged; either all routed
-experts move to the host or the combine kernel must take pre-tree partials.
+The lane is not wired into `lightning.Engine` yet. The mixed-layer combine contract is now
+implemented and gated (2026-11-19): `Q2Matrix.partials` returns the host experts' pre-tree
+`[rows, 32]` lane partials, `lt_mv_q2_down_parts` and `lt_q2_shared_parts` return the card side's,
+and `lt_q2_combine` applies the same per-lane gateway sum and five-step XOR tree as
+`lt_mv_q2_down`. `tools/q2_combine_lane.py` mixes two host and two card experts plus the card's
+shared expert on synthetic Q2_0 weights and finds **0 differing elements** against one
+`lt_mv_q2_down` launch, with zero and non-zero residuals and for the shared-only branch; the host
+partials also match `lt_mv_q2_down_parts` exactly. Engine wiring and the capacity-bound model row
+remain open, the latter for want of the pack.
 
 **Cost: the direct host-mapped GPU read wins on this host.** One 2,806,272-byte expert (three fresh
 processes, medians): CPU **2.395 ms** (up 1.070 + down 1.325), H2D copy **0.643 ms** at **4.065 GiB/s**,

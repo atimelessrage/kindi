@@ -79,7 +79,7 @@ superseded; those two secret-scan findings were fixed on 2026-11-19. The generat
 gates (`project_memory --check`, `config_reference --check`, `support_matrix --check`) are
 clean. The skip count is the hardware/model/clang-only set, so the CPU and stub-engine
 surface is the part measured; the GPU and model paths were not re-run for this suite.
-`python tools/check_claims.py` re-derives **20 gates / 109 numbers** from tracked evidence.
+`python tools/check_claims.py` re-derives **21 gates / 116 numbers** from tracked evidence.
 A previously clean coverage run at `539a504` remains **1,241 passed / 28 skipped / 0 failed**.
 The preview chips are computed at render time from HEAD and the working-tree shortstat.
 
@@ -167,7 +167,7 @@ is mode A speculation at an explicit k=4, and it is no longer the default (mode 
 | 0.6.1 container packaging | `ghcr.io/ahtx/kindi:0.6.1-cuda`, `0.6.1-rocm6`, `0.6.1-rocm7`; compose/Docker docs updated | `compose.yaml`, `compose.amd.yaml` and `docs/CONTAINERS.md` are present from `dce89df`; the 0.6.1 commit changes `compose.yaml`, the three Dockerfiles and docs; `compose.amd.yaml` came in with `dce89df` | no 0.6.1 images exist from this fork, so pointing at them would be false; publish matching images with a fork release |
 | Upstream code | `kindi/mtp.py`'s `hp` argument and `kindi/spec.py`'s graph diagnostic | both ported in `f934a55`; the remaining v0.6.1 changes are version strings, docs, `compose.yaml`, the Dockerfiles and install scripts | nothing to port; no file of the `v0.6.1` tree is missing here |
 | Not-behind-stock absences | stock lacks them too | dense standard-attention llama/qwen engines; an image projector (an image part is an enveloped 400); the llama.cpp proxy (REQ-0019 T4.4) and real concurrency (T4.5), whose positioning is an open maintainer call (MANUAL-HELP §6); Metal | listed so "missing" is not read as "behind stock" |
-| MoE expert-cache tandem | stock had no such path | **not a backend**: `kindi/expert_cache.py` is a model-free slot/LRU prototype, with no router, pack, GPU copy path or measured inference (`docs/MOE-TANDEM.md`). The 2026-11-19 Q2_0 CPU expert-lane gate is bit-identical to `lt_mv_q2`/`lt_mv_q2_down` (0 differing elements with device-resident or host-mapped weights), but the CPU expert is **2.395 ms**, against **0.783 ms** for the copy lane (**3.06x** faster) and **0.662 ms** for the engine's direct host-mapped GPU read (**3.62x** faster than the CPU lane; **1.18x** faster than the copy lane), and the lane is not wired into `lightning.Engine`; no Lightning pack exists here, so there is no model row | Raon-1 mini R0 reference goldens or the Gemma 4 26B contract, plus the layer combine contract; the host-mapped GPU read wins on this host, so the CPU lane is not the default. `docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/` |
+| MoE expert-cache tandem | stock had no such path | **not a backend**: `kindi/expert_cache.py` is a model-free slot/LRU prototype, with no router, pack, GPU copy path or measured inference (`docs/MOE-TANDEM.md`). The 2026-11-19 Q2_0 CPU expert-lane gate is bit-identical to `lt_mv_q2`/`lt_mv_q2_down` (0 differing elements with device-resident or host-mapped weights), but the CPU expert is **2.395 ms**, against **0.783 ms** for the copy lane (**3.06x** faster) and **0.662 ms** for the engine's direct host-mapped GPU read (**3.62x** faster than the CPU lane; **1.18x** faster than the copy lane), and the lane is not wired into `lightning.Engine`, but the mixed card/CPU combine contract is implemented: `Q2Matrix.partials`, `lt_mv_q2_down_parts`, `lt_q2_shared_parts` and `lt_q2_combine` match `lt_mv_q2_down` bit for bit in the synthetic combine gate (**0 differing elements**); no Lightning pack exists here, so there is no model row | Raon-1 mini R0 reference goldens or the Gemma 4 26B contract; the host-mapped GPU read wins on this host, so the CPU lane is not the default. `docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/`; combine evidence `docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-combine/` |
 
 ### 4.3 Unverified (in the tree, no recorded run)
 
@@ -314,7 +314,7 @@ arbitrary-draft-GGUF harness stays a separate gate.
 
 - §1's git commands (`git merge-base --is-ancestor`, `rev-list --count`,
   `diff --shortstat`, `diff --diff-filter=D`, `ls-tree`, `ls-files`).
-- Focused checks at this refresh: `python tools/check_claims.py` (20 gates / 109 numbers),
+- Focused checks at this refresh: `python tools/check_claims.py` (21 gates / 116 numbers),
   `python -m pytest -q tests/test_claims.py tests/test_docs_links.py tests/test_agents_handoff.py`.
 - Full suite on the committed tree at `b893157`: **1,312 passed, 28 skipped, 0 failed** in
   225.81 s; generated-artifact checks (`project_memory --check`, `config_reference --check`,
