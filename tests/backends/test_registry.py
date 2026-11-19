@@ -264,6 +264,7 @@ class _FakeLightningEngine(object):
         from types import SimpleNamespace
 
         self.calls = []
+        self.closed = False
         self.cand, self.sc = list(cand), list(sc)
         logits = np.zeros(128, dtype=np.float64)
         for token_id, score in zip(self.cand, self.sc):
@@ -271,6 +272,9 @@ class _FakeLightningEngine(object):
                 logits[token_id] = score
         self.logits = logits
         self.cp = SimpleNamespace(asnumpy=np.asarray, flatnonzero=np.flatnonzero)
+
+    def close(self):
+        self.closed = True
 
     def reset(self):
         self.calls.append(("reset",))
@@ -300,6 +304,15 @@ def _lightning(greedy_engine=None):
     backend.engine = greedy_engine or _FakeLightningEngine()
     backend.stop_ids = {backend.tok.eos}
     return backend
+
+
+def test_lightning_close_releases_its_engine():
+    backend = _lightning()
+    engine = backend.engine
+    backend.close()
+    assert engine.closed is True
+    assert backend.engine is None
+    assert backend.loaded is False
 
 
 def test_lightning_generate_prefills_resets_and_stops_on_a_control_token():

@@ -1,5 +1,6 @@
 """kindi convert / verify / bench for Nemotron-H MoE GGUF files (backend "kindi_lightning"). The pack holds only
 kindi_pack.json: the engine (lightning.py) reads the weights from the GGUF file itself."""
+import contextlib
 import json
 import os
 import random
@@ -93,32 +94,32 @@ def verify(cfg, man, log=print):
             log("tokenizer: %s differs from llama.cpp" % r["prompt"][:50])
     log("tokenizer and chat template: %s" % ("the same ids as llama.cpp" if ok_tok else "DIFFERENT ids"))
     need = max(len(r["ids"]) + len(r["expected"]) for r in ref["prompts"])
-    eng = _engine(cfg, man, need + 64, log)
-    fails = ties = 0
-    t0 = time.time()
-    for r in ref["prompts"]:
-        want = r["expected"]
-        got = eng.generate(r["ids"], len(want), stop=(tok.eos,))
-        pre = next((k for k in range(len(want)) if k >= len(got) or got[k] != want[k]), len(want))
-        gap = r["gap"][pre] if pre < len(want) and r.get("gap") else None
-        alt = r.get("alt") or []
-        if pre == len(want):
-            state = "PASS"
-        elif (pre < len(alt) and alt[:pre + 1] == got[:pre + 1]) or (gap is not None and gap <= floor):
-            state = "TIE"
-            ties += 1
-        else:
-            state = "FAIL"
-            fails += 1
-        why = ""
-        if state != "PASS":
-            why = " (llama.cpp top-2 gap there %.4f%s)" % (gap, "; llama.cpp -ub 1 gives Kindi's token"
-                                                             if pre < len(alt) and alt[pre] == got[pre] else "")
-        log("%-4s %-44s %2d of %2d tokens agree%s" % (state, repr(r["prompt"])[:44], pre, len(want), why))
-    n = len(ref["prompts"])
-    log("%s: %d of %d prompts token-exact, %d end at a llama.cpp tie (noise floor %.3f), %d fail (%.0f s)" % (
-        "PASS" if not fails and ok_tok else "FAIL", n - ties - fails, n, ties, floor, fails, time.time() - t0))
-    return 0 if not fails and ok_tok else 1
+    with contextlib.closing(_engine(cfg, man, need + 64, log)) as eng:
+        fails = ties = 0
+        t0 = time.time()
+        for r in ref["prompts"]:
+            want = r["expected"]
+            got = eng.generate(r["ids"], len(want), stop=(tok.eos,))
+            pre = next((k for k in range(len(want)) if k >= len(got) or got[k] != want[k]), len(want))
+            gap = r["gap"][pre] if pre < len(want) and r.get("gap") else None
+            alt = r.get("alt") or []
+            if pre == len(want):
+                state = "PASS"
+            elif (pre < len(alt) and alt[:pre + 1] == got[:pre + 1]) or (gap is not None and gap <= floor):
+                state = "TIE"
+                ties += 1
+            else:
+                state = "FAIL"
+                fails += 1
+            why = ""
+            if state != "PASS":
+                why = " (llama.cpp top-2 gap there %.4f%s)" % (gap, "; llama.cpp -ub 1 gives Kindi's token"
+                                                                 if pre < len(alt) and alt[pre] == got[pre] else "")
+            log("%-4s %-44s %2d of %2d tokens agree%s" % (state, repr(r["prompt"])[:44], pre, len(want), why))
+        n = len(ref["prompts"])
+        log("%s: %d of %d prompts token-exact, %d end at a llama.cpp tie (noise floor %.3f), %d fail (%.0f s)" % (
+            "PASS" if not fails and ok_tok else "FAIL", n - ties - fails, n, ties, floor, fails, time.time() - t0))
+        return 0 if not fails and ok_tok else 1
 
 
 def bench(cfg, man, log=print):
@@ -126,25 +127,25 @@ def bench(cfg, man, log=print):
     token prompts, for the configured context (ctx 0: the largest that fits)"""
     ctx = int(cfg.get("ctx") or 0)
     from .lightning import Engine
-    eng = Engine(man["model_path"], ctx=ctx or 33280, log=log)
-    sync = eng.stream.synchronize
-    random.seed(7)
-    rows = []
-    for n in [x for x in (512, 8192, 32768) if x + 96 <= eng.ctx]:
-        ids = [random.randrange(1000, 100000) for _ in range(n)]
-        eng.reset()
-        eng.prefill(ids[:64], 0)
-        eng.reset()
-        sync()
-        t0 = time.time()
-        t = eng.prefill(ids, 0)
-        tr = time.time() - t0
-        for _ in range(16):
-            t = eng.step(t)
-        t0 = time.time()
-        for _ in range(64):
-            t = eng.step(t)
-        tw = time.time() - t0
-        rows.append((n, n / tr, 64 / tw))
-        log("context %5d: read %7.1f tokens/s, write %6.2f tokens/s (at position %d)" % (n, n / tr, 64 / tw, n + 16))
-    return 0
+    with contextlib.closing(Engine(man["model_path"], ctx=ctx or 33280, log=log)) as eng:
+        sync = eng.stream.synchronize
+        random.seed(7)
+        rows = []
+        for n in [x for x in (512, 8192, 32768) if x + 96 <= eng.ctx]:
+            ids = [random.randrange(1000, 100000) for _ in range(n)]
+            eng.reset()
+            eng.prefill(ids[:64], 0)
+            eng.reset()
+            sync()
+            t0 = time.time()
+            t = eng.prefill(ids, 0)
+            tr = time.time() - t0
+            for _ in range(16):
+                t = eng.step(t)
+            t0 = time.time()
+            for _ in range(64):
+                t = eng.step(t)
+            tw = time.time() - t0
+            rows.append((n, n / tr, 64 / tw))
+            log("context %5d: read %7.1f tokens/s, write %6.2f tokens/s (at position %d)" % (n, n / tr, 64 / tw, n + 16))
+        return 0

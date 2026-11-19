@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `53198e5` on `freebuff/tandem-cpu-recovery` (**main** fast-forwards to the handoff commit; guarded by `tests/test_agents_handoff.py`); the 2026-11-18 audit round, the ternary-MoE census correction, the host-mapped Q2 lane, the fresh k=1 A/B and the mixed card/CPU Q2 combine contract are committed (`31d10cc` code, `d28397f` evidence and claim, `26309d2` multi-slot gate); the 2026-11-19 consolidation adds request-shape validation, Windows secret-scan batching, the controlled 2B/4B/9B pairs, the 9B chunk sweep, the context-growth and ternary-MoE pages and the Q2 lane move to `tools/` (`f75253b`, `84b6686`); full CPU gate **1,357 passed, 28 skipped, 0 failed**; Engine wiring and the model row remain blocked by the absent Lightning pack.
+- **HEAD:** `8c3b083` on `freebuff/tandem-cpu-recovery` (**main** fast-forwards to the handoff commit; guarded by `tests/test_agents_handoff.py`); the 2026-11-18 audit round, the ternary-MoE census correction, the host-mapped Q2 lane, the fresh k=1 A/B and the mixed card/CPU Q2 combine contract are committed (`31d10cc` code, `d28397f` evidence and claim, `26309d2` multi-slot gate); the 2026-11-19 consolidation adds request-shape validation, Windows secret-scan batching, the controlled 2B/4B/9B pairs, the 9B chunk sweep, the context-growth and ternary-MoE pages and the Q2 lane move to `tools/` (`f75253b`, `84b6686`); full CPU gate **1,357 passed, 28 skipped, 0 failed**; Engine wiring and the model row remain blocked by the absent Lightning pack.
 
 ### Python quality ratchet
 
@@ -22,7 +22,7 @@ code, Pyright 1.1.414 (`basic`, all platforms) and Pylint 4.1.3 (`E`, `F`, impor
 disabled) at Python 3.10 over the same production targets, recorded as **321 Ruff findings / 59 mypy
 errors / 1,035 Pyright errors / 255 Pylint findings** in
 `tools/python_quality_baseline.json`. CI runs it; a new or increased file/rule count fails, while
-existing debt is tolerated and `--update` lowers the baseline after review.
+existing debt is tolerated and `--update --reason "..."` lowers the baseline after review; it refuses growth and records the reason and delta, so it cannot launder a new finding.
 `tests/test_python_quality.py` + `tests/test_ci_config.py` **14 passed**; no full-suite or GPU run. Dependency scanning is report-only in CI (`tools/check_dependencies.py`, `requirements-runtime.txt`); the gate waits for a reviewed baseline. The prior test task is below.
 
 ### MTP smoke guard
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `53198e5` | main checkout; clean; fast-forwarded to the handoff commit |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `53198e5` | this session; checked out here |
+| `T:/kindi` | `main` | `8c3b083` | main checkout; clean; fast-forwarded to the handoff commit |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `8c3b083` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.

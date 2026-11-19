@@ -241,6 +241,12 @@ class LightningBackend(object):
         if os.environ.get("KINDI_LT_SELFCHECK", "1") != "0":
             self.selfcheck()
 
+    def close(self):
+        """Release the engine's cold reader/lookahead thread when the server tears down."""
+        eng, self.eng = getattr(self, "eng", None), None
+        if eng is not None:
+            eng.close()
+
     def selfcheck(self):
         """before the first request: the same greedy tokens twice, from a prompt read in one pass and token by token,
         and not a degenerate run. A failure raises, so that the service restarts."""

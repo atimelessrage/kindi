@@ -6,7 +6,9 @@ The tree predates a lint/type gate, so making either tool fail on all current
 findings would block every change. Instead, this gate records the current
 (file, rule/code) counts in `tools/python_quality_baseline.json` and fails only
 when a count grows or a new file/rule pair appears. Fixing debt is always allowed;
-`--update` lowers the baseline deliberately after a reviewed change.
+`--update --reason ...` lowers the baseline deliberately after a reviewed change. An update
+refuses any file/rule count that grew, so the flag cannot be used to launder a new finding, and
+it records the reason, the measured commit and the per-tool delta in the baseline.
 
 Ruff covers the whole Python tree with correctness rules F, E9, B and I (see
 `ruff.toml`). Mypy and Pyright cover first-party production code only (`kindi`,
@@ -19,7 +21,7 @@ optional-import errors ignored.
 
 Usage:
     python tools/check_python_quality.py
-    python tools/check_python_quality.py --update
+    python tools/check_python_quality.py --update --reason "removed the B904 sites in kindi/cache.py"
 """
 import argparse
 import json
@@ -190,12 +192,24 @@ def _counts(ruff, ruff_findings, mypy_findings, pyright, pyright_findings, pylin
     }
 
 
+def _head():
+    """The measured commit, for the baseline's review block; empty when the tree is not a checkout."""
+    try:
+        proc = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+                              capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return (proc.stdout or "").strip() if proc.returncode == 0 else ""
+
+
 def _load_baseline():
     try:
         with BASELINE_PATH.open(encoding="utf-8") as handle:
             return json.load(handle)
     except OSError as exc:
-        raise QualityError("cannot read %s: %s (run with --update)" % (BASELINE_PATH, exc)) from exc
+        raise QualityError("cannot read %s: %s (run with --update --reason ...)"
+                           % (BASELINE_PATH, exc)) from exc
     except ValueError as exc:
         raise QualityError("invalid %s: %s" % (BASELINE_PATH, exc)) from exc
 
@@ -222,7 +236,7 @@ def _check(ruff, ruff_findings, mypy_findings, pyright, pyright_findings, pylint
         for problem in problems:
             print("  " + problem, file=sys.stderr)
         print("Fix the finding, or after review run "
-              "`python tools/check_python_quality.py --update`.", file=sys.stderr)
+              "`python tools/check_python_quality.py --update --reason \"...\"`.", file=sys.stderr)
         return 1
     for tool in ("ruff", "mypy", "pyright", "pylint"):
         now = current[tool]["total"]
@@ -232,17 +246,42 @@ def _check(ruff, ruff_findings, mypy_findings, pyright, pyright_findings, pylint
     return 0
 
 
-def _update(ruff, ruff_findings, mypy_findings, pyright, pyright_findings, pylint, pylint_findings):
+def _update(ruff, ruff_findings, mypy_findings, pyright, pyright_findings, pylint, pylint_findings,
+            reason):
+    baseline = _load_baseline()
+    if baseline.get("schema") != 2:
+        raise QualityError("unsupported baseline schema: %r" % (baseline.get("schema"),))
     current = _counts(ruff, ruff_findings, mypy_findings, pyright, pyright_findings,
                        pylint, pylint_findings)
+    problems = []
+    for tool in ("ruff", "mypy", "pyright", "pylint"):
+        problems.extend("%s: %s" % (tool, item) for item in _regressions(
+            baseline.get(tool, {}).get("findings") or {}, current[tool]["findings"]))
+    if problems:
+        print("refusing to update: %d new or increased finding(s) must be fixed first." % len(problems),
+              file=sys.stderr)
+        for problem in problems:
+            print("  " + problem, file=sys.stderr)
+        return 1
     payload: dict[str, object] = {"schema": 2}
     payload.update(current)
+    payload["review"] = {
+        "reason": reason.strip(),
+        "head": _head(),
+        "previous_head": str((baseline.get("review") or {}).get("head") or ""),
+        "deltas": {tool: current[tool]["total"] - int(baseline.get(tool, {}).get("total") or 0)
+                   for tool in ("ruff", "mypy", "pyright", "pylint")},
+    }
     BASELINE_PATH.parent.mkdir(parents=True, exist_ok=True)
     with BASELINE_PATH.open("w", encoding="utf-8", newline="\n") as handle:
         json.dump(payload, handle, indent=2, sort_keys=True)
         handle.write("\n")
+    try:
+        shown = BASELINE_PATH.relative_to(ROOT)
+    except ValueError:                 # a caller may point --update at a baseline outside the tree
+        shown = BASELINE_PATH
     print("wrote %s: ruff=%d, mypy=%d, pyright=%d, pylint=%d" % (
-        BASELINE_PATH.relative_to(ROOT), current["ruff"]["total"], current["mypy"]["total"],
+        shown, current["ruff"]["total"], current["mypy"]["total"],
         current["pyright"]["total"], current["pylint"]["total"]))
     return 0
 
@@ -250,8 +289,17 @@ def _update(ruff, ruff_findings, mypy_findings, pyright, pyright_findings, pylin
 def main(argv=None):
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--update", action="store_true",
-                        help="rewrite the baseline from the current tree after review")
+                        help="lower the baseline after review; refuses any growth")
+    parser.add_argument("--reason", default="",
+                        help="why the baseline is being lowered (required with --update)")
     args = parser.parse_args(argv)
+    if args.update and not args.reason.strip():
+        print("check_python_quality: --update requires --reason so the change is reviewable",
+              file=sys.stderr)
+        return 2
+    if args.reason.strip() and not args.update:
+        print("check_python_quality: --reason is only valid with --update", file=sys.stderr)
+        return 2
 
     ruff = shutil.which("ruff") or ""
     pyright = shutil.which("pyright") or ""
@@ -268,7 +316,7 @@ def main(argv=None):
         pyright_findings = _pyright_findings(pyright)
         pylint_findings = _pylint_findings(pylint)
         return (_update(ruff, ruff_findings, mypy_findings, pyright, pyright_findings,
-                        pylint, pylint_findings)
+                        pylint, pylint_findings, args.reason)
                 if args.update else
                 _check(ruff, ruff_findings, mypy_findings, pyright, pyright_findings,
                        pylint, pylint_findings))

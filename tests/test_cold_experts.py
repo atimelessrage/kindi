@@ -1,8 +1,10 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """The cold-expert file reader: exact bytes, coalescing, prefetch and the accounting behind the gate."""
+import threading
+import types
+
 import numpy as np
 import pytest
-import types
 
 from kindi import cold_experts, hostram, lightning
 
@@ -160,6 +162,70 @@ def test_read_many_returns_exact_bytes_and_accounts_for_them(tmp_path):
         assert reader.stats()["requested_bytes"] == before + 64
     finally:
         reader.close()
+
+
+def test_a_closed_reader_is_idempotent_and_rejects_further_reads(tmp_path):
+    path, _data = _file(tmp_path)
+    reader = cold_experts.ColdExpertReader(path, coalesce=0)
+    assert reader.read(0, 16)
+    reader.close()
+    reader.close()
+    assert reader.closed is True
+    with pytest.raises(ValueError, match="closed"):
+        reader.read(0, 16)
+
+
+def test_a_lookahead_read_and_a_demand_read_are_serialized(tmp_path):
+    """The reader lock is the fallback for any caller that forgets `_join_prefetch`: a queue
+    prefetch and a demand read still return exact bytes instead of sharing a file pointer."""
+    path, data = _file(tmp_path)
+    spans = [(i * 4096, 64) for i in range(4)]
+    expected = [data[o:o + n] for o, n in spans]
+    reader = cold_experts.ColdExpertReader(path, coalesce=0, prefetch_bytes=1 << 20)
+    errors = []
+
+    def lookahead():
+        try:
+            for _ in range(20):
+                reader.prefetch(spans)
+        except BaseException as exc:        # noqa: BLE001 - the test reports it on the main thread
+            errors.append(exc)
+
+    thread = threading.Thread(target=lookahead)
+    try:
+        thread.start()
+        for _ in range(20):
+            assert reader.read_many(spans) == expected
+    finally:
+        thread.join()
+        reader.close()
+    assert errors == []
+
+
+def test_engine_close_joins_the_lookahead_and_closes_the_reader_once():
+    class Reader(object):
+        def __init__(self):
+            self.closed = 0
+
+        def close(self):
+            self.closed += 1
+
+    class Lookahead(object):
+        def __init__(self):
+            self.joined = 0
+
+        def join(self):
+            self.joined += 1
+
+    reader, lookahead = Reader(), Lookahead()
+    eng = lightning.Engine.__new__(lightning.Engine)
+    eng.cold_reader = reader
+    eng._prefetch_thread = lookahead
+    eng.close()
+    eng.close()
+    assert eng.cold_reader is None
+    assert reader.closed == 1
+    assert lookahead.joined == 1
 
 
 def test_coalescing_merges_neighbouring_ranges_into_one_read(tmp_path):

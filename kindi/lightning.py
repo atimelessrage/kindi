@@ -104,6 +104,7 @@ class Engine(object):
     def __init__(self, path, ctx=32768, device=None, log=print, experts_on_card=None):
         import cupy as cp
         self.cp, self.log = cp, log
+        self._closed = False
         g = GGUF(path)
         self.g, self.s = g, Spec(g)
         s = self.s
@@ -1180,3 +1181,26 @@ class Engine(object):
         while len(out) < n and out[-1] not in stop:
             out.append(self.step())
         return out
+
+    def close(self):
+        """Join the cold lookahead thread and close its reader. Idempotent.
+
+        The prefetch thread is a daemon so a process exit cannot hang on it, but that also
+        means an exit without a teardown can kill it mid-read and leave the file handle to the
+        OS. Owners that know when the engine is finished (the backend adapter, the CLI and the
+        HTTP server) call this instead. A prefetch error is not re-raised here: it was already
+        surfaced by the consumer that needed those bytes.
+        """
+        if getattr(self, "_closed", False):
+            return
+        self._closed = True
+        try:
+            self._join_prefetch()
+        except Exception:
+            pass
+        reader, self.cold_reader = getattr(self, "cold_reader", None), None
+        if reader is not None:
+            try:
+                reader.close()
+            except Exception:
+                pass

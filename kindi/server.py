@@ -600,6 +600,12 @@ class Kindi(object):
                       "errors": 0, "gen_seconds": 0.0, "last_tok_s": 0.0}
         self.t0 = time.time()
 
+    def close(self):
+        """Release engine-owned OS resources (the Lightning cold reader and its lookahead)."""
+        eng, self.eng = getattr(self, "eng", None), None
+        if eng is not None:
+            getattr(eng, "close", lambda: None)()
+
     def head_mode(self):
         """exact | fast: the state file (written by `kindi head`) wins over the config."""
         try:
@@ -1309,6 +1315,7 @@ def create_app(cfg, log=print):
         log("warning: serving on %s without api_key; /health details are loopback-only - use loopback or set api_key"
             % cfg.get("host"))
     app = FastAPI(title="Kindi", version=__version__)
+    app.state.kindi = K                # so the serve() teardown can close the cold reader
 
     @app.exception_handler(Exception)
     async def _unhandled(request, exc):
@@ -2190,4 +2197,9 @@ def serve(cfg, log=print):
     import uvicorn
     app = create_app(cfg, log)
     log("serving on http://%s:%d/v1 (model %s)" % (cfg["host"], cfg["port"], cfg["model_name"]))
-    uvicorn.run(app, host=cfg["host"], port=int(cfg["port"]), log_level="warning")
+    try:
+        uvicorn.run(app, host=cfg["host"], port=int(cfg["port"]), log_level="warning")
+    finally:
+        engine = getattr(app.state, "kindi", None)
+        if engine is not None and hasattr(engine, "close"):
+            engine.close()

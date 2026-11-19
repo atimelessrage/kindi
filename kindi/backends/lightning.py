@@ -77,11 +77,11 @@ class LightningBackend(Backend):
     def load(self, config):
         """Build the engine for ``config["pack"]``. An empty config loads nothing."""
         config = dict(config or {})
+        self.close()                    # a reload must not orphan the previous engine/reader
         self.config = config
         self.log = config.get("log") or print
         pack = config.get("pack")
         if not pack:
-            self.close()
             return self
         if not os.path.isdir(pack):
             raise registry.BackendUnavailable("no Lightning pack directory at %r" % (pack,))
@@ -103,7 +103,9 @@ class LightningBackend(Backend):
         return self
 
     def close(self):
-        self.engine = None
+        engine, self.engine = self.engine, None
+        if engine is not None:
+            engine.close()
         self.tok = None
         self.man = None
         self.pack = None

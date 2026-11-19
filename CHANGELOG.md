@@ -308,6 +308,18 @@
 
 ### Fixed
 
+- **Cold-tier readers now have a real teardown path** — `lightning.Engine` created a
+  `ColdExpertReader` and a daemon lookahead thread but never closed either, so a process exit could
+  kill the thread mid-read and leave the file handle to the OS. `Engine.close()` now joins the
+  lookahead and closes the reader once; the registry adapter, `lightning_cli` verify/bench and the
+  HTTP server's `kindi.close()`/`serve()` teardown call it. The reader also serializes prefetch and
+  demand reads with an internal lock, so a future consumer that forgets an external join cannot
+  corrupt the queue or share a Windows file pointer. Tests pin the idempotent close, the lock path
+  and the adapter/server teardown; no GPU, model or throughput claim.
+- **The Python quality baseline cannot be lowered to hide a new finding** — `--update` now requires
+  `--reason`, refuses any new or increased file/rule count, and records the reason, measured commit
+  and per-tool delta in `tools/python_quality_baseline.json`. The CI gate's message names the new
+  form, and the reviewed debt burn-down still lowers the baseline one family at a time.
 - **`--save-baseline` refuses provenance for a different measurement** — when it carried a
   baseline's `logs` list forward, it did not require the new row's `log` to be one of those files,
   so a fresh single pass could inherit a three-pass list it was not part of. It now refuses

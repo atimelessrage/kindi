@@ -915,3 +915,42 @@ engine or evidence changes behind it. `CURRENT-VS-KINDI-0.6.md` and
 - **Preview.** `bench-logs/render_comparison.py` renders the live report to the ignored
   `current-vs-kindi-0.6-preview.html`; its chips compute HEAD and the committed
   `v0.6.1..HEAD` shortstat at render time, so they name `53198e5` and the 827-file delta.
+
+## 47. Round-3 audit disposition (2026-11-19)
+
+The round-3 review was written against `f984962`; this worktree is at `8c3b083`, which is 14
+commits later, so every finding was re-checked by function name as well as line number.
+
+- **N1/N5 (cold reader teardown) — closed.** `lightning.Engine` created a `ColdExpertReader`
+  and a daemon lookahead thread but never closed either. `Engine.close()` now joins the thread and
+  closes the reader once; the registry adapter, `lightning_cli` verify/bench and the HTTP server's
+  `Kindi.close()`/`serve()` teardown call it. `Engine.close()` suppresses a prefetch error that a
+  consumer already surfaced and is idempotent.
+- **N2 (quality baseline lowering) — closed.** `--update` requires `--reason`, refuses any new or
+  increased file/rule count, and records the reason, measured commit and per-tool delta in
+  `tools/python_quality_baseline.json`. A baseline edit can no longer be used to launder a new
+  finding.
+- **R1 (implicit join before queue access) — closed.** `ColdExpertReader.prefetch`, `read_many`,
+  `stats` and `close` now share an internal `RLock`, so a future consumer that forgets
+  `_join_prefetch()` cannot race the daemon or move a shared Windows file pointer mid-read.
+- **N3 (forward-slash drive root in the history gate) — accepted by design.** The rule remains
+  current-tree-only because the reviewed history snapshot predates it; a path added and deleted
+  in one commit is the remaining gap, and the current-tree test is the primary guard.
+- **N4 (bridge is a separate package) — not a finding.** The bridge smoke job and its own suite
+  remain separate by design; `tests/test_ci_config.py` pins the README command to the job.
+- **R2 (quality debt) — accepted, count corrected.** The current baseline is **321 Ruff / 59 mypy
+  / 1,035 Pyright / 255 Pylint**, not the audit's 332 Ruff; the debt is still tolerated by the
+  ratchet, and `docs/CI.md` now lists the actual 163 bugbear findings and the burn-down rule.
+- **R3/M4 (history exposure) — decision recorded.** `docs/SECURITY.md` records the 160-row /
+  ~3,318-hit history baseline and the decision not to rewrite again; a public push must disclose
+  it, and another rewrite needs a new signed review and owner authorization.
+- **R4/M5 (worktree behind main) — resolved.** `main` and `freebuff/tandem-cpu-recovery` were
+  the same commit (`8c3b083`) before this round; the audit's `f984962` observation was stale.
+- **M1/M2 (cold-tier hardware gate, GPU CI) — open and unmeasured.** No larger-than-RAM pack,
+  `kindi verify` 4/4, tok/s or flash MiB/token is claimed, and the CUDA-graph/kernel-arity gates
+  remain local-only facts.
+- **M3 (quality clean-up) — incremental.** This round fixes the ratchet's review hole and
+  documents the true debt; it does not claim a full lint/type burn-down.
+
+No full suite, GPU, model pack or cold-tier run is claimed by this round. The focused checks are
+recorded in `docs/development/AGENTS-HISTORY.md`.

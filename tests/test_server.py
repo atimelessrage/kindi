@@ -19,6 +19,23 @@ from gbnf_fixtures import CANONICAL_JSON
 from kindi import server
 
 
+def test_kindi_close_releases_the_engine_once():
+    class Engine(object):
+        def __init__(self):
+            self.closed = 0
+
+        def close(self):
+            self.closed += 1
+
+    engine = Engine()
+    kindi = server.Kindi.__new__(server.Kindi)
+    kindi.eng = engine
+    kindi.close()
+    kindi.close()
+    assert kindi.eng is None
+    assert engine.closed == 1
+
+
 def test_the_server_names_only_families_it_can_serve():
     for family in server.SERVED_BACKENDS:
         assert server.served_backend({"backend": family}) == family

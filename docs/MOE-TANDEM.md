@@ -93,9 +93,12 @@ performs the unbuffered aligned read, coalesces neighbouring ranges into one ali
 keeps a bounded lookahead prefetch queue; a decode step starts a background read of the next cold
 layer's most-used experts, so the file work overlaps the current layer's GPU kernels, and the next
 cold layer joins that read before its demand lookup. The demand lookup itself stays synchronous. Each read is accounted as requested expert bytes versus bytes
-actually transferred, and the split reports exact pinned and disk expert bytes. The engine disables the decode CUDA graph while this
-tier is active, because a cold miss needs a host read after the router. Warm slots take no file
-read and no page fault. `kindi plan` applies the same split to its planned host set: with
+actually transferred, and the split reports exact pinned and disk expert bytes. The reader
+serializes its lookahead queue and file handle with an internal lock, so a future consumer cannot
+race the daemon by forgetting an external join; `Engine.close()` joins that thread and closes the
+reader, and the backend adapter, `lightning_cli` and the HTTP server teardown call it. The engine
+disables the decode CUDA graph while this tier is active, because a cold miss needs a host read
+after the router. Warm slots take no file read and no page fault. `kindi plan` applies the same split to its planned host set: with
 `KINDI_LT_COLD=1`, the `host ram` line names the pinned and file-backed expert counts and bytes
 under the same `KINDI_LT_HOST_MB` (or automatic) budget, and the report's `host_tier` object
 carries those stats. This is a start, not a gate result: no larger-than-RAM pack, no tok/s and

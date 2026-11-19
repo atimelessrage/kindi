@@ -80,6 +80,54 @@ def test_pylint_parser_counts_findings_by_file_and_code(monkeypatch):
     assert mod._pylint_findings("pylint") == {"tools/b.py": {"E1101": 2}}
 
 
+def _quality_payload(ruff=1, mypy=1, pyright=1, pylint=1):
+    return {
+        "ruff": {"version": "0.16.0", "total": ruff,
+                 "findings": {"kindi/a.py": {"F401": ruff}} if ruff else {}},
+        "mypy": {"version": "2.4.0", "total": mypy,
+                 "findings": {"kindi/a.py": {"assignment": mypy}} if mypy else {}},
+        "pyright": {"version": "1.1.414", "total": pyright,
+                    "findings": {"kindi/a.py": {"reportArgumentType": pyright}} if pyright else {}},
+        "pylint": {"version": "4.1.3", "total": pylint,
+                   "findings": {"kindi/a.py": {"E1101": pylint}} if pylint else {}},
+    }
+
+
+def _write_baseline(path, payload):
+    path.write_text(json.dumps({"schema": 2, **payload}), encoding="utf-8")
+
+
+def test_update_requires_a_reason(monkeypatch):
+    mod = _load()
+    assert mod.main(["--update"]) == 2
+    assert mod.main(["--reason", "cleanup"]) == 2
+
+
+def test_update_refuses_growth_and_leaves_the_baseline_alone(tmp_path, monkeypatch):
+    mod = _load()
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, _quality_payload(ruff=1))
+    monkeypatch.setattr(mod, "BASELINE_PATH", baseline)
+    monkeypatch.setattr(mod, "_counts", lambda *args: _quality_payload(ruff=2))
+    monkeypatch.setattr(mod, "_head", lambda: "abc123")
+    assert mod._update(None, None, None, None, None, None, None, "cleanup") == 1
+    assert json.loads(baseline.read_text(encoding="utf-8"))["ruff"]["total"] == 1
+
+
+def test_update_records_the_reason_and_delta_of_a_reviewed_lowering(tmp_path, monkeypatch):
+    mod = _load()
+    baseline = tmp_path / "baseline.json"
+    _write_baseline(baseline, _quality_payload(ruff=2))
+    monkeypatch.setattr(mod, "BASELINE_PATH", baseline)
+    monkeypatch.setattr(mod, "_counts", lambda *args: _quality_payload(ruff=1))
+    monkeypatch.setattr(mod, "_head", lambda: "abc123")
+    assert mod._update(None, None, None, None, None, None, None, "removed the F401") == 0
+    payload = json.loads(baseline.read_text(encoding="utf-8"))
+    assert payload["review"]["reason"] == "removed the F401"
+    assert payload["review"]["head"] == "abc123"
+    assert payload["review"]["deltas"]["ruff"] == -1
+
+
 def test_the_committed_baseline_has_consistent_totals():
     payload = json.loads(BASELINE.read_text(encoding="utf-8"))
     assert payload["schema"] == 2

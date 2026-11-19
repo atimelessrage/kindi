@@ -88,8 +88,10 @@ baseline:
 `tools/python_quality_baseline.json` stores the counts per file and rule/error code. The gate fails
 when a count grows or a new file/rule pair appears, and passes when debt shrinks. Fix findings
 normally; after a reviewed cleanup, lower the baseline deliberately with
-`python tools/check_python_quality.py --update`. All four tools are exact-pinned in
-`tests/requirements-test.txt` so the measured counts are reproducible. The baseline is **not** a
+`python tools/check_python_quality.py --update --reason "what was fixed"`. An update refuses any
+new or increased file/rule count, so it cannot be used to launder a finding, and it records the
+reason, the measured commit and the per-tool delta in the baseline. All four tools are
+exact-pinned in `tests/requirements-test.txt` so the measured counts are reproducible. The baseline is **not** a
 claim that the existing findings are acceptable: it is a ratchet against regression, and the
 remaining debt stays visible. Dependency scanning is a separate open audit item.
 
@@ -98,16 +100,16 @@ remaining debt stays visible. Dependency scanning is a separate open audit item.
 
 ### Debt burn-down
 
-The baseline still tolerates **143 bugbear (`B`) findings**: 60 `B904` (raise without `from`),
-55 `B905` (`zip()` without `strict=`), 17 `B023` (closure over a loop variable), 9 `B007`
-(unused loop control variable) and 2 `B002` (the unary-prefix-decrement pattern). The 2026-11-19
-pass renamed six unused loop variables and left the tuple-unpacking cases for a per-site review.
-`B905` is
-blocked by the supported Python floor, `B023` needs a per-site review to confirm the closure is
-not intentional, and the two `B002` sites are arithmetic double-negations, not decrements. Burn
-one family down per session: fix it, run the focused tests, then lower the baseline with
-`python tools/check_python_quality.py --update`. Do not add `# noqa` or weaken the rule to make the
-number move.
+The baseline still tolerates **163 bugbear (`B`) findings**: 66 `B905` (`zip()` without
+`strict=`), 60 `B904` (raise without `from`), 17 `B023` (closure over a loop variable), 15 `B007`
+(unused loop control variable), 2 `B002` (the unary-prefix-decrement pattern), 1 `B011`
+(`assert False`), 1 `B008` (function call in a default argument) and 1 `B017` (`assertRaises(Exception)`).
+The 2026-11-19 pass renamed six unused loop variables and left the tuple-unpacking cases for a
+per-site review. `B905` is blocked by the supported Python floor, `B023` needs a per-site review to
+confirm the closure is not intentional, and the two `B002` sites are arithmetic double-negations,
+not decrements. Burn one family down per session: fix it, run the focused tests, then lower the
+baseline with `python tools/check_python_quality.py --update --reason "fixed ..."`. Do not add
+`# noqa` or weaken the rule to make the number move.
 
 ## Dependency audit
 

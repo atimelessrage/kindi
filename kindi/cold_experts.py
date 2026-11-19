@@ -29,6 +29,7 @@ not the device's, so a throughput claim must never use it silently.
 import ctypes
 import mmap
 import os
+import threading
 from collections import OrderedDict
 
 import numpy as np
@@ -258,6 +259,11 @@ class ColdExpertReader(object):
         self.coalesce = int(coalesce)
         self.prefetch_bytes = int(prefetch_bytes)
         self.log = log
+        # The lookahead thread and a demand read share one file handle and one queue. The engine
+        # joins the thread before every consumer today, but a future path that forgets the join
+        # must not be able to corrupt the queue or move a shared Windows file pointer underneath a
+        # read. RLock because read() delegates to read_many() and prefetch() may be re-entered.
+        self._lock = threading.RLock()
         self.closed = False
         self.unbuffered = None
         self.method = "not opened"
@@ -474,8 +480,13 @@ class ColdExpertReader(object):
         Returns the number of newly queued spans. Already queued spans are not read again, and
         the queue drops its oldest entries when ``prefetch_bytes`` is full. This is real
         lookahead: the bytes are read now and a demand read later consumes them without another
-        file read.
+        file read. The queue and the file handle are serialized with demand reads, so a caller
+        that forgets to join the lookahead thread cannot corrupt either one.
         """
+        with self._lock:
+            return self._prefetch_locked(spans)
+
+    def _prefetch_locked(self, spans):
         spans = [(int(o), int(n)) for o, n in spans if int(n) > 0]
         if not spans or self.prefetch_bytes <= 0:
             return 0
@@ -498,8 +509,13 @@ class ColdExpertReader(object):
         Returns one ``bytes`` object per input span, in input order. ``coalesce`` is the gap
         window in alignment blocks (the old ``read_ahead`` keyword is accepted for callers that
         have not migrated). Queued prefetch bytes are used first, so a demand read that follows
-        ``prefetch`` does not touch the file again.
+        ``prefetch`` does not touch the file again. The internal lock serializes this read with
+        the lookahead thread's read, so no caller has to remember an external join first.
         """
+        with self._lock:
+            return self._read_many_locked(spans, coalesce=coalesce, read_ahead=read_ahead)
+
+    def _read_many_locked(self, spans, coalesce=None, read_ahead=None):
         spans = [(int(o), int(n)) for o, n in spans]
         if not spans:
             return []
@@ -526,6 +542,10 @@ class ColdExpertReader(object):
 
     def stats(self):
         """The byte accounting a benchmark or a test may quote."""
+        with self._lock:
+            return self._stats_locked()
+
+    def _stats_locked(self):
         return {"path": self.path, "method": self.method, "unbuffered": self.unbuffered,
                 "alignment": self.alignment, "coalesce_blocks": self.coalesce,
                 "prefetch_limit_bytes": self.prefetch_bytes,
@@ -539,13 +559,15 @@ class ColdExpertReader(object):
                 "alignment_bytes": self.alignment_bytes}
 
     def close(self):
-        if self.closed:
-            return
-        self._close_os()
-        if self._file is not None:
-            try:
-                self._file.close()
-            except Exception:
-                pass
-        self._file = None
-        self.closed = True
+        """Close the file handles once; safe from any thread and safe to call twice."""
+        with self._lock:
+            if self.closed:
+                return
+            self._close_os()
+            if self._file is not None:
+                try:
+                    self._file.close()
+                except Exception:
+                    pass
+            self._file = None
+            self.closed = True

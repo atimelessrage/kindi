@@ -20,8 +20,9 @@ bash -n install.sh
 The Python-quality gate ratchets Ruff 0.16.0 (`F`, `E9`, `B`, `I`), mypy 2.4.0, Pyright 1.1.414
 (basic, all platforms) and Pylint 4.1.3 (errors and fatal messages) against
 `tools/python_quality_baseline.json`: existing debt is recorded, and only a new or increased finding
-fails. Ruff covers the Python tree; the other three cover production code. `--update` lowers the
-baseline only after review.
+fails. Ruff covers the Python tree; the other three cover production code. `--update --reason
+"..."` lowers the baseline only after review; it refuses any new or increased finding and records
+the reason and delta in the baseline.
 
 The suite uses stub engines and stand-in CuPy where needed. It covers config precedence, the chat
 template and tool-call round trips, tokenizer behavior, sampling, cache decisions, the HTTP boundary
