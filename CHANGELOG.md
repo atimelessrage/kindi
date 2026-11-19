@@ -4,6 +4,13 @@
 
 ### Added
 
+- **DSV4.1 request shapes are validated before token counting or generation** — the served
+  `kindi/dsv41_server.py` path now rejects a malformed message/tool/stream/stop shape with an
+  OpenAI-style 400 before `count()` or any model work, and the error envelope is pinned by
+  app-level tests.
+- **Windows secret-baseline scanning no longer trips the command-line limit** — detect-secrets is
+  invoked in bounded argv batches and the results are merged, so a large tracked tree no longer
+  fails with `WinError 206`; a regression test pins the batching and merge.
 - **Mode A's default now follows its measured winning draft length** — explicit `KINDI_SPEC=mtp`
   defaulted to `KINDI_SPEC_K=4`, the setting that cost 0.66-0.89x on the 2B / RTX 4060 Ti; the
   measured k=1 row is 1.12-1.13x at 512 and 24K and a 1.01x wash at 8K. `spec_begin` now defaults
@@ -399,6 +406,11 @@
   cover both; `kindi io --skip` remains the reference for the error style.
 
 ### Changed
+
+- **The live comparison is re-based at `53198e5`** — official Kindi `v0.6.1` (`7fececb`) remains
+  the latest release and upstream `main` has no post-release commit. The fork is now 664 commits /
+  827 files ahead (`+106,882/−1,320`), with 929 tracked files, 28 numbered requirements and zero
+  file deletions; `CURRENT-VS-KINDI-0.6.md` and `docs/claims/upstream-delta.json` carry the figures.
 
 - **The kernel launch contract now covers every graph call site, not one kernel** — `k_rmsfold_qT`'s
   missing `hp` was caught for one kernel only after four releases of silent breakage. `tests/test_kernel_arity.py`

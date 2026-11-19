@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `84b6686` on `freebuff/tandem-cpu-recovery` (**main** fast-forwards to the handoff commit; guarded by `tests/test_agents_handoff.py`); the 2026-11-18 audit round, the ternary-MoE census correction, the host-mapped Q2 lane, the fresh k=1 A/B and the mixed card/CPU Q2 combine contract are committed (`31d10cc` code, `d28397f` evidence and claim, `26309d2` multi-slot gate); the 2026-11-19 consolidation adds request-shape validation, Windows secret-scan batching, the controlled 2B/4B/9B pairs, the 9B chunk sweep, the context-growth and ternary-MoE pages and the Q2 lane move to `tools/` (`f75253b`, `84b6686`); full CPU gate **1,357 passed, 28 skipped, 0 failed**; Engine wiring and the model row remain blocked by the absent Lightning pack.
+- **HEAD:** `53198e5` on `freebuff/tandem-cpu-recovery` (**main** fast-forwards to the handoff commit; guarded by `tests/test_agents_handoff.py`); the 2026-11-18 audit round, the ternary-MoE census correction, the host-mapped Q2 lane, the fresh k=1 A/B and the mixed card/CPU Q2 combine contract are committed (`31d10cc` code, `d28397f` evidence and claim, `26309d2` multi-slot gate); the 2026-11-19 consolidation adds request-shape validation, Windows secret-scan batching, the controlled 2B/4B/9B pairs, the 9B chunk sweep, the context-growth and ternary-MoE pages and the Q2 lane move to `tools/` (`f75253b`, `84b6686`); full CPU gate **1,357 passed, 28 skipped, 0 failed**; Engine wiring and the model row remain blocked by the absent Lightning pack.
 
 ### Python quality ratchet
 
@@ -41,7 +41,7 @@ suite plus CI job, and pinned every workflow's actions. The forward-slash drive-
 
 ### Full CPU gate
 
-The final coverage run at `539a504` is **1,241 passed, 28 skipped, 0 failed** in 277.17 s at **46.36%** line+branch coverage (23,504 statements and 8,394 branches); the plain suite at that commit is 1,241 / 28 / 0 in 227.62 s. The committed 2026-11-19 tree at `b893157` is **1,312 passed, 28 skipped, 0 failed** in 225.81 s with `pytest -q -rs`, and every skip is inventoried by node ID and exact reason in `tests/README.md`.
+The final coverage run at `539a504` is **1,241 passed, 28 skipped, 0 failed** in 277.17 s at **46.36%** line+branch coverage (23,504 statements and 8,394 branches); the plain suite at that commit is 1,241 / 28 / 0 in 227.62 s. The consolidated 2026-11-19 content commits (`f75253b` + `84b6686`) are **1,357 passed, 28 skipped, 0 failed** in 229.53 s; the final handoff commit `53198e5` changes only `AGENTS.md` and its history. Every skip is inventoried by node ID and exact reason in `tests/README.md`.
 
 ### Upstream v0.6.1 and comparison
 
@@ -49,8 +49,8 @@ Stock moved to upstream `v0.6.1` (`7fececb`, fetched 2026-11-17) and one of its 
 `hp`, so the MTP head's CUDA graph did not build and mode A speculation was dead on the tensor-core layout (fixed in `f934a55`, with
 `tests/test_kernel_arity.py`); measured after the fix, mode A at the old default `KINDI_SPEC_K=4` costs 0.66x on the 2B; at
 `KINDI_SPEC_K=1` it is 1.12-1.13x at 512 and 24K tokens of context and a wash at 8K (4-run medians, 2026-11-17, `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-mtp-context/RESULTS.md`), so mode A now
-defaults to k=1 (`docs/MTP.md`), and `CURRENT-VS-KINDI-0.6.md` records the current official v0.6.1 comparison (649-commit / 736-file
-delta at `b893157`; the 2026-11-19 round adds MTP k=1, the Q2 expert lane, the controlled 9B pair and the chunk sweep; upstream `main` now points at the release commit `7fececb` (no post-release commit to port); round history in
+defaults to k=1 (`docs/MTP.md`), and `CURRENT-VS-KINDI-0.6.md` records the current official v0.6.1 comparison (664-commit / 827-file
+delta at `53198e5`; the 2026-11-19 round adds request-shape validation, Windows secret-scan batching, MTP k=1, the Q2 expert lane, the controlled pairs and the chunk sweep; upstream `main` now points at the release commit `7fececb` (no post-release commit to port); round history in
 `detailed-fork-changelog.md`); §4.6 closes the same-settings A/B with stock `v0.6.1` (tag source, loader shim) and this
 tree at `a79137f` on the same 2B/9B packs at ctx 8192, plain engine and exact head, five passes each: every decode median is within 2.6% and the ranges overlap,
 while the 9B prompt-reading gap (83.9 vs 72.4) was rechecked at 20 passes and closed as noise (70.7 vs 75.7; paired -1.4, p=0.648); a separate stock harness
@@ -165,7 +165,7 @@ state - and at a 200-token document the average *falls* to 463 ms/token against 
 whitespace-permitting constraint lets the greedy 2B spend the whole budget on whitespace (200 tokens, 9 characters) (`docs/API.md`,
 `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/RESULTS.md`), and the two harnesses behind it are tracked as `tools/grammar_cost.py` and
 `tools/grammar_cost_serve.py` so a clean checkout re-derives the rows instead of trusting the JSON artifact. The numbers those docs quote are no longer prose:
-`python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (21 gates, 116 numbers across `docs/claims/*.json`, 4 citations
+`python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (21 gates, 124 numbers across `docs/claims/*.json`, 4 citations
 listed as reasoned debt), and refuses a benchmark citation no claim accounts for - schema and procedure in `docs/claims/README.md`.
 
 ### Dated evidence
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `84b6686` | main checkout; clean; fast-forwarded to the handoff commit |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `84b6686` | this session; checked out here |
+| `T:/kindi` | `main` | `53198e5` | main checkout; clean; fast-forwarded to the handoff commit |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `53198e5` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.

@@ -880,3 +880,38 @@ the worktree.
   it on 2026-11-19. The live report now names `b893157` as its baseline: **650 commits, 768
   files, +101,646/−1,289**, zero file deletions and **871 tracked files** against `v0.6.1`.
   The worktree counts above are kept as the pre-commit history of this section.
+
+## 46. Consolidated tree and live comparison at `53198e5` (2026-11-19)
+
+This is the first section in which the live comparison names a tree with no uncommitted
+engine or evidence changes behind it. `CURRENT-VS-KINDI-0.6.md` and
+`docs/claims/upstream-delta.json` now name **`53198e5`**; `main` and
+`freebuff/tandem-cpu-recovery` are the same commit and both worktrees are clean.
+
+- **Latest official release rechecked.** The GitHub release API and `git ls-remote --tags
+  origin` still report **v0.6.1** (`7fececb`, published 2026-11-16T21:49:20Z) as latest on
+  2026-11-19; there is no v0.6.2, and `origin/main` still points at the release commit. The
+  shared base remains `dce89df`, and `v0.6.1` is one commit past it, so `v0.6.1..53198e5` is
+  the comparison range.
+- **Current delta.** Against `v0.6.1` the fork is **664 commits, 827 files changed,
+  +106,882/−1,320**, with **zero file deletions**; the v0.6.1 tree has **172** files, the
+  current tree **929** tracked files, and there are **28** numbered requirements.
+- **The 14 commits after `b893157`.** They are the fresh MTP k=1 confirmation, the
+  host-mapped Q2 lane, the mixed card/CPU combine contract and its gate, the ternary-MoE
+  census correction, the 2026-11-18 audit follow-up, the comparison refresh at `f984962`, and
+  the final consolidation: `f75253b` (DSV4.1 request-shape validation and batched Windows
+  secret scanning), `84b6686` (controlled 2B/4B/9B pairs, 9B chunk sweep, context-growth and
+  ternary-MoE pages, Q2 lane moved to `tools/`) and `53198e5` (handoff).
+- **Full CPU gate.** On the consolidated content (`f75253b` + `84b6686`): **1,357 passed,
+  28 skipped, 0 failed** in 229.53 s (one CuPy CUDA-path warning). The final handoff commit
+  only changes `AGENTS.md` and its history; the handoff/docs tests are **7 passed**.
+- **Current checks.** Python quality **316 Ruff / 59 mypy / 1,035 Pyright / 255 Pylint**
+  within the reviewed baseline; `check_claims.py` **21 gates / 124 numbers**;
+  `config_reference --check`, `support_matrix --check`, `project_memory --check`,
+  `check_secret_baseline.py` (104 findings in 31 tracked files) and `git diff --check` clean.
+- **No GPU or model run.** This round changed tests, documentation, evidence and the request
+  validation/secret-scanning paths only; no CUDA, model pack or cold-tier run is claimed. No
+  push or deployment was made.
+- **Preview.** `bench-logs/render_comparison.py` renders the live report to the ignored
+  `current-vs-kindi-0.6-preview.html`; its chips compute HEAD and the committed
+  `v0.6.1..HEAD` shortstat at render time, so they name `53198e5` and the 827-file delta.
