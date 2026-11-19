@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `b893157` on `freebuff/tandem-cpu-recovery` (**main** is at `b893157`; guarded by `tests/test_agents_handoff.py`); `--save-baseline` now carries each cell's `logs` list from the replaced baseline only when it names the cell's `log`, and refuses to drop one; the 27B baseline summaries quote the median pass's duration to two decimals, so a one-decimal look-alike from another pass cannot stand in (`tests/test_verify_matrix.py` **48 passed**); the DSV4.1 CLI now validates its remaining paths, counts, prompt JSONL and reference continuations before loading, and the standalone server/dspark/tool audit moved its late numeric parsing to argparse (`tests/test_dsv41_cli.py` **45 passed**).
+- **HEAD:** `dc503da` on `freebuff/tandem-cpu-recovery` (**main** is at `f984962`; guarded by `tests/test_agents_handoff.py`); the 2026-11-18 audit round is committed (closing JSON reader, offsite bundle tool, report-only dependency audit, security/push policy); the current task audits the ternary-MoE census arithmetic in `docs/ROADMAP.md` and records the result in the lease and history.
 
 ### Python quality ratchet
 
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `b893157` | main checkout; clean; same commit as this branch |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `b893157` | this session; checked out here |
+| `T:/kindi` | `main` | `f984962` | main checkout; clean; one commit behind this branch |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `dc503da` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
