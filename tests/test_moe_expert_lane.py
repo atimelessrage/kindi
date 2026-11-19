@@ -9,7 +9,7 @@ import math
 import numpy as np
 import pytest
 
-from kindi import moe_expert_lane as lane
+from tools import moe_expert_lane as lane
 
 pytestmark = pytest.mark.skipif(not lane.available(), reason="numba with its fmaf intrinsic is required")
 

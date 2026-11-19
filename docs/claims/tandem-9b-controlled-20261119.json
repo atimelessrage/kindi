@@ -1,61 +1,75 @@
 {
   "gate": "tandem-9b-controlled-20261119",
-  "title": "9B CPU-only vs CPU+GPU tandem: controlled same-session pair at 24,576",
+  "title": "9B CPU-only vs CPU+GPU tandem: two controlled runs at 24,576",
   "measured": "2026-11-19",
   "commit": "3002a40",
-  "command": "KINDI_DEVICE=cpu python -m kindi --pack ~/.kindi/packs/bonsai-9b --ctx 24576 bench --split-at none --json cpu.json; python -m kindi --pack ~/.kindi/packs/bonsai-9b --ctx 24576 bench --tandem cpu-first --tandem-cpu-layers 6 --sample-vram --split-at none --json tandem.json (one fresh process per placement)",
-  "notes": "This is the controlled replacement for the old cross-run 9B tandem-to-CPU ratio. It is a single fresh-process run per placement, not a full-GPU pair: the full-GPU 9B rows remain the 2026-11-17 capacity run, and no thermal or run-to-run control was applied here. Both placements verified 4/4 prompts and 133/133 tokens at the verify gate's 1,024-token context.",
+  "command": "KINDI_DEVICE=cpu python -m kindi --pack ~/.kindi/packs/bonsai-9b --ctx 24576 bench --split-at none --json cpu.json; python -m kindi --pack ~/.kindi/packs/bonsai-9b --ctx 24576 bench --tandem cpu-first --tandem-cpu-layers 6 --sample-vram --split-at none --json tandem.json; then the same pair again into cpu-2.json and tandem-2.json (one fresh process per placement)",
+  "notes": "This is the controlled replacement for the old cross-run 9B tandem-to-CPU ratio. The 2B/4B rows remain one pair; the 9B row is the median of two fresh-process pairs because run 2 was 23-38% slower on the CPU side. The shallow ratio is 3.0x in run 1 and 4.1x in run 2, so the two-run median is 3.5x; the 3.0x reading is not stable. Run 1 verified 4/4 and 133/133 at both placements; run 2 was throughput only. The full-GPU 9B rows remain the 2026-11-17 capacity run, and no thermal control was applied.",
   "evidence": [
     "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs.json",
     "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/RESULTS.md",
     "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/cpu.json",
-    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/tandem.json"
+    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/tandem.json",
+    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs-2.json",
+    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/cpu-2.json",
+    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/tandem-2.json",
+    "docs/benchmarks/CROSS-MODE.csv",
+    "docs/benchmarks/CROSS-MODE.md"
   ],
   "numbers": [
     {
       "id": "cpu-24k",
-      "display": "2.9",
+      "display": "2.4",
       "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
       "check": {
-        "kind": "json",
-        "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs.json",
-        "pointer": "/cpu/24000",
-        "expect": 2.9
+        "kind": "csv",
+        "file": "docs/benchmarks/CROSS-MODE.csv",
+        "where": {"mode": "cpu", "model": "9b"},
+        "field": "gen_24000",
+        "expect": 2.4
       }
     },
     {
       "id": "tandem-24k",
-      "display": "16.8",
+      "display": "15.8",
       "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
       "check": {
-        "kind": "json",
-        "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs.json",
-        "pointer": "/tandem/24000",
-        "expect": 16.8
+        "kind": "csv",
+        "file": "docs/benchmarks/CROSS-MODE.csv",
+        "where": {"mode": "tandem", "model": "9b"},
+        "field": "gen_24000",
+        "expect": 15.8
       }
     },
     {
       "id": "ratio-24k",
-      "display": "5.8x",
+      "display": "6.7x",
       "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
       "check": {
-        "kind": "ratio",
-        "a": {"file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs.json", "pointer": "/tandem/24000"},
-        "b": {"file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs.json", "pointer": "/cpu/24000"},
-        "expect": 5.8
+        "kind": "text",
+        "file": "docs/benchmarks/CROSS-MODE.md",
+        "needle": "| 9B | 3.5x | 3.8x | 4.8x | 5.7x | 6.7x |"
       }
     },
     {
       "id": "ratio-100",
-      "display": "3.0x",
+      "display": "3.5x",
       "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
       "check": {
-        "kind": "ratio",
-        "a": {"file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs.json", "pointer": "/tandem/100"},
-        "b": {"file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs.json", "pointer": "/cpu/100"},
-        "expect": 3.0
-      },
-      "tolerance": 0.01
+        "kind": "text",
+        "file": "docs/benchmarks/CROSS-MODE.md",
+        "needle": "| 9B | 3.5x | 3.8x | 4.8x | 5.7x | 6.7x |"
+      }
+    },
+    {
+      "id": "range-100",
+      "display": "3.0x-4.1x",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/CROSS-MODE.md",
+        "needle": "3.0x-4.1x"
+      }
     }
   ]
 }

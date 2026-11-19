@@ -288,20 +288,22 @@ positions 100 to 24,000, with read speeds and sources, is generated at
 
 | Model | CPU-only 24K | GPU-only 24K | GPU / CPU | Tandem 24K |
 |---|---:|---:|---:|---:|
-| 2B | 8.2 | 160.6 | 19.6x | 34.9 |
-| 4B | 3.1 | 79.8 | 25.7x | 16.7 |
-| 9B | 2.6 | 62.3 | 24.0x | 15.2 |
+| 2B | 8.2 | 160.6 | 19.6x | 37.4 |
+| 4B | 2.9 | 79.8 | 27.5x | 14.4 |
+| 9B | 2.4 | 62.3 | 26.5x | 15.8 |
 
-CPU-only is the 6-thread native Windows run (2026-11-10); GPU-only is the median of three Windows runs. The old
-WSL2 CPU cells are archived in the 2026-11-09 benchmark page. The 2B/4B/9B tandem cells are the
-2026-11-13 `cpu-first` medians of three fresh-process runs, like the GPU-only column. The 2026-11-12
-single runs are kept as `bench-<model>-cpu-first-24k.log` in the same folder. The dense
-tandem runtime and its current status are in [TANDEM-STATUS.md](TANDEM-STATUS.md) and
-[TANDEM-RUNTIME.md](TANDEM-RUNTIME.md).
+CPU-only and tandem are the 2026-11-19 controlled same-context pairs (6-thread native Windows,
+one fresh process per placement for 2B/4B, two for 9B); GPU-only is the median of three Windows
+runs. The 2026-11-10 CPU and 2026-11-13 tandem rows remain as history, and the old WSL2 CPU
+cells are archived in the 2026-11-09 benchmark page. The dense tandem runtime and its current
+status are in [TANDEM-STATUS.md](TANDEM-STATUS.md) and [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md).
 
-Every tandem row is faster than CPU-only at 24K: **4.3x (2B), 5.4x (4B), 5.8x (9B)**, but each is
-4.1-4.8x slower than GPU-only, so this is a capacity trade rather than a win for a model that fits the
-card. The measured capacity-bound case is outside the 4060 Ti table: AH-Nanbeige4.3-33B IQ3_XXS on a
+Every tandem row is faster than CPU-only at 24K: **4.6x (2B), 5.0x (4B), 6.7x (9B)**, but each is
+3.9-5.5x slower than GPU-only, so this is a capacity trade rather than a win for a model that fits the
+card. The 2B pair and the 9B's first pair verified 4/4 in both placements; the 4B tandem was 3/4 with one
+llama.cpp top-2 tie, so its rate is throughput evidence, not an exactness claim. The 9B's two-run
+spread is recorded in its page. The measured capacity-bound case is outside the 4060 Ti table:
+AH-Nanbeige4.3-33B IQ3_XXS on a
 12 GB Quadro K6000 keeps 13 layers in host memory and computes 55% of their FFN rows on the CPU, and
 writes 3.85/3.55/3.56 tok/s at 480/2,016/8,160 tokens against llama.cpp's 2.19/1.96/1.52 (4.4-5.0 vs
 2.5-2.7 at 1,024; Kindi 0.4.0, the K6000 section below). It is a dense 33B model. No big-MoE CPU-compute

@@ -34,17 +34,32 @@ def test_matrix_shows_all_four_modes():
     for r in tandem:
         if r["available"] == 1:
             assert r["read"] and r["gen_24000"]
-            if r["model"] == "9b":
-                assert r["source"].startswith("2026-11-19 controlled pair")
-            else:
-                assert "2026-11-12-i7-8086k-rtx4060ti-tandem" in r["source"]
+            assert r["source"].startswith("2026-11-19 controlled pair")
         else:
             assert r["available"] == 0 and r["read"] is None and r["gen_24000"] is None
+    for r in rows:
+        if r["mode"] in ("cpu", "tandem"):
+            assert r["source"].startswith("2026-11-19 controlled pair"), r
     md, _ = load().build()
     if all(r["available"] == 1 for r in tandem):
-        assert "The 2B/4B rows are the median of three fresh-process runs (2026-11-13)" in md
-        assert "its ratio is not cross-run" in md
+        assert "All three rows are controlled CPU-only/tandem pairs from" in md
+        assert "no tandem-to-CPU ratio is cross-run" in " ".join(md.split())
         assert "the other tandem rows say `n/a`" not in md
     two_b = next(r for r in tandem if r["model"] == "2b")
     assert two_b["available"] == 1 and two_b["source"].startswith(
-        "2026-11-12-i7-8086k-rtx4060ti-tandem (cpu-first")
+        "2026-11-19 controlled pair (cpu-first")
+    nine_b = next(r for r in tandem if r["model"] == "9b")
+    assert nine_b["available"] == 1 and nine_b["runs"] == 2
+
+
+def test_gpu_comparison_follows_the_measured_ratio():
+    module = load()
+    slower = module.gpu_comparison(3.9, 5.5)
+    assert "slower than GPU-only" in slower
+    assert "capacity trade" in slower
+    faster = module.gpu_comparison(0.5, 0.8)
+    assert "faster than GPU-only" in faster
+    assert "capacity trade, not a win" not in faster
+    assert "not just a capacity trade" in faster
+    mixed = module.gpu_comparison(0.8, 1.4)
+    assert "bracket GPU-only" in mixed

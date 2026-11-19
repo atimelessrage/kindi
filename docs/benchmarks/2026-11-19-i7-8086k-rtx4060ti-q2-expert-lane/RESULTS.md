@@ -6,7 +6,7 @@ pack was loaded; this is an expert-level gate, not a model row.
 
 ## What was tested
 
-`kindi/moe_expert_lane.py` computes one routed expert of the Lightning big MoE
+`tools/moe_expert_lane.py` computes one routed expert of the Lightning big MoE
 (Nemotron 3.5 Lightning 30B-A3B: hidden 2688, expert width 1856, 23 MoE layers,
 128 routed experts top-6 plus one shared) on the host CPUs. The arithmetic is
 the kernel's, not an equivalent one:

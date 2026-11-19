@@ -212,11 +212,14 @@ is functionally possible but is not a performance-supported configuration.
 ```sh
 # 1. Device visible with the kernel driver loaded
 ls -l /dev/dri/
-lspci -k | grep -A3 -i vga        # driver in use, link width/generation
+lscpu                              # CPU/feature baseline for intel-info and the CPU comparison
+lspci -nnk | grep -A3 -i 'vga\|display'   # BDF, device id and driver in use
+ls -l /dev/dri/by-path/            # render node -> PCI slot mapping
+lspci -vv -s <bdf> | grep -Ei 'resizable|lnkcap|lnksta'  # ReBAR and link width/generation
 
 # 2. Toolchain: pin oneAPI/SYCL/Level Zero + Intel compute runtime (Open Decision 1);
 #    verify against Intel's current oneAPI system-requirements matrix, not the CUDA image.
-sycl-ls
+sycl-ls --verbose
 clinfo
 
 # 3. CPU baseline (same host, same packs): the 2B/4B/9B CPU verify rows.
@@ -229,6 +232,54 @@ KINDI_DEVICE=cpu python -m kindi --pack <pack> verify
 
 M1 passes when: the device is visible with 16 GB, the ReBAR state is recorded, and both baselines
 run. Only then does M2 (backend smoke test) start.
+
+### CPU tuning hypotheses from `cputune.py` (record during M1)
+
+Two host-tuning hypotheses survive the `cputune.py` review. They are experiments, not adopted
+settings, and neither changes the M1 pass condition. Run them on the A770 host with the same pack,
+context, token stream and exact head; keep every `--json` report. A result inside run-to-run noise
+is a useful no-go, not a failure.
+
+**THP.** Kindi disables transparent huge pages for ROCm processes today (`engine._no_thp()`), not
+for Intel. First record the host policy (`cat /sys/kernel/mm/transparent_hugepage/enabled`) and
+screen it on the M1 CPU baseline: three `KINDI_DEVICE=cpu ... bench` passes with THP left at the
+host default (`KINDI_THP=1`), and three with `PR_SET_THP_DISABLE` set by a launcher before Kindi
+starts. Then repeat both arms on the M7 CPU+Arc tandem, where host compaction is the actual concern.
+
+```sh
+# Control: host THP policy (KINDI_THP=1 prevents Kindi's own disable on ROCm).
+KINDI_DEVICE=cpu KINDI_THP=1 python -m kindi --pack <pack> --ctx 8192 bench --json thp-on.json
+
+# Experiment: same process after PR_SET_THP_DISABLE (41), before Kindi imports.
+KINDI_DEVICE=cpu python -c 'import ctypes,runpy,sys;ctypes.CDLL(None).prctl(41,1,0,0,0);sys.argv=["kindi","--pack","<pack>","--ctx","8192","bench","--json","thp-off.json"];runpy.run_module("kindi.__main__",run_name="__main__")'
+```
+
+Decide on the M7 tandem result: add the Intel THP call only if the three-pass 8K decode median
+improves by at least 3% over THP-on, the three-pass ranges do not overlap, and `kindi verify` stays
+exact. If the M1 CPU screen is within noise, record that and do not add an Intel hook on CPU-only
+evidence. If the CPU screen wins but the M7 tandem does not, leave THP enabled on Intel.
+
+**P-core pinning.** If `lscpu` and `cpu_capacity` show a hybrid part, compare Kindi's all-core
+default with a pin to the CPUs whose `cpu_capacity` is maximal. Choose one logical CPU from each
+max-capacity physical core (deduplicate by `thread_siblings_list`), set `OMP_NUM_THREADS` to the
+P-core count, and run the same three-pass M1 CPU `bench` at 8K. Record the capacity map, chosen CPU
+list, thread count and raw reports.
+
+```sh
+# Show capacity per logical CPU, highest first (skip this arm if cpu_capacity is absent).
+for c in /sys/devices/system/cpu/cpu[0-9]*; do
+  printf '%s %s\n' "${c##*/}" "$(cat "$c/cpu_capacity" 2>/dev/null)"
+done | sort -k2,2nr
+
+# After choosing the deduplicated P-core list and count:
+KINDI_DEVICE=cpu taskset -c "$PCORES" env OMP_NUM_THREADS="$PCORE_COUNT" \
+  python -m kindi --pack <pack> --ctx 8192 bench --json pcore.json
+```
+
+Adopt a `cpu_capacity`-based default only if the 8K decode median improves by at least 3% over the
+all-core default, the three-pass ranges do not overlap, and neither prompt-read nor exactness
+regresses; otherwise keep the current thread default and record the no-go. If the CPU arm wins,
+repeat the comparison on the M7 tandem before making it the Arc-host default.
 
 ## Acceptance matrix
 
@@ -354,11 +405,53 @@ copied.
   pinned staging ring against `file_to_card` on the Arc rig — as a measurement, not an import.
 - **`cputune.py` — mostly already in Kindi.** `kindi/cpu.py` already defaults to one thread per
   physical core, sets `OMP_PROC_BIND=close` and binds the workers, so the OpenMP block duplicates
-  existing behaviour. Two ideas survive as hypotheses, not code: disabling THP on Intel too
-  (Kindi's `engine._no_thp()` is gated on ROCm today, and host-memory compaction is what a CPU+Arc
-  tandem decode would feel), and P-core pinning through `cpu_capacity` if the Arc rig is a hybrid
-  part. The cpufreq-governor report is a diagnostic worth copying into the M1 checklist output, not
-  a runtime feature.
+  existing behaviour. Two ideas survive as hypotheses, not code, and are folded into the M1
+  arrival checklist above with their decision measurements: disabling THP on Intel too (Kindi's
+  `engine._no_thp()` is gated on ROCm today, and host-memory compaction is what a CPU+Arc tandem
+  decode would feel), and P-core pinning through `cpu_capacity` if the Arc rig is a hybrid part.
+  The cpufreq-governor report is a diagnostic worth copying into the M1 checklist output, not a
+  runtime feature.
+
+### Verdict on `intel.py` and `ov_build.py` (read 2026-11-19)
+
+Read at fork head `ad227a8`; nothing here is merged or copied. The useful material is the probe/report
+shape, not the backend.
+
+**`intel.py`: probe/report ideas worth reimplementing independently.** The one-machine profile is
+the right scope for `kindi intel-info` and M1: CPU vendor/model/family/stepping/cores and feature
+flags (`avx2`, `fma`, `avx_vnni`, `amx`), Intel display devices, NPU presence, Level Zero devices,
+OpenVINO version/available devices, and oneAPI presence. Keep the current `/sys/class/drm` discovery
+as the primary device source and use `lspci` only as corroboration. Preserve the PCI BDF, device id,
+driver and render node for each device, and distinguish integrated from discrete entries.
+
+The fork's Level Zero names are useful M1 evidence, but its ctypes probe guesses a
+`ze_device_properties_t` layout in a 512-byte buffer and reads the name at a fixed offset; that is
+not a stable ABI, so take the names from `sycl-ls --verbose` or a maintained loader binding instead.
+Treat `KINDI_OV_DEVICE` and OpenVINO's device list as diagnostic fields only. Kindi's
+`KINDI_DEVICE=intel` must remain the SYCL backend selector; do not adopt the fork's OpenVINO
+GPU -> NPU -> CPU fallback. A missing probe should be explicit in the report (an error/absence
+field), not silently omitted, and the layout must be testable with synthetic sysfs/command output
+on a CPU-only host.
+
+The M1 checklist now records `lscpu`, the feature flags, `lspci -nnk` for every Intel display device,
+the `/dev/dri/by-path` render-node-to-slot mapping, `sycl-ls --verbose`, and optional OpenVINO
+versions/devices as a baseline. The fork does not probe ReBAR or PCIe link state, so the existing
+manual `lspci -vv`/sysfs capture stays mandatory.
+
+**Not worth taking from `intel.py`:** `_gen_of`/`_SKU_MODELS` (duplicated and contradictory model
+mappings; the profile stores the stepping-derived value in a field named `model`), broad `lspci`
+substring matching, `pick_backend`'s OpenVINO precedence, `spec_ready`, and the OpenVINO
+`Engine`/`export_ir` path.
+
+**`ov_build.py`: no backend code worth reimplementing.** It is a non-runnable OpenVINO IR builder:
+`main()` prints "weights are staged, graph emission pending" and returns 0 without writing
+`model.xml`, its `Builder.build()` bodies are `pass`/`raise`, `attn_body()` returns `None`, and
+`embed_body()` is a placeholder. `export_ir()` therefore cannot produce the IR `Engine` needs, and
+there is no test, benchmark or A770 run. The only transferable test idea is a reduced-dimension
+(`--tiny`) synthetic graph for an eventual backend smoke, which belongs in M2/M3, not M1. The graph
+and state inventory (residual, GDN convolution/M state, KV cache) is design documentation, not
+verified arithmetic. Do not adopt OpenVINO IR or `ov_genai`; M1/M2 remain SYCL/Level Zero and
+Kindi's pack format.
 
 ## References
 

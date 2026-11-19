@@ -71,7 +71,8 @@ A line-count drop in a shortstat is edits inside files, not file deletions.
 The 2026-11-19 round is committed at `b893157`: it adds `kindi/moe_expert_lane.py` and
 `tools/q2_expert_lane.py`, the MTP k=1 default in `kindi/spec.py`, plan/DSV4.1 edits, the 9B
 controlled pair, the chunk sweep, the Q2_0 expert-lane page and its claim,
-`tests/test_cross_mode_gain.py`, and the controlled-pair claim file.
+`tests/test_cross_mode_gain.py`, and the controlled-pair claim file. The lane module was later
+moved to `tools/moe_expert_lane.py` as an experiment; it is not wired into the engine.
 
 Full suite on the committed tree at `b893157`: **1,312 passed, 28 skipped, 0 failed** in 225.81 s
 (one CuPy CUDA-path warning). The earlier `3002a40` note's 1,274 / 2 failures is
@@ -132,7 +133,7 @@ The preview chips are computed at render time from HEAD and the working-tree sho
 | **DSV4.1 server body cap** (`kindi/dsv41_server.py`, 2026-11-18) | the standalone server shares `KINDI_MAX_BODY_MB` (16 MiB), refuses an over-cap body with 413 `request_too_large` before reading it, answers 400 for a malformed length/JSON, and half-closes plus drains the refused body so the 413 cannot be lost to a reset; a socket-level test sends a 1 MiB body past a small cap followed by a valid request |
 | **Cold-expert slots stay pinned across decode steps** (`kindi/cold_experts.py`, 2026-11-18) | the decode hit test now uses a per-layer slot table from `cold_slot_plan`: a repeated expert is served from its unchanged slot, a routed expert's slot is never stolen, and `cold_stats()` reports `slot_hits`. Unit-tested only; the per-layer stream sync and blocking current-layer read stay open (C9), with no GPU, larger-than-RAM pack or tok/s claim |
 | **Mode A now defaults to its measured k=1 win** (`kindi/spec.py`, 2026-11-19) | explicit `KINDI_SPEC=mtp` now defaults to `KINDI_SPEC_K=1`; the 2B path is 4/4 token-exact, 160/160 tokens with 65/94 drafts accepted on the live ctx-1024 check. k=4 remains available but no longer silently selected; the other drafters keep k=4 (`docs/MTP.md`) |
-| **Controlled 9B CPU-only vs CPU+GPU tandem pair** (2026-11-19) | same-session `cpu-first` six-layer pair at ctx 24,576: CPU-only **2.9** vs tandem **16.8** tok/s at 24K (**5.8x** over CPU-only), **3.0x** at 100; both placements 4/4, 133/133 exact. Corrects the old cross-run shallow-context 4.3x; the split stays below the full-GPU 9B row and buys headroom only. `docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/` |
+| **Controlled 9B CPU-only vs CPU+GPU tandem pair** (2026-11-19) | two controlled `cpu-first` six-layer pairs at ctx 24,576: run medians CPU-only **2.4** vs tandem **15.8** tok/s at 24K (**6.7x** over CPU-only), **3.5x** at 100 with the pair spanning **3.0x-4.1x**. The second CPU-only pass was 23-38% slower, so the shallow 3.0x reading is not stable; run 1 verified both placements 4/4, 133/133, while run 2 was throughput only. Corrects the old cross-run shallow-context 4.3x; the split stays below the full-GPU 9B row and buys headroom only. `docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/` |
 
 ## 4. What is worse, missing, or unverified vs official Kindi 0.6.1
 

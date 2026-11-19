@@ -6,8 +6,9 @@ The check is the M2 gate of docs/MOE-TANDEM.md for the Lightning quant format:
 
 * ``lt_mv_q2`` (up) and ``lt_mv_q2_down`` (down, one expert) run on synthetic
   Q2_0 weights of the real geometry (hidden 2688, expert width 1856);
-* the same experts run through ``kindi.moe_expert_lane`` from the GPU's own
-  ``lt_quant`` output, so only the matvec arithmetic is compared;
+* the same experts run through ``tools.moe_expert_lane`` (the experiment moved
+  out of ``kindi/``) from the GPU's own ``lt_quant`` output, so only the matvec
+  arithmetic is compared;
 * the kernels also run from the engine's **host-expert** path: one
   ``cupy.cuda.alloc_pinned_memory`` block (codes then scales) and device uint64
   pointer tables, exactly as ``lightning.py:_q2`` builds ``w.tc``/``w.ts``;
@@ -34,7 +35,7 @@ ROOT = os.path.dirname(HERE)
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from kindi import moe_expert_lane as lane  # noqa: E402
+from tools import moe_expert_lane as lane  # noqa: E402
 
 HIDDEN = 2688                                               # Spec.n_embd of the 30B-A3B
 FF = 1856                                                   # Spec.n_ff

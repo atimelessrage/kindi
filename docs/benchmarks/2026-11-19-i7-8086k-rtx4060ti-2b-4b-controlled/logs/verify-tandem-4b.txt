@@ -1,0 +1,16 @@
+<local-home>\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+[kindi 20:56:27] kindi-cpu ready: Ternary-Bonsai-2-4B, avx2-fma-f16c, 6 threads, ctx 1024 (15.6s)
+[kindi 20:56:28] blocking sync: card 0 primary context flags 0x4 (set: 0)
+[kindi 20:56:28] plan engine: the other backend embeds (no token_embd on this side)
+[kindi 20:56:28] card 0: 0.77 GB of weights (1s)
+[kindi 20:56:28] plan engine ready: 1 card, ctx 1024, K/V q8_0, weights 5-trit lane (0.9s)
+[kindi 20:56:28] tandem cpu-first: CPU layers 0..5, plan engine on layers 6..31, 1024-token context, GPU head
+[kindi 20:56:29] kindi: <local-home>\.kindi\packs\bonsai-4b -> the bonsai backend (bonsai2-4b)
+[kindi 20:56:29] speculation: unavailable (this engine has no spec_begin); verifying the plain engine
+[kindi 20:56:30] prompt 1 'The sky is blue because'                                    TIE  39/40 tokens match  (0.9s)
+[kindi 20:56:30]    first difference at token 24 (llama.cpp top-2 gap there 0.0157)
+[kindi 20:56:30] prompt 2 'The capital of France is'                                   PASS  40/40 tokens match  (0.8s)
+[kindi 20:56:31] prompt 3 'Water boils at a lower temperature on mountains because'    PASS  40/40 tokens match  (0.8s)
+[kindi 20:56:32] prompt 4 'def add_two_numbers('                                       PASS  40/40 tokens match  (0.8s)
+[kindi 20:56:32] PASS (speculation off): 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 56.3 tokens/s over the run

@@ -16,7 +16,8 @@ methodology as the GPU-only cells. The original 2026-11-12 single runs
 > run) read 94.6 against the recorded 80.9. Re-running all three models three times moved
 > 4B read by **-21%** and 9B at position 100 by **+32%**; the perf gate flagged the 4B row
 > (-21% read, -17% at 24K) before the new medians were adopted. Single tandem runs are not
-> spec-grade evidence; medians are what [CROSS-MODE.md](../CROSS-MODE.md) reports.
+> spec-grade evidence; these medians were [CROSS-MODE.md](../CROSS-MODE.md)'s source until the
+> 2026-11-19 controlled pairs replaced them.
 
 Commands:
 

@@ -44,4 +44,5 @@ def test_generated_page_names_the_gain_and_its_limit():
     md, _csv_text = module.build()
     assert "Tandem speedup over CPU-only" in md
     assert "capacity trade" in md
+    assert "slower than GPU-only" in md
     assert "big-MoE CPU-compute row still needs the CPU expert lane" in md

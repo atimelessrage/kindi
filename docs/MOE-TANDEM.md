@@ -416,7 +416,7 @@ Implemented, model-free:
 |---|---|
 | `kindi/expert_cache.py` | copy-only slot manager, pin-aware LRU, transient fallback and JSON-safe metrics; no tensors, GPU or engine wiring |
 | `kindi/moe_tandem.py` | one execution unit's expert split over the cache and a placement: `card` / `copy` / `cpu` lanes, opt-in CPU lane with a deterministic `cpu_share` throttle, router or expert-id combine order kept separate from scheduling, plan metrics; no tensors, copies or kernels |
-| `kindi/moe_expert_lane.py` | CPU executor for the Lightning Q2_0 expert (up, relu^2 activation from the card's `lt_quant`, down): exact int32 runs, one `fmaf` per run and the kernel's XOR tree, bit-identical to `lt_mv_q2`/`lt_mv_q2_down`; `Q2Matrix.partials` is the host side of the mixed combine contract; not wired into the engine |
+| `tools/moe_expert_lane.py` | **experiment, not production:** CPU executor for the Lightning Q2_0 expert (up, relu^2 activation from the card's `lt_quant`, down): exact int32 runs, one `fmaf` per run and the kernel's XOR tree, bit-identical to `lt_mv_q2`/`lt_mv_q2_down`; `Q2Matrix.partials` is the host side of the mixed combine contract; moved out of `kindi/` on 2026-11-19 and not wired into the engine |
 | `tools/q2_expert_lane.py` | the M2 gate for that format plus the copy-lane microbenchmark; refuses to pass on any differing element |
 | `tools/q2_combine_lane.py` | mixed card/CPU layer gate: host `partials` plus `lt_mv_q2_down_parts`/`lt_q2_shared_parts` reduced by `lt_q2_combine`, compared bit for bit with one `lt_mv_q2_down` launch |
 | `kindi/plan.py` | `kindi plan` on a `kindi_lightning` pack: expert tiers, the decode-slot trade, and with `--moe-chunk N` what `MoeTandem` would do for an N-token sample prompt chunk (lane split, distinct copies, copy bytes) from the header and `--usage`; no weights read, no bytes moved |
@@ -496,7 +496,7 @@ the overflow; its warm-slot rows must show no file read and no page fault.
 ### M2 — CPU miss lane, parity-gated
 
 **Lightning Q2_0 expert gate passed 2026-11-19; layer wiring and the model row are open.**
-`kindi/moe_expert_lane.py` computes one Lightning routed expert on the host with the kernel's own
+`tools/moe_expert_lane.py` computes one Lightning routed expert on the host with the kernel's own
 arithmetic: the exact int32 run sums of `lt_run_q2`, one `fmaf` per run into lane `h % 32` in run
 order, and the same five-step XOR reduction. It consumes the card's `lt_quant` runs (`xq/dx/sx`)
 rather than re-quantizing, because the engine's fast-math division is not reproducible on the host.
@@ -525,6 +525,19 @@ read is the engine's existing path. The capacity-bound model row is **blocked**:
 `kindi_lightning` pack exists on this host, so `kindi verify` 4/4 and decode tok/s are unmeasured.
 Evidence:
 [RESULTS.md](benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/RESULTS.md).
+
+**Choice (2026-11-19): keep the CPU lane as a `tools/` experiment, not a production backend.**
+The module was moved from `kindi/moe_expert_lane.py` to `tools/moe_expert_lane.py`; no code in
+`kindi` imports it. It stays available so the parity and combine gates remain reproducible, but
+it is not an all-host-layer opt-in. Three findings decided this: the engine's existing direct
+host-mapped GPU read is **3.62x** faster per expert than the CPU lane (and **1.18x** faster than
+the copy lane), so the lane does not win on this host's cost gate; wiring all-host layers would
+change planning (`_plan` currently requires `n_card >= s.n_used`), prompt staging, decode slots,
+routing/combine and CUDA-graph handling, not just call one function; and the required
+`kindi_lightning` pack is absent, so `kindi verify` 4/4 and decode tok/s cannot be measured. An
+unwired production module would therefore ship with no model evidence. Reopen only with a
+pack-backed all-host-layer experiment (or a host where the host-mapped read loses) that passes
+the M2 output-parity and tok/s gates; until then this is a tools experiment.
 
 For a Raon MXFP8 expert the M2 gate is still open: no CPU kernel exists for that format. The
 gate remains cold/warm/forced-eviction outputs identical with the lane enabled; a parity failure

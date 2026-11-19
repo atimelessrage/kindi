@@ -28,12 +28,16 @@ floating point, so activations must come from the card's own ``lt_quant`` (as
 ``xq``/``dx``/``sx``). Everything this module computes from those runs is
 bit-identical to the kernel's expert output.
 
-It is not wired into ``kindi.lightning.Engine`` yet. The mixed-layer combine
-contract is implemented separately: ``Q2Matrix.partials`` returns the host
-side's pre-tree lane partials, ``lt_mv_q2_down_parts`` and
-``lt_q2_shared_parts`` produce the card side's, and ``lt_q2_combine`` performs
-the same per-lane weighted sum and warp tree as ``lt_mv_q2_down``. No model
-tok/s is claimed; the engine wiring needs a pack.
+Experimental status (2026-11-19): this module lives under ``tools/``, outside the
+production ``kindi`` package, and nothing in ``kindi`` imports it. It is a
+reproducible parity/cost experiment, not a backend or an engine path. It is not
+wired into ``kindi.lightning.Engine``; the engine's existing host-mapped GPU
+read is faster on this host, and an all-host-layer opt-in could not be verified
+without a ``kindi_lightning`` pack. The mixed-layer combine contract is
+implemented separately: ``Q2Matrix.partials`` returns the host side's pre-tree
+lane partials, ``lt_mv_q2_down_parts`` and ``lt_q2_shared_parts`` produce the
+card side's, and ``lt_q2_combine`` performs the same per-lane weighted sum and
+warp tree as ``lt_mv_q2_down``. No model tok/s is claimed.
 """
 import numpy as np
 

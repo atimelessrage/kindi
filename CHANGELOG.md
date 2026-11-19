@@ -9,14 +9,15 @@
   measured k=1 row is 1.12-1.13x at 512 and 24K and a 1.01x wash at 8K. `spec_begin` now defaults
   mode A to k=1 while the model drafter modes keep k=4, and an explicit `KINDI_SPEC_K` still wins.
   Pinned by `tests/test_verify_spec.py`; no output token changes because verify decides every token.
-- **The Lightning Q2_0 CPU expert lane has an exactness gate** — `kindi/moe_expert_lane.py` computes
-  one routed expert with the CUDA kernel's own int32 run sums, fused multiply-add placement and XOR
-  tree; against the real `lt_mv_q2`/`lt_mv_q2_down` at hidden 2688 / width 1856 it has **0 differing
-  elements** on both matrices with device-resident or host-mapped weights. It is a gate, not a
-  backend: the CPU expert costs 2.395 ms, against 0.783 ms for the copy lane (3.06x) and 0.662 ms
-  for the engine's direct host-mapped GPU read (3.62x faster than the CPU lane; 1.18x faster than
-  the copy lane), the lane is not wired into `lightning.Engine`, and the model row is blocked by the
-  absent Lightning pack. `tests/test_moe_expert_lane.py` pins the host arithmetic.
+- **The Lightning Q2_0 CPU expert lane has an exactness gate** — `tools/moe_expert_lane.py` (an
+  experiment, moved out of `kindi/` so no unused production module ships) computes one routed expert
+  with the CUDA kernel's own int32 run sums, fused multiply-add placement and XOR tree; against the
+  real `lt_mv_q2`/`lt_mv_q2_down` at hidden 2688 / width 1856 it has **0 differing elements** on
+  both matrices with device-resident or host-mapped weights. It is a gate, not a backend: the CPU
+  expert costs 2.395 ms, against 0.783 ms for the copy lane (3.06x) and 0.662 ms for the engine's
+  direct host-mapped GPU read (3.62x faster than the CPU lane; 1.18x faster than the copy lane), the
+  lane is not wired into `lightning.Engine`, and the model row is blocked by the absent Lightning
+  pack. `tests/test_moe_expert_lane.py` pins the host arithmetic.
 - **The mixed card/CPU Q2_0 expert layer has a bit-exact combine contract** — `Q2Matrix.partials`
   returns the host experts' pre-tree lane partials, `lt_mv_q2_down_parts` and `lt_q2_shared_parts`
   return the card side's, and `lt_q2_combine` performs `lt_mv_q2_down`'s per-lane gateway sum and

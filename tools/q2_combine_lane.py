@@ -7,7 +7,7 @@ for the whole slot set: the host produces the CPU experts' per-lane pre-tree
 partials, while the card produces the card experts' and the shared expert's.
 The contract is:
 
-* host: ``kindi.moe_expert_lane.Q2Matrix.partials`` returns float32
+* host: ``tools.moe_expert_lane.Q2Matrix.partials`` returns float32
   ``[rows, 32]`` per expert, the same accumulators ``lt_mv_q2_down`` would hold;
 * card experts: ``lt_mv_q2_down_parts`` writes float32 ``[nslot, rows, 32]``;
 * shared expert: ``lt_q2_shared_parts`` writes float32 ``[rows, 32]``;
@@ -36,7 +36,7 @@ ROOT = os.path.dirname(HERE)
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from kindi import moe_expert_lane as lane  # noqa: E402
+from tools import moe_expert_lane as lane  # noqa: E402
 
 HIDDEN = 2688                                               # Spec.n_embd of the 30B-A3B
 FF = 1856                                                   # Spec.n_ff

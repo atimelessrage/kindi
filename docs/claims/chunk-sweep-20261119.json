@@ -1,14 +1,16 @@
 {
   "gate": "chunk-sweep-20261119",
-  "title": "KINDI_CHUNK prefill sweep on the 2B: 4K and 8K, chunks 128/256/512/1024",
+  "title": "KINDI_CHUNK prefill sweep on the 2B and 9B: 4K and 8K, chunks 128/256/512/1024",
   "measured": "2026-11-19",
-  "commit": "3002a40",
-  "command": "python run_chunk_sweep.py --pack ~/.kindi/packs/bonsai-2b --out . (three fresh processes per chunk, each `python -m kindi bench --split-at 4096,8192 --split-generated 128 --sample-vram --json`, KINDI_CTX=8320, KINDI_CHUNK=<chunk>)",
-  "notes": "256 is the fastest cell at both prompt lengths and is already the default, so no default change and no autotune candidate. The roadmap quotes the two winning p50 cells and the two 128-token p50 cells; the page carries p95, the per-pass rows and the sampled peak.",
+  "commit": "3002a40 (2B); 16683ac (9B)",
+  "command": "python run_chunk_sweep.py --pack ~/.kindi/packs/bonsai-2b --out .; python run_chunk_sweep.py --pack ~/.kindi/packs/bonsai-9b --out 9b (three fresh processes per chunk, each `python -m kindi bench --split-at 4096,8192 --split-generated 128 --sample-vram --json`, KINDI_CTX=8320, KINDI_CHUNK=<chunk>); KINDI_CHUNK=1024 python -m kindi --pack ~/.kindi/packs/bonsai-9b verify",
+  "notes": "The 2B's fastest cell at both prompt lengths remains 256, already the default; the 9B fits at 8,320 context and its fastest cell is 1024, with 512 1.0-1.4% behind and 256 9.5-11.2% behind. No global default change: 256 remains the 2B optimum, the 9B gain over 512 is small at a higher peak, and 4B is unmeasured. The roadmap quotes the 2B p50 cells, the 9B 1024/512/256 p50 cells and the 9B verify result; the page carries p95, the per-pass rows and the sampled peak.",
   "evidence": [
     "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/RESULTS.md",
     "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/results.json",
-    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/run_chunk_sweep.py"
+    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/run_chunk_sweep.py",
+    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/9b/results.json",
+    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/9b/verify-1024.txt"
   ],
   "numbers": [
     {"id": "chunk256-4k-prefill-p50", "display": "962.15", "quoted_in": ["docs/ROADMAP.md"],
@@ -22,6 +24,27 @@
                "pointer": "/summary/chunks/128/4096/prefill_ms_p50", "expect": 1179.81}},
     {"id": "chunk128-8k-prefill-p50", "display": "3015.29", "quoted_in": ["docs/ROADMAP.md"],
      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/results.json",
-               "pointer": "/summary/chunks/128/8192/prefill_ms_p50", "expect": 3015.29}}
+               "pointer": "/summary/chunks/128/8192/prefill_ms_p50", "expect": 3015.29}},
+    {"id": "chunk9b-1024-4k-prefill-p50", "display": "3118.80", "quoted_in": ["docs/ROADMAP.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/9b/results.json",
+               "pointer": "/summary/chunks/1024/4096/prefill_ms_p50", "expect": 3118.8}},
+    {"id": "chunk9b-1024-8k-prefill-p50", "display": "8071.40", "quoted_in": ["docs/ROADMAP.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/9b/results.json",
+               "pointer": "/summary/chunks/1024/8192/prefill_ms_p50", "expect": 8071.4}},
+    {"id": "chunk9b-512-4k-prefill-p50", "display": "3151.39", "quoted_in": ["docs/ROADMAP.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/9b/results.json",
+               "pointer": "/summary/chunks/512/4096/prefill_ms_p50", "expect": 3151.39}},
+    {"id": "chunk9b-512-8k-prefill-p50", "display": "8185.80", "quoted_in": ["docs/ROADMAP.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/9b/results.json",
+               "pointer": "/summary/chunks/512/8192/prefill_ms_p50", "expect": 8185.8}},
+    {"id": "chunk9b-256-4k-prefill-p50", "display": "3414.99", "quoted_in": ["docs/ROADMAP.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/9b/results.json",
+               "pointer": "/summary/chunks/256/4096/prefill_ms_p50", "expect": 3414.99}},
+    {"id": "chunk9b-256-8k-prefill-p50", "display": "8978.64", "quoted_in": ["docs/ROADMAP.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/9b/results.json",
+               "pointer": "/summary/chunks/256/8192/prefill_ms_p50", "expect": 8978.64}},
+    {"id": "chunk9b-1024-verify", "display": "ALL PASS", "quoted_in": ["docs/ROADMAP.md"],
+     "check": {"kind": "text", "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/9b/verify-1024.txt",
+               "needle": "ALL PASS: token-exact with llama.cpp"}}
   ]
 }

@@ -17,7 +17,7 @@ The implemented contract is:
 
 | piece | output | producer |
 |---|---|---|
-| host routed expert | float32 `[rows, 32]` | `kindi.moe_expert_lane.Q2Matrix.partials` |
+| host routed expert | float32 `[rows, 32]` | `tools.moe_expert_lane.Q2Matrix.partials` |
 | card routed experts | float32 `[nslot, rows, 32]` | `lt_mv_q2_down_parts` |
 | shared expert | float32 `[rows, 32]` | `lt_q2_shared_parts` |
 | final reduction | `x[r] += tot` | `lt_q2_combine` |

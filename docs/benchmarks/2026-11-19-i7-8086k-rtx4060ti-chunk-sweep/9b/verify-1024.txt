@@ -1,0 +1,14 @@
+<local-home>\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+[kindi 22:12:41] blocking sync: card 0 primary context flags 0x4 (set: 0)
+[kindi 22:12:41] Hadamard block 4096: high-precision activations on (measured 4/4 at 122 tok/s; KINDI_TC_HP=0 asks for the default activations, measured 3/4)
+[kindi 22:12:44] card 0: 1.73 GB of weights (1s)
+[kindi 22:12:44] plan engine ready: 1 card, ctx 1024, K/V q8_0, weights 5-trit lane (2.6s)
+[kindi 22:12:44] kindi: <pack> -> the bonsai backend (bonsai2-9b)
+[kindi 22:12:44] speculation: unavailable (this engine has no spec_begin); verifying the plain engine
+[kindi 22:12:45] prompt 1 'The sky is blue because'                                    PASS  40/40 tokens match  (0.5s)
+[kindi 22:12:45] prompt 2 'The capital of France is'                                   PASS  40/40 tokens match  (0.5s)
+[kindi 22:12:45] prompt 3 'Water boils at a lower temperature on mountains because'    PASS  13/13 tokens match  (0.2s)
+[kindi 22:12:46] prompt 4 'def add_two_numbers('                                       PASS  40/40 tokens match  (0.5s)
+[kindi 22:12:46] ALL PASS: token-exact with llama.cpp (speculation off) - 99.3 tokens/s over the run
+VERIFY_9B_CHUNK1024_STATUS=0

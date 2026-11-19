@@ -1,0 +1,75 @@
+{
+  "date": "2026-11-19",
+  "host": "Intel Core i7-8086K (6 physical cores, 12 threads, 32 GB), NVIDIA GeForce RTX 4060 Ti 8 GB, Windows 10 22H2, Python 3.13.6, CuPy 14.2.0, clang 18.1.8 (prepended to PATH)",
+  "pack": "bonsai-2b",
+  "model": "Ternary-Bonsai-2-2B",
+  "ctx": 24576,
+  "ctx_reduced": false,
+  "head": "exact",
+  "speculation": "off",
+  "placement": "cpu-first",
+  "cpu_layers": 6,
+  "cpu": {
+    "device": "cpu",
+    "threads": 6,
+    "load_s": 25.0,
+    "read": 41.8,
+    "100": 27.7,
+    "2000": 27.8,
+    "8000": 18.4,
+    "16000": 11.5,
+    "24000": 8.2,
+    "vram": null,
+    "verify": {
+      "result": "ALL PASS",
+      "prompts": 4,
+      "tokens_matched": 160,
+      "tokens_total": 160,
+      "ctx": 1024,
+      "tok_s": 19.4,
+      "log": "logs/verify-cpu-2b.txt"
+    },
+    "json": "cpu-2b.json"
+  },
+  "tandem": {
+    "device": "gpu",
+    "cpu_range": [0, 1, 2, 3, 4, 5],
+    "gpu_range": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
+    "kv": "q8_0",
+    "load_s": 26.2,
+    "free_mib_after_load": 6577,
+    "read": 93.5,
+    "100": 70.8,
+    "2000": 81.8,
+    "8000": 64.1,
+    "16000": 43.8,
+    "24000": 37.4,
+    "vram": {
+      "available": true,
+      "baseline_used_mib": 1022,
+      "interval_s": 0.5,
+      "peak_delta_mib": 605,
+      "peak_free_mib": 6323,
+      "peak_phase": "loaded",
+      "peak_used_mib": 1627,
+      "sample_count": 51,
+      "source": "nvidia-smi memory.used (device-wide, GPU 0)"
+    },
+    "verify": {
+      "result": "ALL PASS",
+      "prompts": 4,
+      "tokens_matched": 160,
+      "tokens_total": 160,
+      "ctx": 1024,
+      "tok_s": 80.3,
+      "log": "logs/verify-tandem-2b.txt"
+    },
+    "json": "tandem-2b.json"
+  },
+  "commands": {
+    "cpu_bench": "KINDI_DEVICE=cpu python -m kindi --pack ~/.kindi/packs/bonsai-2b --ctx 24576 bench --split-at none --json cpu-2b.json",
+    "tandem_bench": "python -m kindi --pack ~/.kindi/packs/bonsai-2b --ctx 24576 bench --tandem cpu-first --tandem-cpu-layers 6 --sample-vram --split-at none --json tandem-2b.json",
+    "cpu_verify": "KINDI_DEVICE=cpu python -m kindi --pack ~/.kindi/packs/bonsai-2b --ctx 24576 verify",
+    "tandem_verify": "python -m kindi --pack ~/.kindi/packs/bonsai-2b --ctx 24576 verify --tandem cpu-first --tandem-cpu-layers 6"
+  }
+}

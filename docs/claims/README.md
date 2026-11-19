@@ -83,7 +83,7 @@ file to `docs/development/AGENTS-HISTORY.md`-style history or delete it with the
 
 ## Coverage today
 
-21 gates, 116 numbers. Four citations are listed as debt in `REGISTRY.json` with the reason each one
+21 gates, 124 numbers. Four citations are listed as debt in `REGISTRY.json` with the reason each one
 cannot be claimed yet (a page that keeps the breakdown but not the cell the doc quotes, a page that
 adds provenance rather than a measurement, architecture constants, and a summary line the run's page
 never states). `python tools/check_claims.py` prints the debt count on every run, so the gap is
