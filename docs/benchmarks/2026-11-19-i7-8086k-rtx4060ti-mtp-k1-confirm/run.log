@@ -1,0 +1,50 @@
+# Mode A k=1 fresh A/B — 2026-11-19
+# host: i7-8086K, RTX 4060 Ti 8 GB, Windows 10 22H2
+# pack: ~/.kindi/packs/bonsai-2b
+# head: ~/.kindi/models/kindi-mtp-2b-v1.npz
+# environment: KINDI_SPEC_K unset; KINDI_TC=1
+# command 512: python tools/mtp_context_bench.py --pack ~/.kindi/packs/bonsai-2b --head ~/.kindi/models/kindi-mtp-2b-v1.npz --ctx 1024 --positions 512 --tokens 128 --runs 2 --json docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-mtp-k1-confirm/mtp-context-k1-512-unset.json
+# command 24K: python tools/mtp_context_bench.py --pack ~/.kindi/packs/bonsai-2b --head ~/.kindi/models/kindi-mtp-2b-v1.npz --ctx 26624 --positions 24576 --tokens 128 --runs 4 --json docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-mtp-k1-confirm/mtp-context-k1-24k-unset.json
+
+# normalized: home-directory and Python-install prefixes are shown as ~ and <python>; the exact raw copy is bench-logs/mtp-k1-confirm-20261119/run-raw.log (ignored)
+
+=== 512 ===
+<python>\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+blocking sync: card 0 primary context flags 0x4 (set: 0)
+card 0: 0.41 GB of weights, streamed (0s)
+card 0: weights repacked for the tensor cores (0.0s)
+tensor-core plans ready: T = 1 .. 8, 274 nodes per decode token (0.2s; 6537 MiB free on the card)
+MTP head attached: kindi-mtp-2b-v1.npz (61 MB, window 64, sha256 1b5c0c790a59)
+speculation: requested mtp, effective mtp
+plan engine ready: 1 card, ctx 1024, K/V q8_0, weights 5-trit lane (1.7s)
+kindi: ~/.kindi/packs/bonsai-2b -> the bonsai backend (bonsai2-2b)
+prompt: 306836 tokens available, ctx 1024, 128 new tokens, 2 runs per mode
+pos   512 run 1 off  337.7 tok/s
+pos   512 run 1 mtp  362.8 tok/s  52/75 drafted (69.3%)
+pos   512 run 2 off  345.9 tok/s
+pos   512 run 2 mtp  393.6 tok/s  52/75 drafted (69.3%)
+wrote docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-mtp-k1-confirm/mtp-context-k1-512-unset.json
+exit=0
+=== 24K ===
+<python>\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+blocking sync: card 0 primary context flags 0x4 (set: 0)
+card 0: 0.41 GB of weights, streamed (0s)
+card 0: weights repacked for the tensor cores (0.0s)
+tensor-core plans ready: T = 1 .. 8, 274 nodes per decode token (0.2s; 6359 MiB free on the card)
+MTP head attached: kindi-mtp-2b-v1.npz (61 MB, window 64, sha256 1b5c0c790a59)
+speculation: requested mtp, effective mtp
+plan engine ready: 1 card, ctx 26624, K/V q8_0, weights 5-trit lane (1.6s)
+kindi: ~/.kindi/packs/bonsai-2b -> the bonsai backend (bonsai2-2b)
+prompt: 306836 tokens available, ctx 26624, 128 new tokens, 4 runs per mode
+pos 24576 run 1 off  303.0 tok/s
+pos 24576 run 1 mtp  338.7 tok/s  54/74 drafted (73.0%)
+pos 24576 run 2 off  301.6 tok/s
+pos 24576 run 2 mtp  344.3 tok/s  54/74 drafted (73.0%)
+pos 24576 run 3 off  301.2 tok/s
+pos 24576 run 3 mtp  342.2 tok/s  54/74 drafted (73.0%)
+pos 24576 run 4 off  301.8 tok/s
+pos 24576 run 4 mtp  344.2 tok/s  54/74 drafted (73.0%)
+wrote docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-mtp-k1-confirm/mtp-context-k1-24k-unset.json
+exit=0

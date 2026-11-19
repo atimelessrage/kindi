@@ -28,6 +28,12 @@ For explicit mode A, `KINDI_SPEC_K` now defaults to **1**; the model drafter mod
 previous default of 4. An explicit `KINDI_SPEC_K` still wins. The depth run below is why: k=1
 measured 1.12-1.13x at 512/24K and 1.01x at 8K, while the old k=4 default measured 0.66-0.89x.
 
+A fresh 2026-11-19 A/B with `KINDI_SPEC_K` unset confirmed it on the current tree: 512 was
+341.8 -> 378.2 tok/s (**1.11x**, 52/75 accepted) and 24K was 301.7 -> 343.2 (**1.14x**, 54/74),
+medians of 2 and 4 runs. The current `docs/*.md` prompt had grown to 306,836 tokens, so this is a
+confirmation rather than an identical replay of the 281,805-token 2026-11-17 prompt.
+[Results](benchmarks/2026-11-19-i7-8086k-rtx4060ti-mtp-k1-confirm/RESULTS.md).
+
 ## Which cards
 
 MTP runs only on the tensor-core path: NVIDIA sm_80 and later, with `KINDI_TC=1`. Without that switch the server logs `warning: speculation off: KINDI_SPEC=... requires the tensor-core plan engine: set KINDI_TC=1 (and do not set KINDI_TP=0)` at startup, and its `/health` `drafting` block reports `enabled: false` with the same reason, not a null one.

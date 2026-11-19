@@ -1,0 +1,87 @@
+{
+  "ctx": 26624,
+  "head": "kindi-mtp-2b-v1.npz",
+  "pack": "bonsai-2b",
+  "rows": [
+    {
+      "accepted": 0,
+      "drafted": 0,
+      "mode": "off",
+      "position": 24576,
+      "run": 1,
+      "seconds": 0.422,
+      "tok_s": 303.0,
+      "tokens": 128
+    },
+    {
+      "accepted": 54,
+      "drafted": 74,
+      "mode": "mtp",
+      "position": 24576,
+      "run": 1,
+      "seconds": 0.378,
+      "tok_s": 338.7,
+      "tokens": 128
+    },
+    {
+      "accepted": 0,
+      "drafted": 0,
+      "mode": "off",
+      "position": 24576,
+      "run": 2,
+      "seconds": 0.424,
+      "tok_s": 301.6,
+      "tokens": 128
+    },
+    {
+      "accepted": 54,
+      "drafted": 74,
+      "mode": "mtp",
+      "position": 24576,
+      "run": 2,
+      "seconds": 0.372,
+      "tok_s": 344.3,
+      "tokens": 128
+    },
+    {
+      "accepted": 0,
+      "drafted": 0,
+      "mode": "off",
+      "position": 24576,
+      "run": 3,
+      "seconds": 0.425,
+      "tok_s": 301.2,
+      "tokens": 128
+    },
+    {
+      "accepted": 54,
+      "drafted": 74,
+      "mode": "mtp",
+      "position": 24576,
+      "run": 3,
+      "seconds": 0.374,
+      "tok_s": 342.2,
+      "tokens": 128
+    },
+    {
+      "accepted": 0,
+      "drafted": 0,
+      "mode": "off",
+      "position": 24576,
+      "run": 4,
+      "seconds": 0.424,
+      "tok_s": 301.8,
+      "tokens": 128
+    },
+    {
+      "accepted": 54,
+      "drafted": 74,
+      "mode": "mtp",
+      "position": 24576,
+      "run": 4,
+      "seconds": 0.372,
+      "tok_s": 344.2,
+      "tokens": 128
+    }
+  ]
+}
