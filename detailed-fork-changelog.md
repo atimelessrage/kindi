@@ -857,9 +857,11 @@ the worktree.
   with no K passed 4/4 prompts, 160/160 tokens, 65/94 drafts accepted at 403.3 tok/s (ctx
   1024, RTX 4060 Ti). The 0.66x row remains only for explicit k=4.
 - **Q2_0 CPU expert lane.** The 2026-11-19 gate is bit-identical to `lt_mv_q2` and
-  `lt_mv_q2_down` (0 differing elements), but the CPU expert costs 2.475 ms against the
-  0.788 ms copy lane (3.14x), and the lane is not wired into `lightning.Engine`; the model row
-  is blocked by the absent Lightning pack. This is a passed exactness gate, not a backend.
+  `lt_mv_q2_down` (0 differing elements with device-resident or host-mapped weights), but the CPU
+  expert costs 2.395 ms, against 0.783 ms for the copy lane (3.06x) and 0.662 ms for the engine's
+  direct host-mapped GPU read (3.62x faster than the CPU lane; 1.18x faster than the copy lane),
+  and the lane is not wired into `lightning.Engine`; the model row is blocked by the absent
+  Lightning pack. This is a passed exactness gate, not a backend.
 - **Controlled 9B CPU/tandem pair.** The same-session `cpu-first` six-layer run at ctx 24,576
   gives 2.9 tok/s CPU-only vs 16.8 tandem at 24K (5.8x over CPU-only), and 3.0x at 100; both
   placements verify 4/4, 133/133. This replaces the old cross-run shallow-context 4.3x and

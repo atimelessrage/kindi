@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `dc503da` on `freebuff/tandem-cpu-recovery` (**main** is at `f984962`; guarded by `tests/test_agents_handoff.py`); the 2026-11-18 audit round is committed (closing JSON reader, offsite bundle tool, report-only dependency audit, security/push policy); the current task audits the ternary-MoE census arithmetic in `docs/ROADMAP.md` and records the result in the lease and history.
+- **HEAD:** `bfb4604` on `freebuff/tandem-cpu-recovery` (**main** is at `f984962`; guarded by `tests/test_agents_handoff.py`); the 2026-11-18 audit round and the ternary-MoE census correction are committed; the 2026-11-19 host-mapped Q2 lane round updated `tools/q2_expert_lane.py` and its evidence: host-mapped parity is 0 differing, the direct pinned-host read is 0.662 ms vs 0.783 ms copy lane and 2.395 ms CPU, and the model row stays blocked by the absent Lightning pack.
 
 ### Python quality ratchet
 
@@ -235,7 +235,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `f984962` | main checkout; clean; one commit behind this branch |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `dc503da` | this session; checked out here |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `bfb4604` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.

@@ -1,4 +1,4 @@
-"""Gate and measure the CPU-compute Q2_0 expert lane against the real Lightning kernels.
+"""Gate and measure the Q2_0 expert lanes against the real Lightning kernels.
 
     python tools/q2_expert_lane.py --json docs/benchmarks/<run>/results.json
 
@@ -8,13 +8,17 @@ The check is the M2 gate of docs/MOE-TANDEM.md for the Lightning quant format:
   Q2_0 weights of the real geometry (hidden 2688, expert width 1856);
 * the same experts run through ``kindi.moe_expert_lane`` from the GPU's own
   ``lt_quant`` output, so only the matvec arithmetic is compared;
+* the kernels also run from the engine's **host-expert** path: one
+  ``cupy.cuda.alloc_pinned_memory`` block (codes then scales) and device uint64
+  pointer tables, exactly as ``lightning.py:_q2`` builds ``w.tc``/``w.ts``;
 * every output element must be bit-identical, or the lane stays disabled.
 
 Then it measures one expert: CPU up + down, the H2D copy of the expert's bytes,
-the GPU kernels with device-resident weights, and the small transfers a lane
-needs (up result to the card for ``lt_quant``, quantized activation back, output
-forward). The copy lane is ``copy + gpu``. This is a microbenchmark, not a model
-row: the Lightning pack is absent on this host, which is reported as the blocker.
+the GPU kernels with device-resident weights, the GPU kernels reading the
+pinned host weights over PCIe (no copy-to-VRAM step), and the small transfers a
+lane needs. The copy lane is ``copy + gpu``. This is a microbenchmark, not a
+model row: the Lightning pack is absent on this host, which is reported as the
+blocker.
 """
 import argparse
 import json
@@ -64,6 +68,31 @@ def _ptrs(cp, arrays):
     return cp.asarray(np.array([a.data.ptr for a in arrays], dtype=np.uint64))
 
 
+def _host_tables(cp, codes, scales, rows, cols, experts):
+    """The engine's host-expert layout: one pinned block, codes then scales.
+
+    ``lightning.py:_q2`` allocates a single ``cupy.cuda.alloc_pinned_memory`` block for the
+    warm experts, puts every expert's codes first and every expert's fp16 scales after them,
+    and hands ``lt_mv_q2``/``lt_mv_q2_down`` a device uint64 table of those host addresses.
+    This helper reproduces that layout so the measured path is the engine's, not a copy.
+    """
+    cw, sw = rows * (cols // 64) * 16, rows * (cols // 64) * 2
+    n = experts * (cw + sw)
+    mem = cp.cuda.alloc_pinned_memory(n)
+    buf = np.frombuffer(mem, np.uint8, n)
+    pc, ps = [], []
+    for e in range(experts):
+        c = np.ascontiguousarray(codes[e]).view(np.uint8).reshape(-1)
+        s = np.ascontiguousarray(scales[e]).view(np.uint8).reshape(-1)
+        if c.size != cw or s.size != sw:
+            raise ValueError("expert %d has %d/%d weight bytes, expected %d/%d" % (e, c.size, s.size, cw, sw))
+        buf[e * cw:(e + 1) * cw] = c
+        buf[experts * cw + e * sw:experts * cw + (e + 1) * sw] = s
+        pc.append(mem.ptr + e * cw)
+        ps.append(mem.ptr + experts * cw + e * sw)
+    return mem, cp.asarray(np.array(pc, dtype=np.uint64)), cp.asarray(np.array(ps, dtype=np.uint64))
+
+
 def _timed(fn, passes):
     out = []
     for _ in range(passes):
@@ -108,6 +137,9 @@ def main(argv=None):
     dev_dn_s = [cp.asarray(down_scales[e].reshape(-1)) for e in range(a.experts)]
     ptr_up, ptr_up_s = _ptrs(cp, dev_up), _ptrs(cp, dev_up_s)
     ptr_dn, ptr_dn_s = _ptrs(cp, dev_dn), _ptrs(cp, dev_dn_s)
+    up_mem, ptr_up_host, ptr_up_s_host = _host_tables(cp, up_codes, up_scales, a.ff, a.hidden, a.experts)
+    dn_mem, ptr_dn_host, ptr_dn_s_host = _host_tables(cp, down_codes, down_scales, a.hidden, a.ff, a.experts)
+    _host_blocks = (up_mem, dn_mem)                    # keep the pinned blocks alive through the timed calls
 
     dx_dev, sx_dev, xq_dev = cp.asarray(dx), cp.asarray(sx), cp.asarray(xq)
     gpu_up = cp.zeros(a.ff, np.float32)
@@ -137,6 +169,23 @@ def main(argv=None):
     parity_up = bool(np.array_equal(up_gpu.view(np.int32), cpu_up.view(np.int32)))
     parity_down = bool(np.array_equal(down_gpu.view(np.int32), cpu_down.view(np.int32)))
 
+    # the engine's host-expert path: the same kernels read the pinned block through the
+    # device pointer tables; no cp.asarray of the weights and no copy-to-VRAM step.
+    host_up = cp.zeros(a.ff, np.float32)
+    hq_host, hd_host, hs_host = cp.zeros_like(hq), cp.zeros_like(hd), cp.zeros_like(hs)
+    host_down = cp.zeros(a.hidden, np.float32)
+    mv_up(((a.ff + 7) // 8,), (128,), (ptr_up_host, ptr_up_s_host, None, np.int32(a.ff), np.int32(a.hidden),
+                                      xq_dev, dx_dev, sx_dev, np.int32(0), host_up, np.int32(a.ff),
+                                      np.int32(0), np.int32(0)))
+    quant((((a.ff // 32) + 7) // 8,), (256,), (host_up, np.int32(1), np.int32(a.ff), np.int32(a.ff),
+                                              np.int32(1), hq_host, hd_host, hs_host))
+    mv_down(((a.hidden + 3) // 4,), (128,), (ptr_dn_host, ptr_dn_s_host, ids, gw, np.int32(1),
+                                           np.int32(a.hidden), np.int32(a.ff), hq_host, hd_host, hs_host,
+                                           sh_codes, sh_scales, np.int32(colsh), gq, gd, gs, host_down))
+    up_host, down_host = cp.asnumpy(host_up), cp.asnumpy(host_down)
+    parity_host_up = bool(np.array_equal(up_host.view(np.int32), cpu_up.view(np.int32)))
+    parity_host_down = bool(np.array_equal(down_host.view(np.int32), cpu_down.view(np.int32)))
+
     # measurement: CPU expert, H2D copy of its bytes, GPU kernels with device weights
     cpu_up_ms = _timed(lambda: up.matvec(0, xq, dx, sx), a.passes)
     cpu_down_ms = _timed(lambda: down.matvec(0, cp.asnumpy(hq).reshape(-1), cp.asnumpy(hd), cp.asnumpy(hs)), a.passes)
@@ -160,6 +209,19 @@ def main(argv=None):
         cp.cuda.Stream.null.synchronize()
     gpu_ms = _timed(gpu_expert, a.passes)
 
+    def gpu_host_expert():
+        cp.cuda.Stream.null.synchronize()
+        mv_up(((a.ff + 7) // 8,), (128,), (ptr_up_host, ptr_up_s_host, None, np.int32(a.ff), np.int32(a.hidden),
+                                          xq_dev, dx_dev, sx_dev, np.int32(0), host_up, np.int32(a.ff),
+                                          np.int32(0), np.int32(0)))
+        quant((((a.ff // 32) + 7) // 8,), (256,), (host_up, np.int32(1), np.int32(a.ff), np.int32(a.ff),
+                                                  np.int32(1), hq_host, hd_host, hs_host))
+        mv_down(((a.hidden + 3) // 4,), (128,), (ptr_dn_host, ptr_dn_s_host, ids, gw, np.int32(1),
+                                               np.int32(a.hidden), np.int32(a.ff), hq_host, hd_host, hs_host,
+                                               sh_codes, sh_scales, np.int32(colsh), gq, gd, gs, host_down))
+        cp.cuda.Stream.null.synchronize()
+    gpu_host_ms = _timed(gpu_host_expert, a.passes)
+
     def lane_xfer():
         cp.cuda.Stream.null.synchronize()
         t0 = time.perf_counter()
@@ -180,13 +242,26 @@ def main(argv=None):
                  "numba": __import__("numba").__version__},
         "geometry": {"hidden": a.hidden, "ff": a.ff, "experts": a.experts, "expert_bytes": int(nbytes)},
         "parity": {"up": parity_up, "down": parity_down,
-                   "up_differing": int(np.sum(up_gpu != cpu_up)), "down_differing": int(np.sum(down_gpu != cpu_down))},
+                   "host_up": parity_host_up, "host_down": parity_host_down,
+                   "up_differing": int(np.sum(up_gpu != cpu_up)), "down_differing": int(np.sum(down_gpu != cpu_down)),
+                   "host_up_differing": int(np.sum(up_host != cpu_up)),
+                   "host_down_differing": int(np.sum(down_host != cpu_down))},
+        "host_mapped": {
+            "source": "kindi/lightning.py:_q2",
+            "allocation": "cupy.cuda.alloc_pinned_memory (one block, codes then scales)",
+            "pointer_tables": "device uint64 arrays passed as lt_mv_q2/lt_mv_q2_down codes/scales",
+            "note": "the kernels read the pinned host weights over PCIe; no cp.asarray of the weights "
+                    "and no explicit H2D copy",
+        },
         "timing_ms": {"cpu_up": round(cpu_up_ms, 3), "cpu_down": round(cpu_down_ms, 3),
                       "cpu_expert": round(cpu_up_ms + cpu_down_ms, 3), "copy": round(copy_ms, 3),
                       "gpu_expert": round(gpu_ms, 3), "copy_lane": round(copy_ms + gpu_ms, 3),
+                      "gpu_host_expert": round(gpu_host_ms, 3),
                       "lane_xfer": round(xfer_ms, 3), "lane_total": round(cpu_up_ms + cpu_down_ms + xfer_ms, 3)},
         "rates": {"h2d_gib_s": round(nbytes / (copy_ms * 1e-3) / 2 ** 30, 3)},
         "ratio_cpu_to_copy": round((cpu_up_ms + cpu_down_ms) / (copy_ms + gpu_ms), 2),
+        "ratio_cpu_to_host_gpu": round((cpu_up_ms + cpu_down_ms) / gpu_host_ms, 2),
+        "ratio_copy_to_host_gpu": round((copy_ms + gpu_ms) / gpu_host_ms, 2),
         "passes": a.passes,
         "pack": None,
         "blocker": None,
@@ -206,14 +281,18 @@ def main(argv=None):
                              "Q2_0 weights, but the capacity-bound model row (verify 4/4 and tok/s) needs the "
                              "Lightning GGUF/pack, which is absent")
 
-    print("parity: up %s (%d differing), down %s (%d differing)"
+    print("parity: up %s (%d differing), down %s (%d differing), host-mapped up %s (%d), down %s (%d)"
           % ("IDENTICAL" if parity_up else "DIFFERS", result["parity"]["up_differing"],
-             "IDENTICAL" if parity_down else "DIFFERS", result["parity"]["down_differing"]))
+             "IDENTICAL" if parity_down else "DIFFERS", result["parity"]["down_differing"],
+             "IDENTICAL" if parity_host_up else "DIFFERS", result["parity"]["host_up_differing"],
+             "IDENTICAL" if parity_host_down else "DIFFERS", result["parity"]["host_down_differing"]))
     t = result["timing_ms"]
     print("per expert (%d bytes): CPU %.2f ms (up %.2f + down %.2f), copy %.2f ms (%.1f GiB/s), "
-          "GPU %.2f ms, copy lane %.2f ms, lane %.2f ms (%.2f ms transfers)"
+          "GPU %.2f ms, copy lane %.2f ms, host-mapped GPU %.2f ms, lane %.2f ms (%.2f ms transfers)"
           % (nbytes, t["cpu_expert"], t["cpu_up"], t["cpu_down"], t["copy"], result["rates"]["h2d_gib_s"],
-             t["gpu_expert"], t["copy_lane"], t["lane_total"], t["lane_xfer"]))
+             t["gpu_expert"], t["copy_lane"], t["gpu_host_expert"], t["lane_total"], t["lane_xfer"]))
+    print("ratios: CPU/copy %.2fx, CPU/host-mapped %.2fx, copy/host-mapped %.2fx"
+          % (result["ratio_cpu_to_copy"], result["ratio_cpu_to_host_gpu"], result["ratio_copy_to_host_gpu"]))
     if result["blocker"]:
         print("model row: BLOCKED - " + result["blocker"])
     if a.json:
@@ -221,7 +300,7 @@ def main(argv=None):
         with open(a.json, "w", encoding="utf-8") as f:
             json.dump(result, f, indent=2)
             f.write("\n")
-    return 0 if parity_up and parity_down else 1
+    return 0 if parity_up and parity_down and parity_host_up and parity_host_down else 1
 
 
 if __name__ == "__main__":

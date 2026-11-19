@@ -12,9 +12,11 @@
 - **The Lightning Q2_0 CPU expert lane has an exactness gate** — `kindi/moe_expert_lane.py` computes
   one routed expert with the CUDA kernel's own int32 run sums, fused multiply-add placement and XOR
   tree; against the real `lt_mv_q2`/`lt_mv_q2_down` at hidden 2688 / width 1856 it has **0 differing
-  elements** on both matrices. It is a gate, not a backend: the CPU expert costs 2.475 ms against the
-  0.788 ms copy lane (3.14x), the lane is not wired into `lightning.Engine`, and the model row is
-  blocked by the absent Lightning pack. `tests/test_moe_expert_lane.py` pins the host arithmetic.
+  elements** on both matrices with device-resident or host-mapped weights. It is a gate, not a
+  backend: the CPU expert costs 2.395 ms, against 0.783 ms for the copy lane (3.06x) and 0.662 ms
+  for the engine's direct host-mapped GPU read (3.62x faster than the CPU lane; 1.18x faster than
+  the copy lane), the lane is not wired into `lightning.Engine`, and the model row is blocked by the
+  absent Lightning pack. `tests/test_moe_expert_lane.py` pins the host arithmetic.
 - **The DSV4.1 CLI rejects unreadable paths, invalid counts and malformed prompt/reference content
   before loading a model** — `python -m kindi.dsv41` accepted `--prompts`, `--ids`, `--out`, `--ref`,
   `--dspark` and `--dump` values unchecked until after the model was mapped, and parsed `--free1`

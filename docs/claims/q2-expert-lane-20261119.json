@@ -1,35 +1,40 @@
 {
   "gate": "q2-expert-lane-20261119",
-  "title": "Lightning Q2_0 CPU expert lane: bit-identical output and copy-lane cost",
+  "title": "Lightning Q2_0 expert lanes: CPU parity, host-mapped GPU read and copy-lane cost",
   "measured": "2026-11-19",
-  "commit": "3002a40",
-  "command": "python tools/q2_expert_lane.py --json docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/results.json (three fresh processes, seven passes each; the page records the medians)",
-  "notes": "The parity check compares the host lane against the real lt_mv_q2/lt_mv_q2_down kernels on synthetic Q2_0 weights at hidden 2688 and expert width 1856. The model row is blocked: no kindi_lightning pack exists on this host, so no verify/tok/s is claimed.",
+  "commit": "bfb4604",
+  "command": "for i in 1 2 3; do python tools/q2_expert_lane.py --passes 7 --json \"bench-logs/q2-host-mapped-20261119-run$i.json\"; done; then merge the three per-process medians into the tracked results.json as RESULTS.md describes",
+  "notes": "The parity check compares the host lane against the real lt_mv_q2/lt_mv_q2_down kernels on synthetic Q2_0 weights at hidden 2688 and expert width 1856, both with device-resident weights and through the engine's pinned host pointer tables from lightning.py:_q2 (0 differing elements in both paths). The top-level CPU/copy-lane totals are sums of component medians, so the table adds up; results.json records each per-process row and the additive definition. The CPU lane is not adopted: the direct host-mapped GPU read is 1.18x faster than the copy lane and 3.62x faster than the CPU lane. The model row is blocked: no kindi_lightning pack exists on this host, so no verify/tok/s is claimed.",
   "evidence": [
     "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/RESULTS.md",
     "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/results.json",
     "tools/q2_expert_lane.py",
+    "kindi/lightning.py",
+    "kindi/lightning.cu",
     "kindi/moe_expert_lane.py"
   ],
   "numbers": [
     {
       "id": "cpu-expert",
-      "display": "2.475",
+      "display": "2.395",
       "quoted_in": [
         "docs/ROADMAP.md",
         "docs/MOE-TANDEM.md",
-        "CURRENT-VS-KINDI-0.6.md"
+        "CURRENT-VS-KINDI-0.6.md",
+        "CHANGELOG.md",
+        "detailed-fork-changelog.md",
+        "docs/EXTERNAL-ENGINES.md"
       ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/results.json",
         "pointer": "/timing_ms/cpu_expert",
-        "expect": 2.475
+        "expect": 2.395
       }
     },
     {
       "id": "copy",
-      "display": "0.646",
+      "display": "0.643",
       "quoted_in": [
         "docs/ROADMAP.md",
         "docs/MOE-TANDEM.md"
@@ -38,12 +43,12 @@
         "kind": "json",
         "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/results.json",
         "pointer": "/timing_ms/copy",
-        "expect": 0.646
+        "expect": 0.643
       }
     },
     {
       "id": "gpu-expert",
-      "display": "0.142",
+      "display": "0.140",
       "quoted_in": [
         "docs/ROADMAP.md",
         "docs/MOE-TANDEM.md"
@@ -52,27 +57,48 @@
         "kind": "json",
         "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/results.json",
         "pointer": "/timing_ms/gpu_expert",
-        "expect": 0.142
+        "expect": 0.14
       }
     },
     {
       "id": "copy-lane",
-      "display": "0.788",
+      "display": "0.783",
       "quoted_in": [
         "docs/ROADMAP.md",
         "docs/MOE-TANDEM.md",
-        "CURRENT-VS-KINDI-0.6.md"
+        "CURRENT-VS-KINDI-0.6.md",
+        "CHANGELOG.md",
+        "detailed-fork-changelog.md",
+        "docs/EXTERNAL-ENGINES.md"
       ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/results.json",
         "pointer": "/timing_ms/copy_lane",
-        "expect": 0.788
+        "expect": 0.783
+      }
+    },
+    {
+      "id": "gpu-host-expert",
+      "display": "0.662",
+      "quoted_in": [
+        "docs/ROADMAP.md",
+        "docs/MOE-TANDEM.md",
+        "CURRENT-VS-KINDI-0.6.md",
+        "CHANGELOG.md",
+        "detailed-fork-changelog.md",
+        "docs/EXTERNAL-ENGINES.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/results.json",
+        "pointer": "/timing_ms/gpu_host_expert",
+        "expect": 0.662
       }
     },
     {
       "id": "h2d-rate",
-      "display": "4.05",
+      "display": "4.065",
       "quoted_in": [
         "docs/ROADMAP.md",
         "docs/MOE-TANDEM.md"
@@ -81,22 +107,87 @@
         "kind": "json",
         "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/results.json",
         "pointer": "/rates/h2d_gib_s",
-        "expect": 4.046
+        "expect": 4.065
       }
     },
     {
       "id": "cpu-to-copy",
-      "display": "3.14x",
+      "display": "3.06x",
       "quoted_in": [
         "docs/ROADMAP.md",
         "docs/MOE-TANDEM.md",
-        "CURRENT-VS-KINDI-0.6.md"
+        "CURRENT-VS-KINDI-0.6.md",
+        "CHANGELOG.md",
+        "detailed-fork-changelog.md",
+        "docs/EXTERNAL-ENGINES.md"
       ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/results.json",
         "pointer": "/ratio_cpu_to_copy",
-        "expect": 3.14
+        "expect": 3.06
+      }
+    },
+    {
+      "id": "cpu-to-host-gpu",
+      "display": "3.62x",
+      "quoted_in": [
+        "docs/ROADMAP.md",
+        "docs/MOE-TANDEM.md",
+        "CURRENT-VS-KINDI-0.6.md",
+        "CHANGELOG.md",
+        "detailed-fork-changelog.md",
+        "docs/EXTERNAL-ENGINES.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/results.json",
+        "pointer": "/ratio_cpu_to_host_gpu",
+        "expect": 3.62
+      }
+    },
+    {
+      "id": "copy-to-host-gpu",
+      "display": "1.18x",
+      "quoted_in": [
+        "docs/ROADMAP.md",
+        "docs/MOE-TANDEM.md",
+        "CURRENT-VS-KINDI-0.6.md",
+        "CHANGELOG.md",
+        "detailed-fork-changelog.md",
+        "docs/EXTERNAL-ENGINES.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/results.json",
+        "pointer": "/ratio_copy_to_host_gpu",
+        "expect": 1.18
+      }
+    },
+    {
+      "id": "lane-total",
+      "display": "2.801",
+      "quoted_in": [
+        "docs/MOE-TANDEM.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/results.json",
+        "pointer": "/timing_ms/lane_total",
+        "expect": 2.801
+      }
+    },
+    {
+      "id": "lane-xfer",
+      "display": "0.406",
+      "quoted_in": [
+        "docs/MOE-TANDEM.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/results.json",
+        "pointer": "/timing_ms/lane_xfer",
+        "expect": 0.406
       }
     }
   ]

@@ -17,75 +17,97 @@
   "parity": {
     "up": true,
     "down": true,
+    "host_up": true,
+    "host_down": true,
     "up_differing": 0,
-    "down_differing": 0
+    "down_differing": 0,
+    "host_up_differing": 0,
+    "host_down_differing": 0
+  },
+  "host_mapped": {
+    "source": "kindi/lightning.py:_q2",
+    "allocation": "cupy.cuda.alloc_pinned_memory (one block, codes then scales)",
+    "pointer_tables": "device uint64 arrays passed as lt_mv_q2/lt_mv_q2_down codes/scales",
+    "note": "the kernels read the pinned host weights over PCIe; no cp.asarray of the weights and no explicit H2D copy"
   },
   "timing_ms": {
-    "cpu_up": 1.086,
-    "cpu_down": 1.42,
-    "cpu_expert": 2.475,
-    "copy": 0.646,
-    "gpu_expert": 0.142,
-    "copy_lane": 0.788,
-    "lane_xfer": 0.412,
-    "lane_total": 2.887
+    "cpu_up": 1.07,
+    "cpu_down": 1.325,
+    "cpu_expert": 2.395,
+    "copy": 0.643,
+    "gpu_expert": 0.14,
+    "copy_lane": 0.783,
+    "gpu_host_expert": 0.662,
+    "lane_xfer": 0.406,
+    "lane_total": 2.801
   },
   "rates": {
-    "h2d_gib_s": 4.046
+    "h2d_gib_s": 4.065
   },
-  "ratio_cpu_to_copy": 3.14,
+  "ratio_cpu_to_copy": 3.06,
+  "ratio_cpu_to_host_gpu": 3.62,
+  "ratio_copy_to_host_gpu": 1.18,
   "passes": 7,
   "pack": null,
   "blocker": "no kindi_lightning pack on this host: the expert-level gate ran on synthetic Q2_0 weights, but the capacity-bound model row (verify 4/4 and tok/s) needs the Lightning GGUF/pack, which is absent",
   "runs": [
     {
       "timing_ms": {
-        "cpu_up": 2.077,
-        "cpu_down": 2.48,
-        "cpu_expert": 4.557,
-        "copy": 0.646,
-        "gpu_expert": 0.142,
-        "copy_lane": 0.788,
-        "lane_xfer": 0.396,
-        "lane_total": 4.953
-      },
-      "rates": {
-        "h2d_gib_s": 4.044
-      },
-      "ratio_cpu_to_copy": 5.78
-    },
-    {
-      "timing_ms": {
-        "cpu_up": 1.054,
-        "cpu_down": 1.42,
-        "cpu_expert": 2.475,
+        "cpu_up": 1.067,
+        "cpu_down": 1.325,
+        "cpu_expert": 2.392,
         "copy": 0.652,
-        "gpu_expert": 0.141,
-        "copy_lane": 0.793,
-        "lane_xfer": 0.412,
-        "lane_total": 2.887
+        "gpu_expert": 0.142,
+        "copy_lane": 0.794,
+        "gpu_host_expert": 0.657,
+        "lane_xfer": 0.409,
+        "lane_total": 2.801
       },
       "rates": {
-        "h2d_gib_s": 4.009
+        "h2d_gib_s": 4.007
       },
-      "ratio_cpu_to_copy": 3.12
+      "ratio_cpu_to_copy": 3.01,
+      "ratio_cpu_to_host_gpu": 3.64,
+      "ratio_copy_to_host_gpu": 1.21
     },
     {
       "timing_ms": {
-        "cpu_up": 1.086,
-        "cpu_down": 1.332,
-        "cpu_expert": 2.418,
-        "copy": 0.639,
-        "gpu_expert": 0.142,
-        "copy_lane": 0.781,
-        "lane_xfer": 0.422,
-        "lane_total": 2.84
+        "cpu_up": 1.089,
+        "cpu_down": 1.348,
+        "cpu_expert": 2.436,
+        "copy": 0.637,
+        "gpu_expert": 0.14,
+        "copy_lane": 0.777,
+        "gpu_host_expert": 0.662,
+        "lane_xfer": 0.406,
+        "lane_total": 2.842
       },
       "rates": {
-        "h2d_gib_s": 4.091
+        "h2d_gib_s": 4.104
       },
-      "ratio_cpu_to_copy": 3.1
+      "ratio_cpu_to_copy": 3.14,
+      "ratio_cpu_to_host_gpu": 3.68,
+      "ratio_copy_to_host_gpu": 1.17
+    },
+    {
+      "timing_ms": {
+        "cpu_up": 1.07,
+        "cpu_down": 1.317,
+        "cpu_expert": 2.387,
+        "copy": 0.643,
+        "gpu_expert": 0.14,
+        "copy_lane": 0.783,
+        "gpu_host_expert": 0.669,
+        "lane_xfer": 0.404,
+        "lane_total": 2.792
+      },
+      "rates": {
+        "h2d_gib_s": 4.065
+      },
+      "ratio_cpu_to_copy": 3.05,
+      "ratio_cpu_to_host_gpu": 3.57,
+      "ratio_copy_to_host_gpu": 1.17
     }
   ],
-  "runs_note": "three fresh processes, seven passes each; timing_ms is the median of the three"
+  "runs_note": "three fresh processes, seven passes each; top-level component fields are medians of the three run medians; cpu_expert, copy_lane and lane_total are sums of the reported component medians, so the table adds up; the runs array records each run raw medians"
 }

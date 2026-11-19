@@ -500,20 +500,24 @@ arithmetic: the exact int32 run sums of `lt_run_q2`, one `fmaf` per run into lan
 order, and the same five-step XOR reduction. It consumes the card's `lt_quant` runs (`xq/dx/sx`)
 rather than re-quantizing, because the engine's fast-math division is not reproducible on the host.
 `tools/q2_expert_lane.py` compiles the real `lightning.cu` and compares the lane with `lt_mv_q2`
-(up, 1856 x 2688) and `lt_mv_q2_down` (down, one expert) on synthetic Q2_0 weights: **0 differing
-elements** on both matrices, so the per-expert output is bit-identical for this format.
+(up, 1856 x 2688) and `lt_mv_q2_down` (down, one expert) on synthetic Q2_0 weights, first with
+device-resident weights and then through the engine's pinned host pointer tables: **0 differing
+elements** on both matrices in both paths, so the per-expert output is bit-identical for this format.
 
 The lane is not wired into `lightning.Engine` yet. A layer that mixes card and CPU experts still
 needs the combine contract: `lt_mv_q2_down` sums the experts' per-lane partials before its warp
 tree, so a host-computed final vector cannot enter that reduction unchanged; either all routed
 experts move to the host or the combine kernel must take pre-tree partials.
 
-**Cost, not a win on this host.** One 2,806,272-byte expert (three fresh processes, medians): CPU
-**2.475 ms** (up 1.086 + down 1.420), H2D copy **0.646 ms** at **4.05 GiB/s**, GPU kernels
-**0.142 ms**, so the copy lane's **0.788 ms** is **3.14x** faster; including the lane's 0.412 ms of
-small transfers the lane total is 2.887 ms. The copy lane stays the default. The capacity-bound
-model row is **blocked**: no `kindi_lightning` pack exists on this host, so `kindi verify` 4/4 and
-decode tok/s are unmeasured. Evidence:
+**Cost: the direct host-mapped GPU read wins on this host.** One 2,806,272-byte expert (three fresh
+processes, medians): CPU **2.395 ms** (up 1.070 + down 1.325), H2D copy **0.643 ms** at **4.065 GiB/s**,
+GPU kernels **0.140 ms**, copy lane **0.783 ms**, and the engine's direct host-mapped GPU read
+**0.662 ms**. The host-mapped path is **1.18x** faster than the copy lane and **3.62x** faster than
+the CPU lane; the CPU lane is **3.06x** slower than the copy lane, and including its 0.406 ms of small
+transfers its total is 2.801 ms. The CPU lane is bit-identical but is not adopted; the host-mapped
+read is the engine's existing path. The capacity-bound model row is **blocked**: no
+`kindi_lightning` pack exists on this host, so `kindi verify` 4/4 and decode tok/s are unmeasured.
+Evidence:
 [RESULTS.md](benchmarks/2026-11-19-i7-8086k-rtx4060ti-q2-expert-lane/RESULTS.md).
 
 For a Raon MXFP8 expert the M2 gate is still open: no CPU kernel exists for that format. The
