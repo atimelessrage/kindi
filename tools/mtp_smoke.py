@@ -225,6 +225,10 @@ def _check_last_method(last):
     The pre-request health check can show `mtp` while the request itself falls back
     to another drafter; the last block is the evidence that mode A actually ran.
     """
+    if last is None:
+        raise SmokeError("drafting.last is missing or null; expected an MTP result")
+    if not isinstance(last, dict):
+        raise SmokeError("drafting.last is %r, not an object; expected an MTP result" % (last,))
     if last.get("method") != "mtp":
         raise SmokeError("drafting.last.method is %r, not mtp (last=%r)"
                          % (last.get("method"), last))

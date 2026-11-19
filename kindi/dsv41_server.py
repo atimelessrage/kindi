@@ -208,15 +208,75 @@ def _finite_number(value):
 
 
 def validate_request(req):
-    """Check the sampling fields at the HTTP boundary, before generation.
+    """Check the request shape and sampling fields at the HTTP boundary, before generation.
 
-    Mirrors `kindi.server._validate_request`: integer fields are JSON ints (a bool is not one),
-    numeric fields must be finite, `max_tokens`/`max_completion_tokens` are at least 1, `top_k`
-    is non-negative, the probabilities are in their sampler ranges and `seed` is a valid
-    RandomState seed. Raises ValueError naming the field; the caller answers 400.
+    Mirrors `kindi.server._validate_request` for the fields that used to fail after prompt counting:
+    messages/tools structure, `stream`, `stream_options` and `stop`. The sampling checks are then
+    the same as before: integer fields are JSON ints (a bool is not one), numeric fields must be
+    finite, `max_tokens`/`max_completion_tokens` are at least 1, `top_k` is non-negative, the
+    probabilities are in their sampler ranges and `seed` is a valid RandomState seed. Raises
+    ValueError naming the field; the caller answers 400 before `count()` or generation.
     """
     if not isinstance(req, dict):
         raise ValueError("the body must be a JSON object")
+
+    messages = req.get("messages")
+    if not isinstance(messages, list) or not messages:
+        raise ValueError("messages must be a non-empty list")
+    for i, message in enumerate(messages):
+        if not isinstance(message, dict):
+            raise ValueError("messages[%d] must be an object" % i)
+        role = message.get("role")
+        if not isinstance(role, str) or role not in ("system", "user", "assistant", "tool", "developer"):
+            raise ValueError("messages[%d].role must be system, user, assistant, developer or tool" % i)
+        content = message.get("content")
+        if content is not None and not isinstance(content, (str, list)):
+            raise ValueError("messages[%d].content must be a string or a list" % i)
+        if isinstance(content, list):
+            for j, part in enumerate(content):
+                if not isinstance(part, dict):
+                    raise ValueError("messages[%d].content[%d] must be an object" % (i, j))
+                if "text" in part and not isinstance(part["text"], str):
+                    raise ValueError("messages[%d].content[%d].text must be a string" % (i, j))
+        if role == "assistant":
+            calls = message.get("tool_calls")
+            if calls is not None:
+                if not isinstance(calls, list):
+                    raise ValueError("messages[%d].tool_calls must be a list" % i)
+                for j, call in enumerate(calls):
+                    fn = call.get("function", call) if isinstance(call, dict) else None
+                    if not isinstance(fn, dict) or not isinstance(fn.get("name"), str):
+                        raise ValueError("messages[%d].tool_calls[%d] needs a function name" % (i, j))
+                    args = fn.get("arguments")
+                    if args is not None and not isinstance(args, (str, dict)):
+                        raise ValueError("messages[%d].tool_calls[%d].arguments must be a string or object"
+                                         % (i, j))
+
+    tools = req.get("tools")
+    if tools is not None:
+        if not isinstance(tools, list):
+            raise ValueError("tools must be a list")
+        for i, tool in enumerate(tools):
+            fn = tool.get("function", tool) if isinstance(tool, dict) else None
+            if not isinstance(fn, dict) or not isinstance(fn.get("name"), str):
+                raise ValueError("tools[%d] needs a function name" % i)
+            if fn.get("parameters") is not None and not isinstance(fn["parameters"], dict):
+                raise ValueError("tools[%d].function.parameters must be an object" % i)
+
+    if req.get("stream") is not None and not isinstance(req["stream"], bool):
+        raise ValueError("stream must be true or false")
+    stop = req.get("stop")
+    if stop is not None and not isinstance(stop, str):
+        if not isinstance(stop, list) or any(not isinstance(s, str) for s in stop):
+            raise ValueError("stop must be a string or a list of strings")
+    stream_options = req.get("stream_options")
+    if stream_options is not None:
+        if not isinstance(stream_options, dict):
+            raise ValueError("stream_options must be an object")
+        if (stream_options.get("include_usage") is not None
+                and not isinstance(stream_options["include_usage"], bool)):
+            raise ValueError("stream_options.include_usage must be true or false")
+
     for name in ("max_tokens", "max_completion_tokens", "top_k", "seed"):
         value = req.get(name)
         if value is None:

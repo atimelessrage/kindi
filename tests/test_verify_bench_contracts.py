@@ -37,6 +37,26 @@ def test_bench_refuses_nanbeige_on_cpu(tmp_path, monkeypatch):
     assert any("Nanbeige" in line for line in logged)
 
 
+def test_bench_routes_nanbeige_to_its_own_bench_when_a_gpu_is_present(tmp_path, monkeypatch):
+    """The CPU guard must not hide the real route: with a GPU, bench calls nanbeige_cli.bench."""
+    pack = _pack(tmp_path, {"backend": "kindi_nanbeige"})
+    seen = []
+    monkeypatch.setattr(bench, "_cupy", lambda: object())
+    monkeypatch.setattr("kindi.nanbeige_cli.bench",
+                        lambda cfg, man, log=print: seen.append((cfg, man)) or 0)
+    assert bench.run({"pack": pack, "ctx": 1024}, log=lambda *a: None) == 0
+    assert seen and seen[0][1]["backend"] == "kindi_nanbeige"
+
+
+def test_verify_routes_nanbeige_to_its_own_gate(tmp_path, monkeypatch):
+    pack = _pack(tmp_path, {"backend": "kindi_nanbeige"})
+    seen = []
+    monkeypatch.setattr("kindi.nanbeige_cli.verify",
+                        lambda cfg, man, log=print: seen.append((cfg, man)) or 0)
+    assert verify.run({"pack": pack}, log=lambda *a: None) == 0
+    assert seen and seen[0][1]["backend"] == "kindi_nanbeige"
+
+
 def test_bench_names_the_families_it_cannot_bench(tmp_path, monkeypatch):
     """`kindi bench` must not fall through to the dense loop for a Gemma 4 or DeepSeek pack."""
     monkeypatch.setenv("KINDI_DEVICE", "cpu")

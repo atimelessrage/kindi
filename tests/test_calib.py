@@ -95,3 +95,34 @@ def test_calibrate_subcommand_is_wired():
     with pytest.raises(SystemExit) as e:
         main(["calibrate", "--help"])
     assert e.value.code == 0
+
+
+def test_calibrate_passes_the_configured_kv_cache_to_the_gateway(tmp_path, monkeypatch):
+    """`kindi calibrate` must build the same K/V-cache variant as serve/verify/bench."""
+    import sys
+    import types
+
+    from kindi import calibrate
+
+    pack = tmp_path / "pack"
+    pack.mkdir()
+    (pack / "kindi_pack.json").write_text(
+        json.dumps({"backend": "kindi_nanbeige", "source_sha256": "abc123"}), encoding="utf-8")
+    monkeypatch.setitem(sys.modules, "cupy", types.SimpleNamespace())
+    monkeypatch.setattr("kindi.calib.gpu_identity", lambda: "gpu-sm89")
+    monkeypatch.setattr("kindi.calib.read", lambda *a: {})
+    monkeypatch.setattr("kindi.calib.record", lambda *a: None)
+    monkeypatch.setattr("kindi.calib.path_for", lambda *a: str(tmp_path / "calib.json"))
+    monkeypatch.setattr("kindi.tandem.load_ratio", lambda **kw: None)
+
+    def no_placement(*args, **kwargs):
+        raise RuntimeError("skip placement")
+
+    monkeypatch.setattr("kindi.tandem.pack_bytes", no_placement)
+    seen = []
+    monkeypatch.setattr("kindi.engine.make_engine",
+                        lambda *a, **kw: seen.append((a, kw)) or object())
+
+    assert calibrate.run({"pack": str(pack), "ctx": 1024, "kv_cache": "q8_0"},
+                         log=lambda *a: None) == 0
+    assert seen and seen[0][1]["kv_cache"] == "q8_0"

@@ -49,3 +49,23 @@ def test_authentication_error_keeps_its_type():
                            error_type="authentication_error"))
     assert status == 401
     assert body["error"]["type"] == "authentication_error"
+
+
+def test_malformed_sampling_field_is_a_live_400_envelope(api_server):
+    """The uvicorn socket returns the envelope, not a stubbed _err helper."""
+    import httpx
+
+    base_url, _stub = api_server
+    response = httpx.post(base_url + "/v1/chat/completions", json={
+        "model": "kindi-fake",
+        "messages": [{"role": "user", "content": "hello"}],
+        "temperature": "hot",
+    }, timeout=10)
+    assert response.status_code == 400
+    assert response.headers["content-type"].startswith("application/json")
+    assert response.json() == {"error": {
+        "message": "temperature must be a finite number",
+        "type": "invalid_request_error",
+        "param": None,
+        "code": "invalid_request_error",
+    }}

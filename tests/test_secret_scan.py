@@ -4,7 +4,6 @@ import json
 import subprocess
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "tools" / "check_secret_baseline.py"
 
@@ -66,3 +65,36 @@ def test_baseline_normalization_uses_posix_paths():
     })
     assert list(normalized) == ["docs/example.md"]
     assert normalized["docs/example.md"][0]["filename"] == "docs/example.md"
+
+
+def test_scan_tracked_batches_and_merges_results(monkeypatch):
+    """A long Windows argv used to raise WinError 206 before detect-secrets ran.
+
+    Keep each fake invocation inside the budget and prove that every tracked file reaches one
+    batch and that the detector's per-batch findings are merged back into one payload.
+    """
+    mod = load()
+    files = ["%s.py" % (letter * 20) for letter in "abc"]
+    monkeypatch.setattr(mod, "tracked_files", lambda: files)
+    monkeypatch.setattr(mod, "MAX_SCAN_ARGV_CHARS", 30)
+    calls = []
+
+    def fake_run(command, **kwargs):
+        batch = command[command.index("scan") + 1:]
+        calls.append(batch)
+        assert sum(len(path) + mod.PATH_ARG_OVERHEAD for path in batch) <= 30
+        results = {
+            path: [{"filename": path, "line_number": 1, "type": "Hex"}]
+            for path in batch
+        }
+        return subprocess.CompletedProcess(
+            command, 0, stdout=json.dumps({"version": "1.5.0", "results": results}),
+            stderr="",
+        )
+
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+    payload = mod.scan_tracked()
+    assert len(calls) > 1
+    assert [path for batch in calls for path in batch] == files
+    assert list(payload["results"]) == sorted(files)
+    assert all(len(findings) == 1 for findings in payload["results"].values())

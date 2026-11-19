@@ -151,3 +151,16 @@ def test_a_missing_nanbeige_mtp_head_is_one_warning_not_a_failure(tmp_path, monk
 
     assert kindi.nanbeige.mtp is False
     assert any("no MTP head file" in line for line in logged)
+
+
+def test_nanbeige_mtp_is_optional_when_no_head_is_configured():
+    """No `mtp_head` is not a warning: the serve wrapper simply runs without a drafter."""
+    from kindi.nanbeige import attach_mtp
+
+    class _NoHeadEngine(object):
+        def load_mtp(self, path):
+            raise AssertionError("attach_mtp loaded an unset head")
+
+    logged = []
+    assert attach_mtp(_NoHeadEngine(), {}, logged.append) is False
+    assert logged == []

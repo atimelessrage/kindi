@@ -44,6 +44,16 @@ def test_a_drafting_last_with_no_method_field_is_rejected():
     assert "not mtp" in message
 
 
+def test_a_null_drafting_last_is_rejected_without_an_attribute_error():
+    smoke = _load_smoke()
+    with pytest.raises(smoke.SmokeError) as caught:
+        smoke._check_last_method(None)
+    assert caught.value.code == 1
+    message = str(caught.value)
+    assert "drafting.last is missing or null" in message
+    assert "expected an MTP result" in message
+
+
 def test_a_drafting_last_whose_method_is_mtp_is_accepted():
     smoke = _load_smoke()
     last = {"method": "mtp", "passes": 2, "drafted": 8, "accepted": 3}

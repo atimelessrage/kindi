@@ -162,7 +162,8 @@ def test_valid_sampling_fields_are_accepted():
            "top_k": 20, "min_p": 0.05, "seed": 2 ** 32 - 1}
     assert dsv41_server.validate_request(req) is req
     # the default/off values are valid too
-    assert dsv41_server.validate_request({"temperature": 0, "top_p": 1, "top_k": 0, "min_p": 0})
+    assert dsv41_server.validate_request({"messages": req["messages"], "temperature": 0,
+                                          "top_p": 1, "top_k": 0, "min_p": 0})
 
 
 def test_malformed_or_non_finite_sampling_fields_are_400_before_generation():
@@ -222,3 +223,78 @@ def test_malformed_or_non_finite_sampling_fields_are_400_before_generation():
         h.do_POST()
         assert sent and sent[0][0] == 400, (extra, sent)
         assert field in sent[0][1], (extra, sent)
+
+
+@pytest.mark.parametrize(("field", "extra"), (
+    ("messages", {"messages": None}),
+    ("messages", {"messages": {}}),
+    ("messages", {"messages": []}),
+    ("messages[0]", {"messages": [1]}),
+    ("messages[0].role", {"messages": [{"role": "robot", "content": "hi"}]}),
+    ("messages[0].content", {"messages": [{"role": "user", "content": 1}]}),
+    ("messages[0].content[0]", {"messages": [{"role": "user", "content": [1]}]}),
+    ("messages[0].content[0].text",
+     {"messages": [{"role": "user", "content": [{"type": "text", "text": 1}]}]}),
+    ("messages[0].tool_calls", {"messages": [{"role": "assistant", "tool_calls": {}}]}),
+    ("messages[0].tool_calls[0]", {"messages": [{"role": "assistant", "tool_calls": [{}]}]}),
+    ("messages[0].tool_calls[0].arguments",
+     {"messages": [{"role": "assistant", "tool_calls":
+                    [{"function": {"name": "f", "arguments": 1}}]}]}),
+    ("tools", {"tools": {}}),
+    ("tools[0]", {"tools": [1]}),
+    ("tools[0].function.parameters",
+     {"tools": [{"function": {"name": "f", "parameters": []}}]}),
+    ("stream", {"stream": "true"}),
+    ("stream", {"stream": 1}),
+    ("stream_options", {"stream_options": []}),
+    ("stream_options.include_usage", {"stream_options": {"include_usage": "true"}}),
+    ("stop", {"stop": 1}),
+    ("stop", {"stop": [1]}),
+    ("stop", {"stop": ["ok", 1]}),
+))
+def test_malformed_shapes_are_400_before_count(field, extra):
+    """A bad message/tool/stream/stop shape is a 400 at the boundary, not a late render failure."""
+    class NoEngine:
+        class a:
+            api_key = ""
+
+        class model:
+            ctx = 1024
+
+        @staticmethod
+        def count(req):
+            raise AssertionError("count() ran before the request was validated")
+
+        @staticmethod
+        def run(*args, **kwargs):
+            raise AssertionError("run() ran before the request was validated")
+
+    payload = {"messages": [{"role": "user", "content": "hello"}]}
+    payload.update(extra)
+    body = json.dumps(payload).encode()
+    h = object.__new__(dsv41_server.make_handler(NoEngine))
+    h.path = "/v1/chat/completions"
+    h.headers = {"Content-Length": str(len(body))}
+    h.rfile = io.BytesIO(body)
+    h.close_connection = False
+    sent = []
+    h._err = lambda code, msg, typ="invalid_request_error", box=sent: box.append((code, msg, typ))
+    h.do_POST()
+    assert sent and sent[0][0] == 400, (extra, sent)
+    assert field in sent[0][1], (extra, sent)
+
+
+def test_valid_message_tool_stream_and_stop_shapes_are_accepted():
+    req = {
+        "messages": [
+            {"role": "developer", "content": "be brief"},
+            {"role": "user", "content": [{"type": "text", "text": "hello"}]},
+            {"role": "assistant", "content": None,
+             "tool_calls": [{"function": {"name": "lookup", "arguments": {"q": "x"}}}]},
+        ],
+        "tools": [{"type": "function", "function": {"name": "lookup", "parameters": {"type": "object"}}}],
+        "stream": True,
+        "stream_options": {"include_usage": True},
+        "stop": ["END"],
+    }
+    assert dsv41_server.validate_request(req) is req
