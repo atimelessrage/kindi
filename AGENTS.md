@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `7310590` on `freebuff/tandem-cpu-recovery` (**main** is fast-forwarded to this branch at handoff; guarded by `tests/test_agents_handoff.py`); `--save-baseline` now carries each cell's `logs` list from the replaced baseline and refuses to drop one (`tests/test_verify_matrix.py` **42 passed**); the DSV4.1 CLI now validates its remaining paths and counts before loading, and the standalone server/dspark/tool audit moved its late numeric parsing to argparse (`tests/test_dsv41_cli.py` **24 passed**; focused suites **101 passed**).
+- **HEAD:** `f069c1d` on `freebuff/tandem-cpu-recovery` (**main** is at `7310590`; guarded by `tests/test_agents_handoff.py`); `--save-baseline` now carries each cell's `logs` list from the replaced baseline and refuses to drop one; the 27B baseline summaries quote the median pass's duration to two decimals, so a one-decimal look-alike from another pass cannot stand in (`tests/test_verify_matrix.py` **43 passed**); the DSV4.1 CLI now validates its remaining paths and counts before loading, and the standalone server/dspark/tool audit moved its late numeric parsing to argparse (`tests/test_dsv41_cli.py` **24 passed**; focused suites **101 passed**).
 
 ### Python quality ratchet
 
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `7310590` | main checkout; clean; fast-forwarded to this branch |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `7310590` | this session; checked out here |
+| `T:/kindi` | `main` | `7310590` | main checkout; clean; behind this branch |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `f069c1d` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.

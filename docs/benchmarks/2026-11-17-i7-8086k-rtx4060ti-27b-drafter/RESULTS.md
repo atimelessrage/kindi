@@ -97,9 +97,11 @@ follows the medians: `started_utc` (`2026-11-17T21:15:21Z`) is the first
 ran at. Each row's `tokens_per_second` is the three-pass median and equals the
 tok/s of its named pass; its `duration_s` is that same pass's duration, not a
 median of durations, and `summary` names the same pass (r2 for `ngram`, r1 for
-`draft2b` and `both`). Throughput, duration, transcript and summary therefore
-describe one actual pass instead of pairing a median tok/s with another pass's
-median duration. That matters because the gate's `comparison.json` copies the
+`draft2b` and `both`) and quotes that pass's duration to two decimals (12.61,
+12.57 and 12.96 s). A one-decimal display would let r3's 13.02 s pass for r1's
+12.96 s, so the summary uses two decimals. Throughput, duration, transcript and
+summary therefore describe one actual pass instead of pairing a median tok/s
+with another pass's median duration. That matters because the gate's `comparison.json` copies the
 baseline's `started_utc`/`git_revision` into
 `baseline_started_utc`/`baseline_git_revision`; before this, the receipt paired
 the medians with the earlier single pass's `53003a9`/`17:57:48Z`. Each row's

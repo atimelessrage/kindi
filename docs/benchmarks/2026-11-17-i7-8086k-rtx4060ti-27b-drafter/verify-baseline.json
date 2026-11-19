@@ -1,7 +1,7 @@
 {
   "started_utc": "2026-11-17T21:15:21Z",
   "git_revision": "cf81a82",
-  "throughput_basis": "three-pass medians from median-r1..r3-results.json (started 2026-11-17T21:15:21Z at cf81a82); started_utc and git_revision name that median set, not the earlier single-pass results.json (53003a9, 2026-11-17T17:57:48Z); each row's tokens_per_second is the three-pass median and equals the tok/s of its named pass, duration_s is that same pass's duration (not a median of durations), and summary and log name the same pass, so throughput, duration, log and summary describe one actual pass; logs lists all three transcripts under logs/median-rN/ (the first pass's transcripts remain at logs/27b-tc*.log)",
+  "throughput_basis": "three-pass medians from median-r1..r3-results.json (started 2026-11-17T21:15:21Z at cf81a82); started_utc and git_revision name that median set, not the earlier single-pass results.json (53003a9, 2026-11-17T17:57:48Z); each row's tokens_per_second is the three-pass median and equals the tok/s of its named pass, duration_s is that same pass's duration (not a median of durations), summary and log name the same pass, and the summary quotes that pass's duration to two decimals, so throughput, duration, log and summary describe one actual pass and a rounded duration from another pass cannot stand in; logs lists all three transcripts under logs/median-rN/ (the first pass's transcripts remain at logs/27b-tc*.log)",
   "python": "3.13.6",
   "packs_dir": "~/.kindi/packs",
   "pack_27b": "<kindi-model-root>/kindi-27b/packs/bonsai-27b",
@@ -74,7 +74,7 @@
       "spec_effective": "ngram",
       "drafts_accepted": 35,
       "drafts_drafted": 148,
-      "summary": "three-pass median at cf81a82: PASS with KINDI_SPEC=ngram: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 45.7 tokens/s on the r2 pass (the three-pass median) in 12.6 s",
+      "summary": "three-pass median at cf81a82: PASS with KINDI_SPEC=ngram: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 45.7 tokens/s on the r2 pass (the three-pass median) in 12.61 s",
       "log": "logs/median-r2/27b-tc-ngram.log",
       "logs": [
         "logs/median-r1/27b-tc-ngram.log",
@@ -146,7 +146,7 @@
       "spec_effective": "draft2b",
       "drafts_accepted": 112,
       "drafts_drafted": 162,
-      "summary": "three-pass median at cf81a82: PASS with KINDI_SPEC=draft2b: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 71.0 tokens/s on the r1 pass (the three-pass median) in 12.6 s",
+      "summary": "three-pass median at cf81a82: PASS with KINDI_SPEC=draft2b: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 71.0 tokens/s on the r1 pass (the three-pass median) in 12.57 s",
       "log": "logs/median-r1/27b-tc-draft2b.log",
       "logs": [
         "logs/median-r1/27b-tc-draft2b.log",
@@ -219,7 +219,7 @@
       "spec_effective": "both",
       "drafts_accepted": 90,
       "drafts_drafted": 211,
-      "summary": "three-pass median at cf81a82: PASS with KINDI_SPEC=both: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 62.0 tokens/s on the r1 pass (the three-pass median) in 13.0 s",
+      "summary": "three-pass median at cf81a82: PASS with KINDI_SPEC=both: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 62.0 tokens/s on the r1 pass (the three-pass median) in 12.96 s",
       "log": "logs/median-r1/27b-tc-both.log",
       "logs": [
         "logs/median-r1/27b-tc-both.log",

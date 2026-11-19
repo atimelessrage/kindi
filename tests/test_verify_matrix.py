@@ -414,7 +414,8 @@ def test_27b_drafter_baseline_has_the_three_spec_cells():
                     for run in runs]
         assert row["tokens_per_second"] == sorted(r["tokens_per_second"] for r in measured)[1]
         # The throughput is a median, but the duration and summary must describe the actual pass
-        # that produced it, not a median duration taken from a different pass.
+        # that produced it, not a median duration taken from a different pass. Quote the duration
+        # to two decimals: 12.96 s (r1) and 13.02 s (r3) both round to 13.0 s.
         median_pass = next(r for r in measured if r["tokens_per_second"] == row["tokens_per_second"])
         index = measured.index(median_pass)
         assert row["duration_s"] == median_pass["duration_s"]
@@ -431,7 +432,10 @@ def test_27b_drafter_baseline_has_the_three_spec_cells():
         for rel in row["logs"]:
             assert (page / rel).is_file(), rel
         assert "r%d pass" % (index + 1) in row["summary"]
-        assert "%.1f s" % row["duration_s"] in row["summary"]
+        assert "in %.2f s" % row["duration_s"] in row["summary"]
+        for other in measured:
+            if other is not median_pass:
+                assert "in %.2f s" % other["duration_s"] not in row["summary"]
         text = (page / row["log"]).read_text(encoding="utf-8", errors="replace")
         assert "%.1f tokens/s" % row["tokens_per_second"] in text
 
