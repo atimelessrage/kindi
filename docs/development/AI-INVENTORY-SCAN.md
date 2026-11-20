@@ -135,3 +135,20 @@ not read and no knowledge-base candidate is recorded. The roadmap review therefo
 repository's measurements and the tracked Intel fork; no `[M]` or `[P]` number was adopted. Gate for
 the next scan: set the variable, then follow the incremental procedure from the last recorded commit
 `1135eab` (or the base's then-current HEAD), comparing mtimes because its working tree lags git.
+
+## Check attempt 2026-11-20 (path unavailable; repository-only ranking)
+
+**Last checked:** 2026-11-20. `$KINDI_AI_INVENTORY` is unset in this session's shell and in both the
+Windows User and Machine scopes, so the base was not read and no knowledge-base candidate or number
+is recorded. The ranking in [ROADMAP.md](../../docs/ROADMAP.md) "Follow-ups from the 2026-11-20
+review" is repository-derived: the current v0.6.1 comparison, the 9B default-vs-TC smoke page, the
+grammar-cost page, the handoff tests and the release checklist. Files reviewed for this pass:
+`docs/ROADMAP.md`, `CURRENT-VS-KINDI-0.6.md`, `docs/development/AI-INVENTORY-SCAN.md`,
+`docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-9b-default-vs-tc/RESULTS.md`,
+`docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/RESULTS.md`, `docs/API.md`, and
+`tests/test_agents_handoff.py`. Nothing was adopted from the knowledge base; the roadmap items are
+this repository's own gaps and each carries a gate.
+
+Gate for the next real scan: set `$KINDI_AI_INVENTORY`, then follow the incremental procedure from the
+last recorded commit `1135eab` (or the base's then-current HEAD), comparing mtimes because its working
+tree lags git. The path is deliberately not stored in this repository.

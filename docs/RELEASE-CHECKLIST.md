@@ -65,8 +65,10 @@ from `kindi/sessions.py` and the three other modules that carried it (`kindi/cas
 `kindi/draft_policy.py`, `kindi/moe_compat.py`); none uses postponed annotations. The rebuilt CUDA
 image `kindi:0.7.0-fork` (`sha256:b08916d7d25a19c87831196067a4407d0dac5d1143237b22c97dc59aa3b45af1`,
 2.56 GB, Python 3.6.9) passed the **unmodified-image** smoke on the RTX 4060 Ti: `/health` returned
-200, and one non-streaming chat returned 200 in **0.2337 s** with `container smoke ok`. Build and run
-outputs: [container smoke evidence](benchmarks/2026-11-20-i7-8086k-rtx4060ti-container-smoke/RESULTS.md).
+200, and one non-streaming chat returned 200 in **0.2337 s** with `container smoke ok`. GPU
+passthrough was checked with `nvidia-smi` and `kindi info`; the latter exits 0 and reports the
+RTX 4060 Ti plus the `/data/pack` 2B pack. Build and run outputs, including the full `kindi info`
+output: [container smoke evidence](benchmarks/2026-11-20-i7-8086k-rtx4060ti-container-smoke/RESULTS.md).
 The image label records revision `1627b96312509e6e2bdaad805116f7f6459b88f3-dirty`; the
 `kindi/COMMIT` placeholder still makes `/health` report `commit: null`. No image was published.
 

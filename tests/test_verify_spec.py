@@ -138,6 +138,27 @@ def test_an_engine_without_speculation_says_so_instead_of_implying_a_mode(monkey
     assert refusal and "this engine cannot speculate" in refusal
 
 
+def test_an_engine_without_speculation_names_the_actual_path(monkeypatch):
+    """The default 9B runs the plan engine's 5-trit lane, not the plain engine."""
+    monkeypatch.setenv("KINDI_SPEC", "0")
+
+    class TPEngine(object):
+        tc = False
+
+    TPEngine.__module__ = "kindi.tp"
+    mode, line, refusal = verify.spec_state(TPEngine())
+    assert mode is None and refusal is None
+    assert "plan engine's 5-trit lane" in line
+    assert "plain engine" not in line
+
+    class Engine(object):
+        pass
+
+    Engine.__module__ = "kindi.engine"
+    mode, line, refusal = verify.spec_state(Engine())
+    assert "plain engine" in line
+
+
 def test_the_cli_flag_selects_the_mode(monkeypatch, tmp_path):
     """`kindi verify --spec mtp` is `KINDI_SPEC=mtp` for the run, and nothing else changes."""
     import kindi

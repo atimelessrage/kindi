@@ -62,6 +62,24 @@ TIE_GAP = 0.01
 OFF = ("0", "", "off")
 
 
+def _engine_path(eng):
+    """The engine path a verify line names: the plan engine is not the plain engine."""
+    cls = type(eng)
+    module, name = cls.__module__, cls.__name__
+    if module == "kindi.tp" and name == "TPEngine":
+        return ("the tensor-core plan engine" if getattr(eng, "tc", False)
+                else "the plan engine's 5-trit lane")
+    if module == "kindi.engine" and name == "Engine":
+        return "the plain engine"
+    if module == "kindi.cpu" and name == "Engine":
+        return "the CPU engine"
+    if module == "kindi.tandem" and name == "TandemEngine":
+        return "the tandem engine"
+    if name == "Engine":
+        return "the %s engine" % module.rsplit(".", 1)[-1]
+    return "the %s engine" % name
+
+
 def spec_state(eng, requested=None):
     """The speculation `kindi verify` will run, the line that says so, and a refusal (REQ-0025 A1/A4).
 
@@ -73,7 +91,8 @@ def spec_state(eng, requested=None):
     requested = (os.environ.get("KINDI_SPEC", "0") or "0") if requested is None else requested
     off = requested in OFF
     if not hasattr(eng, "spec_begin"):
-        line = "speculation: unavailable (this engine has no spec_begin); verifying the plain engine"
+        line = ("speculation: unavailable (this engine has no spec_begin); verifying %s"
+                % _engine_path(eng))
         return None, line, None if off else "KINDI_SPEC=%s was requested but this engine cannot speculate" % requested
     from . import spec as _sp
     st = _sp.effective_state(eng, requested)

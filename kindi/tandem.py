@@ -25,12 +25,14 @@ import hashlib
 import json
 import os
 import time
+from typing import Any, cast
 
 import numpy as np
 
 from .cache import Runner
 from .cpu import Engine as CPUEngine
-from .engine import Engine as GPUEngine, MOE_BACKENDS
+from .engine import MOE_BACKENDS, VOCAB
+from .engine import Engine as GPUEngine
 
 MODES = ("cpu-first", "gpu-first")
 PlanEngine = None          # kindi.tp.TPEngine, imported on first use (it needs CuPy at import time)
@@ -670,11 +672,39 @@ class TandemEngine(object):
         self.cpu_first = cpu_first
         self._gpu_head = self.NL - 1 in self.gpu_range
         self.ctx = int(ctx)
+        self.head_split = None
+        split_text = os.environ.get("KINDI_TANDEM_HEAD_SPLIT", "").strip().lower()
+        if split_text not in ("", "0", "off"):
+            # The exact head is split by vocabulary rows: the CPU owns the lower rows and the GPU the
+            # upper rows. Both run the same output norm and a disjoint slice of the head; the full
+            # argmax is merged on the host. The plan engine owns its head inside its own card layout,
+            # so this experiment is deliberately limited to the plain engine.
+            if self.gpu_kind != "plain":
+                raise SystemExit("kindi: the exact head row split needs --tandem-gpu plain")
+            if man.get("head", "token_embd.weight") == "token_embd.weight":
+                raise SystemExit("kindi: the exact head row split needs a separate output.weight; "
+                                 "this pack ties the head to token_embd.weight")
+            try:
+                percent = float(split_text)
+            except ValueError:
+                raise SystemExit("kindi: KINDI_TANDEM_HEAD_SPLIT must be a percentage, e.g. 50") from None
+            if not 0.0 < percent < 100.0:
+                raise SystemExit("kindi: KINDI_TANDEM_HEAD_SPLIT must be between 0 and 100")
+            cut = int(round(VOCAB * percent / 100.0 / 16.0)) * 16
+            if not 0 < cut < VOCAB:
+                raise SystemExit("kindi: KINDI_TANDEM_HEAD_SPLIT is too small at this vocabulary")
+            self.head_split = (0, cut)
+            self.log("tandem: exact head split %.1f%% on the CPU (rows 0..%d), %d..%d on the GPU"
+                     % (percent, cut - 1, cut, VOCAB - 1))
 
         # Load only the CPU-owned slice: converting a whole 27B pack on the CPU
         # cost ~365 s even when the CPU owned 16 of 64 layers.
+        split_cpu_head = self.head_split is not None
+        cpu_head_kw = {"head_rows": self.head_split} if split_cpu_head else {}
         self.cpu = CPUEngine(pack, ctx=ctx, log=log, layers=self.cpu_range,
-                             embed=0 in self.cpu_range, head=self.NL - 1 in self.cpu_range)
+                             embed=0 in self.cpu_range,
+                             head=(self.NL - 1 in self.cpu_range) or split_cpu_head,
+                             **cpu_head_kw)
         if self.gpu_kind == "plan":
             # the plan engine loads only the GPU-owned tensors and allocates q8_0 K/V for the owned
             # attention layers only: an offloaded layer frees its weights and its K/V, not just its time
@@ -682,8 +712,13 @@ class TandemEngine(object):
             self.gpu = Plan(pack, ctx=ctx, log=log, layers=self.gpu_range,
                             embed=0 in self.gpu_range, head=self._gpu_head)
         else:
+            if self.head_split is None:
+                gpu_head_kw = {}
+            else:
+                gpu_head_kw = {"head_rows": (self.head_split[1], VOCAB)}
             self.gpu = GPUEngine(pack, ctx=ctx, log=log, layers=self.gpu_range,
-                                 embed=0 in self.gpu_range, head=self._gpu_head, kv="q8_0")
+                                 embed=0 in self.gpu_range, head=self._gpu_head or split_cpu_head,
+                                 kv="q8_0", **gpu_head_kw)
         self.ctx = min(int(self.cpu.ctx), int(self.gpu.ctx))
         self.D = int(self.cpu.D)
         if int(self.gpu.D) != self.D:
@@ -697,10 +732,11 @@ class TandemEngine(object):
         self._probe = os.environ.get("KINDI_TANDEM_DEBUG_TIMING", "0") not in ("0", "", "off")
         self.timing = {"cpu_s": 0.0, "gpu_s": 0.0, "transfer_s": 0.0, "head_s": 0.0,
                        "cpu_layers": 0, "gpu_layers": 0, "transfers": 0, "tokens": 0}
-        if self._gpu_head:
+        if self._gpu_head and self.head_split is None:
             # Sampler uses the same GPU-kernel path as the normal engine: the logits and aout live on the card.
-            self.k = self.gpu.k
-            self.aout = self.gpu.aout
+            gpu_any = cast(Any, self.gpu)
+            self.k = gpu_any.k
+            self.aout = gpu_any.aout
         # the per-layer owner table, resolved once: `_run` must not re-derive the owner of every
         # layer on every token (it built a frozenset and did a set lookup per layer per token)
         cpu_set = frozenset(self.cpu_range)
@@ -712,11 +748,27 @@ class TandemEngine(object):
             return "%d..%d" % (rng[0], rng[-1]) if full else ",".join(str(x) for x in rng)
         self.log("tandem %s: CPU layers %s, %s engine on layers %s, %d-token context, %s head"
                  % (self.mode, _rng(self.cpu_range), self.gpu_kind, _rng(self.gpu_range),
-                    self.ctx, "GPU" if self._gpu_head else "CPU"))
+                    self.ctx, "split CPU/GPU" if self.head_split is not None
+                    else ("GPU" if self._gpu_head else "CPU")))
 
     def _sync_logits(self):
+        if self.head_split is not None:
+            self.ylog = np.zeros(VOCAB, dtype=np.float32)
+            self.ylog_n, self.ylog_map = VOCAB, None
+            return
         owner = self.gpu if self._gpu_head else self.cpu
         self.ylog, self.ylog_n, self.ylog_map = owner.ylog, owner.ylog_n, owner.ylog_map
+
+    def _merge_head_logits(self):
+        """Join the two disjoint exact-head slices into the full host logit vector."""
+        full = np.empty(VOCAB, dtype=np.float32)
+        c, g = self.cpu, cast(Any, self.gpu)
+        full[c.head_off:c.head_off + c.head_count] = np.asarray(c.ylog[:c.head_count], dtype=np.float32)
+        gy = g.ylog[:g.head_count]
+        if hasattr(gy, "get"):
+            gy = gy.get()
+        full[g.head_off:g.head_off + g.head_count] = np.asarray(gy, dtype=np.float32)
+        self.ylog, self.ylog_n, self.ylog_map = full, VOCAB, None
 
     def cache_view(self):
         """A single cache-facing engine spanning both ownership domains."""
@@ -775,11 +827,23 @@ class TandemEngine(object):
                 t["tokens"] += 1
             return None
         t0 = time.perf_counter() if self._probe else None
-        out = self.gpu.finish() if self._gpu_head else self.cpu.head()
+        if self.head_split is not None:
+            hidden = cur.get_hidden()
+            if cur is not self.cpu:
+                self.cpu.set_hidden(hidden)
+            if cur is not self.gpu:
+                self.gpu.set_hidden(hidden)
+            self.cpu.head()
+            self.gpu.finish()
+            self._merge_head_logits()
+            out = int(np.argmax(self.ylog))
+        else:
+            out = self.gpu.finish() if self._gpu_head else self.cpu.head()
         if self._probe:
             t["head_s"] += time.perf_counter() - t0
             t["tokens"] += 1
-        self._sync_logits()
+        if self.head_split is None:
+            self._sync_logits()
         return int(out)
 
     def timing_summary(self):

@@ -10,7 +10,7 @@ binds port 8093 normally.
 |---|---|---|
 | Python 3.6 package compile | **PASS** | 94 files, `python36_compile_failures=0` |
 | Image build | **PASS** | [`docker-build.log`](docker-build.log), `BUILD_EXIT=0` |
-| GPU passthrough | **PASS** | `nvidia-smi` and `kindi info` |
+| GPU passthrough | **PASS** | [`nvidia-smi` and `kindi info`](#gpu-passthrough-preflight) |
 | Pack + GPU engine load | **PASS** | [`unmodified-startup.log`](unmodified-startup.log) |
 | `/health` on the unmodified image | **PASS, 200** | [`unmodified-health.json`](unmodified-health.json) |
 | One chat on the unmodified image | **PASS, 200 in 0.2337 s** | [`unmodified-chat.json`](unmodified-chat.json) |
@@ -99,9 +99,30 @@ docker run --rm --gpus all --entrypoint nvidia-smi kindi:0.7.0-fork \
 NVIDIA GeForce RTX 4060 Ti, 8188 MiB, 617.42
 ```
 
-`kindi info` in the built image shows the same card and reports the 2B pack's
-GGUF as loadable. The engine log records the plan engine and the tensor-core
-configuration used by the smoke.
+`kindi info` was also run in the same image (ID `b08916d7…`) on 2026-11-20,
+using the smoke's named volume; it exits 0 and reports the card and the 2B pack
+at `/data/pack`:
+
+```sh
+MSYS_NO_PATHCONV=1 docker run --rm --gpus all \
+  -v kindi-smoke-data:/data \
+  -e KINDI_PACK=/data/pack \
+  -e KINDI_STATE_DIR=/data/state \
+  --entrypoint python3 kindi:0.7.0-fork -m kindi info
+```
+
+```
+Kindi 0.7.0-fork
+…
+pack: /data/pack - Ternary-Bonsai-2-2B, from Ternary-Bonsai-2-2B-PTQ1_0.gguf
+…
+GPU: NVIDIA GeForce RTX 4060 Ti, compute 89, 7039 of 8188 MiB free
+```
+
+The full output is [`kindi-info.txt`](kindi-info.txt). `kindi info` reports the
+pack manifest, not that the engine loaded it; the pack load is the startup log
+below. The engine log records the plan engine and the tensor-core configuration
+used by the smoke.
 
 ## Unmodified-image run
 

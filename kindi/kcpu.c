@@ -421,14 +421,22 @@ static void attn(Model* m, Layer* L, int pos, int add){
   gemv1(m, &L->o, m->y, m->xp);
 }
 
-static void ffn(Model* m, Layer* L){
+static void ffn_input(Model* m, Layer* L){
   TS(5);
   rmsfold(m, L->post_norm, 1);
   { const Mat* a[2] = {&L->ffg, &L->ffu}; float* yy[2] = {m->ffg, m->ffu}; gemv(m, 2, a, yy, m->xp); }
   #pragma omp for schedule(static)
   for(int e = 0; e < m->NFF; ++e) m->m[e] = silu(m->ffg[e]) * m->ffu[e];
   fold(m, m->m, m->sF, m->xp, m->NFF);
+}
+
+static void ffn_down(Model* m, Layer* L){
   gemv1(m, &L->ffd, m->y, m->xp);
+}
+
+static void ffn(Model* m, Layer* L){
+  ffn_input(m, L);
+  ffn_down(m, L);
 }
 
 static void layer_body(Model* m, int il, int pos, int add){
@@ -513,6 +521,38 @@ KC_API int kc_layer(Model* m, int il, int pos){
     #pragma omp single
     { for(int e = 0; e < m->D; ++e) m->h[e] += m->y[e]; }
   }
+  kc_times[t_cur] += omp_get_wtime() - t_last;
+  return 0;
+}
+
+/* The same layer without its FFN-down GEMV.  m->xp is left holding the folded FFN input;
+   m->y is zero so a caller can fill the down rows from one or more backends. */
+KC_API int kc_layer_ffn_input(Model* m, int il, int pos){
+  if(il < 0 || il >= m->NL || pos < 0 || pos >= m->ctx) return -1;
+  t_last = omp_get_wtime(); t_cur = 0;
+  #pragma omp parallel
+  {
+    #pragma omp single
+    { for(int e = 0; e < m->D; ++e) m->y[e] = 0.0f; }
+    #pragma omp barrier
+    Layer* L = m->L + il;
+    if(L->is_attn) attn(m, L, pos, 0); else gdn(m, L, 0);
+    ffn_input(m, L);
+    #pragma omp single
+    { for(int e = 0; e < m->D; ++e) m->y[e] = 0.0f; }
+  }
+  kc_times[t_cur] += omp_get_wtime() - t_last;
+  return 0;
+}
+
+/* One ternary matrix over an explicit row range, for a CPU/GPU row split.  The caller supplies
+   the packed rows and the complete input vector; this entry point does not touch the layer
+   schedule or the residual stream. */
+KC_API int kc_gemv(Model* m, const Mat* A, const float* x, float* y){
+  if(!m || !A || !x || !y) return -1;
+  t_last = omp_get_wtime(); t_cur = 0;
+  #pragma omp parallel
+  { gemv1(m, A, y, x); }
   kc_times[t_cur] += omp_get_wtime() - t_last;
   return 0;
 }

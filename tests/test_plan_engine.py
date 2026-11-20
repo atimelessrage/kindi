@@ -298,17 +298,91 @@ def _probe(hb):
     return shard
 
 
-def test_hb_4096_packs_get_the_exact_activations_by_default(monkeypatch):
+def test_hb_4096_packs_get_the_exact_activations_for_the_tensor_core_path(monkeypatch):
     # 4/4 with the high-precision activations against 3/4 without (measured on the 4060 Ti), so for an
-    # HB-4096 pack the exact setting is the default instead of a flag every user has to find
+    # HB-4096 pack the exact setting is the default instead of a flag every user has to find. It belongs
+    # to the tensor-core path: with KINDI_TC off the 5-trit lane ignores KINDI_TC_HP, so the default run
+    # must not set it (or log that it is on).
     from kindi import engine as _eng
     monkeypatch.delenv("KINDI_TC_HP", raising=False)
+    monkeypatch.delenv("KINDI_TC", raising=False)
+    assert _eng.tc_hp_for({"hadamard_block": 4096}) is None
+    monkeypatch.setenv("KINDI_TC", "1")
     assert _eng.tc_hp_for({"hadamard_block": 4096}) == "1"
     assert _eng.tc_hp_for({"hadamard_block": "4096"}) == "1"
     assert _eng.tc_hp_for({"hadamard_block": 1024}) is None
     assert _eng.tc_hp_for({}) is None                 # a pack without the key folds 512
     monkeypatch.setenv("KINDI_TC_HP", "0")           # an explicit choice always wins (it then refuses)
     assert _eng.tc_hp_for({"hadamard_block": 4096}) is None
+
+
+def test_the_hp_line_waits_for_a_confirmed_tensor_core_layout(spec_tp, monkeypatch):
+    """A card without a tensor-core backend, or a repack that declines the layout, runs the 5-trit
+    lane: it must not announce the 9B tensor-core path. The announcement follows the repack and the
+    tensor-core layout check, not the HP setting alone."""
+    spec, tp = spec_tp
+    saved = (tp.Shard._slices, tp.Shard.build_plans, tp.Shard._load,
+             spec._chunk.reserve, spec._chunk.build)
+    installed = spec._installed[0]
+    said, calls = [], []
+    state = {"backend": None, "layout": False, "lane": False, "pascal": False}
+    monkeypatch.setenv("KINDI_TC", "1")
+    monkeypatch.delenv("KINDI_SPEC", raising=False)
+    monkeypatch.delenv("KINDI_SPEC_PACK", raising=False)
+    monkeypatch.setattr(spec, "HP", True)
+    monkeypatch.setattr(spec, "_tc_backend", lambda card: state["backend"])
+    monkeypatch.setattr(spec._tc, "pascal", lambda card: state["pascal"])
+    monkeypatch.setattr(spec, "load_stream", lambda shard: calls.append("load_stream") or True)
+    monkeypatch.setattr(spec, "SpecKernels", lambda backend: calls.append("kernels") or object())
+
+    def fallback(shard):
+        calls.append("fallback")
+
+    def fake_repack(shard, log):
+        calls.append("repack")
+        if state["layout"]:
+            shard.tc_layout = True
+            shard.tc_lane = state["lane"]
+            log("card 0: weights repacked for the tensor cores (0.0s)")
+        else:
+            log("card 0: weights do not fit the tc layout")
+
+    monkeypatch.setattr(spec, "repack", fake_repack)
+    try:
+        tp.Shard._load = fallback
+        spec._installed[0] = False
+        spec.install(log=said.append)
+        load = tp.Shard._load
+        cases = [
+            (False, False, False, False, False),   # no tensor-core backend: o_load keeps 5-trit
+            (True, False, False, False, False),    # repack declined the layout
+            (True, True, False, False, True),      # tensor cores: the only case that may announce HP
+            (True, True, True, False, False),      # sm_60 lane products, not tensor cores
+            (True, True, False, True, False),      # Pascal dp4a, not tensor cores
+        ]
+        for backend, layout, lane, pascal, want in cases:
+            state.update(backend=object() if backend else None, layout=layout,
+                         lane=lane, pascal=pascal)
+            calls.clear()
+            said.clear()
+            shard = types.SimpleNamespace(
+                card=0, tp=types.SimpleNamespace(W=1, kv="q8_0"),
+                HB=4096, g5l=True, log=said.append)
+            load(shard)
+            hp = [line for line in said if "high-precision activations" in line]
+            assert bool(hp) is want, (backend, layout, lane, pascal, said)
+            if want:
+                repack_at = next(i for i, line in enumerate(said) if "weights repacked" in line)
+                assert said.index(hp[0]) > repack_at
+                assert hp[0] == said[-1]
+            if not backend:
+                assert "fallback" in calls
+            if backend and not layout:
+                assert "fallback" not in calls
+    finally:
+        (tp.Shard._slices, tp.Shard.build_plans, tp.Shard._load,
+         spec._chunk.reserve, spec._chunk.build) = saved
+        spec._installed[0] = installed
 
 
 def test_tensor_parallel_plans_refuse_hadamard_4096(spec_tp):
