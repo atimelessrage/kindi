@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `3b9224a` on `freebuff/tandem-cpu-recovery` (**main** fast-forwards to the handoff commit; guarded by `tests/test_agents_handoff.py`); the 2026-11-20 integration lands the `0.7.0-fork` release surface, local archive builder, read-only Intel probe, dense placement portfolio, process-shared token-class grammar masks, stricter request validation and autotune/parity fixes, with the controlled benchmark, container-smoke and claims evidence tracked; the earlier 2026-11-19 round remains in history; Engine wiring and the model row remain blocked by the absent Lightning pack. The 2026-11-20 follow-up adds a per-card dense-tandem VRAM ceiling (`--vram-budget-mib` / `tandem_vram_mb`) and display reserve (`--vram-reserve-mib` / `tandem_reserve_mb`), applied as `min(free - reserve, ceiling)` by `auto`/`rate`, the runtime and autotune (over-budget peaks are not recommended); full CPU suite 1420 passed / 28 skipped.
+- **HEAD:** `e57f6bd` on `wip/local-round-2026-11-20` (**main** fast-forwards to the handoff commit; guarded by `tests/test_agents_handoff.py`); the 2026-11-20 integration lands the `0.7.0-fork` release surface, local archive builder, read-only Intel probe, dense placement portfolio, process-shared token-class grammar masks, stricter request validation and autotune/parity fixes, with the controlled benchmark, container-smoke and claims evidence tracked; the earlier 2026-11-19 round remains in history; Engine wiring and the model row remain blocked by the absent Lightning pack. The 2026-11-20 follow-up adds a per-card dense-tandem VRAM ceiling (`--vram-budget-mib` / `tandem_vram_mb`) and display reserve (`--vram-reserve-mib` / `tandem_reserve_mb`), applied as `min(free - reserve, ceiling)` by `auto`/`rate`, the runtime and autotune (over-budget peaks are not recommended); full CPU suite 1420 passed / 28 skipped.
 
 ### Python quality ratchet
 
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `3b9224a` | main checkout; clean; fast-forwarded to the handoff refresh |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `3b9224a` | this session; checked out here |
+| `T:/kindi` | `main` | `e57f6bd` | main checkout; clean; fast-forwarded to the handoff refresh |
+| `<worktree>` | `wip/local-round-2026-11-20` | `e57f6bd` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
