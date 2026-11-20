@@ -72,6 +72,37 @@ The `--sample-vram` bench run did not print a separate sampled-peak line in
 this stdout capture, so no sampled-peak number is claimed here; the planner
 estimate above is the VRAM record for this gate.
 
+## 8K / 32K follow-up (2026-11-20): blocked
+
+No `kindi_lightning` pack or Lightning GGUF existed on this host. `kindi models`
+listed `lightning-30b` with no presence label, and `~/.kindi/packs` contained
+only Bonsai packs. The two intended runs were:
+
+```bash
+KINDI_PACK=~/.kindi/packs/nemotron-lightning-30b KINDI_DEVICE=gpu \
+  python -m kindi --ctx 8288 bench --sample-vram
+KINDI_PACK=~/.kindi/packs/nemotron-lightning-30b KINDI_DEVICE=gpu \
+  python -m kindi --ctx 32864 bench --sample-vram
+```
+
+Both exited 1 with `FileNotFoundError` for
+`.../nemotron-lightning-30b/kindi_pack.json`, before any weights loaded. No 8K
+or 32K prefill, decode or peak-VRAM number is claimed.
+
+Two details for the eventual run:
+
+- The 2026-11-16 bench used ctx 8192, so it could not produce the 8K row:
+  `lightning_cli.bench` includes a length N only when `N + 96 <= eng.ctx`.
+  Use `--ctx 8288` or more for 8K and `--ctx 32864` or more for 32K.
+- `kindi bench` dispatches a `kindi_lightning` pack to `lightning_cli.bench`
+  before creating its `VramMonitor`; `--sample-vram` does not currently print
+  a peak for this backend. A peak-VRAM record needs an external `nvidia-smi`
+  sampler or a bench change.
+
+The catalog artifact is `9,472,656,320` bytes, SHA-256
+`38854de649212dc2761006b75afbc41412e7531f763c3ff965bd31f969bb14f3`;
+downloading it is an owner action, not part of this blocked run.
+
 ## Scope of the verdict
 
 This closes the Lightning MoE GPU gate on the 4060 Ti for the clean catalog

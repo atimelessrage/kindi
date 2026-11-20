@@ -61,6 +61,22 @@ def test_pyright_parser_counts_errors_by_file_and_rule(monkeypatch):
         "kindi/a.py": {"reportArgumentType": 2}}
 
 
+def test_a_file_target_covered_by_its_directory_is_deduplicated():
+    mod = _load()
+    assert mod._dedupe_targets(("tools", "tools/moe_expert_lane.py")) == ("tools",)
+    assert mod._dedupe_targets(("tools/moe_expert_lane.py", "tools")) == ("tools",)
+
+
+def test_mypy_does_not_receive_a_deduplicated_file_target(monkeypatch):
+    mod = _load()
+    seen = []
+    monkeypatch.setattr(mod, "MYPY_TARGETS", ("tools", "tools/moe_expert_lane.py"))
+    monkeypatch.setattr(mod, "_run", lambda command, what: (
+        seen.append(command) or SimpleNamespace(returncode=0, stdout="", stderr="")))
+    assert mod._mypy_findings() == {}
+    assert seen[0].count("tools/moe_expert_lane.py") == 0
+
+
 def test_pylint_targets_the_other_tools_python_version(monkeypatch):
     mod = _load()
     seen = []

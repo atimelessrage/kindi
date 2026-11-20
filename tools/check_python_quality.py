@@ -42,6 +42,24 @@ PYLINT_TARGETS = MYPY_TARGETS
 PYLINT_PY_VERSION = "3.10"          # Ruff/mypy/Pyright target 3.10; Pylint would otherwise use the host Python
 
 
+def _dedupe_targets(targets: tuple[str, ...]) -> tuple[str, ...]:
+    """Keep the outermost target when a path is nested inside another target.
+
+    Mypy maps a file and its containing directory to the same module and exits 2
+    with ``Duplicate module named ...`` when both are passed. The directory already
+    covers the nested path, so dropping the nested entry checks the same files.
+    """
+    paths = [Path(target) for target in targets]
+    keep = []
+    for index, (target, path) in enumerate(zip(targets, paths, strict=True)):
+        if path in paths[:index]:
+            continue
+        if any(path != other and other in path.parents for other in paths):
+            continue
+        keep.append(target)
+    return tuple(keep)
+
+
 class QualityError(Exception):
     """The gate could not run or its inputs are invalid."""
 
@@ -98,7 +116,7 @@ def _ruff_findings(ruff):
 def _mypy_findings():
     command = [sys.executable, "-m", "mypy", "--config-file", str(MYPY_CONFIG),
                "--no-error-summary", "--show-error-codes", "--no-pretty"]
-    command.extend(MYPY_TARGETS)
+    command.extend(_dedupe_targets(MYPY_TARGETS))
     proc = _run(command, "mypy")
     if proc.returncode not in (0, 1):
         raise QualityError("mypy failed: %s" % (proc.stderr or proc.stdout).strip())

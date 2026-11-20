@@ -87,6 +87,28 @@ kindi --pack ~/.kindi/packs/bonsai-2b serve  --tandem cpu-first --tandem-cpu-lay
 The CPU library must be buildable on the host (`gcc` with OpenMP, or clang with libomp on Windows).
 The tandem path requires a CUDA/ROCm GPU; `KINDI_DEVICE=cpu` is rejected.
 
+## Portfolio dry run (2026-11-20)
+
+`kindi plan --portfolio` prices the three dense placements in one report before any weights are
+loaded:
+
+- full GPU (no split);
+- `cpu-first`, which keeps the output head on the GPU;
+- `gpu-first`, which keeps the embedding and early layers on the GPU and moves the output head to
+  the CPU.
+
+```sh
+kindi --pack ~/.kindi/packs/bonsai-2b --ctx 24576 plan --portfolio
+kindi --pack ~/.kindi/packs/bonsai-2b --ctx 24576 plan --portfolio --assume-vram-gib 8 --json plan.json
+```
+
+The rows use the same `pack_bytes` / `gpu_estimate` arithmetic as the planner and are labelled
+`yes`/`no` against the supplied or probed free VRAM. The recommendation is **capacity-first**: full
+GPU when it fits (on this host every measured dense split is slower than GPU-only), otherwise the
+first fitting split. It never reports a throughput prediction; `kindi autotune` runs the selected
+commands as real benches. `--portfolio` is dense-only and points at the ordinary MoE expert-tier
+report for a Lightning pack rather than pretending a layer split applies there.
+
 ## Prompt cache
 
 `TandemRunner` subclasses the normal `cache.Runner` over `TandemEngine.cache_view()`. The view

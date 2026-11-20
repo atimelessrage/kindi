@@ -47,9 +47,9 @@ class _Engine:
         ctx = 1024
 
 
-def _handler(headers, body):
+def _handler(headers, body, engine=_Engine):
     """A handler instance with the socket parts replaced: only the body/error path runs."""
-    h = object.__new__(dsv41_server.make_handler(_Engine))
+    h = object.__new__(dsv41_server.make_handler(engine))
     h.headers = headers
     h.rfile = io.BytesIO(body)
     h.close_connection = False
@@ -80,6 +80,34 @@ def test_a_body_error_closes_the_keepalive_connection():
         h, _sent = _handler(headers, body)
         h._tokenize()
         assert h.close_connection is True, (headers, body)
+
+
+def test_the_tokenize_endpoint_validates_messages_and_tools_before_count():
+    """The same shape checks as chat, before the tokenize route reaches E.count()."""
+    class NoCountEngine:
+        class model:
+            ctx = 1024
+
+        @staticmethod
+        def count(req):
+            raise AssertionError("count() ran before the tokenize request was validated")
+
+    base = {"messages": [{"role": "user", "content": "hello"}]}
+    cases = (
+        {"messages": "not a list"},
+        {"messages": []},
+        {"messages": [{"content": "no role"}]},
+        {"messages": [{"role": "user", "content": 3}]},
+        {"messages": [{"role": "assistant", "tool_calls": "not a list"}]},
+        dict(base, tools="not a list"),
+        dict(base, tools=[{"type": "function", "function": {}}]),
+        dict(base, tools=[{"type": "function", "function": {"name": "f", "parameters": "not an object"}}]),
+    )
+    for payload in cases:
+        body = json.dumps(payload).encode()
+        h, sent = _handler({"Content-Length": str(len(body))}, body, engine=NoCountEngine)
+        h._tokenize()
+        assert sent and sent[0][0] == 400, (payload, sent)
 
 
 def test_the_error_response_announces_the_close():

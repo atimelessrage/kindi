@@ -221,6 +221,16 @@ lspci -vv -s <bdf> | grep -Ei 'resizable|lnkcap|lnksta'  # ReBAR and link width/
 #    verify against Intel's current oneAPI system-requirements matrix, not the CUDA image.
 sycl-ls --verbose
 clinfo
+#    Optional OpenVINO baseline: read-only, no model load. Record absence explicitly.
+python - <<'PY'
+try:
+    import openvino as ov
+except ImportError:
+    print("OpenVINO: not installed (optional)")
+else:
+    print("OpenVINO:", ov.__version__)
+    print("Available devices:", ", ".join(ov.Core().available_devices))
+PY
 
 # 3. CPU baseline (same host, same packs): the 2B/4B/9B CPU verify rows.
 KINDI_DEVICE=cpu python -m kindi --pack <pack> verify
@@ -244,14 +254,31 @@ is a useful no-go, not a failure.
 for Intel. First record the host policy (`cat /sys/kernel/mm/transparent_hugepage/enabled`) and
 screen it on the M1 CPU baseline: three `KINDI_DEVICE=cpu ... bench` passes with THP left at the
 host default (`KINDI_THP=1`), and three with `PR_SET_THP_DISABLE` set by a launcher before Kindi
-starts. Then repeat both arms on the M7 CPU+Arc tandem, where host compaction is the actual concern.
+starts. The launcher must check the `prctl` return and the process flag; if either check fails, it
+stops before the bench. Then repeat both arms on the M7 CPU+Arc tandem, where host compaction is
+the actual concern. Keep `thp-host.state`, `thp-off.state` and every `--json` report.
 
 ```sh
+cat /sys/kernel/mm/transparent_hugepage/enabled > thp-host.state
+
 # Control: host THP policy (KINDI_THP=1 prevents Kindi's own disable on ROCm).
 KINDI_DEVICE=cpu KINDI_THP=1 python -m kindi --pack <pack> --ctx 8192 bench --json thp-on.json
 
-# Experiment: same process after PR_SET_THP_DISABLE (41), before Kindi imports.
-KINDI_DEVICE=cpu python -c 'import ctypes,runpy,sys;ctypes.CDLL(None).prctl(41,1,0,0,0);sys.argv=["kindi","--pack","<pack>","--ctx","8192","bench","--json","thp-off.json"];runpy.run_module("kindi.__main__",run_name="__main__")'
+# Experiment: set THP off, verify both calls, then run the bench in the same process.
+KINDI_DEVICE=cpu python - <<'PY' > thp-off.state 2>&1
+import ctypes, runpy, sys
+
+libc = ctypes.CDLL(None, use_errno=True)
+rc = libc.prctl(41, 1, 0, 0, 0)  # PR_SET_THP_DISABLE
+if rc != 0:
+    raise SystemExit("PR_SET_THP_DISABLE failed: rc=%d errno=%d" % (rc, ctypes.get_errno()))
+state = libc.prctl(42, 0, 0, 0, 0)  # PR_GET_THP_DISABLE
+print("THP state before bench: PR_SET_THP_DISABLE=0, PR_GET_THP_DISABLE=%d" % state, flush=True)
+if state != 1:
+    raise SystemExit("THP disable did not take effect: PR_GET_THP_DISABLE=%d" % state)
+sys.argv = ["kindi", "--pack", "<pack>", "--ctx", "8192", "bench", "--json", "thp-off.json"]
+runpy.run_module("kindi.__main__", run_name="__main__")
+PY
 ```
 
 Decide on the M7 tandem result: add the Intel THP call only if the three-pass 8K decode median

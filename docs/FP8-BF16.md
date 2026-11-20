@@ -53,8 +53,9 @@ re-run with the native kernels.
 
 Synthetic random FP8 weights and f32 activations on the RTX 4060 Ti 8 GB (Ada sm_89, driver 617.42),
 module compiled once, two warm-up calls then five timed calls. The time includes the per-token
-quantization of the activations. E4M3 and E5M2 are within about 2% of each other; the table is
-E4M3. Evidence: [the tracked kernel log](benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md).
+quantization of the activations. E5M2's matching TFLOPS endpoints are 15.4 and 35.2; the two
+formats are within about 2% of each other. The table is E4M3. Evidence:
+[the tracked kernel log](benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md).
 
 | weight matrix (rows x cols) | tokens | time | TFLOPS |
 |---|---:|---:|---:|

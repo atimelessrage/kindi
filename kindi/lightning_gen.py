@@ -9,6 +9,7 @@ import codecs
 import os
 import re
 import time
+from typing import Any
 
 import numpy as np
 
@@ -223,6 +224,9 @@ def pick_candidates(eng, greedy, temperature, top_p, top_k, rng, min_p=0.0, pena
 
 
 class LightningBackend(object):
+    # The engine is built in __init__ and released by close(); see the server's matching annotation.
+    eng: Any
+
     def __init__(self, man, cfg, log=print):
         from .gguf import GGUF
         from .lightning import Engine

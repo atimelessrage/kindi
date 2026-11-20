@@ -152,7 +152,7 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   manifest (full card, two-card TP split, tandem auto/gdn:N, Lightning decode cache, CPU engine),
   one real `kindi bench --sample-vram` child run each, ranked by decode tok/s with a reduced-context
   run ranked below a full one and a failed run recorded with its own error. Measured on this host
-  2026-11-17 (2B, ctx 8192): `gpu0` 97.4-97.8 tok/s decode / 111.7-113.0 read / 3,050 MiB peak,
+  2026-11-17 (2B, ctx 8192): `gpu0` 97.4-97.6 tok/s decode / 111.7-113.0 read / 3,050 MiB peak,
   `tandem-auto` refused as unnecessary, `tandem-gdn:8` blocked by a missing compiler — all three
   reported honestly in [AUTOTUNE.md](AUTOTUNE.md). Open: two-card and MoE candidates are unit-tested
   only (one card here, no Lightning pack); exactness stays with `kindi verify`.

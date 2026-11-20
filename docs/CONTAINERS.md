@@ -1,21 +1,25 @@
-# Ready-made container images
+# Release-target container images
 
-Kindi has ready-made images on GitHub's container registry. You do not need to clone the source or build an image.
-You start a container, and it gets the model, builds the pack once and starts the server.
+Kindi's `0.7.0-fork` container images are **release targets in GitHub's registry, not published
+images**. This bundle has not pushed them. The tags become live only after `kindi verify` (the
+token-for-token check against llama.cpp) passes on a real card for each backend and the release is
+published. Until then, build locally with [DOCKER.md](DOCKER.md).
 
-| Image | For |
+| Release-target image | For |
 |---|---|
-| `ghcr.io/ahtx/kindi:cuda` (also `latest`) | NVIDIA cards from Kepler on (CUDA 10.2 in the image), and the CPU engine |
-| `ghcr.io/ahtx/kindi:rocm6` | AMD RDNA3 graphics (ROCm 6.3 in the image; tested: Radeon 780M) |
-| `ghcr.io/ahtx/kindi:rocm7` | AMD RDNA 3.5 graphics (ROCm 7 in the image; tested: Radeon 840M, Radeon 8060S) |
+| `ghcr.io/atimelessrage/kindi:0.7.0-fork-cuda` (moving `cuda`/`latest` after publication) | NVIDIA cards from Kepler on (CUDA 10.2 in the image), and the CPU engine |
+| `ghcr.io/atimelessrage/kindi:0.7.0-fork-rocm6` (moving `rocm6` after publication) | AMD RDNA3 graphics (ROCm 6.3 in the image) |
+| `ghcr.io/atimelessrage/kindi:0.7.0-fork-rocm7` (moving `rocm7` after publication) | AMD RDNA 3.5 graphics (ROCm 7 in the image) |
 
-`cuda`, `rocm6`, `rocm7` and `latest` move to each new release. To keep one release, use the version tag, for
-example `ghcr.io/ahtx/kindi:0.6.0-cuda`. Each release tag points to an image that passed `kindi verify` (the
-token-for-token check against llama.cpp) on a real card before it was published. Kindi 0.6.0: `0.6.0-cuda` on NVIDIA GeForce RTX 3080; `0.6.0-rocm6` on AMD Radeon Graphics (with HSA_OVERRIDE_GFX_VERSION=11.0.2); `0.6.0-rocm7` on AMD Radeon 780M Graphics (RDNA3, run with HSA_OVERRIDE_GFX_VERSION=11.0.2).
+The moving `cuda`, `rocm6`, `rocm7` and `latest` tags move only when the versioned targets above
+are published. The last verified fork images were the 0.6.0 tags: `0.6.0-cuda` on NVIDIA GeForce
+RTX 3080; `0.6.0-rocm6` on AMD Radeon Graphics (with HSA_OVERRIDE_GFX_VERSION=11.0.2);
+`0.6.0-rocm7` on AMD Radeon 780M Graphics (RDNA3, run with HSA_OVERRIDE_GFX_VERSION=11.0.2).
 
-The images are the same as the ones that the [one-command installer](INSTALL.md) builds. The installer also selects
-the models and the settings for your cards, so it is still the easiest way on one computer. The images are for
-Compose, Podman, automated installs and servers. [DOCKER.md](DOCKER.md) tells how to build the images yourself.
+The release-target images are built from the same Dockerfiles the [one-command installer](INSTALL.md) uses.
+The installer also selects the models and the settings for your cards, so it is still the easiest way on one
+computer. Once published, the images are for Compose, Podman, automated installs and servers.
+[DOCKER.md](DOCKER.md) tells how to build the images yourself.
 
 ## Host requirements
 
@@ -27,6 +31,9 @@ Compose, Podman, automated installs and servers. [DOCKER.md](DOCKER.md) tells ho
 
 ## Quick start with Compose
 
+These commands use the moving tags, so they work only after the release is published. Until then,
+build the local image as described in [DOCKER.md](DOCKER.md).
+
 The compose files need Docker Compose v2 (the `docker compose` command) or podman-compose. The old Python
 `docker-compose` 1.x is no longer maintained, and it fails with current Docker versions; use the `docker run` commands
 below instead.
@@ -34,7 +41,7 @@ below instead.
 NVIDIA:
 
 ```sh
-curl -fsSLO https://raw.githubusercontent.com/ahtx/kindi/main/compose.yaml
+curl -fsSLO https://raw.githubusercontent.com/atimelessrage/kindi/main/compose.yaml
 KINDI_MODEL=bonsai-4b docker compose up -d
 docker compose logs -f
 ```
@@ -42,7 +49,7 @@ docker compose logs -f
 AMD (the numbers of your `video` and `render` groups are necessary, because the GPU device files belong to them):
 
 ```sh
-curl -fsSLO https://raw.githubusercontent.com/ahtx/kindi/main/compose.amd.yaml
+curl -fsSLO https://raw.githubusercontent.com/atimelessrage/kindi/main/compose.amd.yaml
 export VIDEO_GID=$(getent group video | cut -d: -f3) RENDER_GID=$(getent group render | cut -d: -f3)
 KINDI_MODEL=bonsai-4b KINDI_TAG=rocm6 docker compose -f compose.amd.yaml up -d
 ```
@@ -63,7 +70,7 @@ The settings go in the environment or in a `.env` file beside the compose file:
 | Setting | Default | |
 |---|---|---|
 | `KINDI_MODEL` | `bonsai-4b` | a model id, or a GGUF file in the container (see below) |
-| `KINDI_TAG` | `cuda` (`rocm6` in `compose.amd.yaml`) | the image tag, for example `0.6.0-cuda` |
+| `KINDI_TAG` | `cuda` (`rocm6` in `compose.amd.yaml`) | the image tag, for example `0.7.0-fork-cuda` |
 | `KINDI_PORT` | `8093` | the port on the host |
 | `KINDI_BIND` | `127.0.0.1` | `0.0.0.0` serves the network: then set `KINDI_API_KEY` |
 | `KINDI_API_KEY` | empty | clients must then send `Authorization: Bearer <key>` |
@@ -93,22 +100,22 @@ Without `KINDI_MODEL`, the image serves the pack at `KINDI_PACK` (default `/data
 releases. `KINDI_DOWNLOAD=0` stops all downloads (for computers without internet access): then the GGUF must be in
 `/data/models`.
 
-## Without Compose
+## Without Compose (after publication)
 
 ```sh
 docker run -d --name kindi --restart unless-stopped --gpus all \
-    -p 127.0.0.1:8093:8093 -v kindi-data:/data -e KINDI_MODEL=bonsai-9b ghcr.io/ahtx/kindi:cuda
+    -p 127.0.0.1:8093:8093 -v kindi-data:/data -e KINDI_MODEL=bonsai-9b ghcr.io/atimelessrage/kindi:cuda
 ```
 
 ```sh
 docker run -d --name kindi --restart unless-stopped --device /dev/kfd --device /dev/dri \
     --group-add $(getent group video | cut -d: -f3) --group-add $(getent group render | cut -d: -f3) \
     --security-opt seccomp=unconfined -p 127.0.0.1:8093:8093 -v kindi-data:/data \
-    -e KINDI_MODEL=bonsai-4b ghcr.io/ahtx/kindi:rocm6
+    -e KINDI_MODEL=bonsai-4b ghcr.io/atimelessrage/kindi:rocm6
 ```
 
 The other commands work in the same image: `docker run --rm --gpus all -v kindi-data:/data -e KINDI_MODEL=bonsai-9b
-ghcr.io/ahtx/kindi:cuda verify` (or `bench`, `info`, `models`).
+ghcr.io/atimelessrage/kindi:cuda verify` (or `bench`, `info`, `models`).
 
 ## Users and permissions
 

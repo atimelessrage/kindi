@@ -20,9 +20,11 @@ Machine-readable artifact: [grammar-mask.json](grammar-mask.json).
   subtree only when the same loop proof covers it; otherwise the old per-token
   advance is still the fallback.
 
-The table is grammar-owned and state-cached. The language is unchanged: the
-CPU set-equality tests compare every vocabulary entry against
-`_vocab_allowed_scan`, the pre-change implementation.
+The vocabulary index is process-shared by token-text sequence object and bounded
+to two vocabularies; each grammar owns its own step function, safe-set proof and
+per-state mask cache. The language is unchanged: the CPU set-equality tests
+compare every vocabulary entry against `_vocab_allowed_scan`, the pre-change
+implementation.
 
 ## Gate rows
 
@@ -47,10 +49,31 @@ required 10x. The unrolled depth-2 and depth-3 diagnostics were 324 and
 unrolled grammar measured by the baseline. The tables remain a diagnostic for
 recursive GBNF and are not a serving recommendation.
 
-The same harness reports the first start-state mask separately: 7,023 ms for
-the schema and 856 ms for GBNF depth 1. That is the one-time table/trie build;
-the gate's per-token rows above exclude it. It is recorded rather than hidden,
-but is not claimed as a decode latency.
+The first start-state mask includes the one-time table/trie build; the gate's
+per-token rows above exclude it. It is recorded rather than hidden, but is not
+claimed as a decode latency.
+
+## Repeated structured requests
+
+`--repeat` builds the token-text list once (as a server does), then runs three
+separate grammar instances: the first, the same schema again, and a different
+schema. `first-mask` includes grammar setup and the first mask. The timing is a
+median of three fresh-process runs.
+
+```sh
+python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b --repeat
+```
+
+| request | grammar compile | first mask |
+|---|---:|---:|
+| first (same schema) | 0.0 ms | **3,386 ms** |
+| repeat (same schema) | 0.0 ms | **2.4 ms** |
+| new grammar | 0.0 ms | **2.2 ms** |
+
+The first request pays the vocabulary-index build; the next two reuse it. This
+is the setup/first-mask part of a structured request, not prompt reading or
+decode time. The cache is keyed by the token-text sequence object and holds at
+most two vocabularies, so a server with one pack retains one index.
 
 ## Semantics
 
@@ -60,7 +83,10 @@ but is not claimed as a decode latency.
 - The same comparison on the real 2B vocabulary matched on all 18 short
   schema states and all 19 short GBNF depth-1 states.
 - A 17-state sample of each 200-token walk matched with no mismatches.
-- Focused grammar/token tests: 54 passed.
+- Focused grammar/token tests: 57 passed, including the shared-index build-once
+  and GBNF/JSON two-grammar language checks.
+- After the index was shared, a 7-state sample across two schemas on the real 2B
+  vocabulary matched `_vocab_allowed_scan` on every vocabulary entry.
 
 ## Not covered
 
@@ -69,5 +95,6 @@ but is not claimed as a decode latency.
 - No unconstrained decode A/B was run, so the 1% regression condition in A5
   is not claimed.
 - The first start-state build is several seconds for `json_schema`; only the
-  per-token gate is claimed.
+  first request pays it. The repeat rows are setup/first-mask measurements, not
+  full server request latency.
 - The whitespace stall (A6) is unchanged and was not measured here.

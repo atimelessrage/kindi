@@ -1,6 +1,8 @@
 """The tracked stock-v0.6.1 greedy goldens are well formed and comparable."""
 import json
 import subprocess
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -41,7 +43,17 @@ def test_prompt_source_hash_is_the_tracked_source(prompts):
     assert prompts["source_sha256"] == parity._sha256_text(source)
 
 
+def test_prompt_loader_rejects_a_changed_source_hash(tmp_path):
+    prompts = _load(parity.DEFAULT_PROMPTS)
+    prompts["source_sha256"] = "0" * 64
+    path = tmp_path / "prompts.json"
+    path.write_text(json.dumps(prompts), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="source hash mismatch"):
+        parity._load_prompts(path)
+
+
 def test_stock_tag_is_the_pinned_commit():
+    assert parity._check_stock_tag() is None
     got = subprocess.check_output(["git", "-C", str(parity.ROOT), "rev-parse", "v0.6.1^{commit}"],
                                   text=True).strip()
     assert got == parity.STOCK_COMMIT
@@ -82,6 +94,98 @@ def test_comparison_can_scope_to_one_model(goldens):
     assert not mismatches
     assert len(rows) == len(parity.POSITIONS)
     assert {row[0] for row in rows} == {"2b"}
+
+
+def test_comparison_can_scope_to_positions(goldens):
+    positions = (100, 2000)
+    result = {"models": {
+        model: {"positions": {str(pos): goldens["models"][model]["positions"][str(pos)]
+                               for pos in positions}}
+        for model in parity.MODELS
+    }}
+    rows, mismatches = parity._compare(goldens, result, "fork", positions=positions)
+    assert not mismatches
+    assert len(rows) == len(parity.MODELS) * len(positions)
+    assert {row[1] for row in rows} == set(positions)
+
+
+def _report_args(**overrides):
+    values = {
+        "json": None,
+        "models": parity.MODELS,
+        "positions": parity.POSITIONS,
+        "generated_tokens": parity.GENERATED_TOKENS,
+        "ctx": parity.CONTEXT,
+        "prompts": str(parity.DEFAULT_PROMPTS),
+        "goldens": str(parity.DEFAULT_GOLDENS),
+        "pack_root": str(parity.DEFAULT_PACK_ROOT),
+        "pack_2b": None,
+        "pack_9b": None,
+    }
+    values.update(overrides)
+    return SimpleNamespace(**values)
+
+
+def test_canonical_check_refreshes_the_tracked_report_by_default():
+    assert parity._report_path(_report_args()) == parity.DEFAULT_REPORT
+
+
+def test_narrowed_or_custom_check_needs_json_to_write_a_report():
+    assert parity._report_path(_report_args(models=("2b",))) is None
+    assert parity._report_path(_report_args(ctx=4096)) is None
+    assert parity._report_path(_report_args(prompts="other-prompts.json")) is None
+    assert parity._report_path(_report_args(pack_2b="/tmp/pack")) is None
+    assert parity._report_path(_report_args(models=("2b",), json="partial.json")) == Path(
+        "partial.json")
+
+
+def test_check_rejects_goldens_from_another_stock_tag(goldens, prompts):
+    bad = json.loads(json.dumps(goldens))
+    bad["stock"]["commit"] = "0" * 40
+    with pytest.raises(RuntimeError, match="pinned"):
+        parity._check_goldens(bad, _report_args(), prompts)
+
+
+def test_check_rejects_a_missing_golden_position(goldens, prompts):
+    bad = json.loads(json.dumps(goldens))
+    del bad["models"]["2b"]["positions"]["2000"]
+    with pytest.raises(RuntimeError, match="no 2b row at position 2000"):
+        parity._check_goldens(bad, _report_args(), prompts)
+
+
+def test_check_rejects_a_short_golden(goldens, prompts):
+    bad = json.loads(json.dumps(goldens))
+    bad["models"]["2b"]["positions"]["100"]["ids"].pop()
+    with pytest.raises(RuntimeError, match="do not contain 32 tokens"):
+        parity._check_goldens(bad, _report_args(), prompts)
+
+
+def test_check_writes_the_default_report(monkeypatch, tmp_path):
+    report = tmp_path / "parity-report.json"
+    rows = [("2b", 100, "stock", "exact", None)]
+    monkeypatch.setattr(parity, "DEFAULT_REPORT", report)
+    monkeypatch.setattr(parity, "_stock_tree", lambda: tmp_path)
+    monkeypatch.setattr(parity, "_run_check", lambda *args: (rows, []))
+    assert parity.main(["--check"]) == 0
+    written = _load(report)
+    assert written["ok"] is True
+    assert written["rows_exact"] == 1
+    assert written["rows"][0]["side"] == "stock"
+
+
+def test_failed_check_writes_a_failure_report(monkeypatch, tmp_path):
+    report = tmp_path / "parity-report.json"
+
+    def fail():
+        raise RuntimeError("stock tag is not pinned")
+
+    monkeypatch.setattr(parity, "DEFAULT_REPORT", report)
+    monkeypatch.setattr(parity, "_stock_tree", fail)
+    assert parity.main(["--check"]) == 2
+    written = _load(report)
+    assert written["ok"] is False
+    assert written["rows_exact"] == 0
+    assert written["error"] == "check failed; see stderr"
 
 
 def test_comparison_names_the_first_difference(goldens):

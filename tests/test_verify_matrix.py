@@ -281,12 +281,14 @@ def test_save_baseline_refuses_to_drop_a_logs_row(tmp_path):
     kept = {**_row(), "logs": kept_logs}
     dropped = {**_row(), "mode": "tc-both", "logs": dropped_logs}
     target = tmp_path / "baseline.json"
-    target.write_text(json.dumps({"results": [kept, dropped]}), encoding="utf-8")
+    before = json.dumps({"results": [kept, dropped]})
+    target.write_text(before, encoding="utf-8")
     source = tmp_path / "results.json"
     source.write_text(json.dumps({"results": [{**_row(), "log": kept_logs[1]}]}), encoding="utf-8")
 
     with pytest.raises(SystemExit, match="has logs provenance.*no row in this run"):
         mod.save_baseline(source, target)
+    assert target.read_text(encoding="utf-8") == before
 
 
 def test_save_baseline_refuses_to_overwrite_an_unreadable_target(tmp_path):
@@ -867,6 +869,45 @@ def test_save_baseline_refuses_carried_logs_from_the_comparison_baseline(tmp_pat
 
     with pytest.raises(SystemExit, match="not in its carried logs list"):
         mod.save_baseline(source, target, previous)
+    assert not target.exists()
+
+
+def test_save_baseline_prefers_the_existing_target_over_the_comparison_baseline(tmp_path):
+    mod = load()
+    target_logs = ["logs/median-r1/27b-tc.log", "logs/median-r2/27b-tc.log",
+                   "logs/median-r3/27b-tc.log"]
+    previous_logs = ["logs/old-r1/27b-tc.log", target_logs[1],
+                     "logs/old-r3/27b-tc.log"]
+    target = tmp_path / "baseline.json"
+    target.write_text(json.dumps({"results": [{**_row(), "logs": target_logs}]}), encoding="utf-8")
+    source = tmp_path / "results.json"
+    source.write_text(json.dumps({"results": [{**_row(), "log": target_logs[1]}]}), encoding="utf-8")
+
+    mod.save_baseline(source, target, {"results": [{**_row(), "logs": previous_logs}]})
+
+    saved = json.loads(target.read_text(encoding="utf-8"))["results"][0]
+    assert saved["logs"] == target_logs
+
+
+def test_save_baseline_refuses_an_unreadable_source(tmp_path):
+    mod = load()
+    source = tmp_path / "results.json"
+    source.write_text("{not json", encoding="utf-8")
+    target = tmp_path / "baseline.json"
+
+    with pytest.raises(SystemExit, match="refusing to save baseline"):
+        mod.save_baseline(source, target)
+    assert not target.exists()
+
+
+def test_save_baseline_refuses_a_source_with_duplicate_cells(tmp_path):
+    mod = load()
+    source = tmp_path / "results.json"
+    source.write_text(json.dumps({"results": [_row(), _row()]}), encoding="utf-8")
+    target = tmp_path / "baseline.json"
+
+    with pytest.raises(SystemExit, match="duplicate cell 27b/tc"):
+        mod.save_baseline(source, target)
     assert not target.exists()
 
 

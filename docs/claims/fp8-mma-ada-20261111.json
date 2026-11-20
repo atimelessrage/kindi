@@ -1,10 +1,10 @@
 {
   "gate": "fp8-mma-ada-20261111",
-  "title": "Native FP8 MMA microbench on Ada: latency and TFLOPS",
+  "title": "Native FP8 MMA microbench on Ada: latency, TFLOPS and E5M2 endpoints",
   "measured": "2026-11-11",
   "commit": "60a039b",
   "command": "python bench-logs/bench_fp8_mma.py on the RTX 4060 Ti (sm_89), two warm-ups and five timed calls per row",
-  "notes": "The E4M3 table quoted by FP8-BF16 is a synthetic kernel measurement, not a real FP8 model and not a Blackwell result. The tracked RESULTS.md is a sanitized copy of the local log.",
+  "notes": "The E4M3 table quoted by FP8-BF16 is a synthetic kernel measurement, not a real FP8 model and not a Blackwell result. The tracked RESULTS.md also records the E5M2 endpoints and the within-2% sentence; the tracked log is the sanitized copy of the local run.",
   "evidence": [
     "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md"
   ],
@@ -12,58 +12,134 @@
     {
       "id": "e4m3-128-ms",
       "display": "0.11",
-      "quoted_in": ["docs/FP8-BF16.md"],
-      "check": {"kind": "text", "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
-                "needle": "E4M3 2560 x 2560 | 128 | 0.11 | 15.1"}
+      "quoted_in": [
+        "docs/FP8-BF16.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
+        "needle": "E4M3 2560 x 2560 | 128 | 0.11 | 15.1"
+      }
     },
     {
       "id": "e4m3-512-ms",
       "display": "0.24",
-      "quoted_in": ["docs/FP8-BF16.md"],
-      "check": {"kind": "text", "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
-                "needle": "E4M3 2560 x 2560 | 512 | 0.24 | 28.2"}
+      "quoted_in": [
+        "docs/FP8-BF16.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
+        "needle": "E4M3 2560 x 2560 | 512 | 0.24 | 28.2"
+      }
     },
     {
       "id": "e4m3-wide-128-ms",
       "display": "0.23",
-      "quoted_in": ["docs/FP8-BF16.md"],
-      "check": {"kind": "text", "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
-                "needle": "E4M3 10240 x 2560 | 128 | 0.23 | 29.0"}
+      "quoted_in": [
+        "docs/FP8-BF16.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
+        "needle": "E4M3 10240 x 2560 | 128 | 0.23 | 29.0"
+      }
     },
     {
       "id": "e4m3-wide-512-ms",
       "display": "0.76",
-      "quoted_in": ["docs/FP8-BF16.md"],
-      "check": {"kind": "text", "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
-                "needle": "E4M3 10240 x 2560 | 512 | 0.76 | 35.5"}
+      "quoted_in": [
+        "docs/FP8-BF16.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
+        "needle": "E4M3 10240 x 2560 | 512 | 0.76 | 35.5"
+      }
     },
     {
       "id": "e4m3-128-tflops",
       "display": "15.1",
-      "quoted_in": ["docs/FP8-BF16.md"],
-      "check": {"kind": "text", "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
-                "needle": "E4M3 2560 x 2560 | 128 | 0.11 | 15.1"}
+      "quoted_in": [
+        "docs/FP8-BF16.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
+        "needle": "E4M3 2560 x 2560 | 128 | 0.11 | 15.1"
+      }
     },
     {
       "id": "e4m3-512-tflops",
       "display": "28.2",
-      "quoted_in": ["docs/FP8-BF16.md"],
-      "check": {"kind": "text", "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
-                "needle": "E4M3 2560 x 2560 | 512 | 0.24 | 28.2"}
+      "quoted_in": [
+        "docs/FP8-BF16.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
+        "needle": "E4M3 2560 x 2560 | 512 | 0.24 | 28.2"
+      }
     },
     {
       "id": "e4m3-wide-128-tflops",
       "display": "29.0",
-      "quoted_in": ["docs/FP8-BF16.md"],
-      "check": {"kind": "text", "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
-                "needle": "E4M3 10240 x 2560 | 128 | 0.23 | 29.0"}
+      "quoted_in": [
+        "docs/FP8-BF16.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
+        "needle": "E4M3 10240 x 2560 | 128 | 0.23 | 29.0"
+      }
     },
     {
       "id": "e4m3-wide-512-tflops",
       "display": "35.5",
-      "quoted_in": ["docs/FP8-BF16.md"],
-      "check": {"kind": "text", "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
-                "needle": "E4M3 10240 x 2560 | 512 | 0.76 | 35.5"}
+      "quoted_in": [
+        "docs/FP8-BF16.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
+        "needle": "E4M3 10240 x 2560 | 512 | 0.76 | 35.5"
+      }
+    },
+    {
+      "id": "e5m2-128-tflops",
+      "display": "15.4",
+      "quoted_in": [
+        "docs/FP8-BF16.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
+        "needle": "E5M2 2560 x 2560 | 128 | 0.11 | 15.4"
+      }
+    },
+    {
+      "id": "e5m2-wide-512-tflops",
+      "display": "35.2",
+      "quoted_in": [
+        "docs/FP8-BF16.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
+        "needle": "E5M2 10240 x 2560 | 512 | 0.76 | 35.2"
+      }
+    },
+    {
+      "id": "e4m3-e5m2-gap",
+      "display": "2%",
+      "quoted_in": [
+        "docs/FP8-BF16.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-11-i7-8086k-rtx4060ti-fp8-mma/RESULTS.md",
+        "needle": "E4M3 and E5M2 are within about 2% of each other"
+      }
     }
   ]
 }

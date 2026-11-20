@@ -103,26 +103,20 @@ commands and interpret the output. Each row states the gate it unlocks.
   `python tools/backup_bundle.py --out <second-medium>/kindi-backups`, then
   copy the bundle and its `.sha256` off this machine. See
   [BACKUP.md](BACKUP.md).
-- **Refresh the published installer** (`fd54148` → current HEAD, see
-  `docs/RELEASE-CHECKLIST.md`): publish the source archive, recompute
-  `SOURCE_COMMIT`/`SOURCE_SHA256`/`KINDI_VERSION`, update `docs/INSTALL.md`,
-  the checklist and `tests/test_installer_source.py` in the same commit.
-  Publishing/tagging needs the owner's explicit authorization (the checklist
-  says so); until then the installer payload is stale but correct.
-- **Republish the installer release asset** (2026-11-16 audit, F9): the one-liners
-  point at tag `v0.5.0-installer`, whose asset predates the fork-merged 0.6.0
-  `install.sh`, while `docs/INSTALL.md` publishes that script's sha256
-  (`070508a0…`) — the two cannot both be right. Either republish the tag with the
-  current script and its hash, or retire the tag from the docs. `docs/INSTALL.md`
-  now says which artifact the value belongs to; only the release owner can make the
-  URL match.
-- **Pair the Windows and Linux installer versions** (2026-11-17 real run, see
-  [WINDOWS.md](WINDOWS.md#verified-installer-run-2026-11-17)): the published
-  `install.sh` reports **0.6.1** while `install.ps1` (`$KindiWinVersion`) and this
-  tree say **0.6.0**, so Settings > Apps shows 0.6.0 for a distribution that holds
-  0.6.1. Republishing one of the two (or bumping `$KindiWinVersion` with the next
-  published script) is a release-owner decision; the agent cannot verify the hosted
-  pair from here.
+- **Publish the 0.7.0-fork release bundle** (see `docs/RELEASE-CHECKLIST.md`): the tree
+  now names **0.7.0-fork** in the package, both installers and the Docker tags; the local
+  source archive and its hash exist in `dist/`. The source URL and checksum in
+  `install.sh` point at the not-yet-created `v0.7.0-fork` release asset, so publication
+  and the hosted checksum pair are still owner-only steps. Publishing/tagging needs the
+  owner's explicit authorization (the checklist says so).
+- **Retire the stale `v0.5.0-installer` one-liners** (2026-11-16 audit, F9): the docs
+  and both installers now point at `v0.7.0-fork`; the old tag's asset predates this tree.
+  Do not publish or link it as the current installer.
+- **Publish the Windows and Linux installer pair together** (2026-11-17 real run, see
+  [WINDOWS.md](WINDOWS.md#verified-installer-run-2026-11-17)): `install.ps1`
+  (`$KindiWinVersion`) and `install.sh` now both say **0.7.0-fork**, so Settings > Apps
+  and the installed tree will agree. The hosted pair is still unverified until the
+  release owner uploads these exact assets.
 - **Report the corrupt ahtx upload (§1) to the repo author** (or file/feedback
   on the HF repo) so a fixed file exists upstream; the agent cannot file
   it for you.

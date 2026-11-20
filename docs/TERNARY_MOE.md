@@ -1,7 +1,7 @@
 # Ternary-MoE census
 
-Status: **canonical, machine-checked census** (rows checked 2026-11-18; arithmetic audited
-2026-11-19). This page is the one source for the Qwen3.6-35B-A3B ternary builds, the other published
+Status: **canonical, machine-checked census** (builds and external card claims checked 2026-11-19;
+arithmetic audited 2026-11-19). This page is the one source for the Qwen3.6-35B-A3B ternary builds, the other published
 ternary MoE builds, their expert-slot count and the leads that are not counted. The roadmap keeps
 only the Qwen3.6 backend gates and links here.
 
@@ -30,7 +30,8 @@ same base model.
 ## Qwen3.6-35B-A3B builds
 
 The two Qwen3.6-35B-A3B ternary MoE builds reviewed so far are quantizations of that model; neither
-card's base-architecture label is asserted here for both. The official model uses `qwen35moe`, and
+card's base-architecture label is asserted here for both. The official Hugging Face config is
+`model_type: qwen3_5_moe`; llama.cpp and GGUF call the same text architecture `qwen35moe`, and
 "llama.cpp-compatible candidate" below means a file with a standard GGUF
 `general.architecture = qwen35moe` tensor layout that upstream llama.cpp can load and that can be
 pinned for the Q0 reference gate; neither qualifies.
@@ -40,11 +41,33 @@ pinned for the Q0 reference gate; neither qualifies.
 | [russellwmy/qwen3.6-35b-a3b-ternary](https://huggingface.co/russellwmy/qwen3.6-35b-a3b-ternary) | 9.1 GB of 2-bit ternary expert codes plus 2.3 GB of the rest; a bundle, not a runnable checkpoint | ironbark pack for Apple Silicon; its card says it is not loadable by `transformers`, `mlx-lm` or `mlx-vlm` | custom safetensors bundle and ironbark trit-pack format, not GGUF; no `qwen35moe` tensor inventory; no byte-level dequant/export test here; no upstream llama.cpp loader or NVIDIA kernel path; no pinned llama.cpp reference or token-exact `kindi verify` |
 | [manjunathshiva/Qwen3.6-35B-A3B-tq3a-tqTe-down4-g64](https://huggingface.co/manjunathshiva/Qwen3.6-35B-A3B-tq3a-tqTe-down4-g64) | 12.6 GB: 3-bit attention, ternary gate/up experts and 4-bit down experts; its separate pure-ternary sibling is 9.4 GB | TurboQuant-MLX safetensors for Apple Silicon | not GGUF; the mixed 3-bit/ternary/4-bit expert layout needs a converter with bit-level dequant tests (none in this repository); no upstream llama.cpp loader or NVIDIA path; the 0/4 vs 3/3 quality split is one agentic task, not a token-exact reference |
 
+### External card claims (not Kindi measurements)
+
+The official [Qwen3.6-35B-A3B card](https://huggingface.co/Qwen/Qwen3.6-35B-A3B) reports
+**SWE-bench Verified 73.4** and **LiveCodeBench v6 80.4** for the base model. Those are the
+publisher's benchmark claims, not a Kindi run and not a claim about either ternary build.
+
+The [russellwmy ternary card](https://huggingface.co/russellwmy/qwen3.6-35b-a3b-ternary) compares its
+ternary experts with the 4-bit MLX checkpoint it was quantized from (reasoning off, all experts
+resident, Apple Silicon): HumanEval pass@1 is **140/164 Python** and **108/156 Rust** for ternary
+versus **153/164** and **142/156** for the 4-bit source; reply perplexity is **1.227 versus 1.102**
+(higher is worse). This is the card author's harness on Apple Silicon, not a Kindi verification,
+and it does not transfer to an NVIDIA or standard-GGUF path.
+
+The Apple-only limitation is unchanged at the 2026-11-19 recheck: the russellwmy build still
+requires an Apple Silicon Mac and an `ironbark` build and states that the bundle is not loadable by
+`transformers`, `mlx-lm` or `mlx-vlm`; the manjunathshiva build still targets TurboQuant-MLX on
+Apple Silicon. Neither has an NVIDIA kernel path or a standard `qwen35moe` GGUF. Neither is
+recognized by `kindi/moe_compat.py` either: that path recognizes only the standard `qwen35moe`
+architecture, so these custom bundles cannot reach the backend refusal or become Q0 evidence.
+
 Both Qwen3.6 builds stay out of the Q0 candidate set until one of two things exists: a byte-pinned
 standard GGUF with the `qwen35moe` tensor inventory, or a converter whose dequant is tested
 bit-for-bit. Either route then needs the same token-exact `kindi verify` against the pinned
 llama.cpp reference and the existing KLD/PPL gate. The 16 GB route in the roadmap uses the ordinary
-Unsloth `UD-IQ2`/`UD-IQ3` GGUFs; neither Apple-only bundle changes that.
+Unsloth `UD-IQ2`/`UD-IQ3` GGUFs; those are stock-llama.cpp artifacts, not Kindi-convertible today
+(the existing converter has no `qwen35moe` path and does not read IQ2_M). Neither Apple-only bundle
+changes that.
 
 ## Other published builds
 

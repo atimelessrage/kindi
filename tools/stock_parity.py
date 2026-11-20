@@ -7,11 +7,11 @@ document.  The official tree generates 32 greedy tokens from each prefix on the
 2B and 9B; those ids are the tracked goldens.  This command runs the same
 prefixes through stock ``v0.6.1`` and this worktree and compares token ids.
 
-A stock tree is recreated from the local git tag when the cached
-``bench-logs/stock-v0.6.1`` tree is absent.  Stock needs the same native-Windows
-loader shim used by the earlier stock page; the worker applies it before
-importing stock Kindi.  Both sides use the plain engine, exact head and no
-speculation/tensor-core/tandem settings.
+A stock tree is extracted from the local git tag after the tag is verified as
+the pinned commit.  Stock needs the same native-Windows loader shim used by the
+earlier stock page; the worker applies it before importing stock Kindi.  Both
+sides use the plain engine, exact head and no speculation/tensor-core/tandem
+settings.
 
 Usage:
     python tools/stock_parity.py --check
@@ -19,12 +19,14 @@ Usage:
     python tools/stock_parity.py --write-prompts
 """
 import argparse
+import atexit
 import ctypes
 import hashlib
 import inspect
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -38,7 +40,7 @@ TOOL = Path(__file__).resolve()
 BENCH_DIR = ROOT / "docs" / "benchmarks" / "2026-11-20-i7-8086k-rtx4060ti-stock-parity"
 DEFAULT_PROMPTS = BENCH_DIR / "prompts.json"
 DEFAULT_GOLDENS = BENCH_DIR / "goldens.json"
-DEFAULT_STOCK = ROOT / "bench-logs" / "stock-v0.6.1"
+DEFAULT_REPORT = BENCH_DIR / "parity-report.json"
 DEFAULT_PACK_ROOT = Path.home() / ".kindi" / "packs"
 STOCK_TAG = "v0.6.1"
 STOCK_COMMIT = "7fececbff13adc88bf21b8f07dea4e1c91996a9d"
@@ -77,14 +79,20 @@ def _pack_for(args, model):
     return (Path(args.pack_root).expanduser() / ("bonsai-" + model)).resolve()
 
 
-def _stock_tree(args):
-    """The stock tree, recreated from the local tag when the cache is absent."""
-    path = Path(args.stock_root).expanduser().resolve()
-    if (path / "kindi" / "engine.py").is_file():
-        return path
-    if path.exists() and any(path.iterdir()):
-        raise RuntimeError("stock tree %s exists but has no kindi/engine.py" % path)
-    path.mkdir(parents=True, exist_ok=True)
+def _check_stock_tag():
+    """Refuse a local tag that is not the pinned stock commit."""
+    try:
+        got = subprocess.check_output(
+            ["git", "-C", str(ROOT), "rev-parse", STOCK_TAG + "^{commit}"],
+            stderr=subprocess.STDOUT, text=True, timeout=30).strip()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise RuntimeError("could not resolve local tag %s: %s" % (STOCK_TAG, exc)) from exc
+    if got != STOCK_COMMIT:
+        raise RuntimeError("local tag %s is %s, not pinned %s" % (STOCK_TAG, got, STOCK_COMMIT))
+
+
+def _extract_stock(path):
+    """Extract the pinned tag into a fresh directory."""
     try:
         archive = subprocess.check_output(
             ["git", "-C", str(ROOT), "archive", "--format=tar", STOCK_TAG],
@@ -101,6 +109,18 @@ def _stock_tree(args):
         raise RuntimeError("could not extract %s into %s: %s" % (STOCK_TAG, path, exc)) from exc
     if not (path / "kindi" / "engine.py").is_file():
         raise RuntimeError("extracted %s has no kindi/engine.py" % STOCK_TAG)
+
+
+def _stock_tree():
+    """A fresh stock tree extracted from the verified tag."""
+    _check_stock_tag()
+    path = Path(tempfile.mkdtemp(prefix="kindi-stock-%s-" % STOCK_TAG))
+    atexit.register(shutil.rmtree, str(path), ignore_errors=True)
+    try:
+        _extract_stock(path)
+    except Exception:
+        shutil.rmtree(path, ignore_errors=True)
+        raise
     return path
 
 
@@ -292,6 +312,12 @@ def _load_prompts(path):
         doc = json.load(handle)
     if doc.get("format") != 1:
         raise RuntimeError("%s: unsupported prompt format" % path)
+    if (doc.get("source_template") != SOURCE_TEMPLATE
+            or doc.get("source_repeats") != SOURCE_REPEATS):
+        raise RuntimeError("%s: prompt source is not the fixed template" % path)
+    source = SOURCE_TEMPLATE * SOURCE_REPEATS
+    if doc.get("source_sha256") != _sha256_text(source):
+        raise RuntimeError("%s: prompt source hash mismatch" % path)
     prompts = doc.get("prompts") or []
     by_pos = {int(p["position"]): p for p in prompts}
     for p in POSITIONS:
@@ -310,60 +336,76 @@ def _prompts_sha256(doc):
                                     for p in doc["prompts"]]))
 
 
+def _check_prompt_config(args, prompts):
+    if prompts.get("context") != args.ctx:
+        raise RuntimeError("prompts use context %s, not %s" % (prompts.get("context"), args.ctx))
+    if prompts.get("generated_tokens") != args.generated_tokens:
+        raise RuntimeError("prompts use %s generated tokens, not %s"
+                           % (prompts.get("generated_tokens"), args.generated_tokens))
+    models = prompts.get("models") or []
+    if not set(args.models).issubset(models):
+        raise RuntimeError("prompts do not cover model(s): %s"
+                           % ", ".join(sorted(set(args.models) - set(models))))
+
+
 def _manifest_sha256(pack):
     with open(Path(pack) / "kindi_pack.json", "rb") as handle:
         return hashlib.sha256(handle.read()).hexdigest()
 
 
 def _capture(args, stock, prompts):
+    _check_stock_tag()
+    _check_prompt_config(args, prompts)
     models = {}
-    for model in args.models:
-        pack = _pack_for(args, model)
-        if not (pack / "kindi_pack.json").is_file():
-            raise RuntimeError("missing pack for %s: %s" % (model, pack))
-        result = _run_worker(stock, args, BENCH_DIR / (".capture-%s.json" % model),
-                             model=model, is_fork=False)
-        outputs = {}
-        for pos in args.positions:
-            row = result["positions"][str(pos)]
-            outputs[str(pos)] = {"ids": row["ids"], "text": row["text"]}
-        models[model] = {
-            "pack": "bonsai-" + model,
-            "manifest_sha256": _manifest_sha256(pack),
-            "engine": result.get("engine"),
-            "positions": outputs,
+    try:
+        for model in args.models:
+            pack = _pack_for(args, model)
+            if not (pack / "kindi_pack.json").is_file():
+                raise RuntimeError("missing pack for %s: %s" % (model, pack))
+            result = _run_worker(stock, args, BENCH_DIR / (".capture-%s.json" % model),
+                                 model=model, is_fork=False)
+            outputs = {}
+            for pos in args.positions:
+                row = result["positions"][str(pos)]
+                outputs[str(pos)] = {"ids": row["ids"], "text": row["text"]}
+            models[model] = {
+                "pack": "bonsai-" + model,
+                "manifest_sha256": _manifest_sha256(pack),
+                "engine": result.get("engine"),
+                "positions": outputs,
+            }
+        goldens = {
+            "format": 1,
+            "captured": time.strftime("%Y-%m-%d"),
+            "stock": {
+                "tag": STOCK_TAG,
+                "commit": STOCK_COMMIT,
+                "loader": "native-Windows libcuda.so.1 -> nvcuda.dll shim",
+                "context": args.ctx,
+                "generated_tokens": args.generated_tokens,
+                "prompts_sha256": _prompts_sha256(prompts),
+                "source_sha256": prompts["source_sha256"],
+            },
+            "models": models,
         }
-    goldens = {
-        "format": 1,
-        "captured": time.strftime("%Y-%m-%d"),
-        "stock": {
-            "tag": STOCK_TAG,
-            "commit": STOCK_COMMIT,
-            "loader": "native-Windows libcuda.so.1 -> nvcuda.dll shim",
-            "context": args.ctx,
-            "generated_tokens": args.generated_tokens,
-            "prompts_sha256": _prompts_sha256(prompts),
-            "source_sha256": prompts["source_sha256"],
-        },
-        "models": models,
-    }
-    _write_json(args.goldens, goldens)
-    for model in args.models:
-        try:
-            (BENCH_DIR / (".capture-%s.json" % model)).unlink()
-        except OSError:
-            pass
+        _write_json(args.goldens, goldens)
+    finally:
+        for model in args.models:
+            try:
+                (BENCH_DIR / (".capture-%s.json" % model)).unlink()
+            except OSError:
+                pass
     return goldens
 
 
-def _compare(goldens, result, side, models=MODELS):
+def _compare(goldens, result, side, models=MODELS, positions=POSITIONS):
     rows, mismatches = [], []
     for model in models:
         if model not in goldens.get("models", {}):
             continue
         want_model = goldens["models"][model]["positions"]
         got_model = result.get("models", {}).get(model, {}).get("positions", {})
-        for pos in POSITIONS:
+        for pos in positions:
             want = want_model.get(str(pos), {}).get("ids")
             got = got_model.get(str(pos), {}).get("ids")
             if want is None:
@@ -382,39 +424,104 @@ def _compare(goldens, result, side, models=MODELS):
     return rows, mismatches
 
 
-def _run_check(args, stock, prompts, goldens):
-    expected_prompts = goldens.get("stock", {}).get("prompts_sha256")
-    if expected_prompts != _prompts_sha256(prompts):
-        raise RuntimeError("tracked prompts do not match the goldens' prompt hash")
-    if goldens.get("stock", {}).get("generated_tokens") != args.generated_tokens:
+def _check_goldens(goldens, args, prompts):
+    stock = goldens.get("stock") or {}
+    if goldens.get("format") != 1:
+        raise RuntimeError("goldens have an unsupported format")
+    if stock.get("tag") != STOCK_TAG or stock.get("commit") != STOCK_COMMIT:
+        raise RuntimeError("goldens were not captured from pinned %s" % STOCK_TAG)
+    if stock.get("context") != args.ctx:
+        raise RuntimeError("goldens use context %s, not %s" % (stock.get("context"), args.ctx))
+    if stock.get("generated_tokens") != args.generated_tokens:
         raise RuntimeError("goldens use %s generated tokens, not %s"
-                           % (goldens["stock"].get("generated_tokens"), args.generated_tokens))
+                           % (stock.get("generated_tokens"), args.generated_tokens))
+    if stock.get("source_sha256") != prompts.get("source_sha256"):
+        raise RuntimeError("goldens and prompts use different source documents")
+    if stock.get("prompts_sha256") != _prompts_sha256(prompts):
+        raise RuntimeError("tracked prompts do not match the goldens' prompt hash")
+    for model in args.models:
+        row = goldens.get("models", {}).get(model)
+        if not row:
+            raise RuntimeError("goldens have no model %s" % model)
+        for pos in args.positions:
+            out = row.get("positions", {}).get(str(pos))
+            if out is None:
+                raise RuntimeError("goldens have no %s row at position %d" % (model, pos))
+            if len(out.get("ids") or []) != args.generated_tokens:
+                raise RuntimeError("goldens %s/%d do not contain %d tokens"
+                                   % (model, pos, args.generated_tokens))
+
+
+def _run_check(args, stock, prompts, goldens):
+    _check_prompt_config(args, prompts)
+    _check_goldens(goldens, args, prompts)
     rows = []
-    for model in args.models:
-        pack = _pack_for(args, model)
-        want = goldens.get("models", {}).get(model, {}).get("manifest_sha256")
-        if want != _manifest_sha256(pack):
-            raise RuntimeError("pack manifest changed for %s; re-capture the goldens" % model)
-        stock_out = _run_worker(stock, args, BENCH_DIR / (".check-stock-%s.json" % model),
-                                model=model, is_fork=False)
-        fork_out = _run_worker(ROOT, args, BENCH_DIR / (".check-fork-%s.json" % model),
-                               model=model, is_fork=True)
-        rows.extend(_compare(goldens, {"models": {model: stock_out}}, "stock",
-                             models=(model,))[0])
-        rows.extend(_compare(goldens, {"models": {model: fork_out}}, "fork",
-                             models=(model,))[0])
+    try:
+        for model in args.models:
+            pack = _pack_for(args, model)
+            manifest = pack / "kindi_pack.json"
+            if not manifest.is_file():
+                raise RuntimeError("missing pack for %s: %s" % (model, pack))
+            want = goldens["models"][model]["manifest_sha256"]
+            if want != _manifest_sha256(pack):
+                raise RuntimeError("pack manifest changed for %s; re-capture the goldens" % model)
+            stock_out = _run_worker(stock, args, BENCH_DIR / (".check-stock-%s.json" % model),
+                                    model=model, is_fork=False)
+            fork_out = _run_worker(ROOT, args, BENCH_DIR / (".check-fork-%s.json" % model),
+                                   model=model, is_fork=True)
+            rows.extend(_compare(goldens, {"models": {model: stock_out}}, "stock",
+                                 models=(model,), positions=args.positions)[0])
+            rows.extend(_compare(goldens, {"models": {model: fork_out}}, "fork",
+                                 models=(model,), positions=args.positions)[0])
+    finally:
+        for model in args.models:
+            for name in (".check-stock-%s.json" % model, ".check-fork-%s.json" % model):
+                try:
+                    (BENCH_DIR / name).unlink()
+                except OSError:
+                    pass
+    expected = len(args.models) * len(args.positions) * 2
+    if len(rows) != expected:
+        raise RuntimeError("expected %d parity rows, got %d" % (expected, len(rows)))
     mismatches = [row for row in rows if row[3] != "exact"]
-    for model in args.models:
-        for name in (".check-stock-%s.json" % model, ".check-fork-%s.json" % model):
-            try:
-                (BENCH_DIR / name).unlink()
-            except OSError:
-                pass
     return rows, mismatches
 
 
 def _parse_list(text, cast):
     return tuple(cast(x.strip()) for x in text.split(",") if x.strip())
+
+
+def _is_default_file(value, default):
+    return Path(value).expanduser().resolve() == Path(default).resolve()
+
+
+def _canonical_run(args):
+    return (tuple(args.models) == MODELS and tuple(args.positions) == POSITIONS
+            and args.generated_tokens == GENERATED_TOKENS and args.ctx == CONTEXT
+            and not args.pack_2b and not args.pack_9b
+            and _is_default_file(args.pack_root, DEFAULT_PACK_ROOT)
+            and _is_default_file(args.prompts, DEFAULT_PROMPTS))
+
+
+def _report_path(args):
+    """The report to write: an explicit --json, else the tracked gate only for the canonical run."""
+    if args.json:
+        return Path(args.json)
+    if _canonical_run(args) and _is_default_file(args.goldens, DEFAULT_GOLDENS):
+        return DEFAULT_REPORT
+    return None
+
+
+def _write_failure_report(args):
+    path = _report_path(args)
+    if path is None:
+        return
+    try:
+        _write_json(path, {"ok": False, "rows_exact": 0, "mismatch_count": 0,
+                           "rows": [], "error": "check failed; see stderr"})
+        print("report: %s (error)" % path)
+    except OSError as exc:
+        print("stock_parity: could not write failure report: %s" % exc, file=sys.stderr)
 
 
 def main(argv=None):
@@ -426,7 +533,6 @@ def main(argv=None):
                         help="capture goldens from official v0.6.1")
     parser.add_argument("--write-prompts", action="store_true",
                         help="recreate prompts.json from the fixed source document")
-    parser.add_argument("--stock-root", default=str(DEFAULT_STOCK))
     parser.add_argument("--pack-root", default=str(DEFAULT_PACK_ROOT))
     parser.add_argument("--pack-2b")
     parser.add_argument("--pack-9b")
@@ -438,7 +544,7 @@ def main(argv=None):
     parser.add_argument("--ctx", type=int, default=CONTEXT)
     parser.add_argument("--timeout", type=int, default=1800)
     parser.add_argument("--force", action="store_true")
-    parser.add_argument("--json", help="write a machine-readable check report")
+    parser.add_argument("--json", help="write the machine-readable report here instead of the tracked gate")
     parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--tree", help=argparse.SUPPRESS)
     parser.add_argument("--pack", help=argparse.SUPPRESS)
@@ -464,10 +570,12 @@ def main(argv=None):
 
     args.models = _parse_list(args.models, str)
     args.positions = _parse_list(args.positions, int)
+    args.prompts = str(Path(args.prompts).expanduser().resolve())
+    args.goldens = str(Path(args.goldens).expanduser().resolve())
     if not args.models or not args.positions:
         parser.error("--models and --positions must not be empty")
     try:
-        stock = _stock_tree(args)
+        stock = _stock_tree()
         prompts_path = Path(args.prompts)
         if args.write_prompts or not prompts_path.is_file():
             _write_prompts(args, stock)
@@ -475,6 +583,10 @@ def main(argv=None):
         if args.capture:
             if Path(args.goldens).exists() and not args.force:
                 raise RuntimeError("%s exists; use --force to replace it" % args.goldens)
+            if (_is_default_file(args.goldens, DEFAULT_GOLDENS)
+                    and not _canonical_run(args)):
+                raise RuntimeError("refusing to replace tracked goldens from a narrowed or "
+                                   "non-default capture; pass --goldens FILE")
             _capture(args, stock, prompts)
             print("wrote %s from official %s" % (args.goldens, STOCK_TAG))
             return 0
@@ -490,16 +602,20 @@ def main(argv=None):
                   "mismatch_count": len(mismatches),
                   "rows": [{"model": m, "position": p, "side": s, "result": r,
                             "first_difference": d} for m, p, s, r, d in rows]}
-        if args.json:
-            _write_json(args.json, report)
+        report_path = _report_path(args)
+        if report_path is not None:
+            _write_json(report_path, report)
+            print("report: %s" % report_path)
         if mismatches:
             print("FAIL: %d mismatch(es) against the %s goldens" % (len(mismatches), STOCK_TAG))
             return 1
         print("PASS: %d/%d stock and fork rows match the tracked %s goldens"
               % (exact, len(rows), STOCK_TAG))
         return 0
-    except RuntimeError as exc:
+    except (RuntimeError, OSError, ValueError, KeyError) as exc:
         print("stock_parity: %s" % exc, file=sys.stderr)
+        if not args.capture:
+            _write_failure_report(args)
         return 2
 
 

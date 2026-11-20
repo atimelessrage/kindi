@@ -1,9 +1,13 @@
 # Kindi on Windows
 
-Kindi runs on Windows 10 and Windows 11 through WSL2. WSL2 is a small Linux virtual machine that is a part of
+Kindi's installed route on Windows 10 and Windows 11 is WSL2. WSL2 is a small Linux virtual machine that is a part of
 Windows. One PowerShell command installs everything: it turns on WSL2, makes a Linux system only for Kindi, installs
 Docker, checks the GPU, and runs the normal Kindi installer inside. Then Windows programs use Kindi at
 `http://localhost:8093/v1`, the same as on Linux.
+
+The source tree also runs natively: the CPU engine is verified on the 2B/4B/9B, and the 2026-11-19 run
+measured the 2B GPU path on an RTX 4060 Ti. See the [native CPU quickstart](#native-windows-cpu-quickstart-without-wsl2)
+and [Native Windows GPU validation](#native-windows-gpu-validation-2026-11-19).
 
 ## Install
 
@@ -133,7 +137,7 @@ image, the distribution, systemd, the GPU check, the Windows items) ran for real
 | distribution | `wsl --import KindiInstallerTest <wsl-root>\wsl` (WSL2), a Linux user named after the Windows account, `systemd=on` and that user as the default written to `/etc/wsl.conf`, distro restarted (other distributions kept running) |
 | resources | WSL memory 16 GB of 32 (the script says `-WslMemoryGB 24` is the way to raise it) |
 | GPU in WSL | `nvidia-smi -L` inside the distribution: `GPU 0: NVIDIA GeForce RTX 4060 Ti (UUID: GPU-78de4e15…)` — the Windows driver reaches WSL2 as documented |
-| Linux installer | the *published* `install.sh` reports **0.6.1**, checked the machine (GPU 0 sm_89, 8188 MiB), listed the supported setups and picked setup 1 (27B on GPU 0, context 65536, profile `pascal8`, `kindi` container on port 8093), then stopped at its own `--dry-run` before building the image |
+| Linux installer | the *then-published* `install.sh` reported **0.6.1**, checked the machine (GPU 0 sm_89, 8188 MiB), listed the supported setups and picked setup 1 (27B on GPU 0, context 65536, profile `pascal8`, `kindi` container on port 8093), then stopped at its own `--dry-run` before building the image. This was the historical run; the 0.7.0-fork bundle now sets both installers to **0.7.0-fork** |
 | Windows check | no server to poll, so the localhost check was skipped exactly as a dry run predicts |
 | Windows items | Start-menu folder with `KindiInstallerTest Console`, `KindiInstallerTest Shell (WSL)` and `Uninstall KindiInstallerTest`; Settings > Apps entry `KindiInstallerTest (WSL2)`; no desktop shortcut (`-NoDesktopShortcut`); no scheduled task; `keepAlivePid: 0` in `state.json` |
 
@@ -154,11 +158,12 @@ distribution, shortcuts, registry entry and state folder distinct.
 
 Two things this run showed and did not hide:
 
-- **The Windows and Linux installers report different versions.** The published `install.sh`
-  says **0.6.1**; `install.ps1` (`$KindiWinVersion`) and this repository's `install.sh` say
-  **0.6.0**, so Settings > Apps shows 0.6.0 while the distribution holds 0.6.1. The version
-  pairing is a release-owner step (republish or pin the two together), tracked in
-  [MANUAL-HELP-NEEDED.md](MANUAL-HELP-NEEDED.md).
+- **The Windows and Linux installers used to report different versions.** At the time of this
+  run the published `install.sh` said **0.6.1**, while `install.ps1` (`$KindiWinVersion`) and
+  this tree's `install.sh` said **0.6.0**, so Settings > Apps showed 0.6.0 for a distribution
+  that held 0.6.1. The 0.7.0-fork release bundle now sets both installers, the package and the
+  image tags to **0.7.0-fork**; publishing that pair together remains the release-owner step
+  tracked in [MANUAL-HELP-NEEDED.md](MANUAL-HELP-NEEDED.md).
 - **The in-WSL disk check is not a host-space check.** Inside the distribution `install.sh`
   reported **954.5 GB free** for its own home directory, because it sees the virtual disk's capacity,
   while the host `S:` actually had 22 GB free. The Windows layer is the one that knows: it prints
@@ -204,9 +209,12 @@ The Linux installer's own messages are in [INSTALL.md](INSTALL.md) and [TROUBLES
 
 ## What works natively
 
-The native Windows path runs the **CPU engine** on the 2B, 4B and 9B Bonsai packs. It was
+The native Windows CPU path runs the **CPU engine** on the 2B, 4B and 9B Bonsai packs. It was
 verified on 2026-11-10 on an Intel Core i7-8086K with Python 3.13, clang 18.1.8, the MSVC 14.51
 toolset and the Windows SDK. No `vcvars` shell is needed.
+
+The same source tree has a measured GPU path: the 2026-11-19 validation below covers the 2B on an
+RTX 4060 Ti 8 GB. It does not widen the CPU table or claim the 4B/9B/27B, other cards or AMD.
 
 | Model | CPU verify | Approximate speed |
 |---|---:|---:|
@@ -215,8 +223,9 @@ toolset and the Windows SDK. No `vcvars` shell is needed.
 | 9B | 4/4 token-exact | 9.1 tok/s |
 
 These are one-run measurements from the recorded Windows run, not a promise for other CPUs.
-The CPU engine supports **2B/4B/9B only**; 27B and Nanbeige are GPU targets. The full CPU
-details and the AVX/AVX-only limits are in [CPU-SUPPORT.md](CPU-SUPPORT.md).
+The CPU engine supports **2B/4B/9B only**; 27B and Nanbeige are GPU targets, and on this
+native Windows path only the 2B GPU run is measured. The full CPU details and the AVX/AVX-only
+limits are in [CPU-SUPPORT.md](CPU-SUPPORT.md).
 
 ## Prerequisites
 
@@ -228,8 +237,8 @@ details and the AVX/AVX-only limits are in [CPU-SUPPORT.md](CPU-SUPPORT.md).
   SDK that clang finds through `vswhere`.
 - Enough disk for the model and its converted pack. The 2B is the smallest starting point.
 
-The CPU engine does not need CUDA or CuPy. This quickstart stays CPU-only; the native GPU
-path needs CuPy and the NVIDIA driver and is validated separately in
+The CPU engine does not need CUDA or CuPy. This CPU quickstart stays CPU-only; the source-tree GPU
+path needs CuPy and the NVIDIA driver and is measured separately in
 [Native Windows GPU validation](#native-windows-gpu-validation-2026-11-19).
 
 ## Install the Python dependencies
@@ -363,16 +372,16 @@ warning is harmless because the driver loads through that name.
 | server, 2B | `python -m kindi --pack ~/.kindi/packs/bonsai-2b --ctx 4096 serve`, then `POST /v1/chat/completions` | `/health` ok (ctx 4096, head `exact`); 8-token reply, `finish_reason: length`, 256.29 generation tokens/s; `/metrics` served; 6,551 MiB free |
 
 `verify` runs at its fixed 1,024-token context, so the 2B's pack load (about 18 s here) is the
-main cost. The measured scope is the 2B on this one card. **Not measured on this path:** the
-4B, 9B and 27B packs, speculation/MTP, the tandem split, cache restart, a second card, AMD,
+main cost. The measured scope is the 2B on this one card. **Not measured on this path:** Windows 11,
+the 4B, 9B and 27B packs, speculation/MTP, the tandem split, cache restart, a second card, AMD,
 other NVIDIA cards, and the `install.ps1` route (it sets up WSL2, not a native CUDA install).
 
 ## Limits and non-claims
 
-- **Native Windows GPU support is measured on one card and one model.** The 2026-11-19 run
-  above covers the 2B on an RTX 4060 Ti 8 GB from the source tree. The installer's GPU profiles,
-  other cards, and the 4B/9B/27B packs on this path are unmeasured; use the Linux Docker image
-  or WSL2 when you need a supported GPU setup.
+- **Native Windows GPU coverage is one card and one model.** The 2026-11-19 run above covers
+  the 2B on an RTX 4060 Ti 8 GB from the source tree on Windows 10 22H2. Windows 11, the
+  installer's GPU profiles, other cards, and the 4B/9B/27B packs on this path are unmeasured;
+  use the Linux Docker image or WSL2 when you need a supported GPU setup.
 - **AMD graphics are not supported natively on Windows.** Use the Linux ROCm images.
 - **The Linux installer does not run on Windows.** Use `install.ps1` (above) for the WSL2 path, or run this native CPU path directly.
 - **No 27B, Nemotron or Nanbeige CPU model.** Those are GPU targets.

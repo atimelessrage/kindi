@@ -29,6 +29,17 @@ def test_one_card_gets_no_two_card_split_and_no_cpu_run():
     assert "tandem-auto" in names
 
 
+def test_one_card_offers_both_tandem_head_directions():
+    """cpu-first and gpu-first own different heads, so the measured search must include both.
+
+    The candidate is real bench flags, not a label: it runs gpu-first with the automatic slice.
+    """
+    options = autotune.candidates(ONE_CARD, DENSE, 8192, max_runs=10)
+    option = next(item for item in options if item["name"] == "tandem-gpu-first")
+    assert option["args"] == ["--tandem", "gpu-first", "--tandem-cpu-layers", "auto"]
+    assert "output head" in option["why"]
+
+
 def test_two_cards_get_both_tensor_parallel_splits():
     names = _names(autotune.candidates(TWO_CARDS, DENSE, 8192, max_runs=10))
     assert names[:3] == ["gpu0", "tp-2-auto", "tp-2-equal"]
@@ -197,6 +208,14 @@ def test_bench_argv_puts_the_global_context_before_the_subcommand():
     assert argv[-2:] == ["--tandem", "cpu-first"]
 
 
+def test_bench_argv_carries_the_pack_autotune_was_given():
+    argv = autotune.bench_argv(8192, "out.json", {"args": []}, python="py",
+                               pack="T:/kindi-packs/bonsai-27b")
+    assert argv[:7] == ["py", "-m", "kindi", "--pack", "T:/kindi-packs/bonsai-27b",
+                        "--ctx", "8192"]
+    assert argv[7] == "bench"
+
+
 class _Done(object):
     def __init__(self, returncode=0, stdout=b""):
         self.returncode = returncode
@@ -269,6 +288,15 @@ def test_render_names_the_winner_and_the_command_that_reproduces_it():
     assert "best: tandem-gdn:8 - 90.0 tok/s decode at ctx 8192" in text
     assert "kindi --ctx 8192 serve --tandem cpu-first --tandem-cpu-layers gdn:8" in text
     assert "run `kindi verify`" in text
+
+
+def test_render_names_the_pack_the_winner_was_measured_with():
+    results = [{"name": "gpu0", "ok": True, "gen_tok_s": 90.0, "read_tok_s": 700.0,
+                "ctx_reduced": False, "vram_peak": {"peak_used_mib": 3000}, "env": {},
+                "args": []}]
+    text = "\n".join(autotune.render(results, 8192, ONE_CARD["gpus"], ONE_CARD["cpu"],
+                                      pack="T:/kindi-packs/bonsai-27b"))
+    assert "serve it: kindi --pack T:/kindi-packs/bonsai-27b --ctx 8192 serve" in text
 
 
 def test_render_shows_the_environment_of_an_env_only_winner():

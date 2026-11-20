@@ -1,184 +1,182 @@
-# Release checklist: installer safety fixes
+# Release checklist: Kindi 0.7.0-fork
 
-This checklist is for releases that contain the installer safety fixes: the GRUB guard
-(`cwsr_edit_grub()`), the source-archive checksum and the AVX CPU preflight. The GRUB guard backs up `/etc/default/grub`,
-rewrites the kernel command line, re-reads it, and restores the backup and stops when the edit fails,
-adds nothing, or drops an existing parameter. The guard is committed in `2b84658`; the fixture test is
-`tests/test_installer_grub.py`.
+This is the checklist for the fork's `0.7.0-fork` release. It is a **fork release**, not official
+Kindi `0.6.1`. The `-fork` suffix, the `atimelessrage/kindi` release URLs and the fork container
+registry keep it distinct from upstream.
 
-## AVX CPU preflight (this change)
+## Identity decision
 
-`install.sh` reads `/proc/cpuinfo` (or `KINDI_CPUINFO` in tests) for `avx` before it offers a CPU
-setup. A CPU without AVX hides the CPU setups; `--gpu cpu` and a machine with no usable GPU stop
-with an actionable message before downloading or building anything. GPU installs remain available
-on a CPU without AVX. The fixture test is `tests/test_installer_cpu.py`: AVX is accepted,
-AVX2/FMA/F16C without AVX is rejected, a missing CPU table is rejected, and the CPU setup guard is
-present.
+- Official baseline: `v0.6.1` (`7fececb`), published 2026-11-16.
+- Shared base: `dce89df`; `v0.6.1` is one commit past that base and is **not** an ancestor of this
+  fork. The fork's release HEAD is `60a039b` on `freebuff/tandem-cpu-recovery`.
+- Current range: `git rev-list --count v0.6.1..HEAD` = **669 commits**;
+  `git diff --shortstat v0.6.1..HEAD` = **827 files, +107,320/−1,370**.
+- The **649**-commit figure in `detailed-fork-changelog.md` was the `3002a40` snapshot. The
+  `CURRENT-VS-KINDI-0.6.md` audit recorded 666 at `3fed704`; the release adds 3 commits and is 669.
+  Do not repeat 649 as the current count.
+- Why `0.7.0-fork`: the fork adds substantial runtime, CLI, API and test surface and must not call
+  itself `0.6.1`. The suffix prevents a fork build from being read as an official upstream patch,
+  and the version does not encode a commit count that changes as the branch grows.
 
-## Source archive integrity (this change)
+## Version surfaces (all must agree)
 
-`install.sh` now downloads the release source archive to a `.part` file and checks its sha256 before
-extracting it. It no longer pipes `curl` into `tar`. The default v0.5.0 archive is pinned to the fork's main source archive at commit
-`fd5414889e4acfd72b46bba3138a908b8e97c5be`, sha256
-`3ca1e79d371c87bea5471841db10b0509b90d3bd557512cf59fc83854b929a94`; a custom `--source` URL can be
-pinned with `KINDI_SOURCE_SHA256`. The regression test is `tests/test_installer_source.py`.
-
-Current-head note: the published installer still installs commit `fd54148`, not the current best-of
-`main` tree. Refreshing `SOURCE_COMMIT`/`SOURCE_SHA256` (and `KINDI_VERSION` if bumped) requires the
-release owner to publish and verify the exact source archive for the desired release commit, then update
-`docs/INSTALL.md`, this checklist and `tests/test_installer_source.py` in the same commit. Until that
-publication happens, the installer payload is the `fd54148` release, not current HEAD.
-
-This change is published as the fork-hosted 0.5.0 installer at
-`https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh`.
-The LF artifact hash is `43766d8bbed09fa0ccebe6c39c8076001da99cb15814ff065380f7a46c93db99`; `docs/INSTALL.md` records it. The matching
-`install.sh.sha256` asset is published at the same release. The previous pair is retained as
-`install.sh.pre-avx-preflight-1794385057` and
-`install.sh.sha256.pre-avx-preflight-1794385057` for rollback.
-
-Artifact hash for this worktree:
-
-| candidate | sha256 |
+| Surface | Value |
 |---|---|
-| LF release artifact | `43766d8bbed09fa0ccebe6c39c8076001da99cb15814ff065380f7a46c93db99` |
+| `kindi/__init__.py` | `VERSION = "0.7.0-fork"` |
+| `install.sh` | `KINDI_VERSION="0.7.0-fork"` |
+| `install.ps1` | `$KindiWinVersion = '0.7.0-fork'` |
+| Docker build tags | `kindi:0.7.0-fork`, `kindi-rocm:0.7.0-fork`, `kindi-rocm7:0.7.0-fork` |
+| Published tags after verification | `ghcr.io/atimelessrage/kindi:0.7.0-fork-cuda`, `-rocm6`, `-rocm7`; moving `cuda`, `latest`, `rocm6`, `rocm7` |
+| Docs | README, `WHY.md`, `docs/AMD.md`, `docs/DOCKER.md`, `docs/INSTALL.md`, `docs/CONTAINERS.md`, `docs/CARDS.md`, `SECURITY.md`, `NOTICE` |
 
-Choose one exact candidate, publish that file, then replace both installer checksums in `docs/INSTALL.md`
-with its hash. Do not update the documented published hash before the upload: users would then check a
-file that is not yet served.
+## Local artifacts (prepared, not published)
 
-Do not publish from a worktree with an empty, stale, or locally modified `install.sh`.
+| Artifact | sha256 |
+|---|---|
+| `dist/kindi-0.7.0-fork.tar.gz` | `6086c3cc3c359dfad27a81aeb3215a9784a80284ff39c45e9d29e8b434000499` |
+| `dist/kindi-0.7.0-fork.tar.gz.sha256` | sidecar containing the archive hash |
+| `install.sh` | `7fa65bdb8829a30e280645ebbc191ab9675118c4aaac509093dc2e868b8145e1` |
+| `install.ps1` | `0c25abe5f6806ee57070b52b8dd04c1509f4a1cda583fef729b407a9a7ef2888` |
 
-## 1. Reconcile the worktrees first
+The archive is built from the working tree with:
 
 ```sh
-git worktree list --porcelain
+python scripts/build_release_archive.py
+(cd dist && sha256sum -c kindi-0.7.0-fork.tar.gz.sha256)
+```
+
+It includes tracked files plus non-ignored untracked files (including the two new
+`token_classes` files), and excludes `.git`, `dist/`, both installers, `docs/INSTALL.md`, this
+checklist and `.secrets.baseline`. The exclusions are deliberate: the installers and checksum pages
+are separate assets, and the secret-scanner baseline follows the installer hash, so including them
+would make the archive hash depend on itself. The archive writes the base HEAD
+commit into `kindi/COMMIT`; the working tree itself keeps the `$Format:%H$` placeholder.
+
+`install.sh` pins the archive hash in `SOURCE_SHA256` and downloads the archive from
+`https://github.com/atimelessrage/kindi/releases/download/v0.7.0-fork/kindi-0.7.0-fork.tar.gz`.
+**The URL is not live until the release is published.** The local archive is a release candidate,
+not a claim that the asset already exists.
+
+## Container smoke status (2026-11-20)
+
+The Python 3.6 blocker is fixed. Removed the 3.7-only `from __future__ import annotations` import
+from `kindi/sessions.py` and the three other modules that carried it (`kindi/cascade.py`,
+`kindi/draft_policy.py`, `kindi/moe_compat.py`); none uses postponed annotations. The rebuilt CUDA
+image `kindi:0.7.0-fork` (`sha256:b08916d7d25a19c87831196067a4407d0dac5d1143237b22c97dc59aa3b45af1`,
+2.56 GB, Python 3.6.9) passed the **unmodified-image** smoke on the RTX 4060 Ti: `/health` returned
+200, and one non-streaming chat returned 200 in **0.2337 s** with `container smoke ok`. Build and run
+outputs: [container smoke evidence](benchmarks/2026-11-20-i7-8086k-rtx4060ti-container-smoke/RESULTS.md).
+The image label records revision `1627b96312509e6e2bdaad805116f7f6459b88f3-dirty`; the
+`kindi/COMMIT` placeholder still makes `/health` report `commit: null`. No image was published.
+
+`dist/kindi-0.7.0-fork.tar.gz` predates this fix and still contains the old `kindi/sessions.py`.
+Rebuild the archive and update the hashes before publishing; the hash below was not regenerated.
+
+## 1. Verify the tree before building
+
+```sh
 git status --short
-git -C T:/kindi status --short -- install.sh docs/INSTALL.md
-```
-
-- The main worktree must not have an empty or uncommitted `install.sh` when publishing.
-- If the main worktree has uncommitted `docs/INSTALL.md` changes, reconcile or hand them off before
-  publishing; do not copy a working file between worktrees.
-- Work on the branch that contains the guard, not on the empty main copy.
-
-## 2. Run the no-GPU gate
-
-Run from the repository root on Linux or a compatible shell:
-
-```sh
+python -m pytest tests/test_version_consistency.py tests/test_installer_source.py -q
 bash -n install.sh
-python -m pytest tests/test_installer_grub.py -q
-python -m pytest tests/test_installer_source.py -q
-python -m pytest tests/test_installer_cpu.py -q
-python -m pytest tests/ -q
 python -m compileall -q kindi
+git diff --check
 ```
 
-Expected for this release:
+Expected:
 
-- `bash -n install.sh` prints nothing and exits 0.
-- `tests/test_installer_grub.py` passes all 9 tests.
-- `tests/test_installer_source.py` passes all 4 tests, including the mismatch path that must not extract.
-- `tests/test_installer_cpu.py` passes all 4 tests for the AVX preflight.
-- The full CPU suite passes (254 passed, 7 skipped at the last handoff).
-- No test edits `/etc/default/grub`; the GRUB test uses the fixture and a temporary copy.
+- `test_version_consistency.py` passes; every image tag in README/CARDS/DOCKER/AMD/INSTALL and the
+  three Dockerfiles equals `0.7.0-fork`.
+- `test_installer_source.py` passes; the source block still downloads to `.part`, checks sha256,
+  and only then extracts.
+- `bash -n install.sh` and `compileall` exit 0.
+- No whitespace errors.
 
-If you change the GRUB edit, reintroduce the old literal `0x01` bug on a copy and confirm the failure-path
-tests fail. Do not run the installer against the real `/etc/default/grub` for this check.
-
-On Linux, also run the installer without changing anything:
+Then run the full gate on a machine with the test dependencies:
 
 ```sh
-bash install.sh --dry-run
+python -m pytest tests/ -q
+python tools/check_claims.py
+python tools/check_python_quality.py
+python tools/check_secret_history.py
+python tools/check_secret_baseline.py
+python -m pytest tests/test_docs_links.py tests/test_project_memory.py -q
+python tools/project_memory.py --check
 ```
 
-It needs Linux, Docker access and a model pack for the later checks; a dry run alone is not a GPU or
-model verification.
+Record the exact counts in the release notes. Do not claim a GPU/model benchmark or a Docker image
+verification that was not run on this machine.
 
-## 3. Build and hash the exact release artifact
-
-The published file is the **release artifact**, not necessarily the Git blob. Two hashes are relevant:
-
-| source | sha256 |
-|---|---|
-| the published LF artifact | `43766d8bbed09fa0ccebe6c39c8076001da99cb15814ff065380f7a46c93db99` |
-
-The published 0.5.0 installer is the LF artifact above. This release records that hash in
-`docs/INSTALL.md`; publish that exact file, not a re-saved copy.
+## 2. Build, hash and pin
 
 ```sh
-sha256sum install.sh
-# must print 43766d8bbed09fa0ccebe6c39c8076001da99cb15814ff065380f7a46c93db99
+python scripts/build_release_archive.py
+sha256sum install.sh install.ps1 dist/kindi-0.7.0-fork.tar.gz
 ```
 
-The published artifact is LF. Do not re-save it with different line endings. Update **both** checksum lines in
-`docs/INSTALL.md` plus this table before publishing. Never publish a file whose hash differs from the
-documented value.
+1. Copy the archive hash into `install.sh` (`SOURCE_SHA256`), `docs/INSTALL.md`, this checklist and
+   the final release notes.
+2. Copy the final `install.sh` and `install.ps1` hashes into `docs/INSTALL.md` and this checklist.
+3. Re-run `python -m pytest tests/test_version_consistency.py tests/test_installer_source.py -q`
+   and `bash -n install.sh`.
+4. Confirm `(cd dist && sha256sum -c kindi-0.7.0-fork.tar.gz.sha256)` prints `OK`.
+5. Do **not** rebuild the archive after this point unless source files change. If they do, rebuild,
+   update all three hashes and rerun the checks; the archive excludes the checksum pages and
+   installers, so changing those hashes alone does not change the archive.
 
-Confirm the guard is present and no control byte remains:
+## 3. Docker tags and images
+
+The tree defines the tags, but no fork image has been built or published for this release:
 
 ```sh
-grep -n 'cwsr_edit_grub\|cwsr_line_ok' install.sh
-grep -nP '\x01' install.sh && echo 'STOP: control byte in installer'
+docker build -t kindi:0.7.0-fork -f docker/Dockerfile \
+  --build-arg KINDI_VERSION=0.7.0-fork --build-arg KINDI_REVISION=$(git rev-parse HEAD) .
+docker build -t kindi-rocm:0.7.0-fork -f docker/Dockerfile.rocm \
+  --build-arg KINDI_VERSION=0.7.0-fork --build-arg KINDI_REVISION=$(git rev-parse HEAD) .
+docker build -t kindi-rocm7:0.7.0-fork -f docker/Dockerfile.rocm7 \
+  --build-arg KINDI_VERSION=0.7.0-fork --build-arg KINDI_REVISION=$(git rev-parse HEAD) .
 ```
 
-## 4. Update and verify the documentation
+Before publishing any image tag:
 
-`docs/INSTALL.md` has the checksum in two places: the `sha256sum -c` command and the file table. Both must
-match the release artifact.
+- Run `kindi verify` on a real card for each backend. The 0.6.0 tags are the last verified images;
+  the 0.7.0-fork tags are not verified by this bundle.
+- Push `0.7.0-fork-cuda`, `0.7.0-fork-rocm6` and `0.7.0-fork-rocm7` to
+  `ghcr.io/atimelessrage/kindi` only after each check passes.
+- Move `cuda`, `latest`, `rocm6` and `rocm7` only after the versioned tags are in place.
+- If a backend is not verified, do not publish its tag and correct `docs/CONTAINERS.md` before
+  release.
 
-```sh
-grep -n '43766d8bbed09fa0ccebe6c39c8076001da99cb15814ff065380f7a46c93db99' docs/INSTALL.md
-# two lines expected; the published install.sh.sha256 asset uses the binary-mode '*' marker
-```
+## 4. Commit and tag
 
-Download the candidate artifact and check it exactly as a user would:
+- Commit the release edits and the release notes together. Do not amend or reuse a published tag.
+- Rebuild the archive from that release commit and update the hashes (the current local archive is
+  based on `60a039b` plus uncommitted release edits; its `kindi/COMMIT` says `60a039b`).
+- Tag `v0.7.0-fork` only from the release commit.
+- Do not force-push or move an existing tag.
+- Read `SECURITY.md` before any push. Pushing/tagging requires the owner's explicit authorization.
 
-```sh
-curl -fsSLO https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh
-echo "43766d8bbed09fa0ccebe6c39c8076001da99cb15814ff065380f7a46c93db99  install.sh" | sha256sum -c -
-bash -n install.sh
-```
+## 5. Publish atomically (owner action; not done here)
 
-If the URL still serves the previous artifact (`5f48beca…`), the release has not been published; do not
-change the documented hash to the old file.
-
-## 5. Commit and tag
-
-- Run the secret scans before tagging, not only the tracked-file one:
-  `python tools/check_secret_history.py` fails on any new credential or personal-data row in history
-  (it compares against `tools/secret_history_baseline.json`), and `python tools/check_secret_history.py
-  --all-hits` prints every recorded row so the release owner can decide whether a row still belongs
-  there. Also run `detect-secrets scan --all-files` on a clean export and confirm `.secrets.baseline`
-  still matches. The tracked-file test scans neither commit metadata nor deleted lines.
-- Commit the guard (already in `2b84658`), the checksum update, and this checklist together in the release
-  history. Do not amend or reuse a published tag.
-- Decide the release version before tagging. `install.sh` and `kindi/__init__.py` currently say `0.5.0`; if
-  this is a new patch release, bump both and add the changelog entry in the same release commit.
-- Tag only from the release commit, and only after the artifact hash is fixed.
-- Do not force-push or move an existing release tag.
-- Read [SECURITY.md](SECURITY.md) before any push. The remotes still hold pre-redaction objects; a
-  stale fast-forward can republish them even when the working tree is clean.
-
-## 6. Publish atomically
-
-1. Upload the exact `install.sh` artifact named in `docs/INSTALL.md` and the matching `install.sh.sha256`.
-2. Verify both public URLs with `curl | sha256sum`.
-3. Re-run the user-facing `sha256sum -c` command from `docs/INSTALL.md`.
-4. Confirm `bash install.sh --dry-run` works from the downloaded release.
+1. Create the GitHub release `v0.7.0-fork` with the exact `install.sh`, `install.ps1`,
+   `kindi-0.7.0-fork.tar.gz` and the two `.sha256` sidecars.
+2. Verify every public URL with `curl -fsSLO ... && sha256sum -c ...`.
+3. Confirm the `sha256sum -c` commands in `docs/INSTALL.md` work from the downloaded files.
+4. Run `bash install.sh --dry-run` from the downloaded release on Linux.
 5. Keep the previous installer available for rollback.
 
-Publishing, tagging and pushing require the owner's explicit authorization; preparing this commit does not
-publish anything.
+Publishing, tagging, pushing and image uploads are **not** part of this prepared bundle. Until
+they happen, the release is a local candidate and the `v0.7.0-fork` URLs are intentionally not
+claimed as live.
 
-## 7. Post-release
+## 6. Post-release
 
-- Record the release commit, tag, artifact hash and public URL in the release notes.
-- Confirm `docs/INSTALL.md` at the public documentation URL shows the same hash.
-- Watch the first installer reports for the GRUB step; a restore message means the guard worked and the
-  installer stopped instead of corrupting the kernel command line.
+- Record the release commit, tag, archive hash, installer hashes and public URLs in the release
+  notes.
+- Confirm `docs/INSTALL.md` at the public documentation URL shows the same values.
+- Watch the first installer reports for the GRUB and source-checksum paths; a checksum mismatch
+  must stop before extraction.
 
 ## Rollback
 
-If the public artifact hash is wrong, restore the previous installer and its documented hash first, then
-fix the release artifact. Do not leave a published file whose checksum does not match `docs/INSTALL.md`.
+Restore the previous installer and its documented hash first, then fix the release artifact. Do not
+leave a published file whose checksum disagrees with `docs/INSTALL.md` or this checklist.

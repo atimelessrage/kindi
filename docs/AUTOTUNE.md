@@ -113,11 +113,12 @@ rate-less file is reported by name and both commands fall back to one fresh prob
 selected they say how to save one. A report describes this host and this storage, so rerun
 `kindi io` after changing either.
 
-Measured on the i7-8086K + RTX 4060 Ti, 2026-11-17, `--mib 64`: RAM copy **13,456.7 MiB/s**, disk
-read **2,509.8 MiB/s** unbuffered, PCIe **6.0 GiB/s H2D / 6.1 GiB/s D2H**. These are this host's
+Measured on the i7-8086K + RTX 4060 Ti, 2026-11-20, `--mib 64`: RAM copy **13,266.4 MiB/s**, disk
+read **2,547.5 MiB/s** unbuffered, PCIe **6.0 GiB/s H2D / 6.1 GiB/s D2H**. These are this host's
 numbers, not targets: a different disk or a PCIe x4 riser moves them, which is why they are measured
 before a cache or a streaming budget is sized. The probe loads no model, so it runs on a machine with
-no pack, in about a second per probe at the default size.
+no pack, in about a second per probe at the default size. The raw report is tracked at
+[io.json](benchmarks/2026-11-20-i7-8086k-rtx4060ti-autotune-io/io.json).
 
 ## `kindi autotune` — which placement this model actually likes here
 
@@ -134,6 +135,7 @@ proposes what this machine could actually run:
 | `gpu0` | a card exists | the baseline: one card holds the whole model |
 | `tp-2-auto`, `tp-2-equal` | **two or more cards** | tensor-parallel row split (`KINDI_TP=1`, `KINDI_TP_SPLIT=auto` or `equal`) |
 | `tandem-auto` | a card, a dense pack, ≥4 physical cores | the smallest CPU slice that makes the requested context fit |
+| `tandem-gpu-first` | same | the automatic CPU slice in the opposite direction: the output head moves to the CPU while the embedding and early layers stay on the card |
 | `tandem-gdn:8`, `tandem-gdn:16` | same | fixed CPU slices: the first N non-attention layers |
 | `dcache-<sized>` | a Lightning (MoE) pack | decode LRU slots per expert layer (`KINDI_LT_DCACHE`, default 10) against VRAM; with measured rates the list is the predicted count plus half and double it |
 | `expert-cache-<MiB>` | a Lightning pack with measured rates and host-tier experts | the pinned host cache for the cold tier: `KINDI_LT_COLD=1` plus `KINDI_LT_HOST_MB`, sized from the same rate-sized working set and capped by the experts that live on the host tier |
@@ -157,7 +159,9 @@ line and is never scored — a missing compiler or a refused split stays visible
 zero in a table.
 
 `--json FILE` records the candidates, every run and the winner. The `--dry-run` plan is what to read
-before spending measurements.
+before spending measurements. For a dense pack, `kindi plan --portfolio` prints the same full-GPU /
+`cpu-first` / `gpu-first` trade without loading a weight; `tandem-gpu-first` is the measured form of
+its opposite-head row, so the two directions are not conflated.
 
 ### Measured on this host (2026-11-17)
 
@@ -165,11 +169,14 @@ Bonsai 2B pack, `--ctx 8192`, RTX 4060 Ti + i7-8086K, one card:
 
 | config | decode | read | peak | outcome |
 |---|---|---|---|---|
-| `gpu0` | 97.4–97.8 tok/s | 111.7–113.0 tok/s | 3,050 MiB | winner, recommended |
+| `gpu0` | 97.4–97.6 tok/s | 111.7–113.0 tok/s | 3,050 MiB | winner, recommended |
 | `tandem-auto` | — | — | — | refused by the planner: "this model already fits at 8192 tokens (~2410 MiB needed, 7075 MiB free); a split would only make it slower" |
 | `tandem-gdn:8` | — | — | — | failed: "could not run clang … it needs gcc with OpenMP, or clang and libomp on Windows" |
 
 Raw report: [autotune-2b.json](benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/autotune-2b.json).
+The two repeat reports behind the endpoints are
+[autotune-2b-r2.json](benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/autotune-2b-r2.json) and
+[autotune-2b-r3.json](benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/autotune-2b-r3.json).
 
 Both failures are the tuner behaving correctly rather than a tuner bug: the planner refuses a split
 that would only cost decode (the 9B/27B measurements in [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md) say

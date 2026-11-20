@@ -91,6 +91,53 @@ def test_run_prints_and_returns_zero(tmp_path, capsys):
     assert "placement:" in out and "follow up:" in out
 
 
+def test_portfolio_compares_full_gpu_and_both_split_directions(tmp_path):
+    """The matrix must price the two head placements separately; GPU-first moves the output
+    head to the CPU, so it is not the CPU-first row with a different label."""
+    pack = make_pack(tmp_path)
+    rep = _plan.portfolio(str(pack), 100, "gdn:1", assume_vram_gib=1, assume_ram_gib=4,
+                          assume_cores=2)
+    assert [row["placement"] for row in rep["rows"]] == ["full GPU", "cpu-first", "gpu-first"]
+    assert all(row["fit"] is True for row in rep["rows"])
+    full, cpu, gpu = rep["rows"]
+    assert full["cpu_layers"] == [] and full["command"].endswith("bench")
+    assert "--tandem" not in full["command"]
+    assert cpu["cpu_layers"] == [0] and gpu["cpu_layers"] == [0]
+    assert cpu["command"].endswith("bench --tandem cpu-first --tandem-cpu-layers gdn:1")
+    assert gpu["command"].endswith("bench --tandem gpu-first --tandem-cpu-layers gdn:1")
+    assert rep["best"] == "full GPU"
+    assert any(line.startswith("recommendation: full GPU") for line in rep["lines"])
+
+
+def test_portfolio_rejects_a_moe_pack_with_its_own_planner(tmp_path):
+    """A layer split is the wrong vocabulary for an expert-tier pack; say so, do not fake rows."""
+    pack = make_pack(tmp_path)
+    man = json.loads((pack / "kindi_pack.json").read_text())
+    man["backend"] = "kindi_lightning"
+    (pack / "kindi_pack.json").write_text(json.dumps(man))
+    with pytest.raises(SystemExit, match="dense Bonsai"):
+        _plan.portfolio(str(pack), 100, "auto", assume_vram_gib=1)
+
+
+def test_portfolio_does_not_call_an_unknown_fit_a_failure(tmp_path, monkeypatch):
+    """Without a card and without --assume-vram-gib the rows are unknown, not "no"."""
+    pack = make_pack(tmp_path)
+    monkeypatch.setattr(_plan, "_free_vram_gib", lambda: None)
+    rep = _plan.portfolio(str(pack), 100, "gdn:1", assume_ram_gib=4, assume_cores=2)
+    assert all(row["fit"] is None for row in rep["rows"])
+    assert rep["best"] is None
+    assert any("cannot decide without a free-VRAM number" in line for line in rep["lines"])
+
+
+def test_run_portfolio_prints_the_matrix_and_skips_the_moe_probe(tmp_path, capsys):
+    pack = make_pack(tmp_path)
+    args = _FakeArgs(assume_vram_gib=1, assume_ram_gib=4, assume_cores=2, portfolio=True)
+    assert _plan.run({"pack": str(pack), "ctx": 100}, args) == 0
+    out = capsys.readouterr().out
+    assert "portfolio:" in out and "full GPU" in out and "cpu-first" in out and "gpu-first" in out
+    assert "rates:" not in out                                # a dense matrix, not the MoE path
+
+
 class _FakeArgs:
     def __init__(self, **kw):
         self.tandem_cpu_layers = None
@@ -99,6 +146,7 @@ class _FakeArgs:
         self.assume_vram_gib = None
         self.assume_ram_gib = None
         self.assume_cores = None
+        self.portfolio = False
         self.json = None
         self.__dict__.update(kw)
 

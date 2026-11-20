@@ -36,7 +36,7 @@ the state at that commit.
 | [REQ-0024](requirements/REQ-0024.md) | Speculation state is reported as effective, and the head is verified on load | proposed | `3ececca68d4a` | `b8931576e618` |
 | [REQ-0025](requirements/REQ-0025.md) | `kindi verify` can run under speculation | proposed | `3ececca68d4a` | `0f91b86174ac` |
 | [REQ-0026](requirements/REQ-0026.md) | `kindi bench` can measure a speculation mode | proposed | `3ececca68d4a` | `3ececca68d4a` |
-| [REQ-0027](requirements/REQ-0027.md) | A constrained-decoding mask that does not sweep the vocabulary per state | proposed | `62ea1a6828f0` | `62ea1a6828f0` |
+| [REQ-0027](requirements/REQ-0027.md) | A constrained-decoding mask that does not sweep the vocabulary per state | active | `62ea1a6828f0` | `62ea1a6828f0` |
 | [REQ-0028](requirements/REQ-0028.md) | An Anthropic Messages endpoint for agent harnesses | proposed | `8c4decde1d0f` | `8c4decde1d0f` |
 
 `uncommitted` means the requirement file is not in `HEAD` yet. Commit the requirement

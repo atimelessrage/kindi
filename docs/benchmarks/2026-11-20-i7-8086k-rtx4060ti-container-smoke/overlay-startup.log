@@ -1,0 +1,15 @@
+[kindi 07:19:54] [kindi] building engine for bonsai2-2b ...
+[kindi 07:19:55] blocking sync: card 0 primary context flags 0x4 (set: 0)
+[kindi 07:19:57] card 0: 0.41 GB of weights (1s)
+[kindi 07:19:57] plan engine ready: 1 card, ctx 4096, K/V q8_0, weights 5-trit lane (2.5s)
+[kindi 07:19:57] kindi: /data/pack -> the bonsai backend (bonsai2-2b)
+[kindi 07:19:58] prompt cache: a checkpoint every 256 tokens (20 MB each), 3 parked conversations, budget 3191 MB
+[kindi 07:19:58] engine fingerprint be9504087346: {"engine": "kindi.tp.TPEngine", "cards": 1, "weights": "5-trit lane", "kv": "q8_0", "chunk": 256, "chunk_q8": true, "chunk_tc": false, "chunk_att": "flash", "chunk_tile": "", "batch": "4", "tc": "0", "tc_tmax": "", "fd": "0", "d1": "0", "fd_ch": "512", "kexpf": "1", "att_tc": "0", "spec": "0", "head": "exact"}
+[kindi 07:19:58] saved openings: 0 in /data/state/openings/36061ad406df-ebe9504087346
+[kindi 07:19:58] saved turns: 0 in /data/state/turns/36061ad406df-ebe9504087346 (keep 4, 4096 MB of disk)
+[kindi 07:19:58] [kindi] engine ready for bonsai2-2b
+[kindi 07:19:58] serving on http://0.0.0.0:8093/v1 (model bonsai2-2b)
+[kindi 07:20:11] request: 19 prompt tokens (max 24 new)
+[kindi 07:20:11] cache: 19 prompt tokens, 0 shared with the last request, resumed at 0
+[kindi 07:20:12] prompt: 0 reused, 19 read in 0.5s
+[kindi 07:20:12] done: 3 tokens in 0.0s (stop)

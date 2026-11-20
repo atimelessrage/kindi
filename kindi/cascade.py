@@ -11,8 +11,6 @@ kernels in this module, so `verify`/`bench`/`serve` remain gated until those
 kernels exist. Do not add this model to the catalog, installer, or support
 matrix until `kindi verify` passes against the pinned reference.
 """
-from __future__ import annotations
-
 import json
 import os
 

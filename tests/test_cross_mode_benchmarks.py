@@ -1,10 +1,18 @@
-"""The cross-mode matrix must keep CPU-only and GPU-only measured, and mark a tandem cell
-available only when the same complete throughput benchmark exists."""
+"""The cross-mode matrix must keep CPU-only and GPU-only measured, mark a tandem cell
+available only when the same complete throughput benchmark exists, and derive every
+published Tandem / GPU ratio from the rates in its table."""
 import importlib.util
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "docs" / "benchmarks" / "build_cross_mode.py"
+RATE_PAGES = (
+    ("2B", "2026-11-19-i7-8086k-rtx4060ti-2b-4b-controlled/RESULTS.md", "### 2B"),
+    ("4B", "2026-11-19-i7-8086k-rtx4060ti-2b-4b-controlled/RESULTS.md", "### 4B"),
+    ("9B", "2026-11-19-i7-8086k-rtx4060ti-9b-controlled/RESULTS.md", "## Throughput (tokens/s)"),
+)
+METRIC_LABELS = ("Read", "100", "2K", "8K", "16K", "24K")
 
 
 def load():
@@ -50,6 +58,63 @@ def test_matrix_shows_all_four_modes():
         "2026-11-19 controlled pair (cpu-first")
     nine_b = next(r for r in tandem if r["model"] == "9b")
     assert nine_b["available"] == 1 and nine_b["runs"] == 3
+
+
+def _section_table(text, heading):
+    lines = text.splitlines()
+    assert heading in lines, "missing heading %r" % heading
+    start = lines.index(heading)
+    table = []
+    for line in lines[start + 1:]:
+        if line.startswith("|"):
+            table.append(line)
+        elif table:
+            break
+    assert table, "missing table under %r" % heading
+    return table
+
+
+def _cells(row):
+    return [cell.strip().strip("*").strip() for cell in row.strip().strip("|").split("|")]
+
+
+def _row(table, placement, qualifier=None):
+    matches = [row for row in table
+               if _cells(row)[0].startswith(placement)
+               and (qualifier is None or (_cells(row)[1] == qualifier))]
+    assert len(matches) == 1, "expected one %r row%s, found %d" % (
+        placement, " with %r" % qualifier if qualifier else "", len(matches))
+    return matches[0]
+
+
+def _rates(row):
+    values = []
+    for cell in _cells(row)[1:]:
+        if re.fullmatch(r"\d+(?:\.\d+)?", cell):
+            values.append(float(cell))
+    assert len(values) == len(METRIC_LABELS), "%r does not hold six rates: %r" % (row, values)
+    return values
+
+
+def _ratios(row):
+    values = [cell for cell in _cells(row)[1:] if re.fullmatch(r"\d+\.\d+x", cell)]
+    assert len(values) == len(METRIC_LABELS), "%r does not hold six ratios: %r" % (row, values)
+    return values
+
+
+def test_tandem_gpu_rows_recompute_from_measured_rates():
+    """Every published Tandem / GPU cell is tandem throughput divided by GPU-only."""
+    for model, relative_path, heading in RATE_PAGES:
+        table = _section_table((ROOT / "docs" / "benchmarks" / relative_path).read_text(encoding="utf-8"),
+                               heading)
+        qualifier = "3-run median" if model == "9B" else None
+        gpu = _rates(_row(table, "GPU only", qualifier))
+        tandem = _rates(_row(table, "GPU+CPU tandem", qualifier))
+        actual = _ratios(_row(table, "Tandem / GPU"))
+        expected = ["%.1fx" % (t / g) for t, g in zip(tandem, gpu, strict=True)]
+        for metric, shown, derived in zip(METRIC_LABELS, actual, expected, strict=True):
+            assert shown == derived, "%s %s: Tandem / GPU says %s, tandem/GPU gives %s" % (
+                model, metric, shown, derived)
 
 
 def test_gpu_comparison_follows_the_measured_ratio():

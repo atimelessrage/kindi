@@ -383,18 +383,17 @@
         "reportOptionalMemberAccess": 1
       },
       "kindi/plan.py": {
-        "reportArgumentType": 4,
+        "reportArgumentType": 2,
         "reportOptionalOperand": 1
       },
       "kindi/sampling.py": {
         "reportOptionalMemberAccess": 11
       },
       "kindi/server.py": {
-        "reportArgumentType": 7,
-        "reportAttributeAccessIssue": 62,
+        "reportArgumentType": 6,
+        "reportAttributeAccessIssue": 24,
         "reportCallIssue": 1,
-        "reportIndexIssue": 5,
-        "reportOperatorIssue": 1,
+        "reportIndexIssue": 3,
         "reportOptionalCall": 2,
         "reportOptionalMemberAccess": 23,
         "reportOptionalSubscript": 7
@@ -487,8 +486,19 @@
         "reportOptionalMemberAccess": 1
       }
     },
-    "total": 1035,
+    "total": 991,
     "version": "1.1.414"
+  },
+  "review": {
+    "deltas": {
+      "mypy": 0,
+      "pylint": 0,
+      "pyright": -44,
+      "ruff": -7
+    },
+    "head": "60a039b107b078338d5e865d98d1f231089457de",
+    "previous_head": "",
+    "reason": "full verification: fix the server/lightning optional-engine annotations and the lscpu parser lint finding"
   },
   "ruff": {
     "findings": {
@@ -670,9 +680,6 @@
         "F401": 1,
         "I001": 1
       },
-      "kindi/intel.py": {
-        "F401": 1
-      },
       "kindi/kld.py": {
         "I001": 1
       },
@@ -785,8 +792,7 @@
         "I001": 1
       },
       "tests/test_cold_experts.py": {
-        "B007": 1,
-        "I001": 1
+        "B007": 1
       },
       "tests/test_cpu_layers.py": {
         "F401": 1
@@ -854,9 +860,6 @@
       "tests/test_plan_engine.py": {
         "B017": 1
       },
-      "tests/test_secret_scan.py": {
-        "I001": 1
-      },
       "tests/test_server.py": {
         "B905": 1,
         "I001": 1
@@ -911,10 +914,6 @@
       "tools/check_perf_baseline.py": {
         "F401": 1
       },
-      "tools/check_secret_baseline.py": {
-        "B904": 3,
-        "I001": 1
-      },
       "tools/check_secret_history.py": {
         "F841": 1
       },
@@ -939,7 +938,7 @@
         "B905": 1
       }
     },
-    "total": 321,
+    "total": 314,
     "version": "0.16.0"
   },
   "schema": 2,

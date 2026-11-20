@@ -121,6 +121,16 @@ client = OpenAI(base_url="http://localhost:8093/v1", api_key="none", timeout=360
    - Max output: `2048`.
 2. Increase the request timeout of the agent, as above.
 
+**Pi no-thinking request.** Thinking is off by default, but a harness can make the no-thinking arm explicit by sending `enable_thinking: false` as a top-level chat-completions field:
+
+```sh
+curl -s http://localhost:8093/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"bonsai2-2b","messages":[{"role":"user","content":"Say hello."}],"enable_thinking":false}'
+```
+
+This is Kindi's request control only; it does not validate or install an external Pi adapter.
+
 A shorter custom system prompt helps the first turn.
 
 **Chat UIs** (Open WebUI, LibreChat and similar): add an OpenAI connection with the base URL above.

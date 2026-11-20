@@ -1,0 +1,31 @@
+[kindi 07:12:21] [kindi] building engine for bonsai2-2b ...
+[kindi 07:12:21] blocking sync: card 0 primary context flags 0x4 (set: 0)
+[kindi 07:12:40] card 0: 0.41 GB of weights (17s)
+[kindi 07:12:50] plan engine ready: 1 card, ctx 4096, K/V q8_0, weights 5-trit lane (28.7s)
+[kindi 07:12:50] kindi: /data/pack -> the bonsai backend (bonsai2-2b)
+[kindi 07:12:51] prompt cache: a checkpoint every 256 tokens (20 MB each), 3 parked conversations, budget 3191 MB
+[kindi 07:12:51] engine fingerprint be9504087346: {"engine": "kindi.tp.TPEngine", "cards": 1, "weights": "5-trit lane", "kv": "q8_0", "chunk": 256, "chunk_q8": true, "chunk_tc": false, "chunk_att": "flash", "chunk_tile": "", "batch": "4", "tc": "0", "tc_tmax": "", "fd": "0", "d1": "0", "fd_ch": "512", "kexpf": "1", "att_tc": "0", "spec": "0", "head": "exact"}
+[kindi 07:12:51] saved openings: 0 in /data/state/openings/36061ad406df-ebe9504087346
+[kindi 07:12:51] saved turns: 0 in /data/state/turns/36061ad406df-ebe9504087346 (keep 4, 4096 MB of disk)
+[kindi 07:12:51] [kindi] engine ready for bonsai2-2b
+Traceback (most recent call last):
+  File "/usr/lib/python3.6/runpy.py", line 193, in _run_module_as_main
+    "__main__", mod_spec)
+  File "/usr/lib/python3.6/runpy.py", line 85, in _run_code
+    exec(code, run_globals)
+  File "/opt/kindi/kindi/container.py", line 254, in <module>
+    sys.exit(main())
+  File "/opt/kindi/kindi/container.py", line 250, in main
+    return kmain(args)
+  File "/opt/kindi/kindi/__main__.py", line 650, in main
+    "backends": cmd_backends, "models": cmd_models, "use": cmd_use, "sessions": cmd_sessions}[a.cmd](cfg, a)
+  File "/opt/kindi/kindi/__main__.py", line 283, in cmd_serve
+    serve(cfg, log=log)
+  File "/opt/kindi/kindi/server.py", line 2217, in serve
+    app = create_app(cfg, log)
+  File "/opt/kindi/kindi/server.py", line 1731, in create_app
+    from .sessions import STATUSES as SESSION_STATUSES
+  File "/opt/kindi/kindi/sessions.py", line 10
+    from __future__ import annotations
+    ^
+SyntaxError: future feature annotations is not defined

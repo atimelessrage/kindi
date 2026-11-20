@@ -23,7 +23,7 @@ def test_package_and_installer_versions_match():
 
 def test_current_docs_and_images_use_the_package_version():
     version = _version(r'^VERSION = "([^"]+)"', "kindi/__init__.py")
-    tag = re.compile(r"\bkindi(?:-rocm7?)?:(\d+\.\d+\.\d+)\b")
+    tag = re.compile(r"\bkindi(?:-rocm7?)?:([0-9][0-9A-Za-z_.-]*)")
     offenders = []
     for relative in ("README.md", "docs/CARDS.md", "docs/DOCKER.md", "docs/AMD.md",
                      "docs/INSTALL.md", "docker/Dockerfile", "docker/Dockerfile.rocm",
@@ -36,7 +36,7 @@ def test_current_docs_and_images_use_the_package_version():
 
 def test_readme_release_archive_matches_the_package_version():
     version = _version(r'^VERSION = "([^"]+)"', "kindi/__init__.py")
-    archives = re.findall(r"kindi-(\d+\.\d+\.\d+)\.tar\.gz", _read("README.md"))
+    archives = re.findall(r"kindi-(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)\.tar\.gz", _read("README.md"))
     assert archives, "README.md no longer documents a release archive"
     assert set(archives) == {version}, "README.md archive versions: %s" % sorted(set(archives))
 

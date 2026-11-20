@@ -9,9 +9,10 @@ are emitted in schema order (like llama.cpp's ``json-schema-to-grammar``); a
 
 This is decode-side constraint, not a post-hoc prompt: the sampler only ever picks
 token ids whose decoded text the automaton accepts, so the finished reply parses
-against the schema by construction. ``vocab_allowed(state, texts)`` enumerates the
-vocabulary once per state (cached); the server's constrained sampler intersects it
-with the engine head logits.
+against the schema by construction. ``vocab_allowed(state, texts)`` uses the token-class table
+(``kindi.token_classes``), bulk-accepting a state's universal character loops
+and checking the remaining token texts exactly; the server's constrained
+sampler intersects the result with the engine head logits.
 
 A state is a small tuple, so a candidate token is checked on a copy:
 ``advance(state, text) -> new state or None``. The automaton is forward-complete:
@@ -136,6 +137,8 @@ class JsonGrammar(object):
     def __init__(self, node):
         self.root = node
         self._vocab_cache = {}
+        self._mask_table = None
+        self._mask_texts = None
 
     def start(self):
         return ("val", (), "", None)
@@ -150,15 +153,50 @@ class JsonGrammar(object):
                 return None
         return st
 
-    def vocab_allowed(self, state, texts):
-        """Token ids whose decoded text keeps ``state`` alive (cached per state)."""
+    def _token_safe_sets(self, state, alphabet):
+        """Character sets this state accepts for any length.
+
+        ``str`` and ``akey`` are the JSON string-body loops: every character
+        except a closing quote, a backslash, or a control character returns the
+        same state.  The whitespace prefixes in front of every structural
+        token have the analogous, narrower loop.
+        """
+        mode = state[0]
+        if mode in ("str", "akey"):
+            safe = frozenset(ch for ch in alphabet
+                             if ord(ch) >= 0x20 and ch not in '"' and ch != "\\")
+            return [safe] if safe else []
+        if mode in ("trail", "val", "aval", "oval", "aempty", "otail", "atail",
+                    "objk", "objkb", "objkf", "objka", "ocolon"):
+            safe = frozenset(ch for ch in _WS if ch in alphabet)
+            return [safe] if safe else []
+        return []
+
+    def _vocab_table(self, texts):
+        if self._mask_texts is not texts:
+            from .token_classes import TokenClassTable
+
+            self._mask_table = TokenClassTable(texts, self._step, self._token_safe_sets)
+            self._mask_texts = texts
+            self._vocab_cache.clear()
+        table = self._mask_table
+        if table is None:
+            raise RuntimeError("token-class table was not initialized")
+        return table
+
+    def _vocab_allowed_scan(self, state, texts):
+        """The pre-token-class implementation, kept as the set-equality oracle."""
         import numpy as np
 
+        return np.fromiter((i for i, t in enumerate(texts) if self.advance(state, t) is not None),
+                           dtype=np.int64)
+
+    def vocab_allowed(self, state, texts):
+        """Token ids whose decoded text keeps ``state`` alive (cached per state)."""
         cached = self._vocab_cache.get(state)
         if cached is not None:
             return cached
-        ids = np.fromiter((i for i, t in enumerate(texts) if self.advance(state, t) is not None),
-                          dtype=np.int64)
+        ids = self._vocab_table(texts).allowed(state)
         self._vocab_cache[state] = ids
         return ids
 

@@ -130,7 +130,7 @@ The preview chips are computed at render time from the committed baseline and it
 | Audit dispositions (2026-11-15) | the 202611150853 audit verified item-by-item on the current tree: handoff-guard findings already fixed, coverage floors already landed, hardware items already recorded unverified; hash-bump hook declined by design, fork gap unfixable (push 403) |
 | Audit fixes: optional-accelerator degradation, `kindi_cache_*` telemetry, reference-config section | 2026-11-14 audit round (N1/N3–N5/D3/D4) |
 | **`kindi caps`: per-card and per-CPU capability report** (`kindi/caps.py`, REQ-0022) | 2026-11-17: nvidia-smi → pynvml → CuPy layered identification (name, UUID, PCI bus, compute capability, total/free VRAM, driver), hardware facts kept apart from the Kindi paths they enable, unknown capacity reported as unknown; CPU half reuses the engine probe plus model name, cores, L2/L3, AVX-512/AMX and the CPU-build toolchain. On Windows the AVX/AVX2/AVX-512F flags come from `kernel32.IsProcessorFeaturePresent` (no compiler needed). `tests/test_caps.py` 19 tests; live run on the 4060 Ti rig |
-| **`kindi autotune`: measured placements** (`kindi/autotune.py`, REQ-0022) | 2026-11-17: candidates from the hardware report + pack manifest (full card, two-card TP split, tandem `auto`/`gdn:N`, Lightning decode cache, CPU), each one a real `kindi bench --sample-vram` child run, ranked by decode tok/s with reduced-context runs ranked below full-context ones and failed runs unscored. Live 2B/ctx-8192 run: 97.4–97.8 tok/s decode, 111.7–113.0 read, 3,050 MiB peak; `tandem-auto` refused as unnecessary and `tandem-gdn:8` blocked by a missing compiler, both reported as such. `tests/test_autotune.py` 18 tests |
+| **`kindi autotune`: measured placements** (`kindi/autotune.py`, REQ-0022) | 2026-11-17: candidates from the hardware report + pack manifest (full card, two-card TP split, tandem `auto`/`gdn:N`, Lightning decode cache, CPU), each one a real `kindi bench --sample-vram` child run, ranked by decode tok/s with reduced-context runs ranked below full-context ones and failed runs unscored. Live 2B/ctx-8192 run: 97.4–97.6 tok/s decode, 111.7–113.0 read, 3,050 MiB peak; `tandem-auto` refused as unnecessary and `tandem-gdn:8` blocked by a missing compiler, both reported as such. `tests/test_autotune.py` 18 tests |
 | **Image input is refused, not silently dropped** (`kindi/server.py`) | 2026-11-17: a pack manifest that declares `vision`/`mmproj` no longer unlocks acceptance — no build implements a projector, so an image part or Ollama `images` is always an enveloped 400, and the message names the missing projector when a pack claims one. Pinned by an app-level test built on a vision-declaring manifest |
 | **One grammar compile per structured request** (`kindi/server.py`) | 2026-11-17: validation already built the automaton to answer an invalid schema/grammar with a 400; the decode path built it again. The compiled object is now parked on the request and reused (GBNF and `json_schema`), so a structured request compiles once: llama.cpp's canonical `json.gbnf` at nesting 2 is 7,936 states / 7.8 ms median build, ~15.6 → ~7.8 ms per request. Pinned by a call-counting test |
 | **GBNF size honesty** (`kindi/gbnf.py`) | 2026-11-17: `Grammar.states` exposes the compiled size, and the over-budget refusal names `*`/`+` and `json_schema` instead of only a state count. Measured: exact per-use expansion costs ~143 states per enumerated copy (a 40-pair record referencing `ws` 82 times is 5,915 states / ~6 ms), the loop form is ~330 states at any length, and the default 20,000-state cap holds ~130 enumerated copies. The pre-`221d652` rule cache was 20× smaller because it widened the language (an "exactly 3" grammar accepted 0–5 copies) |
@@ -300,9 +300,9 @@ with the fixed prompt ids in `prompts.json` and the official outputs in
 python tools/stock_parity.py --check
 ```
 
-It recreates the stock tree from the local `v0.6.1` tag when needed, runs both
-trees, and exits non-zero on the first differing token. The captured run is
-**12/12 exact**. The page records the plain-engine/exact-head settings and the
+It verifies the local `v0.6.1` tag, extracts the stock tree from it, runs both
+trees, exits non-zero on the first differing token, and refreshes the tracked
+`parity-report.json`. The captured run is **12/12 exact**. The page records the plain-engine/exact-head settings and the
 limits; it makes no speed claim and does not replace the §4.6 A/B.
 
 ## 5. Model and hardware status
@@ -350,8 +350,8 @@ arbitrary-draft-GGUF harness stays a separate gate.
   pack load passed; unmodified `serve` is blocked before `/health`, while a diagnostic overlay
   passed `/health` and one chat. The run, skipped steps and why are recorded in
   `docs/RELEASE-CHECKLIST.md` and its linked evidence page.
-- Focused checks at this refresh: `python tools/check_claims.py` (35 gates / 253 numbers),
-  `python -m pytest -q tests/test_claims.py tests/test_docs_links.py tests/test_stock_parity.py` (26 passed).
+- Focused checks at this refresh: `python tools/check_claims.py` (36 gates / 263 numbers),
+  `python -m pytest -q tests/test_claims.py tests/test_docs_links.py tests/test_stock_parity.py` (36 passed).
 - Full suite on the current content: **1,391 passed, 28 skipped, 0 failed** in 232.01 s;
   the earlier 1,357-pass note is superseded. Generated-artifact checks (`project_memory --check`,
   `config_reference --check`, `support_matrix --check`) clean. The earlier `3002a40` 1,274 / 2-failure note is superseded.

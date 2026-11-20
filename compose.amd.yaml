@@ -2,7 +2,7 @@
 # image: no clone and no build. The project name is the folder name (or -p kindi). See docs/CONTAINERS.md and
 # docs/AMD.md.
 #
-#   curl -fsSLO https://raw.githubusercontent.com/ahtx/kindi/main/compose.amd.yaml
+#   curl -fsSLO https://raw.githubusercontent.com/atimelessrage/kindi/main/compose.amd.yaml
 #   VIDEO_GID=$(getent group video | cut -d: -f3) RENDER_GID=$(getent group render | cut -d: -f3) \
 #     KINDI_MODEL=bonsai-4b docker compose -f compose.amd.yaml up -d
 #
@@ -14,7 +14,7 @@
 # keeps your groups. Full Podman support is planned for a later release; this is best effort.
 services:
   kindi:
-    image: ghcr.io/ahtx/kindi:${KINDI_TAG:-rocm6}
+    image: ghcr.io/atimelessrage/kindi:${KINDI_TAG:-rocm6}
     restart: unless-stopped
     user: "${KINDI_UID:-1000:1000}"
     ports:

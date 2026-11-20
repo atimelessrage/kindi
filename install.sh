@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Kindi installer: one command from a bare Linux machine to a verified, running Kindi server.
 #
-#   curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh | bash             # install (or upgrade / repair)
-#   curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh | bash -s -- --dry-run
+#   curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.7.0-fork/install.sh | bash             # install (or upgrade / repair)
+#   curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.7.0-fork/install.sh | bash -s -- --dry-run
 #   bash install.sh --uninstall [--purge]
 #
 # What it does, in order (every step prints what it is about to do and why):
@@ -19,10 +19,10 @@
 # password or a key. Copyright (c) 2026 Amir Husain. SPDX-License-Identifier: AGPL-3.0-only.
 set -euo pipefail
 
-KINDI_VERSION="0.6.0"
-SOURCE_URL="https://github.com/ahtx/kindi/archive/refs/tags/v${KINDI_VERSION}.tar.gz"
-# sha256 of the v0.6.0 release archive at SOURCE_URL (checked 2026-11-14); a custom URL can be pinned with KINDI_SOURCE_SHA256
-SOURCE_SHA256="613f73204e21823f43258fff7b2fdc1771a88e4ca10ed557c4e8ed19023580fc"
+KINDI_VERSION="0.7.0-fork"
+SOURCE_URL="https://github.com/atimelessrage/kindi/releases/download/v${KINDI_VERSION}/kindi-${KINDI_VERSION}.tar.gz"
+# sha256 of the fork's 0.7.0-fork source archive at SOURCE_URL; a custom URL can be pinned with KINDI_SOURCE_SHA256
+SOURCE_SHA256="6086c3cc3c359dfad27a81aeb3215a9784a80284ff39c45e9d29e8b434000499"
 HF="https://huggingface.co/prism-ml"
 # model: GGUF file, sha256 (= the Hugging Face file hash), size in bytes
 declare -A GGUF SHA SIZE

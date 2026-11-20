@@ -41,6 +41,7 @@ import re
 import threading
 import time
 import uuid
+from typing import Any
 
 import numpy as np
 
@@ -296,12 +297,11 @@ def _is_image_part(part):
             or "image_url" in part or "image" in part)
 
 
-def _validate_request(req, image_error=_IMAGE_UNSUPPORTED):
-    """Check the OpenAI request shape before it reaches the engine or the prompt cache.
+def _validate_messages_and_tools(req, image_error=_IMAGE_UNSUPPORTED):
+    """Check the messages/tools shape shared by chat and prompt counting.
 
-    The server takes a raw Request, so this is the boundary that turns a typo or a wrong JSON type into a
-    400 RequestError instead of a KeyError/TypeError from chat.render() that would be reported as an engine
-    failure (and, before this check, would clear the prompt cache).
+    A raw Request can carry a typo or a wrong JSON type into chat.render(); both the chat route and
+    `/v1/tokenize` need the same 400 before they touch the engine or the prompt cache.
     """
     if not isinstance(req, dict):
         _request_error("the body must be a JSON object")
@@ -351,6 +351,16 @@ def _validate_request(req, image_error=_IMAGE_UNSUPPORTED):
                 _request_error("tools[%d] needs a function name" % i)
             if fn.get("parameters") is not None and not isinstance(fn["parameters"], dict):
                 _request_error("tools[%d].function.parameters must be an object" % i)
+
+
+def _validate_request(req, image_error=_IMAGE_UNSUPPORTED):
+    """Check the OpenAI request shape before it reaches the engine or the prompt cache.
+
+    The server takes a raw Request, so this is the boundary that turns a typo or a wrong JSON type into a
+    400 RequestError instead of a KeyError/TypeError from chat.render() that would be reported as an engine
+    failure (and, before this check, would clear the prompt cache).
+    """
+    _validate_messages_and_tools(req, image_error)
 
     if "tool_choice" in req and req["tool_choice"] is not None and not isinstance(req["tool_choice"], (str, dict)):
         _request_error("tool_choice must be a string or an object")
@@ -531,6 +541,10 @@ def served_backend(man):
 
 class Kindi(object):
     """Engine + tokenizer + cache + sampler, shared by the HTTP layer and `kindi chat`."""
+
+    # The engine is one of several backend classes (dense, Lightning, Gemma 4, ...), chosen at runtime; it is
+    # non-None for the whole serving lifetime and is cleared only by close(), which the tests pin.
+    eng: Any
 
     def __init__(self, cfg, log=print):
         try:
@@ -1666,6 +1680,11 @@ def create_app(cfg, log=print):
             return _err(400, str(e), param=getattr(e, "param", None))
         if not isinstance(req, dict):
             return _err(400, "send a JSON object")
+        if req.get("messages") is not None:
+            try:
+                _validate_messages_and_tools(req, image_error)
+            except RequestError as e:
+                return _err(400, str(e), param=getattr(e, "param", None))
         ctx = K.eng.ctx
         try:
             if req.get("messages") is not None:   # a chat request: the whole prompt, as the chat endpoint builds it

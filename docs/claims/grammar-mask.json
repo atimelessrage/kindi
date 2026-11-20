@@ -3,8 +3,8 @@
   "title": "Token-class constrained mask: REQ-0027 gate rows on the 2B",
   "measured": "2026-11-20",
   "commit": "working tree (uncommitted at measurement)",
-  "command": "python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b; python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b --doc long",
-  "notes": "REQ-0027 A2. The token-class table was measured on the same pack, documents and harness as the 2026-11-17 baseline. All four rows clear the 10x gate; A4/A5 remain unmeasured.",
+  "command": "python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b; python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b --doc long; python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b --repeat",
+  "notes": "REQ-0027 A2. The token-class table was measured on the same pack, documents and harness as the 2026-11-17 baseline. All four rows clear the 10x gate; the repeat command records the process-shared vocabulary index; A4/A5 remain unmeasured.",
   "evidence": [
     "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-grammar-mask/grammar-mask.json",
     "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-grammar-mask/RESULTS.md"

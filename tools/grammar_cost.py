@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """What a constrained vocab filter costs per token, on a pack's real vocabulary.
 
-`Grammar.vocab_allowed` / `JsonGrammar.vocab_allowed` enumerate every vocabulary entry and advance
-the automaton over that entry's text, caching the surviving ids **per automaton state**. So a
-request pays one full vocabulary sweep per *new* state it reaches, and the per-token price has to
-count real cache misses over a real document -- which is what this measures. No GPU, no server.
+`Grammar.vocab_allowed` / `JsonGrammar.vocab_allowed` use the token-class table, whose
+vocabulary-only index is shared across grammars and whose surviving ids are cached **per automaton
+state**. The per-token price therefore counts real state-mask misses over a real document; this
+harness also keeps the pre-token-class sweep as the language oracle. `--repeat` measures the
+first request that builds the shared index against later grammars that reuse it. No GPU, no server.
 
   python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b            # 22-token document
   python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b --doc long # 200-token document
+  python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b --repeat  # first vs cached index
 
 Prints one row per grammar and exits non-zero if a grammar refused the document: a rejected document
 makes the row meaningless, and this harness must not report a number it did not measure. The
@@ -71,6 +73,11 @@ SCHEMA = {
     },
     "required": ["name", "tags", "n"],
     "additionalProperties": False,
+}
+REPEAT_SCHEMA = {
+    "type": "object",
+    "properties": {"city": {"type": "string"}},
+    "required": ["city"],
 }
 DOC = '{"name": "alpha", "tags": ["x", "y"], "n": 42}'
 
@@ -188,6 +195,29 @@ def build(text, depth, max_states="200000"):
     return g, (time.perf_counter() - t0) * 1e3
 
 
+def repeat_requests(texts):
+    """Measure grammar setup plus the first mask across separate structured requests.
+
+    The token texts are built once, as a server does.  The first grammar owns
+    the token-class index build; the next two are new grammar instances over the
+    same vocabulary, which is the repeat-request case the process cache covers.
+    """
+    rows = []
+    for label, schema in (("first (same schema)", SCHEMA),
+                          ("repeat (same schema)", SCHEMA),
+                          ("new grammar", REPEAT_SCHEMA)):
+        t0 = time.perf_counter()
+        grammar = grammar_from_schema(schema)
+        t1 = time.perf_counter()
+        allowed = grammar.vocab_allowed(grammar.start(), texts)
+        t2 = time.perf_counter()
+        rows.append({"label": label, "grammar_ms": (t1 - t0) * 1e3,
+                     "first_mask_ms": (t2 - t1) * 1e3, "allowed": len(allowed)})
+        print("%-22s grammar=%8.1f ms  first-mask=%8.1f ms  allowed=%d"
+              % (label, rows[-1]["grammar_ms"], rows[-1]["first_mask_ms"], len(allowed)))
+    return rows
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--pack", default=os.path.expanduser("~/.kindi/packs/bonsai-2b"),
@@ -195,10 +225,17 @@ def main():
     ap.add_argument("--doc", choices=("short", "long"), default="short",
                     help="short: the 22-token document on every grammar; long: the 200-token "
                          "document with its own ordered grammar and equivalent schema")
+    ap.add_argument("--repeat", action="store_true",
+                    help="measure the first request against repeat requests sharing the "
+                         "vocabulary index (no document walk)")
     args = ap.parse_args()
 
     tok, texts = vocab_texts(args.pack)
     print("pack: %s\nvocab entries: %d\n" % (args.pack, len(texts)))
+
+    if args.repeat:
+        repeat_requests(texts)
+        return 0
 
     if args.doc == "long":
         print("document: %d tokens\n" % len(tok.encode(LONG_DOC)))

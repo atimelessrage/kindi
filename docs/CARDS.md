@@ -15,7 +15,7 @@ is at `/data/<pack>`. The examples serve on `127.0.0.1:8093`.
 ```
 docker run -d --name kindi --restart unless-stopped --gpus all -u $(id -u):$(id -g) \
   -p 127.0.0.1:8093:8093 -v $HOME/.kindi:/data -e HOME=/tmp \
-  -e KINDI_PACK=/data/pack -e KINDI_STATE_DIR=/data/state ... kindi:0.6.0
+  -e KINDI_PACK=/data/pack -e KINDI_STATE_DIR=/data/state ... kindi:0.7.0-fork
 ```
 
 Replace `...` with the variables in the section for your card. To use one card of two, set `--gpus device=N`.

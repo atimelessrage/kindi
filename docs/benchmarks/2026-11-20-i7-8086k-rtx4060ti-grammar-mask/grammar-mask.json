@@ -4,7 +4,7 @@
   "pack": "bonsai-2b",
   "vocab_entries": 248320,
   "code": "working tree, uncommitted at measurement",
-  "command": "python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b; python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b --doc long",
+  "command": "python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b; python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b --doc long; python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b --repeat",
   "short": {
     "document_tokens": 22,
     "gbnf_json_d1": {
@@ -50,6 +50,14 @@
       "start_ms": 4590,
       "doc_ok": true
     }
+  },
+  "first_vs_repeat": {
+    "command": "python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b --repeat",
+    "note": "Median of three fresh-process runs. Each request is a new grammar over the same token-text sequence. The first mask includes the one-time vocabulary-index build; later requests reuse the process cache. This is setup plus first mask, not prompt or decode time.",
+    "runs": 3,
+    "first": {"grammar_ms": 0.0, "first_mask_ms": 3386.4, "allowed": 426},
+    "repeat_same_schema": {"grammar_ms": 0.0, "first_mask_ms": 2.4, "allowed": 426},
+    "new_grammar": {"grammar_ms": 0.0, "first_mask_ms": 2.2, "allowed": 426}
   },
   "gate": {
     "short": {"json_schema_max_ms_per_token": 23, "gbnf_max_ms_per_token": 272},

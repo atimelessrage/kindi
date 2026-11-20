@@ -73,3 +73,62 @@ def test_verify_refuses_the_deepseek_reference_matrix(tmp_path, capsys):
     logged = []
     assert verify.run({"pack": pack, "ctx": 1024}, log=logged.append) == 2
     assert any("dsv41.verify" in line for line in logged), logged
+
+
+class _BenchEngine(object):
+    """The small engine surface bench needs; it never loads a model or a kernel."""
+
+    def __init__(self, pack, ctx=None, clusters=None, tandem=None, cpu_layers=None, **_):
+        self.ctx = ctx
+        self.hsl = None
+        self.shortlist = 0
+
+    def reset(self):
+        pass
+
+    def feed(self, tok, pos):
+        pass
+
+    def step(self, tok, pos):
+        pass
+
+
+def test_bench_passes_configured_kv_cache_to_make_engine(tmp_path, monkeypatch):
+    """`kindi bench` must build the same K/V-cache variant as serve, not drop the config key."""
+    monkeypatch.setenv("KINDI_DEVICE", "cpu")
+    pack = _pack(tmp_path, {})
+    seen = {}
+
+    def fake_make_engine(*args, **kwargs):
+        seen.update(kwargs)
+        return _BenchEngine(*args, **kwargs)
+
+    monkeypatch.setattr("kindi.engine.make_engine", fake_make_engine)
+    assert bench.run({"pack": pack, "ctx": 1024, "fast_clusters": 256,
+                      "split_at": "none", "kv_cache": "q8_0"},
+                     log=lambda *a: None) == 0
+    assert seen["kv_cache"] == "q8_0"
+
+
+def test_verify_passes_configured_kv_cache_to_make_engine(tmp_path, monkeypatch):
+    """Generic `kindi verify` must forward the K/V-cache choice into the same gateway."""
+    pack = _pack(tmp_path, {"model": "bonsai2-2b"})
+    reference = tmp_path / "reference.json"
+    reference.write_text(json.dumps({
+        "prompts": [{"prompt": "p", "ids": [1, 2], "expected": [3, 4], "gap": []}]}),
+        encoding="utf-8")
+    monkeypatch.setattr(verify, "reference_for", lambda _: str(reference))
+    monkeypatch.delenv("KINDI_SPEC", raising=False)
+    seen = {}
+
+    class Engine(object):
+        def generate(self, ids, n):
+            return [3, 4]
+
+    def fake_make_engine(*args, **kwargs):
+        seen.update(kwargs)
+        return Engine()
+
+    monkeypatch.setattr("kindi.engine.make_engine", fake_make_engine)
+    assert verify.run({"pack": pack, "kv_cache": "q8_0"}, log=lambda *a: None) == 0
+    assert seen["kv_cache"] == "q8_0"

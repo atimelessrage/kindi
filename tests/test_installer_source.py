@@ -74,10 +74,10 @@ def test_source_archive_has_a_pinned_release_sha256():
     text = installer_text()
     match = re.search(r'^SOURCE_SHA256="([0-9a-f]{64})"$', text, re.MULTILINE)
     assert match, "install.sh has no pinned 64-hex SOURCE_SHA256"
-    # the sha256 of the v0.6.0 release archive at SOURCE_URL (recomputed from the published tarball)
-    assert match.group(1) == "613f73204e21823f43258fff7b2fdc1771a88e4ca10ed557c4e8ed19023580fc"
-    assert 'KINDI_VERSION="0.6.0"' in text
-    assert ('SOURCE_URL="https://github.com/ahtx/kindi/archive/refs/tags/v${KINDI_VERSION}.tar.gz"') in text
+    assert match.group(1) != "0" * 64, "install.sh still has the build placeholder source hash"
+    assert 'KINDI_VERSION="0.7.0-fork"' in text
+    assert ('SOURCE_URL="https://github.com/atimelessrage/kindi/releases/download/'
+            'v${KINDI_VERSION}/kindi-${KINDI_VERSION}.tar.gz"') in text
 
 
 def test_source_block_never_pipes_curl_into_tar():

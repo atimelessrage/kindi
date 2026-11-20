@@ -21,8 +21,6 @@ a confident first token is more likely to be accepted than the historical
 average, an unconfident one less. It never changes the output tokens, only
 how many are drafted.
 """
-from __future__ import annotations
-
 # verify-pass price in plain steps, keyed by drafted tokens k (pass of k + 1).
 # Same measured table as kindi/lookup.py (Nanbeige 33B, 2x RTX 3080).
 from .lookup import CHECK_COST

@@ -1196,6 +1196,11 @@ def make_handler(E):
             except Exception:
                 self.close_connection = True
                 return self._err(400, "invalid JSON")
+            if req.get("messages") is not None:
+                try:
+                    validate_request(req)      # messages/tools shape and settings, before E.count()
+                except ValueError as e:
+                    return self._err(400, str(e))
             ctx = E.model.ctx
             if req.get("messages") is not None:   # a chat request: the whole prompt, as the chat endpoint builds it
                 ids = E.count(req)

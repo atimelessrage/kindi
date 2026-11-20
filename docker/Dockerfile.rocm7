@@ -3,10 +3,10 @@
 # yet measured. ROCm 6.3 (docker/Dockerfile.rocm) does not know these GPUs. They run natively: no
 # HSA_OVERRIDE_GFX_VERSION. The host needs only the amdgpu kernel driver and Docker.
 #
-#   docker build -t kindi-rocm7:0.6.0 -f docker/Dockerfile.rocm7 --build-arg KINDI_VERSION=0.6.0 .
+#   docker build -t kindi-rocm7:0.7.0-fork -f docker/Dockerfile.rocm7 --build-arg KINDI_VERSION=0.7.0-fork .
 #   docker run -d --name kindi --device /dev/kfd --device /dev/dri \
 #       --group-add $(getent group video | cut -d: -f3) --group-add $(getent group render | cut -d: -f3) \
-#       --security-opt seccomp=unconfined -p 127.0.0.1:8093:8093 -v kindi-data:/data -e KINDI_MODEL=bonsai-4b kindi-rocm7:0.6.0
+#       --security-opt seccomp=unconfined -p 127.0.0.1:8093:8093 -v kindi-data:/data -e KINDI_MODEL=bonsai-4b kindi-rocm7:0.7.0-fork
 #
 # The base image is pinned by digest (rocm/dev-ubuntu-24.04:10.1.0-full).
 FROM rocm/dev-ubuntu-24.04:10.1.0-full@sha256:5ed1362ea542a928651e4c710b44024ebe98870f74159cb70f0265aec8ef0abe
@@ -43,7 +43,7 @@ ARG KINDI_VERSION=dev
 ARG KINDI_REVISION=unknown
 LABEL org.opencontainers.image.title="Kindi (AMD ROCm 7)" \
       org.opencontainers.image.description="Kindi: local LLM inference on low-cost GPUs. AMD RDNA 3.5 graphics (ROCm 7; tested: Radeon 840M, Radeon 8060S)." \
-      org.opencontainers.image.source="https://github.com/ahtx/kindi" \
+      org.opencontainers.image.source="https://github.com/atimelessrage/kindi" \
       org.opencontainers.image.url="https://amirhusain.com/kindi" \
       org.opencontainers.image.documentation="https://github.com/ahtx/kindi/blob/main/docs/DOCKER.md" \
       org.opencontainers.image.licenses="AGPL-3.0-only" \

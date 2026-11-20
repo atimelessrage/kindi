@@ -1,18 +1,21 @@
-<p align="center"><img src="assets/kindi-banner.svg?v=0.6.0" alt="Kindi 0.6.0: language models on low-cost GPUs, from a 1 GB Quadro K420 to the RTX 50 series, the CMP 170HX and Radeon graphics. Ternary Bonsai 2B to 27B, AH-Nanbeige4.3-33B, Nemotron 3.5 Lightning 30B-A3B and DeepSeek-V4.1-Flash." width="100%"></p>
+<p align="center"><img src="assets/kindi-banner.svg?v=0.7.0-fork" alt="Kindi 0.7.0-fork: language models on low-cost GPUs, from a 1 GB Quadro K420 to the RTX 50 series, the CMP 170HX and Radeon graphics. Ternary Bonsai 2B to 27B, AH-Nanbeige4.3-33B, Nemotron 3.5 Lightning 30B-A3B and DeepSeek-V4.1-Flash." width="100%"></p>
 
-# Kindi 0.6.0
+# Kindi 0.7.0-fork
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Commercial licenses available](https://img.shields.io/badge/commercial%20licenses-available-green.svg)](COMMERCIAL-LICENSE.md)
-[![Release v0.6.0](https://img.shields.io/badge/release-v0.6.0-lightgrey.svg)](https://github.com/ahtx/kindi/releases/tag/v0.6.0)
+[![Fork release v0.7.0-fork](https://img.shields.io/badge/release-v0.7.0--fork-lightgrey.svg)](https://github.com/atimelessrage/kindi/releases/tag/v0.7.0-fork)
 
 Kindi is a custom inference engine for language models on low-cost GPUs. It runs Prism ML's ternary
 Bonsai models (2B, 4B, 9B and 27B), AH-Nanbeige4.3-33B, Nemotron 3.5 Lightning 30B-A3B and DeepSeek-V4.1-Flash.
 Kindi supports NVIDIA cards from the 1 GB Quadro K420 (Kepler) to the RTX 50 series and the CMP 170HX. It also
 supports AMD Radeon 780M, 840M and 8060S graphics, and x86-64 CPUs. The OpenAI-compatible server has a prompt
 cache, tool calls, a thinking mode and speculative decoding. With the exact head, the greedy output is the same as
-the output of llama.cpp for the same model file, token for token. Version 0.6.0 adds two mixture-of-experts models
-that keep experts in host memory, the DSpine drafter for the 27B, and a one-command installer for Windows.
+the output of llama.cpp for the same model file, token for token. Version 0.7.0-fork is this fork's release, based on
+`60a039b`: it is **669 commits and 827 files ahead of official Kindi v0.6.1** and is not an official release. It includes
+the two mixture-of-experts models that keep experts in host memory, the DSpine drafter for the 27B, and the one-command
+installer for Windows. The older `649`-commit figure in `detailed-fork-changelog.md` was recorded at `3002a40`; the
+current `v0.6.1..HEAD` range is 669.
 
 ### Measured speed
 
@@ -61,13 +64,13 @@ The measured cards and the per-card settings: [docs/CARDS.md](docs/CARDS.md).
 Linux x86-64:
 
 ```bash
-curl -fsSL https://amirhusain.com/kindi/install.sh | bash
+curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.7.0-fork/install.sh | bash
 ```
 
 Windows 10 and 11 (PowerShell; the installer sets up WSL2):
 
 ```powershell
-irm https://amirhusain.com/kindi/install.ps1 | iex
+irm https://github.com/atimelessrage/kindi/releases/download/v0.7.0-fork/install.ps1 | iex
 ```
 
 The installer finds your cards and shows the setups that they support, the recommended setup first. It downloads
@@ -81,7 +84,7 @@ DeepSeek-V4.1-Flash has its own installer ([docs/DEEPSEEK.md](docs/DEEPSEEK.md))
 - [CHANGELOG.md](CHANGELOG.md): what changed in each version
 - [docs/BENCHMARKS.md](docs/BENCHMARKS.md) and [docs/CARDS.md](docs/CARDS.md): the measurements and the settings
 - [WHY.md](WHY.md): the one-page summary
-- The manual: [How to get work done with Kindi](https://amirhusain.com/software/kindi/How-To-Get-Work-Done-with-Kindi-0.6.0.pdf)
+- The Kindi 0.6.0 manual: [How to get work done with Kindi](https://amirhusain.com/software/kindi/How-To-Get-Work-Done-with-Kindi-0.6.0.pdf)
 - Project page: [amirhusain.com/kindi](https://amirhusain.com/kindi/)
 
 By [Amir Husain](https://www.amirhusain.com).
@@ -153,12 +156,20 @@ context to the free card memory. On the K420 1 GB, Kindi uses about 870 MB of it
 
 ## Install
 
-### Containers: ready-made images
+### Containers: release-target images
 
-The images are on GitHub's container registry: `ghcr.io/ahtx/kindi:cuda` (NVIDIA and the CPU engine; also `latest`), `:rocm6` (AMD RDNA3), `:rocm7` (AMD RDNA 3.5). With Docker Compose or podman-compose, no clone and no build:
+The fork's `0.7.0-fork` container tags are **release targets, not published images**:
+`ghcr.io/atimelessrage/kindi` with tags `0.7.0-fork-cuda` (NVIDIA and the CPU engine),
+`0.7.0-fork-rocm6` (AMD RDNA3) and `0.7.0-fork-rocm7` (AMD RDNA 3.5). They become live only
+after `kindi verify` passes on a real card for each backend and the release is published; this
+bundle has not pushed them. The moving `cuda`, `latest`, `rocm6` and `rocm7` tags move only at
+publication. Until then, build locally below.
+
+Once the images are published, Docker Compose or podman-compose can start them with no clone and
+no build:
 
 ```sh
-curl -fsSLO https://raw.githubusercontent.com/ahtx/kindi/main/compose.yaml
+curl -fsSLO https://raw.githubusercontent.com/atimelessrage/kindi/main/compose.yaml
 KINDI_MODEL=bonsai-4b docker compose up -d
 ```
 
@@ -171,31 +182,34 @@ CUDA 10.2 and CuPy 9.6 are the last releases that support Kepler, and they need 
 exactly that.
 
 ```sh
-git clone https://github.com/ahtx/kindi.git && cd kindi
-docker build -t kindi:0.6.0 -f docker/Dockerfile .   # downloads the CUDA 10.2 toolkit (~2.5 GB), ~15 minutes
+git clone https://github.com/atimelessrage/kindi.git && cd kindi
+docker build -t kindi:0.7.0-fork -f docker/Dockerfile .   # downloads the CUDA 10.2 toolkit (~2.5 GB), ~15 minutes
 ```
 
-For AMD RDNA3 graphics, build `docker/Dockerfile.rocm` instead (`kindi-rocm:0.6.0`, about 6 GB to download). For
-RDNA 3.5 graphics, build `docker/Dockerfile.rocm7` (`kindi-rocm7:0.6.0`, about 9 GB to download). See
+For AMD RDNA3 graphics, build `docker/Dockerfile.rocm` instead (`kindi-rocm:0.7.0-fork`, about 6 GB to download). For
+RDNA 3.5 graphics, build `docker/Dockerfile.rocm7` (`kindi-rocm7:0.7.0-fork`, about 9 GB to download). See
 [docs/AMD.md](docs/AMD.md).
 
-You can also use the release archive. Download `kindi-0.6.0.tar.gz` from the
-[v0.6.0 release](https://github.com/ahtx/kindi/releases/tag/v0.6.0), then run
-`tar xzf kindi-0.6.0.tar.gz && cd kindi-0.6.0` and build the image with the same `docker build` command.
+You can also use the release archive. Download `kindi-0.7.0-fork.tar.gz` from the
+[v0.7.0-fork release](https://github.com/atimelessrage/kindi/releases/tag/v0.7.0-fork), then run
+`tar xzf kindi-0.7.0-fork.tar.gz && cd kindi-0.7.0-fork` and build the image with the same `docker build` command.
 
 Check that Docker sees the GPU (create `~/.kindi` first, so it belongs to you and not to root):
 
 ```sh
 mkdir -p ~/.kindi
-docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.6.0 info
+docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.7.0-fork info
 ```
 
 More in [docs/DOCKER.md](docs/DOCKER.md).
 
 ### Natively
 
-Windows users: [docs/WINDOWS.md](docs/WINDOWS.md) has the verified native CPU quickstart and
-its limits. The installer is Linux-only, and native Windows GPU execution has not been validated.
+Windows users: [docs/WINDOWS.md](docs/WINDOWS.md) has the verified native CPU quickstart,
+the measured 2B source-tree GPU path and the limits of both. The installer is Linux-only; the native
+GPU result is one 2B/RTX 4060 Ti source-tree run, not an installer or general Windows GPU claim.
+The 4B/9B/27B packs, other cards, AMD and the installer's GPU profiles remain unmeasured; for a
+supported GPU setup, use the Linux Docker image or WSL2.
 
 You need CUDA 10.2 (toolkit with NVRTC and cuBLAS), Python 3.6 or later that CuPy 9.6 supports, and:
 
@@ -221,7 +235,7 @@ Convert it once into Kindi's weight pack (about a minute; exact - the same weigh
 
 ```sh
 # Docker
-docker run --rm -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.6.0 convert /data/Ternary-Bonsai-2-2B-PTQ1_0.gguf
+docker run --rm -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.7.0-fork convert /data/Ternary-Bonsai-2-2B-PTQ1_0.gguf
 # native
 python3 -m kindi convert ~/.kindi/Ternary-Bonsai-2-2B-PTQ1_0.gguf          # writes ~/.kindi/pack
 ```
@@ -229,7 +243,7 @@ python3 -m kindi convert ~/.kindi/Ternary-Bonsai-2-2B-PTQ1_0.gguf          # wri
 Check the engine against llama.cpp's reference output:
 
 ```sh
-docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.6.0 verify
+docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.7.0-fork verify
 ```
 
 ```
@@ -248,14 +262,14 @@ measures the generation speed (see [Performance](#performance)).
 Optional - build the cluster file for the fast output head (about 2 minutes):
 
 ```sh
-docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.6.0 fast-head
+docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.7.0-fork fast-head
 ```
 
 ## Run the server
 
 ```sh
 docker run -d --name kindi --restart unless-stopped --gpus all -u $(id -u):$(id -g) \
-    -p 127.0.0.1:8093:8093 -v ~/.kindi:/data kindi:0.6.0
+    -p 127.0.0.1:8093:8093 -v ~/.kindi:/data kindi:0.7.0-fork
 # native:  python3 -m kindi serve
 ```
 

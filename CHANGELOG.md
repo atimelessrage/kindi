@@ -1,9 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.7.0-fork (2026-11-20)
+
+This is the fork's release, not official Kindi 0.6.1. At HEAD `60a039b` the fork is **669 commits and
+827 files ahead** of official `v0.6.1` (`+107,320/−1,370`), with no upstream file deleted. The older
+**649**-commit figure in `detailed-fork-changelog.md` was the `3002a40` snapshot; `CURRENT-VS-KINDI-0.6.md`
+recorded 666 at `3fed704`, and the current range is 669. The package, both installers and the Docker tags
+now say `0.7.0-fork`, so the fork cannot be mistaken for an official `0.6.1` patch. The source archive and
+installer hashes are recorded in `docs/INSTALL.md`; publication is still a release-owner step.
 
 ### Added
 
+- **The dense tandem portfolio is comparable before a model is loaded** — `kindi plan --portfolio`
+  prices full GPU, `cpu-first` and `gpu-first` in one dry run with the planner's own byte estimate,
+  labelled against free VRAM and with a capacity-first recommendation (full GPU wins whenever it
+  fits; no throughput is predicted). `kindi autotune` now also measures `tandem-gpu-first`, because
+  the two directions own different output heads and one cannot stand in for the other.
 - **DSV4.1 request shapes are validated before token counting or generation** — the served
   `kindi/dsv41_server.py` path now rejects a malformed message/tool/stream/stop shape with an
   OpenAI-style 400 before `count()` or any model work, and the error envelope is pinned by
@@ -214,8 +226,8 @@
   a temporary file and reads it with `O_DIRECT` (Linux) or `FILE_FLAG_NO_BUFFERING` (Windows) so it
   measures the device instead of the page cache, and says `buffered` rather than pretending when the
   OS refuses; the PCIe probe uses pinned memory like the engine's staging buffers and reports H2D and
-  D2H apart. It loads no model. Measured here on 2026-11-17 with `--mib 64`: 13,456.7 MiB/s RAM,
-  2,509.8 MiB/s disk, 6.0/6.1 GiB/s H2D/D2H on the 4060 Ti. The rates feed slot sizing; the
+  D2H apart. It loads no model. Measured here on 2026-11-20 with `--mib 64`: 13,266.4 MiB/s RAM,
+  2,547.5 MiB/s disk, 6.0/6.1 GiB/s H2D/D2H on the 4060 Ti. The rates feed slot sizing; the
   NVMe cold-expert tier now has its first engine path, whose gate is in `docs/ROADMAP.md`
   "Memory-tier follow-ups".
 - **The Lightning cold-expert tier is opt-in and reads only the host overflow, not a page cache** —
@@ -292,7 +304,7 @@
   `kindi bench --sample-vram` child run, ranked by decode tok/s with a reduced-context run ranked
   below a full-context one and a failed run reported with its own error text. `--dry-run` prints the
   plan without loading weights, `--json` records every run. Measured on the RTX 4060 Ti with the 2B
-  pack at ctx 8192: 97.4-97.8 tok/s decode, 3,050 MiB sampled peak; the two tandem candidates were
+  pack at ctx 8192: 97.4-97.6 tok/s decode, 3,050 MiB sampled peak; the two tandem candidates were
   refused (already fits) and blocked (no compiler) and were reported as such, not scored.
 - **Recursive GBNF compiles on request, up to a stated depth** — the canonical
   `json.gbnf` was refused outright, which made the standard recursive grammar unusable.

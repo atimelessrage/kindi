@@ -44,5 +44,10 @@ def test_generated_page_names_the_gain_and_its_limit():
     md, _csv_text = module.build()
     assert "Tandem speedup over CPU-only" in md
     assert "capacity trade" in md
-    assert "slower than GPU-only" in md
+    by = _by_cell(module.matrix())
+    measured = [model for model in module.MODELS if by[("tandem", model)]["available"] == 1]
+    assert measured, "no measured tandem rows to compare with GPU-only"
+    gpu_ratios = [by[("gpu", model)]["gen_24000"] / by[("tandem", model)]["gen_24000"]
+                  for model in measured]
+    assert module.gpu_comparison(min(gpu_ratios), max(gpu_ratios)) in md
     assert "big-MoE CPU-compute row still needs the CPU expert lane" in md

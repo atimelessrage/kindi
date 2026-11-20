@@ -278,9 +278,87 @@ def _pasteable(argv):
     return subprocess.list2cmdline(argv) if _WINDOWS else shlex.join(argv)
 
 
-def _command(pack, mode, spec):
-    return _pasteable([sys.executable, "-m", "kindi", "--pack", pack, "bench",
-                       "--tandem", mode, "--tandem-cpu-layers", spec or "auto"])
+def _command(pack, mode, spec, ctx=None):
+    argv = [sys.executable, "-m", "kindi", "--pack", pack]
+    if ctx is not None:
+        argv += ["--ctx", str(int(ctx))]
+    argv += ["bench", "--tandem", mode, "--tandem-cpu-layers", spec or "auto"]
+    return _pasteable(argv)
+
+
+def _plain_command(pack, ctx):
+    """The no-split follow-up: the ordinary bench command at the planned context."""
+    return _pasteable([sys.executable, "-m", "kindi", "--pack", pack, "--ctx", int(ctx),
+                       "bench"])
+
+
+def portfolio(pack, ctx, spec="auto", gpu_kind=None,
+              assume_vram_gib=None, assume_ram_gib=None, assume_cores=None, reserve_mib=512):
+    """Compare the dense placements the runtime can build, without loading a weight.
+
+    The list is deliberately small and honest: no split, a CPU prefix (`cpu-first`) and a CPU
+    suffix (`gpu-first`), with the same layer spec in both directions. The CPU-first split keeps
+    the output head on the GPU; GPU-first keeps the embedding and early layers there and moves the
+    head to the CPU. Those are different trade-offs on the same card, so measuring one and
+    assuming the other is a placement bug, not a minor variant.
+
+    This is a capacity-first recommendation: full GPU wins whenever it fits, because the dense
+    split is slower on this host. When it does not fit, the first fitting split is recommended;
+    the rows carry the estimated peak so a caller can choose headroom over the recommendation.
+    `kindi autotune` is the measured follow-up; this report never claims a throughput number.
+    """
+    man = _manifest(pack)
+    if man.get("backend") in ("kindi_lightning", "kindi_nanbeige", "kindi_gemma4",
+                              "kindi_dsv41", "kindi_cascade"):
+        raise SystemExit("kindi: --portfolio compares dense Bonsai CPU/GPU placements; this pack's "
+                         "backend is %r and needs its own planner - use `kindi plan` without "
+                         "--portfolio" % man.get("backend"))
+    rows = []
+    for label, row_mode, row_spec in (("full GPU", "off", None),
+                                      ("cpu-first", "cpu-first", spec),
+                                      ("gpu-first", "gpu-first", spec)):
+        rep = describe(pack, ctx, row_spec, mode=row_mode, gpu_kind=gpu_kind,
+                       assume_vram_gib=assume_vram_gib, assume_ram_gib=assume_ram_gib,
+                       assume_cores=assume_cores, reserve_mib=reserve_mib)
+        if row_spec is None:
+            command = _plain_command(pack, ctx)
+            estimate = rep.get("estimate_full_mib")
+            layers = []
+        else:
+            command = _command(pack, row_mode, row_spec, ctx)
+            estimate = rep.get("estimate_mib")
+            layers = rep.get("cpu_layers") or []
+        rows.append({"placement": label, "mode": row_mode, "cpu_layers": layers,
+                     "estimate_mib": estimate, "fit": rep.get("fit"),
+                     "owner": rep.get("owner"), "command": command})
+    fitting = [row for row in rows if row.get("fit") is True]
+    full = next((row for row in fitting if row["placement"] == "full GPU"), None)
+    best = full or (fitting[0] if fitting else None)
+    lines = ["portfolio: %d dense placements at %d tokens; the rows use the pack indexes and "
+             "the planner's own byte estimate, not a loaded tensor" % (len(rows), int(ctx))]
+    lines.append("  %-10s %-10s %-24s %10s  %s" %
+                 ("placement", "head", "CPU layers", "estimate", "fit"))
+    for row in rows:
+        layers = row.get("cpu_layers") or []
+        layer_text = "%d (%s)" % (len(layers), ",".join(str(x) for x in layers)) if layers else "all GPU"
+        est = "%d MiB" % row["estimate_mib"] if row.get("estimate_mib") is not None else "unknown"
+        fit = {True: "yes", False: "no", None: "unknown"}.get(row.get("fit"), "unknown")
+        lines.append("  %-10s %-10s %-24s %10s  %s" %
+                     (row["placement"], row["mode"], layer_text, est, fit))
+    if best is None and any(row.get("fit") is None for row in rows):
+        lines.append("recommendation: cannot decide without a free-VRAM number; pass "
+                     "--assume-vram-gib or run this on the target card")
+    elif best is None:
+        lines.append("recommendation: none of these placements fit the supplied VRAM; reduce "
+                     "--ctx or add free memory")
+    elif best["placement"] == "full GPU":
+        lines.append("recommendation: full GPU (it fits; a dense split would only add CPU work)")
+    else:
+        lines.append("recommendation: %s (capacity-first; full GPU does not fit)" % best["placement"])
+    lines.append("measured follow-up: %s" % (best["command"] if best else _plain_command(pack, ctx)))
+    return {"pack": pack, "model": man.get("model"), "ctx": int(ctx), "rows": rows,
+            "best": best["placement"] if best else None, "lines": lines,
+            "command": best["command"] if best else _plain_command(pack, ctx)}
 
 
 def _verify_command(pack, mode=None, spec=None):
@@ -453,12 +531,14 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
     else:
         lines.append(("rates", "not measured; the slot count uses the engine's default"))
     n_card = None
-    cap = int(moe_cache_mib) * 2 ** 20 if moe_cache_mib is not None else None
-    if cap is not None:
+    cache_mib = int(moe_cache_mib) if moe_cache_mib is not None else None
+    if cache_mib is not None:
+        cap = cache_mib * 2 ** 20
         n_card = max(0, cap // (n_moe * eb))
         lines.append(("cache cap", "--moe-cache-mib caps the experts' card budget at %d MiB: %d of %d "
-                      "experts per layer on the card" % (int(moe_cache_mib), n_card, s.n_exp)))
+                      "experts per layer on the card" % (cache_mib, n_card, s.n_exp)))
     else:
+        cap = None
         n_card, room = _lt_fit(s, free_bytes, dense, kv, state, _lt_buf_bytes(s, 512),
                                reserve, eb, moe_layers, dcache=dcache)
     # the same room with the slots priced at zero: the fit's own counterfactual, so the line can
@@ -658,6 +738,19 @@ def run(cfg, a, log=print):
     spec = getattr(a, "tandem_cpu_layers", None) or cfg.get("tandem_cpu_layers") or "auto"
     med = getattr(a, "tandem", None) or cfg.get("tandem") or "cpu-first"
     gpu_kind = getattr(a, "tandem_gpu", None) or cfg.get("tandem_gpu") or os.environ.get("KINDI_TANDEM_GPU")
+    if getattr(a, "portfolio", False):
+        rep = portfolio(pack, cfg.get("ctx", 24576), spec, gpu_kind=gpu_kind,
+                        assume_vram_gib=getattr(a, "assume_vram_gib", None),
+                        assume_ram_gib=getattr(a, "assume_ram_gib", None),
+                        assume_cores=getattr(a, "assume_cores", None),
+                        reserve_mib=int(os.environ.get("KINDI_TANDEM_RESERVE_MB", "512")))
+        for line in rep["lines"]:
+            log(line)
+        if getattr(a, "json", None):
+            from .bench import bench_json
+            bench_json(rep, a.json)
+            log("wrote %s" % a.json)
+        return 0
     rates = None
     if _manifest(pack).get("backend") == "kindi_lightning":
         report_path = getattr(a, "io_report", None) or os.environ.get("KINDI_IO_REPORT")

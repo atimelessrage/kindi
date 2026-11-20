@@ -4,6 +4,9 @@
 ``Grammar.from_string(text)`` parses llama.cpp's GBNF and exposes the same shape as
 ``jsongrammar.JsonGrammar`` — ``start()``, ``done(state)``, ``advance(state, text)`` and
 ``vocab_allowed(state, texts)`` — so the server's constrained sampler drives either one.
+``vocab_allowed`` uses a token-class table (``kindi.token_classes``) and only
+falls back to a per-token scan when the grammar cannot prove a universal
+character loop.
 
 Supported: rules ``name ::= body`` (``root`` is the start rule), alternation ``|``,
 sequences, grouping ``(...)``, literals ``"..."`` with C-style escapes, character
@@ -522,6 +525,9 @@ class Grammar(object):
         self._productive = self._productive_states()
         self._closures = {}
         self._vocab_cache = {}
+        self._mask_table = None
+        self._mask_texts = None
+        self._self_loop_chars = {}
 
     @property
     def states(self):
@@ -603,15 +609,56 @@ class Grammar(object):
             return None                                # dead end: the language cannot finish
         return closed
 
-    def vocab_allowed(self, state, texts):
-        """Token ids whose decoded text keeps ``state`` alive (cached per state)."""
+    def _token_safe_sets(self, state, alphabet):
+        """Characters a productive self-loop in ``state`` accepts without end.
+
+        A token whose text uses only one such set can be accepted from that
+        loop for its whole length.  The table uses this only as a proof; it
+        never treats a merely plausible JSON-shaped class as safe.
+        """
+        out = []
+        for q in state:
+            if q not in self._productive:
+                continue
+            chars = self._self_loop_chars.get(q)
+            if chars is None:
+                closed = frozenset([q])
+                chars = set()
+                for c in alphabet:
+                    nxt = self._step(closed, c)
+                    if nxt is not None and q in nxt:
+                        chars.add(c)
+                chars = frozenset(chars)
+                self._self_loop_chars[q] = chars
+            if chars:
+                out.append(chars)
+        return out
+
+    def _vocab_table(self, texts):
+        if self._mask_texts is not texts:
+            from .token_classes import TokenClassTable
+
+            self._mask_table = TokenClassTable(texts, self._step, self._token_safe_sets)
+            self._mask_texts = texts
+            self._vocab_cache.clear()
+        table = self._mask_table
+        if table is None:
+            raise RuntimeError("token-class table was not initialized")
+        return table
+
+    def _vocab_allowed_scan(self, state, texts):
+        """The pre-token-class implementation, kept as the set-equality oracle."""
         import numpy as np
 
+        return np.fromiter((i for i, t in enumerate(texts) if self.advance(state, t) is not None),
+                           dtype=np.int64)
+
+    def vocab_allowed(self, state, texts):
+        """Token ids whose decoded text keeps ``state`` alive (cached per state)."""
         cached = self._vocab_cache.get(state)
         if cached is not None:
             return cached
-        ids = np.fromiter((i for i, t in enumerate(texts) if self.advance(state, t) is not None),
-                          dtype=np.int64)
+        ids = self._vocab_table(texts).allowed(state)
         self._vocab_cache[state] = ids
         return ids
 

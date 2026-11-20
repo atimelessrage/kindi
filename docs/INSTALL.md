@@ -5,8 +5,11 @@ computer can run, with the best one first, and then downloads and checks the mod
 output against llama.cpp and starts the servers as services.
 
 This installer is **Linux-only**. Windows users can follow [WINDOWS.md](WINDOWS.md) for the
-verified native CPU path; native Windows GPU execution is not validated, and GPU work should use
-the Linux Docker image or WSL2.
+verified native CPU path and [the measured 2B source-tree GPU run](WINDOWS.md#native-windows-gpu-validation-2026-11-19).
+Native Windows GPU execution is not covered by this Linux installer and is not a general support claim: the 2026-11-19 result
+covers one 2B pack on an RTX 4060 Ti 8 GB from the source tree; the 4B/9B/27B packs, other cards,
+AMD and the installer's GPU profiles remain unmeasured. For a supported GPU setup, use the Linux
+Docker image or WSL2.
 
 ## Install (Linux x86-64)
 
@@ -14,24 +17,23 @@ Download the script, compare its sha256 with the value below, read it, and then 
 the path the project supports: the checksum covers the file you actually execute.
 
 ```bash
-curl -fsSLO https://amirhusain.com/kindi/install.sh
-echo "070508a00c1b67d99692360c7e0d61289486a043a639203d6819f4e02ef8bb46  install.sh" | sha256sum -c -
+curl -fsSLO https://github.com/atimelessrage/kindi/releases/download/v0.7.0-fork/install.sh
+echo "7fa65bdb8829a30e280645ebbc191ab9675118c4aaac509093dc2e868b8145e1  install.sh" | sha256sum -c -
 bash install.sh --dry-run     # show every step and command first
 bash install.sh
 ```
 
 `curl ... | bash` is convenient but verifies nothing; if you use that form, it runs the hosted file
-without the checksum block. The GitHub release tag used by older copies of this page
-(`v0.5.0-installer`) predates the 0.6.0 script, so **do not use that tag's `install.sh`** until the
-release owner republishes it (tracked in [MANUAL-HELP-NEEDED.md](MANUAL-HELP-NEEDED.md) §5).
+without the checksum block. The fork release tag is `v0.7.0-fork`; the older `v0.5.0-installer`
+tag predates this tree and is not the current installer.
 
 On Windows 10 or 11, use the PowerShell installer. It sets up WSL2 and then runs this installer
-inside it (see [WINDOWS.md](WINDOWS.md)). No checksum is published for the hosted PowerShell file
-yet, so download it and inspect it before running rather than piping it straight into `iex`:
+inside it (see [WINDOWS.md](WINDOWS.md)). Download it and compare the hash below with a reviewed
+copy before running rather than piping it straight into `iex`:
 
 ```powershell
-Invoke-WebRequest https://amirhusain.com/kindi/install.ps1 -OutFile install.ps1
-Get-FileHash install.ps1      # record it; compare with a reviewed copy before running
+Invoke-WebRequest https://github.com/atimelessrage/kindi/releases/download/v0.7.0-fork/install.ps1 -OutFile install.ps1
+Get-FileHash install.ps1      # compare with the table below
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
@@ -40,21 +42,23 @@ For Docker Compose, Podman, servers and automated installs, there are also ready
 
 | File | sha256 |
 |---|---|
-| `install.sh` (Kindi 0.6.0, fork-merged tree) | `070508a00c1b67d99692360c7e0d61289486a043a639203d6819f4e02ef8bb46` |
+| `install.sh` (Kindi 0.7.0-fork) | `7fa65bdb8829a30e280645ebbc191ab9675118c4aaac509093dc2e868b8145e1` |
+| `install.ps1` (Kindi 0.7.0-fork) | `0c25abe5f6806ee57070b52b8dd04c1509f4a1cda583fef729b407a9a7ef2888` |
+| `kindi-0.7.0-fork.tar.gz` (source archive) | `6086c3cc3c359dfad27a81aeb3215a9784a80284ff39c45e9d29e8b434000499` |
 
-**What that value hashes.** It is the `install.sh` in the repository root of this tree
-(`KINDI_VERSION="0.6.0"`). The older GitHub release tag `v0.5.0-installer` was published
-before this script existed, so its asset does **not** hash to this value: a mismatch there
-means a stale artifact, not tampering. Until the release owner republishes the tag
-(tracked in `MANUAL-HELP-NEEDED.md` §5), take the file from the URL in this checksum
-block, or from a clone of this repository, and compare against a copy you fetched over
-TLS from a source you trust.
+**What those values hash.** They are the exact release assets: the two installers and the source
+archive. The archive is built from the release tree and excludes the installers, the two
+checksum-bearing release pages and the secret-scanner baseline, so its hash does not depend on
+itself. The installers are uploaded
+as separate assets. Older tags, including `v0.5.0-installer`, hash differently; a mismatch means a
+stale or modified artifact, not tampering.
 
-If `sha256sum -c` does not print `install.sh: OK`, do not run the script. The checksum is for the fork-merged
-`install.sh` in the repository root (upstream 0.6.0 plus the fork's pinned source archive, card classes and
-verify-speed fallback; LF line endings - a copy re-saved with CRLF hashes differently). The upstream 0.6.0
-release's own `install.sh` hashes to `ec0f3f19cf5c5c2d6f0f660db1efb9a6e289a4cfaf0a7c8decfb996f5e4471dc`;
-use that value for the file from the upstream release, this one only for the file in this tree.
+If `sha256sum -c` does not print `install.sh: OK`, do not run the script. The checksum is for the
+fork `install.sh` in the release bundle (the shared tree plus the fork's pinned source archive, card
+classes and verify-speed fallback; LF line endings - a copy re-saved with CRLF hashes differently).
+The upstream 0.6.0 release's own `install.sh` hashes to
+`ec0f3f19cf5c5c2d6f0f660db1efb9a6e289a4cfaf0a7c8decfb996f5e4471dc`; that value is historical and
+is not used by this fork release.
 
 ## What it does
 
@@ -63,7 +67,7 @@ use that value for the file from the upstream release, this one only for the fil
 | 1. Check the machine | Linux x86-64, AVX for the CPU engine, RAM, free disk, each NVIDIA GPU with its compute capability, and each AMD RDNA3 or RDNA 3.5 GPU. Without AVX, GPU setups remain available but CPU setups are not offered. | no |
 | 2. Docker and GPU access | Finds Docker, and the NVIDIA Container Toolkit or the AMD devices `/dev/kfd` and `/dev/dri`. If something is missing, it asks before it installs it (apt). Without the toolkit, it gives the container the NVIDIA devices and the driver libraries directly. | only to install |
 | 3. Select the setup | Shows each setup for this computer, the recommended one first, and asks which one (below). | no |
-| 4. Build the image | Builds `kindi:0.6.0` (CUDA 10.2), `kindi-rocm:0.6.0` (ROCm 6.3, RDNA3) or `kindi-rocm7:0.6.0` (ROCm 7, RDNA 3.5) from the release source, and checks that the Kindi modules load. A re-run with the same source does not build again. | no |
+| 4. Build the image | Builds `kindi:0.7.0-fork` (CUDA 10.2), `kindi-rocm:0.7.0-fork` (ROCm 6.3, RDNA3) or `kindi-rocm7:0.7.0-fork` (ROCm 7, RDNA 3.5) from the release source, and checks that the Kindi modules load. A re-run with the same source does not build again. | no |
 | 5. Download the models | Downloads each GGUF from Hugging Face. The sha256 must match the value in the script (table below). | no |
 | 6. Convert and verify | `kindi convert`, then `kindi verify` one time for each model on each kind of card. | no |
 | 7. Start the servers | One Docker container for each server, with `--restart unless-stopped`, on `127.0.0.1`. It waits until each `/health` answers. | no |
@@ -220,7 +224,7 @@ curl http://<address>:8093/v1/chat/completions -H 'Content-Type: application/jso
 | `--name N` | The name of the first container (default `kindi`; later ones are `N-2`, `N-3`, ...). |
 | `--threads N` | The CPU engine: the number of threads. |
 | `--memory M` | The container memory limit, for example `8g`. |
-| `--source S` | The Kindi source: a folder, or a `.tar.gz` path or URL (default: the 0.6.0 release). |
+| `--source S` | The Kindi source: a folder, or a `.tar.gz` path or URL (default: the 0.7.0-fork release). |
 | `--with-bridge` | Also installs Kindi Bridge, the terminal workspace for agents on Kindi (see below). |
 | `--no-bridge` | Does not ask about Kindi Bridge. |
 | `--bridge-source D` | Installs Kindi Bridge from folder D (default: `bridge/` in the Kindi source). |

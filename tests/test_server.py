@@ -1280,6 +1280,36 @@ def test_the_tokenize_routes_enforce_the_same_body_cap(app_client):
     assert good.json()["count"] == 5
 
 
+def test_tokenize_validates_messages_and_tools_before_counting(app_client):
+    """A malformed chat prompt is a 400, not a TypeError from the counting path."""
+    client, K = app_client
+    counted = []
+    K.check_prompt = lambda req: counted.append(req) or [7, 8]
+    base = {"messages": [{"role": "user", "content": "hello"}]}
+    cases = (
+        {"messages": "not a list"},
+        {"messages": []},
+        {"messages": [{"content": "no role"}]},
+        {"messages": [{"role": "user", "content": 3}]},
+        {"messages": [{"role": "assistant", "content": None, "tool_calls": "not a list"}]},
+        dict(base, tools="not a list"),
+        dict(base, tools=[{"type": "function", "function": {}}]),
+        dict(base, tools=[{"type": "function", "function": {"name": "f", "parameters": "not an object"}}]),
+    )
+    for payload in cases:
+        r = client.post("/v1/tokenize", json=payload)
+        assert r.status_code == 400, (payload, r.text)
+        assert r.json()["error"]["type"] == "invalid_request_error"
+    assert counted == [], "an invalid request reached K.check_prompt"
+
+    valid = dict(base, tools=[{"type": "function", "function": {
+        "name": "lookup", "parameters": {"type": "object"}}}])
+    r = client.post("/v1/tokenize", json=valid)
+    assert r.status_code == 200, r.text
+    assert r.json()["count"] == 2
+    assert len(counted) == 1 and counted[0]["stream"] is False
+
+
 def test_a_dry_run_that_cannot_count_is_an_error_not_a_fit(app_client):
     """A preflight is acted on, so a counting failure must not answer `fits: true` with 0 tokens:
     the swallowed exception used to make every such run look like it fit."""

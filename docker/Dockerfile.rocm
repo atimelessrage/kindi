@@ -4,11 +4,11 @@
 # For the Radeon 780M (gfx1103), also set HSA_OVERRIDE_GFX_VERSION=11.0.2 and boot with amdgpu.cwsr_enable=0
 # (see docs/AMD.md).
 #
-#   docker build -t kindi-rocm:0.6.0 -f docker/Dockerfile.rocm --build-arg KINDI_VERSION=0.6.0 .
+#   docker build -t kindi-rocm:0.7.0-fork -f docker/Dockerfile.rocm --build-arg KINDI_VERSION=0.7.0-fork .
 #   docker run -d --name kindi --device /dev/kfd --device /dev/dri \
 #       --group-add $(getent group video | cut -d: -f3) --group-add $(getent group render | cut -d: -f3) \
 #       --security-opt seccomp=unconfined -e HSA_OVERRIDE_GFX_VERSION=11.0.2 \
-#       -p 127.0.0.1:8093:8093 -v kindi-data:/data -e KINDI_MODEL=bonsai-4b kindi-rocm:0.6.0
+#       -p 127.0.0.1:8093:8093 -v kindi-data:/data -e KINDI_MODEL=bonsai-4b kindi-rocm:0.7.0-fork
 #
 # The base image is pinned by digest (rocm/dev-ubuntu-24.04:6.3.3).
 FROM rocm/dev-ubuntu-24.04:6.3.3@sha256:17811ff26c4c9067e774aeb0829742633dff5927caaead1e78434a975e15af64
@@ -49,7 +49,7 @@ ARG KINDI_VERSION=dev
 ARG KINDI_REVISION=unknown
 LABEL org.opencontainers.image.title="Kindi (AMD ROCm 6.3)" \
       org.opencontainers.image.description="Kindi: local LLM inference on low-cost GPUs. AMD RDNA3 graphics (ROCm 6.3; tested: Radeon 780M)." \
-      org.opencontainers.image.source="https://github.com/ahtx/kindi" \
+      org.opencontainers.image.source="https://github.com/atimelessrage/kindi" \
       org.opencontainers.image.url="https://amirhusain.com/kindi" \
       org.opencontainers.image.documentation="https://github.com/ahtx/kindi/blob/main/docs/DOCKER.md" \
       org.opencontainers.image.licenses="AGPL-3.0-only" \

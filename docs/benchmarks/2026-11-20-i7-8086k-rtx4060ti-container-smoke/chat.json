@@ -1,0 +1,30 @@
+{
+    "id": "chatcmpl-04596db420df4e3ab277a7bd",
+    "object": "chat.completion",
+    "created": 1795159211,
+    "model": "bonsai2-2b",
+    "choices": [
+        {
+            "index": 0,
+            "message": {
+                "role": "assistant",
+                "content": "container smoke ok"
+            },
+            "finish_reason": "stop"
+        }
+    ],
+    "usage": {
+        "prompt_tokens": 19,
+        "completion_tokens": 3,
+        "total_tokens": 22,
+        "prompt_tokens_details": {
+            "cached_tokens": 0
+        }
+    },
+    "timing": {
+        "prompt_s": 0.46,
+        "prompt_new_tokens": 19,
+        "gen_s": 0.01,
+        "gen_tok_s": 230.46
+    }
+}

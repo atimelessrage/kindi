@@ -110,6 +110,15 @@ def candidates(report, manifest, ctx, max_runs=6, include_cpu=False, rates=None,
         out.append({"name": "tandem-auto", "args": ["--tandem", "cpu-first",
                                                     "--tandem-cpu-layers", "auto"],
                     "why": "the smallest CPU slice that makes the context fit", "env": {}})
+        # The two directions are not interchangeable: cpu-first keeps the output head on the
+        # card, gpu-first moves it to the CPU and keeps the embedding there. A search that only
+        # measures cpu-first cannot claim the other placement is worse, so both directions come
+        # before the fixed-count sweep.
+        out.append({"name": "tandem-gpu-first",
+                    "args": ["--tandem", "gpu-first", "--tandem-cpu-layers", "auto"],
+                    "why": "the same automatic CPU slice in the opposite direction: the output "
+                           "head runs on the CPU and the early layers stay on the card",
+                    "env": {}})
         for n in (8, 16):
             out.append({"name": "tandem-gdn:%d" % n,
                         "args": ["--tandem", "cpu-first", "--tandem-cpu-layers", "gdn:%d" % n],
@@ -153,10 +162,12 @@ def candidates(report, manifest, ctx, max_runs=6, include_cpu=False, rates=None,
     return out[:max(1, int(max_runs))]
 
 
-def bench_argv(ctx, json_path, candidate, python=None):
-    """The child command: `kindi --ctx N bench --json FILE` plus the candidate's own flags."""
-    argv = [python or sys.executable, "-m", "kindi", "--ctx", str(int(ctx)), "bench",
-            "--json", json_path, "--sample-vram"]
+def bench_argv(ctx, json_path, candidate, python=None, pack=None):
+    """The child command: `kindi --pack P --ctx N bench --json FILE` plus the candidate's own flags."""
+    argv = [python or sys.executable, "-m", "kindi"]
+    if pack:
+        argv += ["--pack", str(pack)]
+    argv += ["--ctx", str(int(ctx)), "bench", "--json", json_path, "--sample-vram"]
     return argv + list((candidate or {}).get("args") or [])
 
 
@@ -171,13 +182,13 @@ def _best_gen(gen):
     return max(values) if values else None
 
 
-def run_candidate(candidate, ctx, timeout=600.0, python=None, workdir=None):
+def run_candidate(candidate, ctx, timeout=600.0, python=None, workdir=None, pack=None):
     """One bench run. Returns a result dict; a failed run is recorded, never scored."""
     fd, json_path = tempfile.mkstemp(prefix="kindi-autotune-", suffix=".json", dir=workdir)
     os.close(fd)
     env = dict(os.environ)
     env.update({k: str(v) for k, v in ((candidate or {}).get("env") or {}).items()})
-    argv = bench_argv(ctx, json_path, candidate, python=python)
+    argv = bench_argv(ctx, json_path, candidate, python=python, pack=pack)
     result = {"name": (candidate or {}).get("name"), "ok": False, "gen_tok_s": None,
               "read_tok_s": None, "ctx_reduced": None, "vram_peak": None, "error": None,
               "argv": argv, "args": list((candidate or {}).get("args") or []),
@@ -234,7 +245,7 @@ def _peak_mib(vram_peak):
     return None
 
 
-def render(results, ctx, cards, cpu):
+def render(results, ctx, cards, cpu, pack=None):
     """The ranked table plus the exact command that reproduces the winner."""
     lines = []
     lines.append("kindi autotune: ctx %d, %d card%s, %s (%s physical cores), %d run%s" %
@@ -266,7 +277,8 @@ def render(results, ctx, cards, cpu):
                  (best.get("name"), best["gen_tok_s"], ctx))
     env = best.get("env") or {}
     prefix = " ".join("%s=%s" % (k, v) for k, v in sorted(env.items()))
-    argv = ["kindi", "--ctx", str(ctx), "serve"] + list(best.get("args") or [])
+    argv = ["kindi"] + (["--pack", str(pack)] if pack else []) + \
+           ["--ctx", str(ctx), "serve"] + list(best.get("args") or [])
     command = ("%s %s" % (prefix, " ".join(argv))).strip()
     lines.append("serve it: %s" % command)
     if env:
@@ -313,7 +325,7 @@ def run(cfg, a, log=print):
     timeout = float(getattr(a, "timeout_s", None) or 600.0)
     for item in options:
         log("kindi autotune: measuring %s (%s) ..." % (item["name"], item["why"]))
-        result = run_candidate(item, ctx, timeout=timeout)
+        result = run_candidate(item, ctx, timeout=timeout, pack=pack)
         if result.get("ok"):
             gen = result.get("gen_tok_s")
             log("kindi autotune: %s -> %s tok/s decode%s" %
@@ -322,7 +334,8 @@ def run(cfg, a, log=print):
         else:
             log("kindi autotune: %s failed (%s)" % (item["name"], result.get("error")))
         results.append(result)
-    for line in render(results, ctx, report.get("gpus") or [], report.get("cpu") or {}):
+    for line in render(results, ctx, report.get("gpus") or [], report.get("cpu") or {},
+                       pack=pack):
         log(line)
     if getattr(a, "json", None):
         payload = {"pack": pack, "model": manifest.get("model"), "ctx": ctx,

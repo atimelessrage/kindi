@@ -5,8 +5,6 @@ next project milestone that would be needed before the model can be converted,
 catalogued, or installed. A match here means Kindi recognizes the file well enough
 to refuse it with a specific reason, not that Kindi can serve it.
 """
-from __future__ import annotations
-
 _SMALL_MOE = {
     "qwen3moe": (
         "Qwen3-Coder-30B-A3B",

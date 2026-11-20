@@ -7,8 +7,6 @@ has a title, an ordered message list, tags, and a triage status
 message text, verbatim, with a small header — no rewriting, no reflowing —
 and `import_markdown` reads that same format back.
 """
-from __future__ import annotations
-
 import datetime
 import hashlib
 import json

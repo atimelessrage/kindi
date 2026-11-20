@@ -987,22 +987,28 @@ def save_baseline(results_json: Path, target: Path, previous: dict | None = None
     passes. Replacing a baseline must not silently drop that list: merge it from the
     explicit `--baseline` and/or the target being overwritten, unless the new row already
     carries its own `logs`. A carried or explicit `logs` list must name the new row's own
-    `log`; otherwise it describes a different measurement and the save refuses. An
+    `log`; otherwise it describes a different measurement and the save refuses. When the
+    target and the comparison baseline both carry a list for one cell, the target being
+    replaced wins; the comparison baseline only fills cells the target does not have. An
     unreadable or malformed old baseline refuses instead of being overwritten blindly.
     """
     target = Path(target).expanduser()
-    payload = json.loads(Path(results_json).read_text(encoding="utf-8"))
-    if not isinstance(payload, dict) or not isinstance(payload.get("results"), list):
-        raise SystemExit("refusing to save baseline: %s has no results list" % results_json)
+    try:
+        payload = load_baseline(Path(results_json))
+    except SystemExit as exc:
+        raise SystemExit("refusing to save baseline: %s" % exc) from None
 
-    prior = {}
+    target_logs = {}
     if target.is_file():
         try:
-            prior.update(_logs_by_cell(load_baseline(target), str(target)))
+            target_logs = _logs_by_cell(load_baseline(target), str(target))
         except SystemExit as exc:
             raise SystemExit("refusing to replace baseline %s: %s" % (target, exc)) from None
+
+    prior = {}
     if previous is not None:
         prior.update(_logs_by_cell(previous, "the comparison baseline"))
+    prior.update(target_logs)
 
     current = set()
     for row in payload["results"]:

@@ -64,6 +64,9 @@ used by `CROSS-MODE.md`; it is shown for comparison and is not part of that pair
 | GPU only | 190.0 | 169.0 | 163.3 | 175.4 | 171.7 | 160.6 |
 | GPU+CPU tandem | 93.5 | 70.8 | 81.8 | 64.1 | 43.8 | 37.4 |
 | **Tandem / CPU** | **2.2x** | **2.6x** | **2.9x** | **3.5x** | **3.8x** | **4.6x** |
+| **Tandem / GPU** | **0.5x** | **0.4x** | **0.5x** | **0.4x** | **0.3x** | **0.2x** |
+
+The Tandem / GPU row is tandem throughput as a fraction of GPU-only (1.0x is parity).
 
 The old cross-run row reported 2.2x/2.5x/3.0x/3.6x/4.3x at 100/2K/8K/16K/24K. The controlled
 pair gives 2.6x/2.9x/3.5x/3.8x/4.6x: the current CPU placement is slower at shallow positions
@@ -78,6 +81,9 @@ pair gives 2.6x/2.9x/3.5x/3.8x/4.6x: the current CPU placement is slower at shal
 | GPU only | 129.0 | 106.2 | 101.9 | 90.8 | 89.3 | 79.8 |
 | GPU+CPU tandem | 53.3 | 39.6 | 37.9 | 26.2 | 18.4 | 14.4 |
 | **Tandem / CPU** | **3.2x** | **2.8x** | **3.2x** | **3.9x** | **4.7x** | **5.0x** |
+| **Tandem / GPU** | **0.4x** | **0.4x** | **0.4x** | **0.3x** | **0.2x** | **0.2x** |
+
+The Tandem / GPU row is tandem throughput as a fraction of GPU-only (1.0x is parity).
 
 The old cross-run row reported 3.1x/3.3x/4.7x/5.5x/5.4x at 100/2K/8K/16K/24K. The controlled
 pair gives 2.8x/3.2x/3.9x/4.7x/5.0x. Position 100 is slower in both placements than the old
