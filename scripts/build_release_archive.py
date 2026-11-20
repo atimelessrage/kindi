@@ -26,6 +26,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DIST = ROOT / "dist"
 EXCLUDED = {
+    "AGENTS.md",
     "install.sh",
     "install.ps1",
     "docs/INSTALL.md",

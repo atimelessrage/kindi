@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `82a72bf` on `freebuff/tandem-cpu-recovery` (**main** fast-forwards to the handoff commit; guarded by `tests/test_agents_handoff.py`); the 2026-11-20 integration lands the `0.7.0-fork` release surface, local archive builder, read-only Intel probe, dense placement portfolio, process-shared token-class grammar masks, stricter request validation and autotune/parity fixes, with the controlled benchmark, container-smoke and claims evidence tracked; the earlier 2026-11-19 round remains in history; Engine wiring and the model row remain blocked by the absent Lightning pack.
+- **HEAD:** `b04cca8` on `freebuff/tandem-cpu-recovery` (**main** fast-forwards to the handoff commit; guarded by `tests/test_agents_handoff.py`); the 2026-11-20 integration lands the `0.7.0-fork` release surface, local archive builder, read-only Intel probe, dense placement portfolio, process-shared token-class grammar masks, stricter request validation and autotune/parity fixes, with the controlled benchmark, container-smoke and claims evidence tracked; the earlier 2026-11-19 round remains in history; Engine wiring and the model row remain blocked by the absent Lightning pack.
 
 ### Python quality ratchet
 
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `82a72bf` | main checkout; clean; fast-forwarded to the integration commit |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `82a72bf` | this session; checked out here |
+| `T:/kindi` | `main` | `b04cca8` | main checkout; clean; fast-forwarded to the release-pin commit |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `b04cca8` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
