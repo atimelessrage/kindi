@@ -22,7 +22,7 @@ set -euo pipefail
 KINDI_VERSION="0.7.0-fork"
 SOURCE_URL="https://github.com/atimelessrage/kindi/releases/download/v${KINDI_VERSION}/kindi-${KINDI_VERSION}.tar.gz"
 # sha256 of the fork's 0.7.0-fork source archive at SOURCE_URL; a custom URL can be pinned with KINDI_SOURCE_SHA256
-SOURCE_SHA256="6086c3cc3c359dfad27a81aeb3215a9784a80284ff39c45e9d29e8b434000499"
+SOURCE_SHA256="6427b5cadf3e69f2130570e81232f0bbe808711a6c053df099dac80ceb68f3bd"
 HF="https://huggingface.co/prism-ml"
 # model: GGUF file, sha256 (= the Hugging Face file hash), size in bytes
 declare -A GGUF SHA SIZE

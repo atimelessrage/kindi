@@ -8,11 +8,12 @@ registry keep it distinct from upstream.
 
 - Official baseline: `v0.6.1` (`7fececb`), published 2026-11-16.
 - Shared base: `dce89df`; `v0.6.1` is one commit past that base and is **not** an ancestor of this
-  fork. The fork's release HEAD is `60a039b` on `freebuff/tandem-cpu-recovery`.
-- Current range: `git rev-list --count v0.6.1..HEAD` = **669 commits**;
-  `git diff --shortstat v0.6.1..HEAD` = **827 files, +107,320/−1,370**.
+  fork. The release-code baseline is `a2c450f` on `freebuff/tandem-cpu-recovery`; the checksum-pin
+  commit follows it.
+- Current range at that baseline: `git rev-list --count v0.6.1..a2c450f` = **672 commits**;
+  `git diff --shortstat v0.6.1..a2c450f` = **891 files, +125,457/−1,406**.
 - The **649**-commit figure in `detailed-fork-changelog.md` was the `3002a40` snapshot. The
-  `CURRENT-VS-KINDI-0.6.md` audit recorded 666 at `3fed704`; the release adds 3 commits and is 669.
+  `CURRENT-VS-KINDI-0.6.md` audit recorded 666 at `3fed704`; the integration adds six commits.
   Do not repeat 649 as the current count.
 - Why `0.7.0-fork`: the fork adds substantial runtime, CLI, API and test surface and must not call
   itself `0.6.1`. The suffix prevents a fork build from being read as an official upstream patch,
@@ -33,9 +34,9 @@ registry keep it distinct from upstream.
 
 | Artifact | sha256 |
 |---|---|
-| `dist/kindi-0.7.0-fork.tar.gz` | `6086c3cc3c359dfad27a81aeb3215a9784a80284ff39c45e9d29e8b434000499` |
+| `dist/kindi-0.7.0-fork.tar.gz` | `6427b5cadf3e69f2130570e81232f0bbe808711a6c053df099dac80ceb68f3bd` |
 | `dist/kindi-0.7.0-fork.tar.gz.sha256` | sidecar containing the archive hash |
-| `install.sh` | `7fa65bdb8829a30e280645ebbc191ab9675118c4aaac509093dc2e868b8145e1` |
+| `install.sh` | `d5c90e8dfdbb03c3b38573b09fd20fd0ff55176b71cd58497f603c777e2aff77` |
 | `install.ps1` | `0c25abe5f6806ee57070b52b8dd04c1509f4a1cda583fef729b407a9a7ef2888` |
 
 The archive is built from the working tree with:
@@ -69,8 +70,8 @@ outputs: [container smoke evidence](benchmarks/2026-11-20-i7-8086k-rtx4060ti-con
 The image label records revision `1627b96312509e6e2bdaad805116f7f6459b88f3-dirty`; the
 `kindi/COMMIT` placeholder still makes `/health` report `commit: null`. No image was published.
 
-`dist/kindi-0.7.0-fork.tar.gz` predates this fix and still contains the old `kindi/sessions.py`.
-Rebuild the archive and update the hashes before publishing; the hash below was not regenerated.
+The archive above was rebuilt from `a2c450f` after the Python 3.6 fix, so it contains the
+repaired `kindi/sessions.py`; the image label still records its earlier dirty build.
 
 ## 1. Verify the tree before building
 

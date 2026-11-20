@@ -7,6 +7,8 @@ post-release upstream commit left to port. This page keeps the current compariso
 the round-by-round history has moved verbatim to `detailed-fork-changelog.md`. The 2026-11-19 engine/test/evidence round is committed through `53198e5`, and the round-3 audit fixes are in `3fed704`, so
 the figures for that round include both.
 
+> **2026-11-20 integration note:** the `0.7.0-fork` release edits described below as uncommitted were integrated and committed at `82a72bf`; this report's measurements and counts remain those of the `60a039b` audit baseline.
+
 **Short answer.** This fork is **669 commits and 827 files ahead** of `v0.6.1` at the committed
 baseline `60a039b` (**+107,320/−1,370** lines), with **zero file deletions** against the official tree.
 The measured advantages are the fork's own plan engine and tensor-core path, the tandem

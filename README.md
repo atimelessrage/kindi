@@ -12,10 +12,10 @@ Kindi supports NVIDIA cards from the 1 GB Quadro K420 (Kepler) to the RTX 50 ser
 supports AMD Radeon 780M, 840M and 8060S graphics, and x86-64 CPUs. The OpenAI-compatible server has a prompt
 cache, tool calls, a thinking mode and speculative decoding. With the exact head, the greedy output is the same as
 the output of llama.cpp for the same model file, token for token. Version 0.7.0-fork is this fork's release, based on
-`60a039b`: it is **669 commits and 827 files ahead of official Kindi v0.6.1** and is not an official release. It includes
+`a2c450f`: it is **672 commits and 891 files ahead of official Kindi v0.6.1** and is not an official release. It includes
 the two mixture-of-experts models that keep experts in host memory, the DSpine drafter for the 27B, and the one-command
 installer for Windows. The older `649`-commit figure in `detailed-fork-changelog.md` was recorded at `3002a40`; the
-current `v0.6.1..HEAD` range is 669.
+current `v0.6.1..a2c450f` range is 672.
 
 ### Measured speed
 
