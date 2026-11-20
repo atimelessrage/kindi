@@ -48,6 +48,8 @@ Each key can also be set from the environment as `KINDI_<KEY>` (for example `KIN
 | `ctx` | int | `24576` | requested context; each backend clamps it to available device memory |
 | `head` | string | `exact` | exact \| fast (shortlist head, ~15% faster, approximate) |
 | `fast_clusters` | int | `256` | clusters scored by the fast head |
+| `tandem_vram_mb` | int | `0` | tandem GPU ceiling in MiB (0: no ceiling) |
+| `tandem_reserve_mb` | int | `512` | free card memory the tandem planner leaves for the display/driver |
 
 ### prompt cache
 
@@ -111,9 +113,9 @@ variables, and are therefore not listed twice here.
 | `KINDI_CHUNK_TS` | `64` | `kindi/chunk.py:454` |
 | `KINDI_CKPT_PINNED` | `"1" if _WDDM else "0"` | `kindi/cache.py:45` |
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:585` |
-| `KINDI_CONFIG` | (unset) | `kindi/config.py:120` (+1 more) |
+| `KINDI_CONFIG` | (unset) | `kindi/config.py:125` (+1 more) |
 | `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:212` (+4 more) |
-| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:421` (+1 more) |
+| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:426` (+1 more) |
 | `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:47` |
 | `KINDI_D1` | `1` or `0` | `kindi/spec.py:727` (+1 more) |
 | `KINDI_DATA` | `/data` | `kindi/container.py:243` |
@@ -199,11 +201,11 @@ variables, and are therefore not listed twice here.
 | `KINDI_LT_NSPLIT` | `32` | `kindi/lightning.py:30` |
 | `KINDI_LT_NSPLIT_TC` | `64` | `kindi/lightning.py:31` |
 | `KINDI_LT_PRE6` | `"1" if self.cc >= 60 else "0"` | `kindi/lightning.py:146` |
-| `KINDI_LT_RESERVE_MB` | `350` | `kindi/autotune.py:310` (+2 more) |
+| `KINDI_LT_RESERVE_MB` | `350` | `kindi/autotune.py:337` (+2 more) |
 | `KINDI_LT_SELFCHECK` | `1` | `kindi/lightning_gen.py:245` |
 | `KINDI_LT_SM75` | (unset) | `kindi/lightning.py:149` |
 | `KINDI_LT_TC` | `1` | `kindi/lightning.py:144` |
-| `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:561` |
+| `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:588` |
 | `KINDI_MEM_RESERVE_MB` | `96` or `256` or `32` | `kindi/engine.py:308` (+4 more) |
 | `KINDI_MODEL` | (empty) | `kindi/container.py:240` |
 | `KINDI_MOE_COPY` | `0` | `kindi/dsv41.py:596` |
@@ -246,7 +248,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_Q8X2` | `1` | `kindi/chunk.py:272` |
 | `KINDI_SAMPLER_ORDER` | `llama` | `kindi/sampling.py:19` |
 | `KINDI_SM2` | (empty) | `kindi/spec.py:747` |
-| `KINDI_SPEC` | `0` | `kindi/__main__.py:225` (+13 more) |
+| `KINDI_SPEC` | `0` | `kindi/__main__.py:230` (+13 more) |
 | `KINDI_SPEC_B0_K2_MAX` | `1024` | `kindi/spec.py:59` |
 | `KINDI_SPEC_B2_MAX` | `0` | `kindi/spec.py:60` |
 | `KINDI_SPEC_CTX` | (unset) | `kindi/spec.py:1962` |
@@ -256,17 +258,16 @@ variables, and are therefore not listed twice here.
 | `KINDI_SPEC_GUARD_BOUND_DEPTH` | `8192` | `kindi/spec.py:1013` |
 | `KINDI_SPEC_GUARD_FROM` | `32768` | `kindi/spec.py:63` |
 | `KINDI_SPEC_GUARD_LOG` | (unset) | `kindi/spec.py:1048` |
-| `KINDI_SPEC_K` | `"1" if mode == "mtp" else "4"` or `4` | `kindi/calibrate.py:70` (+2 more) |
+| `KINDI_SPEC_K` | `"1" if mode == "mtp" else "4"` or `4` | `kindi/calibrate.py:76` (+2 more) |
 | `KINDI_SPEC_KNOWN` | `1` | `kindi/cache.py:1111` |
 | `KINDI_SPEC_MTP_K2_MAX` | `8192` | `kindi/spec.py:58` |
 | `KINDI_SPEC_PACK` | (unset) | `kindi/spec.py:1955` (+2 more) |
 | `KINDI_SPEC_SAMPLE` | `1` | `kindi/spec.py:1345` |
 | `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:1962` |
 | `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:196` |
-| `KINDI_TANDEM_DEBUG_TIMING` | `0` | `kindi/tandem.py:653` |
+| `KINDI_TANDEM_DEBUG_TIMING` | `0` | `kindi/tandem.py:697` |
 | `KINDI_TANDEM_GPU` | `auto` | `kindi/plan.py:187` (+2 more) |
-| `KINDI_TANDEM_RATIO` | (unset) | `kindi/tandem.py:322` |
-| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/plan.py:746` (+3 more) |
+| `KINDI_TANDEM_RATIO` | (unset) | `kindi/tandem.py:352` |
 | `KINDI_TC` | `0` | `kindi/spec.py:82` (+3 more) |
 | `KINDI_TC_B2` | (empty) | `kindi/tc.py:51` |
 | `KINDI_TC_DP4A` | `0` | `kindi/tc.py:74` |

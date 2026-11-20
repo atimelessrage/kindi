@@ -26,6 +26,8 @@ DEFAULTS = {
     "ctx": "24576",                     # requested context; each backend clamps it to available device memory
     "head": "exact",                    # exact | fast (shortlist head, ~15% faster, approximate)
     "fast_clusters": "256",             # clusters scored by the fast head
+    "tandem_vram_mb": "0",              # tandem GPU ceiling in MiB (0: no ceiling)
+    "tandem_reserve_mb": "512",         # free card memory the tandem planner leaves for the display/driver
     # prompt cache
     "checkpoint_every": "256",          # recurrent-state checkpoint spacing (tokens)
     "prefix_max": "8",                  # saved prompt openings kept on disk
@@ -53,7 +55,8 @@ DEFAULTS = {
     "sampling_profile": "default",       # default | publisher: the model publisher's sampling values (Bonsai only)
 }
 
-INT_KEYS = {"repeat_stop", "lookup", "port", "ctx", "fast_clusters", "checkpoint_every", "checkpoint_budget_mb", "prefix_max", "prefix_min", "park_max",
+INT_KEYS = {"repeat_stop", "lookup", "port", "ctx", "fast_clusters", "tandem_vram_mb", "tandem_reserve_mb",
+            "checkpoint_every", "checkpoint_budget_mb", "prefix_max", "prefix_min", "park_max",
             "turn_save", "turn_keep", "turn_disk_mb", "turn_min",
             "max_tokens", "top_k", "repeat_last_n", "max_body_mb", "queue_max", "rate_limit_per_min", "log_json"}
 FLOAT_KEYS = {"temperature", "top_p", "min_p", "repeat_penalty", "presence_penalty"}
@@ -75,6 +78,8 @@ def _validate(cfg):
         ("log_json", 0, 1),
         ("ctx", 1, None),
         ("fast_clusters", 1, None),
+        ("tandem_vram_mb", 0, None),
+        ("tandem_reserve_mb", 0, None),
         ("checkpoint_every", 1, None),
         ("prefix_max", 0, None),
         ("prefix_min", 0, None),

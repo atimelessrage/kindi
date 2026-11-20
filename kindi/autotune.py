@@ -85,13 +85,21 @@ def _expert_cache_mib(moe, rates):
     return min(mib, host_mib)
 
 
-def candidates(report, manifest, ctx, max_runs=6, include_cpu=False, rates=None, moe=None):
+def candidates(report, manifest, ctx, max_runs=6, include_cpu=False, rates=None, moe=None,
+               vram_budget_mib=None, vram_reserve_mib=None):
     """The configurations worth measuring on this host, most likely useful first.
 
     Every entry is a dict: `name`, `why`, `args` (bench flags) and `env` (process environment).
     `moe` is the Lightning sizing report (`dcache`, `n_used`, `n_exp`); with `rates` it lets the
-    slot candidates follow the measured I/O model instead of the fixed 16/6 pair.
+    slot candidates follow the measured I/O model instead of the fixed 16/6 pair. A VRAM ceiling
+    or reserve is carried into every tandem candidate, so the child planner obeys the same barrier
+    as the plan this list came from.
     """
+    mem_env = {}
+    if vram_budget_mib:
+        mem_env["KINDI_TANDEM_VRAM_MB"] = str(int(vram_budget_mib))
+    if vram_reserve_mib is not None:
+        mem_env["KINDI_TANDEM_RESERVE_MB"] = str(int(vram_reserve_mib))
     cards = (report or {}).get("gpus") or []
     cpu = (report or {}).get("cpu") or {}
     backend = (manifest or {}).get("backend") or ""
@@ -109,7 +117,8 @@ def candidates(report, manifest, ctx, max_runs=6, include_cpu=False, rates=None,
     if cards and dense and physical >= 4:
         out.append({"name": "tandem-auto", "args": ["--tandem", "cpu-first",
                                                     "--tandem-cpu-layers", "auto"],
-                    "why": "the smallest CPU slice that makes the context fit", "env": {}})
+                    "why": "the smallest CPU slice that makes the context fit (VRAM budget-aware)",
+                    "env": dict(mem_env)})
         # The two directions are not interchangeable: cpu-first keeps the output head on the
         # card, gpu-first moves it to the CPU and keeps the embedding there. A search that only
         # measures cpu-first cannot claim the other placement is worse, so both directions come
@@ -118,11 +127,12 @@ def candidates(report, manifest, ctx, max_runs=6, include_cpu=False, rates=None,
                     "args": ["--tandem", "gpu-first", "--tandem-cpu-layers", "auto"],
                     "why": "the same automatic CPU slice in the opposite direction: the output "
                            "head runs on the CPU and the early layers stay on the card",
-                    "env": {}})
+                    "env": dict(mem_env)})
         for n in (8, 16):
             out.append({"name": "tandem-gdn:%d" % n,
                         "args": ["--tandem", "cpu-first", "--tandem-cpu-layers", "gdn:%d" % n],
-                        "why": "fixed CPU slice: the first %d non-attention layers" % n, "env": {}})
+                        "why": "fixed CPU slice: the first %d non-attention layers" % n,
+                        "env": dict(mem_env)})
     if backend in MOE_BACKENDS:
         sized = int((moe or {}).get("dcache") or 0)
         n_used = int((moe or {}).get("n_used") or 4)
@@ -224,12 +234,21 @@ def run_candidate(candidate, ctx, timeout=600.0, python=None, workdir=None, pack
     return result
 
 
-def rank(results):
-    """Fastest decode first; a reduced context or a failed run never outranks a full one."""
+def _over_budget(item, budget_mib=None):
+    """Whether a measured peak exceeds the explicit ceiling (an unknown peak is not a violation)."""
+    if not budget_mib:
+        return False
+    peak = _peak_mib(item.get("vram_peak"))
+    return peak is not None and peak > int(budget_mib)
+
+
+def rank(results, budget_mib=None):
+    """Fastest decode first; failed, over-budget and reduced-context runs never outrank safe ones."""
     def key(item):
         reduced = 1 if item.get("ctx_reduced") else 0
+        over = 1 if _over_budget(item, budget_mib) else 0
         gen = item.get("gen_tok_s")
-        return (0 if item.get("ok") else 1, reduced, -(gen if gen is not None else -1.0),
+        return (0 if item.get("ok") else 1, over, reduced, -(gen if gen is not None else -1.0),
                 item.get("name") or "")
     return sorted(results, key=key)
 
@@ -245,7 +264,7 @@ def _peak_mib(vram_peak):
     return None
 
 
-def render(results, ctx, cards, cpu, pack=None):
+def render(results, ctx, cards, cpu, pack=None, vram_budget_mib=None):
     """The ranked table plus the exact command that reproduces the winner."""
     lines = []
     lines.append("kindi autotune: ctx %d, %d card%s, %s (%s physical cores), %d run%s" %
@@ -253,7 +272,8 @@ def render(results, ctx, cards, cpu, pack=None):
                   cpu.get("model") or "unknown CPU", cpu.get("physical"),
                   len(results), "" if len(results) == 1 else "s"))
     lines.append("  %-14s %10s %10s %10s  %s" % ("config", "decode", "read", "peak", "note"))
-    ordered = rank(results)
+    budget = int(vram_budget_mib or 0)
+    ordered = rank(results, budget_mib=budget or None)
     for item in ordered:
         if not item.get("ok"):
             lines.append("  %-14s %10s %10s %10s  failed: %s" %
@@ -262,16 +282,23 @@ def render(results, ctx, cards, cpu, pack=None):
         gen = item.get("gen_tok_s")
         peak = _peak_mib(item.get("vram_peak"))
         note = ""
-        if item.get("ctx_reduced"):
+        if _over_budget(item, budget):
+            note = "over the %d MiB VRAM budget" % budget
+        elif item.get("ctx_reduced"):
             note = "context reduced to fit"
         lines.append("  %-14s %10s %10s %10s  %s" %
                      (item.get("name"),
                       "%.1f" % gen if gen is not None else "-",
                       "%.1f" % item["read_tok_s"] if item.get("read_tok_s") is not None else "-",
                       "%d MiB" % peak if peak is not None else "-", note))
-    best = next((item for item in ordered if item.get("ok") and item.get("gen_tok_s") is not None), None)
+    best = next((item for item in ordered if item.get("ok") and item.get("gen_tok_s") is not None
+                 and not _over_budget(item, budget)), None)
     if best is None:
-        lines.append("no candidate produced a decode number; nothing is recommended")
+        if budget and any(item.get("ok") and item.get("gen_tok_s") is not None for item in ordered):
+            lines.append("no candidate stayed within the %d MiB VRAM budget; nothing is recommended"
+                         % budget)
+        else:
+            lines.append("no candidate produced a decode number; nothing is recommended")
         return lines
     lines.append("best: %s - %.1f tok/s decode at ctx %d" %
                  (best.get("name"), best["gen_tok_s"], ctx))
@@ -311,9 +338,18 @@ def run(cfg, a, log=print):
                                  rates=rates)
         except (Exception, SystemExit):
             moe = None
+    budget = getattr(a, "vram_budget_mib", None)
+    if budget is None:
+        budget = int(cfg.get("tandem_vram_mb") or 0) or None
+    reserve = getattr(a, "vram_reserve_mib", None)
+    if reserve is None:
+        reserve = cfg.get("tandem_reserve_mb")
+    if reserve is None:
+        reserve = int(os.environ.get("KINDI_TANDEM_RESERVE_MB", "512"))
     options = candidates(report, manifest, ctx, max_runs=getattr(a, "max_runs", 6),
                          include_cpu=getattr(a, "include_cpu", False),
-                         rates=rates, moe=moe)
+                         rates=rates, moe=moe, vram_budget_mib=budget,
+                         vram_reserve_mib=reserve)
     if getattr(a, "dry_run", False):
         log("kindi autotune: %d candidate%s at ctx %d (dry run: nothing is loaded)" %
             (len(options), "" if len(options) == 1 else "s", ctx))
@@ -333,20 +369,23 @@ def run(cfg, a, log=print):
                  " (context reduced)" if result.get("ctx_reduced") else ""))
         else:
             log("kindi autotune: %s failed (%s)" % (item["name"], result.get("error")))
+        result["over_budget"] = _over_budget(result, budget)
         results.append(result)
     for line in render(results, ctx, report.get("gpus") or [], report.get("cpu") or {},
-                       pack=pack):
+                       pack=pack, vram_budget_mib=budget):
         log(line)
     if getattr(a, "json", None):
         payload = {"pack": pack, "model": manifest.get("model"), "ctx": ctx,
+                   "vram_budget_mib": budget, "vram_reserve_mib": reserve,
                    "cards": report.get("gpus") or [], "cpu": report.get("cpu") or {},
                    "rates": rates, "moe": ({k: moe.get(k) for k in
                                            ("dcache", "n_used", "n_exp", "n_moe", "n_card",
                                             "expert_bytes", "room", "fit")}
                                           if moe else None),
                    "candidates": options, "results": results,
-                   "best": (next((r for r in rank(results) if r.get("ok")
-                                  and r.get("gen_tok_s") is not None), None) or {}).get("name")}
+                   "best": (next((r for r in rank(results, budget_mib=budget) if r.get("ok")
+                                  and r.get("gen_tok_s") is not None
+                                  and not _over_budget(r, budget)), None) or {}).get("name")}
         try:
             with open(a.json, "w", encoding="utf-8") as f:
                 json.dump(payload, f, indent=2, sort_keys=True)

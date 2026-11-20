@@ -77,6 +77,16 @@ def test_describe_without_a_card_reports_the_model_only(tmp_path, monkeypatch):
     assert rep["command"]                                    # the follow-up command is still printed
 
 
+def test_describe_reports_the_vram_budget_ceiling(tmp_path):
+    pack = make_pack(tmp_path)
+    rep = _plan.describe(str(pack), 100, "auto", assume_vram_gib=1, assume_ram_gib=4,
+                         assume_cores=2, vram_budget_mib=512)
+    assert rep["vram_budget_mib"] == 512
+    assert rep["budget_mib"] == 512
+    assert any(key == "vram budget" and "512 MiB ceiling" in reason
+               for key, reason in rep["lines"])
+
+
 def test_describe_missing_pack_is_an_error(tmp_path):
     with pytest.raises(SystemExit):
         _plan.describe(str(tmp_path / "nope"), 100, "auto", assume_vram_gib=1)
@@ -107,6 +117,14 @@ def test_portfolio_compares_full_gpu_and_both_split_directions(tmp_path):
     assert gpu["command"].endswith("bench --tandem gpu-first --tandem-cpu-layers gdn:1")
     assert rep["best"] == "full GPU"
     assert any(line.startswith("recommendation: full GPU") for line in rep["lines"])
+
+
+def test_portfolio_carries_the_vram_budget_into_its_rows(tmp_path):
+    pack = make_pack(tmp_path)
+    rep = _plan.portfolio(str(pack), 100, "gdn:1", assume_vram_gib=1, assume_ram_gib=4,
+                          assume_cores=2, vram_budget_mib=512)
+    assert all(row["budget_mib"] == 512 for row in rep["rows"])
+    assert "--vram-budget-mib 512" in rep["rows"][1]["command"]
 
 
 def test_portfolio_rejects_a_moe_pack_with_its_own_planner(tmp_path):
@@ -147,6 +165,8 @@ class _FakeArgs:
         self.assume_ram_gib = None
         self.assume_cores = None
         self.portfolio = False
+        self.vram_budget_mib = None
+        self.vram_reserve_mib = None
         self.json = None
         self.__dict__.update(kw)
 

@@ -29,6 +29,16 @@ def test_one_card_gets_no_two_card_split_and_no_cpu_run():
     assert "tandem-auto" in names
 
 
+def test_tandem_candidates_carry_the_vram_ceiling_and_reserve():
+    options = autotune.candidates(ONE_CARD, DENSE, 8192, max_runs=10,
+                                  vram_budget_mib=6144, vram_reserve_mib=1024)
+    for name in ("tandem-auto", "tandem-gpu-first", "tandem-gdn:8"):
+        option = next(item for item in options if item["name"] == name)
+        assert option["env"]["KINDI_TANDEM_VRAM_MB"] == "6144"
+        assert option["env"]["KINDI_TANDEM_RESERVE_MB"] == "1024"
+    assert next(item for item in options if item["name"] == "gpu0")["env"] == {}
+
+
 def test_one_card_offers_both_tandem_head_directions():
     """cpu-first and gpu-first own different heads, so the measured search must include both.
 
@@ -264,6 +274,20 @@ def test_a_failed_candidate_is_reported_without_a_number():
     text = "\n".join(autotune.render(results, 8192, [], {"model": "x", "physical": 6}))
     assert "failed: kindi: the CPU engine does not have this pack" in text
     assert "nothing is recommended" in text
+
+
+def test_ranking_puts_an_over_budget_run_behind_a_safe_one():
+    results = [
+        {"name": "fast-over", "ok": True, "gen_tok_s": 120.0, "ctx_reduced": False,
+         "vram_peak": {"peak_used_mib": 7000}},
+        {"name": "safe-slower", "ok": True, "gen_tok_s": 80.0, "ctx_reduced": False,
+         "vram_peak": {"peak_used_mib": 5000}},
+    ]
+    assert [r["name"] for r in autotune.rank(results, budget_mib=6144)] == ["safe-slower", "fast-over"]
+    text = "\n".join(autotune.render(results, 8192, ONE_CARD["gpus"], ONE_CARD["cpu"],
+                                      vram_budget_mib=6144))
+    assert "over the 6144 MiB VRAM budget" in text
+    assert "best: safe-slower" in text
 
 
 def test_ranking_puts_a_full_context_ahead_and_failures_last():

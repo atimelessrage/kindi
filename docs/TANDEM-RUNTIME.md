@@ -45,6 +45,7 @@ rejected with the accepted forms named in the error:
   at that context, the head, the f32 file and a measured scratch allowance. It **refuses instead of
   splitting** when the model already fits, and refuses with the missing amount when no split can fit.
   `KINDI_TANDEM_RESERVE_MB` (default 512) sets the free memory it leaves behind.
+  `--vram-budget-mib N` adds a hard ceiling for the card; see [per-card VRAM budget](#per-card-vram-budget).
 - **`rate`** (or **`rate:0.25`** to keep at least 25% of the full-GPU rate) — picks by the measured
   CPU-vs-PCIe ratio, not by free memory alone (roadmap prior-art item 1, from tandem.cpp). It reads a
   split-ratio calibration written by `tools/measure_split_ratio.py` (the keyed JSON in
@@ -76,7 +77,7 @@ is a separate change.
 
 ## Usage
 
-The flags are on `verify`, `bench`, `serve` and `chat`:
+The tandem placement flags are on `verify`, `bench`, `serve`, `chat` and `plan`; `--vram-budget-mib` and `--vram-reserve-mib` are also on `autotune` and `calibrate`:
 
 ```sh
 kindi --pack ~/.kindi/packs/bonsai-2b verify --tandem cpu-first --tandem-cpu-layers 6
@@ -86,6 +87,41 @@ kindi --pack ~/.kindi/packs/bonsai-2b serve  --tandem cpu-first --tandem-cpu-lay
 
 The CPU library must be buildable on the host (`gcc` with OpenMP, or clang with libomp on Windows).
 The tandem path requires a CUDA/ROCm GPU; `KINDI_DEVICE=cpu` is rejected.
+
+## Per-card VRAM budget
+
+The planner has two independent memory controls:
+
+- `--vram-budget-mib N` (or `tandem_vram_mb` / `KINDI_TANDEM_VRAM_MB`) is a **hard ceiling** for the
+  GPU side. It is not the card's advertised size: a P106-100 can be limited to `6144`, and a card
+  that also runs the display can be limited lower, for example `7168` of 8 GiB. A ceiling below the
+  full model's estimate makes `auto`/`rate` move GDN layers to the CPU even when the card currently
+  has more free memory, which is the display-sharing case.
+- `--vram-reserve-mib N` (or `tandem_reserve_mb` / `KINDI_TANDEM_RESERVE_MB`) is the headroom left
+  below the **live free** figure for the display, driver and allocation noise. The default is 512;
+  lower it only for a dedicated card. `0` means no reserve.
+
+The fit uses `min(free - reserve, budget)`. The live free figure still wins when it is lower than the
+ceiling, so a budget cannot promise memory that is not currently available. A budget of `0` or unset
+means no explicit ceiling.
+
+```sh
+# a 6 GiB P106-100, with the full card available
+kindi --pack ~/.kindi/packs/bonsai-9b --ctx 24576 serve \
+  --tandem cpu-first --tandem-cpu-layers auto --vram-reserve-mib 0 --vram-budget-mib 6144
+
+# an 8 GiB card that also drives the desktop: keep 1 GiB free
+kindi --pack ~/.kindi/packs/bonsai-9b --ctx 24576 plan \
+  --assume-vram-gib 8 --vram-budget-mib 7168 --vram-reserve-mib 512
+```
+
+`plan` and `plan --portfolio` label the rows against the same ceiling; `autotune` carries it into
+every tandem child run and marks a measured peak above it as over-budget, so it cannot recommend the
+fastest run that violates the barrier. Fixed `gdn:N` and explicit layer sets are still manual
+placements: they are reported, but only `auto`/`rate` choose a set to fit the budget.
+
+`auto:MiB` is a different control: it asks the planner to **free** that much extra headroom, not to
+cap the card. Use `--vram-budget-mib` when the card must stay below a ceiling.
 
 ## Portfolio dry run (2026-11-20)
 
@@ -103,7 +139,8 @@ kindi --pack ~/.kindi/packs/bonsai-2b --ctx 24576 plan --portfolio --assume-vram
 ```
 
 The rows use the same `pack_bytes` / `gpu_estimate` arithmetic as the planner and are labelled
-`yes`/`no` against the supplied or probed free VRAM. The recommendation is **capacity-first**: full
+`yes`/`no` against the supplied or probed free VRAM, after the reserve and any
+`--vram-budget-mib` ceiling. The recommendation is **capacity-first**: full
 GPU when it fits (on this host every measured dense split is slower than GPU-only), otherwise the
 first fitting split. It never reports a throughput prediction; `kindi autotune` runs the selected
 commands as real benches. `--portfolio` is dense-only and points at the ordinary MoE expert-tier

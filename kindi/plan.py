@@ -128,7 +128,7 @@ def _moe_free_bytes(assume_vram_gib):
 def describe(pack, ctx, spec, mode="cpu-first", gpu_kind=None,
              assume_vram_gib=None, assume_ram_gib=None, assume_cores=None, reserve_mib=512,
              usage_path=None, moe_cache_mib=None, dcache=None,
-             chunk_tokens=None, chunk_lane="copy", rates=None):
+             chunk_tokens=None, chunk_lane="copy", rates=None, vram_budget_mib=None):
     """The placement report as a dict; no weight tensor is read, only indexes and the manifest."""
     man = _manifest(pack)
     if man.get("backend") == "kindi_lightning":
@@ -198,12 +198,21 @@ def describe(pack, ctx, spec, mode="cpu-first", gpu_kind=None,
         lines.append(("placement", "not decided without a free-VRAM number; the full model needs "
                       "~%.1f GiB of weights + K/V at %d tokens"
                       % (pack_gib, int(ctx))))
-        out["command"] = _command(pack, mode, spec)
+        out["command"] = _command(pack, mode, spec, vram_budget_mib=vram_budget_mib,
+                                  reserve_mib=reserve_mib)
         return out
 
     free_bytes = int(free_gib * 2 ** 30)
     full = _t.gpu_estimate(dims, sizes, int(ctx), (), owner=owner)
-    budget = free_bytes - reserve_mib * 2 ** 20
+    budget = _t.vram_budget_bytes(free_bytes, reserve_mib, vram_budget_mib)
+    out["budget_mib"] = budget // 2 ** 20
+    out["reserve_mib"] = int(reserve_mib)
+    out["vram_budget_mib"] = (int(vram_budget_mib) if vram_budget_mib else None)
+    if vram_budget_mib:
+        lines.append(("vram budget", "%d MiB ceiling on the GPU side; the planner uses %d MiB "
+                      "(%d MiB free less %d MiB reserve, capped by the budget)"
+                      % (int(vram_budget_mib), budget // 2 ** 20, free_bytes // 2 ** 20,
+                         int(reserve_mib))))
     out["estimate_full_mib"] = full // 2 ** 20
 
     try:
@@ -215,13 +224,17 @@ def describe(pack, ctx, spec, mode="cpu-first", gpu_kind=None,
         if parsed in ("auto", "rate"):
             if parsed == "auto":
                 chosen = _t.plan_cpu_layers(dims, sizes, int(ctx), free_bytes,
-                                            reserve_mib=reserve_mib, owner=owner)
-                reason = ("smallest GDN-first set that makes %d tokens fit in %.2f GiB free "
-                          "(%d MiB reserve)" % (int(ctx), free_gib, reserve_mib))
+                                            reserve_mib=reserve_mib, owner=owner,
+                                            vram_budget_mib=vram_budget_mib)
+                reason = ("smallest GDN-first set that makes %d tokens fit in the %d MiB budget "
+                          "(%.2f GiB free, %d MiB reserve%s)"
+                          % (int(ctx), budget // 2 ** 20, free_gib, reserve_mib,
+                             ", %d MiB ceiling" % int(vram_budget_mib) if vram_budget_mib else ""))
             else:
                 chosen = _t.plan_cpu_layers_rate(dims, sizes, int(ctx), free_bytes,
                                                  reserve_mib=reserve_mib, owner=owner,
-                                                 pack_sha=man.get("source_sha256"))
+                                                 pack_sha=man.get("source_sha256"),
+                                                 vram_budget_mib=vram_budget_mib)
                 reason = ("rate rule: the fastest fitting GDN set (CPU/PCIe ratio "
                           "calibration %s)" % ("found" if _t.load_ratio(man.get("source_sha256"))
                                                else "not found for this pack - fit-only pick"))
@@ -239,7 +252,8 @@ def describe(pack, ctx, spec, mode="cpu-first", gpu_kind=None,
     except SystemExit as e:                     # the planner's refusal is the answer, not a crash
         lines.append(("placement", str(e)[len("kindi: "):]))
         out["cpu_layers"], out["fit"], out["estimate_mib"] = None, False, None
-        out["command"] = _command(pack, mode, spec)
+        out["command"] = _command(pack, mode, spec, vram_budget_mib=vram_budget_mib,
+                                  reserve_mib=reserve_mib)
         return out
 
     est = _t.gpu_estimate(dims, sizes, int(ctx), chosen, owner=owner)
@@ -260,7 +274,8 @@ def describe(pack, ctx, spec, mode="cpu-first", gpu_kind=None,
         lines.append(("placement", "%d CPU layers still do not fit (~%d MiB against a %d MiB "
                       "budget): the pick is insufficient; reduce --ctx or add free VRAM"
                       % (len(chosen), est // 2 ** 20, budget // 2 ** 20)))
-    out["command"] = _command(pack, mode, spec)
+    out["command"] = _command(pack, mode, spec, vram_budget_mib=vram_budget_mib,
+                              reserve_mib=reserve_mib)
     return out
 
 
@@ -278,11 +293,15 @@ def _pasteable(argv):
     return subprocess.list2cmdline(argv) if _WINDOWS else shlex.join(argv)
 
 
-def _command(pack, mode, spec, ctx=None):
+def _command(pack, mode, spec, ctx=None, vram_budget_mib=None, reserve_mib=None):
     argv = [sys.executable, "-m", "kindi", "--pack", pack]
     if ctx is not None:
         argv += ["--ctx", str(int(ctx))]
     argv += ["bench", "--tandem", mode, "--tandem-cpu-layers", spec or "auto"]
+    if vram_budget_mib:
+        argv += ["--vram-budget-mib", str(int(vram_budget_mib))]
+    if reserve_mib is not None and int(reserve_mib) != 512:
+        argv += ["--vram-reserve-mib", str(int(reserve_mib))]
     return _pasteable(argv)
 
 
@@ -293,7 +312,8 @@ def _plain_command(pack, ctx):
 
 
 def portfolio(pack, ctx, spec="auto", gpu_kind=None,
-              assume_vram_gib=None, assume_ram_gib=None, assume_cores=None, reserve_mib=512):
+              assume_vram_gib=None, assume_ram_gib=None, assume_cores=None, reserve_mib=512,
+              vram_budget_mib=None):
     """Compare the dense placements the runtime can build, without loading a weight.
 
     The list is deliberately small and honest: no split, a CPU prefix (`cpu-first`) and a CPU
@@ -319,18 +339,21 @@ def portfolio(pack, ctx, spec="auto", gpu_kind=None,
                                       ("gpu-first", "gpu-first", spec)):
         rep = describe(pack, ctx, row_spec, mode=row_mode, gpu_kind=gpu_kind,
                        assume_vram_gib=assume_vram_gib, assume_ram_gib=assume_ram_gib,
-                       assume_cores=assume_cores, reserve_mib=reserve_mib)
+                       assume_cores=assume_cores, reserve_mib=reserve_mib,
+                       vram_budget_mib=vram_budget_mib)
         if row_spec is None:
             command = _plain_command(pack, ctx)
             estimate = rep.get("estimate_full_mib")
             layers = []
         else:
-            command = _command(pack, row_mode, row_spec, ctx)
+            command = _command(pack, row_mode, row_spec, ctx, vram_budget_mib=vram_budget_mib,
+                               reserve_mib=reserve_mib)
             estimate = rep.get("estimate_mib")
             layers = rep.get("cpu_layers") or []
         rows.append({"placement": label, "mode": row_mode, "cpu_layers": layers,
                      "estimate_mib": estimate, "fit": rep.get("fit"),
-                     "owner": rep.get("owner"), "command": command})
+                     "budget_mib": rep.get("budget_mib"), "owner": rep.get("owner"),
+                     "command": command})
     fitting = [row for row in rows if row.get("fit") is True]
     full = next((row for row in fitting if row["placement"] == "full GPU"), None)
     best = full or (fitting[0] if fitting else None)
@@ -361,7 +384,7 @@ def portfolio(pack, ctx, spec="auto", gpu_kind=None,
             "command": best["command"] if best else _plain_command(pack, ctx)}
 
 
-def _verify_command(pack, mode=None, spec=None):
+def _verify_command(pack, mode=None, spec=None, vram_budget_mib=None, reserve_mib=None):
     """The exactness follow-up: quote the interpreter and pack for the host shell.
 
     The MoE strategy verifies the base engine; other strategies keep the planned tandem
@@ -370,6 +393,10 @@ def _verify_command(pack, mode=None, spec=None):
     argv = [sys.executable, "-m", "kindi", "--pack", pack, "verify"]
     if mode:
         argv += ["--tandem", mode, "--tandem-cpu-layers", spec or "auto"]
+    if vram_budget_mib:
+        argv += ["--vram-budget-mib", str(int(vram_budget_mib))]
+    if reserve_mib is not None and int(reserve_mib) != 512:
+        argv += ["--vram-reserve-mib", str(int(reserve_mib))]
     return _pasteable(argv)
 
 
@@ -738,12 +765,20 @@ def run(cfg, a, log=print):
     spec = getattr(a, "tandem_cpu_layers", None) or cfg.get("tandem_cpu_layers") or "auto"
     med = getattr(a, "tandem", None) or cfg.get("tandem") or "cpu-first"
     gpu_kind = getattr(a, "tandem_gpu", None) or cfg.get("tandem_gpu") or os.environ.get("KINDI_TANDEM_GPU")
+    budget = getattr(a, "vram_budget_mib", None)
+    if budget is None:
+        budget = int(cfg.get("tandem_vram_mb") or 0) or None
+    reserve = getattr(a, "vram_reserve_mib", None)
+    if reserve is None:
+        reserve = cfg.get("tandem_reserve_mb")
+    if reserve is None:
+        reserve = int(os.environ.get("KINDI_TANDEM_RESERVE_MB", "512"))
     if getattr(a, "portfolio", False):
         rep = portfolio(pack, cfg.get("ctx", 24576), spec, gpu_kind=gpu_kind,
                         assume_vram_gib=getattr(a, "assume_vram_gib", None),
                         assume_ram_gib=getattr(a, "assume_ram_gib", None),
                         assume_cores=getattr(a, "assume_cores", None),
-                        reserve_mib=int(os.environ.get("KINDI_TANDEM_RESERVE_MB", "512")))
+                        reserve_mib=reserve, vram_budget_mib=budget)
         for line in rep["lines"]:
             log(line)
         if getattr(a, "json", None):
@@ -769,13 +804,14 @@ def run(cfg, a, log=print):
                    dcache=getattr(a, "dcache", None),
                    chunk_tokens=getattr(a, "moe_chunk", None),
                    chunk_lane=getattr(a, "moe_lane", None) or "copy",
-                   reserve_mib=int(os.environ.get("KINDI_TANDEM_RESERVE_MB", "512")),
+                   reserve_mib=reserve, vram_budget_mib=budget,
                    rates=rates)
     for choice, reason in rep["lines"]:
         log("%-11s %s" % (choice + ":", reason))
     log("follow up: %s" % rep["command"])
     verify = (_verify_command(pack) if rep.get("strategy") == "moe-expert-tiers"
-              else _verify_command(pack, med, spec))
+              else _verify_command(pack, med, spec, vram_budget_mib=budget,
+                                   reserve_mib=reserve))
     log("verify:    %s" % verify)
     if getattr(a, "json", None):
         from .bench import bench_json

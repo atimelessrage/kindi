@@ -55,10 +55,16 @@ def run(cfg, log=print):
         sizes = tandem.pack_bytes(pack, man)
         ctx = cfg.get("ctx", 24576)
         free, total = cp.cuda.runtime.memGetInfo()
-        budget = int(total)                     # as if the card were empty: the planner's own input
-        auto = tandem.plan_cpu_layers(dims, sizes, ctx, budget, owner="plan")
-        picks = {"ctx": ctx, "budget_mib": budget // 2 ** 20, "auto": [int(x) for x in auto], "owner": "plan"}
-        rate = tandem.plan_cpu_layers_rate(dims, sizes, ctx, budget, owner="plan", pack_sha=pack_sha)
+        # As if the card were empty, but with the user's ceiling and display reserve: calibration
+        # must recommend the placement the runtime would actually build.
+        room = tandem.vram_budget_bytes(total, cfg.get("tandem_reserve_mb", 512),
+                                        cfg.get("tandem_vram_mb"))
+        auto = tandem.plan_cpu_layers(dims, sizes, ctx, room, reserve_mib=0, owner="plan")
+        picks = {"ctx": ctx, "budget_mib": room // 2 ** 20, "auto": [int(x) for x in auto],
+                 "owner": "plan", "vram_budget_mib": cfg.get("tandem_vram_mb") or None,
+                 "reserve_mib": cfg.get("tandem_reserve_mb", 512)}
+        rate = tandem.plan_cpu_layers_rate(dims, sizes, ctx, room, reserve_mib=0, owner="plan",
+                                           pack_sha=pack_sha)
         picks["rate"] = [int(x) for x in rate]
         calib.record(gpu, pack_sha, "placement", picks)
         log("kindi calibrate: placement picks at ctx %d: auto %d layers, rate %d layers"

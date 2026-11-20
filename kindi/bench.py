@@ -178,6 +178,8 @@ def _run(cfg, log=print):
               # 256-token rounding is inside the fit, so any shortfall is a real reduction)
               "ctx_reduced": cfg["ctx"] > eng.ctx, "ctx_requested": cfg["ctx"],
               "tandem": cfg.get("tandem", "off"), "cpu_layers": cfg.get("tandem_cpu_layers"),
+              "vram_budget_mib": cfg.get("tandem_vram_mb") or None,
+              "vram_reserve_mib": cfg.get("tandem_reserve_mb"),
               "device": "gpu" if cp is not None else "cpu", "read_tok_s": None, "gen_tok_s": {}}
     if hasattr(eng, "cpu_range"):
         result["cpu_range"] = list(eng.cpu_range)

@@ -270,6 +270,32 @@ def test_auto_planner_prefers_gdn_layers_and_respects_the_budget():
     assert len(big) > len(cpu) and all((il + 1) % 4 for il in big)
 
 
+def test_vram_budget_helper_combines_free_memory_reserve_and_ceiling():
+    mb = 2 ** 20
+    assert tandem.vram_budget_bytes(8 << 30, 512, 6144) == min((8 << 30) - 512 * mb, 6144 * mb)
+    assert tandem.vram_budget_bytes(8 << 30, 0, None) == 8 << 30
+    assert tandem.vram_budget_bytes(512 * mb, 512, 6144) == 0
+    with pytest.raises(SystemExit, match="cannot be negative"):
+        tandem.vram_budget_bytes(8 << 30, -1, None)
+
+
+def test_explicit_vram_ceiling_forces_a_split_below_a_larger_free_figure():
+    """A display card can have 8 GiB free but a 6 GiB usable barrier: the ceiling, not free memory,
+    decides the fit."""
+    dims = {"layers": 32, "full_attention_interval": 4, "kv_heads": 4, "head_dim": 256}
+    mb = 2 ** 20
+    sizes = {"layers": {il: 56 * mb for il in range(32)}, "embed": 0, "head": 258 * mb,
+             "f32": 28 * mb}
+    full = tandem.gpu_estimate(dims, sizes, 24576)
+    ceiling = full // mb - 300
+    cpu = tandem.plan_cpu_layers(dims, sizes, 24576, 64 << 30, reserve_mib=0,
+                                 vram_budget_mib=ceiling)
+    assert cpu and all((il + 1) % 4 for il in cpu)
+    assert tandem.gpu_estimate(dims, sizes, 24576, cpu) <= ceiling * mb
+    # the same card with no ceiling fits the whole model
+    assert tandem.plan_cpu_layers(dims, sizes, 24576, 64 << 30, reserve_mib=0) == ()
+
+
 def test_auto_target_frees_at_least_the_requested_headroom():
     dims = {"layers": 32, "full_attention_interval": 4, "kv_heads": 4, "head_dim": 256}
     mb = 2 ** 20
@@ -464,6 +490,22 @@ def test_auto_placement_resolves_before_the_backends_are_built(fake_pack, fake_b
     monkeypatch.setattr(tandem, "plan_cpu_layers", lambda *a, **k: (1, 2))
     eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers="auto", mode="cpu-first", log=lambda *a: None)
     assert eng.cpu_range == (1, 2) and eng.gpu_range == (0, 3)
+
+
+def test_auto_placement_passes_the_vram_budget_to_the_planner(fake_pack, fake_backends, monkeypatch):
+    dims = {"layers": 4, "full_attention_interval": 2, "kv_heads": 1, "head_dim": 8}
+    (Path(fake_pack) / "kindi_pack.json").write_text(json.dumps({"dimensions": dims}), encoding="utf-8")
+    sizes = {"layers": {il: 1 for il in range(4)}, "embed": 1, "head": 1, "f32": 1}
+    seen = []
+    monkeypatch.setattr(tandem, "pack_bytes", lambda pack, man=None: sizes)
+    monkeypatch.setattr(tandem, "gpu_estimate", lambda *a, **k: 8 << 30)
+    monkeypatch.setattr(tandem, "plan_cpu_layers", lambda *a, **k: seen.append(k) or (1, 2))
+    monkeypatch.setenv("KINDI_TANDEM_VRAM_MB", "6144")
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers="auto", mode="cpu-first",
+                              log=lambda *a: None)
+    assert eng.cpu_range == (1, 2)
+    assert seen[-1]["vram_budget_mib"] == 6144
+    assert seen[-1]["reserve_mib"] == 512
 
 
 def test_auto_placement_refuses_when_the_model_already_fits(fake_pack, fake_backends, monkeypatch):

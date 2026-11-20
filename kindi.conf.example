@@ -25,6 +25,10 @@ log_json = 0
 ctx = 24576
 head = exact
 fast_clusters = 256
+# CPU+GPU tandem: cap the GPU side at this many MiB (0: no ceiling) and leave this much free for the
+# display/driver. The planner uses min(free - reserve, vram budget).
+tandem_vram_mb = 0
+tandem_reserve_mb = 512
 # 1: stop a reply caught in a repeating loop (close it while thinking)
 repeat_stop = 0
 

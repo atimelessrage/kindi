@@ -188,6 +188,11 @@ def _setup_gpu_env(cfg):
     os.environ.setdefault("CUPY_CACHE_DIR", kdir)
     os.environ.setdefault("CUDA_CACHE_PATH", jdir)
     os.environ.setdefault("CUDA_CACHE_MAXSIZE", str(512 * 1024 * 1024))
+    # The tandem engine reads these before it builds the GPU owner. The config loader has already
+    # applied file < environment < CLI precedence; writing them here makes that one decision the
+    # value every backend sees, including a direct TandemEngine construction.
+    os.environ["KINDI_TANDEM_VRAM_MB"] = str(int(cfg.get("tandem_vram_mb", 0) or 0))
+    os.environ["KINDI_TANDEM_RESERVE_MB"] = str(int(cfg.get("tandem_reserve_mb", 512) or 0))
 
 
 def cmd_convert(cfg, a):
@@ -492,6 +497,27 @@ def _tandem_layers_arg(text):
     return text
 
 
+def _mib_arg(text):
+    try:
+        value = int(text)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError("must be an integer number of MiB") from None
+    if value < 0:
+        raise argparse.ArgumentTypeError("must not be negative")
+    return value
+
+
+def _vram_args(s):
+    """A per-card ceiling and free-memory reserve for the dense tandem planner."""
+    s.add_argument("--vram-budget-mib", type=_mib_arg, default=None, metavar="N",
+                   help="ceiling in MiB for the tandem GPU side (0: no ceiling); the planner uses "
+                        "min(free - reserve, this budget), so a 6 GiB P106 can be capped at 6144 "
+                        "and a display card can keep a lower barrier")
+    s.add_argument("--vram-reserve-mib", type=_mib_arg, default=None, metavar="N",
+                   help="free card memory the tandem planner leaves for the display/driver "
+                        "(default: 512; KINDI_TANDEM_RESERVE_MB)")
+
+
 def _tandem_args(s):
     """The dense CPU+GPU split flags, available on the commands that build an engine."""
     s.add_argument("--tandem", choices=("off", "cpu-first", "gpu-first"), default=None,
@@ -506,6 +532,7 @@ def _tandem_args(s):
                    help="engine that owns the GPU side of a tandem split: auto (the plan engine, "
                         "which loads only the GPU-owned layers and uses q8_0 K/V), plan or plain "
                         "(also q8_0 K/V; the only owner for a two-card split)")
+    _vram_args(s)
 
 
 def main(argv=None):
@@ -606,6 +633,7 @@ def main(argv=None):
     s.add_argument("--json", nargs="?", const=True, default=False, metavar="FILE",
                    help="print the report as JSON; with FILE, also save it for plan/autotune reuse")
     s = sub.add_parser("autotune", help="measure the placements for this model and rank them (one bench per candidate)")
+    _vram_args(s)
     s.add_argument("--max-runs", type=int, default=6, help="how many configurations to measure (default 6)")
     s.add_argument("--dry-run", action="store_true", help="print the candidate list and stop (loads nothing)")
     s.add_argument("--io-report", default=None, metavar="FILE",
@@ -632,6 +660,10 @@ def main(argv=None):
         cfg["tandem_cpu_layers"] = a.tandem_cpu_layers
     if getattr(a, "tandem_gpu", None) is not None:
         cfg["tandem_gpu"] = a.tandem_gpu
+    if getattr(a, "vram_budget_mib", None) is not None:
+        cfg["tandem_vram_mb"] = int(a.vram_budget_mib)
+    if getattr(a, "vram_reserve_mib", None) is not None:
+        cfg["tandem_reserve_mb"] = int(a.vram_reserve_mib)
     if getattr(a, "json", None) is not None:
         cfg["json"] = a.json
     if getattr(a, "sample_vram", False):

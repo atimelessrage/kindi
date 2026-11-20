@@ -212,7 +212,8 @@ def test_split_prompts_parsing():
 def test_bench_cli_rejects_unknown_comma_values_before_loading():
     import subprocess, sys
     for args, expected in ((["--split-at", "4096,fast"], "positive integers"),
-                           (["--tandem-cpu-layers", "0,1,fast"], "layer spec")):
+                           (["--tandem-cpu-layers", "0,1,fast"], "layer spec"),
+                           (["--vram-budget-mib", "-1"], "must not be negative")):
         out = subprocess.run([sys.executable, "-m", "kindi", "bench"] + args,
                              capture_output=True, text=True, timeout=30)
         assert out.returncode == 2, out.stderr

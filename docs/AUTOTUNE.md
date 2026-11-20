@@ -134,7 +134,7 @@ proposes what this machine could actually run:
 |---|---|---|
 | `gpu0` | a card exists | the baseline: one card holds the whole model |
 | `tp-2-auto`, `tp-2-equal` | **two or more cards** | tensor-parallel row split (`KINDI_TP=1`, `KINDI_TP_SPLIT=auto` or `equal`) |
-| `tandem-auto` | a card, a dense pack, ≥4 physical cores | the smallest CPU slice that makes the requested context fit |
+| `tandem-auto` | a card, a dense pack, ≥4 physical cores | the smallest CPU slice that makes the requested context fit, honoring `--vram-budget-mib` / `--vram-reserve-mib` |
 | `tandem-gpu-first` | same | the automatic CPU slice in the opposite direction: the output head moves to the CPU while the embedding and early layers stay on the card |
 | `tandem-gdn:8`, `tandem-gdn:16` | same | fixed CPU slices: the first N non-attention layers |
 | `dcache-<sized>` | a Lightning (MoE) pack | decode LRU slots per expert layer (`KINDI_LT_DCACHE`, default 10) against VRAM; with measured rates the list is the predicted count plus half and double it |
@@ -152,16 +152,28 @@ the gate.
 
 Every candidate is **one real `kindi bench` run in a child process**, with `--sample-vram`, so decode
 and read rates, the context actually granted and the device-wide VRAM peak all come from the code
-path `serve` uses. Ranking is by measured decode tok/s; a run that had to **reduce the context** is
+path `serve` uses. A `--vram-budget-mib N` ceiling (or `tandem_vram_mb`) is passed to every tandem
+child as `KINDI_TANDEM_VRAM_MB`; `--vram-reserve-mib` is passed as `KINDI_TANDEM_RESERVE_MB`. A
+measured peak above the ceiling is marked **over the budget** and ranked behind every safe run, so
+the fastest configuration that violates a P106-100's 6 GiB barrier (or a display card's lower one)
+cannot win. Ranking is by measured decode tok/s; a run that had to **reduce the context** is
 flagged and ranked below every run that got the requested one, because a faster number at a smaller
 context answers a different question. A candidate that fails is printed with the child's own last
 line and is never scored — a missing compiler or a refused split stays visible instead of becoming a
 zero in a table.
 
-`--json FILE` records the candidates, every run and the winner. The `--dry-run` plan is what to read
-before spending measurements. For a dense pack, `kindi plan --portfolio` prints the same full-GPU /
-`cpu-first` / `gpu-first` trade without loading a weight; `tandem-gpu-first` is the measured form of
-its opposite-head row, so the two directions are not conflated.
+`--json FILE` records the candidates, every run, the ceiling/reserve and the winner. The `--dry-run`
+plan is what to read before spending measurements. For a dense pack, `kindi plan --portfolio` prints
+the same full-GPU / `cpu-first` / `gpu-first` trade without loading a weight; `tandem-gpu-first` is
+the measured form of its opposite-head row, so the two directions are not conflated.
+
+```sh
+# the planner and the measured search use the same 6 GiB barrier
+kindi --pack ~/.kindi/packs/bonsai-9b --ctx 24576 plan --assume-vram-gib 8 \
+  --vram-budget-mib 6144 --vram-reserve-mib 0 --portfolio
+kindi --pack ~/.kindi/packs/bonsai-9b --ctx 24576 autotune \
+  --vram-budget-mib 6144 --vram-reserve-mib 0 --max-runs 6
+```
 
 ### Measured on this host (2026-11-17)
 

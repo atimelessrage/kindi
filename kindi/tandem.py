@@ -131,6 +131,29 @@ SCRATCH_MIB = 192          # measured plain-engine scratch at 24K (113 MiB on th
 PLAN_SCRATCH_MIB = 160     # the plan engine's own fixed buffers (prompt chunk buffers are not reserved here)
 Q8_0 = 1.0 + 2.0 / 32      # q8_0: one int8 per value plus one fp16 scale per 32 values, two arrays (K and V)
 GPU_OWNERS = ("auto", "plan", "plain")
+MIB = 2 ** 20
+
+
+def vram_budget_bytes(free_bytes, reserve_mib=512, budget_mib=None):
+    """The GPU owner's planning ceiling: free memory less a reserve, capped by an explicit budget.
+
+    ``reserve_mib`` is the headroom left for the display, the driver and allocation noise;
+    ``budget_mib`` is an optional hard ceiling for the card (a P106-100 limited to 6 GiB, or an
+    8 GiB display card limited to 7 GiB). A live free-memory figure still wins when it is lower:
+    the planner never promises memory that is not currently available. ``budget_mib`` of 0 or
+    None means no explicit ceiling.
+    """
+    try:
+        reserve = int(reserve_mib or 0)
+        ceiling = int(budget_mib or 0)
+    except (TypeError, ValueError):
+        raise SystemExit("kindi: tandem VRAM reserve and budget must be integers in MiB") from None
+    if reserve < 0 or ceiling < 0:
+        raise SystemExit("kindi: tandem VRAM reserve and budget cannot be negative")
+    available = max(0, int(free_bytes) - reserve * MIB)
+    if ceiling:
+        available = min(available, ceiling * MIB)
+    return available
 
 
 def _pick_owner(kind, log=None):
@@ -270,7 +293,7 @@ def gpu_estimate(dims, sizes, ctx, cpu_layers=(), owner="plain"):
 
 
 def plan_cpu_layers(dims, sizes, ctx, free_bytes, reserve_mib=512, target_mib=None, log=None,
-                    owner="plain"):
+                    owner="plain", vram_budget_mib=None):
     """The smallest CPU layer set that makes the GPU side fit, or ``()`` when no split is needed.
 
     Gated-delta layers go first, ascending: they cost no device K/V and little per-token CPU time, so
@@ -278,11 +301,15 @@ def plan_cpu_layers(dims, sizes, ctx, free_bytes, reserve_mib=512, target_mib=No
     because a CPU attention layer's cost grows with the context. The estimate is the GPU owner's actual
     allocation (see ``gpu_estimate``) plus a measured scratch allowance; with the plain owner on the 27B
     at 24K it predicts 7,778 MiB against a measured 7,783 MiB peak.
+
+    The fit budget is ``vram_budget_bytes(free_bytes, reserve_mib, vram_budget_mib)``. The explicit
+    budget is what makes a split happen on a card with plenty of free memory but a lower usable
+    ceiling, such as a display card that must leave room for the desktop.
     """
     log = log or (lambda *a: None)
     NL = int(dims["layers"])
     interval = max(1, int(dims["full_attention_interval"]))
-    budget = int(free_bytes) - int(reserve_mib) * 2 ** 20
+    budget = vram_budget_bytes(free_bytes, reserve_mib, vram_budget_mib)
     free_target = None if target_mib is None else int(target_mib) * 2 ** 20
     full = gpu_estimate(dims, sizes, ctx, (), owner=owner)
 
@@ -296,17 +323,20 @@ def plan_cpu_layers(dims, sizes, ctx, free_bytes, reserve_mib=512, target_mib=No
         if not over and not short:
             break
         if len(cpu) + 1 >= NL:
-            raise SystemExit("kindi: tandem auto cannot fit this model at %d tokens on the free GPU memory "
-                             "(needs about %d MiB more); reduce --ctx"
-                             % (int(ctx), max(est - budget, 0) // 2 ** 20))
+            raise SystemExit("kindi: tandem auto cannot fit this model at %d tokens on the usable GPU "
+                             "budget of %d MiB (needs about %d MiB more); reduce --ctx, the reserve "
+                             "or the ceiling"
+                             % (int(ctx), budget // 2 ** 20, max(est - budget, 0) // 2 ** 20))
         cpu.append(order[len(cpu)])
     if not cpu:
         return ()
     cpu = tuple(sorted(cpu))
     est = gpu_estimate(dims, sizes, ctx, cpu, owner=owner)
-    log("tandem auto: %d CPU layer%s (%s) takes the %s GPU side to ~%d MiB (%d MiB freed; %d MiB budget)"
+    ceiling = (" (budget %d MiB)" % int(vram_budget_mib) if vram_budget_mib else "")
+    log("tandem auto: %d CPU layer%s (%s) takes the %s GPU side to ~%d MiB "
+        "(%d MiB freed; %d MiB budget%s)"
         % (len(cpu), "" if len(cpu) == 1 else "s", ",".join(str(x) for x in cpu), owner,
-           est // 2 ** 20, (full - est) // 2 ** 20, budget // 2 ** 20))
+           est // 2 ** 20, (full - est) // 2 ** 20, budget // 2 ** 20, ceiling))
     return cpu
 
 
@@ -373,7 +403,7 @@ def _predicted_rate(ratio, n, ctx):
 
 
 def plan_cpu_layers_rate(dims, sizes, ctx, free_bytes, reserve_mib=512, rate_floor=None,
-                         ratio=None, log=None, owner="plan", pack_sha=None):
+                         ratio=None, log=None, owner="plan", pack_sha=None, vram_budget_mib=None):
     """The CPU layer set a measured ratio would pick: `rate`, or `rate:<frac>` with a floor.
 
     Candidates are the gdn-first counts that fit the GPU side (`gpu_estimate` <= budget, the
@@ -386,7 +416,7 @@ def plan_cpu_layers_rate(dims, sizes, ctx, free_bytes, reserve_mib=512, rate_flo
     log = log or (lambda *a: None)
     NL = int(dims["layers"])
     interval = max(1, int(dims.get("full_attention_interval", 4)))
-    budget = int(free_bytes) - int(reserve_mib) * 2 ** 20
+    budget = vram_budget_bytes(free_bytes, reserve_mib, vram_budget_mib)
     if ratio is None:
         ratio = load_ratio(pack_sha=pack_sha)
     feeds = (ratio or {}).get("predicted_tok_s") or {}
@@ -400,8 +430,9 @@ def plan_cpu_layers_rate(dims, sizes, ctx, free_bytes, reserve_mib=512, rate_flo
     gdn_total = NL - sum(1 for il in range(NL) if (il + 1) % interval == 0)
     viable = [count for count in range(min(NL, gdn_total)) if fits(count)]
     if not viable:
-        raise SystemExit("kindi: tandem rate cannot fit this model at %d tokens on the free GPU "
-                         "memory; reduce --ctx" % int(ctx))
+        raise SystemExit("kindi: tandem rate cannot fit this model at %d tokens on the usable GPU "
+                         "budget of %d MiB; reduce --ctx, the reserve or the ceiling"
+                         % (int(ctx), budget // 2 ** 20))
     if not ratio:
         log("tandem rate: no split-ratio calibration found for this pack, so it falls back to the "
             "fit-only pick (run tools/measure_split_ratio.py to calibrate this machine)")
@@ -431,10 +462,11 @@ def plan_cpu_layers_rate(dims, sizes, ctx, free_bytes, reserve_mib=512, rate_flo
     predicted = (" (predicted ~%.1f tok/s at %d tokens%s)" % (rate, int(ctx),
                  " (full GPU predicted %.1f)" % full_rate if full_rate else "")
                  if rate is not None else " (no predicted rate for this count)")
-    log("tandem rate: %d CPU layer%s (%s) by %s takes the %s GPU side to ~%d MiB%s"
+    ceiling = (" (budget %d MiB)" % int(vram_budget_mib) if vram_budget_mib else "")
+    log("tandem rate: %d CPU layer%s (%s) by %s takes the %s GPU side to ~%d MiB%s%s"
         % (len(layers), "" if len(layers) == 1 else "s",
            ",".join(str(x) for x in layers), by,
-           owner, est // 2 ** 20, predicted))
+           owner, est // 2 ** 20, predicted, ceiling))
     return tuple(layers)
 
 
@@ -531,7 +563,8 @@ class _TandemCacheView(object):
 class TandemEngine(object):
     """A dense layer split over the CPU engine and one GPU engine."""
 
-    def __init__(self, pack, ctx=4096, cpu_layers=None, mode="cpu-first", log=print, gpu=None):
+    def __init__(self, pack, ctx=4096, cpu_layers=None, mode="cpu-first", log=print, gpu=None,
+                 vram_budget_mib=None, reserve_mib=None):
         self.log = log or (lambda *a: None)
         manifest = os.path.join(pack, "kindi_pack.json")
         man = json.load(open(manifest))
@@ -583,21 +616,32 @@ class TandemEngine(object):
             free = int(_cp.cuda.runtime.memGetInfo()[0])
             sizes = pack_bytes(pack, man)
             need = gpu_estimate(dims, sizes, ctx, owner=self.gpu_kind) // 2 ** 20
-            if auto_target is None and need <= (free // 2 ** 20) - 512:
-                raise SystemExit("kindi: this model already fits at %d tokens (~%d MiB needed, %d MiB free); "
-                                 "a split would only make it slower - run without --tandem, or ask for a "
-                                 "target with --tandem-cpu-layers auto:<MiB>"
-                                 % (int(ctx), need, free // 2 ** 20))
+            try:
+                if reserve_mib is None:
+                    reserve_mib = os.environ.get("KINDI_TANDEM_RESERVE_MB", "512")
+                if vram_budget_mib is None:
+                    vram_budget_mib = os.environ.get("KINDI_TANDEM_VRAM_MB", "0") or 0
+                reserve_mib = int(reserve_mib or 0)
+                vram_budget_mib = int(vram_budget_mib or 0) or None
+            except (TypeError, ValueError):
+                raise SystemExit("kindi: tandem VRAM reserve and budget must be integers in MiB") from None
+            budget = vram_budget_bytes(free, reserve_mib, vram_budget_mib)
+            if auto_target is None and need <= budget // 2 ** 20:
+                raise SystemExit("kindi: this model already fits at %d tokens (~%d MiB needed, %d MiB usable%s); "
+                                 "a split would only make it slower - run without --tandem, ask for a "
+                                 "target with --tandem-cpu-layers auto:<MiB>, or lower --vram-budget-mib"
+                                 % (int(ctx), need, budget // 2 ** 20,
+                                    " (%d MiB reserve)" % reserve_mib if reserve_mib else ""))
             if cpu_layers == "auto":
                 cpu_layers = plan_cpu_layers(dims, sizes, ctx, free,
-                                             reserve_mib=int(os.environ.get("KINDI_TANDEM_RESERVE_MB", "512")),
-                                             target_mib=auto_target, log=self.log, owner=self.gpu_kind)
+                                             reserve_mib=reserve_mib, target_mib=auto_target,
+                                             log=self.log, owner=self.gpu_kind,
+                                             vram_budget_mib=vram_budget_mib)
             else:
                 cpu_layers = plan_cpu_layers_rate(
-                    dims, sizes, ctx, free,
-                    reserve_mib=int(os.environ.get("KINDI_TANDEM_RESERVE_MB", "512")),
+                    dims, sizes, ctx, free, reserve_mib=reserve_mib,
                     rate_floor=auto_target, log=self.log, owner=self.gpu_kind,
-                    pack_sha=man.get("source_sha256"))
+                    pack_sha=man.get("source_sha256"), vram_budget_mib=vram_budget_mib)
         cpu_first = self.mode == "cpu-first"
         if isinstance(cpu_layers, (list, tuple)):
             explicit = tuple(int(x) for x in cpu_layers)

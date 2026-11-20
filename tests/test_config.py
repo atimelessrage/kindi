@@ -68,6 +68,16 @@ def test_built_in_defaults():
     assert cfg["explicit"] == frozenset()
 
 
+def test_tandem_memory_limits_must_be_non_negative(monkeypatch):
+    monkeypatch.setenv("KINDI_TANDEM_VRAM_MB", "-1")
+    with pytest.raises(SystemExit, match="tandem_vram_mb must be at least 0"):
+        config.load()
+    monkeypatch.delenv("KINDI_TANDEM_VRAM_MB")
+    monkeypatch.setenv("KINDI_TANDEM_RESERVE_MB", "-512")
+    with pytest.raises(SystemExit, match="tandem_reserve_mb must be at least 0"):
+        config.load()
+
+
 def test_file_beats_defaults(clean_env):
     path = write_conf(clean_env, "ctx = 4096\ntemperature = 0.25\nhead = fast\n")
     cfg = config.load(explicit=path)
