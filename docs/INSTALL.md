@@ -37,8 +37,10 @@ Get-FileHash install.ps1      # compare with the table below
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-For Docker Compose, Podman, servers and automated installs, there are also ready-made images (no build):
-[CONTAINERS.md](CONTAINERS.md). The installer builds the same images on your computer.
+For Docker Compose, Podman, servers and automated installs, [CONTAINERS.md](CONTAINERS.md) lists the `0.7.0-fork`
+registry tags as **unpublished release targets**: they become live only after `kindi verify` passes on a real card for
+each backend and the release is published. Until then, the installer builds the same images on your computer, or
+[DOCKER.md](DOCKER.md) shows how to build them locally.
 
 | File | sha256 |
 |---|---|

@@ -165,7 +165,7 @@ state - and at a 200-token document the average *falls* to 463 ms/token against 
 whitespace-permitting constraint lets the greedy 2B spend the whole budget on whitespace (200 tokens, 9 characters) (`docs/API.md`,
 `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/RESULTS.md`), and the two harnesses behind it are tracked as `tools/grammar_cost.py` and
 `tools/grammar_cost_serve.py` so a clean checkout re-derives the rows instead of trusting the JSON artifact. The numbers those docs quote are no longer prose:
-`python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (36 gates, 263 numbers across `docs/claims/*.json`, six
+`python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (37 gates, 265 numbers across `docs/claims/*.json`, six
 claimed docs and zero citations listed as debt), and refuses a benchmark citation no claim accounts for - schema and procedure in `docs/claims/README.md`.
 
 ### Dated evidence

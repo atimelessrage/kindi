@@ -1,10 +1,12 @@
 # Running Kindi with Docker
 
-To install Kindi with one command (the image, the models and the servers), see [INSTALL.md](INSTALL.md). To use the
-ready-made images from GitHub's container registry (no clone and no build), see [CONTAINERS.md](CONTAINERS.md). This
-page tells how to build the images and do the steps by hand.
+To install Kindi with one command (the image, the models and the servers), see [INSTALL.md](INSTALL.md). The
+`0.7.0-fork` tags in GitHub's container registry are **unpublished release targets**, not ready-made images: they
+become live only after `kindi verify` passes on a real card for each backend and the release is published. Until then,
+build the images locally; [CONTAINERS.md](CONTAINERS.md) records the target tags and those conditions. This page tells
+how to build the images and do the steps by hand.
 
-Kindi has three images:
+The local build tags are:
 
 | Image | Dockerfile | Contents | For |
 |---|---|---|---|

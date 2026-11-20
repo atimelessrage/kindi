@@ -256,6 +256,7 @@ historical equal split. Kepler stays single-card. No mixed-card execution has be
 | verify, plain engine | 4B **4/4 token-exact**, 114.9 tokens/s; 9B **4/4 token-exact** (13/13 on prompt 3), 72.5 tokens/s |
 | result | The tc plan passes on the 2B (4/4), the 4B (3 exact + 1 accepted tie with FD fallback), the 9B (4/4 with `KINDI_TC_HP=1`) and the 27B (3 exact + 1 accepted tie). The 27B single-card path now has a 24K benchmark and a real server/cache restart cycle, but no long soak or concurrency; [CARD-SUPPORT.md](CARD-SUPPORT.md) tracks the remaining gaps |
 
+- A single-run 2026-11-20 smoke on this host records the default 5-trit lane and the TC+HP path at 8K and 24K, with the exact commands and the single-run caveat: [9B default vs TC+HP smoke](benchmarks/2026-11-20-i7-8086k-rtx4060ti-9b-default-vs-tc/RESULTS.md).
 - The 8 GB `tc` installer profile only adds tensor-core settings to the 27B (and the 2B when its MTP head is installed); the 2B/4B/9B/27B settings above are the documented tc plan. The plain 4B/9B paths remain the safe default.
 
 #### Stock Kindi v0.6.1 user report (plain engine, 2026-11-17)

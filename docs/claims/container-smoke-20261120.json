@@ -1,0 +1,40 @@
+{
+  "gate": "container-smoke-20261120",
+  "title": "0.7.0-fork container: Python 3.6 compile, unmodified health and chat",
+  "measured": "2026-11-20",
+  "commit": "1627b96-dirty (image label); archive rebuilt from 20e2ea0",
+  "command": "docker build -t kindi:0.7.0-fork ...; docker run ...; GET /health; POST /v1/chat/completions (see RESULTS.md)",
+  "notes": "Local unmodified-image smoke on the RTX 4060 Ti, not an official v0.6.1 image-parity run. The image uses Python 3.6.9 and the 2B pack; the Python 3.6 import blocker is fixed. The page records the build, GPU passthrough and request bodies.",
+  "evidence": [
+    "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-container-smoke/RESULTS.md",
+    "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-container-smoke/unmodified-health.json",
+    "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-container-smoke/unmodified-chat.json",
+    "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-container-smoke/unmodified-startup.log"
+  ],
+  "numbers": [
+    {
+      "id": "health-status",
+      "display": "200",
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-container-smoke/RESULTS.md",
+        "needle": "**PASS, 200**"
+      }
+    },
+    {
+      "id": "chat-status-latency",
+      "display": "0.2337 s",
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-container-smoke/RESULTS.md",
+        "needle": "**PASS, 200 in 0.2337 s**"
+      }
+    }
+  ]
+}

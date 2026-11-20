@@ -1,0 +1,46 @@
+Kindi 0.7.0-fork
+CPU: Intel(R) Core(TM) i7-8086K CPU @ 4.00GHz, 6 physical / 12 logical cores
+CPU engine: AVX=yes, AVX2=yes, FMA3=yes, F16C=yes
+CPU engine path: AVX2/FMA/F16C fast path
+CPU engine build: avx2-fma-f16c
+speculation: off: KINDI_SPEC=0, no model drafter
+config: (built-in defaults)
+  api_key
+  checkpoint_budget_mb 0
+  checkpoint_every  256
+  ctx               24576
+  fast_clusters     256
+  head              exact
+  host              0.0.0.0
+  kv_cache          auto
+  log_json          0
+  lookup            5
+  max_body_mb       16
+  max_tokens        1024
+  min_p             0.0
+  model_name        bonsai2-2b
+  mtp_head
+  pack              /data/pack
+  park_max          3
+  port              8093
+  prefix_max        8
+  prefix_min        512
+  presence_penalty  0.0
+  queue_max         8
+  rate_limit_per_min 0
+  reasoning_effort
+  repeat_last_n     64
+  repeat_penalty    1.0
+  repeat_stop       0
+  sampling_profile  default
+  state_dir         /data/state
+  temperature       0.7
+  top_k             20
+  top_p             0.8
+  turn_disk_mb      4096
+  turn_keep         4
+  turn_min          64
+  turn_save         1
+pack: /data/pack - Ternary-Bonsai-2-2B, from Ternary-Bonsai-2-2B-PTQ1_0.gguf
+fast head: not built (kindi fast-head)
+GPU: NVIDIA GeForce RTX 4060 Ti, compute 89, 7039 of 8188 MiB free

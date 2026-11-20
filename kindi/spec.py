@@ -1866,9 +1866,6 @@ def install(log=print):
             raise SystemExit("kindi: the tensor-core plan engine refuses Hadamard blocks of 4096 unless "
                              "KINDI_TC_HP=1 (measured: 4/4 at 122 tok/s, 3/4 with the default activations); "
                              "use the plain engine (KINDI_TP=0)")
-        if self.HB == 4096 and HP:
-            log("card %d: 4096 Hadamard blocks run with high-precision activations (KINDI_TC_HP=1); "
-                "that is the exact 9B tensor-core path (4/4, 122 tok/s; the default activations are 3/4)" % self.card)
         # two cards are tensor parallel on the Ampere and Pascal kernels; the Turing backend is one card
         w_ok = self.tp.W == 1 if backend is _tc_turing else self.tp.W in (1, 2)
         if not (w_ok and self.g5l and backend is not None and load_stream(self)):
@@ -1876,6 +1873,14 @@ def install(log=print):
         if w_ok and self.g5l and backend is not None:
             self.sk = SpecKernels(backend=backend)
             repack(self, self.log)
+            # only after repack chose the tensor-core layout: a refused layout, an sm_60 lane or a
+            # dp4a card keeps the 5-trit lane and must not claim the tensor-core 9B path
+            tensor_core_layout = (getattr(self, "tc_layout", False)
+                                  and not getattr(self, "tc_lane", False)
+                                  and not _tc.pascal(self.card))
+            if self.HB == 4096 and HP and tensor_core_layout:
+                log("card %d: 4096 Hadamard blocks run with high-precision activations (KINDI_TC_HP=1); "
+                    "that is the exact 9B tensor-core path (4/4, 122 tok/s; the default activations are 3/4)" % self.card)
 
     def _reserve(eng):
         o_reserve(eng)                          # the chunk buffers (chunk.py runs its GEMMs on the tc kernels)

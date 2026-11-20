@@ -26,6 +26,7 @@ import struct
 import subprocess
 import sys
 import time
+from typing import Any
 
 import numpy as np
 
@@ -242,6 +243,10 @@ def _lib():
     lib.kc_embed.argtypes = [ctypes.POINTER(Model), ctypes.c_int]
     lib.kc_layer.argtypes = [ctypes.POINTER(Model), ctypes.c_int, ctypes.c_int]
     lib.kc_layer.restype = ctypes.c_int
+    lib.kc_layer_ffn_input.argtypes = [ctypes.POINTER(Model), ctypes.c_int, ctypes.c_int]
+    lib.kc_layer_ffn_input.restype = ctypes.c_int
+    lib.kc_gemv.argtypes = [ctypes.POINTER(Model), ctypes.POINTER(Mat), PF, PF]
+    lib.kc_gemv.restype = ctypes.c_int
     lib.kc_head.argtypes = [ctypes.POINTER(Model)]
     lib.kc_head.restype = ctypes.c_int
     assert lib.kc_sizeof_model() == ctypes.sizeof(Model) and lib.kc_sizeof_layer() == ctypes.sizeof(Layer)
@@ -525,12 +530,13 @@ def paircodes(codes, R, C, chunk=4096):
     return out
 
 
-def _p(a, t=PF):
+def _p(a, t: Any = PF) -> Any:
     return a.ctypes.data_as(t)
 
 
 class Engine(object):
-    def __init__(self, pack, ctx=4096, clusters=None, log=print, threads=None, layers=None, embed=True, head=True):
+    def __init__(self, pack, ctx=4096, clusters=None, log=print, threads=None, layers=None, embed=True, head=True,
+                 head_rows=None):
         t0 = time.time()
         self.threads = _configure_threads(threads)
         self.lib = _lib()
@@ -554,6 +560,17 @@ class Engine(object):
             if bad:
                 raise SystemExit("kindi: CPU layer %d is outside 0..%d" % (bad[0], NL - 1))
         self.need_embed, self.need_head = bool(embed), bool(head)
+        self.head_rows = None if head_rows is None else (int(head_rows[0]), int(head_rows[1]))
+        self.head_off, self.head_count = 0, VOCAB
+        if self.head_rows is not None:
+            r0, r1 = self.head_rows
+            if not 0 <= r0 < r1 <= VOCAB:
+                raise SystemExit("kindi: head rows must be a non-empty range inside 0..%d" % (VOCAB - 1))
+            if r0 % 16 or r1 % 16:
+                raise SystemExit("kindi: head row bounds must be multiples of 16")
+            if self.head_name == "token_embd.weight" and self.need_embed:
+                raise SystemExit("kindi: a partial tied head cannot also be the embedding")
+            self.head_off, self.head_count = r0, r1 - r0
         NH, NHKV, HD = d["heads"], d["kv_heads"], d["head_dim"]
         NK, HK = d["groups"], d["state_size"]
         NV = d["gdn_inner"] // HK
@@ -583,15 +600,26 @@ class Engine(object):
             return False
 
         mats = {}
+        self._mat_arrays = {}
         for name, rec in bi.items():
             if not _wanted(name):
                 continue
             R, C = rec["rows"], rec["ne0"]
             ns, G = C // 4, C // 128
             o, q = rec["bc_off"], rec["dpm_off"] // 2
+            if name == self.head_name and self.head_rows is not None:
+                r0, r1 = self.head_rows
+                b = np.ascontiguousarray(np.asarray(bc[o:o + ns * R]).reshape(ns, R)[:, r0:r1])
+                s = np.asarray(dp[q:q + G * R]).reshape(G, R // 8, 8)[:, r0 // 8:r1 // 8, :].transpose(1, 0, 2)
+                W = keep(paircodes(b, r1 - r0, C))
+                S = keep(np.ascontiguousarray(s.astype(F32)))
+                mats[name] = Mat(_p(W, PU8), _p(S), r1 - r0, C)
+                self._mat_arrays[name] = (W, S)
+                continue
             W = keep(paircodes(bc[o:o + ns * R], R, C))
             S = keep(np.ascontiguousarray(np.asarray(dp[q:q + G * R]).reshape(G, R // 8, 8).transpose(1, 0, 2).astype(F32)))
             mats[name] = Mat(_p(W, PU8), _p(S), R, C)
+            self._mat_arrays[name] = (W, S)
         fl = keep(np.fromfile(os.path.join(pack, "f32.bin"), dtype=F32))
 
         def f(name):
@@ -656,7 +684,11 @@ class Engine(object):
             if k == "logits":
                 self.logits = a
         m.red = _p(z(256, np.float64), ctypes.POINTER(ctypes.c_double))
-        self.ylog, self.ylog_n, self.ylog_map = self.logits, VOCAB, None
+        if self.head_rows is None:
+            self.ylog, self.ylog_n, self.ylog_map = self.logits, VOCAB, None
+        else:
+            self.ylog, self.ylog_n = self.logits, self.head_count
+            self.ylog_map = np.arange(self.head_off, self.head_off + self.head_count, dtype=np.int64)
         self.hidden = np.ctypeslib.as_array(m.h, shape=(D,))   # in-place residual for a tandem handoff
         self.hsl, self.shortlist = None, 0
         self.shortlist = 0
@@ -682,6 +714,23 @@ class Engine(object):
         if self.lib.kc_layer(ctypes.byref(self.m), il, pos):
             raise ValueError("kindi: the CPU layer entry point rejected layer %d" % il)
 
+    def layer_pre_ffn(self, il, pos):
+        """Run a layer up to the folded FFN input, leaving the down GEMV to the caller."""
+        if self.lib.kc_layer_ffn_input(ctypes.byref(self.m), int(il), int(pos)):
+            raise ValueError("kindi: the CPU FFN-input entry point rejected layer %d" % il)
+
+    def layer_finish(self):
+        """Add the caller-filled FFN-down output to the CPU residual stream."""
+        self.hidden += np.ctypeslib.as_array(self.m.y, shape=(self.D,))
+
+    def ffn_input_host(self):
+        """A copy of the folded FFN input left by layer_pre_ffn."""
+        return np.ctypeslib.as_array(self.m.xp, shape=(int(self.m.NFF),)).copy()
+
+    def output_y(self):
+        """The mutable per-layer FFN-down output buffer (D floats)."""
+        return np.ctypeslib.as_array(self.m.y, shape=(self.D,))
+
     def feed_layers(self, tok, pos):
         """The per-layer equivalent of feed(): embed then run every block."""
         if pos >= self.ctx:
@@ -692,7 +741,26 @@ class Engine(object):
 
     def head(self):
         """Greedy token from the residual left by the last layer (or by begin() plus layers)."""
-        return int(self.lib.kc_head(ctypes.byref(self.m)))
+        tok = int(self.lib.kc_head(ctypes.byref(self.m)))
+        return tok + self.head_off if self.head_rows is not None else tok
+
+    def gemv_rows(self, name, rows, x):
+        """One loaded ternary matrix over a row range, with the complete input vector."""
+        r0, r1 = (int(rows[0]), int(rows[1]))
+        W, S = self._mat_arrays[name]
+        if r0 < 0 or r1 > (W.shape[0] * 8) or r0 >= r1 or r0 % 8 or r1 % 8:
+            raise ValueError("kindi: row range %r is not an 8-row slice of %s" % (rows, name))
+        C = int(S.shape[1] * 128)
+        x = np.ascontiguousarray(x, dtype=F32)
+        if x.shape != (C,):
+            raise ValueError("kindi: input has shape %r, expected (%d,)" % (x.shape, C))
+        w = np.ascontiguousarray(W[r0 // 8:r1 // 8])
+        s = np.ascontiguousarray(S[r0 // 8:r1 // 8])
+        A = Mat(_p(w, PU8), _p(s), r1 - r0, C)
+        y = np.empty(r1 - r0, dtype=F32)
+        if self.lib.kc_gemv(ctypes.byref(self.m), ctypes.byref(A), _p(x), _p(y)):
+            raise ValueError("kindi: the CPU row GEMV rejected %s" % name)
+        return y
 
     def feed(self, tok, pos):
         if pos >= self.ctx:
@@ -702,7 +770,8 @@ class Engine(object):
     def step(self, tok, pos):
         if pos >= self.ctx:
             raise OverflowError("position %d is past the context (%d)" % (pos, self.ctx))
-        return self.lib.kc_step(ctypes.byref(self.m), int(tok), int(pos), 1)
+        best = int(self.lib.kc_step(ctypes.byref(self.m), int(tok), int(pos), 1))
+        return best + self.head_off if self.head_rows is not None else best
 
     def step_layers(self, tok, pos):
         """The per-layer equivalent of step(): embed, every block, then the exact head."""

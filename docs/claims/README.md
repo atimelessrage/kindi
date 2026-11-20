@@ -85,7 +85,7 @@ file to `docs/development/AGENTS-HISTORY.md`-style history or delete it with the
 
 ## Coverage today
 
-36 gates, 263 numbers. No citation is listed as debt: every `docs/benchmarks/<dir>` cited by the six
+37 gates, 265 numbers. No citation is listed as debt: every `docs/benchmarks/<dir>` cited by the six
 docs has an owning claim, including the autotune report, its two repeat reports, the tracked I/O
 probe and the promoted FP8 MMA log. The checker prints the gate, number and debt counts on every run.
 

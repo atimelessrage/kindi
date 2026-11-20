@@ -136,7 +136,10 @@ class Engine(object):
     """One sequence at a time. step(tok, pos) -> next token (greedy) with the logits left in self.ylog;
     feed(tok, pos) processes a prompt token without the output head."""
 
-    def __init__(self, pack, ctx=4096, clusters=None, log=print, layers=None, embed=True, head=True, kv=None):
+    def __init__(self, pack, ctx=4096, clusters=None, log=print, layers=None, embed=True, head=True, kv=None,
+                 head_rows=None):
+        if cp is None:
+            raise SystemExit("kindi: the GPU engine needs CuPy; KINDI_DEVICE=cpu uses the CPU engine")
         t0 = time.time()
         self.log = log
         self.ctx = int(ctx)
@@ -180,9 +183,23 @@ class Engine(object):
             raise SystemExit("kindi: a partial layer range cannot use the fast head")
         self._layer_set = frozenset(self.layers)
         self.need_embed, self.need_head = bool(embed), bool(head)
+        self.head_rows = None if head_rows is None else (int(head_rows[0]), int(head_rows[1]))
+        self._partial_head = self.head_rows is not None
+        self.head_off, self.head_count = 0, VOCAB
+        if self.head_rows is not None:
+            r0, r1 = self.head_rows
+            if not 0 <= r0 < r1 <= VOCAB:
+                raise SystemExit("kindi: head rows must be a non-empty range inside 0..%d" % (VOCAB - 1))
+            if r0 % 16 or r1 % 16:
+                raise SystemExit("kindi: head row bounds must be multiples of 16")
+            if clusters is not None:
+                raise SystemExit("kindi: a partial head cannot use the fast-head cluster layout")
+            if self.head_name == "token_embd.weight" and self.need_embed:
+                raise SystemExit("kindi: a partial tied head cannot also be the embedding")
+            self.head_off, self.head_count = r0, r1 - r0
         if self.need_embed and 0 not in self._layer_set:
             raise SystemExit("kindi: embedding needs layer 0 in the layer range")
-        if self.need_head and self.NL - 1 not in self._layer_set:
+        if self.need_head and not self._partial_head and self.NL - 1 not in self._layer_set:
             raise SystemExit("kindi: the output head needs the last layer in the layer range")
         self._kvi = {}
         kvi = 0
@@ -207,7 +224,8 @@ class Engine(object):
         self.bi = load_json(os.path.join(pack, "bcodes_index.json"))["tensors"]
         self._all_bi = self.bi
         if layers is not None:
-            self.bi = self._select_layers(self.bi, self.layers, self.need_embed, self.need_head, self.head_name)
+            self.bi = self._select_layers(self.bi, self.layers, self.need_embed,
+                                          self.need_head and not self._partial_head, self.head_name)
         self.hsl = None
         self.hs_force = None
         if clusters is not None:
@@ -261,6 +279,8 @@ class Engine(object):
             del bcm, dpm
         self.w = {n: (self.bc[self.bi[n]["bc_off"]:], self.dp[self.bi[n]["dpm_off"] // 2:], np.int32(R), np.int32(C))
                   for n, (R, C) in dims.items()}
+        if self._partial_head:
+            self._load_partial_head(pack)
         self.fl = file_to_card(os.path.join(pack, "f32.bin"), cp.float32)
         # Hadamard sign vectors, one per folded input width: D (norm outputs), NV*HK (GDN output), NH*HD (attention
         # output; 2048 = D on the 2B, 4096 != D on the 4B) and NFF (FFN down)
@@ -349,6 +369,7 @@ class Engine(object):
                     self.Kc[self._kvi[il]] = cp.zeros((self.ctx, self.NHKV, self.HD), dtype=cp.float16)
                     self.Vc[self._kvi[il]] = cp.zeros((self.ctx, self.NHKV, self.HD), dtype=cp.float16)
         self.shortlist = 0                 # > 0: fast head over this many clusters
+        self._down_split = None            # opt-in CPU/GPU row split of one FFN-down matrix
         if self.hsl is not None:
             m = self.hsl
             self.hs_cent = cp.asarray(m["cent"])
@@ -357,7 +378,11 @@ class Engine(object):
             self.hs_glist = cp.zeros(m["Rp"] // 16, dtype=cp.int32)
             self.hs_yc = z(m["Rp"])
             self.hs_tokc = cp.zeros(m["Rp"], dtype=cp.int32)
-        self.ylog, self.ylog_n, self.ylog_map = self.y, VOCAB, None
+        if self._partial_head:
+            self.ylog, self.ylog_n = self.y, self.head_count
+            self.ylog_map = cp.arange(self.head_off, self.head_off + self.head_count, dtype=cp.int32)
+        else:
+            self.ylog, self.ylog_n, self.ylog_map = self.y, VOCAB, None
         log("engine ready: ctx %d, head %s (%.1fs)" % (self.ctx, "reordered" if self.hsl else "plain", time.time() - t0))
 
     # ------------------------------------------------------------------------------------------- helpers
@@ -442,6 +467,49 @@ class Engine(object):
         if head:
             out[head_name] = bi[head_name]
         return out
+
+    def _load_partial_head(self, pack):
+        """Load only this engine's exact-head rows, from the same pack record the full head uses."""
+        rec = self._all_bi[self.head_name]
+        R, C = int(rec["rows"]), int(rec["ne0"])
+        assert self.head_rows is not None
+        r0, r1 = self.head_rows
+        ns, P = C // 4, C // 128
+        o, d = rec["bc_off"], rec["dpm_off"] // 2
+        bcm = np.memmap(os.path.join(pack, "bcodes.bin"), dtype=np.uint8, mode="r")
+        dpm = np.memmap(os.path.join(pack, "dpm.bin"), dtype=np.uint16, mode="r")
+        b = np.ascontiguousarray(np.asarray(bcm[o:o + ns * R]).reshape(ns, R)[:, r0:r1]).reshape(-1)
+        q = np.ascontiguousarray(np.asarray(dpm[d:d + P * R]).reshape(P, R)[:, r0:r1]).reshape(-1)
+        layout.repack({self.head_name: dict(rec, rows=r1 - r0, bc_off=0, dpm_off=0)}, b, q)
+        self._head_bc, self._head_dp = _upload(b), _upload(q)
+        self.w[self.head_name] = (self._head_bc, self._head_dp, np.int32(r1 - r0), np.int32(C))
+
+    def load_partial_tensor(self, pack, name, rows):
+        """Replace one loaded tensor with an explicit row range, packed for the GEMV kernel."""
+        rec = self._all_bi[name]
+        R, C = int(rec["rows"]), int(rec["ne0"])
+        r0, r1 = int(rows[0]), int(rows[1])
+        if r0 < 0 or r1 > R or r0 >= r1 or r0 % 16 or r1 % 16:
+            raise ValueError("kindi: row range %r is not a 16-row slice of %s" % (rows, name))
+        ns, P = C // 4, C // 128
+        o, d = rec["bc_off"], rec["dpm_off"] // 2
+        bcm = np.memmap(os.path.join(pack, "bcodes.bin"), dtype=np.uint8, mode="r")
+        dpm = np.memmap(os.path.join(pack, "dpm.bin"), dtype=np.uint16, mode="r")
+        b = np.ascontiguousarray(np.asarray(bcm[o:o + ns * R]).reshape(ns, R)[:, r0:r1]).reshape(-1)
+        q = np.ascontiguousarray(np.asarray(dpm[d:d + P * R]).reshape(P, R)[:, r0:r1]).reshape(-1)
+        layout.repack({name: dict(rec, rows=r1 - r0, bc_off=0, dpm_off=0)}, b, q)
+        bc, dp = _upload(b), _upload(q)
+        self._partial_tensors = getattr(self, "_partial_tensors", {})
+        self._partial_tensors[name] = (bc, dp)
+        self.w[name] = (bc, dp, np.int32(r1 - r0), np.int32(C))
+        return self.w[name]
+
+    def set_down_split(self, cpu, rows):
+        """Split one FFN-down matrix between this GPU engine (upper rows) and a CPU engine (lower rows)."""
+        r0, r1 = int(rows[0]), int(rows[1])
+        if r0 < 0 or r1 > self.D or r0 >= r1:
+            raise ValueError("kindi: FFN-down row range %r is outside 0..%d" % (rows, self.D - 1))
+        self._down_split = (cpu, (r0, r1))
 
     def reset(self):
         state = self.M + self.conv
@@ -556,9 +624,27 @@ class Engine(object):
         grid, hb = self.fold_args(self.NFF)
         self.k.k_smfold(grid, (512,), (self.ffg, self.ffu, self.sF, self.fo6, np.int32(0), np.int32(0), np.int32(0), hb))
         self.fold_hi(self.fo6, self.NFF)
-        npart = self.gemv([p + "ffn_down.weight"], self.fo6, [self.y], parts_ok=True)
+        if self._down_split is None:
+            npart = self.gemv([p + "ffn_down.weight"], self.fo6, [self.y], parts_ok=True)
+        else:
+            npart = self._ffn_down_split(p)
         self.pending = npart
         return h
+
+    def _ffn_down_split(self, p):
+        """GPU upper rows and CPU lower rows of one FFN-down GEMV, merged in the residual buffer."""
+        if self._down_split is None:
+            raise RuntimeError("kindi: no FFN-down row split is configured")
+        cpu, rows = self._down_split
+        r0, r1 = rows
+        if not 0 <= r0 < r1 < self.D:
+            raise ValueError("kindi: a down split needs a proper row subset of 0..%d" % (self.D - 1))
+        getter = "get"
+        x = getattr(self.fo6, getter)().copy()      # the CPU needs the same folded FFN input
+        self.gemv([p + "ffn_down.weight"], self.fo6, [self.y[r1:self.D]])
+        cpu_part = cpu.gemv_rows(p + "ffn_down.weight", (r0, r1), x)
+        self.y[r0:r1].set(np.asarray(cpu_part, dtype=np.float32))
+        return 1
 
     def body(self, tok, pos):
         self._require_full_layers("body")
@@ -645,9 +731,19 @@ class Engine(object):
     def head(self):
         """-> greedy next token id. Leaves the logits in self.ylog[:self.ylog_n], their argmax slot in self.aout and
         (reordered head) each slot's token id in self.ylog_map."""
+        if cp is None:
+            raise RuntimeError("kindi: the GPU engine needs CuPy")
         if not self.need_head:
             raise RuntimeError("kindi: this engine does not own the output head")
         a = self.w[self.head_name]
+        if self._partial_head:
+            self.gemv([self.head_name], self.xp, [self.y])
+            n = self.head_count
+            argmax = "k_argmax"
+            getattr(self.k, argmax)((1,), (1024,), (self.y, np.int32(n), self.aout))
+            self.ylog, self.ylog_n = self.y, n
+            self.ylog_map = cp.arange(self.head_off, self.head_off + n, dtype=cp.int32)
+            return int(self.aout[0]) + self.head_off
         if self.hsl is None:
             self.gemv([self.head_name], self.xp, [self.y])
             self.k.k_argmax((1,), (1024,), (self.y, np.int32(VOCAB), self.aout))
@@ -694,8 +790,8 @@ PLAN_SMALL_HIP = ("gfx1151",)      # the AMD GPUs where the 2B / 4B / 9B take th
 
 
 def tc_hp_for(man):
-    """The activation precision the plan engine should use for this pack: "1", or None to leave the
-    environment alone.
+    """The activation precision the tensor-core path should use for this pack: "1", or None to leave
+    the environment alone.
 
     A pack folded with Hadamard block 4096 (the 9B here) passes the tensor-core verify 4/4 only with the
     high-precision activations (about 14 bits instead of 8, same weight traffic); with the default ones one
@@ -704,9 +800,13 @@ def tc_hp_for(man):
     packs the exact setting is the default rather than a flag every user has to find. An explicit
     `KINDI_TC_HP` always wins, including `0` (which then stops with the measured explanation).
 
-    It is read once, when `kindi.spec` is imported, and caps the verify pass at T = 4, so a process that
-    loads an HB-4096 pack first keeps that cap for any later pack.
+    Only the tensor-core path reads it. With KINDI_TC off, the plan engine runs its 5-trit products and
+    ignores `KINDI_TC_HP`, so this returns None and a default run does not claim high-precision activations
+    it is not using. It is read once, when `kindi.spec` is imported, and caps the verify pass at T = 4, so a
+    process that loads an HB-4096 pack first keeps that cap for any later pack.
     """
+    if os.environ.get("KINDI_TC", "0") != "1":
+        return None
     if "KINDI_TC_HP" in os.environ:
         return None
     try:
@@ -867,8 +967,8 @@ def make_engine_legacy(pack, ctx=4096, clusters=None, log=print, tandem="off", c
         hp = tc_hp_for(man)
         if hp is not None:
             os.environ["KINDI_TC_HP"] = hp         # before kindi.spec is imported: it reads this once
-            log("Hadamard block 4096: high-precision activations on (measured 4/4 at 122 tok/s; "
-                "KINDI_TC_HP=0 asks for the default activations, measured 3/4)")
+            # spec._load logs the setting once the tensor-core path actually builds; a 5-trit
+            # default run never reaches either line, because tc_hp_for returns None when TC is off.
         from . import spec
         from .tp import TPEngine
         spec.install(log)                       # KINDI_TC=1: tensor-core plans (one sm_80+ card); no-op otherwise

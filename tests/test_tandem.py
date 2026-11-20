@@ -18,17 +18,24 @@ from kindi.engine import Engine
 class FakeEngine(object):
     D = 4
 
-    def __init__(self, pack, ctx=4096, log=None, layers=None, embed=True, head=True, kv=None):
+    def __init__(self, pack, ctx=4096, log=None, layers=None, embed=True, head=True, kv=None, head_rows=None):
         self.kv = kv or "f16"
         self.ctx = int(ctx)
         self.layers = None if layers is None else tuple(layers)
         self.embed_owned, self.head_owned = bool(embed), bool(head)
+        self.head_rows = None if head_rows is None else tuple(head_rows)
         self.calls = []
         self.h = np.zeros(self.D, dtype=np.float32)
         self.pending = 0
         self.vocab = {"tok": 0}
         self.ylog = np.arange(5, dtype=np.float32)
         self.ylog_n, self.ylog_map = 5, None
+        self.head_off, self.head_count = 0, 5
+        if self.head_rows is not None:
+            self.head_off, head_end = self.head_rows
+            self.head_count = head_end - self.head_off
+            self.ylog = np.zeros(self.head_count, dtype=np.float32)
+            self.ylog_n = self.head_count
         self.k = object()
         self.aout = np.zeros(1, dtype=np.int32)
         self.dims = {"full_attention_interval": 2}
@@ -69,11 +76,19 @@ class FakeEngine(object):
 
     def finish(self):
         self.calls.append(("finish",))
+        if self.head_rows is not None:
+            self.ylog.fill(-1)
+            self.ylog[-1] = 20
+            return self.head_off + self.head_count - 1
         self.ylog = np.arange(5, dtype=np.float32) + 100
         return 77
 
     def head(self):
         self.calls.append(("head",))
+        if self.head_rows is not None:
+            self.ylog.fill(-1)
+            self.ylog[0] = 10
+            return self.head_off
         self.ylog = np.arange(5, dtype=np.float32) + 200
         return 88
 
@@ -110,8 +125,9 @@ def fake_pack(tmp_path):
 class FakeCPUEngine(FakeEngine):
     """The CPU backend keeps compact per-owner state lists (it only loads its layers)."""
 
-    def __init__(self, pack, ctx=4096, log=None, layers=None, embed=True, head=True, kv=None):
-        super().__init__(pack, ctx=ctx, log=log, layers=layers, embed=embed, head=head, kv=kv)
+    def __init__(self, pack, ctx=4096, log=None, layers=None, embed=True, head=True, kv=None, head_rows=None):
+        super().__init__(pack, ctx=ctx, log=log, layers=layers, embed=embed, head=head, kv=kv,
+                         head_rows=head_rows)
         if self.layers is not None:
             self.M, self.conv, self.Kc, self.Vc = [], [], [], []
             for il in self.layers:
@@ -170,6 +186,21 @@ def test_gpu_first_owns_the_prefix_and_the_cpu_head(fake_pack, fake_backends):
                                  ("layer", 2, 0), ("layer", 3, 0)]
     assert eng.cpu.calls[-1] == ("head",)
     assert eng.ylog is eng.cpu.ylog
+
+
+def test_exact_head_split_merges_disjoint_logits(fake_pack, fake_backends, monkeypatch):
+    man = json.loads((Path(fake_pack) / "kindi_pack.json").read_text(encoding="utf-8"))
+    man["head"] = "output.weight"
+    (Path(fake_pack) / "kindi_pack.json").write_text(json.dumps(man), encoding="utf-8")
+    monkeypatch.setattr(tandem, "VOCAB", 32)
+    monkeypatch.setenv("KINDI_TANDEM_HEAD_SPLIT", "50")
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first", log=lambda *a: None)
+    assert eng.head_split == (0, 16)
+    assert eng.cpu.head_owned and eng.gpu.head_owned
+    assert eng.step(10, 0) == 31                 # the GPU's last row wins the full host argmax
+    assert ("head",) in eng.cpu.calls and ("finish",) in eng.gpu.calls
+    assert eng.ylog.shape == (32,) and eng.ylog_n == 32 and eng.ylog_map is None
+    assert not hasattr(eng, "k")                 # the split uses the host sampler path
 
 
 def test_feed_leaves_the_residual_without_evaluating_the_head(fake_pack, fake_backends):
