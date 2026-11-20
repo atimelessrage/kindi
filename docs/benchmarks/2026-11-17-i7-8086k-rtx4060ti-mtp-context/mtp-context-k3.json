@@ -1,0 +1,47 @@
+{
+  "ctx": 26624,
+  "head": "kindi-mtp-2b-v1.npz",
+  "pack": "bonsai-2b",
+  "rows": [
+    {
+      "accepted": 0,
+      "drafted": 0,
+      "mode": "off",
+      "position": 24576,
+      "run": 1,
+      "seconds": 0.437,
+      "tok_s": 293.1,
+      "tokens": 128
+    },
+    {
+      "accepted": 71,
+      "drafted": 168,
+      "mode": "mtp",
+      "position": 24576,
+      "run": 1,
+      "seconds": 0.464,
+      "tok_s": 276.1,
+      "tokens": 128
+    },
+    {
+      "accepted": 0,
+      "drafted": 0,
+      "mode": "off",
+      "position": 24576,
+      "run": 2,
+      "seconds": 0.437,
+      "tok_s": 293.1,
+      "tokens": 128
+    },
+    {
+      "accepted": 71,
+      "drafted": 168,
+      "mode": "mtp",
+      "position": 24576,
+      "run": 2,
+      "seconds": 0.453,
+      "tok_s": 282.3,
+      "tokens": 128
+    }
+  ]
+}

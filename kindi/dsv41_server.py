@@ -15,7 +15,8 @@ state just before "<think>" is saved while the prompt is read. --slots N keeps t
 RAM (--slot-dir, a tmpfs) instead of the disk. kindi_priority (or X-Kindi-Priority): chat (the default) goes before
 background; a background request yields to a chat request between prompt chunks. A request's temperature, top_p,
 top_k and min_p are used (--sampling auto): with DSpark when the engine has speculative sampling, else plain sampled
-decoding. --repeat-stop stops a reply caught in a loop. /health has drafting, queue and slots.
+decoding. A malformed or non-finite max_tokens, temperature, top_p, top_k, min_p or seed is an HTTP 400 before
+generation. --repeat-stop stops a reply caught in a loop. /health has drafting, queue and slots.
 
 One request at a time (one engine); concurrent requests queue. The prompt is DeepSeek's own V4.1 encoding
 (encoding.py from the model release, --encoding), tool calls are its DSML blocks, parsed back with the same file.
@@ -40,6 +41,7 @@ import argparse
 import codecs
 import importlib.util
 import json
+import math
 import os
 import re
 import select
@@ -67,6 +69,50 @@ EFFORT = {"minimal": "low", "low": "low", "medium": "high", "high": "high", "xhi
 RESERVE = 8                                             # positions kept free after the prompt
 # while nothing else is sent (waiting for the engine, reading a long prompt), a stream gets an SSE comment this often
 KEEPALIVE_S = float(os.environ.get("KINDI_KEEPALIVE_S", "10"))
+
+# the same body cap as kindi/server.py: this server can be bound to 0.0.0.0, so an
+# unbounded `rfile.read(Content-Length)` is a memory-pressure bug, not just a slow request
+MAX_BODY_MB = 16
+_BODY_MB_RAW = os.environ.get("KINDI_MAX_BODY_MB", "16")
+try:
+    MAX_BODY_MB = int(_BODY_MB_RAW)
+except (TypeError, ValueError):
+    raise SystemExit("kindi.dsv41_server: KINDI_MAX_BODY_MB must be an integer (got %r)" % _BODY_MB_RAW)
+if MAX_BODY_MB < 1:
+    raise SystemExit("kindi.dsv41_server: KINDI_MAX_BODY_MB must be at least 1 (got %d)" % MAX_BODY_MB)
+MAX_BODY_BYTES = MAX_BODY_MB << 20
+# A body error closes the connection. Drain only this much of the refused request (plus any
+# pipelined bytes) before the final close: enough to keep the 413/400 from turning into a TCP
+# reset, while a multi-gigabyte Content-Length cannot hold the handler open indefinitely.
+CLOSE_DRAIN_BYTES = MAX_BODY_BYTES + (64 << 10)
+
+
+class BodyTooLarge(ValueError):
+    """The request body exceeds MAX_BODY_BYTES: an HTTP 413, not a request-shape error."""
+
+
+def read_json_body(headers, rfile, limit=MAX_BODY_BYTES):
+    """Read and parse a JSON body with a hard size cap.
+
+    A declared Content-Length over the cap is refused before the body is read; a missing header
+    keeps the old empty-body behavior. The reader never asks for more than the cap, so a lying
+    length cannot make this allocate beyond it either.
+    """
+    declared = headers.get("Content-Length")
+    if declared is None:
+        return {}
+    try:
+        length = int(declared)
+    except (TypeError, ValueError):
+        raise ValueError("invalid Content-Length")
+    if length < 0:
+        raise ValueError("invalid Content-Length")
+    if length > limit:
+        raise BodyTooLarge("the request body is larger than %d bytes" % limit)
+    try:
+        return json.loads(rfile.read(length) or b"{}")
+    except (TypeError, ValueError, UnicodeDecodeError):
+        raise ValueError("the body is not JSON")
 
 
 PRIO_CHAT, PRIO_BACKGROUND = 0, 1
@@ -151,6 +197,113 @@ def _accepts(fn, name):
         return False
 
 
+def _finite_number(value):
+    """JSON numbers only; bool is an int in Python, and NaN/Infinity are not valid JSON numbers."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except (OverflowError, TypeError):
+        return False
+
+
+def validate_request(req):
+    """Check the request shape and sampling fields at the HTTP boundary, before generation.
+
+    Mirrors `kindi.server._validate_request` for the fields that used to fail after prompt counting:
+    messages/tools structure, `stream`, `stream_options` and `stop`. The sampling checks are then
+    the same as before: integer fields are JSON ints (a bool is not one), numeric fields must be
+    finite, `max_tokens`/`max_completion_tokens` are at least 1, `top_k` is non-negative, the
+    probabilities are in their sampler ranges and `seed` is a valid RandomState seed. Raises
+    ValueError naming the field; the caller answers 400 before `count()` or generation.
+    """
+    if not isinstance(req, dict):
+        raise ValueError("the body must be a JSON object")
+
+    messages = req.get("messages")
+    if not isinstance(messages, list) or not messages:
+        raise ValueError("messages must be a non-empty list")
+    for i, message in enumerate(messages):
+        if not isinstance(message, dict):
+            raise ValueError("messages[%d] must be an object" % i)
+        role = message.get("role")
+        if not isinstance(role, str) or role not in ("system", "user", "assistant", "tool", "developer"):
+            raise ValueError("messages[%d].role must be system, user, assistant, developer or tool" % i)
+        content = message.get("content")
+        if content is not None and not isinstance(content, (str, list)):
+            raise ValueError("messages[%d].content must be a string or a list" % i)
+        if isinstance(content, list):
+            for j, part in enumerate(content):
+                if not isinstance(part, dict):
+                    raise ValueError("messages[%d].content[%d] must be an object" % (i, j))
+                if "text" in part and not isinstance(part["text"], str):
+                    raise ValueError("messages[%d].content[%d].text must be a string" % (i, j))
+        if role == "assistant":
+            calls = message.get("tool_calls")
+            if calls is not None:
+                if not isinstance(calls, list):
+                    raise ValueError("messages[%d].tool_calls must be a list" % i)
+                for j, call in enumerate(calls):
+                    fn = call.get("function", call) if isinstance(call, dict) else None
+                    if not isinstance(fn, dict) or not isinstance(fn.get("name"), str):
+                        raise ValueError("messages[%d].tool_calls[%d] needs a function name" % (i, j))
+                    args = fn.get("arguments")
+                    if args is not None and not isinstance(args, (str, dict)):
+                        raise ValueError("messages[%d].tool_calls[%d].arguments must be a string or object"
+                                         % (i, j))
+
+    tools = req.get("tools")
+    if tools is not None:
+        if not isinstance(tools, list):
+            raise ValueError("tools must be a list")
+        for i, tool in enumerate(tools):
+            fn = tool.get("function", tool) if isinstance(tool, dict) else None
+            if not isinstance(fn, dict) or not isinstance(fn.get("name"), str):
+                raise ValueError("tools[%d] needs a function name" % i)
+            if fn.get("parameters") is not None and not isinstance(fn["parameters"], dict):
+                raise ValueError("tools[%d].function.parameters must be an object" % i)
+
+    if req.get("stream") is not None and not isinstance(req["stream"], bool):
+        raise ValueError("stream must be true or false")
+    stop = req.get("stop")
+    if stop is not None and not isinstance(stop, str):
+        if not isinstance(stop, list) or any(not isinstance(s, str) for s in stop):
+            raise ValueError("stop must be a string or a list of strings")
+    stream_options = req.get("stream_options")
+    if stream_options is not None:
+        if not isinstance(stream_options, dict):
+            raise ValueError("stream_options must be an object")
+        if (stream_options.get("include_usage") is not None
+                and not isinstance(stream_options["include_usage"], bool)):
+            raise ValueError("stream_options.include_usage must be true or false")
+
+    for name in ("max_tokens", "max_completion_tokens", "top_k", "seed"):
+        value = req.get(name)
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise ValueError("%s must be an integer" % name)
+        if name in ("max_tokens", "max_completion_tokens") and value < 1:
+            raise ValueError("%s must be at least 1" % name)
+        if name == "top_k" and value < 0:
+            raise ValueError("top_k must be at least 0")
+        if name == "seed" and not 0 <= value <= 2 ** 32 - 1:
+            raise ValueError("seed must be between 0 and 4294967295")
+    for name, lo, hi in (("temperature", 0.0, None), ("top_p", 0.0, 1.0), ("min_p", 0.0, 1.0)):
+        value = req.get(name)
+        if value is None:
+            continue
+        if not _finite_number(value):
+            raise ValueError("%s must be a finite number" % name)
+        if value < lo:
+            raise ValueError("%s must be at least %s" % (name, lo))
+        if hi is not None and value > hi:
+            raise ValueError("%s must be at most %s" % (name, hi))
+    if req.get("top_p") == 0:
+        raise ValueError("top_p must be greater than 0")
+    return req
+
+
 def _distribution(logits, temperature, top_p=1.0, top_k=0, min_p=0.0):
     """(candidate ids, probabilities): temperature first, then top-k, then top-p, then min-p (the order of the
     engine's kindi.dsv41.distribution, used when it exists, so plain and speculative sampling agree)"""
@@ -186,6 +339,66 @@ class ContextOverflow(ValueError):
 
 def _log(*a):
     print(time.strftime("%H:%M:%S"), *a, file=sys.stderr, flush=True)
+
+
+def _positive_int(text):
+    """A single positive integer, rejected at argparse time."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = 0
+    if value <= 0:
+        raise argparse.ArgumentTypeError(
+            "must be a positive integer (got %r)" % (text,))
+    return value
+
+
+def _non_negative_int(text):
+    """A single non-negative integer, rejected at argparse time."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = -1
+    if value < 0:
+        raise argparse.ArgumentTypeError(
+            "must be a non-negative integer (got %r)" % (text,))
+    return value
+
+
+def _non_negative_float(text):
+    """A finite non-negative number, rejected at argparse time."""
+    try:
+        value = float(str(text).strip())
+    except (TypeError, ValueError):
+        value = float("nan")
+    if not math.isfinite(value) or value < 0:
+        raise argparse.ArgumentTypeError(
+            "must be a finite non-negative number (got %r)" % (text,))
+    return value
+
+
+def _port(text):
+    """A TCP port; 0 asks the OS for an ephemeral port."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = -1
+    if not 0 <= value <= 65535:
+        raise argparse.ArgumentTypeError(
+            "must be an integer 0..65535 (got %r)" % (text,))
+    return value
+
+
+def _flag(text):
+    """A 0/1 switch, rejected at argparse time."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = -1
+    if value not in (0, 1):
+        raise argparse.ArgumentTypeError(
+            "must be 0 or 1 (got %r)" % (text,))
+    return value
 
 
 def find_encoding(a):
@@ -375,7 +588,7 @@ class Engine(object):
         self.slot_keys = []                             # RAM slots (--slots), the oldest first
         self.state = {"busy": False}
         self.last = {}
-        self.cal = tuple(float(x) for x in a.cal.split(","))
+        self.cal = a.cal
         self.reqdir = os.path.join(a.cache_dir, "last-requests") if a.cache_dir else None
         self._turn_file = None                          # (tokens, path, key) of the last turn saved (after_turn)
 
@@ -919,11 +1132,19 @@ def make_handler(E):
 
         def _json(self, code, obj):
             b = json.dumps(obj).encode()
+            if getattr(self, "_body_error", False):
+                self.close_connection = True
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(b)))
+            # A body error can leave unread request bytes in rfile; tell the client not to reuse
+            # the connection instead of letting the next request parse those bytes.
+            if getattr(self, "close_connection", False):
+                self.send_header("Connection", "close")
             self.end_headers()
             self.wfile.write(b)
+            if getattr(self, "_body_error", False):
+                self._close_body_error()
 
         def _err(self, code, msg, typ="invalid_request_error"):
             self._json(code, {"error": {"message": msg, "type": typ, "code": typ}})
@@ -933,13 +1154,53 @@ def make_handler(E):
                                        "code": "context_length_exceeded"}})
 
         def _body(self):
-            return json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))) or b"{}")
+            try:
+                return read_json_body(self.headers, self.rfile)
+            except Exception:
+                self._body_error = True
+                raise
+
+        def _close_body_error(self):
+            """Half-close after the error, then discard a bounded prefix before the socket closes.
+
+            A plain close with the refused body still in the receive buffer can reset the
+            connection before the client reads the 413/400. SHUT_WR delivers the response first;
+            draining what the peer already sent (including a pipelined next request) makes the
+            final close orderly without trusting a declared length that is over the cap.
+            """
+            try:
+                self.wfile.flush()
+                self.connection.shutdown(socket.SHUT_WR)
+            except (AttributeError, OSError):
+                return
+            limit = CLOSE_DRAIN_BYTES
+            try:
+                self.connection.settimeout(0.1)
+            except (AttributeError, OSError):
+                return
+            while limit > 0:
+                try:
+                    chunk = self.rfile.read1(min(65536, limit))
+                except (AttributeError, OSError, ValueError):
+                    break
+                if not chunk:
+                    break
+                limit -= len(chunk)
 
         def _tokenize(self):
             try:
                 req = self._body()
+            except BodyTooLarge as e:
+                self.close_connection = True
+                return self._err(413, str(e), "request_too_large")
             except Exception:
+                self.close_connection = True
                 return self._err(400, "invalid JSON")
+            if req.get("messages") is not None:
+                try:
+                    validate_request(req)      # messages/tools shape and settings, before E.count()
+                except ValueError as e:
+                    return self._err(400, str(e))
             ctx = E.model.ctx
             if req.get("messages") is not None:   # a chat request: the whole prompt, as the chat endpoint builds it
                 ids = E.count(req)
@@ -956,7 +1217,11 @@ def make_handler(E):
         def _detokenize(self):
             try:
                 ids = [int(i) for i in self._body().get("tokens") or []]
+            except BodyTooLarge as e:
+                self.close_connection = True
+                return self._err(413, str(e), "request_too_large")
             except Exception:
+                self.close_connection = True
                 return self._err(400, "send tokens: a list of token ids")
             text = b"".join(E.model.tok.decode_bytes(i) for i in ids).decode("utf-8", "replace")
             return self._json(200, {"prompt": text, "content": text})
@@ -991,7 +1256,14 @@ def make_handler(E):
                 return
             if self.path.rstrip("/") == "/v1/kindi/warm":
                 try:
-                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))) or b"{}")
+                    body = self._body()
+                except BodyTooLarge as e:
+                    self.close_connection = True
+                    return self._err(413, str(e), "request_too_large")
+                except Exception:
+                    self.close_connection = True
+                    return self._err(400, "invalid JSON")
+                try:
                     with E.lock:
                         E.state.update(busy=True, since=time.strftime("%H:%M:%S"))
                         try:
@@ -1017,8 +1289,16 @@ def make_handler(E):
                 return self._err(404, "not found")
             try:
                 req = self._body()
+            except BodyTooLarge as e:
+                self.close_connection = True
+                return self._err(413, str(e), "request_too_large")
             except Exception:
+                self.close_connection = True
                 return self._err(400, "invalid JSON")
+            try:
+                validate_request(req)
+            except ValueError as e:
+                return self._err(400, str(e))
             cid = "chatcmpl-" + uuid.uuid4().hex[:24]
             created = int(time.time())
             stream = bool(req.get("stream"))
@@ -1182,29 +1462,35 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m kindi.dsv41_server")
     ap.add_argument("model")
     ap.add_argument("--host", default="0.0.0.0")
-    ap.add_argument("--port", type=int, default=8101)
-    ap.add_argument("--ctx", type=int, default=32768)
-    ap.add_argument("--tmax", type=int, default=512)
-    ap.add_argument("--dspark", default=None, help="DSpark drafter directory (converted by kindi.dsv41_dspark)")
-    ap.add_argument("--cal", default="1,0", help="DSpark draft length calibration a,b")
+    ap.add_argument("--port", type=_port, default=8101)
+    ap.add_argument("--ctx", type=dsv41._positive_int, default=32768,
+                    help="context length in tokens (a positive integer; default: 32768)")
+    ap.add_argument("--tmax", type=_positive_int, default=512,
+                    help="prompt chunk size (a positive integer; default: 512)")
+    ap.add_argument("--dspark", type=dsv41._dspark_dir, default=None,
+                    help="DSpark drafter directory (converted by kindi.dsv41_dspark)")
+    ap.add_argument("--cal", type=dsv41._cal_arg, default=(1.0, 0.0),
+                    help="DSpark draft length calibration: two comma-separated finite numbers, a,b")
     ap.add_argument("--encoding", default=None,
                     help="DeepSeek-V4.1 encoding.py (encoding/encoding.py of the model release; default: "
                          "$KINDI_DSV_ENCODING, else encoding.py in the --dspark directory or next to the model)")
     ap.add_argument("--cache-dir", default=None)
-    ap.add_argument("--cache-gb", type=float, default=8.0)
-    ap.add_argument("--ckpt-min", type=int, default=512, help="save a prompt state once it took this many new tokens")
-    ap.add_argument("--slots", type=int, default=0,
+    ap.add_argument("--cache-gb", type=_non_negative_float, default=8.0)
+    ap.add_argument("--ckpt-min", type=_non_negative_int, default=512,
+                    help="save a prompt state once it took this many new tokens")
+    ap.add_argument("--slots", type=_non_negative_int, default=0,
                     help="RAM slots for other conversations: save on evict writes to --slot-dir (a tmpfs) and keeps the "
                          "newest N (0: save on evict to --cache-dir)")
     ap.add_argument("--slot-dir", default="/dev/shm/kindi-dsv41-slots")
     ap.add_argument("--sampling", choices=("auto", "off"), default="auto",
                     help="auto: a request's temperature, top_p, top_k and min_p are used; off: always greedy")
-    ap.add_argument("--temperature", type=float, default=0.0, help="the temperature of a request that sets none")
-    ap.add_argument("--repeat-stop", type=int, default=1, help="1: stop a reply caught in a repeating loop")
-    ap.add_argument("--turn-min", type=int, default=64,
+    ap.add_argument("--temperature", type=_non_negative_float, default=0.0,
+                    help="the temperature of a request that sets none")
+    ap.add_argument("--repeat-stop", type=_flag, default=1, help="1: stop a reply caught in a repeating loop; 0: off")
+    ap.add_argument("--turn-min", type=_non_negative_int, default=64,
                     help="after each answer, save the state of a conversation this long or longer, in the background "
                          "(0: off; needs --cache-dir)")
-    ap.add_argument("--max-tokens", type=int, default=0,
+    ap.add_argument("--max-tokens", type=_non_negative_int, default=0,
                     help="max_tokens of a request that sets none (0: up to the remaining context)")
     ap.add_argument("--no-prompt-cache", action="store_true", help="compute every prompt from the start")
     ap.add_argument("--keep-system-tail", action="store_true",

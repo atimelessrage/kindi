@@ -14,6 +14,7 @@ An engine calls plan() once at load time and then uploads each layer's experts t
 Nothing here touches the card, so the module is testable on the CPU (tools/test_moe.py).
 """
 import json
+import math
 import os
 
 TIERS = ("card", "host", "disk")
@@ -46,23 +47,137 @@ class MoESpec(object):
         return self._eb[il]
 
 
+def _layer_index(spec, key, field):
+    """A layer key from a usage file, checked against the spec before it indexes anything."""
+    try:
+        il = int(key)
+    except (TypeError, ValueError):
+        raise ValueError("%s names layer %r, not an integer" % (field, key))
+    if il not in spec.layers:
+        raise ValueError("%s names layer %d, not one of %s" % (field, il, spec.layers))
+    return il
+
+
+def _checked_counts(spec, counts):
+    """{layer: [count per expert]}, refusing a short, non-numeric or negative row."""
+    out = {}
+    if counts is None:
+        return out
+    if not isinstance(counts, dict):
+        raise ValueError("counts must be an object keyed by layer")
+    for key, values in counts.items():
+        il = _layer_index(spec, key, "counts")
+        if not isinstance(values, (list, tuple)) or len(values) != spec.n_exp:
+            raise ValueError("counts for layer %d has %s values, expected %d"
+                             % (il, len(values) if isinstance(values, (list, tuple)) else "no",
+                                spec.n_exp))
+        row = []
+        for expert, value in enumerate(values):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError("counts for layer %d expert %d is not a number: %r"
+                                 % (il, expert, value))
+            number = float(value)
+            if not math.isfinite(number) or number < 0:
+                raise ValueError("counts for layer %d expert %d must be finite and non-negative: %r"
+                                 % (il, expert, value))
+            row.append(number)
+        out[il] = row
+    return out
+
+
+def _checked_order(spec, order):
+    """{layer: [expert id]}, refusing an out-of-range, duplicate or non-integer id."""
+    out = {}
+    if order is None:
+        return out
+    if not isinstance(order, dict):
+        raise ValueError("order must be an object keyed by layer")
+    for key, values in order.items():
+        il = _layer_index(spec, key, "order")
+        if not isinstance(values, (list, tuple)):
+            raise ValueError("order for layer %d must be a list" % il)
+        row, seen = [], set()
+        for value in values:
+            if isinstance(value, bool):
+                raise ValueError("order for layer %d has a non-integer expert id: %r" % (il, value))
+            try:
+                expert = int(value)
+            except (TypeError, ValueError):
+                raise ValueError("order for layer %d has a non-integer expert id: %r"
+                                 % (il, value))
+            if expert < 0 or expert >= spec.n_exp:
+                raise ValueError("order for layer %d names expert %d outside 0..%d"
+                                 % (il, expert, spec.n_exp - 1))
+            if expert in seen:
+                raise ValueError("order for layer %d repeats expert %d" % (il, expert))
+            seen.add(expert)
+            row.append(expert)
+        out[il] = row
+    return out
+
+
+def _rows_for_spec(spec, rows, field):
+    """Rows whose layer belongs to this spec; rows for another model are ignored.
+
+    A row for a layer this spec has is parsed strictly. In tolerant mode the bad row is returned
+    in `ignored` instead of raised, so a bundled usage file that was measured on a different
+    expert count cannot silently index the wrong list.
+    """
+    out, ignored = {}, []
+    if rows is None:
+        return out, ignored
+    if not isinstance(rows, dict):
+        raise ValueError("%s must be an object keyed by layer" % field)
+    for key, value in rows.items():
+        try:
+            il = int(key)
+        except (TypeError, ValueError):
+            ignored.append("%s names layer %r, not an integer" % (field, key))
+            continue
+        if il not in spec.layers:
+            continue
+        try:
+            parsed = (_checked_counts if field == "counts" else _checked_order)(
+                spec, {key: value})
+        except ValueError as exc:
+            ignored.append(str(exc))
+            continue
+        out.update(parsed)
+    return out, ignored
+
+
 class Usage(object):
     """per layer: a count for each expert (how often the router chose it). An older file with only an order
     (most used first) is read too; it then gives a uniform split, as before."""
 
     def __init__(self, spec, counts=None, order=None, meta=None):
         self.spec = spec
-        self.counts = {int(k): [float(c) for c in v] for k, v in (counts or {}).items()}
-        self._order = {int(k): [int(e) for e in v] for k, v in (order or {}).items()}
+        self.counts = _checked_counts(spec, counts)
+        self._order = _checked_order(spec, order)
         self.meta = dict(meta or {})
 
     @classmethod
-    def load(cls, spec, path):
+    def load(cls, spec, path, strict=True):
+        """Read a usage file. `strict` refuses a bad row for a layer this spec has; tolerant
+        mode records it in `meta['ignored_usage_rows']` and leaves that layer without counts."""
         if not path or not os.path.exists(path):
             return cls(spec)
-        d = json.load(open(path))
-        return cls(spec, d.get("counts"), d.get("order"),
-                   {k: v for k, v in d.items() if k not in ("counts", "order")})
+        try:
+            with open(path, encoding="utf-8") as f:
+                d = json.load(f)
+            if not isinstance(d, dict):
+                raise ValueError("the file must hold a JSON object")
+            counts, ignored_counts = _rows_for_spec(spec, d.get("counts"), "counts")
+            order, ignored_order = _rows_for_spec(spec, d.get("order"), "order")
+            ignored = ignored_counts + ignored_order
+            if strict and ignored:
+                raise ValueError("; ".join(ignored))
+            meta = {k: v for k, v in d.items() if k not in ("counts", "order")}
+            if ignored:
+                meta["ignored_usage_rows"] = ignored
+            return cls(spec, counts, order, meta)
+        except (OSError, ValueError) as exc:
+            raise ValueError("bad expert usage file %s: %s" % (path, exc))
 
     def save(self, path):
         d = dict(self.meta)
@@ -87,6 +202,19 @@ class Usage(object):
             o = self._order[il]
             return o + [e for e in range(self.spec.n_exp) if e not in set(o)]
         return list(range(self.spec.n_exp))
+
+    def coverage(self, n):
+        """the expected share of all routed picks that the n most-used experts of every layer take (None
+        without counts). Every token passes every MoE layer once, so the layers weigh the same."""
+        if not self.has_counts():
+            return None
+        n = max(0, int(n))
+        num = den = 0.0
+        for il in self.spec.layers:
+            c = self.counts[il]
+            num += sum(c[e] for e in self.order(il)[:n])
+            den += sum(c)
+        return num / den if den else None
 
     def has_counts(self):
         return all(il in self.counts and sum(self.counts[il]) > 0 for il in self.spec.layers)
@@ -190,7 +318,7 @@ def plan(spec, usage, card_bytes, host_bytes=None, min_card=None, weighted=None)
         # the most used non-card experts (by share of their layer's picks) stay in host memory; the rest go to disk
         rest = sorted((((usage.counts[il][e] / (sum(usage.counts[il]) or 1.0)) if usage.has_counts() else 0.0),
                        -il, -e) for il in L for e in range(n) if tier[il][e] == "host")
-        for share, nil, ne in reversed(rest):
+        for _share, nil, ne in reversed(rest):
             il, e = -nil, -ne
             if eb(il) <= room:
                 room -= eb(il)

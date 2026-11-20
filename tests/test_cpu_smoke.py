@@ -1,0 +1,37 @@
+"""The compiled kcpu library must load through the production loader and match the Python ctypes ABI.
+
+The CI `cpu-engine-smoke` job compiles `kindi/kcpu.c` for the AVX baseline and the AVX2/FMA/F16C fast path,
+then sets `KINDI_CPU_CACHE` and `KINDI_CPU_SMOKE=1`. The default suite skips this: it needs a compiled
+library and a C toolchain, and it deliberately needs no model pack.
+"""
+import ctypes
+import os
+
+import pytest
+
+from kindi import cpu
+
+
+@pytest.fixture(scope="module")
+def library():
+    if os.environ.get("KINDI_CPU_SMOKE") != "1":
+        pytest.skip("set KINDI_CPU_SMOKE=1 with a prebuilt kcpu library")
+    cache = os.environ.get("KINDI_CPU_CACHE")
+    name = os.path.basename(cpu._so_path(cache)) if cache else ""
+    if not cache or not name or not os.path.isfile(os.path.join(cache, name)):
+        pytest.fail("KINDI_CPU_CACHE does not contain the keyed CPU library: %s" % name)
+    return cpu._lib()
+
+
+def test_compiled_library_loads_with_the_python_abi(library):
+    assert library.kc_sizeof_model() == ctypes.sizeof(cpu.Model)
+    assert library.kc_sizeof_layer() == ctypes.sizeof(cpu.Layer)
+    assert callable(library.kc_step)
+    assert callable(library.kc_embed)
+    assert callable(library.kc_layer)
+    assert callable(library.kc_head)
+
+
+def test_compiled_library_initializes(library):
+    library.kc_init()
+    assert library.kc_sizeof_model() > 0

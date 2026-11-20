@@ -771,6 +771,262 @@ extern "C" __global__ void k_att_merge_T(const float* __restrict__ PO, int Z, co
   att[(long long)t * lda + hh * 256 + f] = (o / l) * (1.0f / (1.0f + expf(-g)));
 }
 
+/* ---------------------------------------------------------------- prompt chunks: the V4 value cache */
+/* K8/V4 stores V as 16 packed bytes and one fp16 scale per 32 features, half the q8_0 row. These are the q8 kernels'
+   arithmetic with 4-bit loads: the same scores, softmax and order of additions, so a V4 chunk equals V4 one token at a
+   time (k_attn_vq4w / k_attn_combn), exactly as the q8 kernels equal k_attn_vq8w for their cache. The q8 kernels above
+   are untouched: a q8_0 engine compiles and runs exactly the code it did before. */
+
+extern "C" __global__ void __launch_bounds__(256) k_att_pv4_T(const float* __restrict__ S, int ld,
+    const unsigned char* __restrict__ Vq, const unsigned short* __restrict__ Vd, float* __restrict__ AP, int pos, int t0,
+    int TS, int n_kv, int G, int NH){
+  /* k_att_pv_T for the V4 cache: grid (chunks of 256 positions, ceil(TS G / 64), n_kv * 4 feature quarters),
+     block 256: 64 rows x 64 features, 4 rows x 4 features per thread, each with the 4 position-class sums */
+  __shared__ float Ps[64][33];
+  __shared__ float Vs[32][68];
+  const int tid = threadIdx.x, fq = tid & 15, rq = tid >> 4;
+  const int c = blockIdx.x, r0 = blockIdx.y * 64, kv = blockIdx.z >> 2, f0 = (blockIdx.z & 3) * 64;
+  const int nrow = TS * G, i0 = c * 256, nmax = pos + t0 + TS;
+  /* the loader: lane li = position in the step, rows (tid >> 5) + 8 m */
+  const int li = tid & 31;
+  long long rb[8];
+  int nl[8];
+#pragma unroll
+  for(int m = 0; m < 8; ++m){
+    const int rr = r0 + (tid >> 5) + 8 * m;
+    nl[m] = 0; rb[m] = 0;
+    if(rr < nrow){
+      const int t = rr / G, j = rr - t * G;
+      nl[m] = pos + t0 + t + 1;
+      rb[m] = ((long long)t * NH + kv * G + j) * ld;
+    }
+  }
+  float acc[4][4][4];
+#pragma unroll
+  for(int g = 0; g < 4; ++g)
+#pragma unroll
+    for(int a = 0; a < 4; ++a)
+#pragma unroll
+      for(int e = 0; e < 4; ++e) acc[g][a][e] = 0.f;
+  for(int s0 = 0; s0 < 256; s0 += 32){
+    if(i0 + s0 >= nmax) break;
+    __syncthreads();
+    const int p = i0 + s0 + li;
+#pragma unroll
+    for(int m = 0; m < 8; ++m) Ps[(tid >> 5) + 8 * m][li] = p < nl[m] ? S[rb[m] + p] : 0.f;
+    {
+      const int i = tid >> 3, f8 = tid & 7, p = i0 + s0 + i;
+      float v[8];
+#pragma unroll
+      for(int e = 0; e < 8; ++e) v[e] = 0.f;
+      if(p < nmax){
+        const unsigned int w = KLDG((const unsigned int*)(Vq + ((long long)p * n_kv + kv) * 128 + (f0 + f8 * 8) / 2));
+        const float d = h2f(KLDG(Vd + ((long long)p * n_kv + kv) * 8 + (f0 + f8 * 8) / 32));
+#pragma unroll
+        for(int e = 0; e < 8; ++e) v[e] = (float)((int)((w >> (4 * e)) & 15u) - 8) * d;
+      }
+#pragma unroll
+      for(int e = 0; e < 8; ++e) Vs[i][f8 * 8 + e] = v[e];
+    }
+    __syncthreads();
+#pragma unroll
+    for(int i = 0; i < 32; ++i){
+      const float4 v4 = *(const float4*)&Vs[i][fq * 4];
+      const float va[4] = {v4.x, v4.y, v4.z, v4.w};
+      const float pa[4] = {Ps[rq * 4][i], Ps[rq * 4 + 1][i], Ps[rq * 4 + 2][i], Ps[rq * 4 + 3][i]};
+#pragma unroll
+      for(int a = 0; a < 4; ++a)
+#pragma unroll
+        for(int e = 0; e < 4; ++e) acc[i & 3][a][e] += pa[a] * va[e];
+    }
+  }
+#pragma unroll
+  for(int a = 0; a < 4; ++a){
+    const int rr = r0 + rq * 4 + a;
+    if(rr >= nrow) continue;
+    const int t = rr / G, j = rr - t * G;
+    float* ap = AP + (((long long)c * TS + t) * NH + kv * G + j) * 256 + f0 + fq * 4;
+#pragma unroll
+    for(int e = 0; e < 4; ++e){
+      float x = acc[0][a][e];
+      x += acc[1][a][e]; x += acc[2][a][e]; x += acc[3][a][e];
+      ap[e] = x;
+    }
+  }
+}
+
+extern "C" __global__ void __launch_bounds__(256, 2) k_att_flash4_T(const uint2* __restrict__ Kq,
+    const unsigned short* __restrict__ Kd, const unsigned char* __restrict__ Vq, const unsigned short* __restrict__ Vd,
+    const signed char* __restrict__ qq, const float* __restrict__ qd, const float* __restrict__ gatev, int ldg,
+    float* __restrict__ att, int lda, int pos, int T, int n_kv, int G, int NH, float* __restrict__ PO){
+  /* k_att_flash_T for the V4 cache: the same scores, online softmax, split (PO / k_att_merge_T) and gated output;
+     only the value load differs (8 packed bytes are 16 features). */
+  __shared__ float QKV[2 * 32 * 68];          /* scores: Q[32][68] then K[32][68]; values: V[64][68] */
+  __shared__ float Ps[64][68];
+  __shared__ float dqs[64];
+  __shared__ float dks[64];
+  float (*Qs)[68] = (float (*)[68])QKV;
+  float (*Ks)[68] = (float (*)[68])(QKV + 32 * 68);
+  float (*Vs)[68] = (float (*)[68])QKV;
+  const int tid = threadIdx.x, tx = tid & 15, ty = tid >> 4, kv = blockIdx.y;
+  const int r0 = blockIdx.x * 64, nrow = T * G, QL = NH * 256;
+  const int rlast = min(r0 + 63, nrow - 1), nblk = pos + rlast / G + 1;
+  /* this thread's 4 rows */
+  int nr[4];
+#pragma unroll
+  for(int a = 0; a < 4; ++a){
+    const int r = r0 + ty * 4 + a;
+    nr[a] = r < nrow ? pos + r / G + 1 : 0;
+  }
+  /* loader roles */
+  const int lr = tid >> 2, lq = tid & 3;
+  const int qrow = r0 + lr, qt = qrow / G, qj = qrow - qt * G;
+  const bool qok = qrow < nrow;
+  const signed char* qsrc = qq + (long long)(qt) * QL + (kv * G + qj) * 256;
+  float m[4], l[4], o[4][16];
+#pragma unroll
+  for(int a = 0; a < 4; ++a){
+    m[a] = KNEGINF; l[a] = 0.f;
+#pragma unroll
+    for(int f = 0; f < 16; ++f) o[a][f] = 0.f;
+  }
+  const int ntl = (nblk + 63) / 64, z = blockIdx.z, Z = gridDim.z;
+  const int tlo = (int)((long long)z * ntl / Z), thi = (int)((long long)(z + 1) * ntl / Z);
+  for(int p0 = tlo * 64; p0 < thi * 64; p0 += 64){
+    float acc[4][4];
+#pragma unroll
+    for(int a = 0; a < 4; ++a)
+#pragma unroll
+      for(int c = 0; c < 4; ++c) acc[a][c] = 0.f;
+    const int kp = p0 + lr;
+    for(int b = 0; b < 8; ++b){
+      __syncthreads();
+      uint2 qw = make_uint2(0u, 0u), kw = make_uint2(0u, 0u);
+      if(qok) qw = *(const uint2*)(qsrc + b * 32 + lq * 8);
+      if(kp < nblk) kw = KLDG(Kq + (((long long)kp * n_kv + kv) * 256 + b * 32 + lq * 8) / 8);
+#pragma unroll
+      for(int e = 0; e < 4; ++e){
+        Qs[lq * 8 + e][lr] = sbf(qw.x >> (8 * e)); Qs[lq * 8 + 4 + e][lr] = sbf(qw.y >> (8 * e));
+        Ks[lq * 8 + e][lr] = sbf(kw.x >> (8 * e)); Ks[lq * 8 + 4 + e][lr] = sbf(kw.y >> (8 * e));
+      }
+      if(tid < 64){
+        const int r = r0 + tid, t = r / G, j = r - t * G;
+        dqs[tid] = r < nrow ? qd[(long long)t * (QL / 32) + (kv * G + j) * 8 + b] : 0.f;
+      } else if(tid < 128){
+        const int p = p0 + tid - 64;
+        dks[tid - 64] = p < nblk ? h2f(KLDG(Kd + ((long long)p * n_kv + kv) * 8 + b)) : 0.f;
+      }
+      __syncthreads();
+      float part[4][4];
+#pragma unroll
+      for(int a = 0; a < 4; ++a)
+#pragma unroll
+        for(int c = 0; c < 4; ++c) part[a][c] = 0.f;
+#pragma unroll 8
+      for(int i = 0; i < 32; ++i){
+        const float4 qv = *(const float4*)&Qs[i][ty * 4];
+        const float4 k4 = *(const float4*)&Ks[i][tx * 4];
+        const float qa[4] = {qv.x, qv.y, qv.z, qv.w}, ka[4] = {k4.x, k4.y, k4.z, k4.w};
+#pragma unroll
+        for(int a = 0; a < 4; ++a)
+#pragma unroll
+          for(int c = 0; c < 4; ++c) part[a][c] += ka[c] * qa[a];
+      }
+#pragma unroll
+      for(int a = 0; a < 4; ++a)
+#pragma unroll
+        for(int c = 0; c < 4; ++c) acc[a][c] += part[a][c] * (dqs[ty * 4 + a] * dks[tx * 4 + c]);
+    }
+    /* online softmax over this tile's 64 positions; the 16 threads of a row group are lanes of one warp half */
+#pragma unroll
+    for(int a = 0; a < 4; ++a){
+      float sv[4], mt = KNEGINF;
+#pragma unroll
+      for(int c = 0; c < 4; ++c){
+        const int p = p0 + tx * 4 + c;
+        sv[c] = p < nr[a] ? acc[a][c] * 0.0625f : KNEGINF;
+        mt = fmaxf(mt, sv[c]);
+      }
+#pragma unroll
+      for(int off = 8; off > 0; off >>= 1) mt = fmaxf(mt, KSHFLX(mt, off));
+      const float mn = fmaxf(m[a], mt);
+      float rs = 0.f, pv[4];
+#pragma unroll
+      for(int c = 0; c < 4; ++c){ pv[c] = mn == KNEGINF ? 0.f : expf(sv[c] - mn); rs += pv[c]; }
+#pragma unroll
+      for(int off = 8; off > 0; off >>= 1) rs += KSHFLX(rs, off);
+      const float sc = (m[a] == KNEGINF) ? 0.f : expf(m[a] - mn);
+      m[a] = mn;
+      l[a] = l[a] * sc + rs;
+#pragma unroll
+      for(int f = 0; f < 16; ++f) o[a][f] *= sc;
+      *(float4*)&Ps[ty * 4 + a][tx * 4] = make_float4(pv[0], pv[1], pv[2], pv[3]);
+    }
+    /* values: 4 feature quarters of 64, the tile's 64 positions each */
+#pragma unroll 1
+    for(int q = 0; q < 4; ++q){
+      __syncthreads();
+      {
+        const int key = tid >> 2, f16 = (tid & 3) * 16, p = p0 + key;
+        float v[16];
+#pragma unroll
+        for(int e = 0; e < 16; ++e) v[e] = 0.f;
+        if(p < nblk){
+          const uint2 w = KLDG((const uint2*)(Vq + ((long long)p * n_kv + kv) * 128 + (q * 64 + f16) / 2));
+          const float d = h2f(KLDG(Vd + ((long long)p * n_kv + kv) * 8 + (q * 64 + f16) / 32));
+          const unsigned int ww[2] = {w.x, w.y};
+#pragma unroll
+          for(int u = 0; u < 2; ++u)
+#pragma unroll
+            for(int e = 0; e < 8; ++e) v[u * 8 + e] = (float)((int)((ww[u] >> (4 * e)) & 15u) - 8) * d;
+        }
+#pragma unroll
+        for(int e = 0; e < 16; e += 4) *(float4*)&Vs[key][f16 + e] = make_float4(v[e], v[e + 1], v[e + 2], v[e + 3]);
+      }
+      __syncthreads();
+#pragma unroll 8
+      for(int k = 0; k < 64; ++k){
+        const float4 v4 = *(const float4*)&Vs[k][tx * 4];
+        const float va[4] = {v4.x, v4.y, v4.z, v4.w};
+#pragma unroll
+        for(int a = 0; a < 4; ++a){
+          const float pa = Ps[ty * 4 + a][k];
+#pragma unroll
+          for(int e = 0; e < 4; ++e) o[a][q * 4 + e] += pa * va[e];
+        }
+      }
+    }
+  }
+  if(Z > 1){
+#pragma unroll
+    for(int a = 0; a < 4; ++a){
+      const int r = r0 + ty * 4 + a;
+      if(r >= nrow) continue;
+      float* po = PO + (((long long)z * n_kv + kv) * nrow + r) * 260;
+#pragma unroll
+      for(int q = 0; q < 4; ++q)
+        *(float4*)(po + q * 64 + tx * 4) = make_float4(o[a][q * 4], o[a][q * 4 + 1], o[a][q * 4 + 2], o[a][q * 4 + 3]);
+      if(tx == 0){ po[256] = m[a]; po[257] = l[a]; }
+    }
+    return;
+  }
+#pragma unroll
+  for(int a = 0; a < 4; ++a){
+    const int r = r0 + ty * 4 + a;
+    if(r >= nrow) continue;
+    const int t = r / G, j = r - t * G, hh = kv * G + j;
+    const float il = 1.0f / l[a];
+#pragma unroll
+    for(int q = 0; q < 4; ++q)
+#pragma unroll
+      for(int e = 0; e < 4; ++e){
+        const int f = q * 64 + tx * 4 + e;
+        const float g = gatev[(long long)t * ldg + hh * 512 + 256 + f];
+        att[(long long)t * lda + hh * 256 + f] = (o[a][q * 4 + e] * il) * (1.0f / (1.0f + expf(-g)));
+      }
+  }
+}
+
 /* ---------------------------------------------------------------- prompt GEMM, int8 activations (sm_61+, dp4a) */
 /* KINDI_CHUNK_Q8=1 (GTX 1080 and later): the chunk's activations are quantised to int8 per 128-column group (scale
    amax / 127, round to nearest even, as llama.cpp's q8 rows), the weights unpacked to int8 trits, and each group's

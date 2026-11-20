@@ -41,6 +41,8 @@ def convert(g, gguf_path, out_dir, version, pack_format, sha256, log=print):
 
 
 def _engine(cfg, man, ctx, log):
+    # the non-drafting base engine: the server's draft sources (`lookup`, `mtp_head`)
+    # stay in nanbeige_gen, so verify/bench do not load a head they never use
     from .nanbeige import Engine
     return Engine(man["model_path"], ctx=ctx, kv=(cfg or {}).get("kv_cache"), log=log)
 

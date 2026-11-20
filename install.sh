@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Kindi installer: one command from a bare Linux machine to a verified, running Kindi server.
 #
-#   curl -fsSL https://amirhusain.com/kindi/install.sh | bash             # install (or upgrade / repair)
-#   curl -fsSL https://amirhusain.com/kindi/install.sh | bash -s -- --dry-run
+#   curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.7.0-fork/install.sh | bash             # install (or upgrade / repair)
+#   curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.7.0-fork/install.sh | bash -s -- --dry-run
 #   bash install.sh --uninstall [--purge]
 #
 # What it does, in order (every step prints what it is about to do and why):
-#   1. checks the machine: Linux x86-64, RAM, disk, every NVIDIA and AMD GPU (or none: the CPU engine);
+#   1. checks the machine: Linux x86-64 with AVX for the CPU engine, RAM, disk, every NVIDIA and AMD GPU;
 #   2. checks Docker and GPU access: the NVIDIA container toolkit, or the AMD compute driver (/dev/kfd); offers to
 #      install what is missing (sudo only for that). AMD GPUs need no ROCm on the host: ROCm is in the image;
 #   3. lists every setup that Kindi supports on this machine, the recommended one first, and asks which one
@@ -19,8 +19,10 @@
 # password or a key. Copyright (c) 2026 Amir Husain. SPDX-License-Identifier: AGPL-3.0-only.
 set -euo pipefail
 
-KINDI_VERSION="0.6.1"
-SOURCE_URL="https://github.com/ahtx/kindi/archive/refs/tags/v${KINDI_VERSION}.tar.gz"
+KINDI_VERSION="0.7.0-fork"
+SOURCE_URL="https://github.com/atimelessrage/kindi/releases/download/v${KINDI_VERSION}/kindi-${KINDI_VERSION}.tar.gz"
+# sha256 of the fork's 0.7.0-fork source archive at SOURCE_URL; a custom URL can be pinned with KINDI_SOURCE_SHA256
+SOURCE_SHA256="cb03cc938cfcda6bf2ff7afa4467153e0bf6ef770e2c704951295c2e114ae61b"
 HF="https://huggingface.co/prism-ml"
 # model: GGUF file, sha256 (= the Hugging Face file hash), size in bytes
 declare -A GGUF SHA SIZE
@@ -44,7 +46,7 @@ URL[nanbeige]="${NB_CARD_URL}/resolve/main/${GGUF[nanbeige]}"
 # MTP head for the 2B (docs/MTP.md, tensor-core cards only).
 # The files are on Hugging Face (https://huggingface.co/ahtx/kindi-mtp-heads); KINDI_MTP_URL overrides the location.
 MTP_URL="${KINDI_MTP_URL:-https://huggingface.co/ahtx/kindi-mtp-heads/resolve/main}"
-MTPF="kindi-mtp-2b-v1.npz"; MTPSHA="1b5c0c790a594af368c3646370c527c319cdb3bb0592dd3e523e752f721a5520"; MTPSIZE=60960552
+MTPF="kindi-mtp-2b-v1.npz"; MTPSHA="1b5c0c790a594af368c3646370c527c319cdb3bb0592dd3e523e752f721a5520"
 mtp_ready() { [ -f "$DIR/mtp/$MTPF" ] && [ -f "$DIR/mtp/$MTPF.sha256-ok" ]; }
 # The DSpine block drafter of the 27B on tensor-core cards (Tencent, Apache-2.0: https://huggingface.co/tencent/Qwen3.8-27B-DSpine-b16),
 # pinned to a revision and sha256; KINDI_DSPINE_URL overrides the location, --no-dspine leaves it out (docs/DSPINE.md)
@@ -97,7 +99,8 @@ Options:
                    card; lightning = Nemotron 3.5 Lightning 30B-A3B, a mixture of experts, on NVIDIA cards with 6 GB
                    or more)
   --ctx N          context length in tokens (default: the profile's; the engine fits it to the free memory)
-  --gpu G          N (one NVIDIA card), N,M (two cards), amd or amdN (an AMD card), all, or cpu (default: choose)
+  --gpu G          N (one NVIDIA card), N,M (two cards split over one model), N,M,K (one independent
+                   server on each of three cards), amd or amdN (an AMD card), all, or cpu (default: choose)
   --port P         server port on 127.0.0.1 (default ${PORT})
   --lan            also serve the local network (other computers can use Kindi). Off by default. The installer
                    makes an API key (kept in ${DIR}/api-key) that every client must send, unless --api-key none
@@ -171,6 +174,27 @@ need_sudo() {
   SUDO="sudo"
 }
 human() { awk -v b="$1" 'BEGIN { split("B KB MB GB TB", u); i = 1; while (b >= 1024 && i < 5) { b /= 1024; i++ } printf "%.1f %s", b, u[i] }'; }
+# The CPU engine requires AVX. AVX2 with F16C is the fast path; FMA is optional and the AVX2
+# kernel falls back to separate multiply/add when it is absent. An AVX-only CPU uses the scalar
+# fallback. Check before downloading or building anything; a GPU setup is still valid on a CPU
+# without AVX, so the caller decides whether to hide or refuse CPU setups.
+cpu_flag() {
+  grep -qw "$1" "${KINDI_CPUINFO:-/proc/cpuinfo}" 2>/dev/null
+}
+cpu_has_avx() {
+  cpu_flag avx
+}
+cpu_isa_tier() {
+  if ! cpu_flag avx; then echo none; return 0; fi
+  if cpu_flag avx2; then
+    if cpu_flag f16c; then
+      if cpu_flag fma; then echo avx2-fma-f16c; else echo avx2-f16c-no-fma; fi
+    elif cpu_flag fma; then echo avx2-fma
+    else echo avx2; fi
+  else
+    echo avx-only
+  fi
+}
 
 DOCKER="docker"
 STATE="$DIR/install.json"
@@ -338,8 +362,7 @@ if [ "$MODE" = uninstall ]; then
 fi
 
 echo "${B}Kindi ${KINDI_VERSION} installer${N}$([ "$DRY" = 1 ] && echo " (dry run: nothing changes)")"
-PREV=""
-[ -f "$STATE" ] && PREV=$(cat "$STATE") && info "found an earlier install (${STATE}): this run upgrades or repairs it"
+[ -f "$STATE" ] && info "found an earlier install (${STATE}): this run upgrades or repairs it"
 
 # ------------------------------------------------------------------------------------------------ 1. machine
 step "Check the machine" "Kindi runs on 64-bit Linux: on an NVIDIA GPU from the Quadro K420 (Kepler) up, on an AMD RDNA3 or RDNA 3.5 GPU, or on the CPU."
@@ -352,6 +375,23 @@ if [ "$IS_WSL" = 1 ] && [ -d /usr/lib/wsl/lib ]; then case ":$PATH:" in *:/usr/l
 RAM_MB=$(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo)
 AVAIL_MB=$(awk '/MemAvailable/ {print int($2 / 1024)}' /proc/meminfo)
 CORES=$(nproc)
+CPU_AVX=0
+CPU_TIER=none
+CPU_PATH="unavailable"
+if cpu_has_avx; then
+  CPU_AVX=1
+  CPU_TIER=$(cpu_isa_tier)
+  case "$CPU_TIER" in
+    avx2-fma-f16c) CPU_PATH="AVX2/FMA/F16C"; info "CPU engine: AVX2/FMA/F16C fast path" ;;
+    avx2-f16c-no-fma) CPU_PATH="AVX2/F16C without FMA"; info "CPU engine: AVX2/F16C without FMA (separate multiply/add)" ;;
+    avx2-fma) CPU_PATH="AVX2/FMA with software F16C"; info "CPU engine: AVX2/FMA, software F16C" ;;
+    avx2) CPU_PATH="AVX2 with software F16C"; info "CPU engine: AVX2, software F16C and no FMA" ;;
+    avx-only) CPU_PATH="AVX-only fallback"; info "CPU engine: AVX-only fallback" ;;
+    *) warn "unexpected CPU ISA tier '${CPU_TIER}': the compiler will choose the path" ;;
+  esac
+else
+  warn "this CPU does not report AVX: the CPU engine is unavailable; GPU servers are still supported"
+fi
 [ "$DRY" = 1 ] || mkdir -p "$DIR" 2>/dev/null || die "cannot create ${DIR}"
 d="$DIR"; while [ ! -d "$d" ]; do d=$(dirname "$d"); done      # the nearest folder that exists (a dry run makes none)
 FREE_DISK=$(df -Pk "$d" | awk 'NR == 2 {print $4 * 1024}')
@@ -362,6 +402,34 @@ if [ "$IS_WSL" = 1 ]; then
 fi
 
 # GPUs: index, name, memory (MiB), compute capability
+cc_from_name() {   # GPU name -> compute capability, for drivers that do not report it (Kepler's 470, older RTX)
+  case "$1" in
+    *"GTX TITAN X"*) echo 5.2 ;;                                                      # GM200 (Maxwell): before "GTX TITAN"
+    # data-centre parts first: "SXM4" in a name would match the Maxwell M[0-9] pattern below
+    *"Tesla P100"*|*"Quadro GP100"*) echo 6.0 ;;                                       # GP100: no dp4a
+    *V100*|*"TITAN V"*|*"Quadro GV100"*) echo 7.0 ;;                                   # GV100
+    *A100*|*A30*|*"CMP 170HX"*) echo 8.0 ;;                                            # GA100: before A[0-9]
+    *H100*|*H200*|*GH200*) echo 9.0 ;;
+    # the K20 and K40 patterns must not match the K2000 and the K4000: a digit after "K20" or "K40" is another card
+    *K6000*|*K5200*|*K40[!0-9]*|*K40|*K20[!0-9]*|*K20|*"GTX TITAN"*|*"GTX 780"*) echo 3.5 ;;   # GK110
+    *K80*) echo 3.7 ;;                                                                # GK210
+    *K420*|*K600*|*K2000*|*K4000*|*K4200*|*K5000*|*K520*|*K10[!0-9]*|*K10|*"GTX 6"*|*"GTX 7"[0-4]*|*"GT 7"*) echo 3.0 ;;   # GK104, GK106, GK107
+    # Maxwell 2 (GM200, GM204, GM206) is sm_52: before the M[0-9] line below (issue #30: the M5000 showed sm_50)
+    *"Quadro M2000"|*"Quadro M4000"|*"Quadro M5000"|*"Quadro M6000"*|*"Quadro M3000M"*|*"Quadro M4000M"*|*"Quadro M5000M"*|*"Tesla M4"|*"Tesla M40"*|*"Tesla M6"|*"Tesla M60"*|*"GTX 950"|*"GTX 960"|*"GTX 970"*|*"GTX 980"*|*"GTX 965M"*) echo 5.2 ;;
+    *K620*|*K1200*|*K2200*|*"GTX 75"*|*"GTX 9"*|*"940M"*|*"930M"*|*M[0-9]*) echo 5.0 ;;
+    *Tesla\ P100*|*GP100*) echo 6.0 ;;                        # GP100, HBM2: sm_60 (no dp4a), the p100 class
+    *"GTX 10"*|*"Quadro P"*|*"TITAN X"*|*Tesla\ P*) echo 6.1 ;;   # GP10x: GTX 10, P106/P104/P102, Quadro P, P40/P4
+    *"GT 1030"*|*"GT 10"*|*"P106"*) echo 6.1 ;;               # GT 1030 (GP108), GT 1010, P106-100
+    *"RTX 20"*|*"GTX 16"*|*"Quadro RTX"*|*"TITAN RTX"*|*"Quadro T"*|*CMP\ 30HX*|*CMP\ 40HX*|*T4*) echo 7.5 ;;
+    *"RTX 30"*|*A[0-9]*) echo 8.6 ;;
+    *"RTX 4000 Ada"*) echo 8.9 ;;       # NVIDIA RTX 4000 Ada Generation (Ada), before the Turing RTX 4000 below
+    *"RTX 4000"*) echo 7.5 ;;           # Turing TU104: before "RTX 40" (4060/4070), which contains it as a prefix
+    *"RTX 40"*|*L4*) echo 8.9 ;;
+    *"RTX 50"*) echo 12.0 ;;                                   # Blackwell, sm_120: before the "RTX 5" laptop names
+    *"GT 430"*|*"GT 420"*|*"GT 520"*|*"GT 210"*|*"GT 220"*|*"GT 240"*|*"GT 330"*) echo 2.1 ;;   # Fermi / pre-Kepler
+    *) echo 6.1 ;;
+  esac
+}
 GIDX=(); GNAME=(); GMEM=(); GCC=()
 DRIVER=""
 if command -v nvidia-smi >/dev/null && nvidia-smi >/dev/null 2>&1; then
@@ -371,26 +439,7 @@ if command -v nvidia-smi >/dev/null && nvidia-smi >/dev/null 2>&1; then
   while IFS=',' read -r i n m c; do
     n=$(echo "$n" | sed 's/^ *//; s/ *$//'); c=$(echo "$c" | tr -d ' ')
     if [ "$c" = "?" ] || [ -z "$c" ]; then   # older drivers (Kepler's 470) do not report it: from the name
-      case "$n" in
-        *"GTX TITAN X"*) c=5.2 ;;                                                      # GM200 (Maxwell): before "GTX TITAN"
-        # data-centre parts first: "SXM4" in a name would match the Maxwell M[0-9] pattern below
-        *"Tesla P100"*|*"Quadro GP100"*) c=6.0 ;;                                       # GP100: no dp4a
-        *V100*|*"TITAN V"*|*"Quadro GV100"*) c=7.0 ;;                                   # GV100
-        *A100*|*A30*|*"CMP 170HX"*) c=8.0 ;;                                            # GA100: before A[0-9]
-        *H100*|*H200*|*GH200*) c=9.0 ;;
-        # the K20 and K40 patterns must not match the K2000 and the K4000: a digit after "K20" or "K40" is another card
-        *K6000*|*K5200*|*K40[!0-9]*|*K40|*K20[!0-9]*|*K20|*"GTX TITAN"*|*"GTX 780"*) c=3.5 ;;   # GK110
-        *K80*) c=3.7 ;;                                                                # GK210
-        *K420*|*K600*|*K2000*|*K4000*|*K4200*|*K5000*|*K520*|*K10[!0-9]*|*K10|*"GTX 6"*|*"GTX 7"[0-4]*|*"GT 7"*) c=3.0 ;;   # GK104, GK106, GK107
-        # Maxwell 2 (GM200, GM204, GM206) is sm_52: before the M[0-9] line below (issue #30: the M5000 showed sm_50)
-        *"Quadro M2000"|*"Quadro M4000"|*"Quadro M5000"|*"Quadro M6000"*|*"Quadro M3000M"*|*"Quadro M4000M"*|*"Quadro M5000M"*|*"Tesla M4"|*"Tesla M40"*|*"Tesla M6"|*"Tesla M60"*|*"GTX 950"|*"GTX 960"|*"GTX 970"*|*"GTX 980"*|*"GTX 965M"*) c=5.2 ;;
-        *K620*|*K1200*|*K2200*|*"GTX 75"*|*"GTX 9"*|*M[0-9]*) c=5.0 ;;
-        *"GTX 10"*|*"Quadro P"*|*"TITAN X"*|*Tesla\ P*) c=6.1 ;;
-        *"RTX 20"*|*"GTX 16"*|*"Quadro RTX"*|*T4*) c=7.5 ;;
-        *"RTX 30"*|*A[0-9]*) c=8.6 ;;
-        *"RTX 40"*|*L4*) c=8.9 ;;
-        *) c=6.1 ;;
-      esac
+      c=$(cc_from_name "$n")
     fi
     GIDX+=("$(echo "$i" | tr -d ' ')"); GNAME+=("$n"); GMEM+=("$(echo "$m" | tr -d ' ')"); GCC+=("$c")
   done <<< "$out"
@@ -530,7 +579,14 @@ restart_docker() {
 }
 
 GPU_MODE=none
-if [ "$NG" -gt 0 ] && [ "$GPU" != cpu ]; then
+# The legacy Fermi path keeps pre-Kepler cards out of GPU setup entirely: Kindi needs Kepler
+# (sm_30) or later for CUDA, and the installer offers the CPU engine when no supported card remains.
+NG_SUPPORTED=0
+for _c in "${GCC[@]}"; do [ "${_c/./}" -ge 30 ] && NG_SUPPORTED=$((NG_SUPPORTED + 1)); done
+if [ "$NG" -gt 0 ] && [ "$NG_SUPPORTED" -eq 0 ] && [ "$GPU" != cpu ]; then
+  info "Fermi / pre-Kepler NVIDIA cards are not Kindi compute engines; the installer leaves them unused and offers the CPU path"
+fi
+if [ "$NG_SUPPORTED" -gt 0 ] && [ "$GPU" != cpu ]; then
   if [ "$IS_WSL" = 1 ] && [ "$DRY" = 0 ] && $DOCKER info -f '{{.OperatingSystem}}' 2>/dev/null | grep -q 'Docker Desktop'; then
     GPU_MODE=toolkit; ok "Docker Desktop (WSL2): the container gets the GPUs with --gpus"
   elif $DOCKER info 2>/dev/null | grep -i 'runtimes.*nvidia' >/dev/null || command -v nvidia-ctk >/dev/null || command -v nvidia-container-toolkit >/dev/null; then
@@ -567,6 +623,51 @@ if [ "$NA" -gt 0 ] && [ "$GPU" != cpu ]; then
   fi
 fi
 
+if [ "$GPU" = cpu ] && [ "$CPU_AVX" != 1 ]; then
+  die "the CPU engine needs AVX; this CPU does not report it. Use --gpu N for a supported GPU, or run on an AVX CPU."
+fi
+
+if [ "$NG" -eq 0 ] && [ "$NA" -eq 0 ] && [ "$CPU_AVX" != 1 ]; then
+  die "this machine has no usable GPU and its CPU does not support AVX; Kindi's CPU engine needs AVX."
+fi
+
+# The kernel command line that GRUB_CMDLINE_LINUX_DEFAULT="..." holds (empty when the file has no such line).
+grub_cmdline_value() {
+  local line; line=$(grep -m1 '^GRUB_CMDLINE_LINUX_DEFAULT=' "$1" || true)
+  line=${line#*=\"}
+  printf '%s' "${line%\"*}"
+}
+
+# $1: the line before the edit, $2: after. The option is there, and no parameter of the old line is gone.
+cwsr_line_ok() {
+  local p
+  case " $2 " in *" amdgpu.cwsr_enable=0 "*) ;; *) return 1 ;; esac
+  for p in $1; do
+    case " $2 " in *" $p "*) ;; *) return 1 ;; esac
+  done
+  return 0
+}
+
+# $1: the grub file. Back it up, rewrite it, then read it back before update-grub runs: a sed that fails, adds
+# nothing, or drops a parameter of the old line restores the backup and stops (0.4.0's literal 0x01 replaced
+# every parameter on the line, and the installer still reported success).
+cwsr_edit_grub() {
+  local file="$1" old new backup
+  [ "$DRY" = 1 ] && return 0
+  old=$(grub_cmdline_value "$file")
+  backup="$file.kindi-$(date +%Y%m%d%H%M%S)"
+  run $SUDO cp "$file" "$backup" || die "could not back up $file to $backup"
+  if ! run $SUDO sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT="\1 amdgpu.cwsr_enable=0"/' "$file"; then
+    run $SUDO cp "$backup" "$file" || die "the edit of $file failed, and the backup $backup could not be restored"
+    die "the edit of $file failed; the original file is back (backup: $backup)"
+  fi
+  new=$(grub_cmdline_value "$file")
+  if ! cwsr_line_ok "$old" "$new"; then
+    run $SUDO cp "$backup" "$file" || die "the edit of $file lost a kernel parameter, and the backup $backup could not be restored"
+    die "the edit of $file lost a kernel parameter or added nothing; the original file is back (backup: $backup)"
+  fi
+}
+
 # The Radeon 780M (gfx1103) resets under long GPU work when the driver preempts a running kernel (CWSR). The kernel
 # option amdgpu.cwsr_enable=0 turns that preemption off; with it, the long-prompt tests that reset the GPU passed.
 check_cwsr() {
@@ -585,8 +686,7 @@ check_cwsr() {
   [ "$a" = y ] || [ "$a" = Y ] || [ "$a" = yes ] || { info "not changed"; return 0; }
   need_sudo
   if grep -q 'amdgpu.cwsr_enable=' /etc/default/grub; then ok "the option is already in /etc/default/grub (reboot to use it)"; return 0; fi
-  run $SUDO cp /etc/default/grub "/etc/default/grub.kindi-$(date +%Y%m%d%H%M%S)"
-  run $SUDO sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT="\(.*\)"/GRUB_CMDLINE_LINUX_DEFAULT=" amdgpu.cwsr_enable=0"/' /etc/default/grub
+  cwsr_edit_grub /etc/default/grub
   run $SUDO update-grub
   ok "set; reboot to use it (Kindi works before the reboot, but long prompts can reset the GPU)"
 }
@@ -596,12 +696,22 @@ step "Choose the setup" "Every setup that Kindi supports on this machine, the re
 pick_card() {     # the NVIDIA GPU with the most memory (first on a tie)
   local best=0
   for k in $(seq 0 $((NG - 1))); do [ "${GMEM[$k]}" -gt "${GMEM[$best]}" ] && best=$k; done
-  echo $best
+  echo "$best"
 }
 card_k() { local k; for k in $(seq 0 $((NG - 1))); do [ "${GIDX[$k]}" = "$1" ] && { echo "$k"; return 0; }; done; return 1; }
-card_class() {    # NVIDIA card position -> tc | pascal8 | p100 | maxwell | kepler
+card_tc() {       # NVIDIA card position -> 0 when the Turing card has tensor cores (TU102/TU104/TU106)
+  local n; n=$(echo "${GNAME[$1]}" | tr '[:lower:]' '[:upper:]')
+  case "$n" in
+    # sm_75 without tensor cores: TU116/TU117 (GTX 16, Quadro T400/T600/T1000/T2000, MX4xx/MX5xx, CMP 30HX)
+    *"GTX 16"*|*"QUADRO T4"*|*"QUADRO T6"*|*"QUADRO T10"*|*"QUADRO T20"*|*"CMP 30HX"*|*MX*) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+card_class() {    # NVIDIA card position -> tc | turing | pascal8 | p100 | maxwell | kepler | fermi
   local V=${GMEM[$1]} c=${GCC[$1]/./}
-  if [ "$c" -ge 80 ] && [ "$V" -ge 9500 ]; then echo tc
+  if [ "$c" -lt 30 ]; then echo fermi
+  elif [ "$c" -ge 80 ]; then echo tc                 # tensor cores: the memory class is chosen in profile_of
+  elif [ "$c" -eq 75 ] && [ "$V" -ge 7500 ] && card_tc "$1"; then echo turing
   elif [ "$c" -ge 61 ] && [ "$V" -ge 7500 ]; then echo pascal8
   elif [ "$c" -eq 60 ] && [ "$V" -ge 12000 ]; then echo p100     # Tesla P100 (sm_60, no dp4a): docs/CARDS.md
   elif [ "$c" -lt 50 ]; then echo kepler
@@ -623,7 +733,8 @@ nb_cards() {      # NVIDIA card positions (candidates) -> the fewest of them, la
 card_models() {   # NVIDIA card position -> the models that run on it, the best first
   local V=${GMEM[$1]}
   case "$(card_class "$1")" in
-    tc|pascal8) if [ "$V" -ge 5800 ]; then echo "27b lightning nemotron 9b 4b 2b"; else echo "27b nemotron 9b 4b 2b"; fi ;;
+    fermi) echo "" ;;
+    tc|turing|pascal8) if [ "$V" -ge 5800 ]; then echo "27b lightning nemotron 9b 4b 2b"; else echo "27b nemotron 9b 4b 2b"; fi ;;
     p100) echo "27b lightning 9b 4b 2b" ;;
     # Kepler: Lightning on the 12 GB cards (Quadro K6000); no Nemotron Bolt
     kepler) if [ "$V" -ge 11000 ]; then echo "27b lightning 9b 4b 2b"; elif [ "$V" -ge 3800 ]; then echo "9b 4b 2b"
@@ -632,10 +743,33 @@ card_models() {   # NVIDIA card position -> the models that run on it, the best 
        elif [ "$V" -ge 1900 ]; then echo "4b 2b"; else echo "2b"; fi ;;
   esac
 }
+for k in $(seq 0 $((NG - 1))); do
+  if [ "$(card_class "$k")" = fermi ]; then
+    warn "GPU ${GIDX[$k]} (${GNAME[$k]}, sm_${GCC[$k]/./}) is below Kepler (sm_30): Kindi will not use it; use the CPU engine or remove the card"
+  fi
+done
 pair_ok() {       # two NVIDIA card positions -> 0 if they run a model split over both (tensor parallel)
-  local a=$1 b=$2
-  [ "${GCC[$a]/./}" -ge 50 ] && [ "${GCC[$a]/./}" -lt 61 ] && [ "${GCC[$b]/./}" -ge 50 ] && [ "${GCC[$b]/./}" -lt 61 ] \
-    && [ "${GMEM[$a]}" -ge 3800 ] && [ "${GMEM[$b]}" -ge 3800 ]
+  local a=$1 b=$2 ca cb
+  # the floor is the smallest per-card tensor-parallel requirement (Nemotron 2,400 MiB; the 27B needs
+  # 3,800 and pair_fits keeps it off smaller pairs)
+  [ "${GMEM[$a]}" -ge 2400 ] && [ "${GMEM[$b]}" -ge 2400 ] || return 1
+  ca=$(card_class "$a"); cb=$(card_class "$b")
+  # Any two cards from a pair-supported class can use the plain two-card engine, including cards
+  # from different generations. Two sm_80+ cards are upgraded to tc2 by profile_of; a mixed pair
+  # stays plain, and one whose cards disagree on the 5-trit path gets KINDI_G5=0 for both (see
+  # profile_of). Kepler stays single-card; 2 GB cards (GT 1030) stay out because the plan engine
+  # needs a K/V slice and the exchange on each card.
+  case "$ca" in maxwell|pascal8|turing|tc|p100) ;; *) return 1 ;; esac
+  case "$cb" in maxwell|pascal8|turing|tc|p100) ;; *) return 1 ;; esac
+}
+# Per-card feasibility for a split model: each card must meet the model's tensor-parallel per-card
+# requirement (the `two` field in kindi/catalog.py: 27b 3,800 MiB, nemotron 2,400 MiB). Without this
+# a pair of small cards is offered a model whose shard cannot fit (the engine can only reduce
+# context; it cannot shrink the weights).
+pair_fits() {      # two NVIDIA card positions + model -> 0 when each card meets that model's per-card requirement
+  local a=$1 b=$2 need
+  case "$3" in 27b) need=3800 ;; nemotron) need=2400 ;; *) return 1 ;; esac
+  [ "${GMEM[$a]}" -ge "$need" ] && [ "${GMEM[$b]}" -ge "$need" ]
 }
 amd_models() {    # AMD GPU position -> the models that run on it, the best first
   local V=${AMEM[$1]} m=""
@@ -668,23 +802,42 @@ add_cfg() { CFG+=("$1"); CFG_N+=("$2"); }
 want() { [ "$MODEL" = auto ] || [ "$MODEL" = "$1" ]; }
 SINGLE=()         # the single-server setups (for the all-cards setup)
 PAIR=""          # two NVIDIA cards that run one model together
+TRIPLE_MULTI=0   # --gpu N,M,K: one independent server on each selected card (the split-model engine is 1-2 cards)
 if [ "$GPU" != cpu ]; then
   if [ "$NG" -gt 0 ]; then
-    if [[ "$GPU" == *,* ]]; then pa=$(card_k "${GPU%%,*}") || die "no NVIDIA GPU ${GPU%%,*}"; pb=$(card_k "${GPU##*,}") || die "no NVIDIA GPU ${GPU##*,}"
+    if [[ "$GPU" == *,*,* ]]; then
+      # Three or more cards listed explicitly are independent servers, never a three-card
+      # tensor-parallel engine: kindi/tp.py and kindi/gemma4_tp.py are two-card engines. `--gpu all`
+      # still offers the usual two-card split plus a single-card server on the third card.
+      TRIPLE_MULTI=1; pa=""; pb=""
+      IFS=',' read -r -a _gpu_list <<< "$GPU"
+      order=""
+      for _g in "${_gpu_list[@]}"; do
+        _k=$(card_k "$_g") || die "no NVIDIA GPU $_g"
+        order="$order $_k"
+      done
+    elif [[ "$GPU" == *,* ]]; then pa=$(card_k "${GPU%%,*}") || die "no NVIDIA GPU ${GPU%%,*}"; pb=$(card_k "${GPU##*,}") || die "no NVIDIA GPU ${GPU##*,}"
     elif [ "$NG" -ge 2 ] && { [ "$GPU" = auto ] || [ "$GPU" = all ]; }; then pa=0; pb=1
     else pa=""; pb=""; fi
     PAIR=""
-    if [ -n "$pa" ] && pair_ok "$pa" "$pb"; then
+    if [ "$TRIPLE_MULTI" = 0 ] && [ -n "$pa" ] && pair_ok "$pa" "$pb"; then
       PAIR="${GIDX[$pa]},${GIDX[$pb]}"
-      want 27b && add_cfg "cuda|27b|$PAIR" "$(model_label 27b) on GPUs ${PAIR}, split over both cards"
-      want nemotron && add_cfg "cuda|nemotron|$PAIR" "$(model_label nemotron) on GPUs ${PAIR}, split over both cards"
-    elif [[ "$GPU" == *,* ]] && ! { want nanbeige && nb_cards "$pa" "$pb" >/dev/null; }; then die "GPUs ${GPU} cannot run one model together (two Maxwell cards of 4 GB, such as two K1200s, can; Nanbeige 33B needs sm_80 cards or Tesla P100s with 16.2 GB in total, plus 0.7 GB for each more card)"
+      # A pair of unequal-capacity cards gets the proportional (uneven) tensor split; pairs with
+      # the same capacity keep the historical equal layout.
+      PAIR_LABEL="split over both cards"
+      [ "${GMEM[$pa]}" != "${GMEM[$pb]}" ] && PAIR_LABEL="uneven split over both cards"
+      # per model: offer the split only when each card can hold its weight share (pair_fits)
+      want 27b && pair_fits "$pa" "$pb" 27b && add_cfg "cuda|27b|$PAIR" "$(model_label 27b) on GPUs ${PAIR}, ${PAIR_LABEL}"
+      want nemotron && pair_fits "$pa" "$pb" nemotron && add_cfg "cuda|nemotron|$PAIR" "$(model_label nemotron) on GPUs ${PAIR}, ${PAIR_LABEL}"
+    elif [ "$TRIPLE_MULTI" = 0 ] && [[ "$GPU" == *,* ]] && ! { want nanbeige && nb_cards "$pa" "$pb" >/dev/null; }; then die "GPUs ${GPU} cannot run one model together (two supported cards with at least 4 GB each, such as a P106 and a P4000, can; Nanbeige 33B needs sm_80 cards or Tesla P100s with 16.2 GB in total, plus 0.7 GB for each more card)"
     fi
-    if [[ "$GPU" != *,* ]] && [[ "$GPU" != amd* ]]; then
+    if { [[ "$GPU" != *,* ]] || [ "$TRIPLE_MULTI" = 1 ]; } && [[ "$GPU" != amd* ]]; then
       # one card: the card with the most memory first, then each other kind of card. A setup on a kind of card
-      # takes any free card of that kind, so "1,1" runs setup 1 on two such cards.
+      # takes any free card of that kind, so "1,1" runs setup 1 on two such cards. An explicit N,M,K list
+      # keeps `order` built above and gets the same single-card setups for its selected cards.
       # (with one card, grep finds nothing and exits 1: pipefail would stop the installer here)
-      if [ "$GPU" = auto ] || [ "$GPU" = all ]; then best=$(pick_card); order="$best $(seq 0 $((NG - 1)) | { grep -vx "$best" || true; } | tr '\n' ' ')"
+      if [ "$TRIPLE_MULTI" = 1 ]; then : # order already holds the selected card positions
+      elif [ "$GPU" = auto ] || [ "$GPU" = all ]; then best=$(pick_card); order="$best $(seq 0 $((NG - 1)) | { grep -vx "$best" || true; } | tr '\n' ' ')"
       else order=$(card_k "$GPU") || die "no NVIDIA GPU ${GPU}"; fi
       seen="|"
       for k in $order; do
@@ -702,7 +855,8 @@ if [ "$GPU" != cpu ]; then
     fi
   fi
   if [ "$NG" -gt 0 ] && want nanbeige && [[ "$GPU" != amd* ]]; then
-    case "$GPU" in auto|all) cand=$(seq 0 $((NG - 1))) ;; *,*) cand="$pa $pb" ;; *) cand=$(card_k "$GPU") || cand="" ;; esac
+    if [ "$TRIPLE_MULTI" = 1 ]; then cand="$order"
+    else case "$GPU" in auto|all) cand=$(seq 0 $((NG - 1))) ;; *,*) cand="$pa $pb" ;; *) cand=$(card_k "$GPU") || cand="" ;; esac; fi
     if nbc=$(nb_cards $cand); then
       add_cfg "cuda|nanbeige|$nbc" "$(model_label nanbeige) on GPU$([[ "$nbc" == *,* ]] && echo "s ${nbc}, layers split over the cards" || echo " ${nbc}")"
     fi
@@ -718,13 +872,13 @@ if [ "$GPU" != cpu ]; then
     done
   fi
 fi
-if [ "$MODEL" = auto ] || [ "$MODEL" = 2b ]; then
-  add_cfg "cpu|2b|" "$(model_label 2b) on the CPU ($CORES threads; slow, no GPU needed)"
+if [ "$CPU_AVX" = 1 ] && { [ "$MODEL" = auto ] || [ "$MODEL" = 2b ]; }; then
+  add_cfg "cpu|2b|" "$(model_label 2b) on the CPU ($CORES threads; ${CPU_PATH}; slow, no GPU needed)"
 fi
 [ "${#CFG[@]}" -gt 0 ] || die "model '${MODEL}' does not run on the selected hardware (run without --model to see what does)"
 # the all-cards setup: the best model on every card (a pair that runs one model together counts as one); first
 # when the machine has more than one GPU that is not in such a pair
-if [ "$GPU" = auto ] || [ "$GPU" = all ]; then
+if [ "$GPU" = auto ] || [ "$GPU" = all ] || [ "$TRIPLE_MULTI" = 1 ]; then
   srv=""; lab=""; cnt=0
   if [ -n "$PAIR" ]; then srv="${CFG[0]}"; IFS='|' read -r b m c <<< "${CFG[0]}"; lab="$(short "$m") on GPUs ${PAIR} (split)"; cnt=1; fi
   for s in ${SINGLE[@]+"${SINGLE[@]}"}; do
@@ -755,7 +909,24 @@ fi
 
 # the servers: give each its cards, a container name and a port
 SV_B=(); SV_M=(); SV_C=(); SV_NAME=(); SV_PORT=(); USED="|"
-port_free() { ! { ss -ltnH 2>/dev/null | awk '{print $4}' | grep -E "[:.]$1\$" >/dev/null; }; }
+port_free() {     # true when the port is free; do not assume ss exists on the host
+  local p=$1
+  if command -v ss >/dev/null 2>&1; then
+    ! { ss -ltnH 2>/dev/null | awk '{print $4}' | grep -E "[:.]$p\$" >/dev/null; }
+  elif command -v timeout >/dev/null 2>&1; then
+    # No ss: a localhost connection succeeds only when something is listening. A timeout is treated as occupied,
+    # not as free, because the caller is about to publish a Docker port on this address.
+    if timeout 1 bash -c "exec 3<>/dev/tcp/127.0.0.1/$p" 2>/dev/null; then
+      return 1
+    else
+      [ "$?" -eq 124 ] && return 1
+      return 0
+    fi
+  else
+    warn "cannot check whether port $p is free (ss and timeout are missing); treating it as free"
+    return 0
+  fi
+}
 port_ok() {       # free, or held by one of this installer's servers (it is replaced)
   port_free "$1" && return 0
   local h; h=$($DOCKER ps --format '{{.Names}} {{.Ports}}' 2>/dev/null | awk -v p=":$1->" 'index($0, p) {print $1}')
@@ -791,7 +962,7 @@ NS=${#SV_B[@]}
 
 # the engine settings of server i -> PROFILE, C (context), MEM, CPUS, ENV (the -e settings), XPACKS (extra packs)
 profile_of() {
-  local i=$1 B=${SV_B[$1]} M=${SV_M[$1]} CARDS=${SV_C[$1]} k V
+  local i=$1 B=${SV_B[$1]} M=${SV_M[$1]} CARDS=${SV_C[$1]} k V k2 V2 g5a g5b
   ENV=(); XPACKS=(); MEM=""; CPUS=""
   if [ "$B" = cpu ]; then
     PROFILE=cpu
@@ -810,12 +981,37 @@ profile_of() {
       PROFILE=nanbeige; C=${CTX/auto/16384}; MEM=10g
       ENV+=(-e KINDI_REPEAT_STOP=1 -e KINDI_MAX_TOKENS=16384)
     elif [[ "$CARDS" == *,* ]]; then
-      PROFILE=k1200x2; C=${CTX/auto/24576}; MEM=12g
-      ENV+=(-e KINDI_CARDS=2 -e KINDI_REPEAT_STOP=1 -e KINDI_CHECKPOINT_BUDGET_MB=4096)
+      [[ "$CARDS" == *,*,* ]] && die "the split-model engine supports at most two cards; for a third card use one independent server on each card (--gpu 0,1,2) or a two-card split plus a single-card server (--gpu all)"
+      k2=$(card_k "${CARDS##*,}"); V2=${GMEM[$k2]}
+      if [ "${GCC[$k]/./}" -ge 80 ] && [ "${GCC[$k2]/./}" -ge 80 ]; then
+        # two Ada/Blackwell cards: the tensor-core plan engine, the context fitted to the smaller card.
+        # Speculative decoding stays off until the two-card verify is recorded (docs/CARD-SUPPORT.md).
+        PROFILE=tc2; [ "$V2" -lt "$V" ] && V=$V2
+        if [ "$V" -lt 9500 ]; then C=${CTX/auto/24576}; else C=${CTX/auto/65536}; fi
+        MEM=12g
+        ENV+=(-e KINDI_CARDS=2 -e KINDI_TC=1 -e KINDI_FD=1 -e KINDI_ATT_TC=1 -e KINDI_TC_TMAX=4
+              -e KINDI_CKPT_VRAM=1 -e KINDI_MEM_RESERVE_MB=512 -e KINDI_SPEC=0
+              -e KINDI_REPEAT_STOP=1 -e KINDI_CHECKPOINT_BUDGET_MB=4096)
+        # Uneven cards get an uneven tensor split: the engine gives the larger card the larger
+        # aligned share from its free VRAM. Equal-capacity pairs keep the historical equal layout.
+        [ "${GMEM[$k]}" != "${GMEM[$k2]}" ] && ENV+=(-e KINDI_TP_SPLIT=auto)
+      else
+        PROFILE=k1200x2; C=${CTX/auto/24576}; MEM=12g
+        ENV+=(-e KINDI_CARDS=2 -e KINDI_REPEAT_STOP=1 -e KINDI_CHECKPOINT_BUDGET_MB=4096)
+        # Uneven cards get an uneven tensor split: the engine gives the larger card the larger
+        # aligned share from its free VRAM. Equal-capacity pairs keep the historical equal layout.
+        [ "${GMEM[$k]}" != "${GMEM[$k2]}" ] && ENV+=(-e KINDI_TP_SPLIT=auto)
+        # Maxwell cards (major < 6) use the 2-bit decode; Pascal and newer use the 5-trit path.
+        # A mixed pair forces the 2-bit path on both so one plan is valid on each card.
+        g5a=0; if [ "${GCC[$k]/./}" -ge 60 ]; then g5a=1; fi
+        g5b=0; if [ "${GCC[$k2]/./}" -ge 60 ]; then g5b=1; fi
+        [ "$g5a" = "$g5b" ] || ENV+=(-e KINDI_G5=0)
+      fi
     else
       PROFILE=$(card_class "$k")
       case "$PROFILE" in
-        tc) C=${CTX/auto/131072}; MEM=14g; [ "$M" = 2b ] && NEED_MTP=1
+        tc) if [ "$V" -lt 9500 ]; then C=${CTX/auto/24576}; else C=${CTX/auto/131072}; fi
+            MEM=14g; [ "$M" = 2b ] && NEED_MTP=1
             ENV+=(-e KINDI_CARDS=1 -e KINDI_REPEAT_STOP=1 -e KINDI_CHECKPOINT_BUDGET_MB=1280 -e KINDI_PARK_MAX=1
                   -e KINDI_DENSE_SPACING=2048 -e KINDI_PREFIX_MAX=2 -e KINDI_MAX_TOKENS=65536)
             if [ "$M" = 27b ]; then   # the profile of the RTX 3080 cluster servers (docs/CARDS.md)
@@ -833,6 +1029,17 @@ profile_of() {
               ENV+=(-e KINDI_TC=1 -e KINDI_TP=1 -e KINDI_FD=1 -e KINDI_ATT_TC=1 -e KINDI_TC_TMAX=4
                     -e KINDI_SPEC=auto -e "KINDI_MTP_HEAD=/data/mtp/$MTPF")
             fi ;;
+        turing) C=${CTX/auto/65536}; MEM=14g
+                # Turing tensor cores (tc_turing.cu): the RTX 3080 feature set, on the Turing kernels, for every model
+                ENV+=(-e KINDI_CARDS=1 -e KINDI_REPEAT_STOP=1 -e KINDI_CHECKPOINT_BUDGET_MB=1280 -e KINDI_PARK_MAX=1
+                      -e KINDI_DENSE_SPACING=2048 -e KINDI_PREFIX_MAX=2 -e KINDI_MAX_TOKENS=65536
+                      -e KINDI_TC=1 -e KINDI_FD=1 -e KINDI_ATT_TC=1 -e KINDI_TC_TMAX=4 -e KINDI_CKPT_VRAM=1)
+                # 11 GB and more: the 131072-token context of the RTX 3080 (the reserve that fits it there)
+                [ "$V" -ge 11000 ] && { C=${CTX/auto/131072}; ENV+=(-e KINDI_MEM_RESERVE_MB=160); }
+                if [ "$M" = 27b ]; then   # the 2B draft model and its pack, as on the RTX 3080
+                  ENV+=(-e KINDI_SPEC=draft2b -e KINDI_SPEC_K=3 -e KINDI_SPEC_PACK=/data/pack-2b -e KINDI_SPEC_WINDOW=8192)
+                  XPACKS+=(2b)
+                fi ;;
         pascal8) C=${CTX/auto/65536}; MEM=14g; ENV+=(-e KINDI_CARDS=1 -e KINDI_REPEAT_STOP=1 -e KINDI_MAX_TOKENS=65536) ;;
         # Tesla P100 (sm_60, no dp4a): the plain engines, no speculation (on sm_60 a verify pass costs about one
         # step per token, so drafting is slower: docs/CARDS.md)
@@ -946,9 +1153,29 @@ for e in $IMAGES; do
     # the tree of the first run (the default release tarball of this version does not change, so it is kept)
     if [ ! -f "$SRC/$DOCKERFILE" ] || [ -n "$SOURCE" ]; then
       [ -n "$SOURCE" ] && run rm -rf "$SRC"
+      # source-archive: begin
+      # Download to a file and verify it before extraction. Never pipe a remote archive into tar:
+      # a bad or truncated download must not be unpacked. The default release archive is pinned here;
+      # a custom URL can be pinned with KINDI_SOURCE_SHA256.
       run mkdir -p "$SRC"
-      if [ -f "$tarball" ]; then run tar -xzf "$tarball" -C "$SRC" --strip-components=1
-      else run sh -c "curl -fsSL '$tarball' | tar -xz -C '$SRC' --strip-components=1"; fi
+      if [ -f "$tarball" ]; then
+        run tar -xzf "$tarball" -C "$SRC" --strip-components=1
+      else
+        part="$SRC.tar.gz.part"
+        run curl -fsSL "$tarball" -o "$part"
+        if [ "$tarball" = "$SOURCE_URL" ]; then want="$SOURCE_SHA256"
+        else want="${KINDI_SOURCE_SHA256:-}"; fi
+        if [ -n "$want" ]; then
+          [ "$DRY" = 1 ] || got=$(sha256sum "$part" | cut -d' ' -f1)
+          [ "$DRY" = 1 ] || [ "$got" = "$want" ] || {
+            run rm -f "$part"
+            die "source archive sha256 ${got} is not the expected ${want} (deleted)"
+          }
+        fi
+        run tar -xzf "$part" -C "$SRC" --strip-components=1
+        run rm -f "$part"
+      fi
+      # source-archive: end
     fi
   fi
   [ "$DRY" = 1 ] || src_id=$(cd "$SRC" && find kindi docker -type f | sort | xargs cat | sha256sum | cut -c1-12)
@@ -1088,7 +1315,8 @@ for i in $(seq 0 $((NS - 1))); do
     VX=(); [ -n "$CPUS" ] && VX=(--cpus "$CPUS")
     if $DOCKER run --rm ${VX[@]+"${VX[@]}"} ${BASE[@]+"${BASE[@]}"} ${GARGS[@]+"${GARGS[@]}"} ${ENV[@]+"${ENV[@]}"} -e "KINDI_PACK=/data/pack-$M" -e KINDI_HEAD=exact "$IMAGE" verify > "$VERIFY_OUT" 2>&1; then
       grep -E "PASS|FAIL" "$VERIFY_OUT" | sed 's/^\[[^]]*\] /    /' | sed -n 1,6p
-      sp=$(grep -o '[0-9.]* tokens/s over the run' "$VERIFY_OUT" | awk '{print $1}')
+      sp=$(grep -o '[0-9.]* tokens/s over the run' "$VERIFY_OUT" | awk '{print $1}' || true)
+      [ -n "$sp" ] || sp="?"          # an older verify log without the speed line must not fail under pipefail
       if [ "$M" = nanbeige ] || [ "$M" = lightning ]; then ok "server $((i + 1)): agrees with llama.cpp on each prompt, up to a llama.cpp tie (${sp} tokens/s over the check)"
       elif [ "$M" = nemotron ]; then ok "server $((i + 1)): agrees with llama.cpp on the first 12 tokens or more of each prompt (${sp} tokens/s over the check)"
       else ok "server $((i + 1)): token-exact with llama.cpp (${sp} tokens/s over the check, prompt tokens included)"; fi
@@ -1110,6 +1338,9 @@ elif [ "$LAN" = 1 ]; then
   if [ -s "$KEYFILE" ]; then KEY=$(cat "$KEYFILE")      # the key of an earlier --lan install: clients keep working
   else KEY="kindi-$(od -An -N24 -tx1 /dev/urandom | tr -d ' \n')"; fi
 fi
+case "$KEY" in
+  *$'\n'*|*$'\r'*) die "--api-key must be a single line: a newline would inject extra variables into the container env file" ;;
+esac
 [ "$LAN" = 1 ] && BIND=0.0.0.0
 if [ "$DRY" = 0 ]; then
   if [ -n "$KEY" ]; then

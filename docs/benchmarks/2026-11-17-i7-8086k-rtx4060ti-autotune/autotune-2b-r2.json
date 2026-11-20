@@ -1,0 +1,86 @@
+{
+  "best": "gpu0",
+  "candidates": [
+    {
+      "args": [],
+      "env": {},
+      "name": "gpu0",
+      "why": "one card holds the whole model"
+    }
+  ],
+  "cards": [
+    {
+      "compute_cap": "8.9",
+      "driver": "617.42",
+      "features": {
+        "async_copy": true,
+        "bf16": true,
+        "flash_attention_2_class": true,
+        "fp4": false,
+        "fp8": true,
+        "tensor_cores": true,
+        "tf32": true
+      },
+      "index": 0,
+      "kindi": [
+        "5-trit kernels",
+        "dense CPU+GPU tandem split",
+        "plan engine (tensor-core MMA)",
+        "FP8 Gemma 4 path (on by default, KINDI_G4_FP8=0 disables)"
+      ],
+      "memory_free_mib": 6994,
+      "memory_total_mib": 8188,
+      "name": "NVIDIA GeForce RTX 4060 Ti",
+      "pci_bus_id": "00000000:01:00.0",
+      "uuid": "GPU-78de4e15-f013-ab5a-9843-1545356215e3"
+    }
+  ],
+  "cpu": {
+    "amx": null,
+    "avx512": null,
+    "build": "native (-march=native)",
+    "features": {
+      "avx": null,
+      "avx2": null,
+      "f16c": null,
+      "fma": null
+    },
+    "features_known": false,
+    "l2_kb": 1536,
+    "l3_kb": 12288,
+    "logical": 12,
+    "model": "Intel(R) Core(TM) i7-8086K CPU @ 4.00GHz",
+    "physical": 6,
+    "threads_recommended": 6,
+    "tier": "unknown",
+    "tier_label": "unknown until the compiler selects the path"
+  },
+  "ctx": 8192,
+  "model": "Ternary-Bonsai-2-2B",
+  "pack": "~/.kindi/packs/bonsai-2b",
+  "results": [
+    {
+      "args": [],
+      "argv": [
+        "python",
+        "-m",
+        "kindi",
+        "--ctx",
+        "8192",
+        "bench",
+        "--json",
+        "<temp>/kindi-autotune.json"
+      ],
+      "ctx_reduced": false,
+      "ctx_requested": 8192,
+      "env": {},
+      "error": null,
+      "gen_tok_s": 97.6,
+      "name": "gpu0",
+      "ok": true,
+      "read_tok_s": 111.7,
+      "returncode": 0,
+      "vram_peak": null
+    }
+  ]
+}

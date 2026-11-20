@@ -1,0 +1,7 @@
+data: {"id": "chatcmpl-d8258f7be4d5448f8e0089d3", "object": "chat.completion.chunk", "created": 1794339252, "model": "bonsai2-4b", "choices": [{"index": 0, "delta": {"role": "assistant", "content": ""}, "finish_reason": null}]}
+
+data: {"id": "chatcmpl-d8258f7be4d5448f8e0089d3", "object": "chat.completion.chunk", "created": 1794339252, "model": "bonsai2-4b", "choices": [{"index": 0, "delta": {"content": "Red"}, "finish_reason": null}]}
+
+data: {"id": "chatcmpl-d8258f7be4d5448f8e0089d3", "object": "chat.completion.chunk", "created": 1794339252, "model": "bonsai2-4b", "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]}
+
+data: [DONE]

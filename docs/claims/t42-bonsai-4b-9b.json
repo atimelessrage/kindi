@@ -1,0 +1,54 @@
+{
+  "gate": "t42-bonsai-4b-9b",
+  "title": "T4.2 Bonsai adapter gate on the 4B and 9B packs (adapter vs legacy valve)",
+  "measured": "2026-11-15",
+  "commit": "7c456bb",
+  "command": "python -m kindi verify and python -m kindi bench on each pack, once through the registry adapter and once through KINDI_LEGACY_ENGINE_PATH=1",
+  "notes": "The parity quote is checked as a bound on the 9B adapter/valve bench pair: the 4B valve JSON was not kept, so only the 9B pair can be recomputed. That limitation is stated here rather than hidden.",
+  "evidence": [
+    "docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/RESULTS.md",
+    "docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/4b-adapter.json",
+    "docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/9b-adapter.json",
+    "docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/9b-valve.json"
+  ],
+  "numbers": [
+    {
+      "id": "verify-4b",
+      "display": "3+tie",
+      "quoted_in": ["docs/BACKENDS.md", "docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/RESULTS.md",
+                "needle": "PASS 3+tie @ 141.0 tok/s"}
+    },
+    {
+      "id": "verify-9b",
+      "display": "9B ALL PASS 4/4",
+      "quoted_in": ["docs/BACKENDS.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/RESULTS.md",
+                "needle": "9B | ALL PASS 4/4 @ 99.3 tok/s"}
+    },
+    {
+      "id": "bench-parity",
+      "display": "within ~1%",
+      "quoted_in": ["docs/BACKENDS.md", "docs/ROADMAP.md"],
+      "check": {"kind": "compare", "expect": 1.0,
+                "pairs": [
+                  ["docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/9b-adapter.json", "/gen_tok_s/exact:8000",
+                   "docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/9b-valve.json", "/gen_tok_s/exact:8000"],
+                  ["docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/9b-adapter.json", "/gen_tok_s/exact:24000",
+                   "docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/9b-valve.json", "/gen_tok_s/exact:24000"]
+                ]}
+    },
+    {
+      "id": "read-parity",
+      "display": "read row differs by 1.4%",
+      "quoted_in": ["docs/BACKENDS.md", "docs/ROADMAP.md"],
+      "check": {"kind": "compare", "expect": 1.4,
+                "pairs": [
+                  ["docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/9b-adapter.json", "/read_tok_s",
+                   "docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/9b-valve.json", "/read_tok_s"]
+                ]}
+    }
+  ]
+}

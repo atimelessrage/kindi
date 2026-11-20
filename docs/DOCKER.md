@@ -8,9 +8,11 @@ Kindi has three images:
 
 | Image | Dockerfile | Contents | For |
 |---|---|---|---|
-| `kindi:0.6.1` | `docker/Dockerfile` | Ubuntu 18.04, CUDA 10.2, Python 3.6, CuPy 9.6, FastAPI, Kindi | NVIDIA cards from Kepler on, and the CPU engine |
-| `kindi-rocm:0.6.1` | `docker/Dockerfile.rocm` | Ubuntu 24.04, ROCm 6.3.3, Python 3.12, CuPy 14.2.0 built for ROCm, FastAPI, Kindi | AMD RDNA3 graphics (tested: Radeon 780M) |
-| `kindi-rocm7:0.6.1` | `docker/Dockerfile.rocm7` | Ubuntu 24.04, ROCm 7 (HIP 7.16), Python 3.12, CuPy 14.2.0 (cupy-rocm-7-0), FastAPI, Kindi | AMD RDNA 3.5 graphics (tested: Radeon 840M, Radeon 8060S) |
+| `kindi:0.7.0-fork` | `docker/Dockerfile` | Ubuntu 18.04, CUDA 10.2, Python 3.6, CuPy 9.6, FastAPI, Kindi | NVIDIA cards from Kepler on, and the CPU engine |
+| `kindi-rocm:0.7.0-fork` | `docker/Dockerfile.rocm` | Ubuntu 24.04, ROCm 6.3.3, Python 3.12, CuPy 14.2.0 built for ROCm, FastAPI, Kindi | AMD RDNA3 graphics (tested: Radeon 780M) |
+| `kindi-rocm7:0.7.0-fork` | `docker/Dockerfile.rocm7` | Ubuntu 24.04, ROCm 7 (HIP 7.16), Python 3.12, CuPy 14.2.0 (cupy-rocm-7-0), FastAPI, Kindi | AMD RDNA 3.5 graphics (tested: Radeon 840M, Radeon 8060S) |
+
+All three images include a `/health` `HEALTHCHECK`. It answers during model load only after the server starts and does not require an API key (the key still protects the detailed health view).
 
 Everything Kindi reads or writes lives in one volume mounted at `/data`:
 
@@ -49,14 +51,14 @@ AMD:
 ## Build
 
 ```sh
-docker build -t kindi:0.6.1 -f docker/Dockerfile .              # NVIDIA and CPU, about 15 minutes
-docker build -t kindi-rocm:0.6.1 -f docker/Dockerfile.rocm .    # AMD; builds CuPy for ROCm, 30-45 minutes
+docker build -t kindi:0.7.0-fork -f docker/Dockerfile .              # NVIDIA and CPU, about 15 minutes
+docker build -t kindi-rocm:0.7.0-fork -f docker/Dockerfile.rocm .    # AMD; builds CuPy for ROCm, 30-45 minutes
 ```
 
 ## Commands
 
 ```sh
-D="docker run --rm --gpus all -u $(id -u):$(id -g) -v $HOME/.kindi:/data kindi:0.6.1"
+D="docker run --rm --gpus all -u $(id -u):$(id -g) -v $HOME/.kindi:/data kindi:0.7.0-fork"
 $D info
 $D convert /data/Ternary-Bonsai-2-2B-PTQ1_0.gguf
 $D verify
@@ -70,7 +72,7 @@ On AMD graphics, replace `--gpus all` with the AMD devices, and add the group ID
 A="docker run --rm --device /dev/kfd --device /dev/dri --security-opt seccomp=unconfined \
    --group-add $(getent group video | cut -d: -f3) --group-add $(getent group render | cut -d: -f3) \
    -e HSA_OVERRIDE_GFX_VERSION=11.0.2 -e HSA_ENABLE_SDMA=0 \
-   -u $(id -u):$(id -g) -v $HOME/.kindi:/data kindi-rocm:0.6.1"
+   -u $(id -u):$(id -g) -v $HOME/.kindi:/data kindi-rocm:0.7.0-fork"
 $A verify
 ```
 
@@ -80,7 +82,7 @@ $A verify
 
 ```sh
 docker run -d --name kindi --restart unless-stopped --gpus all -u $(id -u):$(id -g) \
-    -p 127.0.0.1:8093:8093 -v $HOME/.kindi:/data kindi:0.6.1
+    -p 127.0.0.1:8093:8093 -v $HOME/.kindi:/data kindi:0.7.0-fork
 docker logs -f kindi                                  # request log
 docker exec kindi python3 -m kindi head fast          # switch the output head
 ```
@@ -93,7 +95,7 @@ To run one server on each card, start one container for each card, with its own 
 ```sh
 docker run -d --name kindi-2 --restart unless-stopped --gpus all -u $(id -u):$(id -g) \
     -e CUDA_DEVICE_ORDER=PCI_BUS_ID -e CUDA_VISIBLE_DEVICES=1 -e KINDI_STATE_DIR=/data/state-gpu1 \
-    -p 127.0.0.1:8094:8093 -v $HOME/.kindi:/data kindi:0.6.1
+    -p 127.0.0.1:8094:8093 -v $HOME/.kindi:/data kindi:0.7.0-fork
 ```
 
 Options go in as environment variables (`-e KINDI_CTX=16384`) or in `/data/kindi.conf`.

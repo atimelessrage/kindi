@@ -95,7 +95,10 @@ class Store:
         return r[0]
 
     def add_agent(self, name, cwd, command):
-        path = Path(cwd).expanduser().resolve(strict=True)
+        try:
+            path = Path(cwd).expanduser().resolve(strict=True)
+        except (OSError, RuntimeError) as error:
+            raise ValueError("Agent working path must be an existing directory") from error
         if not path.is_dir():
             raise ValueError("Agent working path must be a directory")
         ident = uuid.uuid4().hex

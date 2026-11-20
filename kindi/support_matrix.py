@@ -1,0 +1,490 @@
+"""Render the support matrix from the code and the recorded evidence.
+
+`docs/SUPPORT-MATRIX.md` is generated, never edited by hand. The model list comes from
+`kindi/catalog.py`, the pack formats from `kindi/convert.py`, the K/V cache modes from
+`kindi/tp.py:kv_mode()` and the CPU ISA requirements from `kindi/kcpu.c`, so a new model,
+format or switch cannot be missing from the matrix: `python -m kindi.support_matrix --check`
+(and `tests/test_support_matrix.py`) fails until the file is regenerated.
+
+The verification columns are a curated table (`STATUS` below) that names the recorded result.
+They are not re-measured by this generator; `render()` fails when a catalog model has no row.
+
+The per-card rows come from a tracked registry, `docs/benchmarks/card-results.json`, which
+`--from-verify <results.json>` fills from a `tools/verify_matrix.py` run. That is the rig path:
+the numbers are derived from the run's rows, never hand-copied, and the matrix stays generated
+(and `--check`-able) because the registry is checked in.
+"""
+import ast
+import json
+import os
+import re
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+MATRIX = os.path.join(ROOT, "docs", "SUPPORT-MATRIX.md")
+CARD_RESULTS = os.path.join(ROOT, "docs", "benchmarks", "card-results.json")
+
+# The cards this generator can record a verify_matrix run against. The rig cards (unmeasured)
+# and the measured ones stay together so the matrix shows measured and unmeasured alike.
+CARDS = {
+    # slug: (display name, architecture, installer class, name aliases)
+    "rtx-4060-ti": ("NVIDIA RTX 4060 Ti", "Ada 8.9", "tc",
+                    ("rtx 4060 ti", "4060 ti", "4060ti", "4060")),
+    "gtx-1080": ("NVIDIA GTX 1080", "Pascal 6.1", "pascal8", ("gtx 1080", "1080")),
+    "k1200": ("Quadro K1200", "Maxwell 5.0", "maxwell", ("k1200", "quadro k1200")),
+    "p106-100": ("NVIDIA P106-100", "Pascal 6.1", "maxwell", ("p106",)),
+    "p4000": ("Quadro P4000", "Pascal 6.1", "pascal8", ("p4000", "quadro p4000")),
+    "m4000": ("Quadro M4000", "Maxwell 5.2", "maxwell", ("m4000", "quadro m4000")),
+    "m5000": ("Quadro M5000", "Maxwell 5.2", "maxwell", ("m5000", "quadro m5000")),
+    "rtx4000": ("Quadro RTX 4000", "Turing 7.5", "turing", ("rtx 4000", "quadro rtx 4000")),
+    # Blackwell consumer (16 GB): the installer classifies it `tc` (sm_80+), but there is no
+    # Kindi exactness or speed run on Blackwell yet. No support claim until measured;
+    # see docs/CARDS.md. (RTX 5060 Ti is sm_120 / CC 12.0, not "sm_128".)
+    "rtx-5060-ti": ("NVIDIA RTX 5060 Ti 16 GB", "Blackwell 12.0", "tc",
+                    ("rtx 5060 ti", "5060 ti", "5060ti")),
+    # The 2 GB cards. The installer classifies a small Pascal card as `maxwell` (pascal8 needs
+    # 7.5 GB or more); the catalog's own size gates keep 9B off them. Not measured;
+    # see docs/CARDS.md (GeForce 940M is fixed in the ASUS F555U laptop).
+    "geforce-940m": ("NVIDIA GeForce 940M 2 GB", "Maxwell 5.0", "maxwell",
+                     ("940m", "geforce 940m")),
+    "gt-1030": ("NVIDIA GT 1030 2 GB (passive)", "Pascal 6.1", "maxwell",
+                ("gt 1030", "gt1030")),
+    # Purchased 2026-11-15, in transit, not installed: registered so a future rig run has a slug to
+    # fold into later. No Intel backend exists and the installer does not offer this card; the
+    # matrix renders it not measured. See docs/INTEL-ARC.md and REQ-0020.
+    "arc-a770": ("Intel Arc A770 16 GB", "Alchemist (DG2)", "intel",
+                 ("a770", "arc a770", "intel arc a770")),
+    # Integrated Intel graphics (Xe-LP / Xe2-LPG, shared system memory): investigation only,
+    # no backend yet. See docs/INTEL-IGPU-TANDEM.md and REQ-0021.
+    "intel-iris-xe": ("Intel Iris Xe (integrated)", "Xe-LP (Gen12)", "intel-igpu",
+                      ("iris xe", "intel iris xe", "uhd 770", "uhd 730")),
+    "intel-arc-igpu": ("Intel built-in Arc (integrated)", "Xe2-LPG", "intel-igpu",
+                       ("arc 130v", "arc 140v", "arc 140t", "built-in arc")),
+}
+
+CARD_MODELS = ("2b", "4b", "9b", "27b")     # short names, in render order
+
+CAPABILITIES = ["GPU verify", "CPU verify", "PQ2_0/Q2_0", "K8/V4"]
+
+# Recorded results per catalog model, in CAPABILITIES order. Cells say what was measured and on
+# which evidence page; the generator refuses to render a model without a row here.
+STATUS = {
+    "bonsai-2b": ["4/4", "4/4, 33.7 tok/s", "4/4, identical pack", "2/4, gated"],
+    "bonsai-4b": ["4/4", "4/4, 16.7 tok/s", "not tested", "4/4, gated"],
+    "bonsai-9b": ["4/4", "4/4, 9.1 tok/s", "not tested", "n/a"],
+    "bonsai-27b": ["3 exact + tie, 4060 Ti tc", "not supported", "not converted", "n/a"],
+    "nemotron-e4b": ["separate backend", "n/a", "n/a", "n/a"],
+    "nanbeige-33b": ["separate backend", "n/a", "n/a", "n/a"],
+    "lightning-30b": ["separate backend", "n/a", "n/a", "n/a"],
+}
+
+# The configuration each recorded verify row was measured against: the reference configuration
+# for `kindi verify` (exact head, q8_0 K/V unless the row says otherwise). The generator refuses
+# to render a model without a sentence here, so a new model cannot be added without saying which
+# configuration its numbers are the reference for.
+REF = {
+    "bonsai-2b": "plain engine, exact head, q8_0 K/V (GPU and CPU verify both 4/4; the tensor-core"
+                 " plan engine is also 4/4)",
+    "bonsai-4b": "plain engine, exact head, q8_0 K/V (GPU and CPU verify both 4/4)",
+    "bonsai-9b": "plain engine, exact head, q8_0 K/V (GPU verify 4/4; the tensor-core plans need"
+                 " KINDI_TC_HP=1 for the 9B's HB 4096)",
+    "bonsai-27b": "tensor-core plan engine, exact head (3 exact + tie on the 4060 Ti); the plain"
+                  " engine has no recorded verify row",
+    "nemotron-e4b": "separate backend; no `kindi verify` reference configuration recorded",
+    "nanbeige-33b": "separate backend; no `kindi verify` reference configuration recorded",
+    "lightning-30b": "separate backend; no `kindi verify` reference configuration recorded",
+}
+
+EVIDENCE = [
+    ("CPU engine on the i7-8086K, native Windows", "benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md"),
+    ("CPU engine on the i7-8086K, WSL2", "benchmarks/2026-11-09-i7-8086k-cpu/README.md"),
+    ("GPU 2B/4B/9B at 24K on the RTX 4060 Ti", "benchmarks/2026-11-09-i7-8086k-rtx4060ti/README.md"),
+    ("RTX 4060 Ti 27B tc verify and 24K run", "CARDS.md#rtx-4060-ti-8-gb-ada-sm89"),
+    ("No-go experiments and their gates", "ROADMAP.md"),
+]
+
+HEADER = """\
+# Support matrix
+
+<!-- Generated by `python -m kindi.support_matrix`; do not edit this file by hand. -->
+
+What Kindi runs and where. The model list is read from `kindi/catalog.py`, the pack formats from
+`kindi/convert.py`, the K/V cache modes from `kindi/tp.py` and the CPU requirements from
+`kindi/kcpu.c`; the verification columns repeat the recorded evidence linked at the bottom and are
+not re-measured here. `tests/test_support_matrix.py` and `python -m kindi.support_matrix --check`
+fail when the code changes and this file is stale.
+
+Regenerate with:
+
+```sh
+python -m kindi.support_matrix
+```
+"""
+
+
+def _read(path):
+    with open(path, encoding="utf-8", newline="") as f:
+        return f.read().replace("\r\n", "\n")
+
+
+def _tree(name):
+    return ast.parse(_read(os.path.join(HERE, name)))
+
+
+def _cell(text):
+    return str(text).replace("|", "\\|").replace("\n", " ")
+
+
+def catalog():
+    """`kindi/catalog.py:MODELS` as id -> {file, what, size, one, two} (constants only)"""
+    for stmt in _tree("catalog.py").body:
+        if (isinstance(stmt, ast.Assign) and len(stmt.targets) == 1
+                and isinstance(stmt.targets[0], ast.Name) and stmt.targets[0].id == "MODELS"):
+            out = {}
+            for key, value in zip(stmt.value.keys, stmt.value.values):
+                fields = {}
+                for kw in value.keywords:
+                    try:
+                        fields[kw.arg] = ast.literal_eval(kw.value)
+                    except ValueError:
+                        pass            # a call or expression, not a recorded fact
+                out[ast.literal_eval(key)] = fields
+            return out
+    raise SystemExit("kindi: catalog.MODELS not found")
+
+
+def formats():
+    """`kindi/convert.py:TERNARY` as [{format, type, group, block, bpw}]"""
+    tree = _tree("convert.py")
+    consts, ternary = {}, None
+    for stmt in tree.body:
+        if not isinstance(stmt, ast.Assign) or len(stmt.targets) != 1:
+            continue
+        target, value = stmt.targets[0], stmt.value
+        if isinstance(target, ast.Tuple) and isinstance(value, ast.Tuple):
+            for name, item in zip(target.elts, value.elts):
+                try:
+                    consts[name.id] = ast.literal_eval(item)
+                except ValueError:
+                    pass
+        elif isinstance(target, ast.Name) and target.id == "TERNARY":
+            ternary = value
+    if ternary is None:
+        raise SystemExit("kindi: convert.TERNARY not found")
+    out = []
+    for key, value in zip(ternary.keys, ternary.values):
+        group, block, label = ast.literal_eval(value)
+        out.append({"format": label, "type": consts[key.id], "group": group, "block": block,
+                    "bpw": block * 8.0 / group})
+    return out
+
+
+def kv_modes():
+    """the K/V cache modes and default from `kindi/tp.py:kv_mode()`"""
+    src = _read(os.path.join(HERE, "tp.py"))
+    for node in ast.parse(src).body:
+        if isinstance(node, ast.FunctionDef) and node.name == "kv_mode":
+            body = ast.get_source_segment(src, node) or ""
+            default = re.search(r'KINDI_KV",\s*"([^"]+)"', body)
+            return {"default": default.group(1) if default else "?",
+                    "modes": sorted(set(re.findall(r'return "([a-z0-9_]+)"', body))),
+                    "gated": "KINDI_KV_EXPERIMENTAL" in body}
+    raise SystemExit("kindi: tp.kv_mode not found")
+
+
+def cpu_isa():
+    """the baseline ISA and the fast-path instruction sets in `kindi/kcpu.c`"""
+    src = _read(os.path.join(HERE, "kcpu.c"))
+    feats = []
+    if "_mm256_" in src:
+        feats.append("AVX")
+    if "_mm256_srlv_epi32" in src:
+        feats.append("AVX2")
+    if "_mm256_fmadd_ps" in src:
+        feats.append("FMA")
+    if "_cvtsh_ss" in src or "_cvtss_sh" in src:
+        feats.append("F16C")
+    if "_mm512_" in src:
+        feats.append("AVX-512")
+    return feats
+
+
+def _read_registry(path=CARD_RESULTS):
+    """the tracked card-results registry, or an empty one before the first rig run"""
+    if not os.path.exists(path):
+        return {"cards": {}}
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError) as exc:
+        raise SystemExit("kindi: cannot read %s: %s" % (path, exc))
+    if not isinstance(data, dict) or not isinstance(data.get("cards"), dict):
+        raise SystemExit("kindi: %s must be {\"cards\": {...}}" % path)
+    return data
+
+
+def _write_registry(registry, path=CARD_RESULTS):
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(registry, f, indent=2, sort_keys=True)
+        f.write("\n")
+
+
+def _slug_for(payload, card=None):
+    """which known card a verify_matrix payload ran on, from its recorded environment."""
+    if card is not None:
+        if card not in CARDS:
+            raise SystemExit("kindi: unknown card %r; known cards: %s" % (card, ", ".join(CARDS)))
+        return card
+    gpus = []
+    try:
+        gpus = payload.get("environment", {}).get("gpus", []) or []
+    except AttributeError:
+        pass
+    if len(gpus) != 1:
+        raise SystemExit(
+            "kindi: %d cards recorded, so the run has no single card; pass --card instead "
+            "(known cards: %s). A mixed pair run has no single-card row to fill."
+            % (len(gpus), ", ".join(CARDS)))
+    name = str(gpus[0].get("name", "")).lower()
+    for slug, (_, _, _, aliases) in CARDS.items():
+        if any(alias in name for alias in aliases):
+            return slug
+    raise SystemExit(
+        "kindi: card %r is not a known card; register it in kindi/support_matrix.py CARDS first, "
+        "then rerun (known cards: %s)" % (gpus[0].get("name"), ", ".join(CARDS)))
+
+
+def _cell_text(row):
+    """one verify_matrix row as a matrix cell: exactness, tie and speed, no derived claims"""
+    status = row.get("status")
+    if status == "pass":
+        if row.get("prompts_tie"):
+            text = "%d exact + tie" % (row.get("prompts_pass") or 0)
+        else:
+            total = ((row.get("prompts_pass") or 0) + (row.get("prompts_tie") or 0)
+                     + (row.get("prompts_fail") or 0)) or 4
+            text = "%d/%d" % (row.get("prompts_pass") or 0, total)
+        if row.get("tokens_per_second"):
+            text += " @ %.1f tok/s" % row["tokens_per_second"]
+        return text
+    if status == "fail":
+        diff = row.get("first_diff_token")
+        return "failed%s" % (" (first diff %s)" % diff if diff is not None else "")
+    return str(status)                                      # refused, timeout, missing...
+
+
+def _cells_from_results(rows):
+    """model short name -> "plain ... · tc ...", in CELL order; not-run where the run skipped it"""
+    by_model = {}
+    for row in rows:
+        model = str(row.get("model", ""))
+        short = model[len("bonsai-"):] if model.startswith("bonsai-") else model
+        by_model.setdefault(short, {})[str(row.get("mode", ""))] = _cell_text(row)
+    cells = {}
+    for short in CARD_MODELS:
+        modes = by_model.get(short, {})
+        parts = ["%s %s" % (mode, modes[mode]) for mode in ("plain", "tc", "tc-hp") if mode in modes]
+        cells[short] = " · ".join(parts) if parts else "not run"
+    return cells
+
+
+def _evidence_link(source):
+    """the docs-relative link for a recorded run; a gitignored path would break the link guard"""
+    text = str(source).replace("\\", "/")
+    if text.startswith("bench-logs/") or "/bench-logs/" in text:
+        raise SystemExit(
+            "kindi: %s is gitignored, so the matrix would link to a file nobody can read; "
+            "copy the results.json into docs/benchmarks/<date>-<card>/ and pass that path" % source)
+    if not text.startswith("docs/"):
+        raise SystemExit(
+            "kindi: %s is not under docs/, so it cannot be linked from the matrix and would not "
+            "be tracked; copy the results.json into docs/benchmarks/<date>-<card>/ and pass that "
+            "path" % source)
+    return text[len("docs/"):]
+
+
+def apply_results(source, registry_path=CARD_RESULTS, card=None, matrix_path=MATRIX, check_only=False):
+    """fold one verify_matrix results.json into the registry and regenerate the matrix.
+
+    Returns the slug recorded and the cells it produced. A refusal in the run is recorded as a
+    result, never raised; only an unusable input or an unknown card is an error.
+    """
+    try:
+        with open(source, encoding="utf-8") as f:
+            payload = json.load(f)
+    except (OSError, ValueError) as exc:
+        raise SystemExit("kindi: cannot read %s: %s" % (source, exc))
+    if check_only:
+        return None, {}
+    rows = payload.get("results")
+    if not isinstance(rows, list):
+        raise SystemExit("kindi: %s has no results rows; use a verify_matrix results.json" % source)
+    slug = _slug_for(payload, card)
+    link = _evidence_link(source)
+    cells = _cells_from_results(rows)
+    registry = _read_registry(registry_path)
+    registry["cards"][slug] = {
+        "cells": cells,
+        "evidence": link,
+        "git": payload.get("git_revision"),
+        "measured": payload.get("started_utc"),
+    }
+    _write_registry(registry, registry_path)
+    if matrix_path is not None:
+        text = render(card_results=registry)
+        with open(matrix_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+    return slug, cells
+
+
+def render(models=None, fmts=None, kv=None, isa=None, card_results=None):
+    models = catalog() if models is None else models
+    fmts = formats() if fmts is None else fmts
+    kv = kv_modes() if kv is None else kv
+    isa = cpu_isa() if isa is None else isa
+    missing = [mid for mid in models if mid not in STATUS]
+    if missing:
+        raise SystemExit("kindi: no verification row for %s; add it to "
+                         "kindi/support_matrix.py:STATUS" % ", ".join(sorted(missing)))
+    missing_ref = [mid for mid in models if mid not in REF]
+    if missing_ref:
+        raise SystemExit("kindi: no reference configuration for %s; add it to "
+                         "kindi/support_matrix.py:REF" % ", ".join(sorted(missing_ref)))
+    lines = HEADER.splitlines()
+
+    lines += ["", "## Models", "",
+              "From `kindi/catalog.py`; card memory is the catalog's own fit estimate.",
+              "", "| id | model | file | size GB | one card | two cards |", "|---|---|---|---:|---:|---:|"]
+    for mid, m in models.items():
+        two = m.get("two") or ("split" if m.get("split") else 0)
+        lines.append("| `%s` | %s | `%s` | %.1f | %d MiB | %s |" % (
+            mid, _cell(m.get("what", "")), _cell(m.get("file", "")),
+            (m.get("size") or 0) / 1e9, m.get("one", 0),
+            ("%d MiB" % two) if isinstance(two, int) and two else "no split"))
+
+    lines += ["", "## Pack formats", "",
+              "From `kindi/convert.py`; the converter re-codes every format to the same pack, so a",
+              "converted `PQ2_0`/`Q2_0` file is byte-identical to the `PTQ1_0` pack.",
+              "", "| format | GGUF type | weights/group | bytes/block | bits/weight |",
+              "|---|---:|---:|---:|---:|"]
+    for f in sorted(fmts, key=lambda f: -f["type"]):
+        lines.append("| `%s` | %d | %d | %d | %.3f |" % (
+            f["format"], f["type"], f["group"], f["block"], f["bpw"]))
+
+    lines += ["", "## CPU engine requirements", "",
+              "`kindi/kcpu.c` requires **AVX** at build time. The detected instruction-set kernels are",
+              ("**%s**. `kindi/cpu.py` builds one library per tier (`-mavx2 -mfma -mf16c`,"
+               " `-mavx2 -mno-fma -mf16c`, `-mavx2 -mfma -mno-f16c`, `-mavx2`, `-mavx`) and loads the"
+               " best one the CPU supports, or the tier named by `KINDI_CPU_ISA`. FMA is optional:"
+               " without it the AVX2 kernel uses separate multiply/add. Windows builds use clang +"
+               " libomp, elsewhere gcc + OpenMP.") % (", ".join(isa) or "none detected"),
+              "", "See [CPU-SUPPORT.md](CPU-SUPPORT.md) for the per-CPU matrix and gates."]
+
+    lines += ["", "## K/V cache modes", "",
+              "From `kindi/tp.py:kv_mode()`. Default: `%s`; accepted: %s." % (
+                  kv["default"], ", ".join("`%s`" % m for m in kv["modes"])),
+              "", "`k8v4` is experimental and lossy: its 4-bit V is not token-exact with the fp16",
+              "reference (2B `kindi verify`: 2 of 4 prompts; `kindi kld` teacher-forced KLD 1.3e-04/2.3e-04",
+              "nats at 2K/8K, ~500-1000x q8_0's ~2e-07 and growing with context - the quarantine rests",
+              "on that measurement), so it is refused unless `KINDI_KV_EXPERIMENTAL=1`. `q8_0` is the",
+              "supported default (KLD ~2e-07 nats, PPL ratio 1.000002, 100% same-top at 2K/8K on the 2B)." if kv["gated"] else
+              "No experimental gate is present."]
+
+    lines += ["", "## Verified capabilities", "",
+              "Recorded results; see Evidence for where each one was measured. `gated` means the",
+              "feature is behind its explicit experimental switch.",
+              "", "| model | " + " | ".join(CAPABILITIES) + " |",
+              "|---|" + "---|" * len(CAPABILITIES)]
+    for mid in models:
+        lines.append("| `%s` | %s |" % (mid, " | ".join(_cell(c) for c in STATUS[mid])))
+
+    lines += ["", "## Reference configuration", "",
+              "The configuration each verify row above was measured against - the one `kindi verify`",
+              "compares against. Anything else (K8/V4, the fast head, speculation) is measured as a",
+              "delta from this, not as the reference itself.",
+              "", "| model | reference configuration |", "|---|---|"]
+    for mid in models:
+        lines.append("| `%s` | %s |" % (mid, _cell(REF[mid])))
+
+    registry = _read_registry() if card_results is None else card_results
+    lines += ["", "## Cards", "",
+              "Measured per-card results from `tools/verify_matrix.py` runs, folded into the tracked",
+              "registry `docs/benchmarks/card-results.json` by::",
+              "", "```sh",
+              "python -m kindi.support_matrix --from-verify docs/benchmarks/<date>-<card>/results.json",
+              "```",
+              "",
+              "A card without a record shows `not measured`. A refusal is a measured result, not a",
+              "failure: on sm_52 the `tc` cell records the by-design refusal.",
+              "", "The GTX 1080 and the Quadro K1200 rows have speed benchmarks (MoE vs llama.cpp,",
+              "2026-10) in [BENCHMARKS.md](BENCHMARKS.md), but no `verify_matrix` run yet, so their",
+              "cells render `not measured` until one is folded.",
+              "", "| card | arch | class | " + " | ".join(short.upper() for short in CARD_MODELS)
+              + " | evidence |",
+              "|---|---|---|" + "---|" * (len(CARD_MODELS) + 1)]
+    for slug, (name, arch, klass, _) in CARDS.items():
+        entry = (registry.get("cards") or {}).get(slug) or {}
+        cells = entry.get("cells") or {}
+        rendered = [cells.get(short, "not measured") for short in CARD_MODELS]
+        evidence = "not measured"
+        if entry.get("evidence"):
+            when = str(entry.get("measured") or "")[:10]
+            evidence = ("measured %s · " % when if when else "") + "[results](%s)" % entry["evidence"]
+        lines.append("| %s | %s | %s | %s | %s |" % (
+            _cell(name), _cell(arch), _cell(klass),
+            " | ".join(_cell(c) for c in rendered), _cell(evidence)))
+
+    lines += ["", "## Evidence", "", "| page | what |", "|---|---|"]
+    for title, path in EVIDENCE:
+        lines.append("| [%s](%s) | %s |" % (path, path, title))
+
+    lines += ["", "## Open", "",
+              "- `PQ2_0`/`Q2_0` are converted and verified for the 2B only; the 4B/9B/27B files were",
+              "  not downloaded.",
+              "- `k8v4` is quarantined behind `KINDI_KV_EXPERIMENTAL=1` because it is lossy.",
+              "- The CPU server chat path is verified for the 2B, 4B and 9B; repeated-run stability",
+              "  is not measured.",
+              "- The 27B single-card tc path passes on the RTX 4060 Ti (3 exact + 1 llama.cpp tie at",
+              "  1,024 tokens), has a three-run median of 38.1 tok/s (range 36.7-38.2), and benchmarks",
+              "  and serves at 24,576 tokens; the two-card result remains unmeasured.",
+              "- `nemotron-e4b` and `nanbeige-33b` have separate backends and are outside this matrix.",
+              "- The archived no-go work and the gates that would reopen it are in [ROADMAP.md](ROADMAP.md)."]
+    return "\n".join(lines) + "\n"
+
+
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if "--from-verify" in argv:
+        index = argv.index("--from-verify")
+        if index + 1 >= len(argv):
+            sys.stderr.write("kindi: --from-verify needs a results.json path\n")
+            return 1
+        source = argv[index + 1]
+        card = None
+        if "--card" in argv:
+            at = argv.index("--card")
+            if at + 1 >= len(argv):
+                sys.stderr.write("kindi: --card needs a slug (%s)\n" % ", ".join(CARDS))
+                return 1
+            card = argv[at + 1]
+        slug, cells = apply_results(source, card=card)
+        sys.stdout.write("recorded %s from %s: %s\n" % (
+            slug, source, "; ".join("%s: %s" % (short, cells[short]) for short in CARD_MODELS)))
+        return 0
+    text = render()
+    if "--check" in argv:
+        current = _read(MATRIX) if os.path.exists(MATRIX) else ""
+        if current != text:
+            sys.stderr.write("kindi: %s is stale; run `python -m kindi.support_matrix`\n" % MATRIX)
+            return 1
+        return 0
+    with open(MATRIX, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+    sys.stdout.write("wrote %s (%d models, %d formats, %d k/v modes)\n" % (
+        MATRIX, len(catalog()), len(formats()), len(kv_modes()["modes"])))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

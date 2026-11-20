@@ -1,0 +1,27 @@
+<python>/Lib/site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+{
+  "disk": {
+    "available": true,
+    "method": "FILE_FLAG_NO_BUFFERING",
+    "mib": 64.0,
+    "mib_s": 2547.5,
+    "seconds": 0.025123,
+    "unbuffered": true
+  },
+  "pcie": {
+    "available": true,
+    "d2h_gib_s": 6.1,
+    "device": "NVIDIA GeForce RTX 4060 Ti",
+    "h2d_gib_s": 6.0,
+    "method": "cudaMemcpy, pinned host, 5 timed runs",
+    "mib": 64.0
+  },
+  "ram": {
+    "available": true,
+    "method": "memcpy into a second buffer, 1 thread",
+    "mib": 64.0,
+    "mib_s": 13266.4,
+    "seconds": 0.004824
+  }
+}

@@ -1,0 +1,19 @@
+<home>\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+[kindi 20:36:39] kindi-cpu ready: Ternary-Bonsai-2-9B, 6 threads, ctx 1024 (123.7s)
+[kindi 20:36:39] prompt cache: a checkpoint every 256 tokens (50 MB each), 3 parked conversations, budget 1638 MB
+[kindi 20:36:39] engine fingerprint 1d5ba3991d3b: {"engine": "kindi.cpu.Engine", "cards": 1, "weights": "2-bit", "kv": "f16", "chunk": 0, "chunk_q8": false, "chunk_tc": false, "chunk_att": "flash", "chunk_tile": "", "batch": "4", "tc": "0", "tc_tmax": "", "fd": "0", "d1": "0", "fd_ch": "512", "kexpf": "1", "att_tc": "0", "spec": "0", "head": "exact"}
+[kindi 20:36:39] saved openings: 0 in <worktree>\bench-logs\cpu-server-chat-4b-9b\9b\state\openings\3561df7ac7d2-e1d5ba3991d3b
+[kindi 20:36:39] serving on http://127.0.0.1:8199/v1 (model bonsai2-9b)
+[kindi 20:36:48] request: 15 prompt tokens (max 24 new)
+[kindi 20:36:48] cache: 15 prompt tokens, 0 shared with the last request, resumed at 0
+[kindi 20:36:49] prompt: 0 reused, 15 read in 1.3s
+[kindi 20:36:50] done: 9 tokens in 0.8s (stop)
+[kindi 20:36:50] request: 17 prompt tokens (max 12 new)
+[kindi 20:36:50] cache: 17 prompt tokens, 3 shared with the last request, resumed at 0
+[kindi 20:36:52] prompt: 0 reused, 17 read in 1.4s
+[kindi 20:36:52] done: 12 tokens in 1.0s (length)
+[kindi 20:37:42] request: 15 prompt tokens (max 16 new)
+[kindi 20:37:42] cache: 15 prompt tokens, 3 shared with the last request, resumed at 0
+[kindi 20:37:43] prompt: 0 reused, 15 read in 1.2s
+[kindi 20:37:44] done: 9 tokens in 0.8s (stop)

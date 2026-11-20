@@ -1,0 +1,7 @@
+date: 2026-11-11 05:34:09
+KINDI_DEVICE=cpu; KINDI_HEAD=exact; ctx=24576; threads=auto
+OS: Windows-10-10.0.19045-SP0
+HEAD: 22ac35e76a385c45037d00252ba78bd250bc62c9
+logical_cpu_count: 12
+cpu: Intel64 Family 6 Model 158 Stepping 10, GenuineIntel
+clang: clang version 18.1.8

@@ -1,0 +1,903 @@
+{
+  "schema": 1,
+  "title": "Kindi 2B/4B/9B on i7-8086K + RTX 4060 Ti, current vs v0.4.0",
+  "date": "2026-11-09",
+  "rig": {
+    "cpu": "Intel Core i7-8086K @ 4.00 GHz",
+    "gpu": "NVIDIA GeForce RTX 4060 Ti 8 GB (sm_89)",
+    "gpu_memory_mib": 8188,
+    "gpu_driver": "617.42",
+    "gpu_power_limit_w": 160.0,
+    "gpu_max_clock_mhz": 3105,
+    "gpu_observed_clock_mhz": "2805-2820 during the current runs",
+    "gpu_temperature_c": "35-47 during the current runs",
+    "os": "Microsoft Windows 10 Pro 10.0.19045",
+    "python": "3.13.6",
+    "cupy": "14.2.0",
+    "numpy": "2.5.1"
+  },
+  "method": {
+    "command": "python -m kindi --pack <PACK> --ctx 24576 bench",
+    "context": 24576,
+    "head": "exact",
+    "speculation": "off",
+    "runs_per_model_per_source": 3,
+    "statistic": "median; variance and sample standard deviation over the three runs",
+    "order": "all current runs first, then all baseline runs; not interleaved",
+    "note": "bench warms each timed operation; each run starts a fresh process."
+  },
+  "sources": {
+    "current": {
+      "label": "current main (freebuff/tandem-cpu-recovery)",
+      "head_at_run": "2abf9ad",
+      "head_when_written": "46b63f8",
+      "note": "Plain exact-head benchmark; no speculative or plan path."
+    },
+    "v0.4.0+native-loader": {
+      "label": "Kindi v0.4.0 + native-Windows loader only",
+      "commit": "cee44886c3b8b9436320b787caf638c9d027f46f",
+      "note": "git archive of tag v0.4.0; only gpudrv.driver() selection in sched.py/chunk1.py, plus current gpudrv.py. No engine or bench change."
+    }
+  },
+  "models": {
+    "2b": {
+      "model": "Ternary-Bonsai-2-2B",
+      "file": "Ternary-Bonsai-2-2B-PTQ1_0.gguf",
+      "sha256": "36061ad406df8a4903a6db005be350c50fabfaf717f9ef0acf4b76adcd9929fa",
+      "pack": "~/.kindi/packs/bonsai-2b",
+      "head": "token_embd.weight",
+      "layers": 24,
+      "width": 2048
+    },
+    "4b": {
+      "model": "Ternary-Bonsai-2-4B",
+      "file": "Ternary-Bonsai-2-4B-PTQ1_0.gguf",
+      "sha256": "56711263ec9a9ffeaa74a3a0e58dece8127cf9268404746c721113ca76994d60",
+      "pack": "~/.kindi/packs/bonsai-4b",
+      "head": "token_embd.weight",
+      "layers": 32,
+      "width": 2560
+    },
+    "9b": {
+      "model": "Ternary-Bonsai-2-9B",
+      "file": "Ternary-Bonsai-2-9B-PTQ1_0.gguf",
+      "sha256": "3561df7ac7d26a71ffa991ac2db740b10841c3a350aa2676ccd3ff5d428b4e8b",
+      "pack": "~/.kindi/packs/packs/packs/bonsai-9b",
+      "head": "output.weight",
+      "layers": 32,
+      "width": 4096
+    }
+  },
+  "runs": [
+    {
+      "source": "current",
+      "model": "2b",
+      "run": 1,
+      "prompt": 212.8,
+      "gen_100": 169.0,
+      "gen_2000": 159.7,
+      "gen_8000": 176.0,
+      "gen_16000": 167.3,
+      "gen_24000": 160.6
+    },
+    {
+      "source": "current",
+      "model": "2b",
+      "run": 2,
+      "prompt": 165.6,
+      "gen_100": 179.1,
+      "gen_2000": 163.3,
+      "gen_8000": 175.4,
+      "gen_16000": 173.2,
+      "gen_24000": 160.9
+    },
+    {
+      "source": "current",
+      "model": "2b",
+      "run": 3,
+      "prompt": 190.0,
+      "gen_100": 165.9,
+      "gen_2000": 174.6,
+      "gen_8000": 165.8,
+      "gen_16000": 171.7,
+      "gen_24000": 157.4
+    },
+    {
+      "source": "current",
+      "model": "4b",
+      "run": 1,
+      "prompt": 129.0,
+      "gen_100": 108.4,
+      "gen_2000": 101.9,
+      "gen_8000": 89.0,
+      "gen_16000": 88.4,
+      "gen_24000": 78.0
+    },
+    {
+      "source": "current",
+      "model": "4b",
+      "run": 2,
+      "prompt": 129.1,
+      "gen_100": 97.4,
+      "gen_2000": 102.2,
+      "gen_8000": 99.9,
+      "gen_16000": 90.4,
+      "gen_24000": 80.1
+    },
+    {
+      "source": "current",
+      "model": "4b",
+      "run": 3,
+      "prompt": 126.2,
+      "gen_100": 106.2,
+      "gen_2000": 101.3,
+      "gen_8000": 90.8,
+      "gen_16000": 89.3,
+      "gen_24000": 79.8
+    },
+    {
+      "source": "current",
+      "model": "9b",
+      "run": 1,
+      "prompt": 90.3,
+      "gen_100": 77.8,
+      "gen_2000": 77.2,
+      "gen_8000": 71.6,
+      "gen_16000": 63.7,
+      "gen_24000": 62.3
+    },
+    {
+      "source": "current",
+      "model": "9b",
+      "run": 2,
+      "prompt": 75.7,
+      "gen_100": 69.2,
+      "gen_2000": 76.8,
+      "gen_8000": 72.5,
+      "gen_16000": 67.4,
+      "gen_24000": 62.2
+    },
+    {
+      "source": "current",
+      "model": "9b",
+      "run": 3,
+      "prompt": 93.1,
+      "gen_100": 79.5,
+      "gen_2000": 76.7,
+      "gen_8000": 68.2,
+      "gen_16000": 67.6,
+      "gen_24000": 62.7
+    },
+    {
+      "source": "v0.4.0+native-loader",
+      "model": "2b",
+      "run": 1,
+      "prompt": 166.6,
+      "gen_100": 158.3,
+      "gen_2000": 163.2,
+      "gen_8000": 178.5,
+      "gen_16000": 164.3,
+      "gen_24000": 165.5
+    },
+    {
+      "source": "v0.4.0+native-loader",
+      "model": "2b",
+      "run": 2,
+      "prompt": 148.5,
+      "gen_100": 168.8,
+      "gen_2000": 177.8,
+      "gen_8000": 175.3,
+      "gen_16000": 176.5,
+      "gen_24000": 166.0
+    },
+    {
+      "source": "v0.4.0+native-loader",
+      "model": "2b",
+      "run": 3,
+      "prompt": 161.5,
+      "gen_100": 158.6,
+      "gen_2000": 172.7,
+      "gen_8000": 178.5,
+      "gen_16000": 156.1,
+      "gen_24000": 153.5
+    },
+    {
+      "source": "v0.4.0+native-loader",
+      "model": "4b",
+      "run": 1,
+      "prompt": 133.4,
+      "gen_100": 115.2,
+      "gen_2000": 111.4,
+      "gen_8000": 102.9,
+      "gen_16000": 92.6,
+      "gen_24000": 83.8
+    },
+    {
+      "source": "v0.4.0+native-loader",
+      "model": "4b",
+      "run": 2,
+      "prompt": 132.9,
+      "gen_100": 102.1,
+      "gen_2000": 105.5,
+      "gen_8000": 99.4,
+      "gen_16000": 91.2,
+      "gen_24000": 82.1
+    },
+    {
+      "source": "v0.4.0+native-loader",
+      "model": "4b",
+      "run": 3,
+      "prompt": 121.6,
+      "gen_100": 103.0,
+      "gen_2000": 94.3,
+      "gen_8000": 99.6,
+      "gen_16000": 90.1,
+      "gen_24000": 81.4
+    },
+    {
+      "source": "v0.4.0+native-loader",
+      "model": "9b",
+      "run": 1,
+      "prompt": 93.1,
+      "gen_100": 79.9,
+      "gen_2000": 79.1,
+      "gen_8000": 75.3,
+      "gen_16000": 70.1,
+      "gen_24000": 64.7
+    },
+    {
+      "source": "v0.4.0+native-loader",
+      "model": "9b",
+      "run": 2,
+      "prompt": 90.8,
+      "gen_100": 79.0,
+      "gen_2000": 77.1,
+      "gen_8000": 73.0,
+      "gen_16000": 67.8,
+      "gen_24000": 62.7
+    },
+    {
+      "source": "v0.4.0+native-loader",
+      "model": "9b",
+      "run": 3,
+      "prompt": 88.5,
+      "gen_100": 78.8,
+      "gen_2000": 76.9,
+      "gen_8000": 73.3,
+      "gen_16000": 67.7,
+      "gen_24000": 62.2
+    }
+  ],
+  "stats": {
+    "current": {
+      "2b": {
+        "prompt": {
+          "n": 3,
+          "median": 190.0,
+          "variance": 557.1733333333337,
+          "stdev": 23.60451934129,
+          "min": 165.6,
+          "max": 212.8,
+          "values": [
+            212.8,
+            165.6,
+            190.0
+          ]
+        },
+        "gen": {
+          "100": {
+            "n": 3,
+            "median": 169.0,
+            "variance": 47.64333333333326,
+            "stdev": 6.902415036299487,
+            "min": 165.9,
+            "max": 179.1,
+            "values": [
+              169.0,
+              179.1,
+              165.9
+            ]
+          },
+          "2000": {
+            "n": 3,
+            "median": 163.3,
+            "variance": 60.44333333333333,
+            "stdev": 7.774531068388197,
+            "min": 159.7,
+            "max": 174.6,
+            "values": [
+              159.7,
+              163.3,
+              174.6
+            ]
+          },
+          "8000": {
+            "n": 3,
+            "median": 175.4,
+            "variance": 32.75999999999994,
+            "stdev": 5.723635208501669,
+            "min": 165.8,
+            "max": 176.0,
+            "values": [
+              176.0,
+              175.4,
+              165.8
+            ]
+          },
+          "16000": {
+            "n": 3,
+            "median": 171.7,
+            "variance": 9.403333333333256,
+            "stdev": 3.0664855018951673,
+            "min": 167.3,
+            "max": 173.2,
+            "values": [
+              167.3,
+              173.2,
+              171.7
+            ]
+          },
+          "24000": {
+            "n": 3,
+            "median": 160.6,
+            "variance": 3.7633333333333225,
+            "stdev": 1.939931270260192,
+            "min": 157.4,
+            "max": 160.9,
+            "values": [
+              160.6,
+              160.9,
+              157.4
+            ]
+          }
+        }
+      },
+      "4b": {
+        "prompt": {
+          "n": 3,
+          "median": 129.0,
+          "variance": 2.709999999999989,
+          "stdev": 1.6462077633154295,
+          "min": 126.2,
+          "max": 129.1,
+          "values": [
+            129.0,
+            129.1,
+            126.2
+          ]
+        },
+        "gen": {
+          "100": {
+            "n": 3,
+            "median": 106.2,
+            "variance": 33.879999999999995,
+            "stdev": 5.820652884342099,
+            "min": 97.4,
+            "max": 108.4,
+            "values": [
+              108.4,
+              97.4,
+              106.2
+            ]
+          },
+          "2000": {
+            "n": 3,
+            "median": 101.9,
+            "variance": 0.21000000000000313,
+            "stdev": 0.45825756949558744,
+            "min": 101.3,
+            "max": 102.2,
+            "values": [
+              101.9,
+              102.2,
+              101.3
+            ]
+          },
+          "8000": {
+            "n": 3,
+            "median": 90.8,
+            "variance": 34.14333333333338,
+            "stdev": 5.843229700545185,
+            "min": 89.0,
+            "max": 99.9,
+            "values": [
+              89.0,
+              99.9,
+              90.8
+            ]
+          },
+          "16000": {
+            "n": 3,
+            "median": 89.3,
+            "variance": 1.0033333333333339,
+            "stdev": 1.0016652800877817,
+            "min": 88.4,
+            "max": 90.4,
+            "values": [
+              88.4,
+              90.4,
+              89.3
+            ]
+          },
+          "24000": {
+            "n": 3,
+            "median": 79.8,
+            "variance": 1.289999999999994,
+            "stdev": 1.1357816691600522,
+            "min": 78.0,
+            "max": 80.1,
+            "values": [
+              78.0,
+              80.1,
+              79.8
+            ]
+          }
+        }
+      },
+      "9b": {
+        "prompt": {
+          "n": 3,
+          "median": 90.3,
+          "variance": 87.29333333333325,
+          "stdev": 9.343090138350012,
+          "min": 75.7,
+          "max": 93.1,
+          "values": [
+            90.3,
+            75.7,
+            93.1
+          ]
+        },
+        "gen": {
+          "100": {
+            "n": 3,
+            "median": 77.8,
+            "variance": 30.489999999999977,
+            "stdev": 5.521775076911407,
+            "min": 69.2,
+            "max": 79.5,
+            "values": [
+              77.8,
+              69.2,
+              79.5
+            ]
+          },
+          "2000": {
+            "n": 3,
+            "median": 76.8,
+            "variance": 0.07000000000000056,
+            "stdev": 0.26457513110646014,
+            "min": 76.7,
+            "max": 77.2,
+            "values": [
+              77.2,
+              76.8,
+              76.7
+            ]
+          },
+          "8000": {
+            "n": 3,
+            "median": 71.6,
+            "variance": 5.143333333333321,
+            "stdev": 2.2678918257565375,
+            "min": 68.2,
+            "max": 72.5,
+            "values": [
+              71.6,
+              72.5,
+              68.2
+            ]
+          },
+          "16000": {
+            "n": 3,
+            "median": 67.4,
+            "variance": 4.823333333333325,
+            "stdev": 2.196208854670549,
+            "min": 63.7,
+            "max": 67.6,
+            "values": [
+              63.7,
+              67.4,
+              67.6
+            ]
+          },
+          "24000": {
+            "n": 3,
+            "median": 62.3,
+            "variance": 0.07000000000000056,
+            "stdev": 0.26457513110646014,
+            "min": 62.2,
+            "max": 62.7,
+            "values": [
+              62.3,
+              62.2,
+              62.7
+            ]
+          }
+        }
+      }
+    },
+    "v0.4.0+native-loader": {
+      "2b": {
+        "prompt": {
+          "n": 3,
+          "median": 161.5,
+          "variance": 87.1033333333333,
+          "stdev": 9.332916657365654,
+          "min": 148.5,
+          "max": 166.6,
+          "values": [
+            166.6,
+            148.5,
+            161.5
+          ]
+        },
+        "gen": {
+          "100": {
+            "n": 3,
+            "median": 158.6,
+            "variance": 35.730000000000054,
+            "stdev": 5.9774576535513875,
+            "min": 158.3,
+            "max": 168.8,
+            "values": [
+              158.3,
+              168.8,
+              158.6
+            ]
+          },
+          "2000": {
+            "n": 3,
+            "median": 172.7,
+            "variance": 54.903333333333485,
+            "stdev": 7.409678355592332,
+            "min": 163.2,
+            "max": 177.8,
+            "values": [
+              163.2,
+              177.8,
+              172.7
+            ]
+          },
+          "8000": {
+            "n": 3,
+            "median": 178.5,
+            "variance": 3.413333333333309,
+            "stdev": 1.847520861406796,
+            "min": 175.3,
+            "max": 178.5,
+            "values": [
+              178.5,
+              175.3,
+              178.5
+            ]
+          },
+          "16000": {
+            "n": 3,
+            "median": 164.3,
+            "variance": 105.37333333333338,
+            "stdev": 10.265151403332217,
+            "min": 156.1,
+            "max": 176.5,
+            "values": [
+              164.3,
+              176.5,
+              156.1
+            ]
+          },
+          "24000": {
+            "n": 3,
+            "median": 165.5,
+            "variance": 50.083333333333336,
+            "stdev": 7.076957915187382,
+            "min": 153.5,
+            "max": 166.0,
+            "values": [
+              165.5,
+              166.0,
+              153.5
+            ]
+          }
+        }
+      },
+      "4b": {
+        "prompt": {
+          "n": 3,
+          "median": 132.9,
+          "variance": 44.530000000000086,
+          "stdev": 6.673080248281155,
+          "min": 121.6,
+          "max": 133.4,
+          "values": [
+            133.4,
+            132.9,
+            121.6
+          ]
+        },
+        "gen": {
+          "100": {
+            "n": 3,
+            "median": 103.0,
+            "variance": 53.543333333333386,
+            "stdev": 7.317331025266889,
+            "min": 102.1,
+            "max": 115.2,
+            "values": [
+              115.2,
+              102.1,
+              103.0
+            ]
+          },
+          "2000": {
+            "n": 3,
+            "median": 105.5,
+            "variance": 75.4433333333334,
+            "stdev": 8.685812186165057,
+            "min": 94.3,
+            "max": 111.4,
+            "values": [
+              111.4,
+              105.5,
+              94.3
+            ]
+          },
+          "8000": {
+            "n": 3,
+            "median": 99.6,
+            "variance": 3.8633333333333453,
+            "stdev": 1.9655363983740788,
+            "min": 99.4,
+            "max": 102.9,
+            "values": [
+              102.9,
+              99.4,
+              99.6
+            ]
+          },
+          "16000": {
+            "n": 3,
+            "median": 91.2,
+            "variance": 1.5699999999999992,
+            "stdev": 1.2529964086141665,
+            "min": 90.1,
+            "max": 92.6,
+            "values": [
+              92.6,
+              91.2,
+              90.1
+            ]
+          },
+          "24000": {
+            "n": 3,
+            "median": 82.1,
+            "variance": 1.5233333333333254,
+            "stdev": 1.234233905438238,
+            "min": 81.4,
+            "max": 83.8,
+            "values": [
+              83.8,
+              82.1,
+              81.4
+            ]
+          }
+        }
+      },
+      "9b": {
+        "prompt": {
+          "n": 3,
+          "median": 90.8,
+          "variance": 5.289999999999987,
+          "stdev": 2.299999999999997,
+          "min": 88.5,
+          "max": 93.1,
+          "values": [
+            93.1,
+            90.8,
+            88.5
+          ]
+        },
+        "gen": {
+          "100": {
+            "n": 3,
+            "median": 79.0,
+            "variance": 0.3433333333333384,
+            "stdev": 0.5859465277082359,
+            "min": 78.8,
+            "max": 79.9,
+            "values": [
+              79.9,
+              79.0,
+              78.8
+            ]
+          },
+          "2000": {
+            "n": 3,
+            "median": 77.1,
+            "variance": 1.4799999999999909,
+            "stdev": 1.2165525060596403,
+            "min": 76.9,
+            "max": 79.1,
+            "values": [
+              79.1,
+              77.1,
+              76.9
+            ]
+          },
+          "8000": {
+            "n": 3,
+            "median": 73.3,
+            "variance": 1.5633333333333308,
+            "stdev": 1.250333288900736,
+            "min": 73.0,
+            "max": 75.3,
+            "values": [
+              75.3,
+              73.0,
+              73.3
+            ]
+          },
+          "16000": {
+            "n": 3,
+            "median": 67.8,
+            "variance": 1.8433333333333242,
+            "stdev": 1.35769412362775,
+            "min": 67.7,
+            "max": 70.1,
+            "values": [
+              70.1,
+              67.8,
+              67.7
+            ]
+          },
+          "24000": {
+            "n": 3,
+            "median": 62.7,
+            "variance": 1.75,
+            "stdev": 1.3228756555322954,
+            "min": 62.2,
+            "max": 64.7,
+            "values": [
+              64.7,
+              62.7,
+              62.2
+            ]
+          }
+        }
+      }
+    }
+  },
+  "comparison": {
+    "2b": {
+      "prompt": {
+        "current_median": 190.0,
+        "baseline_median": 161.5,
+        "current_stdev": 23.60451934129,
+        "baseline_stdev": 9.332916657365654,
+        "delta_pct": 17.647058823529413
+      },
+      "100": {
+        "current_median": 169.0,
+        "baseline_median": 158.6,
+        "current_stdev": 6.902415036299487,
+        "baseline_stdev": 5.9774576535513875,
+        "delta_pct": 6.5573770491803325
+      },
+      "2000": {
+        "current_median": 163.3,
+        "baseline_median": 172.7,
+        "current_stdev": 7.774531068388197,
+        "baseline_stdev": 7.409678355592332,
+        "delta_pct": -5.442964678633456
+      },
+      "8000": {
+        "current_median": 175.4,
+        "baseline_median": 178.5,
+        "current_stdev": 5.723635208501669,
+        "baseline_stdev": 1.847520861406796,
+        "delta_pct": -1.7366946778711454
+      },
+      "16000": {
+        "current_median": 171.7,
+        "baseline_median": 164.3,
+        "current_stdev": 3.0664855018951673,
+        "baseline_stdev": 10.265151403332217,
+        "delta_pct": 4.503956177723662
+      },
+      "24000": {
+        "current_median": 160.6,
+        "baseline_median": 165.5,
+        "current_stdev": 1.939931270260192,
+        "baseline_stdev": 7.076957915187382,
+        "delta_pct": -2.9607250755287042
+      }
+    },
+    "4b": {
+      "prompt": {
+        "current_median": 129.0,
+        "baseline_median": 132.9,
+        "current_stdev": 1.6462077633154295,
+        "baseline_stdev": 6.673080248281155,
+        "delta_pct": -2.9345372460496657
+      },
+      "100": {
+        "current_median": 106.2,
+        "baseline_median": 103.0,
+        "current_stdev": 5.820652884342099,
+        "baseline_stdev": 7.317331025266889,
+        "delta_pct": 3.106796116504857
+      },
+      "2000": {
+        "current_median": 101.9,
+        "baseline_median": 105.5,
+        "current_stdev": 0.45825756949558744,
+        "baseline_stdev": 8.685812186165057,
+        "delta_pct": -3.412322274881511
+      },
+      "8000": {
+        "current_median": 90.8,
+        "baseline_median": 99.6,
+        "current_stdev": 5.843229700545185,
+        "baseline_stdev": 1.9655363983740788,
+        "delta_pct": -8.835341365461845
+      },
+      "16000": {
+        "current_median": 89.3,
+        "baseline_median": 91.2,
+        "current_stdev": 1.0016652800877817,
+        "baseline_stdev": 1.2529964086141665,
+        "delta_pct": -2.0833333333333393
+      },
+      "24000": {
+        "current_median": 79.8,
+        "baseline_median": 82.1,
+        "current_stdev": 1.1357816691600522,
+        "baseline_stdev": 1.234233905438238,
+        "delta_pct": -2.8014616321559043
+      }
+    },
+    "9b": {
+      "prompt": {
+        "current_median": 90.3,
+        "baseline_median": 90.8,
+        "current_stdev": 9.343090138350012,
+        "baseline_stdev": 2.299999999999997,
+        "delta_pct": -0.5506607929515419
+      },
+      "100": {
+        "current_median": 77.8,
+        "baseline_median": 79.0,
+        "current_stdev": 5.521775076911407,
+        "baseline_stdev": 0.5859465277082359,
+        "delta_pct": -1.5189873417721556
+      },
+      "2000": {
+        "current_median": 76.8,
+        "baseline_median": 77.1,
+        "current_stdev": 0.26457513110646014,
+        "baseline_stdev": 1.2165525060596403,
+        "delta_pct": -0.3891050583657551
+      },
+      "8000": {
+        "current_median": 71.6,
+        "baseline_median": 73.3,
+        "current_stdev": 2.2678918257565375,
+        "baseline_stdev": 1.250333288900736,
+        "delta_pct": -2.319236016371082
+      },
+      "16000": {
+        "current_median": 67.4,
+        "baseline_median": 67.8,
+        "current_stdev": 2.196208854670549,
+        "baseline_stdev": 1.35769412362775,
+        "delta_pct": -0.5899705014749137
+      },
+      "24000": {
+        "current_median": 62.3,
+        "baseline_median": 62.7,
+        "current_stdev": 0.26457513110646014,
+        "baseline_stdev": 1.3228756555322954,
+        "delta_pct": -0.6379585326953838
+      }
+    }
+  }
+}

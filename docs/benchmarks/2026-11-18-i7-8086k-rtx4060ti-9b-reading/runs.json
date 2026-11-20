@@ -1,0 +1,3090 @@
+[
+  {
+    "exit": 0,
+    "finished_epoch": 1794970974.171,
+    "free_mib_after_load": 4371,
+    "pass": 1,
+    "read_tok_s": 70.9,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 8951.0,
+        "mean": 3862.9,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2535.0,
+        "mean": 1306.9,
+        "min": 570.0
+      },
+      "power_w": {
+        "max": 14.89,
+        "mean": 14.4,
+        "min": 13.65
+      },
+      "pstates": {
+        "P2": 3,
+        "P5": 5
+      },
+      "samples": 8,
+      "temp_c": {
+        "max": 36.0,
+        "mean": 34.8,
+        "min": 34.0
+      },
+      "util_pct": {
+        "max": 99.0,
+        "mean": 42.8,
+        "min": 9.0
+      }
+    },
+    "read_window_s": 0.43,
+    "seconds": 10.35,
+    "side": "stock",
+    "started_epoch": 1794970963.821,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 8951.0,
+        "mean": 6382.0,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 1893.0,
+        "min": 210.0
+      },
+      "power_w": {
+        "max": 43.65,
+        "mean": 21.1,
+        "min": 6.57
+      },
+      "pstates": {
+        "P2": 142,
+        "P5": 29,
+        "P8": 34
+      },
+      "samples": 205,
+      "temp_c": {
+        "max": 42.0,
+        "mean": 34.6,
+        "min": 33.0
+      },
+      "util_pct": {
+        "max": 99.0,
+        "mean": 12.7,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794970985.38,
+    "free_mib_after_load": 4369,
+    "pass": 1,
+    "read_tok_s": 53.5,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 552.3,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 570.0,
+        "mean": 388.6,
+        "min": 285.0
+      },
+      "power_w": {
+        "max": 13.45,
+        "mean": 12.8,
+        "min": 12.36
+      },
+      "pstates": {
+        "P5": 4,
+        "P8": 7
+      },
+      "samples": 11,
+      "temp_c": {
+        "max": 35.0,
+        "mean": 35.0,
+        "min": 35.0
+      },
+      "util_pct": {
+        "max": 86.0,
+        "mean": 55.5,
+        "min": 2.0
+      }
+    },
+    "read_window_s": 0.53,
+    "seconds": 10.63,
+    "side": "fork",
+    "started_epoch": 1794970974.752,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7422.7,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2242.6,
+        "min": 285.0
+      },
+      "power_w": {
+        "max": 59.81,
+        "mean": 28.8,
+        "min": 12.36
+      },
+      "pstates": {
+        "P0": 25,
+        "P2": 145,
+        "P5": 30,
+        "P8": 10
+      },
+      "samples": 210,
+      "temp_c": {
+        "max": 42.0,
+        "mean": 35.5,
+        "min": 35.0
+      },
+      "util_pct": {
+        "max": 95.0,
+        "mean": 12.5,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794970996.58,
+    "free_mib_after_load": 4369,
+    "pass": 2,
+    "read_tok_s": 47.2,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 8951.0,
+        "mean": 1488.4,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2535.0,
+        "mean": 608.8,
+        "min": 420.0
+      },
+      "power_w": {
+        "max": 16.58,
+        "mean": 12.2,
+        "min": 11.51
+      },
+      "pstates": {
+        "P2": 1,
+        "P5": 11
+      },
+      "samples": 12,
+      "temp_c": {
+        "max": 39.0,
+        "mean": 35.3,
+        "min": 35.0
+      },
+      "util_pct": {
+        "max": 98.0,
+        "mean": 8.9,
+        "min": 0.0
+      }
+    },
+    "read_window_s": 0.56,
+    "seconds": 10.62,
+    "side": "fork",
+    "started_epoch": 1794970985.956,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7249.1,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2139.6,
+        "min": 420.0
+      },
+      "power_w": {
+        "max": 56.79,
+        "mean": 28.0,
+        "min": 11.51
+      },
+      "pstates": {
+        "P0": 31,
+        "P2": 129,
+        "P3": 10,
+        "P5": 40
+      },
+      "samples": 210,
+      "temp_c": {
+        "max": 43.0,
+        "mean": 36.2,
+        "min": 35.0
+      },
+      "util_pct": {
+        "max": 98.0,
+        "mean": 7.8,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971007.583,
+    "free_mib_after_load": 4371,
+    "pass": 2,
+    "read_tok_s": 93.5,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 8951.0,
+        "mean": 1714.6,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2535.0,
+        "mean": 655.0,
+        "min": 420.0
+      },
+      "power_w": {
+        "max": 20.72,
+        "mean": 12.2,
+        "min": 11.12
+      },
+      "pstates": {
+        "P2": 1,
+        "P5": 8
+      },
+      "samples": 9,
+      "temp_c": {
+        "max": 40.0,
+        "mean": 36.4,
+        "min": 36.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 10.8,
+        "min": 0.0
+      }
+    },
+    "read_window_s": 0.46,
+    "seconds": 10.49,
+    "side": "stock",
+    "started_epoch": 1794970997.095,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7423.8,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2129.6,
+        "min": 420.0
+      },
+      "power_w": {
+        "max": 60.9,
+        "mean": 28.6,
+        "min": 11.12
+      },
+      "pstates": {
+        "P0": 38,
+        "P2": 129,
+        "P5": 40
+      },
+      "samples": 207,
+      "temp_c": {
+        "max": 40.0,
+        "mean": 37.0,
+        "min": 36.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 10.4,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971018.579,
+    "free_mib_after_load": 4371,
+    "pass": 3,
+    "read_tok_s": 93.3,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 8951.0,
+        "mean": 1624.1,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2535.0,
+        "mean": 631.5,
+        "min": 420.0
+      },
+      "power_w": {
+        "max": 20.74,
+        "mean": 12.1,
+        "min": 11.13
+      },
+      "pstates": {
+        "P2": 1,
+        "P5": 9
+      },
+      "samples": 10,
+      "temp_c": {
+        "max": 40.0,
+        "mean": 36.4,
+        "min": 36.0
+      },
+      "util_pct": {
+        "max": 96.0,
+        "mean": 19.5,
+        "min": 11.0
+      }
+    },
+    "read_window_s": 0.47,
+    "seconds": 10.48,
+    "side": "stock",
+    "started_epoch": 1794971008.098,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7423.8,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2239.1,
+        "min": 420.0
+      },
+      "power_w": {
+        "max": 60.12,
+        "mean": 28.1,
+        "min": 11.13
+      },
+      "pstates": {
+        "P0": 38,
+        "P2": 129,
+        "P5": 40
+      },
+      "samples": 207,
+      "temp_c": {
+        "max": 40.0,
+        "mean": 37.2,
+        "min": 36.0
+      },
+      "util_pct": {
+        "max": 96.0,
+        "mean": 8.1,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971029.978,
+    "free_mib_after_load": 4369,
+    "pass": 3,
+    "read_tok_s": 80.6,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 486.0,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 435.0,
+        "mean": 375.0,
+        "min": 360.0
+      },
+      "power_w": {
+        "max": 11.28,
+        "mean": 10.8,
+        "min": 10.62
+      },
+      "pstates": {
+        "P5": 2,
+        "P8": 8
+      },
+      "samples": 10,
+      "temp_c": {
+        "max": 37.0,
+        "mean": 37.0,
+        "min": 37.0
+      },
+      "util_pct": {
+        "max": 81.0,
+        "mean": 66.8,
+        "min": 10.0
+      }
+    },
+    "read_window_s": 0.54,
+    "seconds": 10.82,
+    "side": "fork",
+    "started_epoch": 1794971019.157,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7073.2,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2164.6,
+        "min": 360.0
+      },
+      "power_w": {
+        "max": 60.34,
+        "mean": 27.4,
+        "min": 10.62
+      },
+      "pstates": {
+        "P0": 27,
+        "P2": 127,
+        "P3": 10,
+        "P5": 40,
+        "P8": 10
+      },
+      "samples": 214,
+      "temp_c": {
+        "max": 43.0,
+        "mean": 38.0,
+        "min": 37.0
+      },
+      "util_pct": {
+        "max": 95.0,
+        "mean": 11.8,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971041.352,
+    "free_mib_after_load": 4369,
+    "pass": 4,
+    "read_tok_s": 61.5,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 810.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 510.0,
+        "mean": 450.0,
+        "min": 420.0
+      },
+      "power_w": {
+        "max": 13.56,
+        "mean": 13.1,
+        "min": 12.82
+      },
+      "pstates": {
+        "P5": 9
+      },
+      "samples": 9,
+      "temp_c": {
+        "max": 38.0,
+        "mean": 37.7,
+        "min": 37.0
+      },
+      "util_pct": {
+        "max": 96.0,
+        "mean": 67.7,
+        "min": 11.0
+      }
+    },
+    "read_window_s": 0.46,
+    "seconds": 10.8,
+    "side": "fork",
+    "started_epoch": 1794971030.553,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7270.8,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2149.6,
+        "min": 420.0
+      },
+      "power_w": {
+        "max": 57.52,
+        "mean": 28.6,
+        "min": 12.82
+      },
+      "pstates": {
+        "P0": 29,
+        "P2": 134,
+        "P3": 10,
+        "P5": 40
+      },
+      "samples": 213,
+      "temp_c": {
+        "max": 45.0,
+        "mean": 38.3,
+        "min": 37.0
+      },
+      "util_pct": {
+        "max": 96.0,
+        "mean": 10.4,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971052.359,
+    "free_mib_after_load": 4371,
+    "pass": 4,
+    "read_tok_s": 70.4,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 810.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 510.0,
+        "mean": 450.0,
+        "min": 420.0
+      },
+      "power_w": {
+        "max": 13.74,
+        "mean": 12.8,
+        "min": 12.28
+      },
+      "pstates": {
+        "P5": 9
+      },
+      "samples": 9,
+      "temp_c": {
+        "max": 38.0,
+        "mean": 38.0,
+        "min": 38.0
+      },
+      "util_pct": {
+        "max": 93.0,
+        "mean": 64.3,
+        "min": 7.0
+      }
+    },
+    "read_window_s": 0.43,
+    "seconds": 10.49,
+    "side": "stock",
+    "started_epoch": 1794971041.866,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7457.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2247.6,
+        "min": 420.0
+      },
+      "power_w": {
+        "max": 59.13,
+        "mean": 29.4,
+        "min": 12.28
+      },
+      "pstates": {
+        "P0": 23,
+        "P2": 135,
+        "P3": 10,
+        "P5": 39
+      },
+      "samples": 207,
+      "temp_c": {
+        "max": 45.0,
+        "mean": 39.0,
+        "min": 38.0
+      },
+      "util_pct": {
+        "max": 93.0,
+        "mean": 13.5,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971063.57,
+    "free_mib_after_load": 4371,
+    "pass": 5,
+    "read_tok_s": 92.9,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 8951.0,
+        "mean": 1714.6,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 700.0,
+        "min": 420.0
+      },
+      "power_w": {
+        "max": 20.84,
+        "mean": 12.2,
+        "min": 11.17
+      },
+      "pstates": {
+        "P2": 1,
+        "P5": 8
+      },
+      "samples": 9,
+      "temp_c": {
+        "max": 42.0,
+        "mean": 38.4,
+        "min": 38.0
+      },
+      "util_pct": {
+        "max": 96.0,
+        "mean": 20.4,
+        "min": 11.0
+      }
+    },
+    "read_window_s": 0.47,
+    "seconds": 10.7,
+    "side": "stock",
+    "started_epoch": 1794971052.873,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7485.4,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2260.3,
+        "min": 420.0
+      },
+      "power_w": {
+        "max": 59.41,
+        "mean": 28.4,
+        "min": 11.17
+      },
+      "pstates": {
+        "P0": 33,
+        "P2": 139,
+        "P5": 39
+      },
+      "samples": 211,
+      "temp_c": {
+        "max": 42.0,
+        "mean": 39.2,
+        "min": 38.0
+      },
+      "util_pct": {
+        "max": 96.0,
+        "mean": 12.0,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971075.163,
+    "free_mib_after_load": 4369,
+    "pass": 5,
+    "read_tok_s": 93.5,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 8951.0,
+        "mean": 2114.2,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2535.0,
+        "mean": 759.0,
+        "min": 315.0
+      },
+      "power_w": {
+        "max": 14.68,
+        "mean": 11.0,
+        "min": 10.1
+      },
+      "pstates": {
+        "P2": 2,
+        "P8": 8
+      },
+      "samples": 10,
+      "temp_c": {
+        "max": 39.0,
+        "mean": 39.0,
+        "min": 39.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 40.2,
+        "min": 26.0
+      }
+    },
+    "read_window_s": 0.49,
+    "seconds": 11.01,
+    "side": "fork",
+    "started_epoch": 1794971064.154,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 6915.0,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2046.7,
+        "min": 315.0
+      },
+      "power_w": {
+        "max": 60.64,
+        "mean": 27.2,
+        "min": 10.1
+      },
+      "pstates": {
+        "P0": 27,
+        "P2": 131,
+        "P3": 10,
+        "P5": 40,
+        "P8": 10
+      },
+      "samples": 218,
+      "temp_c": {
+        "max": 47.0,
+        "mean": 39.8,
+        "min": 39.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 10.8,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971086.333,
+    "free_mib_after_load": 4369,
+    "pass": 6,
+    "read_tok_s": 60.3,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 810.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 510.0,
+        "mean": 460.0,
+        "min": 435.0
+      },
+      "power_w": {
+        "max": 13.92,
+        "mean": 13.3,
+        "min": 12.93
+      },
+      "pstates": {
+        "P5": 9
+      },
+      "samples": 9,
+      "temp_c": {
+        "max": 39.0,
+        "mean": 39.0,
+        "min": 39.0
+      },
+      "util_pct": {
+        "max": 99.0,
+        "mean": 69.7,
+        "min": 11.0
+      }
+    },
+    "read_window_s": 0.47,
+    "seconds": 10.59,
+    "side": "fork",
+    "started_epoch": 1794971075.741,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7436.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2245.6,
+        "min": 435.0
+      },
+      "power_w": {
+        "max": 62.21,
+        "mean": 29.2,
+        "min": 12.93
+      },
+      "pstates": {
+        "P0": 36,
+        "P2": 133,
+        "P5": 40
+      },
+      "samples": 209,
+      "temp_c": {
+        "max": 47.0,
+        "mean": 40.2,
+        "min": 39.0
+      },
+      "util_pct": {
+        "max": 99.0,
+        "mean": 12.2,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971096.937,
+    "free_mib_after_load": 4371,
+    "pass": 6,
+    "read_tok_s": 84.9,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 810.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 525.0,
+        "mean": 525.0,
+        "min": 525.0
+      },
+      "power_w": {
+        "max": 13.93,
+        "mean": 13.9,
+        "min": 13.93
+      },
+      "pstates": {
+        "P5": 8
+      },
+      "samples": 8,
+      "temp_c": {
+        "max": 40.0,
+        "mean": 40.0,
+        "min": 40.0
+      },
+      "util_pct": {
+        "max": 11.0,
+        "mean": 11.0,
+        "min": 11.0
+      }
+    },
+    "read_window_s": 0.38,
+    "seconds": 10.09,
+    "side": "stock",
+    "started_epoch": 1794971086.848,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7766.4,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2338.0,
+        "min": 525.0
+      },
+      "power_w": {
+        "max": 59.6,
+        "mean": 30.6,
+        "min": 13.93
+      },
+      "pstates": {
+        "P0": 24,
+        "P2": 135,
+        "P3": 10,
+        "P5": 30
+      },
+      "samples": 199,
+      "temp_c": {
+        "max": 46.0,
+        "mean": 41.0,
+        "min": 40.0
+      },
+      "util_pct": {
+        "max": 95.0,
+        "mean": 8.8,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971107.751,
+    "free_mib_after_load": 4371,
+    "pass": 7,
+    "read_tok_s": 93.8,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 648.0,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 435.0,
+        "mean": 387.0,
+        "min": 315.0
+      },
+      "power_w": {
+        "max": 11.82,
+        "mean": 11.5,
+        "min": 11.33
+      },
+      "pstates": {
+        "P2": 4,
+        "P5": 6
+      },
+      "samples": 10,
+      "temp_c": {
+        "max": 40.0,
+        "mean": 40.0,
+        "min": 40.0
+      },
+      "util_pct": {
+        "max": 100.0,
+        "mean": 44.8,
+        "min": 8.0
+      }
+    },
+    "read_window_s": 0.51,
+    "seconds": 10.3,
+    "side": "stock",
+    "started_epoch": 1794971097.45,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 6975.0,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2124.1,
+        "min": 315.0
+      },
+      "power_w": {
+        "max": 57.57,
+        "mean": 29.1,
+        "min": 11.33
+      },
+      "pstates": {
+        "P0": 32,
+        "P2": 132,
+        "P5": 40
+      },
+      "samples": 204,
+      "temp_c": {
+        "max": 48.0,
+        "mean": 41.1,
+        "min": 40.0
+      },
+      "util_pct": {
+        "max": 100.0,
+        "mean": 13.1,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971118.951,
+    "free_mib_after_load": 4369,
+    "pass": 7,
+    "read_tok_s": 93.8,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 455.6,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 435.0,
+        "mean": 343.1,
+        "min": 330.0
+      },
+      "power_w": {
+        "max": 11.41,
+        "mean": 10.3,
+        "min": 10.11
+      },
+      "pstates": {
+        "P5": 1,
+        "P8": 7
+      },
+      "samples": 8,
+      "temp_c": {
+        "max": 40.0,
+        "mean": 40.0,
+        "min": 40.0
+      },
+      "util_pct": {
+        "max": 8.0,
+        "mean": 1.0,
+        "min": 0.0
+      }
+    },
+    "read_window_s": 0.45,
+    "seconds": 10.62,
+    "side": "fork",
+    "started_epoch": 1794971108.327,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7074.6,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2155.9,
+        "min": 330.0
+      },
+      "power_w": {
+        "max": 61.12,
+        "mean": 28.2,
+        "min": 10.11
+      },
+      "pstates": {
+        "P0": 34,
+        "P2": 127,
+        "P5": 40,
+        "P8": 9
+      },
+      "samples": 210,
+      "temp_c": {
+        "max": 48.0,
+        "mean": 41.3,
+        "min": 40.0
+      },
+      "util_pct": {
+        "max": 95.0,
+        "mean": 9.9,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971130.307,
+    "free_mib_after_load": 4369,
+    "pass": 8,
+    "read_tok_s": 45.9,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 810.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 765.0,
+        "mean": 652.5,
+        "min": 540.0
+      },
+      "power_w": {
+        "max": 14.69,
+        "mean": 14.7,
+        "min": 14.63
+      },
+      "pstates": {
+        "P5": 12
+      },
+      "samples": 12,
+      "temp_c": {
+        "max": 42.0,
+        "mean": 41.5,
+        "min": 41.0
+      },
+      "util_pct": {
+        "max": 100.0,
+        "mean": 63.0,
+        "min": 26.0
+      }
+    },
+    "read_window_s": 0.57,
+    "seconds": 10.78,
+    "side": "fork",
+    "started_epoch": 1794971119.527,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7507.3,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2176.4,
+        "min": 540.0
+      },
+      "power_w": {
+        "max": 57.98,
+        "mean": 29.3,
+        "min": 14.63
+      },
+      "pstates": {
+        "P0": 40,
+        "P2": 134,
+        "P5": 39
+      },
+      "samples": 213,
+      "temp_c": {
+        "max": 49.0,
+        "mean": 42.2,
+        "min": 41.0
+      },
+      "util_pct": {
+        "max": 100.0,
+        "mean": 11.5,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971141.109,
+    "free_mib_after_load": 4371,
+    "pass": 8,
+    "read_tok_s": 51.4,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 8951.0,
+        "mean": 1550.1,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2535.0,
+        "mean": 707.7,
+        "min": 525.0
+      },
+      "power_w": {
+        "max": 19.64,
+        "mean": 14.9,
+        "min": 14.41
+      },
+      "pstates": {
+        "P2": 1,
+        "P5": 10
+      },
+      "samples": 11,
+      "temp_c": {
+        "max": 46.0,
+        "mean": 41.5,
+        "min": 41.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 18.8,
+        "min": 11.0
+      }
+    },
+    "read_window_s": 0.53,
+    "seconds": 10.28,
+    "side": "stock",
+    "started_epoch": 1794971130.824,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7789.8,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2328.0,
+        "min": 525.0
+      },
+      "power_w": {
+        "max": 59.69,
+        "mean": 30.1,
+        "min": 14.41
+      },
+      "pstates": {
+        "P0": 34,
+        "P2": 139,
+        "P5": 30
+      },
+      "samples": 203,
+      "temp_c": {
+        "max": 46.0,
+        "mean": 42.3,
+        "min": 41.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 9.3,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971151.716,
+    "free_mib_after_load": 4371,
+    "pass": 9,
+    "read_tok_s": 73.4,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 8951.0,
+        "mean": 3862.9,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2535.0,
+        "mean": 1391.2,
+        "min": 705.0
+      },
+      "power_w": {
+        "max": 22.34,
+        "mean": 20.3,
+        "min": 16.98
+      },
+      "pstates": {
+        "P2": 3,
+        "P5": 5
+      },
+      "samples": 8,
+      "temp_c": {
+        "max": 44.0,
+        "mean": 42.8,
+        "min": 42.0
+      },
+      "util_pct": {
+        "max": 99.0,
+        "mean": 42.1,
+        "min": 8.0
+      }
+    },
+    "read_window_s": 0.42,
+    "seconds": 10.09,
+    "side": "stock",
+    "started_epoch": 1794971141.624,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 8184.4,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2321.6,
+        "min": 585.0
+      },
+      "power_w": {
+        "max": 62.0,
+        "mean": 30.8,
+        "min": 16.98
+      },
+      "pstates": {
+        "P0": 38,
+        "P2": 142,
+        "P5": 20
+      },
+      "samples": 200,
+      "temp_c": {
+        "max": 50.0,
+        "mean": 43.1,
+        "min": 42.0
+      },
+      "util_pct": {
+        "max": 99.0,
+        "mean": 9.4,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971162.942,
+    "free_mib_after_load": 4369,
+    "pass": 9,
+    "read_tok_s": 92.7,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 486.0,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 450.0,
+        "mean": 366.0,
+        "min": 345.0
+      },
+      "power_w": {
+        "max": 12.39,
+        "mean": 11.0,
+        "min": 10.69
+      },
+      "pstates": {
+        "P5": 2,
+        "P8": 8
+      },
+      "samples": 10,
+      "temp_c": {
+        "max": 42.0,
+        "mean": 42.0,
+        "min": 42.0
+      },
+      "util_pct": {
+        "max": 40.0,
+        "mean": 32.8,
+        "min": 4.0
+      }
+    },
+    "read_window_s": 0.5,
+    "seconds": 10.65,
+    "side": "fork",
+    "started_epoch": 1794971152.293,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7082.7,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2925.0,
+        "mean": 2159.0,
+        "min": 345.0
+      },
+      "power_w": {
+        "max": 61.74,
+        "mean": 29.2,
+        "min": 10.69
+      },
+      "pstates": {
+        "P0": 25,
+        "P2": 137,
+        "P5": 39,
+        "P8": 10
+      },
+      "samples": 211,
+      "temp_c": {
+        "max": 49.0,
+        "mean": 43.2,
+        "min": 42.0
+      },
+      "util_pct": {
+        "max": 95.0,
+        "mean": 11.0,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971174.099,
+    "free_mib_after_load": 4369,
+    "pass": 10,
+    "read_tok_s": 54.2,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 8951.0,
+        "mean": 1624.1,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2535.0,
+        "mean": 726.0,
+        "min": 525.0
+      },
+      "power_w": {
+        "max": 19.34,
+        "mean": 15.3,
+        "min": 14.84
+      },
+      "pstates": {
+        "P2": 1,
+        "P5": 9
+      },
+      "samples": 10,
+      "temp_c": {
+        "max": 44.0,
+        "mean": 40.4,
+        "min": 40.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 9.7,
+        "min": 0.0
+      }
+    },
+    "read_window_s": 0.5,
+    "seconds": 10.58,
+    "side": "fork",
+    "started_epoch": 1794971163.523,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7629.3,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2234.3,
+        "min": 525.0
+      },
+      "power_w": {
+        "max": 57.96,
+        "mean": 29.8,
+        "min": 14.84
+      },
+      "pstates": {
+        "P0": 30,
+        "P2": 139,
+        "P3": 10,
+        "P5": 30
+      },
+      "samples": 209,
+      "temp_c": {
+        "max": 44.0,
+        "mean": 42.2,
+        "min": 40.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 8.2,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971185.098,
+    "free_mib_after_load": 4371,
+    "pass": 10,
+    "read_tok_s": 50.5,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 8951.0,
+        "mean": 1550.1,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2535.0,
+        "mean": 721.4,
+        "min": 540.0
+      },
+      "power_w": {
+        "max": 20.0,
+        "mean": 14.2,
+        "min": 13.64
+      },
+      "pstates": {
+        "P2": 1,
+        "P5": 10
+      },
+      "samples": 11,
+      "temp_c": {
+        "max": 43.0,
+        "mean": 39.4,
+        "min": 39.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 18.8,
+        "min": 11.0
+      }
+    },
+    "read_window_s": 0.54,
+    "seconds": 10.48,
+    "side": "stock",
+    "started_epoch": 1794971174.614,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7817.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2238.8,
+        "min": 540.0
+      },
+      "power_w": {
+        "max": 62.29,
+        "mean": 30.3,
+        "min": 13.64
+      },
+      "pstates": {
+        "P0": 38,
+        "P2": 139,
+        "P5": 30
+      },
+      "samples": 207,
+      "temp_c": {
+        "max": 43.0,
+        "mean": 40.6,
+        "min": 39.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 10.9,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971195.889,
+    "free_mib_after_load": 4371,
+    "pass": 11,
+    "read_tok_s": 50.1,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 810.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 885.0,
+        "mean": 819.5,
+        "min": 705.0
+      },
+      "power_w": {
+        "max": 22.46,
+        "mean": 18.8,
+        "min": 16.64
+      },
+      "pstates": {
+        "P5": 11
+      },
+      "samples": 11,
+      "temp_c": {
+        "max": 38.0,
+        "mean": 38.0,
+        "min": 38.0
+      },
+      "util_pct": {
+        "max": 95.0,
+        "mean": 63.7,
+        "min": 9.0
+      }
+    },
+    "read_window_s": 0.55,
+    "seconds": 10.28,
+    "side": "stock",
+    "started_epoch": 1794971185.612,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7794.7,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2262.6,
+        "min": 600.0
+      },
+      "power_w": {
+        "max": 61.68,
+        "mean": 30.9,
+        "min": 16.64
+      },
+      "pstates": {
+        "P0": 38,
+        "P2": 135,
+        "P5": 30
+      },
+      "samples": 203,
+      "temp_c": {
+        "max": 45.0,
+        "mean": 39.3,
+        "min": 38.0
+      },
+      "util_pct": {
+        "max": 95.0,
+        "mean": 11.2,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971206.906,
+    "free_mib_after_load": 4369,
+    "pass": 11,
+    "read_tok_s": 76.4,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 810.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 705.0,
+        "mean": 560.6,
+        "min": 540.0
+      },
+      "power_w": {
+        "max": 22.49,
+        "mean": 14.8,
+        "min": 13.75
+      },
+      "pstates": {
+        "P5": 8
+      },
+      "samples": 8,
+      "temp_c": {
+        "max": 37.0,
+        "mean": 37.0,
+        "min": 37.0
+      },
+      "util_pct": {
+        "max": 10.0,
+        "mean": 1.2,
+        "min": 0.0
+      }
+    },
+    "read_window_s": 0.39,
+    "seconds": 10.44,
+    "side": "fork",
+    "started_epoch": 1794971196.465,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7815.2,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2339.6,
+        "min": 540.0
+      },
+      "power_w": {
+        "max": 58.85,
+        "mean": 30.5,
+        "min": 13.75
+      },
+      "pstates": {
+        "P0": 41,
+        "P2": 135,
+        "P5": 30
+      },
+      "samples": 206,
+      "temp_c": {
+        "max": 44.0,
+        "mean": 38.2,
+        "min": 37.0
+      },
+      "util_pct": {
+        "max": 94.0,
+        "mean": 5.8,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971218.094,
+    "free_mib_after_load": 4369,
+    "pass": 12,
+    "read_tok_s": 60.4,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 810.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 540.0,
+        "mean": 540.0,
+        "min": 540.0
+      },
+      "power_w": {
+        "max": 15.11,
+        "mean": 15.1,
+        "min": 15.11
+      },
+      "pstates": {
+        "P5": 9
+      },
+      "samples": 9,
+      "temp_c": {
+        "max": 36.0,
+        "mean": 36.0,
+        "min": 36.0
+      },
+      "util_pct": {
+        "max": 0.0,
+        "mean": 0.0,
+        "min": 0.0
+      }
+    },
+    "read_window_s": 0.46,
+    "seconds": 10.61,
+    "side": "fork",
+    "started_epoch": 1794971207.487,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7836.8,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2331.7,
+        "min": 540.0
+      },
+      "power_w": {
+        "max": 57.37,
+        "mean": 29.2,
+        "min": 15.11
+      },
+      "pstates": {
+        "P0": 41,
+        "P2": 139,
+        "P5": 30
+      },
+      "samples": 210,
+      "temp_c": {
+        "max": 41.0,
+        "mean": 37.2,
+        "min": 36.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 7.6,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971228.881,
+    "free_mib_after_load": 4371,
+    "pass": 12,
+    "read_tok_s": 55.6,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 810.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 705.0,
+        "mean": 558.0,
+        "min": 495.0
+      },
+      "power_w": {
+        "max": 22.38,
+        "mean": 18.0,
+        "min": 16.18
+      },
+      "pstates": {
+        "P5": 10
+      },
+      "samples": 10,
+      "temp_c": {
+        "max": 36.0,
+        "mean": 35.7,
+        "min": 35.0
+      },
+      "util_pct": {
+        "max": 85.0,
+        "mean": 62.5,
+        "min": 10.0
+      }
+    },
+    "read_window_s": 0.5,
+    "seconds": 10.27,
+    "side": "stock",
+    "started_epoch": 1794971218.607,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7795.9,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2234.6,
+        "min": 495.0
+      },
+      "power_w": {
+        "max": 61.54,
+        "mean": 30.6,
+        "min": 16.18
+      },
+      "pstates": {
+        "P0": 39,
+        "P2": 134,
+        "P5": 30
+      },
+      "samples": 203,
+      "temp_c": {
+        "max": 42.0,
+        "mean": 36.7,
+        "min": 35.0
+      },
+      "util_pct": {
+        "max": 94.0,
+        "mean": 10.7,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971239.516,
+    "free_mib_after_load": 4371,
+    "pass": 13,
+    "read_tok_s": 94.0,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 810.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 450.0,
+        "mean": 450.0,
+        "min": 450.0
+      },
+      "power_w": {
+        "max": 11.05,
+        "mean": 11.1,
+        "min": 11.05
+      },
+      "pstates": {
+        "P5": 8
+      },
+      "samples": 8,
+      "temp_c": {
+        "max": 34.0,
+        "mean": 34.0,
+        "min": 34.0
+      },
+      "util_pct": {
+        "max": 9.0,
+        "mean": 9.0,
+        "min": 9.0
+      }
+    },
+    "read_window_s": 0.4,
+    "seconds": 10.12,
+    "side": "stock",
+    "started_epoch": 1794971229.396,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7364.1,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2238.5,
+        "min": 450.0
+      },
+      "power_w": {
+        "max": 58.07,
+        "mean": 29.4,
+        "min": 11.05
+      },
+      "pstates": {
+        "P0": 33,
+        "P2": 127,
+        "P5": 40
+      },
+      "samples": 200,
+      "temp_c": {
+        "max": 40.0,
+        "mean": 36.1,
+        "min": 34.0
+      },
+      "util_pct": {
+        "max": 95.0,
+        "mean": 10.0,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971250.907,
+    "free_mib_after_load": 4369,
+    "pass": 13,
+    "read_tok_s": 74.9,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 552.3,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 450.0,
+        "mean": 354.5,
+        "min": 300.0
+      },
+      "power_w": {
+        "max": 11.5,
+        "mean": 11.3,
+        "min": 10.91
+      },
+      "pstates": {
+        "P5": 4,
+        "P8": 7
+      },
+      "samples": 11,
+      "temp_c": {
+        "max": 34.0,
+        "mean": 34.0,
+        "min": 34.0
+      },
+      "util_pct": {
+        "max": 100.0,
+        "mean": 65.5,
+        "min": 5.0
+      }
+    },
+    "read_window_s": 0.55,
+    "seconds": 10.81,
+    "side": "fork",
+    "started_epoch": 1794971240.092,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7113.6,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2068.2,
+        "min": 300.0
+      },
+      "power_w": {
+        "max": 57.72,
+        "mean": 28.0,
+        "min": 10.91
+      },
+      "pstates": {
+        "P0": 39,
+        "P2": 126,
+        "P5": 39,
+        "P8": 10
+      },
+      "samples": 214,
+      "temp_c": {
+        "max": 41.0,
+        "mean": 35.2,
+        "min": 34.0
+      },
+      "util_pct": {
+        "max": 100.0,
+        "mean": 12.6,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971262.071,
+    "free_mib_after_load": 4369,
+    "pass": 14,
+    "read_tok_s": 56.9,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 810.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 540.0,
+        "mean": 540.0,
+        "min": 540.0
+      },
+      "power_w": {
+        "max": 12.64,
+        "mean": 12.6,
+        "min": 12.64
+      },
+      "pstates": {
+        "P5": 10
+      },
+      "samples": 10,
+      "temp_c": {
+        "max": 34.0,
+        "mean": 34.0,
+        "min": 34.0
+      },
+      "util_pct": {
+        "max": 0.0,
+        "mean": 0.0,
+        "min": 0.0
+      }
+    },
+    "read_window_s": 0.49,
+    "seconds": 10.59,
+    "side": "fork",
+    "started_epoch": 1794971251.483,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7831.5,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2328.8,
+        "min": 540.0
+      },
+      "power_w": {
+        "max": 58.39,
+        "mean": 29.1,
+        "min": 12.64
+      },
+      "pstates": {
+        "P0": 31,
+        "P2": 148,
+        "P5": 30
+      },
+      "samples": 209,
+      "temp_c": {
+        "max": 37.0,
+        "mean": 35.1,
+        "min": 34.0
+      },
+      "util_pct": {
+        "max": 96.0,
+        "mean": 8.2,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971272.866,
+    "free_mib_after_load": 4371,
+    "pass": 14,
+    "read_tok_s": 54.7,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 810.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 690.0,
+        "mean": 582.0,
+        "min": 510.0
+      },
+      "power_w": {
+        "max": 20.83,
+        "mean": 17.8,
+        "min": 15.73
+      },
+      "pstates": {
+        "P5": 10
+      },
+      "samples": 10,
+      "temp_c": {
+        "max": 34.0,
+        "mean": 33.6,
+        "min": 33.0
+      },
+      "util_pct": {
+        "max": 99.0,
+        "mean": 62.6,
+        "min": 8.0
+      }
+    },
+    "read_window_s": 0.51,
+    "seconds": 10.28,
+    "side": "stock",
+    "started_epoch": 1794971262.585,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7795.9,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2326.5,
+        "min": 510.0
+      },
+      "power_w": {
+        "max": 58.55,
+        "mean": 29.9,
+        "min": 15.73
+      },
+      "pstates": {
+        "P0": 39,
+        "P2": 134,
+        "P5": 30
+      },
+      "samples": 203,
+      "temp_c": {
+        "max": 40.0,
+        "mean": 34.3,
+        "min": 33.0
+      },
+      "util_pct": {
+        "max": 99.0,
+        "mean": 11.1,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971283.67,
+    "free_mib_after_load": 4371,
+    "pass": 15,
+    "read_tok_s": 62.9,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 8951.0,
+        "mean": 1958.8,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2535.0,
+        "mean": 792.3,
+        "min": 405.0
+      },
+      "power_w": {
+        "max": 17.74,
+        "mean": 12.2,
+        "min": 11.02
+      },
+      "pstates": {
+        "P2": 2,
+        "P8": 9
+      },
+      "samples": 11,
+      "temp_c": {
+        "max": 35.0,
+        "mean": 33.4,
+        "min": 33.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 26.6,
+        "min": 11.0
+      }
+    },
+    "read_window_s": 0.55,
+    "seconds": 10.29,
+    "side": "stock",
+    "started_epoch": 1794971273.381,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7367.6,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2955.0,
+        "mean": 2225.9,
+        "min": 405.0
+      },
+      "power_w": {
+        "max": 58.74,
+        "mean": 28.5,
+        "min": 11.02
+      },
+      "pstates": {
+        "P0": 23,
+        "P2": 130,
+        "P3": 10,
+        "P5": 30,
+        "P8": 10
+      },
+      "samples": 203,
+      "temp_c": {
+        "max": 40.0,
+        "mean": 34.1,
+        "min": 33.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 10.0,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971294.886,
+    "free_mib_after_load": 4369,
+    "pass": 15,
+    "read_tok_s": 76.9,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 589.1,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 450.0,
+        "mean": 360.0,
+        "min": 285.0
+      },
+      "power_w": {
+        "max": 11.03,
+        "mean": 10.9,
+        "min": 10.76
+      },
+      "pstates": {
+        "P8": 11
+      },
+      "samples": 11,
+      "temp_c": {
+        "max": 33.0,
+        "mean": 33.0,
+        "min": 33.0
+      },
+      "util_pct": {
+        "max": 100.0,
+        "mean": 58.2,
+        "min": 8.0
+      }
+    },
+    "read_window_s": 0.55,
+    "seconds": 10.64,
+    "side": "fork",
+    "started_epoch": 1794971284.246,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7045.3,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2955.0,
+        "mean": 2149.7,
+        "min": 285.0
+      },
+      "power_w": {
+        "max": 60.88,
+        "mean": 27.6,
+        "min": 10.76
+      },
+      "pstates": {
+        "P0": 26,
+        "P2": 125,
+        "P3": 10,
+        "P5": 30,
+        "P8": 20
+      },
+      "samples": 211,
+      "temp_c": {
+        "max": 40.0,
+        "mean": 34.2,
+        "min": 33.0
+      },
+      "util_pct": {
+        "max": 100.0,
+        "mean": 12.3,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971306.05,
+    "free_mib_after_load": 4369,
+    "pass": 16,
+    "read_tok_s": 50.1,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 810.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 660.0,
+        "mean": 550.9,
+        "min": 540.0
+      },
+      "power_w": {
+        "max": 20.79,
+        "mean": 14.4,
+        "min": 13.79
+      },
+      "pstates": {
+        "P5": 11
+      },
+      "samples": 11,
+      "temp_c": {
+        "max": 34.0,
+        "mean": 34.0,
+        "min": 34.0
+      },
+      "util_pct": {
+        "max": 17.0,
+        "mean": 15.8,
+        "min": 4.0
+      }
+    },
+    "read_window_s": 0.54,
+    "seconds": 10.59,
+    "side": "fork",
+    "started_epoch": 1794971295.462,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7871.6,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2955.0,
+        "mean": 2357.8,
+        "min": 540.0
+      },
+      "power_w": {
+        "max": 57.67,
+        "mean": 28.5,
+        "min": 13.79
+      },
+      "pstates": {
+        "P0": 32,
+        "P2": 148,
+        "P5": 29
+      },
+      "samples": 209,
+      "temp_c": {
+        "max": 38.0,
+        "mean": 34.5,
+        "min": 34.0
+      },
+      "util_pct": {
+        "max": 96.0,
+        "mean": 9.2,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971316.674,
+    "free_mib_after_load": 4371,
+    "pass": 16,
+    "read_tok_s": 80.3,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 8951.0,
+        "mean": 3136.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2535.0,
+        "mean": 1195.7,
+        "min": 660.0
+      },
+      "power_w": {
+        "max": 20.74,
+        "mean": 20.4,
+        "min": 19.53
+      },
+      "pstates": {
+        "P2": 2,
+        "P5": 5
+      },
+      "samples": 7,
+      "temp_c": {
+        "max": 36.0,
+        "mean": 35.3,
+        "min": 35.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 33.4,
+        "min": 8.0
+      }
+    },
+    "read_window_s": 0.39,
+    "seconds": 10.11,
+    "side": "stock",
+    "started_epoch": 1794971306.565,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 8174.4,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2419.1,
+        "min": 660.0
+      },
+      "power_w": {
+        "max": 57.79,
+        "mean": 29.8,
+        "min": 19.53
+      },
+      "pstates": {
+        "P0": 30,
+        "P2": 150,
+        "P5": 20
+      },
+      "samples": 200,
+      "temp_c": {
+        "max": 42.0,
+        "mean": 35.3,
+        "min": 35.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 10.1,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971327.454,
+    "free_mib_after_load": 4371,
+    "pass": 17,
+    "read_tok_s": 59.1,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 810.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 540.0,
+        "mean": 444.0,
+        "min": 420.0
+      },
+      "power_w": {
+        "max": 13.64,
+        "mean": 11.8,
+        "min": 11.28
+      },
+      "pstates": {
+        "P5": 10
+      },
+      "samples": 10,
+      "temp_c": {
+        "max": 35.0,
+        "mean": 35.0,
+        "min": 35.0
+      },
+      "util_pct": {
+        "max": 71.0,
+        "mean": 59.0,
+        "min": 11.0
+      }
+    },
+    "read_window_s": 0.48,
+    "seconds": 10.27,
+    "side": "stock",
+    "started_epoch": 1794971317.189,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7185.5,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2129.2,
+        "min": 420.0
+      },
+      "power_w": {
+        "max": 60.82,
+        "mean": 28.2,
+        "min": 11.28
+      },
+      "pstates": {
+        "P0": 27,
+        "P2": 126,
+        "P3": 10,
+        "P5": 40
+      },
+      "samples": 203,
+      "temp_c": {
+        "max": 41.0,
+        "mean": 36.0,
+        "min": 35.0
+      },
+      "util_pct": {
+        "max": 94.0,
+        "mean": 10.2,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971338.679,
+    "free_mib_after_load": 4369,
+    "pass": 17,
+    "read_tok_s": 93.2,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 8951.0,
+        "mean": 2304.1,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2535.0,
+        "mean": 878.3,
+        "min": 405.0
+      },
+      "power_w": {
+        "max": 14.77,
+        "mean": 11.8,
+        "min": 10.95
+      },
+      "pstates": {
+        "P2": 2,
+        "P8": 7
+      },
+      "samples": 9,
+      "temp_c": {
+        "max": 39.0,
+        "mean": 35.9,
+        "min": 35.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 40.2,
+        "min": 24.0
+      }
+    },
+    "read_window_s": 0.46,
+    "seconds": 10.65,
+    "side": "fork",
+    "started_epoch": 1794971328.03,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7238.0,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2139.1,
+        "min": 405.0
+      },
+      "power_w": {
+        "max": 57.11,
+        "mean": 27.4,
+        "min": 10.95
+      },
+      "pstates": {
+        "P0": 31,
+        "P2": 130,
+        "P3": 10,
+        "P5": 30,
+        "P8": 10
+      },
+      "samples": 211,
+      "temp_c": {
+        "max": 43.0,
+        "mean": 36.4,
+        "min": 35.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 10.0,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971349.874,
+    "free_mib_after_load": 4369,
+    "pass": 18,
+    "read_tok_s": 93.7,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 405.0,
+        "mean": 405.0,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 405.0,
+        "mean": 369.0,
+        "min": 345.0
+      },
+      "power_w": {
+        "max": 11.14,
+        "mean": 10.9,
+        "min": 10.67
+      },
+      "pstates": {
+        "P8": 10
+      },
+      "samples": 10,
+      "temp_c": {
+        "max": 36.0,
+        "mean": 36.0,
+        "min": 36.0
+      },
+      "util_pct": {
+        "max": 96.0,
+        "mean": 62.0,
+        "min": 11.0
+      }
+    },
+    "read_window_s": 0.47,
+    "seconds": 10.62,
+    "side": "fork",
+    "started_epoch": 1794971339.255,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7057.6,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2155.7,
+        "min": 345.0
+      },
+      "power_w": {
+        "max": 61.37,
+        "mean": 27.9,
+        "min": 10.67
+      },
+      "pstates": {
+        "P0": 36,
+        "P2": 125,
+        "P5": 30,
+        "P8": 19
+      },
+      "samples": 210,
+      "temp_c": {
+        "max": 44.0,
+        "mean": 37.1,
+        "min": 36.0
+      },
+      "util_pct": {
+        "max": 96.0,
+        "mean": 10.4,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971360.642,
+    "free_mib_after_load": 4371,
+    "pass": 18,
+    "read_tok_s": 63.9,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 8951.0,
+        "mean": 1259.6,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2535.0,
+        "mean": 618.0,
+        "min": 405.0
+      },
+      "power_w": {
+        "max": 17.44,
+        "mean": 11.6,
+        "min": 10.96
+      },
+      "pstates": {
+        "P2": 1,
+        "P8": 9
+      },
+      "samples": 10,
+      "temp_c": {
+        "max": 41.0,
+        "mean": 37.4,
+        "min": 37.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 19.6,
+        "min": 11.0
+      }
+    },
+    "read_window_s": 0.54,
+    "seconds": 10.25,
+    "side": "stock",
+    "started_epoch": 1794971350.39,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7367.6,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2224.5,
+        "min": 405.0
+      },
+      "power_w": {
+        "max": 58.5,
+        "mean": 28.3,
+        "min": 10.96
+      },
+      "pstates": {
+        "P0": 33,
+        "P2": 130,
+        "P5": 30,
+        "P8": 10
+      },
+      "samples": 203,
+      "temp_c": {
+        "max": 42.0,
+        "mean": 37.8,
+        "min": 37.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 10.9,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971371.442,
+    "free_mib_after_load": 4371,
+    "pass": 19,
+    "read_tok_s": 58.3,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 810.0,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 555.0,
+        "mean": 471.0,
+        "min": 435.0
+      },
+      "power_w": {
+        "max": 12.83,
+        "mean": 11.9,
+        "min": 11.52
+      },
+      "pstates": {
+        "P5": 10
+      },
+      "samples": 10,
+      "temp_c": {
+        "max": 38.0,
+        "mean": 37.7,
+        "min": 37.0
+      },
+      "util_pct": {
+        "max": 70.0,
+        "mean": 52.6,
+        "min": 12.0
+      }
+    },
+    "read_window_s": 0.49,
+    "seconds": 10.29,
+    "side": "stock",
+    "started_epoch": 1794971361.156,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7393.7,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2129.9,
+        "min": 435.0
+      },
+      "power_w": {
+        "max": 60.98,
+        "mean": 28.9,
+        "min": 11.52
+      },
+      "pstates": {
+        "P0": 38,
+        "P2": 125,
+        "P5": 40
+      },
+      "samples": 203,
+      "temp_c": {
+        "max": 44.0,
+        "mean": 38.2,
+        "min": 37.0
+      },
+      "util_pct": {
+        "max": 94.0,
+        "mean": 9.8,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971382.662,
+    "free_mib_after_load": 4369,
+    "pass": 19,
+    "read_tok_s": 93.8,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 8951.0,
+        "mean": 2304.1,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2535.0,
+        "mean": 878.3,
+        "min": 405.0
+      },
+      "power_w": {
+        "max": 14.95,
+        "mean": 11.9,
+        "min": 11.02
+      },
+      "pstates": {
+        "P2": 2,
+        "P8": 7
+      },
+      "samples": 9,
+      "temp_c": {
+        "max": 42.0,
+        "mean": 38.9,
+        "min": 38.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 36.3,
+        "min": 19.0
+      }
+    },
+    "read_window_s": 0.47,
+    "seconds": 10.64,
+    "side": "fork",
+    "started_epoch": 1794971372.018,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7475.6,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2147.8,
+        "min": 405.0
+      },
+      "power_w": {
+        "max": 57.66,
+        "mean": 28.4,
+        "min": 11.02
+      },
+      "pstates": {
+        "P0": 41,
+        "P2": 131,
+        "P5": 29,
+        "P8": 10
+      },
+      "samples": 211,
+      "temp_c": {
+        "max": 46.0,
+        "mean": 38.9,
+        "min": 38.0
+      },
+      "util_pct": {
+        "max": 97.0,
+        "mean": 9.6,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971393.869,
+    "free_mib_after_load": 4369,
+    "pass": 20,
+    "read_tok_s": 93.9,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 810.0,
+        "mean": 540.0,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 420.0,
+        "mean": 370.0,
+        "min": 345.0
+      },
+      "power_w": {
+        "max": 10.81,
+        "mean": 10.6,
+        "min": 10.44
+      },
+      "pstates": {
+        "P5": 3,
+        "P8": 6
+      },
+      "samples": 9,
+      "temp_c": {
+        "max": 38.0,
+        "mean": 38.0,
+        "min": 38.0
+      },
+      "util_pct": {
+        "max": 66.0,
+        "mean": 44.0,
+        "min": 0.0
+      }
+    },
+    "read_window_s": 0.43,
+    "seconds": 10.63,
+    "side": "fork",
+    "started_epoch": 1794971383.239,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7037.4,
+        "min": 405.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2148.1,
+        "min": 345.0
+      },
+      "power_w": {
+        "max": 61.91,
+        "mean": 28.1,
+        "min": 10.44
+      },
+      "pstates": {
+        "P0": 27,
+        "P2": 123,
+        "P3": 10,
+        "P5": 40,
+        "P8": 10
+      },
+      "samples": 210,
+      "temp_c": {
+        "max": 46.0,
+        "mean": 39.2,
+        "min": 38.0
+      },
+      "util_pct": {
+        "max": 94.0,
+        "mean": 9.8,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  },
+  {
+    "exit": 0,
+    "finished_epoch": 1794971404.653,
+    "free_mib_after_load": 4371,
+    "pass": 20,
+    "read_tok_s": 71.3,
+    "read_window": {
+      "clocks_mem_mhz": {
+        "max": 8951.0,
+        "mean": 2438.2,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2535.0,
+        "mean": 843.0,
+        "min": 420.0
+      },
+      "power_w": {
+        "max": 16.07,
+        "mean": 11.9,
+        "min": 10.85
+      },
+      "pstates": {
+        "P2": 2,
+        "P5": 8
+      },
+      "samples": 10,
+      "temp_c": {
+        "max": 43.0,
+        "mean": 39.8,
+        "min": 39.0
+      },
+      "util_pct": {
+        "max": 98.0,
+        "mean": 22.0,
+        "min": 3.0
+      }
+    },
+    "read_window_s": 0.51,
+    "seconds": 10.27,
+    "side": "stock",
+    "started_epoch": 1794971394.383,
+    "telemetry": {
+      "clocks_mem_mhz": {
+        "max": 9201.0,
+        "mean": 7428.8,
+        "min": 810.0
+      },
+      "clocks_sm_mhz": {
+        "max": 2940.0,
+        "mean": 2237.1,
+        "min": 420.0
+      },
+      "power_w": {
+        "max": 58.73,
+        "mean": 28.6,
+        "min": 10.85
+      },
+      "pstates": {
+        "P0": 24,
+        "P2": 140,
+        "P5": 39
+      },
+      "samples": 203,
+      "temp_c": {
+        "max": 47.0,
+        "mean": 40.0,
+        "min": 39.0
+      },
+      "util_pct": {
+        "max": 98.0,
+        "mean": 10.3,
+        "min": 0.0
+      }
+    },
+    "telemetry_error": ""
+  }
+]

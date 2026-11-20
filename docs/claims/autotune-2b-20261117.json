@@ -1,0 +1,91 @@
+{
+  "gate": "autotune-2b-20261117",
+  "title": "2B autotune: selected gpu0 decode, read, peak and repeat endpoints",
+  "measured": "2026-11-17",
+  "commit": "60a039b",
+  "command": "kindi --pack ~/.kindi/packs/bonsai-2b --ctx 8192 autotune --max-runs 6 --json tune.json",
+  "notes": "The selected run is autotune-2b.json (97.4 decode / 111.7 read / 3,050 MiB peak). The repeat reports establish the upper decode and read endpoints: r2 97.6/111.7, r3 97.4/113.0. The former 97.8 decode endpoint had no saved report and is not retained. The repeats did not sample VRAM, so the 3,050 MiB peak is the selected run only.",
+  "evidence": [
+    "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/autotune-2b.json",
+    "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/autotune-2b-r2.json",
+    "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/autotune-2b-r3.json",
+    "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/RESULTS.md"
+  ],
+  "numbers": [
+    {
+      "id": "gpu0-decode",
+      "display": "97.4",
+      "quoted_in": [
+        "docs/AUTOTUNE.md",
+        "docs/ROADMAP.md",
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/autotune-2b.json",
+        "pointer": "/results/0/gen_tok_s",
+        "expect": 97.4
+      }
+    },
+    {
+      "id": "gpu0-decode-upper",
+      "display": "97.6",
+      "quoted_in": [
+        "docs/AUTOTUNE.md",
+        "docs/ROADMAP.md",
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/autotune-2b-r2.json",
+        "pointer": "/results/0/gen_tok_s",
+        "expect": 97.6
+      }
+    },
+    {
+      "id": "gpu0-read",
+      "display": "111.7",
+      "quoted_in": [
+        "docs/AUTOTUNE.md",
+        "docs/ROADMAP.md",
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/autotune-2b.json",
+        "pointer": "/results/0/read_tok_s",
+        "expect": 111.7
+      }
+    },
+    {
+      "id": "gpu0-read-upper",
+      "display": "113.0",
+      "quoted_in": [
+        "docs/AUTOTUNE.md",
+        "docs/ROADMAP.md",
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/autotune-2b-r3.json",
+        "pointer": "/results/0/read_tok_s",
+        "expect": 113.0
+      }
+    },
+    {
+      "id": "gpu0-peak",
+      "display": "3,050 MiB",
+      "quoted_in": [
+        "docs/AUTOTUNE.md",
+        "docs/ROADMAP.md",
+        "CURRENT-VS-KINDI-0.6.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/autotune-2b.json",
+        "pointer": "/results/0/vram_peak/peak_used_mib",
+        "expect": 3050
+      }
+    }
+  ]
+}

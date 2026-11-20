@@ -1,0 +1,51 @@
+{
+  "cpu_layers": null,
+  "ctx": 8320,
+  "ctx_reduced": false,
+  "ctx_requested": 8320,
+  "device": "gpu",
+  "free_mib_after_load": 6355,
+  "gen_tok_s": {
+    "exact:100": 223.7,
+    "exact:2000": 219.5,
+    "exact:8000": 211.3
+  },
+  "model": "Ternary-Bonsai-2-2B",
+  "pack": "bonsai-2b",
+  "read_tok_s": 295.9,
+  "split": {
+    "4096": {
+      "decode_ms": 553.65,
+      "decode_share": 36.1,
+      "decode_tok_s": 231.2,
+      "generated_tokens": 128,
+      "prefill_ms": 978.14,
+      "prefill_share": 63.9,
+      "prefill_tok_s": 4187.5,
+      "prompt_tokens": 4096
+    },
+    "8192": {
+      "decode_ms": 581.12,
+      "decode_share": 18.0,
+      "decode_tok_s": 220.3,
+      "generated_tokens": 128,
+      "prefill_ms": 2642.12,
+      "prefill_share": 82.0,
+      "prefill_tok_s": 3100.5,
+      "prompt_tokens": 8192
+    }
+  },
+  "tandem": "off",
+  "total_mib": 8188,
+  "vram_peak": {
+    "available": true,
+    "baseline_used_mib": 929,
+    "interval_s": 0.5,
+    "peak_delta_mib": 832,
+    "peak_free_mib": 6189,
+    "peak_phase": "loaded",
+    "peak_used_mib": 1761,
+    "sample_count": 14,
+    "source": "nvidia-smi memory.used (device-wide, GPU 0)"
+  }
+}

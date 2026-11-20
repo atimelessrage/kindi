@@ -1,14 +1,18 @@
-"""kindi convert: supported Ternary-Bonsai-2 PTQ1_0 GGUF -> Kindi weight pack. Exact (same information, new layout).
+"""kindi convert: supported Ternary-Bonsai-2 PTQ1_0 / PQ2_0 / Q2_0 GGUF -> Kindi weight pack. Exact (same
+information, new layout).
 
-Ternary tensors (GGUF type 143 = PTQ1_0: per 128 weights, qs[24] | qh[2] | fp16 scale d; 5 trits per byte) are
-re-coded 4 trits per byte (byte = t0 + 3 t1 + 9 t2 + 27 t3, t in {0,1,2}, weight = (t-1) * d) and laid out
+Ternary tensors (GGUF type 143 = PTQ1_0: per 128 weights, qs[24] | qh[2] | fp16 scale d; 5 trits per byte;
+142 = PQ2_0: per 128 weights, fp16 scale d then 32 bytes of 2-bit slots; 42 = Q2_0: the same 2-bit slots in
+64-weight blocks) are re-coded 4 trits per byte (byte = t0 + 3 t1 + 9 t2 + 27 t3, t in {0,1,2}, weight = (t-1) * d) and laid out
 slot-major ([slot][row]); the scales are transposed to [phase][row]. The engine repacks this at load time into its
 own layout (layout.py). The Hadamard rotation Prism ML folded into the weights stays folded: the engine applies the
 matching transform to the activations, using the sign vectors stored in the GGUF (prism.hadamard.*).
-Float32 tensors are copied verbatim. Vocabulary and BPE merges come from the GGUF tokenizer metadata.
+Float32 tensors are copied verbatim; BF16, FP8 E4M3 and FP8 E5M2 tensors are widened exactly to float32.
+Vocabulary and BPE merges come from the GGUF tokenizer metadata.
 
 Pack files: bcodes.bin, dpm.bin, f32.bin, signs_2048.f32, signs_6144.f32, vocab.json, merges.txt, index.json,
 bcodes_index.json, kindi_pack.json."""
+import contextlib
 import hashlib
 import json
 import os
@@ -17,9 +21,13 @@ import time
 import numpy as np
 
 from . import __version__
+from .dtypes import BF16, FP8_E4M3, FP8_E5M2, bf16_to_f32, fp8_to_f32
 from .gguf import GGUF
 
-PTQ1_0, F32, BF16 = 143, 0, 30
+PTQ1_0, PQ2_0, Q2_0, F32 = 143, 142, 42, 0
+# ternary tensor type -> (weights per scale group, block bytes, name). The pack keeps one fp16 scale per 128
+# weights, so a Q2_0 file (upstream type 42, groups of 64) is folded two groups at a time.
+TERNARY = {PTQ1_0: (128, 28, "PTQ1_0"), PQ2_0: (128, 34, "PQ2_0"), Q2_0: (64, 18, "Q2_0")}
 POW3 = np.array([1, 3, 9, 27, 81, 243], dtype=np.uint32)
 PROFILES = {
     (24, 2048, 6144, 8, 2, 16): "Ternary-Bonsai-2-2B",
@@ -46,9 +54,38 @@ def trits_from_raw(raw):
     return out
 
 
+def trits_from_slots(raw, group, label="Q2_0"):
+    """raw (nb, 2 + group/4) uint8 Q2_0 / PQ2_0 blocks -> (nb, group) trits in {0,1,2}.
+
+    Both types use the same 2-bit codec: element j is byte 2 + j/4, bits 2*(j%4), and the code is
+    round(w/d) + 1, so 0 = -d, 1 = 0, 2 = +d. Code 3 (+2d) has no ternary value: the pack stores
+    ternary weights only, so it is refused instead of being folded in."""
+    q = (raw[:, 2:, None] >> np.array([0, 2, 4, 6], dtype=np.uint8)) & 3
+    q = q.reshape(raw.shape[0], group)
+    if q.size and int(q.max()) > 2:
+        raise SystemExit("kindi convert: a %s block uses code 3 (+2*scale); the pack stores ternary weights only"
+                         % label)
+    return q
+
+
+def q2_groups(tr, d, rows, spr):
+    """Q2_0's two 64-weight groups -> one 128-weight group: (rows*spr*2, 64) trits and (rows*spr*2,) fp16 scale
+    bits -> (rows, spr*128) trits and (rows, spr) scale bits, where spr = ne0/128 is the pack's scale groups per
+    row. The pack keeps one scale per 128 weights, so the two halves must carry the same fp16 scale; a file that
+    does not (a legacy 128-group Q2_0 read as 64) is refused here."""
+    tr = tr.reshape(rows, spr, 128)
+    d = d.reshape(rows, spr, 2)
+    if not np.array_equal(d[:, :, 0], d[:, :, 1]):
+        bad = int(np.count_nonzero(d[:, :, 0] != d[:, :, 1]))
+        raise SystemExit("kindi convert: %d Q2_0 128-groups hold two different 64-group scales; the pack keeps "
+                         "one scale per 128 weights (legacy group-128 file?)" % bad)
+    return tr.reshape(rows, spr * 128), np.ascontiguousarray(d[:, :, 0])
+
+
 def phase_bytes(tr):
-    """(nb, 128) trits -> (nb, 32) bytes, byte s = t0 + 3 t1 + 9 t2 + 27 t3 of elements 4s .. 4s+3."""
-    g = tr.reshape(-1, 32, 4).astype(np.int32)
+    """(nb, N) trits -> (nb, N/4) bytes, byte s = t0 + 3 t1 + 9 t2 + 27 t3 of elements 4s .. 4s+3."""
+    tr = np.asarray(tr)
+    g = tr.reshape(tr.shape[0], -1, 4).astype(np.int32)
     return (g[:, :, 0] + 3 * g[:, :, 1] + 9 * g[:, :, 2] + 27 * g[:, :, 3]).astype(np.uint8)
 
 
@@ -75,9 +112,19 @@ def convert(gguf_path, out_dir, log=print):
     t0 = time.time()
     selftest()
     g = GGUF(gguf_path)
-    if g.kv.get("general.architecture") == "gemma4":
+    arch = g.kv.get("general.architecture")
+    from .moe_compat import unsupported_reason
+    if arch == "gemma4":
         from .gemma4 import inspect_model
-        info = inspect_model(gguf_path)
+        try:
+            info = inspect_model(gguf_path)
+        except ValueError:
+            # The 26B-A4B MoE has the gemma4 architecture key but a different geometry and
+            # expert tensors. Name that explicitly instead of leaking the E4B shape error.
+            reason = unsupported_reason(g)
+            if reason:
+                raise SystemExit("kindi convert: " + reason)
+            raise
         os.makedirs(out_dir, exist_ok=True)
         manifest = {
             "kindi_version": __version__, "pack_format": PACK_FORMAT, "backend": "kindi_gemma4",
@@ -92,21 +139,26 @@ def convert(gguf_path, out_dir, log=print):
         log("recognized Gemma 4 GGUF: %d tensors, %s quantization; Kindi native CUDA decoder" %
             (info["tensor_count"], info["tensor_types"]))
         return manifest
-    from . import lightning_cli, nanbeige_cli
+    from . import cascade, lightning_cli, nanbeige_cli
+    if cascade.is_cascade(g):
+        return cascade.convert(g, gguf_path, out_dir, __version__, PACK_FORMAT, sha256, log=log)
+    moe_reason = unsupported_reason(g)
+    if moe_reason:
+        raise SystemExit("kindi convert: " + moe_reason)
     if lightning_cli.is_lightning(g):
         return lightning_cli.convert(g, gguf_path, out_dir, __version__, PACK_FORMAT, sha256, log=log)
     if nanbeige_cli.is_llama_iq(g):
         return nanbeige_cli.convert(g, gguf_path, out_dir, __version__, PACK_FORMAT, sha256, log=log)
-    if g.kv.get("general.architecture") != "qwen35":
-        raise SystemExit("kindi convert: expected a qwen35, Gemma 4, llama (K / I-quant) or nemotron_h_moe GGUF")
+    if arch != "qwen35":
+        raise SystemExit("kindi convert: expected a qwen35, Gemma 4, llama (K / I-quant) or nemotron_h_moe GGUF, got %r" % arch)
     profile = (g.kv.get("qwen35.block_count"), g.kv.get("qwen35.embedding_length"),
                g.kv.get("qwen35.feed_forward_length"), g.kv.get("qwen35.attention.head_count"),
                g.kv.get("qwen35.attention.head_count_kv"), g.kv.get("qwen35.ssm.group_count"))
     if profile not in PROFILES:
         raise SystemExit("kindi convert: unsupported Ternary-Bonsai-2 dimensions %r" % (profile,))
     types = {t[2] for t in g.tensors}
-    if not types <= {PTQ1_0, F32, BF16}:
-        raise SystemExit("kindi convert: needs the PTQ1_0 GGUF (found tensor types %s)" % sorted(types))
+    if not types <= {PTQ1_0, PQ2_0, Q2_0, F32, BF16, FP8_E4M3, FP8_E5M2}:
+        raise SystemExit("kindi convert: needs a PTQ1_0, PQ2_0 or Q2_0 GGUF (found tensor types %s)" % sorted(types))
     hd = {k.split("prism.hadamard.")[-1]: v for k, v in g.kv.items() if k.startswith("prism.hadamard.")}
     sv = np.array(hd["sign_values"], dtype=np.float32)
     signs, off = {}, 0
@@ -128,10 +180,12 @@ def convert(gguf_path, out_dir, log=print):
     index = {"tensors": {}, "base": g.data_start,
              "hadamard": {"tied_output": bool(hd.get("tied_output")), "sign_widths": [int(x) for x in hd["sign_widths"]]}}
     bindex = {"tensors": {}}
-    fb = open(os.path.join(out_dir, "bcodes.bin"), "wb")
-    fd = open(os.path.join(out_dir, "dpm.bin"), "wb")
-    ff = open(os.path.join(out_dir, "f32.bin"), "wb")
-    src = open(gguf_path, "rb")
+    # the ExitStack closes the four multi-GB files even when a bad tensor raises mid-conversion
+    stack = contextlib.ExitStack()
+    fb = stack.enter_context(open(os.path.join(out_dir, "bcodes.bin"), "wb"))
+    fd = stack.enter_context(open(os.path.join(out_dir, "dpm.bin"), "wb"))
+    ff = stack.enter_context(open(os.path.join(out_dir, "f32.bin"), "wb"))
+    src = stack.enter_context(open(gguf_path, "rb"))
     bc_off = dpm_off = f32_off = 0
     n_t = 0
     for name, ne, ty, toff in g.tensors:
@@ -141,27 +195,43 @@ def convert(gguf_path, out_dir, log=print):
             rows *= x
         rec = {"dims": list(reversed(ne)), "type": ty, "folded": name in folded, "rows": rows, "ne0": ne0}
         src.seek(g.data_start + toff)
-        if ty == PTQ1_0:
-            bpr = ne0 // 128
-            out = np.empty((rows, bpr * 32), dtype=np.uint8)
-            dm = np.empty((rows, bpr), dtype=np.uint16)
+        if ty in TERNARY:
+            group, bsize, label = TERNARY[ty]
+            bpr = ne0 // group                       # scale groups in the file per row
+            spr = ne0 // 128                         # scale groups in the pack per row
+            if ne0 % group:
+                raise SystemExit("kindi convert: %s tensor %s has %d columns, not a multiple of %d"
+                                 % (label, name, ne0, group))
+            out = np.empty((rows, ne0 // 4), dtype=np.uint8)
+            dm = np.empty((rows, spr), dtype=np.uint16)
             RC = 16384
             for c0 in range(0, rows, RC):
                 c1 = min(rows, c0 + RC)
-                raw = np.frombuffer(src.read(28 * (c1 - c0) * bpr), dtype=np.uint8).reshape((c1 - c0) * bpr, 28)
-                out[c0:c1] = phase_bytes(trits_from_raw(raw)).reshape(c1 - c0, bpr * 32)
-                dm[c0:c1] = np.frombuffer(raw[:, 26:28].tobytes(), dtype=np.uint16).reshape(c1 - c0, bpr)
+                raw = np.frombuffer(src.read(bsize * (c1 - c0) * bpr), dtype=np.uint8).reshape((c1 - c0) * bpr, bsize)
+                if ty == PTQ1_0:
+                    tr = trits_from_raw(raw)
+                    d = np.frombuffer(raw[:, 26:28].tobytes(), dtype=np.uint16).reshape(c1 - c0, bpr)
+                else:
+                    tr = trits_from_slots(raw, group, label)
+                    d = np.frombuffer(raw[:, 0:2].tobytes(), dtype=np.uint16).reshape(c1 - c0, bpr)
+                    if ty == Q2_0:
+                        tr, d = q2_groups(tr, d, c1 - c0, spr)
+                out[c0:c1] = phase_bytes(tr.reshape(c1 - c0, ne0))
+                dm[c0:c1] = d
             fb.write(np.ascontiguousarray(out.T).tobytes())          # [slot][row]
             fd.write(np.ascontiguousarray(dm.T).tobytes())           # [phase][row]
             rec.update({"bc_off": bc_off, "dpm_off": dpm_off})
             bindex["tensors"][name] = {"bc_off": bc_off, "dpm_off": dpm_off, "rows": rows, "ne0": ne0}
-            bc_off += rows * bpr * 32
-            dpm_off += rows * bpr * 2
+            bc_off += rows * (ne0 // 4)          # the pack packs 4 trits per byte, whatever the source group size
+            dpm_off += rows * spr * 2           # and keeps one fp16 scale per 128 weights
         else:
             n = rows * ne0
             if ty == BF16:                      # the 27B stores ssm_alpha / ssm_beta in bf16: widen exactly to f32
-                v = np.frombuffer(src.read(2 * n), dtype="<u2").astype(np.uint32) << 16
-                ff.write(v.astype("<u4").tobytes())
+                v = bf16_to_f32(np.frombuffer(src.read(2 * n), dtype="<u2"))
+                ff.write(v.astype("<f4").tobytes())
+            elif ty in (FP8_E4M3, FP8_E5M2):    # FP8 auxiliary tensors: exact decode, then the ordinary f32 path
+                v = fp8_to_f32(np.frombuffer(src.read(n), dtype=np.uint8), ty)
+                ff.write(v.astype("<f4").tobytes())
             else:
                 ff.write(np.frombuffer(src.read(4 * n), dtype="<f4").tobytes())
             rec.update({"f32_off": f32_off, "nfloats": n})
@@ -170,14 +240,15 @@ def convert(gguf_path, out_dir, log=print):
         n_t += 1
         if n_t % 40 == 0:
             log("  %d / %d tensors" % (n_t, len(g.tensors)))
-    for h in (fb, fd, ff, src):
-        h.close()
+    stack.close()
     with open(os.path.join(out_dir, "index.json"), "w") as f:
         json.dump(index, f)
     with open(os.path.join(out_dir, "bcodes_index.json"), "w") as f:
         json.dump(bindex, f)
     log("hashing the source file ...")
+    fmt = sorted({TERNARY[t][2] for t in types if t in TERNARY})
     manifest = {"kindi_version": __version__, "pack_format": PACK_FORMAT, "model": g.kv.get("general.name"),
+                "source_format": fmt[0] if len(fmt) == 1 else ("mixed " + "+".join(fmt) if fmt else "f32"),
                 "source_file": os.path.basename(gguf_path), "source_sha256": sha256(gguf_path),
                 "tensors": n_t, "bcodes_bytes": bc_off, "dpm_bytes": dpm_off, "f32_bytes": f32_off,
                 "vocab": len(g.kv["tokenizer.ggml.tokens"]), "context_length": g.kv.get("qwen35.context_length"),

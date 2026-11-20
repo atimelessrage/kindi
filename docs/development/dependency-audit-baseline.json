@@ -1,0 +1,4 @@
+{
+  "vulnerabilities": [],
+  "notes": "Reviewed baseline for tools/check_dependencies.py. The CI job is report-only until the first report is reviewed; record it with --update, then remove --report-only."
+}

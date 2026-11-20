@@ -735,6 +735,13 @@ extern "C" __global__ void k_expand(const int* __restrict__ sel, const int* __re
   for(int i = threadIdx.x; i < n; i += blockDim.x) glist[o + i] = s + i;
 }
 
+extern "C" __global__ void k_padd(float* __restrict__ a, const float* __restrict__ b, int n){
+  /* a += b: the tandem plan engine's per-block residual add. A tandem owner resolves every block's
+     down-projection inside its plan (a CuPy call per block would cost ~0.2 ms on a 34-SM card). */
+  for(int i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += gridDim.x * blockDim.x)
+    a[i] += b[i];
+}
+
 extern "C" __global__ void k_mask_neg(float* __restrict__ y, const int* __restrict__ tok, int n){
   for(int i = blockIdx.x * blockDim.x + threadIdx.x; i < n; i += gridDim.x * blockDim.x)
     if(tok[i] < 0) y[i] = -1e30f;
@@ -1290,6 +1297,92 @@ __device__ __forceinline__ void q8_block(const float* __restrict__ x, signed cha
   }
 }
 
+__device__ __forceinline__ void q4_block(const float* __restrict__ x, unsigned char* __restrict__ q,
+                                         unsigned short* dh, int lane){
+  /* symmetric 4-bit values: one fp16 scale per 32 values, the 16 bytes hold pairs (low nibble first).
+     The scale is amax / 7, so the largest magnitude maps to +/-7 and the byte range keeps 0x8 as -8. */
+  const float v = x[lane];
+  float a = fabsf(v);
+  for(int o = 16; o > 0; o >>= 1) a = fmaxf(a, __shfl_xor(a, o));
+  const float d = a / 7.0f, id = a != 0.0f ? 1.0f / d : 0.0f;
+  if(lane < 16){
+    int q0 = __float2int_rn(x[2 * lane] * id);
+    int q1 = __float2int_rn(x[2 * lane + 1] * id);
+    q0 = q0 < -8 ? -8 : (q0 > 7 ? 7 : q0);
+    q1 = q1 < -8 ? -8 : (q1 > 7 ? 7 : q1);
+    q[lane] = (unsigned char)((q0 + 8) | ((q1 + 8) << 4));
+  }
+  if(lane == 0){
+#if KHIP
+    unsigned short hbits; { __half hh = __float2half(d); hbits = *(unsigned short*)&hh; }
+#else
+    unsigned short hbits; asm("cvt.rn.f16.f32 %0, %1;" : "=h"(hbits) : "f"(d));
+#endif
+    dh[0] = hbits;
+  }
+}
+
+__device__ __forceinline__ float e4m3_to_f32(unsigned char b){
+  /* E4M3FN (OCP): one sign bit, four exponent bits (bias 7), three mantissa bits. No infinities;
+     0x7f/0xff are NaN. This decode is exact and returns finite values unchanged. */
+  int s = (b >> 7) & 1, e = (b >> 3) & 15, m = b & 7;
+  if(e == 15 && m == 7) return __int_as_float(s ? 0xffc00000 : 0x7fc00000);
+  float v = (e == 0) ? ((float)m * 0.001953125f)
+                     : ((1.0f + (float)m * 0.125f) * ldexpf(1.0f, e - 7));
+  return s ? -v : v;
+}
+
+__device__ __forceinline__ unsigned char f32_to_e4m3(float x){
+  /* E4M3FN encode: round to nearest, ties to even; saturate finite values at 448 (0x7e). */
+  if(isnan(x)) return 0x7fu;
+  if(isinf(x)) return 0x7eu;
+  int sign = signbit(x) ? 0x80 : 0x00;
+  float a = fabsf(x);
+  if(a == 0.0f) return (unsigned char)sign;
+  if(a >= 448.0f) return (unsigned char)(sign | 0x7eu);
+  int e;
+  float frac = frexpf(a, &e);      /* a = frac * 2^e, frac in [0.5, 1) */
+  int exp = e - 1;
+  if(exp < -6){                    /* subnormal: uniform step 2^-9 below the smallest normal (2^-6) */
+    int sub = __float2int_rn(a * 512.0f);
+    return (unsigned char)(sign | (sub >= 8 ? 0x08 : sub));
+  }
+  float mant_frac = frac * 2.0f - 1.0f;
+  int mant = __float2int_rn(mant_frac * 8.0f);
+  if(mant == 8){ mant = 0; exp += 1; }
+  if(exp > 8) return (unsigned char)(sign | 0x7eu);
+  return (unsigned char)(sign | ((exp + 7) << 3) | mant);
+}
+
+__device__ __forceinline__ void e4m3_block(const float* __restrict__ x, unsigned char* __restrict__ q,
+                                           unsigned short* dh, int lane){
+  /* one 32-value block: scale = amax / 448, so the largest magnitude takes E4M3 value 448; the code
+     stream is one byte per value (8 bits), the fp16 scale is the same 2 bytes per 32 values q8_0 uses. */
+  const float v = x[lane];
+  float a = fabsf(v);
+  for(int o = 16; o > 0; o >>= 1) a = fmaxf(a, __shfl_xor(a, o));
+  const float d = a / 448.0f;
+  q[lane] = f32_to_e4m3(v / (d == 0.0f ? 1.0f : d));
+  if(lane == 0){
+#if KHIP
+    unsigned short hbits; { __half hh = __float2half(d); hbits = *(unsigned short*)&hh; }
+#else
+    unsigned short hbits; asm("cvt.rn.f16.f32 %0, %1;" : "=h"(hbits) : "f"(d));
+#endif
+    if(dh) dh[0] = hbits;
+  }
+}
+
+extern "C" __global__ void k_store_fp8(const float* __restrict__ k, const float* __restrict__ v,
+                                       unsigned char* __restrict__ kq, unsigned short* __restrict__ kd,
+                                       unsigned char* __restrict__ vq, unsigned short* __restrict__ vd, int nblk){
+  /* one position's K/V row: E4M3 K and V, one warp per 32-value block (the same layout as k_store_q8). */
+  const int w = (blockIdx.x * blockDim.x + threadIdx.x) >> 5, lane = threadIdx.x & 31;
+  if(w >= 2 * nblk) return;
+  if(w < nblk) e4m3_block(k + w * 32, kq + w * 32, kd + w, lane);
+  else e4m3_block(v + (w - nblk) * 32, vq + (w - nblk) * 32, vd + (w - nblk), lane);
+}
+
 extern "C" __global__ void k_store_q8(const float* __restrict__ k, const float* __restrict__ v,
                                       signed char* __restrict__ kq, unsigned short* __restrict__ kd,
                                       signed char* __restrict__ vq, unsigned short* __restrict__ vd, int nblk){
@@ -1298,6 +1391,17 @@ extern "C" __global__ void k_store_q8(const float* __restrict__ k, const float* 
   if(w >= 2 * nblk) return;
   if(w < nblk) q8_block(k + w * 32, kq + w * 32, kd + w, 0, lane);
   else q8_block(v + (w - nblk) * 32, vq + (w - nblk) * 32, vd + (w - nblk), 0, lane);
+}
+
+extern "C" __global__ void k_store_k8v4(const float* __restrict__ k, const float* __restrict__ v,
+                                       signed char* __restrict__ kq, unsigned short* __restrict__ kd,
+                                       unsigned char* __restrict__ vq, unsigned short* __restrict__ vd, int nblk){
+  /* one position's K/V row: q8_0 K (one warp per 32-value block), then 4-bit V (one warp per 32 values,
+     16 packed bytes and one fp16 scale per warp). */
+  const int w = (blockIdx.x * blockDim.x + threadIdx.x) >> 5, lane = threadIdx.x & 31;
+  if(w >= 2 * nblk) return;
+  if(w < nblk) q8_block(k + w * 32, kq + w * 32, kd + w, 0, lane);
+  else q4_block(v + (w - nblk) * 32, vq + (w - nblk) * 16, vd + (w - nblk), lane);
 }
 
 extern "C" __global__ void k_q8row(const float* __restrict__ x, signed char* __restrict__ q, float* __restrict__ d,
@@ -1566,6 +1670,126 @@ extern "C" __global__ void __launch_bounds__(256) k_attn_sq8t(const uint4* __res
   for(int j = 0; j < 8; ++j) if(j < G) s[(long long)(kv * G + j) * n + t] = acc[j] * 0.0625f;
 }
 
+extern "C" __global__ void __launch_bounds__(256) k_attn_sf8t(const unsigned char* __restrict__ Kq,
+    const unsigned short* __restrict__ Kd, const signed char* __restrict__ qq, const float* __restrict__ qd,
+    float* __restrict__ s, int n, int n_kv, int G){
+  /* FP8 E4M3 attention scores with the q8_0 layout: a thread per position, all G heads of a K/V head.
+     The query stays q8_0 (int8 exact as floats); K is an E4M3 byte per value and an fp16 scale per 32
+     values. Block sums are float32, scaled by d_q * d_k and added in block order, then * 0.0625 exactly
+     like k_attn_sq8t. */
+  if((int)blockIdx.y * 256 >= n) return;
+  __shared__ float4 q4[8 * 64];
+  __shared__ float dq[8 * 8];
+  const int kv = blockIdx.x, tid = threadIdx.x, t = blockIdx.y * 256 + tid;
+  float* qf = (float*)q4;
+  for(int i = tid; i < G * 256; i += 256) qf[i] = (float)qq[kv * G * 256 + i];
+  for(int i = tid; i < G * 8; i += 256) dq[i] = qd[kv * G * 8 + i];
+  __syncthreads();
+  if(t >= n) return;
+  const unsigned char* row = Kq + ((long long)t * n_kv + kv) * 256;
+  const unsigned short* drow = Kd + ((long long)t * n_kv + kv) * 8;
+  float acc[8];
+#pragma unroll
+  for(int j = 0; j < 8; ++j) acc[j] = 0.f;
+#pragma unroll 2
+  for(int b = 0; b < 8; ++b){
+    float part[8];
+#pragma unroll
+    for(int j = 0; j < 8; ++j) part[j] = 0.f;
+    const float dk = h2f(KLDG(&drow[b]));
+#pragma unroll
+    for(int hl = 0; hl < 2; ++hl){
+      const int base = b * 32 + hl * 16;
+      float kf[16];
+#pragma unroll
+      for(int k = 0; k < 16; ++k) kf[k] = e4m3_to_f32(row[base + k]);
+#pragma unroll
+      for(int j = 0; j < 8; ++j){
+        if(j < G){
+          float p = part[j];
+#pragma unroll
+          for(int e = 0; e < 4; ++e){
+            const float4 q = q4[j * 64 + b * 8 + hl * 4 + e];
+            p += kf[e * 4] * q.x; p += kf[e * 4 + 1] * q.y; p += kf[e * 4 + 2] * q.z; p += kf[e * 4 + 3] * q.w;
+          }
+          part[j] = p;
+        }
+      }
+    }
+#pragma unroll
+    for(int j = 0; j < 8; ++j) if(j < G) acc[j] += part[j] * (dq[j * 8 + b] * dk);
+  }
+#pragma unroll
+  for(int j = 0; j < 8; ++j) if(j < G) s[(long long)(kv * G + j) * n + t] = acc[j] * 0.0625f;
+}
+
+extern "C" __global__ void __launch_bounds__(128) k_attn_vf8w(const float* __restrict__ s,
+    const unsigned char* __restrict__ Vq, const unsigned short* __restrict__ Vd, float* __restrict__ part,
+    int n, int nheads, int n_kv, int G){
+  /* FP8 E4M3 attention values, 8 features per thread: the same layout and reduction as k_attn_vq8w,
+     but each byte is an E4M3 code. Values are decoded to float32 and multiplied by the block scale
+     before the probability-weighted sum; the group order of additions matches k_attn_vq8w. */
+  if((int)blockIdx.z * ATV_CH >= n) return;
+  __shared__ float4 sp[ATV_CH * 2];
+  __shared__ float red[3 * 8 * 256];
+  const int kv = blockIdx.x, f8 = threadIdx.x & 31, grp = threadIdx.x >> 5, c = blockIdx.z;
+  const int i0 = c * ATV_CH, m = min(ATV_CH, n - i0);
+  float* spf = (float*)sp;
+  for(int i = threadIdx.x; i < ATV_CH; i += blockDim.x)
+#pragma unroll
+    for(int j = 0; j < 8; ++j) spf[i * 8 + j] = (i < m && j < G) ? s[(long long)(kv * G + j) * n + i0 + i] : 0.f;
+  __syncthreads();
+  float acc[8][8];
+#pragma unroll
+  for(int j = 0; j < 8; ++j)
+#pragma unroll
+    for(int e = 0; e < 8; ++e) acc[j][e] = 0.f;
+  const int blk = (8 * f8) >> 5;
+  const unsigned char* vb = Vq + ((long long)i0 * n_kv + kv) * 256 + 8 * f8;
+  const unsigned short* db = Vd + ((long long)i0 * n_kv + kv) * 8 + blk;
+  const long long rs = (long long)n_kv * 256, ds = (long long)n_kv * 8;
+#pragma unroll 4
+  for(int i = grp; i < m; i += 4){
+    const unsigned char* vr = vb + i * rs;
+    const float d = h2f(KLDG(db + i * ds));
+    float v[8];
+#pragma unroll
+    for(int e = 0; e < 8; ++e) v[e] = e4m3_to_f32(vr[e]) * d;
+    const float4 p0 = sp[i * 2], p1 = sp[i * 2 + 1];
+    const float p[8] = {p0.x, p0.y, p0.z, p0.w, p1.x, p1.y, p1.z, p1.w};
+#pragma unroll
+    for(int j = 0; j < 8; ++j)
+#pragma unroll
+      for(int e = 0; e < 8; ++e) acc[j][e] += p[j] * v[e];
+  }
+  if(grp > 0){
+    float* r = red + (grp - 1) * 8 * 256;
+#pragma unroll
+    for(int j = 0; j < 8; ++j)
+#pragma unroll
+      for(int e = 0; e < 8; ++e) r[j * 256 + 8 * f8 + e] = acc[j][e];
+  }
+  __syncthreads();
+  if(grp == 0){
+#pragma unroll
+    for(int g = 0; g < 3; ++g){
+      const float* r = red + g * 8 * 256;
+#pragma unroll
+      for(int j = 0; j < 8; ++j)
+#pragma unroll
+        for(int e = 0; e < 8; ++e) acc[j][e] += r[j * 256 + 8 * f8 + e];
+    }
+#pragma unroll
+    for(int j = 0; j < 8; ++j){
+      if(j < G){
+        float* pp = part + ((long long)c * nheads + kv * G + j) * 256 + 8 * f8;
+#pragma unroll
+        for(int e = 0; e < 8; ++e) pp[e] = acc[j][e];
+      }
+    }
+  }
+}
+
 extern "C" __global__ void k_attn_vq8u(const float* __restrict__ s, const unsigned short* __restrict__ Vq2,
                                        const unsigned short* __restrict__ Vd, float* __restrict__ part,
                                        int n, int nheads, int n_kv, int G){
@@ -1785,6 +2009,72 @@ extern "C" __global__ void __launch_bounds__(128) k_attn_vq8w(const float* __res
     float v[8];
 #pragma unroll
     for(int k = 0; k < 4; ++k){ v[k] = sb2f(w.x >> (8 * k)) * d; v[4 + k] = sb2f(w.y >> (8 * k)) * d; }
+    const float4 p0 = sp[i * 2], p1 = sp[i * 2 + 1];
+    const float p[8] = {p0.x, p0.y, p0.z, p0.w, p1.x, p1.y, p1.z, p1.w};
+#pragma unroll
+    for(int j = 0; j < 8; ++j)
+#pragma unroll
+      for(int e = 0; e < 8; ++e) acc[j][e] += p[j] * v[e];
+  }
+  if(grp > 0){
+    float* r = red + (grp - 1) * 8 * 256;
+#pragma unroll
+    for(int j = 0; j < 8; ++j)
+#pragma unroll
+      for(int e = 0; e < 8; ++e) r[j * 256 + 8 * f8 + e] = acc[j][e];
+  }
+  __syncthreads();
+  if(grp == 0){
+#pragma unroll
+    for(int g = 0; g < 3; ++g){
+      const float* r = red + g * 8 * 256;
+#pragma unroll
+      for(int j = 0; j < 8; ++j)
+#pragma unroll
+        for(int e = 0; e < 8; ++e) acc[j][e] += r[j * 256 + 8 * f8 + e];
+    }
+#pragma unroll
+    for(int j = 0; j < 8; ++j){
+      if(j < G){
+        float* pp = part + ((long long)c * nheads + kv * G + j) * 256 + 8 * f8;
+#pragma unroll
+        for(int e = 0; e < 8; ++e) pp[e] = acc[j][e];
+      }
+    }
+  }
+}
+
+extern "C" __global__ void __launch_bounds__(128) k_attn_vq4w(const float* __restrict__ s,
+    const unsigned char* __restrict__ Vq4, const unsigned short* __restrict__ Vd, float* __restrict__ part,
+    int n, int nheads, int n_kv, int G){
+  /* V4 attention values, 8 features per thread: the same layout and reduction as k_attn_vq8w, but each 4-byte
+     load holds 8 packed 4-bit values (16 bytes and one fp16 scale per 32 features). */
+  if((int)blockIdx.z * ATV_CH >= n) return;
+  __shared__ float4 sp[ATV_CH * 2];
+  __shared__ float red[3 * 8 * 256];
+  const int kv = blockIdx.x, f8 = threadIdx.x & 31, grp = threadIdx.x >> 5, c = blockIdx.z;
+  const int i0 = c * ATV_CH, m = min(ATV_CH, n - i0);
+  float* spf = (float*)sp;
+  for(int i = threadIdx.x; i < ATV_CH; i += blockDim.x)
+#pragma unroll
+    for(int j = 0; j < 8; ++j) spf[i * 8 + j] = (i < m && j < G) ? s[(long long)(kv * G + j) * n + i0 + i] : 0.f;
+  __syncthreads();
+  float acc[8][8];
+#pragma unroll
+  for(int j = 0; j < 8; ++j)
+#pragma unroll
+    for(int e = 0; e < 8; ++e) acc[j][e] = 0.f;
+  const int blk = f8 >> 2;
+  const unsigned char* vb = Vq4 + ((long long)i0 * n_kv + kv) * 128;
+  const unsigned short* db = Vd + ((long long)i0 * n_kv + kv) * 8 + blk;
+  const long long rs = (long long)n_kv * 128, ds = (long long)n_kv * 8;
+#pragma unroll 4
+  for(int i = grp; i < m; i += 4){
+    const unsigned int w = KLDG((const unsigned int*)(vb + i * rs + 4 * f8));
+    const float d = h2f(KLDG(db + i * ds));
+    float v[8];
+#pragma unroll
+    for(int e = 0; e < 8; ++e) v[e] = (float)((int)((w >> (4 * e)) & 15u) - 8) * d;
     const float4 p0 = sp[i * 2], p1 = sp[i * 2 + 1];
     const float p[8] = {p0.x, p0.y, p0.z, p0.w, p1.x, p1.y, p1.z, p1.w};
 #pragma unroll

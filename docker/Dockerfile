@@ -3,8 +3,8 @@
 # driver. CUDA 10.2 is the last toolkit with Kepler sm_30 support, and CuPy 9.6 the last CuPy built for it; the host
 # needs the NVIDIA driver (470 for Kepler) and the NVIDIA Container Toolkit. See docs/DOCKER.md.
 #
-#   docker build -t kindi:0.6.1 -f docker/Dockerfile --build-arg KINDI_VERSION=0.6.1 --build-arg KINDI_REVISION=$(git rev-parse HEAD) .
-#   docker run -d --name kindi --gpus all -p 127.0.0.1:8093:8093 -v kindi-data:/data -e KINDI_MODEL=bonsai-4b kindi:0.6.1
+#   docker build -t kindi:0.7.0-fork -f docker/Dockerfile --build-arg KINDI_VERSION=0.7.0-fork --build-arg KINDI_REVISION=$(git rev-parse HEAD) .
+#   docker run -d --name kindi --gpus all -p 127.0.0.1:8093:8093 -v kindi-data:/data -e KINDI_MODEL=bonsai-4b kindi:0.7.0-fork
 #
 # The base image is pinned by digest, and the CUDA installer by sha256, so a rebuild gives the same toolchain.
 FROM ubuntu:18.04@sha256:152dc042452c496007f07ca9127571cb9c29697f42acbfad72324b2bb2e43c98
@@ -53,7 +53,7 @@ ARG KINDI_VERSION=dev
 ARG KINDI_REVISION=unknown
 LABEL org.opencontainers.image.title="Kindi (NVIDIA CUDA)" \
       org.opencontainers.image.description="Kindi: local LLM inference on low-cost GPUs. NVIDIA cards from Kepler on (CUDA 10.2), and the CPU engine." \
-      org.opencontainers.image.source="https://github.com/ahtx/kindi" \
+      org.opencontainers.image.source="https://github.com/atimelessrage/kindi" \
       org.opencontainers.image.url="https://amirhusain.com/kindi" \
       org.opencontainers.image.documentation="https://github.com/ahtx/kindi/blob/main/docs/DOCKER.md" \
       org.opencontainers.image.licenses="AGPL-3.0-only" \
@@ -61,5 +61,8 @@ LABEL org.opencontainers.image.title="Kindi (NVIDIA CUDA)" \
       org.opencontainers.image.version="${KINDI_VERSION}" \
       org.opencontainers.image.revision="${KINDI_REVISION}" \
       org.opencontainers.image.base.name="docker.io/library/ubuntu:18.04"
+# The health endpoint needs no key for liveness; with KINDI_API_KEY set it still returns 200 with a minimal body.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=300s --retries=3 \
+  CMD python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8093/health', timeout=3)"
 ENTRYPOINT ["python3", "-m", "kindi.container"]
 CMD ["serve"]

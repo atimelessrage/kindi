@@ -1,0 +1,53 @@
+{
+  "gate": "tandem-9b",
+  "title": "9B tandem capacity control: 8,192 to 131,072 on both placements",
+  "measured": "2026-11-17",
+  "commit": "8990d5f",
+  "command": "KINDI_CTX=$ctx python -m kindi bench --sample-vram (full GPU) and --tandem cpu-first --tandem-cpu-layers gdn:8|gdn:16, per cell",
+  "notes": "This is the row that settled the capacity question: the 9B never reduces, so the split buys headroom only. The savings bands are the whole ladder's range, not one cell.",
+  "evidence": [
+    "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-tandem-9b/RESULTS.md"
+  ],
+  "numbers": [
+    {
+      "id": "ceiling",
+      "display": "131,072",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-tandem-9b/RESULTS.md",
+                "needle": "| 131,072 | 131,072 | 5,149 (4,180) |"}
+    },
+    {
+      "id": "full-gpu-peak",
+      "display": "5,149 MiB",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-tandem-9b/RESULTS.md",
+                "needle": "5,149 (4,180)"}
+    },
+    {
+      "id": "free-after-load",
+      "display": "3,003 MiB",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-tandem-9b/RESULTS.md",
+                "needle": "3,003 MiB free after loading 131,072"}
+    },
+    {
+      "id": "saving-gdn8",
+      "display": "486-488 MiB",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-tandem-9b/RESULTS.md",
+                "needle": "486-488 MiB"}
+    },
+    {
+      "id": "saving-gdn16",
+      "display": "872-874 MiB",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-tandem-9b/RESULTS.md",
+                "needle": "872-874 MiB"}
+    }
+  ]
+}

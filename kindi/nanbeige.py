@@ -136,7 +136,7 @@ def _free_bytes(cp, devices):
             # a card that drives a desktop (WDDM, more than 1 GB used) pages well before it is full: keep 500 MB more
             extra = 500 if f[3].lower() in ("enabled", "yes") and int(f[1]) > 1024 else 0
             used[_bus(f[0])] = ((int(f[1]) + extra) * 2 ** 20, int(f[2]) * 2 ** 20)
-    except Exception:
+    except Exception:  # noqa: BLE001 - nvidia-smi is best-effort; CuPy memGetInfo below is the fallback
         pass
     for d in devices:
         with cp.cuda.Device(d):
@@ -145,7 +145,7 @@ def _free_bytes(cp, devices):
         # CUDA_VISIBLE_DEVICES renumbers the cards
         try:
             key = _bus(cp.cuda.runtime.deviceGetPCIBusId(d))
-        except Exception:
+        except Exception:  # noqa: BLE001 - PCI bus id is best-effort; unmatched cards use CuPy numbers
             key = None
         if key in used:                    # WSL's CUDA reports about 1.1 GB less than is free; nvidia-smi is right
             f = used[key][1] - used[key][0]
@@ -219,7 +219,8 @@ class Card(object):
                       if tc or n not in TC_KERNELS}
             if self.k35:                       # 8-byte banks (Kepler): nbq_kmm reads float4 rows of its tiles
                 import ctypes
-                cu = ctypes.CDLL("libcuda.so.1")
+                from . import gpudrv
+                cu = gpudrv.driver()
                 for n in tuple(KMM.values()) + tuple(MVC.values()):
                     cu.cuFuncSetSharedMemConfig(ctypes.c_void_p(getattr(self.k[n], "kernel", self.k[n]).ptr), 2)
             for n in MM.values() if tc else ():
@@ -233,6 +234,23 @@ class Card(object):
         self.w = {}
         self.kc, self.vc, self.kd, self.vd = {}, {}, {}, {}    # kd, vd: the q8_0 scales
         self.graph = {}
+
+
+def attach_mtp(eng, cfg, log=print):
+    """Load the config's ``mtp_head`` onto ``eng``; True when a head is attached.
+
+    The serve wrapper's generation loop is the only caller: it drafts with this head and the
+    ``lookup`` source. The registry gateway and verify/bench build the non-drafting base
+    engine, so they do not load a head they never use (C2).
+    """
+    hp = os.path.expanduser((cfg or {}).get("mtp_head") or "")
+    if not hp:
+        return False
+    if not os.path.exists(hp):
+        log("Nanbeige: no MTP head file at %s; drafting without it" % hp)
+        return False
+    eng.load_mtp(hp)
+    return True
 
 
 class Engine(object):

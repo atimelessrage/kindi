@@ -1,0 +1,302 @@
+# CI and the GPU lane
+
+The normal GitHub-hosted workflow is
+[.github/workflows/ci.yml](../.github/workflows/ci.yml):
+
+- `CPU tests`: the CPU-only pytest suite on Ubuntu, with line and branch coverage for `kindi` and a
+  27% regression floor, plus the Python lint/type ratchet;
+- `CPU engine build and smoke`: compiles `kindi/kcpu.c` with AVX2/FMA/F16C and loads it;
+- `Windows CPU and config boundary`: the Windows-safe config, CPU, startup and tokenizer tests;
+- `Installer shell checks`: `bash -n` and ShellCheck on the committed LF installer.
+- `Secret scan`: detect-secrets 1.5.0 scans every tracked file against `.secrets.baseline`, and
+  [tools/check_secret_baseline.py](../tools/check_secret_baseline.py) rejects a stale baseline.
+- `Bridge smoke tests`: the optional Bridge component's dependency-free suite runs from
+  `bridge/` (`python -m unittest discover -s tests -v`). It covers time parsing, the SQLite
+  store, agent status and the CLI parser; the broader UI/PTY/RPC suite is not in this source
+  distribution.
+
+These jobs do **not** run CUDA kernels, a model pack or `kindi verify` on a real card.
+
+## Coverage floor
+
+The CPU job runs `pytest` with `--cov=kindi --cov-branch --cov-report=term --cov-fail-under=27`.
+The current local baseline is **27.17%** line-and-branch coverage on the CPU-only suite
+(2026-11-12); the floor is deliberately at that measured level so platform and dependency
+differences do not make the job noisy. New tests in `tests/test_requirement_coverage.py` are
+written against requirement and user-visible contracts, not implementation internals. Coverage
+is an outcome of those tests, not a reason to test private code paths. This is an
+anti-regression floor, not a quality claim: most CUDA, CuPy, model-loading and vendor paths are
+uncovered because hosted CI has no GPU or model pack. Raise the floor only with measured coverage,
+and do not exclude hardware modules merely to make the number look better.
+
+On top of the total floor, the CPU job runs `tools/check_coverage.py` against
+`tests/coverage_floors.json` (audit M4): a per-module floor for **46** modules the measured
+CPU suite reaches (`engine.py`, `kindi/backends/*`, server, cache, bench, tandem, vram,
+expert_cache, tokenizer, config, hostram, catalog, sched, sampling, spm, lookup, profiles,
+gpudrv, the planner/MoE policy, grammar/chat parsers, CLIs and the cold/I/O/autotune modules).
+A total floor alone lets a CPU-exercised module rot while the total holds; the per-module
+floors pin the modules the requirement tests cover. The graph builders (`spec.py`, `dspine.py`,
+`mtp.py`, `tp.py`) are listed at their measured CPU-reachable coverage only; their CUDA paths
+are verified by `kindi verify` on hardware and need the GPU lane above for a higher floor.
+The new floors sit 10 points below the final `539a504` full-suite run (`coverage run --branch
+--source=kindi -m pytest`, **1,241 passed, 28 skipped, 0 failed, 46.36% total**). The run's
+revision, command and counts are tracked in
+[full-suite.json](benchmarks/2026-11-18-i7-8086k-windows-cpu/full-suite.json). `engine.py` moves from
+19% to 20% against its measured 24.3%, so platform variance does not make CI noisy; raise a
+floor only after a measured run. `moe_cpu.py` stays
+out until its C library is built in CI.
+
+The performance half of the roadmap gate is `tools/check_perf_baseline.py`: it compares the
+recorded `docs/benchmarks/CROSS-MODE.csv` against `docs/benchmarks/perf-baseline.json` and fails
+when a measured cell disappears or regresses by more than 15%. The CPU CI job runs this gate, so
+an accidental overwrite of the recorded numbers fails CI; the GPU lane should regenerate the
+matrix on its runner and run the same gate for a real throughput check. A tok/s number is only
+comparable on the same runner, card, driver and CuPy/CUDA build, so re-recording the baseline
+(`--update`) is a deliberate, reviewed step — never a drive-by. `tests/test_perf_baseline.py`
+pins the gate behaviour.
+
+The same job runs `python tools/check_claims.py`: every number quoted in `docs/BACKENDS.md`,
+`docs/ROADMAP.md`, `CURRENT-VS-KINDI-0.6.md`, `docs/AUTOTUNE.md`, `docs/FP8-BF16.md` and
+`docs/BENCHMARKS.md` is re-derived from the tracked artifact of its run (a JSON row, a
+`CROSS-MODE.csv` cell, a ratio of two cells, a max gap between two files, or a verbatim line in
+the run's `RESULTS.md`), and a doc that stops quoting the number fails. It also
+refuses a `docs/benchmarks/<dir>` citation that no `docs/claims/<gate>.json` (and no reasoned
+`unclaimed` entry in `docs/claims/REGISTRY.json`) accounts for, so new evidence cannot enter a doc
+without an owner. Schema, check kinds and the add/change procedure are in
+[docs/claims/README.md](claims/README.md); `tests/test_claims.py` pins both the repository's claims
+and the checker's own failure modes (a drifted doc number, a moved artifact, untracked evidence, an
+unregistered citation).
+
+## Python lint and type-check ratchet
+
+Audit F9's Python quality gate is `python tools/check_python_quality.py`, run by the `CPU tests`
+job. A gate that failed on every existing finding would block all work, so it starts from a measured
+baseline:
+
+- **Ruff 0.16.0** checks the whole Python tree with correctness rules `F`, `E9`, `B` and `I`
+  (`ruff.toml`). The baseline records **321 findings across 125 files**; style-only rules are not
+  selected, so this is not a formatting freeze.
+- **mypy 2.4.0** checks first-party production code (`kindi`, `tools`, `examples` and
+  `bridge/kindi_bridge`) with missing third-party imports ignored (`mypy.ini`). The baseline records
+  **59 errors across 25 files**. The test tree is not type-checked: its deliberately dynamic
+  fixtures and duplicate `conftest.py` module names make that signal noisy.
+- **Pyright 1.1.414** checks the same first-party production targets (`pyrightconfig.json`) in
+  `basic` mode for all platforms, with missing third-party imports ignored. The baseline records
+  **1,035 errors across 64 files**.
+- **Pylint 4.1.3** checks the same production targets for errors and fatal messages only (`E`, `F`),
+  with `import-error` disabled. The baseline records **255 findings across 33 files**.
+
+`tools/python_quality_baseline.json` stores the counts per file and rule/error code. The gate fails
+when a count grows or a new file/rule pair appears, and passes when debt shrinks. Fix findings
+normally; after a reviewed cleanup, lower the baseline deliberately with
+`python tools/check_python_quality.py --update --reason "what was fixed"`. An update refuses any
+new or increased file/rule count, so it cannot be used to launder a finding, and it records the
+reason, the measured commit and the per-tool delta in the baseline. All four tools are
+exact-pinned in `tests/requirements-test.txt` so the measured counts are reproducible. The baseline is **not** a
+claim that the existing findings are acceptable: it is a ratchet against regression, and the
+remaining debt stays visible. Dependency scanning is a separate open audit item.
+
+`tests/test_python_quality.py` pins the comparison and baseline shape, and
+`tests/test_ci_config.py` pins the CI step and tool versions.
+
+### Debt burn-down
+
+The baseline still tolerates **163 bugbear (`B`) findings**: 66 `B905` (`zip()` without
+`strict=`), 60 `B904` (raise without `from`), 17 `B023` (closure over a loop variable), 15 `B007`
+(unused loop control variable), 2 `B002` (the unary-prefix-decrement pattern), 1 `B011`
+(`assert False`), 1 `B008` (function call in a default argument) and 1 `B017` (`assertRaises(Exception)`).
+The 2026-11-19 pass renamed six unused loop variables and left the tuple-unpacking cases for a
+per-site review. `B905` is blocked by the supported Python floor, `B023` needs a per-site review to
+confirm the closure is not intentional, and the two `B002` sites are arithmetic double-negations,
+not decrements. Burn one family down per session: fix it, run the focused tests, then lower the
+baseline with `python tools/check_python_quality.py --update --reason "fixed ..."`. Do not add
+`# noqa` or weaken the rule to make the number move.
+
+## Dependency audit
+
+`tools/check_dependencies.py` parses `pip-audit` JSON reports into `package advisory` pairs and
+compares them with the reviewed baseline in
+`docs/development/dependency-audit-baseline.json`. The `dependency-audit` job is **report-only**:
+it audits the test requirements and attempts the legacy CUDA 10.2 runtime pins in
+`requirements-runtime.txt`, then prints findings without failing the build. `--no-deps` skips
+dependency resolution, but pip-audit still installs the pinned distributions in a temporary
+environment; a 2022 pin with no wheel for the runner can leave the runtime report missing, which
+`--allow-missing` reports as a skip rather than a false green. Audit that legacy set in a Python
+3.8 / CUDA 10.2 container for a complete report; do not replace the pins just to make it run.
+
+To make it gating, review a report, record it and remove `--report-only` from the workflow:
+
+```sh
+pip-audit -r requirements-runtime.txt --no-deps --format json --output runtime-audit.json
+python tools/check_dependencies.py --report runtime-audit.json --update
+python tools/check_dependencies.py --report runtime-audit.json
+```
+
+`--update` is a reviewed security decision, not routine maintenance; the baseline is an allowlist
+of accepted, understood findings. Do not upgrade the deliberately old CUDA 10.2 pins just to make
+the report shorter. The 2022-era web stack (FastAPI/Pydantic/Uvicorn) needs its own upgrade pass
+because the current pins are API-compatible with the server code; that is a feature change, not a
+security patch.
+
+## CUDA static analysis
+
+The `static-analysis` job installs `cppcheck` and `clang-tidy-18` on the hosted runner and runs
+`tests/static/run_static_analysis.py`, which builds the Turing (sm_75) and Ampere (sm_86)
+translation units the way `kindi.spec.SpecKernels` does and analyses them as source only
+(`tests/static/cuda_stub.h` supplies the CUDA declarations; no CUDA toolkit or GPU is needed).
+Hosted runners have no CuPy, so the harness installs a minimal stub `cupy` module when the real
+one is unavailable — it only has to survive module import while the translation units are built.
+The script exits non-zero when an analyser fails to run; warnings are reported, not gated.
+Validated locally (tools absent): the Turing TU builds and the script skips cleanly with exit 0.
+
+`tests/requirements-test.txt` is deliberately bounded (`pytest>=7,<10`, `fastapi>=0.100,<1`,
+`pydantic>=2,<3`, …): the suite is verified on those majors, and an open-ended spec would let
+CI break with no commit. Ruff and mypy are exact-pinned because the Python-quality baseline counts
+change with analyser versions. `tests/test_ci_config.py` pins both contracts.
+
+## Secret baseline and local hook
+
+The secret scan is intentionally tracked-file based. CI runs
+[tools/check_secret_baseline.py](../tools/check_secret_baseline.py) to compare the baseline with a
+fresh scan of `git ls-files`, then runs `detect-secrets-hook --baseline .secrets.baseline` to reject
+new findings. It also runs [tools/check_secret_history.py](../tools/check_secret_history.py) over the
+full history (that job checks out with `fetch-depth: 0`): the tracked-file scan cannot see a key that
+was committed and deleted, and history is what a push publishes. The history gate compares against a
+counted snapshot (`tools/secret_history_baseline.json`) and fails on any new row or a row whose count
+grew; `tests/test_no_secrets.py` covers the present tree (tracked and untracked), so the two scans
+plus the entropy baseline cover files, deleted lines and commit messages (subject and body). The pre-commit hook uses the same baseline and scans all text files; only
+`.secrets.baseline` is excluded so the hashes in the baseline are not reported as secrets.
+
+Install the local hook once:
+
+```bash
+python -m pip install pre-commit
+pre-commit install
+pre-commit run detect-secrets --all-files
+```
+
+To review and accept a new false positive (for example a published checksum), update the baseline
+from tracked files only:
+
+```bash
+python tools/check_secret_baseline.py --check
+python tools/check_secret_baseline.py --update
+```
+
+Do not use `detect-secrets scan --all-files` for this repository: it includes untracked benchmark
+logs and test caches. Review the flagged line before updating; the baseline stores a hash, not the
+value, but it still marks the line as known. Never commit a real credential to make the baseline
+match.
+
+## GPU lane
+
+[.github/workflows/gpu-smoke.yml](../.github/workflows/gpu-smoke.yml) is a manual
+`workflow_dispatch` lane. It requires a self-hosted runner with both labels:
+
+- `self-hosted`
+- `gpu`
+
+The runner needs a working NVIDIA driver, the CuPy version used by the chosen image, and one or
+more converted Kindi packs. The workflow has four independent jobs:
+
+1. **GPU verify and server boundary** starts from the `pack` input, runs `python -m kindi verify`,
+   then starts the server, waits for `/health` and sends one greedy chat request.
+2. **GPU token exactness and performance regression** uses `pack_dir` and the selected `models`
+   and `modes`. It runs [tools/verify_matrix.py](../tools/verify_matrix.py) as fresh `kindi verify`
+   processes with a clean `KINDI_*` environment. If `baseline` is supplied, the same run also
+   fails on a status loss, a lower exact pass count, a higher fail count, a baseline cell missing
+   from the run, or a throughput drop greater than `max_tps_drop_pct`.
+3. **GPU long-context 24K** runs [tools/check_long_context.py](../tools/check_long_context.py) on
+   the `pack` input with `--ctx 24576`. It fails unless the engine reports at least the requested
+   context and the 24,000-token generation cell exists with non-zero throughput. Change `ctx`
+   when testing a different long-context size.
+4. **GPU MTP head smoke** is skipped unless the optional `mtp_head` input names an existing
+   `.npz` head. It runs [tools/mtp_smoke.py](../tools/mtp_smoke.py) with the `pack` input at
+   context 4096 and `KINDI_SPEC_K=4`, then checks the attached method, the per-request
+   `drafting.last.method`, the draft/accept counters and a greedy completion. Its server log is
+   uploaded when the job fails.
+
+The default matrix is `models: 2b,4b,9b`, `modes: plain`. Add `tc` explicitly when the card and
+packs are known to support it: a 9B tc refusal is a valid recorded result and deliberately makes
+the matrix fail. The matrix and long-context jobs upload their logs and JSON results as workflow
+artifacts even when they fail.
+
+This is intentionally not an automatic job: a GPU and a 0.4-19 GB model pack are not available on
+GitHub-hosted runners, and a skipped job is not verification. Record the runner, card, driver,
+CuPy/CUDA versions and pack hash with the run. Until that run exists, the dual-card rows remain
+unverified as described in [CARD-SUPPORT.md](CARD-SUPPORT.md).
+
+### Registering the runner (M6)
+
+The lane is ready; the missing piece is a registered runner. On the GPU host (a working NVIDIA
+driver, the CuPy version used by the image, and the packs under `~/.kindi/packs/`):
+
+1. In the fork's GitHub settings go to **Actions → Runners → New self-hosted runner** and follow
+   the printed download/configure commands.
+2. At configure time pass the labels `self-hosted` and `gpu` (the Blackwell lane additionally
+   needs `sm_100` or `sm_120` — one runner per architecture, or one runner with both labels).
+3. Install the runner as a service (`./svc.sh install`) so it survives reboots, then dispatch
+   **GPU smoke** from the Actions tab with the pack path and record the run (runner, card,
+   driver, CuPy/CUDA, pack hash) in [CARD-SUPPORT.md](CARD-SUPPORT.md).
+4. Then run `python tools/check_perf_baseline.py` against the regenerated CROSS-MODE.csv on
+   that runner for the real throughput gate.
+
+Until step 3 has run at least once, every GPU-verified card row in the docs stays a manual
+measurement, and `gpu-smoke.yml` remains an unused lane.
+
+## Blackwell FP8 lane
+
+[.github/workflows/blackwell-fp8.yml](../.github/workflows/blackwell-fp8.yml) is a separate manual
+`workflow_dispatch` lane for the native Gemma 4 FP8 kernels. It needs a self-hosted runner labelled
+`self-hosted`, `gpu` and the selected architecture (`sm_100` or `sm_120`), plus a working NVIDIA
+driver and CuPy; it does not need a Kindi pack. The workflow routes the job to the matching
+architecture label from the `arch` input, which requires `sm_100` or `sm_120`. Dispatch once per
+architecture to cover both. The Python tool still accepts `--arch auto` for local runs, but the
+workflow does not use it, so a job cannot land on the wrong Blackwell architecture.
+
+The lane runs [tools/verify_blackwell_fp8.py](../tools/verify_blackwell_fp8.py), which refuses to
+pass on any device whose compute capability is not exactly 100 or 120. A non-Blackwell device or an
+arch mismatch is written as `unsupported` and exits 2; a loaded-kernel or numerical mismatch exits
+1. Both outcomes upload `results.json`, `RESULTS.md` and `run.log`. A green workflow therefore
+means the synthetic E4M3/E5M2 quantization, GEMM and `Ops.linear_batch` checks passed on that
+Blackwell card, not that a real FP8 model was validated. No Blackwell runner is registered for
+this worktree, so the workflow has not run; a local gate on the Ada-only host returned
+`unsupported` (exit 2) on 2026-11-12, recorded in
+[benchmarks/blackwell-fp8-ada-refusal-20261112/RESULTS.md](benchmarks/blackwell-fp8-ada-refusal-20261112/RESULTS.md).
+It is not a Blackwell result.
+
+## Performance baseline
+
+The performance gate is opt-in through the `baseline` input because a throughput number is only
+comparable on the same runner, card, driver and CuPy/CUDA build. Create the baseline from a clean
+run on that machine:
+
+```bash
+python tools/verify_matrix.py \
+  --pack-dir /data/kindi/packs \
+  --models 2b,4b,9b \
+  --modes plain \
+  --out /data/kindi/ci/gpu-baseline-run \
+  --save-baseline /data/kindi/ci/gpu-baseline.json
+```
+
+If that target already holds a baseline, its `logs` provenance must contain the new run's `log`;
+for a fresh baseline use a new path or add an explicit `logs` list naming that `log`. Then pass
+`/data/kindi/ci/gpu-baseline.json` as `baseline` on later dispatches. The default
+`max_tps_drop_pct` is 10%. Status, exactness and missing-cell regressions fail regardless of the
+throughput threshold. If `baseline` is empty, the job still checks token exactness but prints a
+warning and makes no performance-regression claim. The default speculation axis adds the four 2B
+cells (`tc-ngram`, `tc-mtp`, `tc-draft2b`, `tc-both`); keep them in the baseline, and do not pass
+`--spec-modes none`. For a 2B-only baseline, use the explicit command in
+[CARD-SUPPORT.md](CARD-SUPPORT.md#2b-speculation-baseline).
+
+Regenerate the baseline deliberately, on the same hardware, after a measured performance change;
+do not commit it. Upload the run's `comparison.json` alongside the baseline so a failure can be
+reviewed.
+
+## Adding a pack to a runner
+
+The pack is produced once with `python -m kindi convert MODEL.gguf`; point the runner at that
+directory, not at the GGUF, and keep it outside the workspace. Do not commit the pack or any model
+file. The workflow uses `KINDI_PACK` and `KINDI_PACK_DIR`, so the same scripts work with a path
+containing spaces.

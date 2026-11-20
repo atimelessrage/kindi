@@ -1,0 +1,32 @@
+{
+  "gate": "tc-fork-vs-stock-v061",
+  "title": "Fork tensor-core plan path beside the stock v0.6.1 2B/9B rows (different configuration)",
+  "measured": "2026-11-18",
+  "commit": "e769606",
+  "command": "KINDI_TC=1 KINDI_TP=1 KINDI_FD=1 KINDI_ATT_TC=1 KINDI_TC_TMAX=4 KINDI_HEAD=exact KINDI_SPEC=0 python -m kindi --pack ~/.kindi/packs/bonsai-{2b,9b} --ctx 8192 bench --split-at off (5 interleaved passes each)",
+  "notes": "Different configuration, not a same-settings A/B: the stock reference rows in CURRENT-VS §4.6 come from the 2026-11-17 plain-engine run, while these rows are the fork's tensor-core plan path (q8_0 K/V, exact head, 9B auto HP). No stock process was run in this capture. The numbers are absolute TC-path rates against the same bench cells.",
+  "evidence": [
+    "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/RESULTS.md",
+    "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/summary.json",
+    "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/tc-2b-r1.log",
+    "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/tc-9b-r1.log"
+  ],
+  "numbers": [
+    {"id": "2b-tc-read", "display": "484.9", "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/summary.json", "pointer": "/cells/2b/read_tok_s/median", "expect": 484.9}},
+    {"id": "2b-tc-gen-100", "display": "354.9", "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/summary.json", "pointer": "/cells/2b/gen_tok_s/exact:100/median", "expect": 354.9}},
+    {"id": "2b-tc-gen-2000", "display": "333.8", "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/summary.json", "pointer": "/cells/2b/gen_tok_s/exact:2000/median", "expect": 333.8}},
+    {"id": "2b-tc-gen-8000", "display": "331.0", "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/summary.json", "pointer": "/cells/2b/gen_tok_s/exact:8000/median", "expect": 331.0}},
+    {"id": "9b-tc-read", "display": "137.2", "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/summary.json", "pointer": "/cells/9b/read_tok_s/median", "expect": 137.2}},
+    {"id": "9b-tc-gen-100", "display": "118.3", "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/summary.json", "pointer": "/cells/9b/gen_tok_s/exact:100/median", "expect": 118.3}},
+    {"id": "9b-tc-gen-2000", "display": "115.2", "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/summary.json", "pointer": "/cells/9b/gen_tok_s/exact:2000/median", "expect": 115.2}},
+    {"id": "9b-tc-gen-8000", "display": "111.8", "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-fork-tc-vs-stock/summary.json", "pointer": "/cells/9b/gen_tok_s/exact:8000/median", "expect": 111.8}}
+  ]
+}

@@ -1,0 +1,12 @@
+<local-home>\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+[kindi 20:52:57] kindi-cpu ready: Ternary-Bonsai-2-4B, avx2-fma-f16c, 6 threads, ctx 24576 (57.7s)
+[kindi 20:52:57] kindi: <local-home>\.kindi\packs\bonsai-4b -> the bonsai backend (bonsai2-4b)
+[kindi 20:52:57] CPU engine: 6 threads, 24576-token context
+[kindi 20:52:59] prompt reading:        16.4 tokens/s
+[kindi 20:53:00] generation (exact head) at position   100:  14.1 tokens/s
+[kindi 20:53:00] generation (exact head) at position  2000:  11.9 tokens/s
+[kindi 20:53:02] generation (exact head) at position  8000:   6.7 tokens/s
+[kindi 20:53:05] generation (exact head) at position 16000:   3.9 tokens/s
+[kindi 20:53:09] generation (exact head) at position 24000:   2.9 tokens/s
+[kindi 20:53:09] wrote docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-2b-4b-controlled/cpu-4b.json

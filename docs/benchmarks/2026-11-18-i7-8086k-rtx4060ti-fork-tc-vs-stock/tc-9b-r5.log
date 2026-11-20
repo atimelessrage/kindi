@@ -1,0 +1,18 @@
+# fork tc plan, ctx 8192, exact head, pass 5 of 5
+# KINDI_TC=1 KINDI_TP=1 KINDI_FD=1 KINDI_ATT_TC=1 KINDI_TC_TMAX=4 KINDI_HEAD=exact KINDI_SPEC=0 python -m kindi --pack ~/.kindi/packs/bonsai-9b --ctx 8192 bench --split-at off --json tc-9b-r5.json
+<python>\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+[kindi 02:30:54] blocking sync: card 0 primary context flags 0x4 (set: 0)
+[kindi 02:30:54] Hadamard block 4096: high-precision activations on (measured 4/4 at 122 tok/s; KINDI_TC_HP=0 asks for the default activations, measured 3/4)
+[kindi 02:30:55] card 0: 4096 Hadamard blocks run with high-precision activations (KINDI_TC_HP=1); that is the exact 9B tensor-core path (4/4, 122 tok/s; the default activations are 3/4)
+[kindi 02:30:56] card 0: 1.73 GB of weights, streamed (1s)
+[kindi 02:30:57] card 0: weights repacked for the tensor cores (0.1s)
+[kindi 02:30:57] tensor-core plans ready: T = 1 .. 4, 493 nodes per decode token (0.1s; 5077 MiB free on the card)
+[kindi 02:30:57] plan engine ready: 1 card, ctx 8192, K/V q8_0, weights 5-trit lane (2.7s)
+[kindi 02:30:57] kindi: ~/.kindi/packs/bonsai-9b -> the bonsai backend (bonsai2-9b)
+[kindi 02:30:57] GPU memory: 5077 MiB free of 8188 with a 8192-token context
+[kindi 02:30:57] prompt reading:       137.2 tokens/s
+[kindi 02:30:57] generation (exact head) at position   100: 118.0 tokens/s
+[kindi 02:30:57] generation (exact head) at position  2000: 115.2 tokens/s
+[kindi 02:30:58] generation (exact head) at position  8000: 112.0 tokens/s
+[kindi 02:30:58] wrote bench-logs/tc-fork-ab-20261118/9b-r5.json

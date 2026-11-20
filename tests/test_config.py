@@ -1,0 +1,169 @@
+"""Config precedence: defaults < config file < environment < command-line overrides."""
+import json
+import os
+
+import pytest
+
+from kindi import config
+
+ENV_KEYS = ["KINDI_" + k.upper() for k in config.DEFAULTS] + ["KINDI_CONFIG"]
+
+
+@pytest.fixture(autouse=True)
+def clean_env(monkeypatch, tmp_path):
+    """No KINDI_* leakage from the host, no ./kindi.conf, no ~/.kindi/kindi.conf, and a pack path that
+    does not exist. The last one is a default lookup path: without moving `~`, a real config on the
+    machine running the tests silently replaces the built-in defaults."""
+    for k in ENV_KEYS:
+        monkeypatch.delenv(k, raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))          # POSIX expanduser
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))   # Windows expanduser
+    monkeypatch.chdir(tmp_path)
+    return tmp_path
+
+
+def write_conf(tmp_path, body):
+    p = tmp_path / "kindi.conf"
+    p.write_text("[kindi]\n" + body, encoding="utf-8")
+    return str(p)
+
+
+def test_auto_model_name_comes_from_the_adapter_that_claims_the_pack(tmp_path):
+    """A literal tuple of backend names used to answer this, and it forgot nanbeige and dsv41, so
+    those packs reported a Bonsai id to every client. The adapters' own hooks are the one source."""
+    for backend, expected in (("kindi_nanbeige", "nanbeige-33b"),
+                              ("kindi_dsv41", "deepseek-v41-flash"),
+                              ("kindi_gemma4", "gemma4-e4b"),
+                              ("kindi_lightning", "nemotron-lightning-30b")):
+        pack = tmp_path / backend
+        pack.mkdir()
+        (pack / "kindi_pack.json").write_text(
+            json.dumps({"backend": backend, "model": "Hf"}), encoding="utf-8")
+        cfg = config.load(overrides={"pack": str(pack)})
+        assert cfg["model_name"] == expected, (backend, cfg["model_name"])
+
+
+def test_a_non_numeric_environment_value_is_an_actionable_error(monkeypatch):
+    monkeypatch.setenv("KINDI_CTX", "abc")
+    with pytest.raises(SystemExit, match="ctx must be an integer"):
+        config.load()
+    monkeypatch.setenv("KINDI_CTX", "24576")
+    monkeypatch.setenv("KINDI_TEMPERATURE", "warm")
+    with pytest.raises(SystemExit, match="temperature must be a number"):
+        config.load()
+
+
+def test_built_in_defaults():
+    cfg = config.load()
+    assert cfg["ctx"] == 24576
+    assert cfg["temperature"] == 0.7
+    assert cfg["head"] == "exact"
+    assert cfg["source"] == "(built-in defaults)"
+    assert isinstance(cfg["ctx"], int) and isinstance(cfg["temperature"], float)
+    assert cfg["presence_penalty"] == 0.0 and isinstance(cfg["presence_penalty"], float)
+    assert cfg["sampling_profile"] == "default"
+    assert cfg["max_body_mb"] == 16
+    assert cfg["queue_max"] == 8
+    assert cfg["rate_limit_per_min"] == 0
+    assert cfg["explicit"] == frozenset()
+
+
+def test_tandem_memory_limits_must_be_non_negative(monkeypatch):
+    monkeypatch.setenv("KINDI_TANDEM_VRAM_MB", "-1")
+    with pytest.raises(SystemExit, match="tandem_vram_mb must be at least 0"):
+        config.load()
+    monkeypatch.delenv("KINDI_TANDEM_VRAM_MB")
+    monkeypatch.setenv("KINDI_TANDEM_RESERVE_MB", "-512")
+    with pytest.raises(SystemExit, match="tandem_reserve_mb must be at least 0"):
+        config.load()
+
+
+def test_file_beats_defaults(clean_env):
+    path = write_conf(clean_env, "ctx = 4096\ntemperature = 0.25\nhead = fast\n")
+    cfg = config.load(explicit=path)
+    assert cfg["ctx"] == 4096
+    assert cfg["temperature"] == 0.25
+    assert cfg["head"] == "fast"
+    assert cfg["source"] == path
+
+
+def test_server_limits_can_be_set_in_the_config_file(clean_env):
+    path = write_conf(clean_env, "max_body_mb = 4\nqueue_max = 2\nrate_limit_per_min = 30\n")
+    cfg = config.load(explicit=path)
+    assert cfg["max_body_mb"] == 4
+    assert cfg["queue_max"] == 2
+    assert cfg["rate_limit_per_min"] == 30
+
+
+def test_environment_beats_file(clean_env, monkeypatch):
+    path = write_conf(clean_env, "ctx = 4096\n")
+    monkeypatch.setenv("KINDI_CTX", "2048")
+    assert config.load(explicit=path)["ctx"] == 2048
+
+
+def test_command_line_beats_environment(clean_env, monkeypatch):
+    path = write_conf(clean_env, "ctx = 4096\n")
+    monkeypatch.setenv("KINDI_CTX", "2048")
+    assert config.load(explicit=path, overrides={"ctx": 1024})["ctx"] == 1024
+
+
+def test_environment_is_coerced_to_the_key_type(monkeypatch):
+    monkeypatch.setenv("KINDI_CTX", "8192")
+    monkeypatch.setenv("KINDI_TEMPERATURE", "0.0")
+    cfg = config.load()
+    assert cfg["ctx"] == 8192 and isinstance(cfg["ctx"], int)
+    assert cfg["temperature"] == 0.0 and isinstance(cfg["temperature"], float)
+
+
+def test_path_keys_are_expanded_and_absolute(clean_env):
+    path = write_conf(clean_env, "pack = ~/packs/test\n")
+    cfg = config.load(explicit=path)
+    assert cfg["pack"] == os.path.abspath(os.path.expanduser("~/packs/test"))
+
+
+def test_unknown_key_is_rejected(clean_env):
+    path = write_conf(clean_env, "nonsense = 1\n")
+    with pytest.raises(SystemExit, match="unknown config key"):
+        config.load(explicit=path)
+
+
+def test_missing_explicit_file_is_rejected(clean_env):
+    with pytest.raises(SystemExit, match="config file not found"):
+        config.load(explicit=str(clean_env / "does-not-exist.conf"))
+
+
+def test_explicit_keys_are_tracked(clean_env, monkeypatch):
+    path = write_conf(clean_env, "temperature = 0.25\n")
+    monkeypatch.setenv("KINDI_TOP_P", "0.5")
+    cfg = config.load(explicit=path, overrides={"ctx": 1024})
+    assert cfg["explicit"] == frozenset({"temperature", "top_p", "ctx"})
+
+
+def test_invalid_sampling_profile_is_rejected(clean_env):
+    path = write_conf(clean_env, "sampling_profile = fast\n")
+    with pytest.raises(SystemExit, match="sampling_profile must be default or publisher"):
+        config.load(explicit=path)
+
+
+@pytest.mark.parametrize(("key", "value", "message"), (
+    ("port", "0", "port must be between"),
+    ("port", "70000", "port must be between"),
+    ("ctx", "0", "ctx must be at least"),
+    ("max_body_mb", "0", "max_body_mb must be at least"),
+    ("queue_max", "-1", "queue_max must be at least"),
+    ("rate_limit_per_min", "-1", "rate_limit_per_min must be at least"),
+    ("checkpoint_every", "0", "checkpoint_every must be at least"),
+    ("fast_clusters", "0", "fast_clusters must be at least"),
+    ("max_tokens", "0", "max_tokens must be at least"),
+    ("repeat_last_n", "-2", "repeat_last_n must be at least"),
+    ("temperature", "-0.1", "temperature must be at least"),
+    ("top_p", "0", "top_p must be greater than 0"),
+    ("top_p", "1.1", "top_p must be greater than 0"),
+    ("min_p", "-0.1", "min_p must be between"),
+    ("repeat_penalty", "0", "repeat_penalty must be greater than 0"),
+    ("presence_penalty", "2.1", "presence_penalty must be between"),
+))
+def test_invalid_config_ranges_are_rejected(clean_env, key, value, message):
+    path = write_conf(clean_env, "%s = %s\n" % (key, value))
+    with pytest.raises(SystemExit, match=message):
+        config.load(explicit=path)

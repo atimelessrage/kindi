@@ -89,6 +89,16 @@ def parse_calls(text, tools):
     return calls
 
 
+def _response_grammar(req):
+    """The decode grammar for a structured-output request, else None."""
+    from .constrained import is_structured
+    from .server import _response_format_grammar
+    rf = req.get("response_format")
+    if not is_structured(rf):
+        return None
+    return _response_format_grammar(rf)
+
+
 class Sorter(object):
     """splits streamed text into ("reasoning", ...) and ("text", ...) pieces; from <tool_call> on, the text is kept as
     the call tail. A partial tag at the end is held back."""
@@ -132,7 +142,7 @@ class NanbeigeBackend(object):
     def __init__(self, man, cfg, log=print):
         from .gguf import GGUF
         from .spm import SPM
-        from .nanbeige import Engine
+        from .nanbeige import Engine, attach_mtp
         self.log = log
         self.tok = SPM(GGUF(man["model_path"]).kv)
         # every control token ends the turn (</s>, <|im_end|>, <|endoftext|>, a new <|im_start|>), as llama.cpp's
@@ -143,13 +153,9 @@ class NanbeigeBackend(object):
         # prompt-lookup drafting (config key lookup): up to this many drafted tokens per check pass, 0: off
         self.lookup = max(0, min(7, int(cfg.get("lookup") or 0)))
         self.lk_stats = [0] * 6     # this request: check passes, drafted tokens, kept tokens (lookup; MTP head)
-        self.mtp = False            # config key mtp_head: an MTP head file, a draft source
-        hp = os.path.expanduser(cfg.get("mtp_head") or "")
-        if hp and os.path.exists(hp):
-            self.eng.load_mtp(hp)
-            self.mtp = True
-        elif hp:
-            log("Nanbeige: no MTP head file at %s; drafting without it" % hp)
+        # config key mtp_head: an MTP head file, a serve-only draft source (the gateway and
+        # verify/bench are non-drafting, so this wrapper is the only path that loads it)
+        self.mtp = attach_mtp(self.eng, cfg, log)
         if os.environ.get("KINDI_NB_SELFCHECK", "1") != "0":
             self.selfcheck()
 
@@ -178,16 +184,27 @@ class NanbeigeBackend(object):
             raise RuntimeError("Nanbeige self-check failed: the engine gives different tokens for the same prompt")
         self.log("Nanbeige self-check: %s" % repr(self.tok.decode(a))[:60])
 
-    def _pick(self, greedy, temperature, top_p, top_k, rng, row=None):
+    def _pick(self, greedy, temperature, top_p, top_k, rng, row=None, allowed=None):
         """sample the next token. The candidates are found on the card: every token whose logit is within 30
         temperatures of the best (each other token has relative probability under e^-30), at most 256 of the best.
         Only those few scores cross PCIe, not the whole vocabulary. With row, the scores are row `row` of the last
-        check pass, not the last step's."""
-        if temperature <= 0:
-            return greedy
+        check pass, not the last step's. `allowed` is the JSON-grammar mask: then the full logits at the allowed
+        ids are read (no window), so a grammar-legal token is never outside the candidate set."""
         from .sampling import Sampler
         cp = self.eng.cp
         c = self.eng.cards[-1]
+        if allowed is not None:
+            cand = np.asarray(sorted(int(t) for t in allowed), dtype=np.int64)
+            if not cand.size:
+                raise ValueError("constrained sampling: no allowed token in the model's candidates")
+            with cp.cuda.Device(c.dev):
+                z = (c.logits.ravel() if row is None else c.LOG[row])[:len(self.tok.tokens)]
+                sc = cp.asnumpy(z[cand]).astype(np.float64)
+            if temperature <= 0:
+                return int(cand[int(np.argmax(sc))])
+            return Sampler._pick(cand, sc, temperature, top_p, top_k, rng)
+        if temperature <= 0:
+            return greedy
         with cp.cuda.Device(c.dev):
             z = (c.logits.ravel() if row is None else c.LOG[row])[:len(self.tok.tokens)]
             idx = cp.flatnonzero(z >= z.max() - 30.0 * temperature)
@@ -205,7 +222,17 @@ class NanbeigeBackend(object):
         if req.get("tool_choice") == "none":
             tools = None
         kw = req.get("chat_template_kwargs") or {}
-        thinking = kw.get("enable_thinking", req.get("enable_thinking", True)) is not False
+        jgrammar = _response_grammar(req)
+        jstate = jgrammar.start() if jgrammar is not None else None
+        grammar_texts = None
+        if jgrammar is not None:
+            if not hasattr(self, "_grammar_texts"):
+                self._grammar_texts = [self.tok.piece(i).decode("utf-8", "replace")
+                                       for i in range(len(self.tok.tokens))]
+            grammar_texts = self._grammar_texts
+            thinking = False     # a structured reply is the whole reply: it never enters a thought channel
+        else:
+            thinking = kw.get("enable_thinking", req.get("enable_thinking", True)) is not False
         ids = prompt_ids(self.tok, render(req.get("messages") or [], tools=tools, enable_thinking=thinking))
         if len(ids) >= self.eng.ctx:
             from .server import ContextOverflow
@@ -221,6 +248,9 @@ class NanbeigeBackend(object):
         stop = req.get("stop") or []
         if isinstance(stop, str):
             stop = [stop]
+        stop_seq = [x for x in stop if x]   # the stop check scans only the not-yet-checked tail (O(1) per token)
+        stop_win = max((len(x) for x in stop_seq), default=0)
+        stop_from = 0
         repeat_stop = bool(cfg.get("repeat_stop"))
         from .server import _looping, THINK_CLOSE
         budget = req.get("thinking_budget_tokens") or req.get("thinking_budget") or cfg.get("thinking_budget") or 0
@@ -254,7 +284,7 @@ class NanbeigeBackend(object):
             decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
             pos = len(ids)
             pending = False                   # a queued step whose result (the greedy token, the logits) is not read yet
-            look = Lookup(ids) if self.lookup else None
+            look = Lookup(ids) if (self.lookup and jgrammar is None) else None
             queue = []                        # tokens a check pass chose: (token, fed, row); fed: its K/V is on the
             hrow = None                       # cards; row: the pass's row that gave it (the MTP head reads its state)
             mt = [1.0, 2.0]                   # MTP head: kept / checked drafts, decayed (prior 50%)
@@ -268,7 +298,15 @@ class NanbeigeBackend(object):
                 if queue:
                     token, fed, hrow = queue.pop(0)
                 else:
-                    token, fed, hrow = self._pick(greedy, temperature, top_p, top_k, rng), False, None
+                    allowed = None
+                    if jgrammar is not None:
+                        allowed = jgrammar.vocab_allowed(jstate, grammar_texts)
+                        if jgrammar.done(jstate):
+                            allowed = np.concatenate([allowed, np.array(sorted(self.stop_ids), dtype=np.int64)])
+                        if allowed.size == 0:
+                            raise RuntimeError("structured-output grammar allowed no token")
+                    token, fed, hrow = self._pick(
+                        greedy, temperature, top_p, top_k, rng, allowed=allowed), False, None
                 if token in self.stop_ids:
                     finish = "stop"
                     break
@@ -311,7 +349,7 @@ class NanbeigeBackend(object):
                 d = look.draft(min(self.lookup, max_new - n - 2, max(0, self.eng.ctx - pos - 2))) \
                     if (more and not fed and look is not None) else []
                 head = False
-                if not d and self.mtp and more and not fed and n + 2 < max_new and pos + 2 < self.eng.ctx \
+                if not d and self.mtp and jgrammar is None and more and not fed and n + 2 < max_new and pos + 2 < self.eng.ctx \
                         and (mt[0] / mt[1] > 0.4 or n % 16 == 0):
                     # the MTP head drafts one token (while its acceptance pays for the check; every 16th token it
                     # drafts anyway, to measure it again)
@@ -346,8 +384,23 @@ class NanbeigeBackend(object):
                     pos += 1
                     pending = True
                 piece = decoder.decode(self.tok.piece(token))
+                if jgrammar is not None:
+                    advanced = jgrammar.advance(jstate, piece)
+                    if advanced is None:
+                        raise RuntimeError("structured-output grammar rejected token %r it had allowed" % piece)
+                    jstate = advanced
                 text += piece
-                if next((x for x in stop if x and x in text), None):
+                _hit = False
+                if stop_seq:
+                    _base = max(0, stop_from - (stop_win - 1))
+                    _tail = text[_base:]
+                    for x in stop_seq:
+                        if _tail.find(x) >= 0:
+                            _hit = True
+                            break
+                    if not _hit:
+                        stop_from = len(text)
+                if _hit:
                     finish = "stop"
                     break
                 for kind, part in sorter.feed(piece):

@@ -1,0 +1,789 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+"""The dense tandem placement and handoff, without a real GPU or CPU pack.
+
+The fake backends record the layer ranges and the hidden-state exchange.  The real GPU path is
+covered by the code-level checks in the release gate; this test suite keeps the routing contract
+(which backend owns the embedding, head and each layer) and the two placement modes honest.
+"""
+import json
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from kindi import cache, tandem
+from kindi.engine import Engine
+
+
+class FakeEngine(object):
+    D = 4
+
+    def __init__(self, pack, ctx=4096, log=None, layers=None, embed=True, head=True, kv=None):
+        self.kv = kv or "f16"
+        self.ctx = int(ctx)
+        self.layers = None if layers is None else tuple(layers)
+        self.embed_owned, self.head_owned = bool(embed), bool(head)
+        self.calls = []
+        self.h = np.zeros(self.D, dtype=np.float32)
+        self.pending = 0
+        self.vocab = {"tok": 0}
+        self.ylog = np.arange(5, dtype=np.float32)
+        self.ylog_n, self.ylog_map = 5, None
+        self.k = object()
+        self.aout = np.zeros(1, dtype=np.int32)
+        self.dims = {"full_attention_interval": 2}
+        self.NL = 4
+        self._kvi = {1: 0, 3: 1}
+        self.isa, self.threads = "fake", 1
+        self.M, self.conv = [None] * self.NL, [None] * self.NL
+        self.Kc, self.Vc = [None] * 2, [None] * 2
+        if layers is None:                     # the CPU engine owns the whole model
+            self.M = [np.zeros(1, dtype=np.float32) for _ in (0, 2)]
+            self.conv = [np.zeros(1, dtype=np.float32) for _ in (0, 2)]
+            self.Kc = [np.zeros((self.ctx, 1, 1), dtype=np.float16) for _ in (1, 3)]
+            self.Vc = [np.zeros((self.ctx, 1, 1), dtype=np.float16) for _ in (1, 3)]
+        else:                                  # the GPU engine owns only its range
+            for il in self.layers:
+                if il in self._kvi:
+                    k = self._kvi[il]
+                    self.Kc[k] = np.zeros((self.ctx, 1, 1), dtype=np.float16)
+                    self.Vc[k] = np.zeros((self.ctx, 1, 1), dtype=np.float16)
+                else:
+                    self.M[il] = np.zeros(1, dtype=np.float32)
+                    self.conv[il] = np.zeros(1, dtype=np.float32)
+
+    def begin(self, tok):
+        self.calls.append(("begin", int(tok)))
+        self.h = np.full(self.D, float(tok), dtype=np.float32)
+
+    def layer(self, il, pos):
+        self.calls.append(("layer", int(il), int(pos)))
+        self.h += 1.0
+
+    def feed(self, tok, pos):
+        self.calls.append(("feed", int(tok), int(pos)))
+
+    def step(self, tok, pos, **kw):
+        self.calls.append(("step", int(tok), int(pos)))
+        return 42
+
+    def finish(self):
+        self.calls.append(("finish",))
+        self.ylog = np.arange(5, dtype=np.float32) + 100
+        return 77
+
+    def head(self):
+        self.calls.append(("head",))
+        self.ylog = np.arange(5, dtype=np.float32) + 200
+        return 88
+
+    def get_hidden(self):
+        self.calls.append(("get_hidden",))
+        return self.h.copy()
+
+    def set_hidden(self, values):
+        self.calls.append(("set_hidden", list(values)))
+        self.h = np.asarray(values, dtype=np.float32).copy()
+        self.pending = 0
+
+    def flush(self):
+        self.calls.append(("flush",))
+        self.pending = 0
+
+    def reset(self):
+        self.calls.append(("reset",))
+        self.h.fill(0)
+        self.pending = 0
+        for a in self.M + self.conv + self.Kc + self.Vc:
+            if a is not None:
+                a.fill(0)
+
+
+@pytest.fixture
+def fake_pack(tmp_path):
+    pack = tmp_path / "pack"
+    pack.mkdir()
+    (pack / "kindi_pack.json").write_text(json.dumps({"dimensions": {"layers": 4}}), encoding="utf-8")
+    return str(pack)
+
+
+class FakeCPUEngine(FakeEngine):
+    """The CPU backend keeps compact per-owner state lists (it only loads its layers)."""
+
+    def __init__(self, pack, ctx=4096, log=None, layers=None, embed=True, head=True, kv=None):
+        super().__init__(pack, ctx=ctx, log=log, layers=layers, embed=embed, head=head, kv=kv)
+        if self.layers is not None:
+            self.M, self.conv, self.Kc, self.Vc = [], [], [], []
+            for il in self.layers:
+                if il in self._kvi:
+                    self.Kc.append(np.zeros((self.ctx, 1, 1), dtype=np.float16))
+                    self.Vc.append(np.zeros((self.ctx, 1, 1), dtype=np.float16))
+                else:
+                    self.M.append(np.zeros(1, dtype=np.float32))
+                    self.conv.append(np.zeros(1, dtype=np.float32))
+
+
+class FakeGPUEngine(FakeEngine):
+    """The GPU backend keeps global layer-indexed state (it loads a slice by layer id)."""
+
+
+@pytest.fixture
+def fake_backends(monkeypatch):
+    monkeypatch.setattr(tandem, "CPUEngine", FakeCPUEngine)
+    monkeypatch.setattr(tandem, "GPUEngine", FakeGPUEngine)
+    # the owner choice is a property of the machine (a card is visible or not): pin it so these tests
+    # do not change behaviour with the host. The plan owner is covered by its own tests below.
+    monkeypatch.setenv("KINDI_TANDEM_GPU", "plain")
+
+
+def test_cpu_first_owns_the_prefix_and_the_gpu_head(fake_pack, fake_backends):
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first", log=lambda *a: None)
+    assert eng.cpu.layers == (0, 1)          # the CPU engine loads only its owned slice
+    assert eng.cpu.embed_owned is True and eng.cpu.head_owned is False
+    assert eng.gpu.layers == (2, 3)
+    assert eng.gpu.embed_owned is False
+    assert eng.gpu.head_owned is True
+    assert eng.cpu_range == (0, 1) and eng.gpu_range == (2, 3)
+    assert eng.ylog is eng.gpu.ylog
+
+    assert eng.step(10, 0) == 77
+    assert eng.cpu.calls == [("begin", 10), ("layer", 0, 0), ("layer", 1, 0), ("get_hidden",)]
+    assert eng.gpu.calls[:4] == [("set_hidden", [12.0, 12.0, 12.0, 12.0]),
+                                  ("layer", 2, 0), ("layer", 3, 0), ("finish",)]
+    assert eng.ylog is eng.gpu.ylog
+
+
+def test_gpu_first_owns_the_prefix_and_the_cpu_head(fake_pack, fake_backends):
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="gpu-first", log=lambda *a: None)
+    assert eng.cpu.layers == (2, 3)          # the CPU engine loads only its owned slice
+    assert eng.cpu.embed_owned is False and eng.cpu.head_owned is True
+    assert eng.gpu.layers == (0, 1)
+    assert eng.gpu.embed_owned is True
+    assert eng.gpu.head_owned is False
+    assert eng.cpu_range == (2, 3) and eng.gpu_range == (0, 1)
+    assert eng.ylog is eng.cpu.ylog
+
+    assert eng.step(9, 0) == 88
+    assert eng.gpu.calls[:3] == [("begin", 9), ("layer", 0, 0), ("layer", 1, 0)]
+    assert eng.gpu.calls[3] == ("get_hidden",)
+    assert eng.cpu.calls[:3] == [("set_hidden", [11.0, 11.0, 11.0, 11.0]),
+                                 ("layer", 2, 0), ("layer", 3, 0)]
+    assert eng.cpu.calls[-1] == ("head",)
+    assert eng.ylog is eng.cpu.ylog
+
+
+def test_feed_leaves_the_residual_without_evaluating_the_head(fake_pack, fake_backends):
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=1, mode="cpu-first", log=lambda *a: None)
+    eng.feed(3, 7)
+    assert ("finish",) not in eng.gpu.calls
+    assert eng.gpu.calls[-1] == ("flush",)
+
+
+def test_reset_clears_both_backends(fake_pack, fake_backends):
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=1, mode="gpu-first", log=lambda *a: None)
+    eng.reset()
+    assert ("reset",) in eng.cpu.calls and ("reset",) in eng.gpu.calls
+
+
+def test_explicit_layer_list_routes_each_layer_to_its_owner(fake_pack, fake_backends):
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers="0,2", mode="cpu-first", log=lambda *a: None)
+    assert eng.cpu_range == (0, 2) and eng.gpu_range == (1, 3)
+    assert eng.cpu_layers == [0, 2]
+    assert eng.step(5, 0) == 77
+    # CPU embeds, layer 0 runs on the CPU, hidden crosses, layer 1 runs on the GPU,
+    # hidden crosses back, layer 2 runs on the CPU, hidden crosses, layer 3 + head on the GPU
+    assert [c for c in eng.cpu.calls if c[0] == "layer"] == [("layer", 0, 0), ("layer", 2, 0)]
+    assert [c for c in eng.gpu.calls if c[0] == "layer"] == [("layer", 1, 0), ("layer", 3, 0)]
+    assert eng.cpu.calls[0] == ("begin", 5)
+    # every ownership switch must hand the hidden state over (3 switches for 0,2)
+    switches = sum(1 for c in eng.cpu.calls + eng.gpu.calls if c[0] == "set_hidden")
+    assert switches == 3
+
+
+def test_placement_specs_parse_to_layer_sets():
+    assert tandem._parse_layers("6") == 6
+    assert tandem._parse_layers("0,1,2") == (0, 1, 2)
+    assert tandem._parse_layers("0-2,4-6") == (0, 1, 2, 4, 5, 6)
+    assert tandem._parse_layers("gdn:6") == "gdn:6"
+
+
+def test_gdn_first_keeps_attention_layers_on_the_gpu():
+    dims = {"layers": 32, "full_attention_interval": 4}
+    layers = tandem.gdn_first(dims, 6)
+    assert layers == (0, 1, 2, 4, 5, 6)
+    assert not any((il + 1) % 4 == 0 for il in layers)      # no attention layer on the CPU
+    assert len(tandem.gdn_first(dims, 23)) == 23            # every GDN layer is allowed
+    with pytest.raises(SystemExit, match="between 1 and 23"):
+        tandem.gdn_first(dims, 24)                          # the 24th layer would be attention
+
+
+def test_pack_bytes_counts_the_engine_allocation(tmp_path):
+    pack = tmp_path / "p"
+    pack.mkdir()
+    # two ternary tensors: bcodes = rows*ne0/4 plus one fp16 scale per 128-column group; one f32 tensor
+    (pack / "bcodes_index.json").write_text(json.dumps({"tensors": {
+        "token_embd.weight": {"rows": 128, "ne0": 256},
+        "blk.0.attn_qkv.weight": {"rows": 256, "ne0": 128},
+        "blk.1.ffn_up.weight": {"rows": 64, "ne0": 128},
+        "output.weight": {"rows": 128, "ne0": 256}}}), encoding="utf-8")
+    (pack / "index.json").write_text(json.dumps({"tensors": {
+        "token_embd.weight": {"rows": 128, "ne0": 256},
+        "blk.0.attn_qkv.weight": {"rows": 256, "ne0": 128},
+        "blk.1.ffn_up.weight": {"rows": 64, "ne0": 128},
+        "blk.0.ssm_norm.weight": {"nfloats": 100},
+        "output.weight": {"rows": 128, "ne0": 256}}}), encoding="utf-8")
+    man = {"f32_bytes": 4096, "head": "output.weight"}
+    got = tandem.pack_bytes(str(pack), man)
+    assert got["layers"][0] == 256 * 128 // 4 + 256 * 1 * 2 + 400        # qkv + its f32 neighbour
+    assert got["layers"][1] == 64 * 128 // 4 + 64 * 1 * 2
+    assert got["embed"] == 128 * 256 // 4 + 128 * 2 * 2
+    assert got["head"] == got["embed"] and got["f32"] == 4096
+
+
+def test_gpu_estimate_charges_kv_only_for_attention_layers_it_keeps():
+    dims = {"layers": 8, "full_attention_interval": 4, "kv_heads": 2, "head_dim": 16}
+    sizes = {"layers": {il: 1000 for il in range(8)}, "embed": 500, "head": 500, "f32": 100}
+    # the plain GPU owner keeps q8_0 K/V (one int8 per value plus one fp16 scale per 32 values)
+    kv = tandem.kv_bytes(dims, 1024, "q8_0")
+    assert kv == int(1024 * 2 * 2 * 16 * tandem.Q8_0)
+    scratch = tandem.SCRATCH_MIB * 2 ** 20
+    full = tandem.gpu_estimate(dims, sizes, 1024)
+    assert full == scratch + 100 + 500 + 500 + 8000 + 2 * kv      # attention layers 3 and 7
+    # the CPU owns the embedding once layer 0 is off the GPU
+    assert tandem.gpu_estimate(dims, sizes, 1024, (0,)) == full - 1000 - 500
+    # offloading the last attention layer removes its K/V, and (layer 7 is the last layer) the head
+    assert tandem.gpu_estimate(dims, sizes, 1024, (7,)) == full - 1000 - kv - 500
+
+
+def test_auto_planner_prefers_gdn_layers_and_respects_the_budget():
+    dims = {"layers": 32, "full_attention_interval": 4, "kv_heads": 4, "head_dim": 256}
+    sizes = {"layers": {il: 56 * 2 ** 20 for il in range(32)}, "embed": 0, "head": 258 * 2 ** 20,
+             "f32": 28 * 2 ** 20}
+    # 32 layers * 56 MiB + 8 attention * 96 MiB K/V + head + f32 + scratch ~= 2.9 GiB
+    total = tandem.gpu_estimate(dims, sizes, 24576)
+    assert tandem.plan_cpu_layers(dims, sizes, 24576, total + 1024 * 2 ** 20) == ()
+    cpu = tandem.plan_cpu_layers(dims, sizes, 24576, total - 200 * 2 ** 20, reserve_mib=0)
+    assert cpu and all((il + 1) % 4 for il in cpu)         # only GDN layers are moved
+    assert cpu == tuple(sorted(cpu))
+    assert tandem.gpu_estimate(dims, sizes, 24576, cpu) <= total - 200 * 2 ** 20
+    big = tandem.plan_cpu_layers(dims, sizes, 24576, total - 700 * 2 ** 20, reserve_mib=0)
+    assert len(big) > len(cpu) and all((il + 1) % 4 for il in big)
+
+
+def test_vram_budget_helper_combines_free_memory_reserve_and_ceiling():
+    mb = 2 ** 20
+    assert tandem.vram_budget_bytes(8 << 30, 512, 6144) == min((8 << 30) - 512 * mb, 6144 * mb)
+    assert tandem.vram_budget_bytes(8 << 30, 0, None) == 8 << 30
+    assert tandem.vram_budget_bytes(512 * mb, 512, 6144) == 0
+    with pytest.raises(SystemExit, match="cannot be negative"):
+        tandem.vram_budget_bytes(8 << 30, -1, None)
+
+
+def test_explicit_vram_ceiling_forces_a_split_below_a_larger_free_figure():
+    """A display card can have 8 GiB free but a 6 GiB usable barrier: the ceiling, not free memory,
+    decides the fit."""
+    dims = {"layers": 32, "full_attention_interval": 4, "kv_heads": 4, "head_dim": 256}
+    mb = 2 ** 20
+    sizes = {"layers": {il: 56 * mb for il in range(32)}, "embed": 0, "head": 258 * mb,
+             "f32": 28 * mb}
+    full = tandem.gpu_estimate(dims, sizes, 24576)
+    ceiling = full // mb - 300
+    cpu = tandem.plan_cpu_layers(dims, sizes, 24576, 64 << 30, reserve_mib=0,
+                                 vram_budget_mib=ceiling)
+    assert cpu and all((il + 1) % 4 for il in cpu)
+    assert tandem.gpu_estimate(dims, sizes, 24576, cpu) <= ceiling * mb
+    # the same card with no ceiling fits the whole model
+    assert tandem.plan_cpu_layers(dims, sizes, 24576, 64 << 30, reserve_mib=0) == ()
+
+
+def test_auto_target_frees_at_least_the_requested_headroom():
+    dims = {"layers": 32, "full_attention_interval": 4, "kv_heads": 4, "head_dim": 256}
+    mb = 2 ** 20
+    sizes = {"layers": {il: 56 * mb for il in range(32)}, "embed": 258 * mb, "head": 258 * mb, "f32": 28 * mb}
+    full = tandem.gpu_estimate(dims, sizes, 8192)
+    # the model fits easily, but the target asks for 1 GiB of headroom on top
+    cpu = tandem.plan_cpu_layers(dims, sizes, 8192, 64 << 30, reserve_mib=0, target_mib=1024)
+    assert cpu and all((il + 1) % 4 for il in cpu)
+    assert full - tandem.gpu_estimate(dims, sizes, 8192, cpu) >= 1024 * mb
+    # a target of 0 is a no-op
+    assert tandem.plan_cpu_layers(dims, sizes, 8192, 64 << 30, reserve_mib=0, target_mib=0) == ()
+
+
+def test_gpu_estimate_charges_the_head_only_when_the_gpu_owns_the_last_layer():
+    """In gpu-first the CPU owns the final layers and the output head; charging the head
+    to the GPU over-counts the estimate by the head's size (322 MiB on the 27B)."""
+    dims = {"layers": 8, "full_attention_interval": 4, "kv_heads": 2, "head_dim": 16}
+    sizes = {"layers": {il: 1000 for il in range(8)}, "embed": 500, "head": 7777, "f32": 100}
+    cpu_first = tandem.gpu_estimate(dims, sizes, 1024, tuple(range(4)))      # head on GPU, no embed
+    gpu_first = tandem.gpu_estimate(dims, sizes, 1024, tuple(range(4, 8)))    # head on CPU, embed on GPU
+    assert cpu_first - gpu_first == 7777 - 500
+
+
+def test_state_bytes_charges_the_recurrent_state_per_gdn_layer():
+    """The delta matrix (NV x HK x HK fp32) plus three conv channels: ~3.1 MiB per layer on the
+    27B and invisible in the old fixed scratch allowance."""
+    dims = {"state_size": 128, "gdn_inner": 6144, "groups": 16}
+    nv, hk, conv = 48, 128, 2 * 16 * 128 + 48 * 128
+    assert tandem.state_bytes(dims) == nv * hk * hk * 4 + 3 * conv * 4
+    assert 3 * 2 ** 20 < tandem.state_bytes(dims) < 4 * 2 ** 20
+    assert tandem.state_bytes({}) == 0                  # unknown geometry: no charge, no crash
+
+
+def test_gdn_without_a_count_is_a_clean_error():
+    dims = {"layers": 8, "full_attention_interval": 4}
+    for bad in ("", "x", None):
+        with pytest.raises(SystemExit, match="gdn: needs a layer count"):
+            tandem.gdn_first(dims, bad)
+
+
+def test_auto_planner_refuses_when_nothing_can_fit():
+    dims = {"layers": 8, "full_attention_interval": 4, "kv_heads": 2, "head_dim": 16}
+    sizes = {"layers": {il: 1000 for il in range(8)}, "embed": 10, "head": 10, "f32": 10}
+    with pytest.raises(SystemExit, match="cannot fit"):
+        tandem.plan_cpu_layers(dims, sizes, 1024, 0, reserve_mib=0)
+
+
+def test_parse_layers_accepts_the_rate_forms():
+    assert tandem._parse_layers("rate") == "rate"
+    assert tandem._parse_layers("rate:0.25") == "rate:0.25"
+    # a rate floor is a fraction; bare "0.25" is not a layer count and must raise
+    with pytest.raises(ValueError):
+        tandem._parse_layers("0.25")
+
+
+def test_parse_layers_rejects_unknown_forms_with_the_valid_set():
+    for bad in ("fast", "0,1,fast", "auto:lots", "rate:fast", "gdn:many", "0", "-1"):
+        with pytest.raises(ValueError, match="layer spec.*gdn:N.*auto.*rate"):
+            tandem._parse_layers(bad)
+
+
+def _fake_ratio():
+    # full-GPU 30 tok/s, each CPU GDN layer costs 2 tok/s: rate falls linearly with the count
+    return {"kind": "kindi-split-ratio/1", "pack": {"source_sha256": "sha"},
+            "predicted_tok_s": {"8k": {str(n): 30.0 - 2 * n for n in range(33)},
+                               "24k": {str(n): 30.0 - 2 * n for n in range(33)}}}
+
+
+def _rate_fixture():
+    dims = {"layers": 32, "full_attention_interval": 4, "kv_heads": 4, "head_dim": 256}
+    sizes = {"layers": {il: 56 * 2 ** 20 for il in range(32)}, "embed": 0, "head": 258 * 2 ** 20,
+             "f32": 28 * 2 ** 20}
+    total = tandem.gpu_estimate(dims, sizes, 8192)
+    # a budget like the 27B at 24K: the model fits only from 11 CPU layers on
+    fitted = tandem.plan_cpu_layers(dims, sizes, 8192, total - 600 * 2 ** 20, reserve_mib=0)
+    return dims, sizes, total, fitted
+
+
+def test_rate_planner_takes_the_fastest_fitting_split_without_a_floor():
+    dims, sizes, total, fitted = _rate_fixture()
+    pick = tandem.plan_cpu_layers_rate(dims, sizes, 8192, total - 600 * 2 ** 20, reserve_mib=0,
+                                       owner="plain", ratio=_fake_ratio())
+    assert pick == fitted                     # the same fitting boundary the fit-only planner finds
+    assert tandem._predicted_rate(_fake_ratio(), len(pick), 8192) == pytest.approx(30.0 - 2 * len(pick))
+
+
+def test_rate_planner_with_a_floor_frees_as_much_as_the_floor_allows():
+    dims, sizes, total, fitted = _rate_fixture()
+    # 20% of 30 tok/s is 6 tok/s. Rates are 30-2N, so the largest count still at or above the
+    # floor is N=12; the smallest count that fits the budget is 11. The floor pick is allowed
+    # to offload one more layer than the fastest pick, in exchange for more VRAM freed.
+    pick = tandem.plan_cpu_layers_rate(dims, sizes, 8192, total - 600 * 2 ** 20, reserve_mib=0,
+                                       rate_floor=0.2, owner="plain", ratio=_fake_ratio())
+    assert len(pick) == 12 and len(pick) > len(fitted)
+    assert tandem._predicted_rate(_fake_ratio(), len(pick), 8192) == pytest.approx(6.0)
+    assert all((il + 1) % 4 for il in pick)  # still only GDN layers are moved
+
+
+def test_rate_planner_refuses_a_floor_no_fitting_split_can_keep():
+    dims, sizes, total, fitted = _rate_fixture()
+    with pytest.raises(SystemExit, match="rate floor"):
+        # 95% of 30 is 28.5 tok/s; the smallest fitting count is already slower
+        tandem.plan_cpu_layers_rate(dims, sizes, 8192, total - 600 * 2 ** 20, reserve_mib=0,
+                                    rate_floor=0.95, owner="plain", ratio=_fake_ratio())
+
+
+def test_rate_planner_says_fit_only_when_the_calibration_lacks_the_count():
+    # the calibration exists but has no row for the picked count: never print a made-up 0.0 tok/s
+    dims, sizes, total, fitted = _rate_fixture()
+    partial = _fake_ratio()
+    partial["predicted_tok_s"] = {"8k": {}, "24k": {}}
+    logs = []
+    pick = tandem.plan_cpu_layers_rate(dims, sizes, 8192, total - 600 * 2 ** 20, reserve_mib=0,
+                                       owner="plain", ratio=partial, log=logs.append)
+    assert pick == fitted
+    assert any("fit only" in line and "no predicted rate" in line for line in logs)
+    assert not any("0.0 tok/s" in line for line in logs)
+
+
+def test_rate_planner_without_a_calibration_behaves_as_the_fit_only_pick(tmp_path, monkeypatch):
+    dims, sizes, total, fitted = _rate_fixture()
+    monkeypatch.setattr(tandem, "load_ratio", lambda **kw: None)
+    logs = []
+    pick = tandem.plan_cpu_layers_rate(dims, sizes, 8192, total - 600 * 2 ** 20, reserve_mib=0,
+                                       owner="plain", log=logs.append)
+    assert pick == fitted
+    assert any("no split-ratio calibration" in line for line in logs)
+
+
+def test_load_ratio_prefers_a_live_measurement_over_a_stale_nocard_file(tmp_path, monkeypatch):
+    cache_dir = tmp_path / ".cache" / "kindi" / "tandem"
+    cache_dir.mkdir(parents=True)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    old = {"kind": "kindi-split-ratio/1", "measured_utc": "2026-11-14T00:00:00Z", "gpu": None,
+           "pack": {"source_sha256": "SHAME"}, "predicted_tok_s": {"24k": {"12": 12.45}}}
+    new = {"kind": "kindi-split-ratio/1", "measured_utc": "2026-11-14T01:00:00Z",
+           "gpu": "NVIDIA GeForce RTX 4060 Ti",
+           "pack": {"source_sha256": "SHAME"}, "predicted_tok_s": {"24k": {"12": 5.83}}}
+    f_old = cache_dir / "kindi-split-ratio-nocard-SHAME.json"
+    f_new = cache_dir / "kindi-split-ratio-nvidia-SHAME.json"
+    f_old.write_text(json.dumps(old))
+    f_new.write_text(json.dumps(new))
+    got = tandem.load_ratio(pack_sha="SHAME", cache_dir=str(cache_dir))
+    assert got["predicted_tok_s"]["24k"]["12"] == 5.83
+
+
+def test_load_ratio_matches_the_pack_hash(tmp_path, monkeypatch):
+    def write(name, payload):
+        (tmp_path / name).write_text(json.dumps(payload), encoding="utf-8")
+    other = _fake_ratio()
+    write("a.json", other)
+    mine = _fake_ratio()
+    mine["pack"]["source_sha256"] = "SHAME"
+    write("b.json", mine)
+    assert tandem.load_ratio(pack_sha="SHAME", path=str(tmp_path / "b.json")) is not None
+    assert tandem.load_ratio(pack_sha="OTHER", path=str(tmp_path / "b.json")) is None
+    monkeypatch.setenv("KINDI_TANDEM_RATIO", str(tmp_path / "a.json"))
+    assert tandem.load_ratio(pack_sha=None, path=str(tmp_path / "a.json")) is not None
+
+
+def test_load_ratio_ignores_a_file_of_the_wrong_kind(tmp_path):
+    payload = {"kind": "kindi-split-ratio/9", "pack": {"source_sha256": "SHAME"},
+               "predicted_tok_s": {"24k": {"12": 5.8}}}
+    p = tmp_path / "ratio.json"
+    p.write_text(json.dumps(payload), encoding="utf-8")
+    assert tandem.load_ratio(pack_sha="SHAME", path=str(p)) is None
+
+
+def test_load_ratio_ignores_a_corrupt_file(tmp_path):
+    p = tmp_path / "ratio.json"
+    p.write_text("{not json at all", encoding="utf-8")
+    assert tandem.load_ratio(pack_sha="SHAME", path=str(p)) is None
+
+
+def test_owner_table_matches_the_placement(fake_pack, fake_backends):
+    # the dispatch table is resolved once at construction; pin that it routes every layer the way
+    # the old per-token set lookup did, including an interleaved placement (the GDN shape)
+    for spec, cpu_layers in (("0,2", (0, 2)), (2, (0, 1))):
+        eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=spec, mode="cpu-first",
+                                  log=lambda *a: None)
+        assert tuple(i for i, o in enumerate(eng._owners) if o is eng.cpu) == cpu_layers
+        assert eng._owners[0] is eng.cpu     # the embedding owner starts the token
+        assert all((o is eng.cpu) == (il in cpu_layers) for il, o in enumerate(eng._owners))
+
+
+def test_auto_placement_resolves_before_the_backends_are_built(fake_pack, fake_backends, monkeypatch):
+    dims = {"layers": 4, "full_attention_interval": 2, "kv_heads": 1, "head_dim": 8}
+    (Path(fake_pack) / "kindi_pack.json").write_text(json.dumps({"dimensions": dims}), encoding="utf-8")
+    sizes = {"layers": {il: 1 for il in range(4)}, "embed": 1, "head": 1, "f32": 1}
+    monkeypatch.setattr(tandem, "pack_bytes", lambda pack, man=None: sizes)
+    monkeypatch.setattr(tandem, "gpu_estimate", lambda *a, **k: 8 << 30)
+    monkeypatch.setattr(tandem, "plan_cpu_layers", lambda *a, **k: (1, 2))
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers="auto", mode="cpu-first", log=lambda *a: None)
+    assert eng.cpu_range == (1, 2) and eng.gpu_range == (0, 3)
+
+
+def test_auto_placement_passes_the_vram_budget_to_the_planner(fake_pack, fake_backends, monkeypatch):
+    dims = {"layers": 4, "full_attention_interval": 2, "kv_heads": 1, "head_dim": 8}
+    (Path(fake_pack) / "kindi_pack.json").write_text(json.dumps({"dimensions": dims}), encoding="utf-8")
+    sizes = {"layers": {il: 1 for il in range(4)}, "embed": 1, "head": 1, "f32": 1}
+    seen = []
+    monkeypatch.setattr(tandem, "pack_bytes", lambda pack, man=None: sizes)
+    monkeypatch.setattr(tandem, "gpu_estimate", lambda *a, **k: 8 << 30)
+    monkeypatch.setattr(tandem, "plan_cpu_layers", lambda *a, **k: seen.append(k) or (1, 2))
+    monkeypatch.setenv("KINDI_TANDEM_VRAM_MB", "6144")
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers="auto", mode="cpu-first",
+                              log=lambda *a: None)
+    assert eng.cpu_range == (1, 2)
+    assert seen[-1]["vram_budget_mib"] == 6144
+    assert seen[-1]["reserve_mib"] == 512
+
+
+def test_auto_placement_refuses_when_the_model_already_fits(fake_pack, fake_backends, monkeypatch):
+    monkeypatch.setattr(tandem, "pack_bytes", lambda pack, man=None: {"layers": {0: 1, 1: 1}, "embed": 1,
+                                                                        "head": 1, "f32": 1})
+    monkeypatch.setattr(tandem, "gpu_estimate", lambda *a, **k: 1)
+    with pytest.raises(SystemExit, match="already fits"):
+        tandem.TandemEngine(fake_pack, ctx=64, cpu_layers="auto", mode="cpu-first", log=lambda *a: None)
+
+
+def test_invalid_split_is_rejected_before_a_backend_is_built(fake_pack, fake_backends):
+    with pytest.raises(SystemExit, match="between 1 and 3"):
+        tandem.TandemEngine(fake_pack, cpu_layers=0, mode="cpu-first", log=lambda *a: None)
+    with pytest.raises(SystemExit, match="cpu-first or gpu-first"):
+        tandem.TandemEngine(fake_pack, cpu_layers=1, mode="middle", log=lambda *a: None)
+
+
+def cache_cfg(tmp_path):
+    return {"checkpoint_every": "16", "prefix_max": "0", "prefix_min": "0", "park_max": "0",
+            "checkpoint_budget_mb": "0", "state_dir": str(tmp_path), "head": "exact"}
+
+
+def test_runner_reads_the_prompt_and_steps_the_last_token(fake_pack, fake_backends, tmp_path):
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=1, mode="cpu-first", log=lambda *a: None)
+    runner = tandem.TandemRunner(eng, cache_cfg(tmp_path), "test", log=lambda *a: None)
+    nxt, cached = runner.prepare([1, 2, 3], 3)
+    assert nxt == 77 and cached == 0
+    assert runner.tokens == [1, 2, 3]
+    assert ("get_hidden",) in eng.cpu.calls
+    assert runner.step(4) == 77
+    assert runner.tokens == [1, 2, 3, 4]
+
+
+def test_joint_checkpoint_contains_both_owners(fake_pack, fake_backends):
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first", log=lambda *a: None)
+    view = eng.cache_view()
+    assert view.M[0] is eng.cpu.M[0]
+    assert view.M[1] is eng.gpu.M[2]
+    assert view.Kc[0] is eng.cpu.Kc[0]
+    assert view.Kc[1] is eng.gpu.Kc[1]
+    assert view.conv[0] is eng.cpu.conv[0] and view.conv[1] is eng.gpu.conv[2]
+
+
+def test_joint_checkpoint_restores_both_owners(fake_pack, fake_backends, tmp_path):
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first", log=lambda *a: None)
+    view = eng.cache_view()
+    for i, a in enumerate(view.M):
+        a.fill(10 + i)
+    for i, a in enumerate(view.conv):
+        a.fill(30 + i)
+    runner = tandem.TandemRunner(eng, cache_cfg(tmp_path), "test", log=lambda *a: None)
+    runner._save_ckpt(4)
+    for a in view.M + view.conv:
+        a.fill(0)
+    runner._restore(runner.ckpt[4])
+    assert [int(a[0]) for a in view.M] == [10, 11]
+    assert [int(a[0]) for a in view.conv] == [30, 31]
+
+
+def test_joint_prefix_reuse_resumes_at_a_checkpoint(fake_pack, fake_backends, tmp_path):
+    eng = tandem.TandemEngine(fake_pack, ctx=512, cpu_layers=2, mode="gpu-first", log=lambda *a: None)
+    runner = tandem.TandemRunner(eng, cache_cfg(tmp_path), "test", log=lambda *a: None)
+    first = list(range(300))
+    nxt, cached = runner.prepare(first, len(first), len(first))
+    assert nxt == 88 and cached == 0
+    second = first[:260] + [100, 101]
+    nxt, cached = runner.prepare(second, len(second), len(second))
+    assert cached == 256
+    assert runner.tokens == second
+
+
+def test_tandem_runner_recomputes_the_pick_after_its_checkpoint_cache_is_deleted(
+        fake_pack, fake_backends, tmp_path):
+    """If the prompt checkpoint cache is deleted, the runner must read the prompt again
+    and compute a fresh next-token pick instead of relying on stale reuse state."""
+    eng = tandem.TandemEngine(fake_pack, ctx=512, cpu_layers=2, mode="gpu-first", log=lambda *a: None)
+    runner = tandem.TandemRunner(eng, cache_cfg(tmp_path), "test", log=lambda *a: None)
+    first = list(range(300))
+    nxt, cached = runner.prepare(first, len(first), len(first))
+    assert nxt == 88 and cached == 0
+    assert runner.ckpt
+
+    calls_before = len(eng.cpu.calls) + len(eng.gpu.calls)
+    runner.ckpt.clear()
+    runner.parked.clear()
+
+    nxt, cached = runner.prepare(first, len(first), len(first))
+    assert nxt == 88 and cached == 0
+    assert runner.tokens == first
+    assert len(eng.cpu.calls) + len(eng.gpu.calls) > calls_before
+
+
+def test_joint_fingerprint_separates_the_two_placements(fake_pack, fake_backends, tmp_path):
+    cpu_first = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first", log=lambda *a: None)
+    gpu_first = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="gpu-first", log=lambda *a: None)
+    cfg = cache_cfg(tmp_path)
+    a = cache.engine_fingerprint(cpu_first.cache_view(), cfg)[0]
+    b = cache.engine_fingerprint(gpu_first.cache_view(), cfg)[0]
+    assert a != b
+
+
+def test_layer_tensor_selection_keeps_only_owned_layers_and_optional_ends():
+    bi = {
+        "token_embd.weight": {"rows": 1},
+        "output.weight": {"rows": 2},
+        "blk.0.attn_q.weight": {"rows": 3},
+        "blk.1.ffn_up.weight": {"rows": 4},
+        "blk.2.attn_q.weight": {"rows": 5},
+    }
+    got = Engine._select_layers(bi, (1, 2), embed=False, head=True, head_name="output.weight")
+    assert set(got) == {"blk.1.ffn_up.weight", "blk.2.attn_q.weight", "output.weight"}
+    got = Engine._select_layers(bi, (0,), embed=True, head=False, head_name="output.weight")
+    assert set(got) == {"token_embd.weight", "blk.0.attn_q.weight"}
+
+
+# --------------------------------------------------------------- the GPU owner: plan or plain
+def test_the_gpu_owner_defaults_to_the_plan_engine_on_one_card(monkeypatch):
+    """The plan owner is the default because it loads only the owned layers and keeps q8_0 K/V."""
+    monkeypatch.setattr(tandem, "PlanEngine", object)
+    monkeypatch.delenv("KINDI_TP", raising=False)
+    assert tandem._pick_owner("auto") == "plan"          # one card on this host
+    assert tandem._pick_owner("plain") == "plain"
+    assert tandem._pick_owner("plan") == "plan"
+    assert tandem._pick_owner(None) == "plan"
+    with pytest.raises(SystemExit):
+        tandem._pick_owner("gpu")
+
+
+def test_the_plan_owner_steps_back_when_it_cannot_run(monkeypatch):
+    """KINDI_TP=0 keeps the plain engine; more than one visible card is not a tandem GPU owner."""
+    assert tandem._pick_owner("auto") == "plain" if False else True
+    monkeypatch.setenv("KINDI_TP", "0")
+    assert tandem._pick_owner("auto") == "plain"
+    monkeypatch.delenv("KINDI_TP")
+    logged = []
+    # a two-card host is the one case the plan engine cannot own (a partial plan engine is one card)
+    import kindi.engine as engine_mod
+    if engine_mod.cp is None:
+        pytest.skip("no CuPy: _pick_owner cannot read the card count")
+    monkeypatch.setenv("KINDI_CARDS", "2")
+    assert tandem._pick_owner("auto", log=logged.append) == "plain"
+    assert any("2 cards" in line for line in logged)
+
+
+def test_the_plan_owner_gets_only_the_gpu_layers_and_the_head(fake_pack, fake_backends, monkeypatch):
+    """The split under the plan owner: the same routing, a plan engine object, and a fingerprint that
+    records the owner (a plain K/V checkpoint must not be restored into a q8_0 owner)."""
+    monkeypatch.setattr(tandem, "PlanEngine", FakeGPUEngine)
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first",
+                              log=lambda *a: None, gpu="plan")
+    assert eng.gpu_kind == "plan"
+    assert isinstance(eng.gpu, FakeGPUEngine)
+    assert eng.gpu.layers == (2, 3)
+    assert eng.gpu.embed_owned is False and eng.gpu.head_owned is True
+    assert eng.cache_fingerprint()["gpu_owner"] == "plan"
+    plain = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first",
+                                log=lambda *a: None, gpu="plain")
+    assert plain.cache_fingerprint()["gpu_owner"] == "plain"
+    assert plain.cache_fingerprint() != eng.cache_fingerprint()
+    # the plain owner is constructed with q8_0 K/V, so offloaded layers free their K/V too
+    assert plain.gpu.kv == "q8_0"
+
+
+def test_a_plan_owner_frees_the_weights_and_half_the_kv_of_an_offloaded_layer():
+    """Requirement: an offloaded layer frees VRAM under both owners, but the plan owner frees more.
+
+    Both owners keep q8_0 K/V; the plan engine additionally reads the f32 file per tensor (only owned
+    layers) and keeps the embedding in pinned host memory, while the plain engine uploads the whole f32
+    file and the embedding. Compare the two estimates for the 27B geometry.
+    """
+    dims = {"layers": 64, "heads": 24, "kv_heads": 4, "head_dim": 256, "state_size": 128,
+            "groups": 16, "gdn_inner": 6144, "ffn": 17408, "full_attention_interval": 4}
+    layer = 105 * 2 ** 20
+    sizes = {"layers": {il: layer for il in range(64)},
+             "f32_layers": {il: 1 * 2 ** 20 for il in range(64)},
+             "f32": 100 * 2 ** 20, "f32_global": 100 * 2 ** 20 - 64 * 2 ** 20,
+             "embed": 130 * 2 ** 20, "head": 130 * 2 ** 20}
+    ctx = 24576
+    plan_full = tandem.gpu_estimate(dims, sizes, ctx, (), owner="plan")
+    plain_full = tandem.gpu_estimate(dims, sizes, ctx, (), owner="plain")
+    assert plan_full < plain_full
+    # q8_0 K/V is about half of fp16 (the plain engine's old cache)
+    fp16 = 16 * tandem.kv_bytes(dims, ctx)
+    q8 = 16 * tandem.kv_bytes(dims, ctx, "q8_0")
+    assert q8 == pytest.approx(fp16 / 2, rel=0.07)
+    # and it is also what the plain owner is now charged, to the byte (not the fp16 size),
+    # including the recurrent state of the 48 gated-delta layers
+    manual = (tandem.SCRATCH_MIB * 2 ** 20 + 100 * 2 ** 20 + 130 * 2 ** 20 + 130 * 2 ** 20
+              + 64 * layer + 16 * tandem.kv_bytes(dims, ctx, "q8_0")
+              + 48 * tandem.state_bytes(dims))
+    assert plain_full == manual
+    assert tandem.state_bytes(dims) > 3 * 2 ** 20        # ~3.1 MiB per GDN layer on this geometry
+    freed = {}
+    off = tuple(range(4, 36, 4))                        # eight GDN layers, layer 0 stays on the GPU
+    for owner in ("plan", "plain"):
+        full = tandem.gpu_estimate(dims, sizes, ctx, (), owner=owner)
+        eight = tandem.gpu_estimate(dims, sizes, ctx, off, owner=owner)
+        freed[owner] = full - eight
+        assert freed[owner] > 8 * layer * 0.99          # every offloaded layer's weights come back
+    assert freed["plan"] > freed["plain"]                # plus no per-layer f32 upload
+    # a plan owner never charges the whole f32 file nor the embedding on the device
+    one = tandem.gpu_estimate(dims, sizes, ctx, tuple(range(64)), owner="plan")
+    assert one < sizes["f32"] + sizes["head"] + tandem.PLAN_SCRATCH_MIB * 2 ** 20
+
+
+def test_pack_bytes_splits_the_f32_file_per_layer(tmp_path):
+    """f32 is charged per owned layer by the plan owner, so the per-layer sizes must add up."""
+    pack = tmp_path / "p"
+    pack.mkdir()
+    (pack / "kindi_pack.json").write_text(json.dumps({
+        "dimensions": {"layers": 2}, "head": "output.weight", "f32_bytes": 64}), encoding="utf-8")
+    (pack / "bcodes_index.json").write_text(json.dumps({"tensors": {
+        "blk.0.ffn_up.weight": {"rows": 4, "ne0": 128, "bc_off": 0, "dpm_off": 0},
+        "blk.1.ffn_up.weight": {"rows": 4, "ne0": 128, "bc_off": 64, "dpm_off": 0},
+        "output.weight": {"rows": 8, "ne0": 128, "bc_off": 128, "dpm_off": 0},
+        "token_embd.weight": {"rows": 8, "ne0": 128, "bc_off": 256, "dpm_off": 0},
+    }}), encoding="utf-8")
+    (pack / "index.json").write_text(json.dumps({"tensors": {
+        "blk.0.attn_norm.weight": {"f32_off": 0, "nfloats": 4},
+        "blk.1.attn_norm.weight": {"f32_off": 16, "nfloats": 4},
+        "output_norm.weight": {"f32_off": 32, "nfloats": 8},
+    }}), encoding="utf-8")
+    sizes = tandem.pack_bytes(str(pack))
+    assert sizes["f32_layers"] == {0: 16, 1: 16}
+    assert sizes["f32"] == 64 and sizes["f32_global"] == 32
+    # 4 rows x 128 cols: 128 bcodes bytes + 4 dpm bytes, plus the layer's own f32 norm (16 bytes)
+    assert sizes["layers"][0] == 4 * 32 + 4 * 2 + 16
+    assert sizes["f32_layers"][0] == 16
+
+
+def test_timing_probe_off_by_default(fake_pack, fake_backends, monkeypatch):
+    monkeypatch.delenv("KINDI_TANDEM_DEBUG_TIMING", raising=False)
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first", log=lambda *a: None)
+    assert eng._probe is False
+    assert eng.timing_summary() is None
+    assert eng.step(10, 0) == 77
+    assert eng.timing["tokens"] == 0       # untouched while off: today's _run, no bookkeeping
+
+
+def test_timing_probe_splits_one_token(fake_pack, fake_backends, monkeypatch):
+    monkeypatch.setenv("KINDI_TANDEM_DEBUG_TIMING", "1")
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first", log=lambda *a: None)
+    assert eng._probe is True
+    for i in range(5):
+        assert eng.step(10 + i, i) == 77   # probe output matches the unprobed path, token for token
+    s = eng.timing_summary()
+    assert s["tokens"] == 5
+    assert s["cpu_layers"] == 10 and s["gpu_layers"] == 10       # 2 + 2 layers per token
+    assert s["transfers_per_token"] == 1.0                        # one boundary switch, cpu-first
+    assert s["cpu_ms_per_layer"] > 0 and s["gpu_ms_per_layer"] > 0
+    total = s["cpu_ms_per_token"] + s["gpu_ms_per_token"] + s["transfer_ms_per_token"] + s["head_ms_per_token"]
+    assert abs(total - s["total_ms_per_token"]) < 0.01
+    assert s["head_ms_per_token"] > 0
+
+
+def test_timing_probe_counts_feed_without_the_head(fake_pack, fake_backends, monkeypatch):
+    monkeypatch.setenv("KINDI_TANDEM_DEBUG_TIMING", "1")
+    eng = tandem.TandemEngine(fake_pack, ctx=64, cpu_layers=2, mode="cpu-first", log=lambda *a: None)
+    eng.feed(7, 0)
+    s = eng.timing_summary()
+    assert s["tokens"] == 1 and s["head_ms_per_token"] == 0.0
+
+
+def test_a_moe_pack_is_refused_before_the_dense_split_is_built(tmp_path):
+    """`--tandem` on a Lightning pack used to reach the dense GDN split with a MoE manifest: the
+    refusal names the pack's own split instead of splitting layers that do not exist."""
+    import json
+
+    (tmp_path / "kindi_pack.json").write_text(
+        json.dumps({"backend": "kindi_lightning", "dimensions": {"layers": 4}}), encoding="utf-8")
+    with pytest.raises(SystemExit, match="expert-tier"):
+        tandem.TandemEngine(str(tmp_path), ctx=64, cpu_layers=1, mode="cpu-first", log=lambda *a: None)
+
+
+def test_a_non_dense_family_is_refused_without_a_hint(tmp_path):
+    import json
+
+    (tmp_path / "kindi_pack.json").write_text(
+        json.dumps({"backend": "kindi_gemma4", "dimensions": {"layers": 4}}), encoding="utf-8")
+    with pytest.raises(SystemExit, match="dense Bonsai packs"):
+        tandem.TandemEngine(str(tmp_path), ctx=64, cpu_layers=1, mode="cpu-first", log=lambda *a: None)

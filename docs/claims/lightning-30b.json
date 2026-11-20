@@ -1,0 +1,37 @@
+{
+  "gate": "lightning-30b",
+  "title": "Nemotron Lightning 30B adapter gate: verify and bench on the RTX 4060 Ti",
+  "measured": "2026-11-16",
+  "commit": "ba9b839",
+  "command": "python -m kindi verify, python -m kindi bench --sample-vram (ctx 8192) on a fresh pack built from the clean catalog download",
+  "notes": "The gate is a clean download: size, SHA-256 and GGUF header all matched the catalog before the run, which is why this family has a GPU claim while Nanbeige does not.",
+  "evidence": [
+    "docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-lightning-30b/RESULTS.md"
+  ],
+  "numbers": [
+    {
+      "id": "verify-counts",
+      "display": "5 token-exact + 7 llama.cpp ties",
+      "quoted_in": ["docs/BACKENDS.md", "docs/BENCHMARKS.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-lightning-30b/RESULTS.md",
+                "needle": "5 of 12 prompts token-exact, 7 end at a llama.cpp tie"}
+    },
+    {
+      "id": "read-band",
+      "display": "788.3–821.3",
+      "quoted_in": ["docs/BACKENDS.md", "docs/ROADMAP.md", "docs/BENCHMARKS.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-lightning-30b/RESULTS.md",
+                "needle": "788.3–821.3 tok/s"}
+    },
+    {
+      "id": "write-band",
+      "display": "165.96–167.41",
+      "quoted_in": ["docs/BACKENDS.md", "docs/ROADMAP.md", "docs/BENCHMARKS.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-lightning-30b/RESULTS.md",
+                "needle": "165.96–167.41 tok/s"}
+    }
+  ]
+}

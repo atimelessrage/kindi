@@ -1,0 +1,4 @@
+model,threads,binding,run,prompt,gen_100,gen_2000,gen_8000,gen_16000,gen_24000
+2b,6,close/cores,1,45.1,35.9,29.3,19.4,11.9,8.2
+4b,6,close/cores,1,19.2,15.2,13.4,6.8,4.3,3.1
+9b,6,close/cores,1,9.9,8.7,7.7,4.9,3.5,2.6

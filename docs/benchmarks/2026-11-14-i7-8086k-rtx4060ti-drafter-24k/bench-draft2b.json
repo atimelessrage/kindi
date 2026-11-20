@@ -1,0 +1,18 @@
+{
+  "cpu_layers": null,
+  "ctx": 12032,
+  "ctx_reduced": true,
+  "ctx_requested": 24576,
+  "device": "gpu",
+  "free_mib_after_load": 115,
+  "gen_tok_s": {
+    "exact:100": 40.2,
+    "exact:2000": 39.2,
+    "exact:8000": 38.7
+  },
+  "model": "Hf",
+  "pack": "~/.kindi/packs/bonsai-27b",
+  "read_tok_s": 42.8,
+  "tandem": "off",
+  "total_mib": 8187
+}

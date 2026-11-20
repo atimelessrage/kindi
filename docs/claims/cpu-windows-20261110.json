@@ -1,0 +1,464 @@
+{
+  "gate": "cpu-windows-20261110",
+  "title": "Native Windows CPU engine: 6-thread 24K run on the i7-8086K",
+  "measured": "2026-11-10",
+  "commit": "60a039b",
+  "command": "Windows 10, clang 18.1.8 + MSVC 14.51: python -m kindi --pack <pack> --ctx 24576 bench; verify at ctx 1024",
+  "notes": "Native-Windows CPU correctness and speed run; one run per model. BENCHMARKS quotes both the 24K table and the verify/readiness columns.",
+  "evidence": [
+    "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+    "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md"
+  ],
+  "numbers": [
+    {
+      "id": "2b-prompt",
+      "display": "45.1",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "2b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "prompt",
+        "expect": 45.1
+      }
+    },
+    {
+      "id": "2b-gen_100",
+      "display": "35.9",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "2b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "gen_100",
+        "expect": 35.9
+      }
+    },
+    {
+      "id": "2b-gen_2000",
+      "display": "29.3",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "2b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "gen_2000",
+        "expect": 29.3
+      }
+    },
+    {
+      "id": "2b-gen_8000",
+      "display": "19.4",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "2b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "gen_8000",
+        "expect": 19.4
+      }
+    },
+    {
+      "id": "2b-gen_16000",
+      "display": "11.9",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "2b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "gen_16000",
+        "expect": 11.9
+      }
+    },
+    {
+      "id": "2b-gen_24000",
+      "display": "8.2",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "2b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "gen_24000",
+        "expect": 8.2
+      }
+    },
+    {
+      "id": "4b-prompt",
+      "display": "19.2",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "4b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "prompt",
+        "expect": 19.2
+      }
+    },
+    {
+      "id": "4b-gen_100",
+      "display": "15.2",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "4b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "gen_100",
+        "expect": 15.2
+      }
+    },
+    {
+      "id": "4b-gen_2000",
+      "display": "13.4",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "4b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "gen_2000",
+        "expect": 13.4
+      }
+    },
+    {
+      "id": "4b-gen_8000",
+      "display": "6.8",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "4b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "gen_8000",
+        "expect": 6.8
+      }
+    },
+    {
+      "id": "4b-gen_16000",
+      "display": "4.3",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "4b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "gen_16000",
+        "expect": 4.3
+      }
+    },
+    {
+      "id": "4b-gen_24000",
+      "display": "3.1",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "4b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "gen_24000",
+        "expect": 3.1
+      }
+    },
+    {
+      "id": "9b-prompt",
+      "display": "9.9",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "9b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "prompt",
+        "expect": 9.9
+      }
+    },
+    {
+      "id": "9b-gen_100",
+      "display": "8.7",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "9b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "gen_100",
+        "expect": 8.7
+      }
+    },
+    {
+      "id": "9b-gen_2000",
+      "display": "7.7",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "9b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "gen_2000",
+        "expect": 7.7
+      }
+    },
+    {
+      "id": "9b-gen_8000",
+      "display": "4.9",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "9b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "gen_8000",
+        "expect": 4.9
+      }
+    },
+    {
+      "id": "9b-gen_16000",
+      "display": "3.5",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "9b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "gen_16000",
+        "expect": 3.5
+      }
+    },
+    {
+      "id": "9b-gen_24000",
+      "display": "2.6",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "csv",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/runs.csv",
+        "where": {
+          "model": "9b",
+          "threads": "6",
+          "binding": "close/cores",
+          "run": "1"
+        },
+        "field": "gen_24000",
+        "expect": 2.6
+      }
+    },
+    {
+      "id": "2b-verify",
+      "display": "4/4",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md",
+        "needle": "| 4/4 |"
+      }
+    },
+    {
+      "id": "2b-verify-rate",
+      "display": "33.7",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md",
+        "needle": "| 33.7 |"
+      }
+    },
+    {
+      "id": "2b-ready",
+      "display": "22.8 s",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md",
+        "needle": "22.8 s"
+      }
+    },
+    {
+      "id": "4b-verify",
+      "display": "4/4",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md",
+        "needle": "| 4/4 |"
+      }
+    },
+    {
+      "id": "4b-verify-rate",
+      "display": "16.7",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md",
+        "needle": "| 16.7 |"
+      }
+    },
+    {
+      "id": "4b-ready",
+      "display": "50.7 s",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md",
+        "needle": "50.7 s"
+      }
+    },
+    {
+      "id": "9b-verify",
+      "display": "4/4 (13/13 on prompt 3)",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md",
+        "needle": "| 4/4 (13/13 on prompt 3) |"
+      }
+    },
+    {
+      "id": "9b-verify-rate",
+      "display": "9.1",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md",
+        "needle": "| 9.1 |"
+      }
+    },
+    {
+      "id": "9b-ready",
+      "display": "112.3 s",
+      "quoted_in": [
+        "docs/BENCHMARKS.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md",
+        "needle": "112.3 s"
+      }
+    }
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "created_utc": "2026-11-11",
+  "base_model": {
+    "repo": "KRAFTON/Raon-1-mini-preview",
+    "revision": "8c9b802acacdbda9df16606689fcf437cf7262fb",
+    "last_modified": "2026-10-27T08:07:23.000Z",
+    "license": "apache-2.0",
+    "gated": false,
+    "shards": [
+      {
+        "name": "model-00001-of-00007.safetensors",
+        "size": 4998364808,
+        "sha256": "c18545414b88b1b1c694c23a275141885e26168bedca23f821b9b87d316f3867"
+      },
+      {
+        "name": "model-00002-of-00007.safetensors",
+        "size": 5000376992,
+        "sha256": "bbf5fb70a5a6c4af680b84ed482891c7e819829b4805b7511ef6b7daf98a9af1"
+      },
+      {
+        "name": "model-00003-of-00007.safetensors",
+        "size": 5000397960,
+        "sha256": "7e46f3844fd2d659c833bac9d09944407011c541bcf9bc7e71900bf7ac4148f4"
+      },
+      {
+        "name": "model-00004-of-00007.safetensors",
+        "size": 4998818792,
+        "sha256": "6264c2de64c006fb41d2dd215c87e5132681dd2e0e3419d4a0206daa8ae5ea59"
+      },
+      {
+        "name": "model-00005-of-00007.safetensors",
+        "size": 4974921360,
+        "sha256": "ad0dcf3f8ae44e80f1d5171156ef86cd8633b89a826a34a93e0367cfcf0d190e"
+      },
+      {
+        "name": "model-00006-of-00007.safetensors",
+        "size": 4989223544,
+        "sha256": "6628b23347ac6f3a2f8b42dfb93edb7e6e1c08a3a6bae6f09acefb7340190e25"
+      },
+      {
+        "name": "model-00007-of-00007.safetensors",
+        "size": 2740041632,
+        "sha256": "64f717749ef89be949fa95a82118aed668257057d98a807862761b9ed2af74ec"
+      }
+    ],
+    "files": {
+      "config.json": {
+        "size": 2028,
+        "sha256": "ccd1541ed7d4e26dd86e0b9c706f13e5dbdf968c68824c27c2eb53f23d735ee3"
+      },
+      "configuration_raon1_mini.py": {
+        "size": 6989,
+        "sha256": "3656b59a41dec3b228852973f0e2472ed081b14bcd80b36040e0e0afccba42c0"
+      },
+      "modeling_raon1_mini.py": {
+        "size": 56961,
+        "sha256": "ca0742570e8c9b730115f2feedbcd9f424dc47d21b132729f27c4d8ac6998fc6"
+      },
+      "model.safetensors.index.json": {
+        "size": 1837333,
+        "sha256": "698935d27fd0a7be12be30beb0f93408e378b158cb0913390652c7c6a51713a2"
+      },
+      "generation_config.json": {
+        "size": 167,
+        "sha256": "9480ec0f58bcbb8df2050aa8312b3fdd7248792c4b0e861582feeb75fdfe71f5"
+      },
+      "tokenizer_config.json": {
+        "size": 281,
+        "sha256": "d5d612aeef88d4564d2010ab7f65b7e54821acfd7ccda80739dd19761840bcde"
+      },
+      "chat_template.jinja": {
+        "size": 6735,
+        "sha256": "34a9f0219d315211631885b22d8e4973943c092ef319b57c11853127e392b0ac"
+      },
+      "LICENSE": {
+        "size": 11358,
+        "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+      }
+    },
+    "index_total_size": 32699649368,
+    "safetensors_parameters": {
+      "BF16": 3113981970,
+      "F32": 95952,
+      "F8_E4M3": 25669140480,
+      "total": 28783218402
+    },
+    "tokenizer_json": {
+      "size": 12219054,
+      "sha256_lfs_oid": "47752d33008f5dd7cc91d875f1b798d1f1ad8f6a0e84aac9e67cbb49f9da16af"
+    }
+  },
+  "gguf": {
+    "repo": "KRAFTON/Raon-1-mini-preview-gguf",
+    "revision": "cd61e81afcdfdf4b13cb345b3587c0ba4b918d00",
+    "file": "raon-1-mini-preview-Q4_K_M.gguf",
+    "size": 19686434240,
+    "sha256": "ba56ad4bd6d15f8c4255876ff252890143074a5d3835fccfc656cee915999ee8",
+    "header": {
+      "bytes": 134217728,
+      "sha256": "22257ab636f6e900e2e5c9384ca0a310b794c4a2f3f97e0cbac36e980a111841"
+    },
+    "sha256sums_url": "https://huggingface.co/KRAFTON/Raon-1-mini-preview-gguf/raw/main/SHA256SUMS"
+  },
+  "llama_cpp": {
+    "repo": "https://github.com/krafton-ai/llama.cpp",
+    "branch": "raon-1-mini-preview",
+    "commit": "fb895662d25868756a19253ca5e0688f99b18994",
+    "commit_date": "2026-10-20T13:33:00Z",
+    "arg_sha256": "a10b6e6af910366c5c1abb89e47a7c6711fc1f10708b5fbfd8b59ba1a11d0f4a"
+  },
+  "official_repo": {
+    "url": "https://github.com/krafton-ai/Raon-1-mini-preview",
+    "commit": "cfa219538a11a0f10a6ae40ede76bdb8efc4dc4e",
+    "commit_date": "2026-10-27T08:08:21Z"
+  },
+  "evidence": {
+    "base_config_url": "https://huggingface.co/KRAFTON/Raon-1-mini-preview/raw/main/config.json",
+    "base_index_url": "https://huggingface.co/KRAFTON/Raon-1-mini-preview/raw/main/model.safetensors.index.json",
+    "base_model_card_url": "https://huggingface.co/KRAFTON/Raon-1-mini-preview",
+    "gguf_model_card_url": "https://huggingface.co/KRAFTON/Raon-1-mini-preview-gguf",
+    "license_url": "https://www.apache.org/licenses/LICENSE-2.0",
+    "notes": "Only tensor/metadata headers were fetched. The base shards, tokenizer.json and the 19.7 GB GGUF payload were not downloaded or executed. The model card says access is granted on request; no Hugging Face token was used for the headers."
+  }
+}

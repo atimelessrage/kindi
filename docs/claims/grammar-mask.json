@@ -1,0 +1,34 @@
+{
+  "gate": "grammar-mask",
+  "title": "Token-class constrained mask: REQ-0027 gate rows on the 2B",
+  "measured": "2026-11-20",
+  "commit": "working tree (uncommitted at measurement)",
+  "command": "python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b; python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b --doc long; python tools/grammar_cost.py --pack ~/.kindi/packs/bonsai-2b --repeat",
+  "notes": "REQ-0027 A2. The token-class table was measured on the same pack, documents and harness as the 2026-11-17 baseline. All four rows clear the 10x gate; the repeat command records the process-shared vocabulary index; A4/A5 remain unmeasured.",
+  "evidence": [
+    "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-grammar-mask/grammar-mask.json",
+    "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-grammar-mask/RESULTS.md"
+  ],
+  "numbers": [
+    {"id": "json-schema-short", "display": "15 ms",
+     "quoted_in": ["docs/ROADMAP.md"],
+     "check": {"kind": "json",
+               "file": "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-grammar-mask/grammar-mask.json",
+               "pointer": "/short/json_schema/ms_per_token", "expect": 15}},
+    {"id": "gbnf-short", "display": "212 ms",
+     "quoted_in": ["docs/ROADMAP.md"],
+     "check": {"kind": "json",
+               "file": "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-grammar-mask/grammar-mask.json",
+               "pointer": "/short/gbnf_json_d1/ms_per_token", "expect": 212}},
+    {"id": "json-schema-long", "display": "3 ms",
+     "quoted_in": ["docs/ROADMAP.md"],
+     "check": {"kind": "json",
+               "file": "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-grammar-mask/grammar-mask.json",
+               "pointer": "/long/json_schema/ms_per_token", "expect": 3}},
+    {"id": "gbnf-long", "display": "30 ms",
+     "quoted_in": ["docs/ROADMAP.md"],
+     "check": {"kind": "json",
+               "file": "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-grammar-mask/grammar-mask.json",
+               "pointer": "/long/gbnf_ordered_record/ms_per_token", "expect": 30}}
+  ]
+}

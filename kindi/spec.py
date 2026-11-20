@@ -1,5 +1,5 @@
-"""Tensor-core decode and speculative decoding for the one-card plan engine (sm_80+, KINDI_TC=1; on Pascal sm_61
-the same plans run the dp4a kernels of tcp.cu, bit-identical products).
+"""Tensor-core decode and speculative decoding for the one-card plan engine (sm_80+ with tc.cu, sm_75 with
+tc_turing.cu, KINDI_TC=1; on Pascal sm_61 the same plans run the dp4a kernels of tcp.cu, bit-identical products).
 
 One plan per token count T = 1 .. 8: T tokens at positions pos .. pos + T - 1 in one pass, every matrix product an
 int8 tensor-core product of all T tokens (tc.cu: each token's result is bit-identical to a pass of that token
@@ -22,8 +22,9 @@ or through the tensor-core chunk GEMM once it exists. KINDI_TC=0 (the default) l
 Speculative decoding (greedy requests; the server calls spec_begin / spec_end around a reply):
   KINDI_SPEC = 0 (default) | ngram (prompt lookup) | draft2b (a Ternary-Bonsai-2 2B pack, KINDI_SPEC_PACK, on the
   same card, built first with context KINDI_SPEC_CTX, default 73728) | both (n-gram when it proposes 2+ tokens,
-  else the 2B); KINDI_SPEC_K = draft length (default 4, at most 7; 3 is best with the 2B). Sampled requests use
-  speculative sampling (KINDI_SPEC_SAMPLE=0: greedy requests only)."""
+  else the 2B); KINDI_SPEC_K = draft length (default 4, at most 7; 3 is best with the 2B, and mode A
+  defaults to 1 after its depth measurement). Sampled requests use speculative sampling
+  (KINDI_SPEC_SAMPLE=0: greedy requests only)."""
 import ctypes
 import json
 import os
@@ -36,6 +37,7 @@ import cupy as cp
 from . import tp as _tp
 from . import chunk as _chunk
 from . import tc as _tc
+from . import tc_turing as _tc_turing
 from . import sampling
 from . import mtp as _mtp
 from . import dspine as _dsp
@@ -43,15 +45,15 @@ from . import dspine as _dsp
 HERE = os.path.dirname(os.path.abspath(__file__))
 i32, f32t = np.int32, np.float32
 TMAX = max(2, min(8, int(os.environ.get("KINDI_TC_TMAX", "8"))))   # the largest T-token pass (verify needs k + 1)
-WRAP = _chunk.WRAP + ("k_argmax", "k_softmax_rows", "k_attn_vq8w", "k_attn_combn", "k_deq_emb4")
-FUSED = ("k_rmsfold_qT", "k_smfold_qT", "k_fold_fwht_qT", "k_softmax_m", "k_attn_vq8w_m", "k_attn_combn_m", "k_attn_sq8m",
+WRAP = _chunk.WRAP + ("k_argmax", "k_softmax_rows", "k_attn_vq8w", "k_attn_vq4w", "k_attn_combn", "k_deq_emb4")
+FUSED = ("k_rmsfold_qT", "k_smfold_qT", "k_fold_fwht_qT", "k_softmax_m", "k_attn_vq8w_m", "k_attn_vq4w_m", "k_attn_combn_m", "k_attn_sq8m",
          "k_deq_emb4_p", "k_copyf", "k_fd_q8_4", "k_fd_q8_6", "k_fd_q8_8", "k_fd_comb",
          "k_rmsfold2_1024", "k_rmsfold2_512", "k_smfold2_1024", "k_smfold2_512", "k_att_tc_T",
          "k_rmsfold_qa", "k_smfold_qa", "k_fold_qa", "k_mix8_q")
 FD_CH = 512                              # positions per block of the split flash-decode attention (tcf.cu; SpecKernels)
 QB = 4                                   # queries per verify attention launch (k_attn_sq8m)
-# KINDI_SPEC=auto thresholds (positions), measured on an RTX 3080 at 190 W and an RTX 3060 (docs/MTP.md,
-# docs/dev/bench-0.4.0/mtp.md): the 2B's own head k=2 up to 8K, off above; the 27B with the 2B drafter k=2 below
+# KINDI_SPEC=auto thresholds (positions), measured on an RTX 3080 at 190 W and an RTX 3060 (docs/MTP.md):
+# the 2B's own head k=2 up to 8K, off above; the 27B with the 2B drafter k=2 below
 # 1K and k=3 from 1K. B2 (the 2B's head extends the 2B draft) was slower than B0 on both cards: off by default
 AUTO_MTP_K2_MAX = int(os.environ.get("KINDI_SPEC_MTP_K2_MAX", "8192"))
 AUTO_B0_K2_MAX = int(os.environ.get("KINDI_SPEC_B0_K2_MAX", "1024"))
@@ -142,7 +144,10 @@ def fd_ch():
 
 
 class SpecKernels(object):
-    def __init__(self):
+    def __init__(self, backend=None):
+        if backend is None:
+            backend = _tc
+        self.backend = backend
         base = open(os.path.join(HERE, "kindi.cu"), encoding="utf-8").read()
         # NVRTC's own expf on sm_80+ CUDA cards (KINDI_KEXPF=1: kindi.cu's kexpf). With kexpf the 9B tc path
         # differed from llama.cpp at a 0.31-logit point (CMP 170HX, prompt 1 token 36) and passes without it; the
@@ -156,7 +161,8 @@ class SpecKernels(object):
         wr, _ = _chunk._wrappers(re.sub(r"__launch_bounds__\(\d+\) (k_\w+)\(", r"\1(", base), WRAP)
         own = open(os.path.join(HERE, "spec.cu"), encoding="utf-8").read()
         hip = cp.cuda.runtime.is_hip
-        tcs = open(os.path.join(HERE, "tc_hip.cu" if hip else "tc.cu"), encoding="utf-8").read()
+        tc_name = "tc_hip.cu" if hip else ("tc_turing.cu" if backend is _tc_turing else "tc.cu")
+        tcs = open(os.path.join(HERE, tc_name), encoding="utf-8").read()
         tcf = open(os.path.join(HERE, "tcf.cu"), encoding="utf-8").read()
         # drafting on the tensor-core path (KINDI_SPEC set, KINDI_TC=1) with KINDI_FD unset: use the split flash-decode
         # attention. With KINDI_FD=0 the one-token step and the verify pass take different attention kernels, so a draft
@@ -176,7 +182,8 @@ class SpecKernels(object):
         tcf = "#define FF %d" % int(self.ff) + chr(10) + tcf
         tcs = "#define TC_INC %d" % (inc == "1" or (inc != "0" and known)) + chr(10) + tcs   # tc.cu tc_dig (bit-identical)
         pas = not hip and _tc.pascal()
-        names = _tc.NAMES_PASCAL if pas else _tc.NAMES + (() if hip else _tc.NAMES_B2)
+        names = _tc.NAMES_PASCAL if pas else backend.NAMES + (
+            () if hip or backend is _tc_turing else _tc.NAMES_B2)
         if pas:
             # Pascal (sm_61): tcp.cu, the same products with dp4a on the pl layout; tca.cu (k_att_tc_T) is mma.sync
             # only. Compiled for the card itself (no PTX patch).
@@ -194,10 +201,15 @@ class SpecKernels(object):
                 tcf = tcf.replace(old, new)
             mod = cp.RawModule(code=base + "\n" + tcs + "\n" + wr + "\n" + own + "\n" + tcf)
         else:
-            tcf += chr(10) + open(os.path.join(HERE, "tca.cu"), encoding="utf-8").read()
-            p = cp.cuda.runtime.getDeviceProperties(cp.cuda.Device().id)
-            mod = _tc._patched_module(base + "\n" + wr + "\n" + own + "\n" + tcs + "\n" + tcf,
-                                      "sm_%d%d" % (p["major"], p["minor"]))
+            tca_name = "tca_turing.cu" if backend is _tc_turing else "tca.cu"
+            tcf += chr(10) + open(os.path.join(HERE, tca_name), encoding="utf-8").read()
+            if backend is _tc_turing:
+                # Turing: compute_75 PTX as NVRTC produces it (no header patching; Turing has no cp.async)
+                mod = _tc_turing.load_module(base + "\n" + wr + "\n" + own + "\n" + tcs + "\n" + tcf)
+            else:
+                p = cp.cuda.runtime.getDeviceProperties(cp.cuda.Device().id)
+                mod = _tc._patched_module(base + "\n" + wr + "\n" + own + "\n" + tcs + "\n" + tcf,
+                                          "sm_%d%d" % (p["major"], p["minor"]))
         self.mod = mod
         for k in ([w + "_T" for w in WRAP] + ["k_sgdn_pre_T", "k_sgdn_deltan_T", "k_sgdn_deltan_C", "k_sconv_C", "k_xsum_T"] +
                   list(names) + (["k_g5t4"] + ["k_g5t2_%d" % n for n in (2, 3, 4)] + ["k_g5t1_%d" % n for n in (5, 6, 7, 8)]
@@ -210,7 +222,7 @@ class SpecKernels(object):
             setattr(self, k, w)
         self.mv = {2: self.k_tc_mv2, 4: self.k_tc_mv4, 8: self.k_tc_mv8}
         self.mv3 = {2: self.k_tc_mv3_2, 4: self.k_tc_mv3_4, 8: self.k_tc_mv3_8}
-        if not (hip or pas):
+        if not (hip or pas) and backend is _tc:       # tc.cu's b2 layout; tc_turing.cu has no B2 kernels (b2() is false on Turing)
             self.mvb = {2: self.k_tc_mv2b, 4: self.k_tc_mv4b, 8: self.k_tc_mv8b}
             self.mv3b = {2: self.k_tc_mv3b_2, 4: self.k_tc_mv3b_4, 8: self.k_tc_mv3b_8}
 
@@ -270,6 +282,8 @@ class Graph(object):
                     dep = (ctypes.c_void_p * 1)(prev)
                     r = d.cuGraphAddKernelNode(ctypes.byref(node), g, dep, 1, ctypes.byref(kp))
                 if r:
+                    # the node and its launch shape are what makes a graph-build failure diagnosable
+                    # (a short argument tuple used to surface only as "failed (1)"); upstream 0.6.1
                     raise RuntimeError("kindi: cuGraphAddKernelNode failed (%d) at node %d: grid %s, block %s, %d arguments"
                                        % (r, len(self.nodes), tuple(gr), tuple(bl), len(hs)))
                 self.nodes.append((node, kp, arr, hs))
@@ -414,6 +428,15 @@ def tune(s, R, C, rowpar=None):
     cache = s.__dict__.setdefault("tccfg", {})
     if (R, C) in cache:
         return cache[(R, C)]
+    if s.HB == 512:
+        # The 512-point packs (the 2B) are verified against llama.cpp's fp16 K/V reference. A column
+        # split's k_tc_sum order differs from the unsplit dot product; the 1-ulp difference flips an
+        # argmax at long prompts (seen at T=1, T=4 and T=8). One split keeps the plan token-exact;
+        # the 27B (HB 1024, q8_0 reference) keeps its measured splits.
+        NU = C // 1024
+        cfg = ((8 if NU > 8 else 4) if rowpar else 2, 1)
+        cache[(R, C)] = cfg
+        return cfg
     if os.environ.get("KINDI_TC_TUNE", "0") != "1":
         # a fixed rule, so a restart never changes a split and its rounding: the timed bests on the 3080; on cards
         # with at most SMALL_SM multiprocessors (RTX 3060: 28, 5060 Ti: 36) the timed bests on the 3060
@@ -578,7 +601,7 @@ def _reserve_card(eng, s):
                   for il in gl}
         # split products: the parts buffer for the largest sp x T x R of the tuned configs
         mx = 0
-        for name, (_, _, R, C) in s.w.items():
+        for _name, (_, _, R, C) in s.w.items():
             nw, sp = (8, lane_sp(s, int(R), int(C))) if getattr(s, "tc_lane", False) else tune(s, int(R), int(C))
             if sp > 1:
                 mx = max(mx, sp * T * int(R))
@@ -589,6 +612,20 @@ def _reserve_card(eng, s):
                 [p0 + "attn_qkv.weight", p0 + "attn_gate.weight"], [p0 + "ffn_gate.weight", p0 + "ffn_up.weight"],
                 ["blk.%d.attn_q.weight" % ia, "blk.%d.attn_k.weight" % ia, "blk.%d.attn_v.weight" % ia]):
             tune3(s, [int(s.w[n][2]) for n in names], int(s.w[names[0]][3]))
+
+
+def kv_plan(tp):
+    """(store kernel, decode value kernel, verify value kernel, V row stride divisor) for the engine's K/V cache.
+
+    q8_0 is the default and its kernels, buffers and arithmetic are unchanged. k8v4 keeps K at q8_0 and halves the V
+    row; both the decode and the verify passes need their V4 value kernel, and the store must write V4. The choice
+    follows the engine's kv mode only (no model name), so any pack whose head size the value kernels cover can use
+    either format; tp.py refuses k8v4 on other head sizes instead of reading the wrong bytes."""
+    if getattr(tp, "kv", "q8_0") == "k8v4":
+        return "k_store_k8v4_T", "k_attn_vq4w", "k_attn_vq4w_m", 2
+    if getattr(tp, "kv", "q8_0") == "fp8":
+        raise SystemExit("kindi: KINDI_KV=fp8 uses decode attention only; the tensor-core verify attention is q8-only")
+    return "k_store_q8_T", "k_attn_vq8w", "k_attn_vq8w_m", 1
 
 
 def build_plan(s, T, head, wb, aout=None, tokp=None):
@@ -740,6 +777,8 @@ def build_plan(s, T, head, wb, aout=None, tokp=None):
         p = "blk.%d." % il
         mixin(p + "attn_norm.weight")
         L, QL = NHKV * HD, NH * HD
+        st_name, vdec, vver, vdiv = kv_plan(tp)
+        fd = "FDP" in b and vdiv == 1
         QN, KRO, VB, KN, FO, QR, QQ, QD = b["QN"], b["KRO"], b["VB"], b["KN"], b["FO"], b["QR"], b["QQ"], b["QD"]
         gemm3([p + "attn_q.weight", p + "attn_k.weight", p + "attn_v.weight"], [QN, KRO, VB])
         tadd(SK.k_rmsw_T, (NHKV + 7) // 8, (256,), (KRO, s.f(p + "attn_k_norm.weight"), KN, i32(HD), i32(NHKV)), (L, 0, L))
@@ -750,13 +789,13 @@ def build_plan(s, T, head, wb, aout=None, tokp=None):
         sn_ = _tp.Dyn("pos", s.sin_t.data.ptr, rd * 4, ptr=True)
         tadd(SK.k_rope2_T, NH + NHKV, (256,), (FO, KN, cs_, sn_, QR, KRO, i32(NH), i32(HD)), (QL, L, rd, rd, QL, L))
         nb0 = L // 32
-        tadd(SK.k_store_q8_T, (64 * nb0 + 1023) // 1024, (min(1024, 64 * nb0),),
+        tadd(getattr(SK, st_name), (64 * nb0 + 1023) // 1024, (min(1024, 64 * nb0),),
              (KRO, VB, _tp.Dyn("pos", s.Kq[kvi].data.ptr, L, ptr=True), _tp.Dyn("pos", s.Kd[kvi].data.ptr, nb0 * 2, ptr=True),
-              _tp.Dyn("pos", s.Vq[kvi].data.ptr, L, ptr=True), _tp.Dyn("pos", s.Vd[kvi].data.ptr, nb0 * 2, ptr=True), i32(nb0)),
-             (L, L, L, nb0, L, nb0))
+              _tp.Dyn("pos", s.Vq[kvi].data.ptr, L // vdiv, ptr=True), _tp.Dyn("pos", s.Vd[kvi].data.ptr, nb0 * 2, ptr=True), i32(nb0)),
+             (L, L, L, nb0, L // vdiv, nb0))
         tadd(SK.k_q8row_T, (QL + 1023) // 1024, (1024,), (QR, QQ, QD, i32(QL // 32)), (QL, QL, QL // 32))
         nch = (s.ctx + 255) // 256
-        if "FDP" in b:
+        if fd:
             # split flash-decode: K and V read once per query, chunks of FD_CH positions merged by k_fd_comb (the
             # same kernels for decode and verify, so a token's result does not depend on the pass it is in)
             nfd = (s.ctx + FD_CH - 1) // FD_CH
@@ -773,10 +812,10 @@ def build_plan(s, T, head, wb, aout=None, tokp=None):
             n = lambda: _tp.Dyn("pos", 1, 1)  # noqa: E731
             P.add(K.k_attn_sq8t, (NHKV, nch), (256,), (s.Kq[kvi], s.Kd[kvi], QQ, QD, s.sbuf, n(), i32(NHKV), i32(s.G)))
             P.add(K.k_softmax_rows, (NH,), (256,), (s.sbuf, n()))
-            P.add(K.k_attn_vq8w, (NHKV, 1, nch), (128,), (s.sbuf, s.Vq[kvi], s.Vd[kvi], s.apart, n(), i32(NH), i32(NHKV),
+            P.add(getattr(K, vdec), (NHKV, 1, nch), (128,), (s.sbuf, s.Vq[kvi], s.Vd[kvi], s.apart, n(), i32(NH), i32(NHKV),
                                                           i32(s.G)))
             P.add(K.k_attn_combn, (NH,), (256,), (s.apart, QN, OUT, n(), i32(NH)))
-        for k0 in (range(0, T, QB) if T > 1 and "FDP" not in b else ()):
+        for k0 in (range(0, T, QB) if T > 1 and not fd else ()):
             # verify: up to QB queries per launch, query k sees the positions up to its own (pos + k + 1), each with
             # the decode kernels' arithmetic (k_attn_sq8m reads each K row once for all of them)
             qn = min(QB, T - k0)
@@ -785,7 +824,7 @@ def build_plan(s, T, head, wb, aout=None, tokp=None):
             P.add(SK.k_attn_sq8m, (NHKV, nch), (256,), (s.Kq[kvi], s.Kd[kvi], QQ[k0 * QL:], QD[k0 * QL // 32:], i32(QL),
                                                         b["SB"], ss, n0(), i32(qn), i32(NHKV), i32(s.G)))
             P.add(SK.k_softmax_m, (NH, qn), (256,), (b["SB"], ss, n0(), i32(qn)))
-            P.add(SK.k_attn_vq8w_m, (NHKV, qn, nch), (128,), (b["SB"], ss, s.Vq[kvi], s.Vd[kvi], b["AP"], ps, n0(), i32(qn),
+            P.add(getattr(SK, vver), (NHKV, qn, nch), (128,), (b["SB"], ss, s.Vq[kvi], s.Vd[kvi], b["AP"], ps, n0(), i32(qn),
                                                               i32(NH), i32(NHKV), i32(s.G)))
             P.add(SK.k_attn_combn_m, (NH, qn), (256,), (b["AP"], ps, QN[k0 * 2 * QL:], i32(2 * QL), OUT[k0 * QL:], i32(QL),
                                                         n0(), i32(qn), i32(NH)))
@@ -853,7 +892,7 @@ def build_draft(s, k, M0, C0):
     _copies(P, SK, list(zip(s.M, M0)) + list(zip(s.conv, C0)))
     for i in range(k):
         Pi = build_plan(s, 1, True, 1, aout=b["AOUT"][i:], tokp=None if i == 0 else b["AOUT"][i - 1:])
-        for h, d in Pi.dyn:
+        for _h, d in Pi.dyn:
             if d.var == "pos":
                 d.a += d.b * i
         P.segs[-1].extend(e for seg in Pi.segs for e in seg)
@@ -1064,6 +1103,20 @@ class _Guard(object):
             self._start("spec")
 
 
+def _draft_policy(self):
+    """The optional adaptive draft-length controller (REQ-0015), created on first use when
+    KINDI_DRAFT_POLICY=1. It may only shorten the hand-tuned base k (never lengthen it), so the
+    engine's per-card tuning stays in charge; the controller just stops paying for drafts that
+    history says are rejected. Tokens are unaffected: verify() decides every output token."""
+    p = getattr(self, "_draft_policy", None)
+    if p is None:
+        if os.environ.get("KINDI_DRAFT_POLICY", "0") != "1":
+            return None
+        from .draft_policy import DraftPolicy
+        p = self._draft_policy = DraftPolicy("spec")
+    return p
+
+
 def _guard(self):
     g = getattr(self, "_sguard", None)
     if g is None:
@@ -1092,6 +1145,9 @@ def tc_step(self, tok, pos):
     elif k and getattr(self, "spec_auto", False) and self.spec_mode == "draft2b":
         k = 2 if pos < AUTO_B0_K2_MAX else 3        # measured: k=2 best at 512, k=3 from 1K
     k = min(k, self.ctx - pos - 1)
+    policy = _draft_policy(self)
+    if policy is not None and k > 0:
+        k = policy.limit_k(k)
     G = _guard(self) if k > 0 and os.environ.get("KINDI_SPEC_GUARD", "1") == "1" and pos >= GUARD_FROM else None
     if G is not None:
         G.at(pos)
@@ -1129,6 +1185,8 @@ def tc_step(self, tok, pos):
                 j += 1
         if dsp is not None:                          # the target's features of the accepted rows (tok, d[:j])
             dsp.ingest(self.cards[0].tcb["FEAT"], pos, j + 1)
+        if policy is not None:
+            policy.observe(j, len(d))                # the verify kept j of the drafted tokens
         if dr2 is not None:
             dr2.accept(j)
         if mt is not None:
@@ -1153,6 +1211,8 @@ def tc_step(self, tok, pos):
         mt.seen(pos, 1, [best])
     if G is not None:
         G.note(False, 1, G.span(t0))
+    if policy is not None and k > 0:
+        policy.observe(0, 0)                         # the drafter produced nothing this step
     if k:
         self.spec_stats["passes"] += 1
     self._best, self._ylog_ok, self._ylog_row = best, True, 0
@@ -1190,33 +1250,91 @@ def tc_feed_batch(self, toks, pos):
         i += n
 
 
-def spec_begin(self, greedy, temperature=0.0, top_p=1.0, top_k=0, rng=None, min_p=0.0):
-    """speculative decoding for the steps that follow: greedy requests, or sampled ones when the server passes its
-    sampling settings and generator (speculative sampling)"""
-    mode = os.environ.get("KINDI_SPEC", "0")
-    self.spec_auto = mode == "auto"
+def resolve_mode(eng, requested, greedy=True):
+    """The mode that will actually run for `requested`, and why when it is not that mode (REQ-0024).
+
+    One source of truth: `spec_begin` picks the mode for a request with it, and `/health`, the startup
+    log and the tests ask it what is effective instead of reading `KINDI_SPEC` back as if it were
+    running. Returns (mode, reason); reason is None when the requested mode is the effective one.
+    """
+    mode, why = requested, None
     if mode == "auto":
         # KINDI_SPEC=auto (the measured choice on a 3080): the DSpine block drafter when it is attached (27B); a model
         # with its own MTP head drafts with it (greedy); a model with the 2B drafter uses it, plus the 2B's head (B2)
         # below KINDI_SPEC_B2_MAX tokens of context
-        if getattr(self, "dspine", None) is not None:
+        if getattr(eng, "dspine", None) is not None:
             mode = "dspine"
-        elif getattr(self, "drafter", None) is not None:
+        elif getattr(eng, "drafter", None) is not None:
             mode = "draft2b"
-        elif getattr(self, "mtp", None) is not None and greedy:
+        elif getattr(eng, "mtp", None) is not None and greedy:
             mode = "mtp"
         else:
-            mode = "0"
-    if mode == "dspine" and getattr(self, "dspine", None) is None:
-        mode = "draft2b" if getattr(self, "drafter", None) is not None else "ngram"
-    if mode in ("draft2b", "both") and getattr(self, "drafter", None) is None:
-        mode = "ngram"
-    if mode == "mtp" and (getattr(self, "mtp", None) is None or not greedy):
-        mode = "0"                               # the MTP head drafts for greedy requests only (for now)
+            mode, why = "0", "auto found no drafter attached"
+    if mode == "dspine" and getattr(eng, "dspine", None) is None:
+        mode = "draft2b" if getattr(eng, "drafter", None) is not None else "ngram"
+        why = "the DSpine drafter is not attached"
+    if mode in ("draft2b", "both") and getattr(eng, "drafter", None) is None:
+        mode, why = "ngram", "the 2B draft pack is not attached"
+    if mode == "mtp" and (getattr(eng, "mtp", None) is None or not greedy):
+        mode, why = "0", ("the MTP head is not attached" if getattr(eng, "mtp", None) is None
+                          else "the MTP head drafts greedy requests only")
     if _mtp.DUMP is not None:
-        mode = "0"
+        mode, why = "0", "a head dump is being recorded"
+    return mode, why
+
+
+def effective_state(eng, requested=None):
+    """What speculation will actually run, for /health, the startup log and the tests (REQ-0024 A1).
+
+    {"requested": KINDI_SPEC, "mode": the mode or None, "reason": why not the requested one,
+     "head": the attached head {"file", "sha256", "bytes"} or the refusal {"state": "refused",
+     "reason"}}. The head's own refusal is folded into `reason`, so one string explains a missing
+    drafter without the caller knowing which of the two downloads it was.
+    """
+    req = (os.environ.get("KINDI_SPEC", "0") or "0") if requested is None else requested
+    mode, why = resolve_mode(eng, req, True)
+    heads = getattr(eng, "_mtp_heads", None) or {}
+    slot = ("mtp" if mode == "mtp" else "draft2b" if mode in ("draft2b", "both")
+            else "mtp" if req in ("mtp", "auto") else "draft2b" if req in ("draft2b", "both")
+            else "dspine")
+    head = heads.get(slot)
+    if head is not None and head.get("state") == "refused":
+        why = "%s: %s" % (why, head.get("reason")) if why else head.get("reason")
+    return {"requested": req, "mode": mode if mode not in ("0", "") else None, "reason": why, "head": head}
+
+
+def _load_head(eng, slot, path, fn, log):
+    """Attach an optional MTP head and record what happened on the engine, for `/health` (REQ-0024).
+
+    A refusal is a warning - a requested mode that silently did not attach is the failure this
+    requirement exists for - and a load is the head's own `MTP head attached` line, so there is one
+    line either way and never a quiet fallback.
+    """
+    heads = getattr(eng, "_mtp_heads", None)
+    if heads is None:
+        heads = eng._mtp_heads = {}
+    try:
+        head = fn()
+    except Exception as e:                    # noqa: BLE001 - an optional accelerator must not stop the model
+        heads[slot] = {"file": os.path.basename(path), "path": path, "state": "refused", "reason": str(e)}
+        log("warning: speculation off: the %s head %s did not load (%s)" % (slot, path, e))
+        return None
+    heads[slot] = {"file": head.head["file"], "path": path, "state": "loaded", "sha256": head.sha256,
+                   "bytes": head.bytes, "registered": head.head["registered"]}
+    return head
+
+
+def spec_begin(self, greedy, temperature=0.0, top_p=1.0, top_k=0, rng=None, min_p=0.0):
+    """speculative decoding for the steps that follow: greedy requests, or sampled ones when the server passes its
+    sampling settings and generator (speculative sampling)"""
+    requested = os.environ.get("KINDI_SPEC", "0")
+    self.spec_auto = requested == "auto"
+    mode, _ = resolve_mode(self, requested, greedy)
     self.spec_mode = mode
-    self.spec_k = int(os.environ.get("KINDI_SPEC_K", "4")) if mode in ("ngram", "draft2b", "both", "mtp") else 0
+    # mode A's measured best on the 2B is k=1 (1.12-1.13x at 512/24K; k=4 was 0.66-0.89x), so the
+    # head's default follows that row. An explicit KINDI_SPEC_K still wins; the other modes keep 4.
+    self.spec_k = int(os.environ.get("KINDI_SPEC_K", "1" if mode == "mtp" else "4")) \
+        if mode in ("ngram", "draft2b", "both", "mtp") else 0
     if self.spec_auto and mode == "draft2b":
         self.spec_k = 3
     if mode == "dspine":                         # a whole block: the current token + BLOCK - 1 drafts (KINDI_SPEC_K is the 2B's)
@@ -1583,8 +1701,10 @@ def load_stream(self):
     if not (os.path.exists(ipath) and os.path.exists(lpath)):
         return False
     t0 = time.time()
-    _, flt = self._slices()
+    tern, flt = self._slices()
     offs = {n: tuple(v) for n, v in json.load(open(ipath)).items()}
+    if not set(tern) <= set(offs):
+        return False                     # a cache from before the tied-head alias: Shard._load rebuilds it
     nw = os.path.getsize(lpath) // 4
     self.bc = cp.empty(nw, dtype=cp.uint32)
     step = 64 << 20
@@ -1623,6 +1743,68 @@ def load_stream(self):
     return True
 
 
+def _tc_backend(card):
+    """Return the tensor-core backend module for this card, or None."""
+    if _tc.supported(card):
+        return _tc
+    if _tc_turing.supported(card):
+        return _tc_turing
+    return None
+
+
+# ================================================================== optional artifacts
+# A drafter pack, an MTP head and a draft head are accelerators: they make a reply faster and never
+# change a token. A path that is missing, unreadable or the wrong size must therefore turn the
+# accelerator off with one line, not abort engine construction - the installer already behaves that
+# way (it prints a line and serves without MTP), and before this the engine did not: a stale
+# KINDI_MTP_HEAD in kindi.conf raised FileNotFoundError from os.path.getsize inside the engine's
+# __init__ wrapper, so `kindi serve` never started.
+def optional_path(name, log=print):
+    """The path an optional artifact variable names, or None after one log line if it is not a file.
+    An unset variable is None without a word (the normal case). The variable is cleared, so nothing
+    downstream tries the path again."""
+    path = os.environ.get(name)
+    if not path:
+        return None
+    try:
+        ok = os.path.isfile(path)
+    except OSError:                       # a path the OS refuses to stat (length, device, permissions)
+        ok = False
+    if ok:
+        return path
+    log("speculation off: %s=%s is not a file" % (name, path))
+    os.environ.pop(name, None)
+    return None
+
+
+def _optional(log, what, fn):
+    """Build an optional accelerator: its value, or None after one log line if the build fails.
+
+    Optional artifacts (a draft head, an MTP head, the DSpine drafter, the 2B drafter) are
+    accelerators: they must switch off, never abort engine construction. Required artifacts
+    (the pack, the tokenizer) still fail loudly - they are not built through here."""
+    try:
+        return fn()
+    except Exception as e:            # noqa: BLE001 - an optional accelerator must not stop the model
+        log("speculation off: %s did not load (%s)" % (what, e))
+        return None
+
+
+def head_paths(sm, log=print):
+    """The MTP head files the mode will use, each checked once: KINDI_MTP_HEAD for the model's own
+    head (mtp, auto) and KINDI_SPEC_DRAFT_HEAD for the 2B drafter's (draft2b, both, auto)."""
+    out = []
+    if sm in ("mtp", "auto"):
+        p = optional_path("KINDI_MTP_HEAD", log)
+        if p:
+            out.append(p)
+    if sm in ("draft2b", "both", "auto"):
+        p = optional_path("KINDI_SPEC_DRAFT_HEAD", log)
+        if p:
+            out.append(p)
+    return out
+
+
 # ====================================================================================== install
 _installed = [False]
 _drafter = [None]
@@ -1647,7 +1829,16 @@ def install(log=print):
         return tern, flt
 
     def _bplans(self):
-        if getattr(self, "tc_layout", False):          # the tensor-core plans replace them (any Hadamard block)
+        if self.HB == 4096 and not HP:
+            # measured on the 4060 Ti: the 9B passes the tc verify only with KINDI_TC_HP=1 (4/4, 122 tok/s);
+            # with the default int8 activations one borderline prompt flips at token 36 (3/4)
+            raise SystemExit("kindi: the tensor-core plan engine refuses Hadamard blocks of 4096 unless "
+                             "KINDI_TC_HP=1 (measured: 4/4 at 122 tok/s, 3/4 with the default activations); "
+                             "use the plain engine (KINDI_TP=0)")
+        if self.HB not in (512, 1024, 4096):
+            raise SystemExit("kindi: the tensor-core plan engine supports Hadamard blocks of 512, 1024 and 4096 "
+                             "(this pack has %d); use the plain engine (KINDI_TP=0)" % self.HB)
+        if getattr(self, "tc_layout", False):          # the tensor-core plans replace them
             drv = _tp._drv()
             cp.cuda.Device(self.card).synchronize()
             if cp.cuda.runtime.is_hip:             # HIP: the device index (tp.py hipSetDevice(s.ctxh))
@@ -1664,10 +1855,26 @@ def install(log=print):
     _tp.Shard._slices, _tp.Shard.build_plans = _slices, _bplans
 
     def _load(self):
-        if not (self.tp.W in (1, 2) and self.g5l and _tc.supported(self.card) and load_stream(self)):
+        backend = _tc_backend(self.card)
+        if getattr(self.tp, "kv", "q8_0") == "fp8":
+            self.tc_layout = False
+            self.log("card %d: the FP8 cache uses decode attention only (the tensor-core verify "
+                     "attention is q8-only); no tc layout" % self.card)
             o_load(self)
-        if self.tp.W in (1, 2) and self.g5l and _tc.supported(self.card):
-            self.sk = SpecKernels()
+            return None
+        if self.HB == 4096 and not HP:          # measured on the 4060 Ti: refuse before the repack, not after
+            raise SystemExit("kindi: the tensor-core plan engine refuses Hadamard blocks of 4096 unless "
+                             "KINDI_TC_HP=1 (measured: 4/4 at 122 tok/s, 3/4 with the default activations); "
+                             "use the plain engine (KINDI_TP=0)")
+        if self.HB == 4096 and HP:
+            log("card %d: 4096 Hadamard blocks run with high-precision activations (KINDI_TC_HP=1); "
+                "that is the exact 9B tensor-core path (4/4, 122 tok/s; the default activations are 3/4)" % self.card)
+        # two cards are tensor parallel on the Ampere and Pascal kernels; the Turing backend is one card
+        w_ok = self.tp.W == 1 if backend is _tc_turing else self.tp.W in (1, 2)
+        if not (w_ok and self.g5l and backend is not None and load_stream(self)):
+            o_load(self)
+        if w_ok and self.g5l and backend is not None:
+            self.sk = SpecKernels(backend=backend)
             repack(self, self.log)
 
     def _reserve(eng):
@@ -1683,14 +1890,24 @@ def install(log=print):
                 eng.drafter = Draft2B(_drafter[0])
                 eng.log("speculative draft model attached: %s, ctx %d" % (_drafter[0].pack, _drafter[0].ctx))
                 if os.environ.get("KINDI_SPEC_DRAFT_HEAD"):
-                    eng.drafter.mtp = _mtp.MTPDraft(_drafter[0], os.environ["KINDI_SPEC_DRAFT_HEAD"], log=eng.log)
+                    head = os.environ["KINDI_SPEC_DRAFT_HEAD"]
+                    eng.drafter.mtp = _load_head(eng, "draft2b", head,
+                                                 lambda: _mtp.MTPDraft(_drafter[0], head, log=eng.log), eng.log)
             if os.environ.get("KINDI_SPEC") in ("mtp", "auto") and os.environ.get("KINDI_MTP_HEAD") and not _building_drafter[0]:
-                eng.mtp = _mtp.MTPDraft(eng, os.environ["KINDI_MTP_HEAD"], log=eng.log)
+                head = os.environ["KINDI_MTP_HEAD"]
+                eng.mtp = _load_head(eng, "mtp", head, lambda: _mtp.MTPDraft(eng, head, log=eng.log), eng.log)
             if getattr(eng, "_dsp_want", False) and not _building_drafter[0]:
                 if _dsp.fits(eng.cards[0]) and "FEAT" in eng.cards[0].tcb:
-                    eng.dspine = _dsp.DSpine(eng, os.environ["KINDI_DSPINE"], log=eng.log)
+                    dsp = os.environ["KINDI_DSPINE"]
+                    eng.dspine = _optional(eng.log, "the DSpine drafter %s" % dsp,
+                                           lambda: _dsp.DSpine(eng, dsp, log=eng.log))
                 else:
                     eng.log("dspine: not used (it drafts for the 27B on one NVIDIA card with the tensor-core plans)")
+        requested = os.environ.get("KINDI_SPEC", "0") or "0"
+        if requested not in ("0", "off") and not _building_drafter[0]:
+            st = effective_state(eng, requested)      # the effective mode, once every accelerator is attached
+            eng.log("speculation: requested %s, effective %s%s" % (
+                requested, st["mode"] or "0", "" if st["mode"] == requested else " (%s)" % (st["reason"] or "off")))
 
     _tp.Shard._load = _load
     _chunk.reserve = _reserve
@@ -1716,17 +1933,20 @@ def install(log=print):
         os.environ["KINDI_BATCH"] = "1"           # (the tensor-core plans replace the batch plan)
         os.environ.setdefault("KINDI_MEM_RESERVE_MB", "256")   # the graphs are instantiated after the context fit
         sm = os.environ.get("KINDI_SPEC")
-        hps = [os.environ.get("KINDI_MTP_HEAD") if sm in ("mtp", "auto") else None,
-               os.environ.get("KINDI_SPEC_DRAFT_HEAD") if sm in ("draft2b", "both", "auto") else None]
-        hps = [h for h in hps if h]
+        hps = head_paths(sm, log)                 # a missing head clears its variable and says so
         if _dsp.wanted() and not _building_drafter[0] and not getattr(self, "_dsp_rsv", 0):
             # the DSpine drafter: its target features in the plans, its weights kept out of the context fit
             self._dsp_want, self._dsp_rsv = True, _dsp.reserve_mb()
             os.environ["KINDI_MEM_RESERVE_MB"] = str(int(os.environ["KINDI_MEM_RESERVE_MB"]) + self._dsp_rsv)
         if hps and not _building_drafter[0] and not getattr(self, "_mtp_rsv", 0):
             # the MTP heads' weights and buffers: kept out of the context fit (loaded after the build)
-            self._mtp_rsv = sum(os.path.getsize(h) // 2 ** 20 + 160 for h in hps)
-            os.environ["KINDI_MEM_RESERVE_MB"] = str(int(os.environ["KINDI_MEM_RESERVE_MB"]) + self._mtp_rsv)
+            try:
+                self._mtp_rsv = sum(os.path.getsize(h) // 2 ** 20 + 160 for h in hps)
+            except OSError as e:                  # vanished between the check and here: no reservation
+                log("speculation off: a head file could not be measured (%s)" % e)
+                self._mtp_rsv = 0
+            if self._mtp_rsv:
+                os.environ["KINDI_MEM_RESERVE_MB"] = str(int(os.environ["KINDI_MEM_RESERVE_MB"]) + self._mtp_rsv)
         o_init(self, pack, ctx, *a, **k)
 
     _tp.TPEngine.__init__ = init_
@@ -1737,14 +1957,20 @@ def install(log=print):
         cards = os.environ.get("KINDI_CARDS")
         os.environ["KINDI_CARDS"] = "1"
         try:
-            _drafter[0] = _tp.TPEngine(os.environ["KINDI_SPEC_PACK"], ctx=int(os.environ.get("KINDI_SPEC_CTX") or os.environ.get("KINDI_SPEC_WINDOW", "8192")),
-                                       log=lambda *a: log("draft: " + " ".join(str(x) for x in a)))
+            pack = os.environ["KINDI_SPEC_PACK"]
+            _drafter[0] = _optional(log, "the draft pack %s" % pack,
+                                    lambda: _tp.TPEngine(pack, ctx=int(os.environ.get("KINDI_SPEC_CTX") or os.environ.get("KINDI_SPEC_WINDOW", "8192")),
+                                                         log=lambda *a: log("draft: " + " ".join(str(x) for x in a))))
+        except Exception as e:                    # noqa: BLE001 - creating the drafter must not leave the flag set
+            _drafter[0] = None
+            log("speculation off: the draft pack %s did not build (%s)"
+                % (os.environ.get("KINDI_SPEC_PACK"), e))
         finally:
+            _building_drafter[0] = False          # also on the failure path: the next engine is a full one
             if cards is None:
                 os.environ.pop("KINDI_CARDS", None)
             else:
                 os.environ["KINDI_CARDS"] = cards
-        _building_drafter[0] = False
     o_reset = _tp.TPEngine.reset
 
     def reset_(self):

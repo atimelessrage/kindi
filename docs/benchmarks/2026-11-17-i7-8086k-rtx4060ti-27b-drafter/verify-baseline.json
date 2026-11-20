@@ -1,0 +1,255 @@
+{
+  "started_utc": "2026-11-17T21:15:21Z",
+  "git_revision": "cf81a82",
+  "throughput_basis": "three-pass medians from median-r1..r3-results.json (started 2026-11-17T21:15:21Z at cf81a82); started_utc and git_revision name that median set, not the earlier single-pass results.json (53003a9, 2026-11-17T17:57:48Z); each row's tokens_per_second is the three-pass median and equals the tok/s of its named pass, duration_s is that same pass's duration (not a median of durations), summary and log name the same pass, and the summary quotes that pass's duration to two decimals, so throughput, duration, log and summary describe one actual pass and a rounded duration from another pass cannot stand in; logs lists all three transcripts under logs/median-rN/ (the first pass's transcripts remain at logs/27b-tc*.log)",
+  "python": "3.13.6",
+  "packs_dir": "~/.kindi/packs",
+  "pack_27b": "<kindi-model-root>/kindi-27b/packs/bonsai-27b",
+  "cards": 1,
+  "timeout_s": 900.0,
+  "environment": {
+    "platform": "Windows-10-10.0.19045-SP0",
+    "python": "3.13.6",
+    "gpus": [
+      {
+        "index": "0",
+        "name": "NVIDIA GeForce RTX 4060 Ti",
+        "driver": "617.42",
+        "memory_mib": 8188,
+        "compute_capability": "8.9"
+      }
+    ],
+    "cupy": "14.2.0",
+    "cuda_runtime": 12090,
+    "packs": [
+      {
+        "path": "<kindi-model-root>/kindi-27b/packs/bonsai-27b",
+        "source_sha256": "53107f530aa52eb00912263ab1ee29bd199261c87cd7b4ad4ca1318c1fe33ee3",
+        "hadamard_block": 1024,
+        "model": "Hf",
+        "bytes": 18453368125
+      }
+    ]
+  },
+  "results": [
+    {
+      "model": "27b",
+      "mode": "tc-ngram",
+      "status": "pass",
+      "prompts": [
+        {
+          "index": 1,
+          "state": "TIE",
+          "matched": 14,
+          "total": 40
+        },
+        {
+          "index": 2,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 3,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 4,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        }
+      ],
+      "prompts_pass": 3,
+      "prompts_tie": 1,
+      "prompts_fail": 0,
+      "tokens_per_second": 45.7,
+      "exit_code": 0,
+      "duration_s": 12.613566300016828,
+      "first_diff_token": 14,
+      "first_diff_gap": 0.0064,
+      "spec_requested": "ngram",
+      "spec_effective": "ngram",
+      "drafts_accepted": 35,
+      "drafts_drafted": 148,
+      "summary": "three-pass median at cf81a82: PASS with KINDI_SPEC=ngram: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 45.7 tokens/s on the r2 pass (the three-pass median) in 12.61 s",
+      "log": "logs/median-r2/27b-tc-ngram.log",
+      "logs": [
+        "logs/median-r1/27b-tc-ngram.log",
+        "logs/median-r2/27b-tc-ngram.log",
+        "logs/median-r3/27b-tc-ngram.log"
+      ],
+      "config": {
+        "KINDI_DEVICE": "gpu",
+        "KINDI_HEAD": "exact",
+        "KINDI_KV": "q8_0",
+        "KINDI_SPEC": "ngram",
+        "KINDI_TP": "1",
+        "KINDI_TC": "1",
+        "KINDI_FD": "1",
+        "KINDI_ATT_TC": "1",
+        "KINDI_TC_TMAX": "4",
+        "KINDI_CARDS": "1"
+      },
+      "command": [
+        "<python>\\python.exe",
+        "-m",
+        "kindi",
+        "--pack",
+        "<kindi-model-root>/kindi-27b/packs/bonsai-27b",
+        "verify",
+        "--spec",
+        "ngram"
+      ]
+    },
+    {
+      "model": "27b",
+      "mode": "tc-draft2b",
+      "status": "pass",
+      "prompts": [
+        {
+          "index": 1,
+          "state": "TIE",
+          "matched": 14,
+          "total": 40
+        },
+        {
+          "index": 2,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 3,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 4,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        }
+      ],
+      "prompts_pass": 3,
+      "prompts_tie": 1,
+      "prompts_fail": 0,
+      "tokens_per_second": 71.0,
+      "exit_code": 0,
+      "duration_s": 12.569105200003833,
+      "first_diff_token": 14,
+      "first_diff_gap": 0.0064,
+      "spec_requested": "draft2b",
+      "spec_effective": "draft2b",
+      "drafts_accepted": 112,
+      "drafts_drafted": 162,
+      "summary": "three-pass median at cf81a82: PASS with KINDI_SPEC=draft2b: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 71.0 tokens/s on the r1 pass (the three-pass median) in 12.57 s",
+      "log": "logs/median-r1/27b-tc-draft2b.log",
+      "logs": [
+        "logs/median-r1/27b-tc-draft2b.log",
+        "logs/median-r2/27b-tc-draft2b.log",
+        "logs/median-r3/27b-tc-draft2b.log"
+      ],
+      "config": {
+        "KINDI_DEVICE": "gpu",
+        "KINDI_HEAD": "exact",
+        "KINDI_KV": "q8_0",
+        "KINDI_SPEC": "draft2b",
+        "KINDI_TP": "1",
+        "KINDI_TC": "1",
+        "KINDI_FD": "1",
+        "KINDI_ATT_TC": "1",
+        "KINDI_TC_TMAX": "4",
+        "KINDI_CARDS": "1",
+        "KINDI_SPEC_PACK": "~/.kindi\\packs\\bonsai-2b"
+      },
+      "command": [
+        "<python>\\python.exe",
+        "-m",
+        "kindi",
+        "--pack",
+        "<kindi-model-root>/kindi-27b/packs/bonsai-27b",
+        "verify",
+        "--spec",
+        "draft2b"
+      ]
+    },
+    {
+      "model": "27b",
+      "mode": "tc-both",
+      "status": "pass",
+      "prompts": [
+        {
+          "index": 1,
+          "state": "TIE",
+          "matched": 14,
+          "total": 40
+        },
+        {
+          "index": 2,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 3,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        },
+        {
+          "index": 4,
+          "state": "PASS",
+          "matched": 40,
+          "total": 40
+        }
+      ],
+      "prompts_pass": 3,
+      "prompts_tie": 1,
+      "prompts_fail": 0,
+      "tokens_per_second": 62.0,
+      "exit_code": 0,
+      "duration_s": 12.96356570001808,
+      "first_diff_token": 14,
+      "first_diff_gap": 0.0064,
+      "spec_requested": "both",
+      "spec_effective": "both",
+      "drafts_accepted": 90,
+      "drafts_drafted": 211,
+      "summary": "three-pass median at cf81a82: PASS with KINDI_SPEC=both: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 62.0 tokens/s on the r1 pass (the three-pass median) in 12.96 s",
+      "log": "logs/median-r1/27b-tc-both.log",
+      "logs": [
+        "logs/median-r1/27b-tc-both.log",
+        "logs/median-r2/27b-tc-both.log",
+        "logs/median-r3/27b-tc-both.log"
+      ],
+      "config": {
+        "KINDI_DEVICE": "gpu",
+        "KINDI_HEAD": "exact",
+        "KINDI_KV": "q8_0",
+        "KINDI_SPEC": "both",
+        "KINDI_TP": "1",
+        "KINDI_TC": "1",
+        "KINDI_FD": "1",
+        "KINDI_ATT_TC": "1",
+        "KINDI_TC_TMAX": "4",
+        "KINDI_CARDS": "1",
+        "KINDI_SPEC_PACK": "~/.kindi\\packs\\bonsai-2b",
+        "KINDI_SPEC_DRAFT_HEAD": "~/.kindi\\models\\kindi-mtp-2b-v1.npz"
+      },
+      "command": [
+        "<python>\\python.exe",
+        "-m",
+        "kindi",
+        "--pack",
+        "<kindi-model-root>/kindi-27b/packs/bonsai-27b",
+        "verify",
+        "--spec",
+        "both"
+      ]
+    }
+  ]
+}

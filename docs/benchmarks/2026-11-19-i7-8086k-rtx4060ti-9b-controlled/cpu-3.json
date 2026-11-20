@@ -1,0 +1,18 @@
+{
+  "cpu_layers": null,
+  "ctx": 24576,
+  "ctx_reduced": false,
+  "ctx_requested": 24576,
+  "device": "cpu",
+  "gen_tok_s": {
+    "exact:100": 7.7,
+    "exact:16000": 3.3,
+    "exact:2000": 7.0,
+    "exact:24000": 2.4,
+    "exact:8000": 4.7
+  },
+  "model": "Ternary-Bonsai-2-9B",
+  "pack": "~/.kindi/packs/bonsai-9b",
+  "read_tok_s": 8.9,
+  "tandem": "off"
+}

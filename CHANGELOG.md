@@ -1,17 +1,764 @@
 # Changelog
 
-## 0.6.1 (2026-11-16)
+## 0.7.0-fork (2026-11-20)
+
+This is the fork's release, not official Kindi 0.6.1. At HEAD `60a039b` the fork is **669 commits and
+827 files ahead** of official `v0.6.1` (`+107,320/−1,370`), with no upstream file deleted. The older
+**649**-commit figure in `detailed-fork-changelog.md` was the `3002a40` snapshot; `CURRENT-VS-KINDI-0.6.md`
+recorded 666 at `3fed704`, and the current range is 669. The package, both installers and the Docker tags
+now say `0.7.0-fork`, so the fork cannot be mistaken for an official `0.6.1` patch. The source archive and
+installer hashes are recorded in `docs/INSTALL.md`; publication is still a release-owner step.
+
+### Added
+
+- **The dense tandem portfolio is comparable before a model is loaded** — `kindi plan --portfolio`
+  prices full GPU, `cpu-first` and `gpu-first` in one dry run with the planner's own byte estimate,
+  labelled against free VRAM and with a capacity-first recommendation (full GPU wins whenever it
+  fits; no throughput is predicted). `kindi autotune` now also measures `tandem-gpu-first`, because
+  the two directions own different output heads and one cannot stand in for the other.
+- **DSV4.1 request shapes are validated before token counting or generation** — the served
+  `kindi/dsv41_server.py` path now rejects a malformed message/tool/stream/stop shape with an
+  OpenAI-style 400 before `count()` or any model work, and the error envelope is pinned by
+  app-level tests.
+- **Windows secret-baseline scanning no longer trips the command-line limit** — detect-secrets is
+  invoked in bounded argv batches and the results are merged, so a large tracked tree no longer
+  fails with `WinError 206`; a regression test pins the batching and merge.
+- **Mode A's default now follows its measured winning draft length** — explicit `KINDI_SPEC=mtp`
+  defaulted to `KINDI_SPEC_K=4`, the setting that cost 0.66-0.89x on the 2B / RTX 4060 Ti; the
+  measured k=1 row is 1.12-1.13x at 512 and 24K and a 1.01x wash at 8K. `spec_begin` now defaults
+  mode A to k=1 while the model drafter modes keep k=4, and an explicit `KINDI_SPEC_K` still wins.
+  Pinned by `tests/test_verify_spec.py`; no output token changes because verify decides every token.
+- **The Lightning Q2_0 CPU expert lane has an exactness gate** — `tools/moe_expert_lane.py` (an
+  experiment, moved out of `kindi/` so no unused production module ships) computes one routed expert
+  with the CUDA kernel's own int32 run sums, fused multiply-add placement and XOR tree; against the
+  real `lt_mv_q2`/`lt_mv_q2_down` at hidden 2688 / width 1856 it has **0 differing elements** on
+  both matrices with device-resident or host-mapped weights. It is a gate, not a backend: the CPU
+  expert costs 2.395 ms, against 0.783 ms for the copy lane (3.06x) and 0.662 ms for the engine's
+  direct host-mapped GPU read (3.62x faster than the CPU lane; 1.18x faster than the copy lane), the
+  lane is not wired into `lightning.Engine`, and the model row is blocked by the absent Lightning
+  pack. `tests/test_moe_expert_lane.py` pins the host arithmetic.
+- **The mixed card/CPU Q2_0 expert layer has a bit-exact combine contract** — `Q2Matrix.partials`
+  returns the host experts' pre-tree lane partials, `lt_mv_q2_down_parts` and `lt_q2_shared_parts`
+  return the card side's, and `lt_q2_combine` performs `lt_mv_q2_down`'s per-lane gateway sum and
+  five-step XOR tree. `tools/q2_combine_lane.py` mixes two host and two card experts plus the
+  shared expert on synthetic Q2_0 weights and gets **0 differing elements** against one
+  `lt_mv_q2_down` launch, with zero and non-zero residuals and the shared-only branch; host
+  partials match the parts kernel. It is a gate, not Engine wiring: no Lightning pack exists here,
+  so no model verify or tok/s is claimed.
+- **The DSV4.1 CLI rejects unreadable paths, invalid counts and malformed prompt/reference content
+  before loading a model** — `python -m kindi.dsv41` accepted `--prompts`, `--ids`, `--out`, `--ref`,
+  `--dspark` and `--dump` values unchecked until after the model was mapped, and parsed `--free1`
+  inside the `numa` branch. Argparse types now require readable input files, parse every `--prompts`
+  JSONL line as an object with an integer `id` and a string `text`, parse every `--ref`
+  `GEN tok:margin ...` line with token ids in `0..129279` and finite margins, require a writable
+  output parent, a complete DSpark directory, token ids in `0..129279`, a finite non-negative
+  `--free1`, a non-negative `-n`, positive `--tmax`/`--gen`/`--spec` values and a finite `--conf`;
+  commands that need `--prompts` or `--ref` fail with their required set before any model load, and
+  `verify`'s default gate files are parsed by the same validators. `tests/test_dsv41_cli.py` pins the
+  helpers and the pre-load exits, including malformed JSONL and continuation content.
+- **The other standalone CLIs validate late user values before loading** — `python -m
+  kindi.dsv41_server` now parses `--tmax`, `--port`, `--cache-gb`, `--ckpt-min`, `--slots`,
+  `--temperature`, `--repeat-stop`, `--turn-min`, `--max-tokens` and `--dspark` with bounded argparse
+  types instead of bare `int`/`float` or a path opened after the model. `python -m
+  kindi.dsv41_dspark` now uses argparse (`convert`/`check`) and requires the three source shards
+  before `Shards` maps anything, instead of indexing raw `sys.argv`. `tools/mtp_context_bench.py`
+  parses `--ctx`, `--tokens`, `--runs` and comma-separated `--positions` before building the engine,
+  where positions used to be split after the engine existed. `tools/spec_ab.py` validates `--modes`
+  and `--ctx` at argparse time, and `tools/measure_split_ratio.py` validates its internal probe
+  counts before building a split. The gate and harness scripts (`check_long_context`,
+  `check_perf_baseline`, `dsv41_hotplan`, `grammar_cost_serve`, `verify_matrix`, `verify_p106`) now
+  reject non-finite, negative or zero values for their numeric options at parse time; values already
+  validated before loading keep the same valid sets. Tests pin the parsers and the pre-load exits.
+- **Python lint and type checking now ship as a measured ratchet** — `tools/check_python_quality.py`
+  runs Ruff 0.16.0 with correctness rules `F`, `E9`, `B` and `I` over the Python tree, mypy 2.4.0,
+  Pyright 1.1.414 (`basic`, all platforms) and Pylint 4.1.3 (`E`, `F`, import-error disabled) over
+  first-party production code (`kindi`, `tools`, `examples` and `bridge/kindi_bridge`). The legacy
+  baseline is **332 Ruff findings / 59 mypy errors / 1,035 Pyright errors / 255 Pylint findings**,
+  stored per file and rule/error code in `tools/python_quality_baseline.json`; the gate fails only
+  on a new or increased finding, so existing debt does not block work. CI runs it,
+  `tests/test_python_quality.py` pins the comparison and parser shape, and `tests/test_ci_config.py`
+  pins the step and exact tool versions. This closes only the lint/type half of audit M6;
+  dependency scanning remains open.
+- **The full CPU gate was rerun after the Usage/plan edits** — the first pass found the generated
+  configuration reference stale: **1 failed, 1,230 passed, 28 skipped** in 246.53 s. After
+  regenerating `docs/CONFIGURATION-REFERENCE.md`, the rerun is **1,231 passed, 28 skipped, 0 failed**
+  in 243.91 s at **46.2186%** line+branch coverage (23,467 statements, 8,386 branches). This
+  supersedes the older 1,196-pass / 45.4% figure, which predates these edits and also had a stale
+  reference in its first pass.
+- **The cold-expert decoder keeps its pinned slots across steps** — the decode hit test asked the
+  host device-slot table (`lightning.downer`) whether an expert was "already warm", but that table
+  is written by `lt_cache_dec`, which skips every cold expert (`hidx[e] < 0`). The hit set could
+  never contain a cold expert, so every routed cold expert was read and re-pointed on every token.
+  A per-layer slot table now follows `cold_experts.cold_slot_plan`: a repeated expert is served
+  from its unchanged slot, a miss takes a free slot or the least-recently-used slot whose owner is
+  not routed in that step, and a routed expert's slot is never stolen (so its pointer cannot go
+  stale). The prompt path already uses its own `tcp`/`tsp` staging tables, so it does not touch the
+  decode table. `cold_stats()` reports `slot_hits` beside `experts_read`. No GPU run, larger-than-RAM
+  pack or tok/s claim; the per-layer stream sync and blocking current-layer read stay open (C9).
+- **The standalone DSV4.1 server caps request bodies** — `kindi/dsv41_server.py` read
+  `Content-Length` with no limit on every endpoint, unlike `kindi/server.py`'s 16 MiB default. It
+  now shares the `KINDI_MAX_BODY_MB` setting (16 MiB default), refuses an over-cap body with HTTP
+  413 `request_too_large` before reading it, and returns 400 for a malformed length or JSON (the
+  warm endpoint used to answer a parse failure with 500). `tests/test_dsv41_server.py` pins the
+  helper, the exact-cap boundary and both handler responses. A body error also closes the HTTP/1.1
+  connection: the refused body was not read, so reusing the socket would parse its bytes as the
+  next request. The close now half-closes the response direction and drains a bounded prefix of the
+  refused bytes before the final close, so the 413/400 cannot be lost to a TCP reset; a socket-level
+  test sends a 1 MiB body against a small test cap followed by a valid request and pins one 413,
+  `Connection: close`, and no second response.
+- **The optional Bridge component has a runnable smoke suite and CI job** — `bridge/tests` now
+  covers duration/time parsing, the SQLite settings/agent store, agent status and the documented
+  jobs parser with only the standard library. `bridge/README.md` no longer claims the full
+  UI/PTY/RPC suite is in this source distribution, and `ci.yml` runs the smoke suite.
+- **Machine roots are gone from current-facing docs and benchmark evidence** — the forward-slash
+  `D:/`/`L:/` roots that the backslash-only secret rule missed are redacted to portable placeholders,
+  including the tracked 27B median logs. A new current-tree guard catches forward-slash drive roots
+  while still allowing the repository's `T:/kindi` form; the historical secret baseline is unchanged.
+- **Every workflow's actions are SHA-pinned** — the existing CI guard now checks every
+  `.github/workflows/*.yml`, not only `ci.yml`, so a GPU or Blackwell workflow cannot add a mutable
+  action unnoticed.
+- **A direct 27B speculation A/B compares outputs byte for byte** — `tools/spec_ab.py` builds one
+  27B tensor-core engine with the 2B drafter and its head, then generates the same prompts plain
+  and under `ngram`, `draft2b` and `both`, comparing token ids and decoded bytes without consulting
+  a reference verdict. The 2026-11-18 run is **12/12 prompt/mode pairs identical** (4 prompts x
+  3 modes, 40 greedy tokens each); `docs/MTP.md` links the command and hashes.
+- **The server warns at startup when `KINDI_SPEC` has no tensor-core path** — `KINDI_SPEC` without
+  `KINDI_TC=1` used to start silently until `/health` was queried. `create_app` now logs
+  `warning: speculation off: ...` with the same tensor-core-path reason `/health` reports, built by
+  one helper. A parameterized test captures the startup line and compares it with `/health` for
+  `mtp` and `draft2b`.
+- **`drafting.last` names the speculation mode that produced its drafts** — the last-request block
+  now includes `method`, recorded from the engine's per-request effective `spec_mode` when
+  generation ends. A client can attribute `passes`/`drafted`/`accepted` without borrowing the
+  sibling `drafting.method`, which describes the current effective state rather than necessarily
+  the mode of the last request. `/health` docs are updated, and a focused server test pins a last
+  block whose method differs from the sibling field.
+- **An opt-in GPU smoke test covers the 2B MTP server path** — `tools/mtp_smoke.py` boots the
+  real `kindi serve` process with the registered `kindi-mtp-2b-v1.npz` head, sends one greedy
+  completion, and fails unless `/health` says `drafting.method=mtp`, both `drafting.last.drafted`
+  and `kindi_spec_drafted_tokens_total` are above zero, and the accepted counters are consistent.
+  It uses a temporary state directory, an empty config and a free loopback port, and is not
+  collected by the CPU-only pytest suite. `docs/MTP.md` documents the command and defaults.
+- **The cold-expert reader has a real lookahead prefetch queue** — the old `read_ahead` knob only
+  merged adjacent ranges. `ColdExpertReader` now names that behavior `coalesce`, and `prefetch`
+  reads exact ranges into a bounded queue before demand; a later `read_many` consumes those bytes
+  without a second file read. The Lightning decode path queues the next cold MoE layer's most-used
+  cold experts in `_cold_prefetch`. A test prefetches two ranges, then proves the demand read
+  returns the same bytes with the reader's read count unchanged; another pins the next-layer
+  queue selection. Checks are in `tests/test_cold_experts.py`.
+- **`kindi plan` and `kindi autotune` reuse a saved `kindi io` report** — `kindi io --json FILE`
+  writes the probe report, and `--io-report FILE` (or `KINDI_IO_REPORT`) feeds it to either command
+  through the same normalizer as a fresh probe, so the 64 MiB disk probe is not repeated. A missing,
+  unreadable or rate-less report is named in a log line and falls back to one fresh probe; with no
+  report selected, the command says how to save one. Tests cover save/reload, the fallback and the
+  plan/autotune wiring. This reuses measurements, not another host's numbers: the file is the one
+  `kindi io` wrote on this machine.
+- **`kindi autotune` now tests an explicit cold-tier host cache size** — Lightning packs with
+  measured rates get `expert-cache-<MiB>` beside the decode-slot candidates. It sets both engine
+  settings the cache needs (`KINDI_LT_COLD=1` and `KINDI_LT_HOST_MB`) and sizes the budget from the
+  same rate-sized working set as the slots (`n_used` plus the RAM/disk/PCIe lookahead, times the
+  MoE layer count and expert bytes), capped by the host tier's experts and by the host's currently
+  available RAM after the same 10% / 1 GiB headroom as the default host budget. Tests cover the env
+  pair, both caps and the missing-rate/no-host-tier cases. No Lightning pack is available here, so
+  this is an arithmetic candidate, not a measured cache optimum.
+- **`kindi bench` carries the Lightning plan's slot count as a portable flag** — a rate-sized
+  `dcache` was shown in the report but the printed follow-up prefixed `KINDI_LT_DCACHE=<planned>`,
+  which cmd.exe and PowerShell do not parse as an environment assignment and the child engine
+  therefore missed. `kindi bench` now accepts `--dcache N`, applies it as the engine's slot budget
+  for that run and restores the caller's own `KINDI_LT_DCACHE` afterwards. `kindi plan` emits
+  `... bench --dcache <planned>` (also for an explicit `--dcache`), and tests pin the flag, the
+  engine's view of it and the absence of the POSIX prefix.
+- **The Lightning plan's follow-up bench command carries its planned context** — the fit and slot
+  count are computed at `ctx`, but the command omitted it, so a configured default context could
+  produce a different run. The command now passes the global option as
+  `... --ctx <planned> bench --dcache <planned>`; a plan test pins the value and that it precedes
+  the `bench` subcommand, where the CLI accepts it.
+- **The Lightning plan reports the cold host-tier split** — when `KINDI_LT_COLD` is enabled,
+  `kindi plan` now runs the engine's own `cold_experts.split_host_tiers` over the planned host set
+  and budget. The `host ram` line names the pinned host experts and the file-backed overflow with
+  their bytes and budget, the `experts` line no longer calls the whole remainder pinned, and the
+  report's `host_tier` object carries the same counts for JSON consumers. A test enables a 1 MiB
+  budget on the fake pack and checks the pinned/file-backed counts, the displayed line and the
+  byte totals.
+- **The kernel-arity check reaches the DSpine graph** — the checker now resolves the 31
+  `kf["..."]` launches from the literal iterable that builds `self.kf`, and `self.k` /
+  `self.k8 if n <= 8 else self.k16` from their `get_function(...)` assignments. The resolver now
+  follows only table assignments rooted at `self`, and every branch of a conditional kernel must
+  accept the call's argument count instead of the union of the branches' declared counts; two tests
+  pin a foreign table and branches with different arities. DSpine moves from 4/39 measured to 37/39;
+  across the four graph builders the coverage is 105 measured / 37 pinned
+  (spec 13, dspine 2, mtp 2, tp 20 unresolvable), with every measured site still mutation-proven.
+  Conditional **argument** tuples get the same treatment: an `if`/`else` tuple contributes every
+  branch's count, so a 6-or-7 tuple against a 7-parameter kernel fails on the 6 branch instead of
+  passing on the larger one; `test_every_argument_branch_must_match_the_kernel` pins that case.
+- **`/metrics` names the effective speculation mode** — `kindi_spec_mode_effective{mode="..."} 1`
+  comes from `drafting()["method"]`, so a refused head reports `none` and a missing 2B drafter
+  reports `ngram`, never the requested `KINDI_SPEC` mode. The accepted/drafted counters stay global
+  and their help points at the gauge; three test cases cover the loaded, refused and fallback states.
+- **The verify matrix runs and scores speculation** — `tools/verify_matrix.py` gained a second axis:
+  `--spec-modes` (default all four) on `--spec-models` (default 2b) builds `<spec-base>-<spec>`
+  cells (default `tc-ngram`, `tc-mtp`, `tc-draft2b`, `tc-both`), passes `verify --spec` plus the
+  mode's files, and records requested/effective and accepted/drafted counts in the table, CSV and
+  JSON. A fallback is `refused` (checked before the generic exit-2/no-reference branch), and a
+  missing head or pack is a printed skip, so a host without them still runs the plain matrix; a
+  baseline containing a cell makes `--fail-on-regression` fail when it disappears. `--spec-base`,
+  `--mtp-head`, `--spec-pack` and `--draft-head` set the base and files. Eight tests cover the
+  environment chaining, skip reasons, parsing, refusal ordering and dry run.
+- **The 2B verify-matrix baseline includes the four speculation cells** — a 2B run with
+  `--modes plain,tc,tc-hp --spec-modes ngram,mtp,draft2b,both` saved seven passing cells
+  (`tc-ngram`, `tc-mtp`, `tc-draft2b`, `tc-both` each 4/4; 45/120, 94/204, 120/120 and 100/189
+  drafts accepted) at `bench-logs/verify-matrix/2b-spec-baseline.json`, which is gitignored by
+  design. The repeat `--fail-on-regression` run passed with no status, exactness, coverage or
+  throughput regression; the exact commands are in `docs/CARD-SUPPORT.md` and `docs/CI.md`.
+- **The 27B drafter speculation cells are a tracked verify-matrix baseline** —
+  `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-27b-drafter/verify-baseline.json`
+  freezes `tc-ngram`, `tc-draft2b` and `tc-both` (all pass, 3 exact + 1 tie;
+  three-pass medians 45.7/71.0/62.0 tok/s) and the exact
+  `--baseline ... --fail-on-regression --max-tps-drop-pct 10` command is in that
+  page and `docs/CARD-SUPPORT.md`. The 2026-11-18 gate re-run after switching the
+  baseline from the first pass to those medians passed with exactness unchanged
+  and throughput +9.0/+6.6/+7.9% (49.8/75.7/66.9 tok/s); a missing cell, a lost
+  exact prompt or a drop over 10% exits 1. The repeat passes ranged
+  44.5-46.7, 70.7-71.1 and 61.3-62.3; the first pass's 49.8/75.7/67.1 values are
+  superseded.
+- **`kindi io` measures this host's memory tiers** — a RAM copy, an unbuffered disk read and pinned
+  PCIe copies both ways, as text or `--json` (`--mib`, `--disk-dir`, `--skip`). The disk probe writes
+  a temporary file and reads it with `O_DIRECT` (Linux) or `FILE_FLAG_NO_BUFFERING` (Windows) so it
+  measures the device instead of the page cache, and says `buffered` rather than pretending when the
+  OS refuses; the PCIe probe uses pinned memory like the engine's staging buffers and reports H2D and
+  D2H apart. It loads no model. Measured here on 2026-11-20 with `--mib 64`: 13,266.4 MiB/s RAM,
+  2,547.5 MiB/s disk, 6.0/6.1 GiB/s H2D/D2H on the 4060 Ti. The rates feed slot sizing; the
+  NVMe cold-expert tier now has its first engine path, whose gate is in `docs/ROADMAP.md`
+  "Memory-tier follow-ups".
+- **The Lightning cold-expert tier is opt-in and reads only the host overflow, not a page cache** —
+  with `KINDI_LT_COLD=1`, the hottest host experts stay pinned under `KINDI_LT_HOST_MB` (default:
+  available host RAM less 10% or 1 GiB, whichever is larger) and only the overflow is file-backed.
+  The split uses measured expert use when `kindi/lightning-experts.json` has counts, so the hot
+  tier is not lost. A prompt stages a layer's host block through a pinned buffer; a decode step
+  reads only routed cold experts that are not already in a warm device slot. `kindi/cold_experts.py`
+  issues aligned `O_DIRECT`/`FILE_FLAG_NO_BUFFERING` reads where available, coalesces neighbouring
+  ranges into one aligned read, and separates requested expert bytes from bytes actually
+  transferred; `Engine.cold_stats()` exposes requested/transferred bytes plus exact pinned and
+  disk tier bytes. The decode graph is disabled only on this opt-in path because the read follows
+  the router, and warm slots take no file read. CPU tests cover the flag, the host/disk split and
+  byte accounting, exact bytes, coalescing, prefetch, order, warm-slot skips and short reads. **No larger-than-RAM pack, GPU run, tok/s or verify result is claimed**; those are the
+  open gate in `docs/ROADMAP.md`.
+- **`kindi plan` and `kindi autotune` now consume the `kindi io` rates** — the Lightning report
+  normalizes the measured RAM, disk and PCIe numbers into bytes/s, predicts one token's slot
+  working set plus `ceil((RAM copy + disk read) / PCIe H2D)` lookahead, caps it by `n_exp` and by
+  the room that still leaves `n_used` experts resident, and prints the three assumptions in a
+  `rates:` line and in the slots explanation. Autotune tests that count with half and double it.
+  Unit-tested on synthetic rates; the within-10%-of-measured-best Lightning-pack gate is still
+  **not measured** (`docs/ROADMAP.md`, memory-tier #3).
+- **`tools/ollama_links.py` links the GGUF models Ollama already downloaded under readable names**
+  — Ollama keeps its weights as `blobs/sha256-<hash>` and describes them in manifests, so a model
+  you already have could not be named on a Kindi command line. The helper reads those manifests
+  (`$OLLAMA_MODELS`, else `~/.ollama/models`; `-m` for another directory), picks the model layer
+  (not the projector, template or license) and makes one link per model into
+  `~/.kindi/models/ollamaLinks` (`-o` to move it), named after the manifest: `gemma3/4b` becomes
+  `gemma3-4b.gguf`. A symlink is used when the host allows it and a hard link otherwise, so nothing
+  is copied; a cross-volume failure explains both ways out, `--dry-run` lists without writing, and
+  `--force` replaces a file that is not the same blob. If there are no manifests, the blobs
+  themselves are scanned for the `GGUF` magic, so a bare `blobs` folder or a folder of `.gguf`
+  files works too. `tools/ollama_links.ps1` is now a thin wrapper over the same script, and twelve
+  tests cover manifest naming, the blob fallback, the environment variable, dry run, idempotence,
+  the symlink-to-hardlink fallback and the failure hints.
+- **`kindi bench` reports prefill vs decode as a share of one request's wall clock** — two separate
+  tok/s numbers left the reader to combine them, and the printed `prompt reading` rate was measured
+  one token per `feed` call, so it was not a request's prefill rate at all. `--split-at` (default
+  4096,8192) and `--split-generated` (default 128) now time a real chunked prefill followed by that
+  many decode steps, sync, and report each phase's milliseconds, tokens/s and share. Measured on the
+  2B (i7-8086K + RTX 4060 Ti, two runs per context): 512+128 is 13.6% prefill / 86.4% decode,
+  4,096+128 is 64.1% / 35.9%, 8,192+128 is 82.2% / 17.8%; chunked prefill runs at 4,349 tok/s at 4K
+  against the 302 tok/s read line, so the split is not derivable from the old numbers. The
+  AI-inventory row that asked for this is closed for the 2B, with the 27B half and the multi-request
+  share still open: `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-bench-split/RESULTS.md`.
+- **The secret guards now cover git history** — both existing scans look only at the files that exist
+  now, so a key that was committed and deleted lived on in history, which is exactly what a push
+  publishes. `tools/check_secret_history.py` walks every commit's diff once (`git log --all -p -U0`),
+  shares the detector patterns with the file guard (`tools/secret_patterns.py`), reports only the
+  commit, path and detector, and gates against a counted snapshot
+  (`tools/secret_history_baseline.json`) so any new row or a row whose count grew fails. CI runs it in
+  the `secret-scan` job with `fetch-depth: 0`; `tests/test_secret_history.py` proves a key deleted from
+  the tree is still found there. The first baseline records the legacy exposure (3,430 hits: an old
+  gitignored benchmark dump, old benchmark evidence with drive paths, and old revisions with home
+  paths) as a reviewed snapshot rather than an endorsement - removing it needs a history rewrite,
+  which is now a decision instead of an accident.
+- **A synced-folder path counts as personal data** — the file scan gained a cloud-storage rule
+  (Dropbox, OneDrive, iCloud, Nextcloud, ...) and validates addresses against a no-reply/placeholder
+  domain list. It immediately caught the knowledge-base path this repository had just gained in
+  `AGENTS.md`, the skill and the scan ledger; that path is now read from `$KINDI_AI_INVENTORY` and is
+  no longer written down anywhere in the tree.
+- **`kindi caps`: what each card and this CPU can actually do** — card names alone were not
+  enough to pick settings. `kindi caps [--json]` reports every card the driver sees (index, name,
+  UUID, PCI bus id, compute capability, total/free VRAM, driver) from nvidia-smi, with pynvml and
+  CuPy fallbacks, so it still answers when the CUDA runtime is missing; the CPU half reuses the
+  engine's own probe (same tier/build the engine would select) and adds the marketing model name,
+  core counts, L2/L3, AVX-512/AMX and the CPU-engine toolchain. Hardware facts (tensor cores, BF16,
+  FP8, FP4) are kept apart from the Kindi paths those capabilities enable, a missing compute
+  capability is reported as unknown rather than inferred from the name, and a missing compiler is
+  named instead of implying the CPU engine or tandem can run.
+- **`kindi autotune`: measure the placements for this model and rank them** — candidates are
+  derived from the hardware report and the pack manifest (full card, two-card tensor-parallel split,
+  tandem `auto`/`gdn:N`, Lightning decode-cache slots, CPU engine), each one a real
+  `kindi bench --sample-vram` child run, ranked by decode tok/s with a reduced-context run ranked
+  below a full-context one and a failed run reported with its own error text. `--dry-run` prints the
+  plan without loading weights, `--json` records every run. Measured on the RTX 4060 Ti with the 2B
+  pack at ctx 8192: 97.4-97.6 tok/s decode, 3,050 MiB sampled peak; the two tandem candidates were
+  refused (already fits) and blocked (no compiler) and were reported as such, not scored.
+- **Recursive GBNF compiles on request, up to a stated depth** — the canonical
+  `json.gbnf` was refused outright, which made the standard recursive grammar unusable.
+  `KINDI_GBNF_MAX_DEPTH=N` (default 0, i.e. still refused) unrolls the recursion N levels
+  deep, compiling a fresh copy per reference and pruning any branch that would need level
+  N+1, so deeper nesting is refused rather than silently truncated. The language at the
+  allowed depths is checked against an independent AST matcher over every string up to
+  length 8-9 for four recursion shapes, and the refusal paths keep their tests. The cost
+  is states, not runtime: with no sharing each level re-expands every reused rule, so
+  llama.cpp's `json.gbnf` is 4,000 states at depth 1, 21,252 at depth 3 and 398,268 at
+  depth 7 — the default 20,000-state limit allows nesting 2, and `json_schema` remains the
+  unbounded path.
 
 ### Fixed
 
-- The 2B with its MTP head on tensor-core cards stopped at start with `cuGraphAddKernelNode failed (1)`, and
-  `kindi verify` failed. A kernel that the MTP head uses got one more argument in 0.5.0, and the MTP head did not pass
-  it. Affected: 0.5.0 and 0.6.0, the installer's setup "Ternary-Bonsai-2 2B" on an NVIDIA card of compute capability
-  8.0 or later with 9.5 GB or more (RTX 3060 12 GB, 3080, 3090, 40 series, A100), chosen with `--model 2b`,
-  `--config` or the setup list (the recommended setup on these cards is the 27B, which does not use the MTP head), and
-  any setup that sets `KINDI_MTP_HEAD` or `KINDI_SPEC_DRAFT_HEAD` by hand. The 2B, 4B, 9B and 27B without an MTP head
-  were not affected.
-- When a CUDA graph cannot be built, the error names the node, its grid and block, and the number of arguments.
+- **Cold-tier readers now have a real teardown path** — `lightning.Engine` created a
+  `ColdExpertReader` and a daemon lookahead thread but never closed either, so a process exit could
+  kill the thread mid-read and leave the file handle to the OS. `Engine.close()` now joins the
+  lookahead and closes the reader once; the registry adapter, `lightning_cli` verify/bench and the
+  HTTP server's `kindi.close()`/`serve()` teardown call it. The reader also serializes prefetch and
+  demand reads with an internal lock, so a future consumer that forgets an external join cannot
+  corrupt the queue or share a Windows file pointer. Tests pin the idempotent close, the lock path
+  and the adapter/server teardown; no GPU, model or throughput claim.
+- **The Python quality baseline cannot be lowered to hide a new finding** — `--update` now requires
+  `--reason`, refuses any new or increased file/rule count, and records the reason, measured commit
+  and per-tool delta in `tools/python_quality_baseline.json`. The CI gate's message names the new
+  form, and the reviewed debt burn-down still lowers the baseline one family at a time.
+- **`--save-baseline` refuses provenance for a different measurement** — when it carried a
+  baseline's `logs` list forward, it did not require the new row's `log` to be one of those files,
+  so a fresh single pass could inherit a three-pass list it was not part of. It now refuses
+  (`SystemExit`, no write) unless the row's `log` is in the carried list; an explicit new `logs`
+  list must also contain that `log`, and a missing `log` refuses. Tests cover both carried sources,
+  explicit acceptance and refusal, and an unchanged target on refusal.
+- **The cold-expert lookahead read now overlaps the current layer's GPU work** — Lightning's
+  `_cold_prefetch` read the next cold layer's spans synchronously before the current layer's
+  kernels, so the lookahead added file latency instead of hiding it. It now starts the read on a
+  daemon thread; `/health`/`cold_stats`, prompt staging and the next cold layer's demand read join
+  it before touching the queue, and a prefetch error is re-raised on the caller's thread. The reader
+  queue and its byte accounting are unchanged. A new engine-level test queues a span and calls
+  `_cold_prepare` without a manual join, proving the demand read consumes both queued spans with no
+  second file read. No tok/s, GPU or larger-than-RAM run is claimed; C9/R1 stay open.
+- **`kindi verify`/`bench` now pass the configured Nanbeige K/V cache through the engine gateway** —
+  `make_engine` did not put `kv_cache` in the adapter config, so a pack served by `kindi serve`
+  used the configured cache while verify/bench's registry path fell back to the engine default. The
+  gateway now forwards `kv_cache` from verify, bench and calibrate, and
+  `tests/test_served_engines.py` records the engine constructor from both paths for the Nanbeige,
+  Lightning and Gemma 4 serve families, so a wrapper cannot drift to another class or argument again.
+- **The Nanbeige gateway path is explicitly non-drafting** — the registry adapter and
+  `nanbeige_cli` (the verify/bench builder) load the base engine only. `mtp_head` and `lookup`
+  are the serve wrapper's draft sources, so a head that the adapter's one-token-per-step
+  `generate()` never drafts with is no longer loaded there, and `make_engine` no longer takes it.
+  `supports_speculation` stays False and now matches the code and tests: the adapter's done event
+  reports `drafted=0`/`accepted=0`, verify/bench do not pass `mtp_head`, and
+  `tests/test_served_engines.py` pins that only serve attaches the head. C2's claim is narrowed to
+  the base engine the paths share; the missing-head warning for serve is unchanged.
+- **`kindi plan`'s follow-up commands survive a spaced path** — the printed `bench` and `verify`
+  lines formatted the interpreter and pack with `%s`, so `C:\Program Files\Python 313\python.exe`
+  or `/mnt/my packs/bonsai` split into several arguments when pasted. The `bench` builders and the
+  `verify` builder now quote the argv for the host shell (`shlex.join` on POSIX, cmd.exe's
+  `subprocess.list2cmdline` rules on Windows), leaving the flags unchanged. A focused test parses the
+  POSIX forms back with `shlex`, pins the Windows double quotes, and runs the printed `verify` lines
+  through the host shells; PowerShell still needs its `&` call operator when the quoted executable
+  comes first.
+- **`kindi serve` refuses backends it cannot drive instead of building a dense engine** — a
+  DeepSeek V4.1 pack now exits with the documented `python -m kindi.dsv41_server` command, Cascade
+  keeps its converter-only message, and an external `KINDI_BACKEND_MODULES` family is refused
+  because the HTTP generation loop has no contract for it. The server's built-in family list is one
+  table, and a gateway test pins a registry adapter for every served family.
+- **Expert usage counts are validated before they steer an expert tier** — `Usage` now refuses a
+  count row that is not a full `n_exp` list of finite, non-negative numbers, and a bad order id
+  (out of range, duplicate, non-integer). A partial map stays valid, but `split_host_tiers` reports
+  `counts_used`/`counted_layers` and the Lightning engine logs when it had to fall back to the
+  usage order. An explicit plan file is strict; the bundled file measured on another expert count
+  is ignored rather than indexing a short list.
+- **The autotune cold-cache candidate uses the engine's own fit** — `expert-cache-<MiB>` now sizes
+  slots from the full expert count and the plan's room (including staging buffers and decode
+  slots), then caps the cache by the host tier. A tight room lowers the proposal instead of naming
+  a slot count the planner would refuse.
+- **`kindi caps` no longer reports FlashAttention-2 as a hardware fact** — the feature table is
+  silicon-only again; FA2 is a library algorithm and does not belong beside tensor cores and FP8.
+- **The documentation/support gates run in CI** — `check_claims.py`, `project_memory --check`,
+  `config_reference --check` and `support_matrix --check` are now one CPU-job step, pinned by
+  `tests/test_ci_config.py`.
+- **Per-module coverage floors now cover 46 modules** — the historical 2026-11-18 full-suite run
+  (1,196 passed, 28 skipped, 45.4% total; its first pass had the then-stale generated reference)
+  added floors for the planner, MoE policy, grammar and
+  chat parsers, CLIs, the new cold/I/O/autotune modules, and low CPU-reachable floors for the
+  graph builders (`spec.py`, `dspine.py`, `mtp.py`, `tp.py`); `engine.py` moves from 19% to 20%.
+  The floors sit 10 points below the measured values, and `moe_cpu.py` stays out until its C
+  library is built in CI.
+- **The installer docs lead with the checksum-verified file** — the stale
+  `v0.5.0-installer` one-liners are gone; Linux downloads, verifies, inspects and runs the 0.6.0
+  script, and Windows downloads `install.ps1` for review instead of piping it into `iex`.
+- **The standalone DSV4.1 CLIs reject malformed comma values at argparse time** —
+  `python -m kindi.dsv41 --ctx` requires one or more positive integers (e.g. `2048,8192`), its
+  `--auto` and the server's `--cal` require exactly two finite `a,b` numbers, and the server's
+  `--ctx` requires a positive integer. `--ctx` used to be converted after parsing (a bare
+  `ValueError`), and the calibration pairs were split into floats when the engine started; all four
+  now exit 2 before a model or native library is touched, naming the valid set. `tests/test_dsv41_cli.py`
+  pins the parsers and both CLI rejection paths.
+- **`python -m kindi.dsv41 --range` validates the prompt-id range at argparse time** —
+  `--range` now requires `a-b` with two non-negative integers and `a <= b` (e.g. `0-9`); a
+  malformed, reversed or single-id value exits 2 before the model or the prompt file is touched,
+  where `generate` and `specbench` used to split the string bare and raise `ValueError` after the
+  model loaded. `tests/test_dsv41_cli.py` pins the parser and the CLI rejection path.
+- **The 27B median evidence no longer carries machine paths** — the three tracked median JSONs
+  kept the local Python path and the `~/.kindi` pack/head paths from their run commands. They now
+  record `<python>/python.exe` and `~/.kindi/...`, and the history baseline records the seven
+  `local drive path` hits per file from the commit that added them (reviewed with
+  `check_secret_history.py --all-hits`; no credential was involved).
+- **`/health` explains MTP requested without the tensor-core path** — `KINDI_SPEC=mtp` with
+  `KINDI_TC=0` reported `requested: "mtp", enabled: false, reason: null`, because `spec.install()`
+  never patches `spec_begin` onto the engine without the tensor-core path. `drafting()` now names
+  the missing switch when the engine has no speculation path, and
+  `tests/test_server.py::test_health_explains_mtp_needs_the_tensor_core_path` pins it with an engine
+  that has no `spec_begin`.
+- **Comma-separated CLI values now reject unknown tokens with their valid set** — `kindi bench`
+  `--split-at` used to drop zero/negative lengths and end a run with a bare `ValueError` for text;
+  it now rejects anything that is not a positive integer (or `none`/`off`) before the model loads.
+  `--tandem-cpu-layers` now rejects malformed forms (`auto:lots`, `gdn:many`, a bad list entry) at
+  the parser with the accepted count/list/`gdn:N`/`auto[:MiB]`/`rate[:FLOOR]` forms, while its
+  existing count, subset and GDN-range errors keep naming their valid range. Unit and CLI tests
+  cover both; `kindi io --skip` remains the reference for the error style.
+
+### Changed
+
+- **The live comparison is re-based at `53198e5`** — official Kindi `v0.6.1` (`7fececb`) remains
+  the latest release and upstream `main` has no post-release commit. The fork is now 664 commits /
+  827 files ahead (`+106,882/−1,320`), with 929 tracked files, 28 numbered requirements and zero
+  file deletions; `CURRENT-VS-KINDI-0.6.md` and `docs/claims/upstream-delta.json` carry the figures.
+
+- **The kernel launch contract now covers every graph call site, not one kernel** — `k_rmsfold_qT`'s
+  missing `hp` was caught for one kernel only after four releases of silent breakage. `tests/test_kernel_arity.py`
+  now reads every `__global__` declaration in `kindi/*.cu` (including `__launch_bounds__` forms and the
+  generated `k_*_T` token-batched wrappers from `kindi/chunk.py::_wrappers`, whose signature is
+  `params + int T_ + one stride per pointer`) and checks **71 launches** across `kindi/spec.py` (26),
+  `dspine.py` (4), `mtp.py` (3) and `tp.py` (38). **71** further sites cannot be resolved statically
+  (a kernel held in a variable, list element, dict lookup, `getattr` or conditional; an argument tuple
+  assembled at run time) and are now pinned in `UNRESOLVED_SITES` with a reason each, so a new dynamic
+  launch fails the test until it is classified, and the measured count is pinned so a silent coverage
+  drop fails too. Every measured site is proven by mutating a copy of its module and requiring the
+  checker to catch it (drop-last argument first, empty tuple where a dual-arity kernel such as
+  `k_tc_q8` — 7 parameters on HIP/Pascal, 8 on CUDA — makes the drop land legally).
+  Tracked as [REQ-0023](docs/development/requirements/REQ-0023.md); the grid/block half stays open.
+- **A structured request compiles its grammar once, not twice** — validation has to build the
+  automaton to answer an invalid schema or grammar with a 400 before the engine runs, and the
+  decode path then built the same one again. Validation now parks the compiled object on the
+  request and generation reuses it, so a large GBNF is paid once per request instead of twice:
+  llama.cpp's canonical `json.gbnf` at nesting 2 is 7,936 states and a 7.8 ms median build (five
+  runs, this host), so a structured request with that grammar drops from ~15.6 ms to ~7.8 ms of
+  compile before its first token.
+- **A refused GBNF grammar now says why it is large and what to write instead** — the rule cache
+  dropped on 2026-11-17 (it let every use share one copy of a rule, which made an "exactly 3"
+  repetition accept 0-5 copies) was 20x smaller because it changed the language. With exact
+  per-use expansion the price is states: a flat 40-pair record referencing `ws` 82 times is 5,915
+  states / ~6 ms, against 302 for the incorrect build, and the loop form of the same constraint is
+  ~330 states at any document length. The 400 now names `*`/`+` and `json_schema` instead of only
+  the state count, `Grammar.states` exposes the compiled size, and `docs/API.md` records the
+  numbers and the default limit's practical reach (~130 enumerated copies).
+
+### Added
+
+- **`kindi verify --spec <mode>` gates speculation against the reference** — verify always built an
+  engine with speculation off, so `docs/MTP.md`'s "the output of every mode was the same as without
+  speculation" had never been checked by anything. The flag sets the mode for the run (its own
+  variables, `KINDI_MTP_HEAD` / `KINDI_SPEC_PACK` / `KINDI_SPEC_DRAFT_HEAD`, stay as set), the first
+  line reports `speculation: requested …, effective …, head …`, every prompt line adds
+  `N/M drafts accepted`, and the summary names the mode. A mode whose drafter did not attach exits 2
+  with the reason instead of quietly verifying the plain engine; `auto` alone may settle elsewhere.
+  Measured 2026-11-17 on the 2B / RTX 4060 Ti (4 prompts x 40 greedy tokens): plain 4/4 at 279.0
+  tok/s, `ngram` 4/4, `mtp` 4/4 at 203.5 (mode A is token-exact, 98/248 drafts accepted), `draft2b`
+  4/4, `both` 4/4 - the last two with the same 2B as target and drafter, so they prove the path but
+  not the 27B pairing. `dspine` still has no cell (no weights on this host;
+  `docs/MANUAL-HELP-NEEDED.md` row 7). The plain output gains only the mode line and a summary
+  suffix; the `PASS` and `tokens/s` lines `tools/verify_matrix.py` parses are unchanged.
+
+### Fixed
+
+- **`kindi io --skip` rejects unknown probe names** — a misspelled name used to match nothing,
+  so every probe ran, including the disk probe the user had asked to skip. The names are now
+  validated before any probe starts; an unknown one exits 2 and prints the valid set (`ram`,
+  `disk`, `pcie`). Pinned by `tests/test_io_probe.py`.
+- **`kindi plan`'s `slots:` line now prices the decode slots in the weighted branch** — once usage
+  counts exist the line reported only the served share, so the slots' cost was invisible exactly
+  where the plan had already paid it. It now runs the same usage-weighted placement twice, once with
+  the slots and once against the same room and `--moe-cache-mib` cap with `dcache=0`, and states the
+  difference: on the test pack at 0.077 GiB of free VRAM, 4 slots per layer cost 9 of 128 card
+  experts and 5.8 points of served share (94.2% against 100%). The report dict carries the same
+  numbers as `slots_cost` (`served`, `served_without`, `cost_pp`, `experts`, `experts_without`), so a
+  room or cap where the slots are free reads as 0.0 points instead of an assumed one expert per
+  layer. Pinned by `tests/test_plan.py` on a synthetic two-layer spec and on the fake pack's
+  tight-card case.
+- **`kindi plan` and the Lightning engine now plan from one helper, so the slots line cannot drift**
+  — `plan._lt_fit` and `lightning._plan` carried the same fit arithmetic twice, which is how the
+  report's slots line fell behind the engine in the first place. `kindi/ltfit.py` now holds
+  `dcache_default` and `fit_experts`: the report builds the room and calls them, the engine calls them
+  too, and the module-level `DCACHE` snapshot that could disagree with a `KINDI_LT_DCACHE` set later is
+  gone (both read the environment at plan time). Sharing also removes a latent division by zero for a
+  model with two MoE layers, where the engine copy divided by `n_moe - 2`. `tests/test_lt_fit_equivalence.py`
+  drives both callers over synthetic specs (all resident, slots priced, two layers, nothing fits), pins
+  exact equality and the identical refusal, and fails if either side grows its own formula again.
+- **A commit message is now scanned like file content, so a path in one is a caught leak** — the history
+  gate read each commit's subject for credential shapes only and never read a body at all, which is
+  exactly where a path survives a push with no file left to find it in. `tools/check_secret_history.py`
+  now scans the whole message (subject and body) with the same detectors as a diff line, reporting
+  `(commit message)` and the detector, never the text. Re-recording the baseline found one such row in
+  this history: a legacy commit body names a cloud storage folder, so the baseline is 128 rows / 3,247
+  hits and that row is visible instead of invisible. Two tests pin the behaviour — an empty commit
+  whose subject carries a home path, with no file containing it, and a body carrying a drive path.
+- **`CURRENT-VS-KINDI-0.6.md` §41's delta figures were 7 commits stale, and the harness now gates
+  repository figures the way it gates runs** — re-derived from the tags on 2026-11-17: the v0.6.1
+  release delta (16 files, +336/−43) reproduced exactly, but "433 commits, 467 files, +67,049/−1,128,
+  578 tracked files (169 upstream)" at `f934a55` was measured at an earlier commit: the real values
+  are 440 commits, 468 files, +67,156/−1,125, 579 tracked files, and 172 upstream files at v0.6.1
+  (169 is v0.6.0's tree). The v0.6.0 comparison is 442 commits, 467 files, +67,420/−1,096. `v0.6.1`
+  turns out to be one commit past the shared base `dce89df` and not an ancestor of the fork, which
+  the section now says. `tools/check_claims.py` grows a `git` check kind (`commits`, `diffstat`,
+  `deleted`, `treefiles`) and `ref:` evidence, so all 22 of these figures - including §1's baseline -
+  are recomputed from the tags on every run: 14 gates, 75 numbers, four citations as debt.
+- **Mode A is a win at `KINDI_SPEC_K=1`, and the docs now say so instead of "keep it off"** — the
+  0.66x recorded on 2026-11-17 was at the then-default `KINDI_SPEC_K=4`. Re-measured at depth on the 2B /
+  RTX 4060 Ti with one harness (`tools/mtp_context_bench.py`: same engine, plain and mode A
+  interleaved, prompt reading excluded): k=1 gives 1.12x at 512 tokens and 1.13x at 24K (4 runs a
+  side, 72% acceptance), a wash at 8K (1.01x), while the then-default k=4 still loses (0.89x / 0.66x /
+  0.87x) and k=6 at 24K is 0.66x. `KINDI_SPEC_K=1 kindi verify --spec mtp` stays 4/4 token-exact.
+  `docs/MTP.md` carries the table and the corrected advice; `auto` still cannot reach the win (it
+  caps mode A at k=2 below 8K and switches it off above). Results:
+  `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-mtp-context/RESULTS.md`.
+- **`/health`, the startup log and `kindi info` report the speculation that is running, not the one
+  that was requested** — `drafting()` answered `enabled: true, method: mtp` from `KINDI_SPEC` alone,
+  so a head whose graph never built still looked like drafting for four releases. One resolver
+  (`spec.resolve_mode`) now answers for `spec_begin`, `/health` and the startup log, which prints
+  `speculation: requested <mode>, effective <mode> (<reason>)`; a head that refused to load is a
+  `warning: speculation off: ...` line rather than a debug note, the refusal reason is folded into
+  `/health`'s `reason` (with `requested`, the effective `method`, the loaded `head` and its
+  `head_sha256` prefix), and `kindi info` prints the requested mode with the head's registry verdict
+  instead of a mode it cannot know before an engine loads.
+- **The MTP head is checked against `kindi/mtp_heads.json` before its weights are loaded** — the
+  registry's `sha256` and `bytes` were used by hand once and never by the code, so a truncated or
+  patched 60 MB download would load and draft. `kindi/mtp_heads.py` hashes the file in 1 MiB blocks
+  and `MTPDraft` calls it before `np.load`, refusing a mismatch with the expected and found digest
+  (and both sizes) or an unregistered file, naming the local-development escape hatch
+  `KINDI_MTP_HEAD_ALLOW_UNREGISTERED=1` (documented in `docs/CONFIGURATION-REFERENCE.md`). The head's
+  startup line now carries its `sha256` prefix.
+- **The MTP head's CUDA graph never built, so mode A speculation was silently dead** — ported from
+  upstream `v0.6.1`. `k_rmsfold_qT` gained a trailing `hp` argument in 0.5.0; `kindi/spec.py` and
+  `kindi/dspine.py` were updated and `kindi/mtp.py` was not, so with `KINDI_TC=1` and
+  `KINDI_MTP_HEAD` set the head failed to build (`cuGraphAddKernelNode failed (1)`) and the engine
+  logged `speculation off` — a documented feature that had not run on the tensor-core layout for four
+  releases. A short argument tuple is not a Python error, so nothing caught it; `tests/test_kernel_arity.py`
+  now reads each kernel's parameter count from its `.cu` source and each Python call site's argument
+  tuple, and fails on the pre-fix `mtp.py`. The 0.6.1 graph-build diagnostic (node, grid, block,
+  argument count) is ported with it. Measured after the fix on the 2B / RTX 4060 Ti: the head attaches,
+  and mode A costs 0.66x (236.9-239.6 vs 361.2-363.7 tok/s, 22.5% acceptance) — the feature works,
+  the card still does not want it (`docs/MTP.md`).
+- **`kindi plan`'s `slots:` line priced the decode slots wrong** — it said each slot displaces one
+  expert per layer. The engine's fit (`lightning._plan`, mirrored by `plan._lt_fit`) takes the slots
+  off the room *before* dividing it over the remaining `n_moe - 2` layers, so `dcache` slots per
+  layer cost `dcache * n_moe / (n_moe - 2)` experts there, and the residency percentage was computed
+  against `n_card + dcache` rather than against what the same room fits with no slots. The line now
+  runs the fit twice (`dcache=0` for the counterfactual), reports the measured difference and the two
+  coverage shares, and the report carries `slots_resident` for machine readers; on the 256-expert
+  test pack 10 slots cost 20 experts per layer (162 resident against 182, 86.4% of measured picks
+  against 91.6%). `--dcache` is also passed into the fit now instead of only being printed.
+- **An image request can no longer reach a text-only engine through a manifest flag** — the server
+  accepted image content parts and Ollama `images` for any pack whose manifest named `vision` or
+  `mmproj`, but no converter writes that field and no build implements a projector, so such a
+  request would have been answered about an image the engine never saw. Image input is now always
+  a 400: the message is the existing "no vision weights" one for a text pack, and a new one naming
+  the missing projector (`mmproj`) for a pack that claims vision. Pinned by a test that builds an
+  app with a vision-declaring manifest and still gets the 400.
+- **The tokenize and detokenize routes ignored the documented body cap** — they called
+  `await request.json()` instead of the capped reader the chat routes use, so on a `--lan`
+  bind a client could make the process allocate an unbounded body before the API key or the
+  shape was checked. Both routes now read through `_read_json_body` and answer 413
+  `request_too_large` over the limit, with the same 400s as before for a bad body.
+- **A dry run could answer "fits" for a prompt it failed to count** — an unexpected
+  exception from the tokenizer or counter was swallowed, `ids` became empty and the preflight
+  reported `fits: true, prompt_tokens: 0`. A caller acts on that answer, so a counting
+  failure now returns a 500 naming the exception instead of a fit.
+- **A Nanbeige or DeepSeek V4.1 pack reported a Bonsai model id** — `model_name: auto`
+  inferred the id from a literal tuple of backends that forgot those two families, so every
+  response, `/v1/models` entry and access-log line said e.g. `bonsai2-33b`. `kindi/modelids.py`
+  now resolves through the adapters' own `model_id_for_manifest` hooks, which config and the
+  engine gateway share; a manifest two adapters claim is still refused.
+- **A non-numeric config value raised a traceback instead of an actionable error** —
+  `KINDI_CTX=abc` now says "ctx must be an integer (got 'abc')" like the rest of the
+  config validation, instead of an unhandled `ValueError` at startup.
+- **Two sessions with the same title on the same day overwrote each other's export** —
+  the export name was date + slug with no uniqueness, so the second write won; a name that
+  already belongs to another session now gets the session id appended, while re-exporting a
+  session still rewrites its own file.
+- **`--api-key` is validated as a single line** before it is written to the container env
+  file: a value with a newline would have injected extra variables into that file.
+- **`--moe-cache-mib` was silently ignored by the usage-weighted plan** — with a usage file that has counts, `kindi plan`'s weighted scan spent free VRAM instead of the cap and reported every expert on the card (a 1 MiB cap printed "32 of 32 experts per layer"). The scan's budget is now bounded by the cap, so the report and the flag agree. The same line also stops quoting the top-n share a uniform split would get when a usage-weighted placement exists: it reports the share that placement actually serves. Tests: a capped plan with counts reports at most the cap's experts and still prints the measured share.
+- **A GBNF rule used twice lent its successors to the other use** — the compiler cached a
+  rule's NFA pair and every use attached its successors to the same end state, so the
+  epsilon closure after the first use reached a later use's successor and the automaton
+  accepted strings that skipped the symbols between them (a JSON grammar accepted
+  `{"a": }`, since `ws` is reused everywhere). Each reference now compiles its own copy;
+  the state limit bounds the duplication. Found by running llama.cpp's own `json.gbnf`.
+- **GBNF bodies may start on the next line and continue inside parentheses or after `|`** —
+  llama.cpp's documented layout, and the one its `grammars/json.gbnf` is written in, used
+  to fail with "expected a rule name or a reference" before any semantic check ran. A
+  newline anywhere else still ends the rule.
+- **A GBNF grammar is bounded before it is compiled** — the automaton is one state per literal character, so `root ::= "a"{1,100000}` (or a megabyte literal) was a memory request from whoever sent the request. `{m,n}` now refuses a bound above 10,000 copies, and the compiler refuses to exceed 20,000 states (`KINDI_GBNF_MAX_STATES`, read per grammar; a bad value falls back to the default). Both are `ValueError`s, so the server returns an enveloped 400 with `param: response_format` instead of failing the process. Tests: the bound, the state limit, the override and a bad override.
+- **`docs/API.md` still said `grammar` was rejected** — true before the GBNF slice landed, stale afterwards; the row now lists all three structured types as accepted and documents the compile bounds.
+- **The dense tandem no longer accepts a MoE pack** — `TandemEngine` only refused Gemma 4 and Nanbeige, so `--tandem cpu-first` on a `kindi_lightning` or `kindi_dsv41` pack reached the GDN layer split with a manifest that has no such layers (wrong dims, or a crash) while the flag looked honoured. It now refuses any `backend` outside the dense Bonsai family before the GPU is inspected, and for a MoE pack the message names the split that does apply (expert tiers, not layers). `make_engine` (the one gateway) turns a `--tandem` flag on a MoE family off and logs why, pointing at `kindi plan`, so a config that sets tandem globally gets the MoE engine rather than the wrong one. Tests: the MoE refusal, the non-dense refusal, the gateway log and the untouched `off` path.
+- **Adapter generation loops: the O(n^2) stop scan and an empty-prompt token filter** — the five T4.2 adapters rescanned the whole decoded reply for every stop string on every token, the bug already fixed in `server.py` and the `{x}_gen` loops; they now share `base.StopScanner`, which keeps only the longest-stop overlap (a match across two pieces is still found). The same loops passed `{"prompt_ids": []}` to `token_filter`, so a prompt-dependent filter decided on the wrong state; all of them now pass the real prompt. An over-context prompt raises `BackendUnavailable` naming prompt and context instead of silently returning an empty reply finished for length. Tests: scanner boundary/long-reply, real prompt ids, over-context refusal.
+- **`kindi use` no longer re-hashes a verified multi-GB GGUF on every run** — a size+mtime marker next to the file skips the second full read (40-90 s on a 9.5-13 GB model) while a changed stat still forces a re-hash. The KINDI_PACK symlink update is also wrapped: Windows without Developer Mode/admin raised WinError 1314 after the config file was written, failing the command for no reason; it now notes the failure and continues. Tests: cached hash, changed-file rejection, symlink refusal.
+- **Shipped backends no longer register with `replace=True`** — every adapter opted out of the registry's "two backends claiming one name is a bug" guard, which let a `KINDI_BACKEND_MODULES` module silently shadow a shipped family. They register once, and a second registration is now refused.
+- **The engine gateway can no longer build the wrong engine silently** (REQ-0019 T4.2) — `make_engine` now refuses a pack whose manifest names a family no adapter serves (`backend: kindi_cascade`, an unknown one) or that has neither a `backend` nor the dense weight fields, instead of handing it to the dense legacy builder; a manifest two adapters claim is refused as contradictory rather than resolved to the first hook to fire; and `registry.resolve` refuses an equally-specific two-backend match instead of picking by registration order. Every pack now logs the path it took (`-> the bonsai backend (bonsai2-4b)`), and the one legitimate fallback — a dense pack whose own adapter does not claim it, the "Hf" placeholder-`model` case — says so in the log with the manifest field to check. New harness test over the packs on the host, plus gateway tests for each refusal.
+
+- **Installer name fallback: RTX 50 (Blackwell) and RTX 4000 (Turing)** — computed capability now derived from the card name when the driver does not report it (`cc_from_name()` in `install.sh`). RTX 50 series maps to 12.0 (Blackwell sm_120); previously it fell through to the 6.1 default. The existing `RTX 40` rule also matched `RTX 4000` and reported Turing's sm_75 card as Ada 8.9; the separate `RTX 4000` rule now wins.
+- **Config reference regenerated** after the sessions round shifted source lines (191 env reads, same content).
+- **`test_server_cpu` skips instead of erroring** when the libkcpu cache is cold and no gcc/clang is available.
+
+### Added
+
+- **`kindi plan --moe-chunk` reports what the MoE tandem would do for a prompt chunk** — the scheduler was reachable only from tests, so nothing outside them could answer "what does a prefill of N tokens cost in copies?"; the flag builds the placement from the pack header and `--usage` (honouring `--moe-cache-mib` / `--dcache`) and prints the lane split (card / copy / cpu), the deduped copy list and its bytes for an N-token sample chunk, with `--moe-lane cpu` for the host lane. The sample spreads over the measured order so cold experts appear, and adjacent tokens overlap so the dedupe shows. No weights are read and no bytes are moved.
+- **MoE tandem lanes, as a scheduler** — the dense tandem cannot split a routed layer, so `kindi/moe_tandem.py` writes the MoE split down for one execution unit: every selected `(layer, expert)` pair goes to `card` (resident, no slot), `copy` (a complete expert into an `ExpertCache` slot via the chunk planner, so an expert two tokens share is copied once) or `cpu` (a host worker computes it; opt-in, `lane="cpu"`, throttled by a deterministic `cpu_share` that offloads an even, repeatable share of host pairs rather than a sample). Disk-tier experts are always copied even on the CPU lane, because their bytes have to come through anyway. Scheduling order (router order) and arithmetic order are separate: `combine_order="router"` for Raon, `"expert"` for Gemma 4's ascending-expert-id loop, with router ranks kept on every pair. A token that cannot fit rolls the whole forward back, so no pin or LOADING slot survives a refusal. Plan metrics are JSON-safe and split card/copy/cpu pairs plus copies, bytes and hits. `tests/test_moe_tandem.py` (9 cases) pins the lanes, cross-token dedupe, the CPU lane and its thinning, disk experts on the CPU lane, both combine orders against scheduling order, the all-or-nothing rollback, metrics and input validation. Scheduler only: it moves no bytes, runs no kernel and no backend uses it yet.
+- **MoE prefill chunks get one copy list, not one per token** — a plan covered one router token, so a prompt chunk that routes several tokens to the same expert would copy that expert once per token. `kindi/expert_chunk.py` adds `plan_chunk(cache, [(token, keys), ...])` on the model-free cache: each token is still reserved by the cache's own atomic `plan()` (so one token's all-or-nothing guarantee is unchanged), an expert selected by several tokens is copied once, and the chunk returns its copy list in first-need order (chunk order, then each token's router order), plus hits, coalesced selections and misses. `ChunkPlan.metrics()` is JSON-safe and `saved_copies` is the traffic the dedupe removed. If a later token does not fit, the chunk is rolled back: this call's pins are released and the copies it started are failed, while a slot already resident or already loading for another token is left alone. Tests: `tests/test_moe_chunk.py` (10 cases) pins dedupe, run-to-run copy order, hits vs coalesced, per-token router order, rollback (no pins, no LOADING slot, unchanged slot state), the untouched out-of-chunk copy, and input validation. Planner only: no backend, engine or GPU copy path is wired.
+- **MoE placement report: the decode-slot trade is now stated** — `kindi plan` on a `kindi_lightning` pack gained a `slots:` line: the bytes the device slots take, the experts per layer the engine's own fit gives up for them (the fit takes the slots off the room the remaining `n_moe - 2` layers share, so `dcache` slots cost `dcache * n_moe / (n_moe - 2)`), and, when a measured usage file has counts, the share of routed picks the card serves with the slots against the same room with no slots (`Usage.coverage()`, the top-n share over all MoE layers). `kindi plan`'s MoE report also returns `dcache` for machine readers. `kindi/moe.py` had no direct unit tests; `tests/test_moe_policy.py` now covers coverage, the full-fit and host-budget placements, the one-token minimum and the measured share the placement claims.
+- **GBNF grammars: `response_format` type `grammar`** (REQ-0018) — decode-side constraint for any regular grammar, not only JSON schemas. `kindi/gbnf.py` parses llama.cpp GBNF (rules, alternation, groups, literals with C escapes, character classes with ranges/negation, `.`, `* + ? {m} {m,} {m,n}`, references, comments) and compiles it to an NFA whose state is the epsilon-closure of live states; a token is allowed only when its state can still reach acceptance, so constrained decoding cannot walk into a dead end with an empty allowed set. Syntax errors, unknown/duplicate rules, a missing `root` and recursive rules are 400s (`param: response_format`) before the engine runs; recursion is refused because the automaton is regular (`json_schema` is the recursive-JSON path). The three generation paths now ask one predicate (`kindi/constrained.py::is_structured`) instead of repeating a type tuple. Tests: `tests/test_gbnf.py` (language, dead ends, `vocab_allowed`, refusals) and a dense-loop end-to-end test.
+
+- **T4.2 Gemma 4 adapter ported, GPU gate blocked** (REQ-0019) — `kindi/backends/gemma4.py` registered (`gemma4-e4b`, the GGUF chat template through `gemma4_chat`, the tokenizer's stop ids, batched prefill at the KV ring's 512, greedy or sampled from the full logits) over `gemma4.Engine`/`gemma4_tp.TPEngine` (the two-card check moved to `backends.gemma4.two_cards()`, shared with the server); `make_engine` resolves `kindi_gemma4` packs through it. No parity claimed: no Gemma 4 pack on this host.
+- **JSON-schema constrained decoding on the Lightning/Nanbeige paths** (REQ-0018) — `lightning_gen.py` and `nanbeige_gen.py` now wire the same `JsonGrammar` used by the dense/Gemma paths (whole reply, no thought channel; Nanbeige drafting disabled while structured output is active; stop tokens only once the automaton is done). `supports_json_grammar` now names dense, Gemma 4, Lightning and Nanbeige. CPU-verified with fake engines (a scripted illegal top logit is skipped and the reply parses); no GPU gate claimed.
+- **T4.2 DeepSeek V4.1 adapter ported, GPU gate blocked** (REQ-0019) — `kindi/backends/dsv41.py` registered (`deepseek-v41-flash`, CPU engine) over `kindi.dsv41.Model`; a pack is a hand-written `kindi_pack.json` (`backend: kindi_dsv41`, `model_path`, optional `encoding`) because no converter exists. The DSpark drafter, RAM slots, prompt cache and turn saves stay in the standalone `dsv41_server`. Gate blocked on weights and on the release gate data; no parity claimed.
+- **T4.2 Nanbeige adapter ported, GPU gate blocked** (REQ-0019) — `kindi/backends/nanbeige.py` registered (`nanbeige-33b`, SPM + Nanbeige chat template, sampled generation mirroring `nanbeige_gen._pick`); `make_engine` now resolves `kindi_nanbeige` packs through it (previously a Nanbeige pack built a wrong dense engine). No verify/bench parity claimed: the catalog's ahtx GGUF is corrupt as served by Hugging Face (SHA mismatch, garbled tensor infos); owner action in `docs/MANUAL-HELP-NEEDED.md`.
+- **T4.2 Bonsai adapter 27B gate closed** (REQ-0019) — the 27B pack (manifest `model` is the GGUF's placeholder `Hf`) never resolved to the adapter; `model_id_for_manifest` now falls back to the `source_file` size, like `config.py`. 27B `kindi verify` is 4/4 on both the adapter and `KINDI_LEGACY_ENGINE_PATH=1` paths, and bench agrees within ~1% — the Bonsai family gate is now complete for all four packs on this host.
+- **T4.2 Nemotron Lightning adapter ported, GPU gate closed** (REQ-0019) — `kindi/backends/lightning.py` registered (`nemotron-lightning-30b`, the Lightning tokenizer + the GGUF chat template, sampled generation via the shared `lightning_gen.pick_candidates`); `make_engine` now resolves `kindi_lightning` packs through it. The first local catalog copy was unusable (catalog `38854de6…` vs local `bc22bc…` vs pack manifest `2ec6d074…`; zero first megabyte, rejected as not a GGUF). **Update (same day):** a clean re-download matched the catalog size/SHA-256/GGUF magic, and a fresh pack passed the RTX 4060 Ti gate — verify 5 exact + 7 llama.cpp ties, 0 fail; bench ctx 8192 read 788.3–821.3 and write 165.96–167.41 tok/s. Evidence: `docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-lightning-30b/RESULTS.md`.
+- **T4.2 Bonsai adapter, 4B/9B gate** (REQ-0019, measurement only) — extended the adapter's GPU gate beyond the 2B to the other two packs on the RTX 4060 Ti host: verify 4B 3+tie and 9B 4/4 on both the adapter and legacy-valve paths, bench rows through the adapter agreeing with the valve within ~1%. Evidence: `docs/benchmarks/2026-11-15-i7-8086k-rtx4060ti-t42-bonsai-4b-9b/RESULTS.md`. No 27B pack on host; no new support claim.
+
+- **Doc-consistency fix** (no code) — `docs/BACKENDS.md`'s intro now describes the actual registry (fake + bonsai adapter + external; T4.2 Bonsai shipped 2026-11-15, T4.3 shipped the same day) instead of "only the fake backend resolves". `docs/AGENTS.md` documents `response_format` structured output (carrying backends, loud 400 elsewhere); ROADMAP's T5.1 bullet no longer lists structured output as planned for the dense/Gemma paths.
+
+- **OpenAI-client wire coverage** (REQ-0018/REQ-0016, tests only) — the live-HTTP conformance suite (`tests/api/`, real app over uvicorn driven by the official `openai` client) now sends a structured-output request (accepted, recorded) and a backend-without-the-grammar request (loud 400, `param: response_format`), plus a `/sessions` HTTP round trip (list/show/export/status/tags/read, malformed-id 400) over the same harness. GPU-free against the stub engine; `KINDI_API_URL` points the suite at a real server.
+
+- **JSON-schema constrained decoding** (REQ-0018) — `response_format` `json_object` and `json_schema` now constrain the dense decode instead of being rejected: a schema-ordered JSON automaton (`kindi/jsongrammar.py`) intersected with the sampler's candidate set (`allowed` in `kindi/sampling.py`), so the reply parses against the schema by construction. Malformed schemas and `tools` with structured output are enveloped 400s; `grammar` stays rejected. Covered by grammar conformance tests and a CPU-only end-to-end loop test.
+- **JSON-schema constrained decoding on the Gemma 4 path** (REQ-0018 slice) — the native Gemma 4 server now honors the same constraint (`Kindi._generate_gemma` + `_g4_json_token`): structured output takes over the whole reply (no thought channel is entered), and stop tokens are admitted only once the automaton is done. At the time, the `supports_json_grammar` flag gated only the dense + Gemma 4 backends at the HTTP boundary (Lightning/Nanbeige got a loud 400); the entry above now extends the constraint to those two paths too. CPU-verified end to end (fake Gemma engine/tokenizer); the GPU gate for the Gemma path is not run (no Gemma pack on the host).
+- **T4.2 Bonsai adapter** — the dense Ternary-Bonsai-2 engine now lives behind the backend contract (`kindi/backends/bonsai.py`, registered as `bonsai`). `kindi.engine.make_engine` resolves dense Bonsai packs through the registry by default; `KINDI_LEGACY_ENGINE_PATH=1` restores the pre-port builder. Verified 2026-11-15 on the RTX 4060 Ti: `kindi verify` 2B 4/4 on both paths (103.0 vs 103.2 tok/s, timing jitter); `kindi bench` 2B 97.3/91.5/86.3/81.3 tok/s at 2K/8K/16K/24K through the adapter. This was true when the Bonsai adapter landed; Nanbeige, Nemotron Lightning, Gemma 4 and DeepSeek V4.1 now also resolve through the T4.2 adapters above (REQ-0019 T4.2, partial).
+- **Cross-ISA parity test** — all five tier libraries run a fixed decode: greedy tokens identical across tiers, hidden states within summation-order tolerance (measured ~3e-4 max diff).
+- **Sessions protection + unread flags** — records carry `protected` (prune keeps, `kindi sessions protect SESSION_ID [--off]` sets) and `unread` (raised by record/append/import, cleared by `show` or `POST /sessions/<id>/read`). `list`/`triage` show `[unread]`/`[protected]` markers, `stats` counts both, and server summaries expose both.
+- **Legacy Fermi path** — Fermi / pre-Kepler NVIDIA cards now classify as `fermi` in `install.sh`; they offer no GPU models or pairs, skip the NVIDIA container toolkit setup, and the installer offers the CPU engine on an AVX CPU. No CUDA support is claimed (no code path compiles for sm_21).
+- **Support-matrix slugs for the 5060 Ti, GeForce 940M and GT 1030** — rendered as not measured (no fabricated rows); the Fermi GT 430 stays unsupported (below the installer’s sm_30 floor, the CUDA 10.2 image cannot run it).
+- **Fake-GPU tests for the full ten-card rig list** in `tests/test_installer_cards.py` — classification and model offers for every card, plus the name-fallback cases.
+- **Tandem split timings on `/metrics`** (`kindi_tandem_*` gauges: cpu,
+  gpu, transfer, head and total ms/token plus tokens and handoffs per
+  token) — visible whenever the `KINDI_TANDEM_DEBUG_TIMING` probe ran.
+- **`kindi chat --resume SESSION_ID`** continues a saved session: the REPL
+  is seeded with the stored turns and new turns append back to the same
+  record on exit (`SessionStore.append_messages`).
+- **`kindi sessions prune --days N [--all] [--dry-run]`** retention:
+  deletes sessions not updated for N days (resolved-only by default).
+- **`kindi sessions stats [--json]`** reports sessions by status,
+  message totals, bytes on disk, and oldest/newest updates.
+
+### Changed
+
+- **Stop-sequence checks are O(1) per token.** The generation loop
+  scanned the whole accumulated reply for stop strings every token
+  (O(n²) over a generation); it now scans only the not-yet-checked tail
+  via a `stop_from` cursor. Same truncation semantics, including stops
+  that accumulated during thinking. Isolated check at 20K tokens:
+  0.088 s → 0.018 s (4.8×). The same fix is applied to the Gemma,
+  Lightning and Nanbeige generation loops, which had the identical scan.
+- **Tandem decode dispatch resolved once.** `TandemEngine` now iterates a
+  per-layer owner table built at construction instead of rebuilding a
+  `frozenset` and re-resolving the owner per layer per token. Same
+  routing; dispatch overhead measured on the fake backends at 19.34 µs →
+  17.57 µs per token (×0.91, Python overhead only — no GPU claim).
+
+### Fixed
+
+- **Sessions export carries its filename.** `GET /sessions/<id>/export`
+  returns a `Content-Disposition` filename (`<date>-<slug>.md`, matching
+  the CLI export convention).
+- **Config reference also scans `os.environ.setdefault` reads**, so a var
+  introduced only via setdefault cannot silently vanish from the
+  reference.
+- **Tandem `load_ratio` robustness pinned by tests**: wrong-kind and
+  corrupt calibration files return `None` (fit-only fallback) instead
+  of raising or being priced.
+- **Sessions mutations are serialized.** Each `/sessions` request builds
+  its own `SessionStore`, so concurrent status/tag posts raced their
+  read-modify-write and one update could silently win; the routes now
+  share one lock, `_save` writes unique tmp files, and `list()` closes its
+  file handles.
+- **Validation errors now name the field.** `RequestError` carries an
+  optional `param` and the handlers surface it, so the `n`,
+  `response_format` and `logprobs` 400s return the field in the envelope
+  instead of `null`.
+- **Tandem `rate` log no longer prints a fake prediction.** When the
+  split-ratio calibration has no row for the picked layer count, the log
+  now says the pick is fit-only instead of `predicted ~0.0 tok/s`.
+- **Config reference also scans `os.getenv` reads**, so a future spelling
+  cannot silently drop an env var from the reference.
+- **Config reference now scans subpackages.** `kindi/config_reference.py`
+  `env_vars()` only read `kindi/*.py`, so `KINDI_BACKEND_MODULES` (read in
+  `kindi/backends/registry.py`) was missing from the generated
+  `docs/CONFIGURATION-REFERENCE.md`. The scan is now recursive with
+  subpackage-aware site paths, the reference is regenerated, and
+  `test_the_scan_covers_subpackages` pins it.
+
+### New
+
+- **Loud rejection of unsupported `n` and `response_format`**
+  ([REQ-0018](docs/development/requirements/REQ-0018.md), decision D2).
+  `n` values other than 1 and structured-output `response_format` types
+  (`json_schema`, `json_object`) now return an enveloped 400 before the
+  engine or prompt cache is touched, instead of being silently ignored.
+  `n = 1` and `response_format: {"type": "text"}` are accepted.
+- **Server-side `/sessions` endpoints** ([REQ-0016](docs/development/requirements/REQ-0016.md)).
+  `GET /sessions` (status/tag filters), `GET /sessions/<id>`,
+  `GET /sessions/<id>/export` (raw markdown), `POST /sessions/<id>/status`
+  and `POST /sessions/<id>/tags` expose the chat session history the CLI
+  already records, over HTTP. Host-only (no engine, cache or GPU), behind
+  the API key when one is set, with enveloped errors and a strict id check.
+- **Backend plugin interface, foundations (Feature 4, T4.1)** ([docs/BACKENDS.md](docs/BACKENDS.md),
+  [REQ-0019](docs/development/requirements/REQ-0019.md)). `kindi/backends/` defines the
+  backend contract (capabilities, sampling params, generation events, cancellation), a
+  registry that resolves by model id and by GGUF `general.architecture` metadata and
+  loads external backends through `KINDI_BACKEND_MODULES`, and a deterministic
+  `FakeBackend` for CPU-only tests. No existing engine is an adapter yet (T4.2), so
+  there is no arbitrary-GGUF claim; serving behavior is unchanged.
+- **`kindi backends` listing (Feature 4, T4.3)** ([docs/BACKENDS.md](docs/BACKENDS.md),
+  [REQ-0019](docs/development/requirements/REQ-0019.md)). `kindi backends` lists the
+  registry without touching a pack or GPU, and `--json` emits the registry rows for
+  scripting. External backends loaded through `KINDI_BACKEND_MODULES` appear too.
+- **Agent-grade API foundations (Feature 5, T5.1)** ([docs/API.md](docs/API.md),
+  [REQ-0018](docs/development/requirements/REQ-0018.md)). Every error the server
+  returns now uses the OpenAI envelope (`message`, `type`, `param`, `code`), including
+  404/405 and unhandled failures; `context_length_exceeded` keeps its promised code.
+  `tests/api/` is a conformance suite that drives the real app with the official
+  `openai` Python client (non-streaming, streaming, usage, models listing, error
+  shapes); it runs GPU-free against a stub engine and can be pointed at a real
+  server with `KINDI_API_URL`. No request behavior changes: `n` and `response_format`
+  are still ignored (decision D2 pending), and the queue default is unchanged.
+- **Repo map for the delegation plans** ([docs/dev/REPO-MAP.md](docs/dev/REPO-MAP.md)):
+  every module by role with the FROZEN list, the `/v1/chat/completions` request trace,
+  per-family chat-template and tool-call locations, and the resolution of every
+  `[LOCATE]` in the Feature 4/5 plans.
+- **Intel integrated-graphics G0 slice** ([docs/INTEL-IGPU-TANDEM.md](docs/INTEL-IGPU-TANDEM.md),
+  [REQ-0021](docs/development/requirements/REQ-0021.md)). `kindi/intel.py` discovers iGPUs from
+  Linux DRM sysfs, checks them against the oneAPI floor (unknown PCI ids refused), models the
+  shared-memory budget (half of RAM; Core Ultra override), and checks the tandem GPU-side
+  contract a future SYCL engine must expose. `KINDI_DEVICE=intel` now refuses loudly naming
+  REQ-0020/0021 instead of silently running the CPU engine. No SYCL kernel exists yet — that
+  needs a 11th-gen+ iGPU to compile and verify token-exactness — so this is not a support claim.
+- **Intel Arc A770 purchased** ([docs/INTEL-ARC.md](docs/INTEL-ARC.md),
+  [REQ-0020](docs/development/requirements/REQ-0020.md)). One A770 16 GB is in transit
+  (not installed); the SYCL/oneAPI route is planned (M0 audit done) and M1 hardware
+  qualification can start on arrival, with an arrival checklist in INTEL-ARC.md. The
+  card is registered in the support matrix as not measured; no backend exists and
+  this is not a support claim.
 
 ## 0.6.0 (2026-11-12)
 
@@ -302,6 +1049,8 @@
 
 ### Fixed
 
+- `kindi use` now verifies an already-downloaded catalog GGUF against its catalog size and SHA-256 before
+  converting it. Before, a truncated or damaged local file was silently trusted because it merely existed.
 - `model_name = auto` also reads the model size from the GGUF file name. Before, a 27B pack could report
   `bonsai2-2b`.
 - `/health` shows a git commit only for a Kindi checkout. Before, a copy of Kindi in another git folder showed the

@@ -1,0 +1,155 @@
+{
+  "conclusion": "the five-pass 83.9 vs 72.4 gap did not reproduce; no reading difference is claimed",
+  "fork": {
+    "max": 93.9,
+    "mean": 72.67,
+    "median": 75.65,
+    "min": 45.9,
+    "n": 20,
+    "q1": 54.88,
+    "q3": 93.42,
+    "read_window": {
+      "clock_mhz": {
+        "max": 878.3,
+        "median": 500.0,
+        "min": 343.1
+      },
+      "power_w": {
+        "max": 15.3,
+        "median": 12.05,
+        "min": 10.3
+      },
+      "temp_c": {
+        "max": 44.0,
+        "median": 38.0,
+        "min": 33.0
+      }
+    },
+    "runs": [
+      53.5,
+      47.2,
+      80.6,
+      61.5,
+      93.5,
+      60.3,
+      93.8,
+      45.9,
+      92.7,
+      54.2,
+      76.4,
+      60.4,
+      74.9,
+      56.9,
+      76.9,
+      50.1,
+      93.2,
+      93.7,
+      93.8,
+      93.9
+    ],
+    "stdev": 18.36
+  },
+  "host": "i7-8086K + NVIDIA GeForce RTX 4060 Ti 8188 MiB, driver 617.42, Windows, CuPy 14.2.0, CUDA 12090",
+  "measured": "2026-11-18",
+  "metric": "fresh-process `kindi bench` prompt reading: 20 single-token feeds, 1000/mean-ms",
+  "order": "alternating stock-first/fork-first in each pair",
+  "paired": {
+    "bootstrap_median_ci95": [
+      -16.65,
+      10.8
+    ],
+    "definition": "stock - fork",
+    "diffs": [
+      17.4,
+      46.3,
+      12.7,
+      8.9,
+      -0.6,
+      24.6,
+      0.0,
+      5.5,
+      -19.3,
+      -3.7,
+      -26.3,
+      -4.8,
+      19.1,
+      -2.2,
+      -14.0,
+      30.2,
+      -34.1,
+      -29.8,
+      -35.5,
+      -22.6
+    ],
+    "fork_faster": 11,
+    "max": 46.3,
+    "mean": -1.41,
+    "median": -1.4,
+    "min": -35.5,
+    "sign_test_p": 0.6476058959960938,
+    "stock_faster": 8,
+    "ties": 1
+  },
+  "passes": 20,
+  "position_effect": {
+    "difference": 15.7,
+    "first_median": 60.95,
+    "second_median": 76.65
+  },
+  "settings": {
+    "ctx": 8192,
+    "engine": "plain engine, exact head, no speculation",
+    "fork": "plain engine via KINDI_TP=0; --split-at off",
+    "fork_commit": "549e0cf",
+    "stock": "v0.6.1 (7fececb) + native-Windows libcuda shim"
+  },
+  "stock": {
+    "max": 94.0,
+    "mean": 71.26,
+    "median": 70.65,
+    "min": 50.1,
+    "n": 20,
+    "q1": 56.28,
+    "q3": 90.9,
+    "read_window": {
+      "clock_mhz": {
+        "max": 1391.2,
+        "median": 643.25,
+        "min": 387.0
+      },
+      "power_w": {
+        "max": 20.4,
+        "median": 12.5,
+        "min": 11.1
+      },
+      "temp_c": {
+        "max": 46.0,
+        "median": 39.0,
+        "min": 34.0
+      }
+    },
+    "runs": [
+      70.9,
+      93.5,
+      93.3,
+      70.4,
+      92.9,
+      84.9,
+      93.8,
+      51.4,
+      73.4,
+      50.5,
+      50.1,
+      55.6,
+      94.0,
+      54.7,
+      62.9,
+      80.3,
+      59.1,
+      63.9,
+      58.3,
+      71.3
+    ],
+    "stdev": 16.19
+  }
+}

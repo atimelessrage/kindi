@@ -8,7 +8,11 @@ Kindi reads its settings in this order - later sources win:
 3. environment variables `KINDI_<KEY>` (for example `KINDI_PORT=9000`, `KINDI_API_KEY=...`);
 4. command-line flags (`--pack`, `--state-dir`, `--ctx`, and for `serve`: `--host`, `--port`, `--api-key`, `--head`).
 
-`kindi info` prints the final values and the file that each value came from. The Docker image sets
+For the complete list, including the engine switches that have no config key, see the generated
+[CONFIGURATION-REFERENCE.md](CONFIGURATION-REFERENCE.md).
+
+`kindi info` prints the final values and the config source. It does not track the origin of each
+individual value. The Docker image sets
 `KINDI_PACK=/data/pack`, `KINDI_STATE_DIR=/data/state` and `KINDI_HOST=0.0.0.0`.
 
 ## Keys
@@ -20,14 +24,20 @@ Kindi reads its settings in this order - later sources win:
 | `pack` | `~/.kindi/pack` | the converted model (`kindi convert` writes it) and, optionally, `head_clusters.npz` |
 | `state_dir` | `~/.kindi/state` | the kernel cache (`kernels/`), saved prompt openings (`openings/`) and the head mode set by `kindi head` |
 
+Relative path values are resolved against the server process's current working directory, not against the directory containing the config file. Start the server from the intended directory, or use absolute paths (or `~/...`) in `pack`, `state_dir` and the corresponding `KINDI_*` environment variables.
+
 ### Server
 
 | key | default | |
 |---|---|---|
 | `host` | `127.0.0.1` | address to listen on; `0.0.0.0` serves your network - then also set `api_key` |
 | `port` | `8093` | |
-| `api_key` | (empty) | if set, every `/v1` request needs `Authorization: Bearer <api_key>`; `/health` stays open |
-| `model_name` | `auto` | the model id `/v1/models` reports; `auto` takes it from the pack (bonsai2-2b, bonsai2-4b or bonsai2-9b); clients may send any model name |
+| `api_key` | (empty) | if set, every `/v1` request needs `Authorization: Bearer <api_key>`; `/health` stays open for liveness but its queue, GPU, uptime and usage details need the same header. With no key, those details are available only on a loopback bind (`host=127.0.0.1`, `localhost` or `::1`); a non-loopback bind gets only liveness, version, model and context |
+| `model_name` | `auto` | the model id `/v1/models` reports; `auto` takes it from the pack (the Bonsai ids are `bonsai2-2b`, `bonsai2-4b`, `bonsai2-9b` and `bonsai2-27b`; Nanbeige and Gemma packs use their own ids); clients may send any model name |
+| `max_body_mb` | `16` | maximum HTTP request body in MiB; larger requests get `413` before the engine is touched |
+| `queue_max` | `8` | requests allowed to wait behind the active one; further requests get `429` with `Retry-After: 1` |
+| `rate_limit_per_min` | `0` | generation requests allowed per source address per fixed minute; further requests get `429` with `Retry-After`; `0` disables it. Health, metrics and model listing are exempt. Behind a reverse proxy, all clients share the proxy address |
+| `log_json` | `0` | `1`: one JSON line per inference request on stdout (`request_id`, `status`, `duration_ms`, `queue_wait_ms`, token counts and `gen_tok_s`); the response also carries `X-Request-ID` |
 
 ### Engine
 
@@ -36,11 +46,15 @@ Kindi reads its settings in this order - later sources win:
 | `ctx` | `24576` | context length in tokens (prompt + answer). For GPU memory, see the notes below the table |
 | `head` | `exact` | `exact` = full output head (token-exact with llama.cpp); `fast` = shortlist head (needs `kindi fast-head`). `kindi head exact\|fast` overrides it at run time |
 | `fast_clusters` | `256` | clusters the fast head scores exactly (of 1,024). Fewer is faster and less exact (see the notes below the table) |
+| `tandem_vram_mb` | `0` | ceiling in MiB for the GPU side of a CPU+GPU tandem split; `0` = no explicit ceiling. The planner uses `min(free - reserve, tandem_vram_mb)`, so a 6 GiB P106-100 can use `6144` and a display card can keep a lower barrier (`KINDI_TANDEM_VRAM_MB` is the same setting) |
+| `tandem_reserve_mb` | `512` | free card memory the tandem planner leaves for the display, driver and allocation noise. `KINDI_TANDEM_RESERVE_MB` is the same setting; lower it only when the card is dedicated |
 | `kv_cache` | `auto` | AH-Nanbeige4.3-33B only: the K/V cache, `auto`, `f16` or `q8_0` (`KINDI_KV_CACHE=q8_0`). `q8_0` keeps K and V as int8 with an fp16 scale for each 32 values: half the memory (64K tokens: about 6.6 GiB instead of 13 GiB), so the 33B gets a 64K context on one 24 GB card. Needs compute capability 6.1 or later. `auto` uses `f16` when the model and its f16 cache fit on the cards at `ctx`, and `q8_0` when they do not. `kindi verify` checks `q8_0` against llama.cpp: the tokens that agree with the f16 reference must be at least as many as llama.cpp's own q8_0 cache keeps (on 2x RTX 3080: Kindi 475, llama.cpp 471, of 586) |
 
 Notes:
 
+- `tandem_vram_mb` / `tandem_reserve_mb`: the dense tandem planner's ceiling and headroom. `auto` and `rate` fit the CPU/GPU split to the resulting budget; a ceiling below the full model forces a split even when the card currently has more free memory. For example, `--ctx 24576 --vram-budget-mib 6144 --vram-reserve-mib 512` plans for a 6 GiB P106-100, while `--vram-budget-mib 7168` leaves 1 GiB of an 8 GiB display card unused. The command-line flags are `--vram-budget-mib` and `--vram-reserve-mib` on `plan`, `verify`, `bench`, `calibrate`, `serve`, `chat` and `autotune`; the two config keys are the persistent form. A card's live free figure still wins when it is lower than the ceiling.
 - `ctx`: GPU memory is ~12 KiB per token for the fp16 K/V cache, on top of ~570 MB for weights and buffers.
+- `KINDI_KV=q8_0` (environment, not a config key): the plain engine keeps its K/V cache in q8_0 instead of fp16 (~half the per-token memory, the plan engine's kernels and arithmetic). The prompt is then fed one token per call (the chunked prompt path needs the fp16 cache), and the cache is lossy against the fp16 references, so a q8 run does not reproduce a fp16 `kindi verify`. The tandem's plain GPU owner always uses q8_0, so an offloaded layer frees its K/V as well as its weights.
 - `ctx`: 24,576 leaves ~115 MB of the K420's 980 MB free. Lower it if something else needs the card.
 - `fast_clusters`: 128 clusters found the full head's top token 98.1 % of the time, 256 clusters 99.4 %.
 
@@ -85,20 +99,39 @@ the status is then 200 before the answer is known, so an error comes as an `{"er
 Used when a request does not set them: `max_tokens` (`1024`), `temperature` (`0.7`; `0` = greedy), `top_p`
 (`0.8`), `top_k` (`20`). These are the model publisher's recommended non-thinking settings.
 
+`presence_penalty` (`0`; -2..2) is OpenAI's additive presence penalty: the logit of every token already in the
+prompt or the reply is lowered by that value once, however often it appears there. The Bonsai backends apply it;
+Gemma 4 and Nanbeige do not. `sampling_profile = publisher` fills the sampling values that the user did not set
+explicitly from the Bonsai publisher's profile: non-thinking 0.7 / 0.8 / 20 with presence 1.5; thinking 1.0 /
+0.95 / 20 with presence 1.0 and an 8192-token default output. The default (`default`) keeps the values above.
+
 Off by default: `min_p` (`0`) and `repeat_penalty` (`1.0`), with `repeat_last_n` (`64`; `-1` = the full context).
 They work as in llama.cpp. When `repeat_penalty` is not 1.0, the output is not token-exact with the greedy output,
 and Kindi does not use speculative drafts for that request. The Bonsai models use them. The Gemma 4 and Nanbeige backends
 do not use them yet.
 
+### Output controls and model-specific keys
+
+| key | default | |
+|---|---|---|
+| `repeat_stop` | `0` | `1` stops a reply caught in a repeating loop. A loop while thinking closes the thinking block early and lets the model answer |
+| `lookup` | `5` | Nanbeige prompt-lookup drafting, up to this many tokens per check; `0` turns it off |
+| `mtp_head` | (empty) | Nanbeige MTP head file, a draft source for `kindi serve` only (the registry gateway and `kindi verify`/`bench` are non-drafting); empty = none |
+| `reasoning_effort` | (empty) | 27B template: `xhigh`, `medium` or `low`; empty = the template default (`xhigh`) |
+| `sampling_profile` | `default` | `default` or `publisher`; the publisher profile is described above |
+
 ## Environment variables for the engine
 
-These variables have no config key. Use them to test or to compare.
+These variables have no config key. Use them to test or to compare. The generated reference also lists every
+`KINDI_*` read in the code, including the tensor-core and speculative-decoding switches (`KINDI_TC`, `KINDI_SPEC`
+and the rest).
 
 | variable | default | |
 |---|---|---|
 | `KINDI_DEVICE` | `gpu` | `cpu` = the CPU engine (2B, 4B, 9B). Kindi also uses the CPU engine when CuPy is not installed |
-| `KINDI_CPU_CACHE` | `~/.cache/kindi` | the folder for the built CPU library (`libkcpu.so`) |
-| `KINDI_TP` | (auto) | `1` = the plan engine, `0` = the single-card engine. The 27B always uses the plan engine |
+| `KINDI_CPU_CACHE` | `~/.cache/kindi` | the folder for the built CPU library; the file is keyed by host CPU and compiler (`libkcpu-<key>.so`) |
+| `KINDI_TP` | (auto) | `1` = the plan engine (the default for every model it supports: 1.5-1.9x the single-card engine on the measured card), `0` = the single-card engine |
+| `KINDI_TP_SPLIT` | `equal` | Two-card plan: `auto` gives each card a share of GDN groups, attention heads, FFN blocks and output-head rows from its free VRAM (after a 512 MiB reserve; aligned to the pack's Hadamard block, so on the 27B the GDN and attention splits stay equal while FFN and head move). `equal` keeps the historical 50/50 layout. The 10% deadband keeps equal-capacity cards equal under `auto`. The installer selects `auto` for a pair of unequal-capacity cards (for example 6 GB + 8 GB), while equal-capacity pairs retain `equal` |
 | `KINDI_CARDS` | (all, at most 2) | the number of cards for the plan engine |
 | `KINDI_CHUNK` | `256` | prompt tokens per chunk; `0` = one token at a time. The default is `128` on Kepler (sm_30) |
 | `KINDI_CHUNK_MIN` | `32` | the smallest part of a prompt that goes through a chunk |
@@ -107,7 +140,6 @@ These variables have no config key. Use them to test or to compare.
 | `KINDI_CHUNK_ATT` | `flash` | `exact` = chunk attention with the same arithmetic as one token at a time (slower) |
 | `KINDI_G5L` | `1` | sm_61 and later: the 5-trit lane-per-byte GEMV; `0` = one row per thread |
 | `KINDI_DENSE_SPACING` | `256` | the spacing of the dense checkpoints in an agent opening; `0` = none |
-| `KINDI_STREAM_LOAD` | `1` | the plan engine loads the cached 5-trit weights in 256 MB parts |
 | `KINDI_MEM_RESERVE_MB` | `96` (`32` for the plan engine) | GPU memory that the context fit keeps free |
 | `KINDI_FD` | `0` (`1` with drafting) | `1` = the split flash-decode attention of the 27B on one card (with `KINDI_TC=1`). When drafting is on (`KINDI_SPEC` set) with `KINDI_TC=1` and `KINDI_FD` is not set, Kindi uses `1`: with `0`, a drafted answer can differ from plain decoding at near-ties |
 | `KINDI_TC_DP4A` | `0` | `1` = the Pascal dp4a kernels of the `KINDI_TC=1` path (tcp.cu) on a newer card, for tests. On sm_61 they are always used |

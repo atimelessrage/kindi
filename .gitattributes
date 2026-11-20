@@ -1,1 +1,3 @@
 kindi/COMMIT export-subst
+* text=auto
+*.sh text eol=lf

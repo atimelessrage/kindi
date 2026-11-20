@@ -1,0 +1,27 @@
+{
+  "gate": "reading-9b-20261118",
+  "title": "9B prompt-reading recheck: 20 interleaved stock/fork passes with GPU telemetry",
+  "measured": "2026-11-18",
+  "commit": "549e0cf",
+  "command": "20 alternating-order pairs of `python run_stock.py --pack ~/.kindi/packs/bonsai-9b --ctx 8192 bench` (stock v0.6.1 + libcuda shim) and `KINDI_TP=0 python -m kindi --pack ~/.kindi/packs/bonsai-9b --ctx 8192 bench --split-at off` (fork 549e0cf), with 50 ms nvidia-smi clock/power sampling",
+  "notes": "The 2026-11-17 five-pass 9B reading gap (83.9 stock vs 72.4 fork) did not reproduce. Twenty fresh-process passes per side (order alternated) give 70.7 and 75.7; the paired stock-minus-fork median is -1.4 tok/s, the bootstrap interval spans zero, and the exact sign test is p=0.648. The cell is a sub-second 20-token burst that sat mostly in P5/P8, so it is closed as noise and no reading difference is claimed.",
+  "evidence": [
+    "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-9b-reading/RESULTS.md",
+    "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-9b-reading/summary.json",
+    "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-9b-reading/runs.json",
+    "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-9b-reading/runs/stock-9b-read-r01.log",
+    "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-9b-reading/runs/fork-9b-read-r01.log",
+    "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-9b-reading/clocks/stock-9b-read-r01.clocks.csv",
+    "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-9b-reading/clocks/fork-9b-read-r01.clocks.csv"
+  ],
+  "numbers": [
+    {"id": "9b-stock-read-20", "display": "70.7", "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-9b-reading/summary.json", "pointer": "/stock/median", "expect": 70.65}},
+    {"id": "9b-fork-read-20", "display": "75.7", "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-9b-reading/summary.json", "pointer": "/fork/median", "expect": 75.65}},
+    {"id": "9b-paired-median", "display": "-1.4", "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-9b-reading/summary.json", "pointer": "/paired/median", "expect": -1.4}},
+    {"id": "9b-sign-p", "display": "0.648", "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+     "check": {"kind": "json", "file": "docs/benchmarks/2026-11-18-i7-8086k-rtx4060ti-9b-reading/summary.json", "pointer": "/paired/sign_test_p", "expect": 0.6476058959960938}}
+  ]
+}

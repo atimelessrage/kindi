@@ -29,12 +29,19 @@ class Sampler(object):
         self.cv = cp.zeros(CAP, dtype=cp.float32)
         self.cn = cp.zeros(1, dtype=cp.int32)
 
-    def __call__(self, greedy_tok, temperature, top_p, top_k, rng, min_p=0.0, penalty=None):
-        """penalty: None, or (repeat_penalty, the recent tokens)"""
-        if penalty is not None and penalty[0] > 1.0 and temperature <= 0 and greedy_tok not in penalty[1]:
+    def __call__(self, greedy_tok, temperature, top_p, top_k, rng, min_p=0.0, penalty=None, presence=None,
+                 allowed=None):
+        """penalty: None, or (repeat_penalty, the recent tokens). presence: None, or (presence_penalty, a bool
+        mask over the vocabulary of the tokens already in the prompt and the reply). allowed: None, or an
+        array of token ids only the constraint accepts (JSON grammar); constrains the pick through the full
+        logits, always."""
+        if allowed is not None:
+            return self._constrained(allowed, temperature, top_p, top_k, rng, min_p, penalty, presence)
+        pp = presence[0] if presence is not None else 0.0
+        if not pp and penalty is not None and penalty[0] > 1.0 and temperature <= 0 and greedy_tok not in penalty[1]:
             return greedy_tok                # the penalty only lowers the recent tokens: the best token stays
-        if penalty is not None:
-            return self._penalized(temperature, top_p, top_k, rng, min_p, *penalty)
+        if penalty is not None or pp:
+            return self._penalized(temperature, top_p, top_k, rng, min_p, penalty, presence)
         if temperature <= 0:
             return greedy_tok
         e = self.eng
@@ -74,9 +81,30 @@ class Sampler(object):
         ok = cand >= 0
         return cand[ok], z[ok]
 
-    def _penalized(self, temperature, top_p, top_k, rng, min_p, rp, recent):
+    def _constrained(self, allowed, temperature, top_p, top_k, rng, min_p, penalty, presence):
+        """the next token inside a constrained reply (JSON grammar): the full logits, intersected with the
+        ids the grammar accepts at this state; penalties still apply inside the allowed set. An empty
+        intersection is a grammar/model mismatch - a loud error, not a silent free choice."""
         cand, z = self._logits()
-        z = penalize(cand, z, rp, recent)
+        if penalty is not None:
+            z = penalize(cand, z, penalty[0], penalty[1])
+        if presence is not None and presence[0]:
+            z = apply_presence(cand, z, presence[0], presence[1])
+        keep = np.isin(cand, np.asarray(allowed, dtype=np.int64))
+        cand, z = cand[keep], z[keep]
+        if cand.size == 0:
+            raise ValueError("constrained sampling: no allowed token in the model's candidates")
+        if temperature <= 0:
+            return int(cand[int(np.argmax(z))])
+        band = z >= z.max() - BAND_T * temperature
+        return self._pick(cand[band], z[band], temperature, top_p, int(top_k or 0), rng, min_p)
+
+    def _penalized(self, temperature, top_p, top_k, rng, min_p, penalty=None, presence=None):
+        cand, z = self._logits()
+        if penalty is not None:
+            z = penalize(cand, z, penalty[0], penalty[1])
+        if presence is not None and presence[0]:
+            z = apply_presence(cand, z, presence[0], presence[1])
         if temperature <= 0:
             return int(cand[int(np.argmax(z))])
         band = z >= z.max() - BAND_T * temperature        # as k_band: the rest has probability < e^-30
@@ -114,10 +142,52 @@ def distribution(cand, z, temperature, top_p, kk, min_p=0.0):
     return idx, p
 
 
+def pick_from_logits(z, temperature, top_p, top_k, rng, min_p=0.0, allowed=None, band=None):
+    """The next token from one position's whole logits vector (numpy), for the backend adapters.
+
+    The reduced form of ``Sampler._penalized``: the top-k candidates (or the whole vocabulary
+    when ``top_k`` is 0, or everything within ``band`` temperatures of the best when ``band`` is
+    given) go through ``distribution``/``Sampler._pick``, so the adapter backends and the server
+    share one definition of the sampler chain. ``allowed`` (a set of ids) masks before the
+    candidates are chosen, and temperature 0 argmaxes — over the allowed ids alone when masked.
+    Returns None only when the mask empties the vocabulary, which leaves the caller's greedy token.
+    """
+    z = np.asarray(z, dtype=np.float64)
+    if allowed is not None:
+        keep = np.zeros(z.size, dtype=bool)
+        ids = np.fromiter((int(t) for t in allowed), dtype=np.int64, count=len(allowed))
+        ids = ids[(ids >= 0) & (ids < z.size)]
+        if not ids.size:
+            return None
+        keep[ids] = True
+        z = np.where(keep, z, -np.inf)
+    if temperature <= 0:
+        return int(np.argmax(z))
+    k = int(top_k or 0)
+    if band is not None:
+        cand = np.flatnonzero(z >= z.max() - float(band) * temperature).astype(np.int64)
+    elif 0 < k < z.size:
+        cand = np.argpartition(-z, k - 1)[:k].astype(np.int64)
+    else:
+        cand = np.arange(z.size, dtype=np.int64)
+    return Sampler._pick(cand, z[cand], temperature, top_p, k, rng, min_p)
+
+
 def penalize(cand, z, rp, recent):
     """llama.cpp's repeat penalty: the logit of each recent token is divided by rp when it is positive and
     multiplied by rp when it is negative"""
     hit = np.isin(cand, np.asarray(list(recent), dtype=np.int64))
     z = z.copy()
     z[hit] = np.where(z[hit] > 0, z[hit] / rp, z[hit] * rp)
+    return z
+
+
+def apply_presence(cand, z, pp, seen):
+    """OpenAI's presence penalty: subtract pp once from the logit of every token that is already in the prompt or
+    the reply, however often it appears there. `seen` is a bool mask over the vocabulary. Negative values reward
+    those tokens."""
+    if not pp or seen is None:
+        return z
+    z = z.copy()
+    z[seen[cand]] -= pp
     return z

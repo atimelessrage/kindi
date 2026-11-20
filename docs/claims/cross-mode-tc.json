@@ -1,0 +1,56 @@
+{
+  "gate": "cross-mode-tc",
+  "title": "Cross-mode matrix: plan-engine (tc) rows on 2B/4B/9B at 24K",
+  "measured": "2026-11-13",
+  "commit": "66d2092",
+  "command": "python -m kindi bench (medians of three per cell; 9B with KINDI_TC_HP=1), summarised by docs/benchmarks/build_cross_mode.py",
+  "notes": "The CSV is the machine-readable matrix the perf gate also pins (docs/benchmarks/perf-baseline.json). A doc that quotes a tc cell must quote this file.",
+  "evidence": [
+    "docs/benchmarks/CROSS-MODE.csv",
+    "docs/benchmarks/perf-baseline.json"
+  ],
+  "numbers": [
+    {
+      "id": "read-2b",
+      "display": "471.7",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "csv", "file": "docs/benchmarks/CROSS-MODE.csv",
+                "where": {"mode": "tc", "model": "2b"}, "field": "read", "expect": 471.7}
+    },
+    {
+      "id": "read-4b",
+      "display": "214.1",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "csv", "file": "docs/benchmarks/CROSS-MODE.csv",
+                "where": {"mode": "tc", "model": "4b"}, "field": "read", "expect": 214.1}
+    },
+    {
+      "id": "read-9b",
+      "display": "133.9",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "csv", "file": "docs/benchmarks/CROSS-MODE.csv",
+                "where": {"mode": "tc", "model": "9b"}, "field": "read", "expect": 133.9}
+    },
+    {
+      "id": "gen24k-2b",
+      "display": "299.2",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "csv", "file": "docs/benchmarks/CROSS-MODE.csv",
+                "where": {"mode": "tc", "model": "2b"}, "field": "gen_24000", "expect": 299.2}
+    },
+    {
+      "id": "gen24k-4b",
+      "display": "127.8",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "csv", "file": "docs/benchmarks/CROSS-MODE.csv",
+                "where": {"mode": "tc", "model": "4b"}, "field": "gen_24000", "expect": 127.8}
+    },
+    {
+      "id": "gen24k-9b",
+      "display": "97.0",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "csv", "file": "docs/benchmarks/CROSS-MODE.csv",
+                "where": {"mode": "tc", "model": "9b"}, "field": "gen_24000", "expect": 97.0}
+    }
+  ]
+}

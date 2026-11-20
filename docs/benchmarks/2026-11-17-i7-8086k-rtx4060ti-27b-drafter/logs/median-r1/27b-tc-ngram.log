@@ -1,0 +1,16 @@
+[kindi 22:15:36] blocking sync: card 0 primary context flags 0x4 (set: 0)
+[kindi 22:15:41] card 0: 5.60 GB of weights, streamed (4s)
+[kindi 22:15:42] card 0: weights repacked for the tensor cores (0.4s)
+[kindi 22:15:42] tensor-core plans ready: T = 1 .. 4, 724 nodes per decode token (0.2s; 1107 MiB free on the card)
+[kindi 22:15:42] speculation: requested ngram, effective ngram
+[kindi 22:15:42] plan engine ready: 1 card, ctx 1024, K/V q8_0, weights 5-trit lane (6.2s)
+[kindi 22:15:42] kindi: <machine-path>bonsai-27b -> the bonsai backend (bonsai2-27b)
+[kindi 22:15:42] speculation: requested ngram, effective ngram
+[kindi 22:15:43] prompt 1 'The sky is blue because'                                    TIE  14/40 tokens match  (1.2s, 0/30 drafts accepted)
+[kindi 22:15:43]    first difference at token 14 (llama.cpp top-2 gap there 0.0064)
+[kindi 22:15:44] prompt 2 'The capital of France is'                                   PASS  40/40 tokens match  (0.8s, 14/39 drafts accepted)
+[kindi 22:15:45] prompt 3 'Water boils at a lower temperature on mountains because'    PASS  40/40 tokens match  (1.1s, 5/42 drafts accepted)
+[kindi 22:15:46] prompt 4 'def add_two_numbers('                                       PASS  40/40 tokens match  (0.8s, 16/37 drafts accepted)
+[kindi 22:15:46] PASS with KINDI_SPEC=ngram: 3 of 4 prompts token-exact, 1 end at a llama.cpp tie, 0 fail - 46.7 tokens/s over the run
+<local-home>\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(

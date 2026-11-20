@@ -1,0 +1,1256 @@
+# Current worktree vs Kindi (now 0.6.0)
+
+Audit date: **2026-11-12**; refreshed in §22 (**2026-11-14**, HEAD `3f42a6a`) and §21 (2026-11-14 evening).
+**The comparison baseline is stock 0.6.0 since 2026-11-14 evening** (upstream merged wholesale;
+§25 is the current evaluation against 0.6.0, §§1–24 are preserved as the history against 0.5.0).
+The filename keeps its historical `0.5` suffix.
+Upstream `v0.6.0` (`179710c`) and the post-tag `origin/main` head `dce89df` (container-registry
+docs) are both fully contained in our HEAD. The merge deleted no upstream file: the tree vs
+`v0.6.0` is a strict superset (349 files changed, +45,950/−438 lines).
+
+> This file records the pre-improvement audit and the fixes that followed.
+> Sections 8–11 record the post-audit improvements, the 2026-11-12 evening 27B
+> tandem implementation/gate, the later requirement/structural-coverage work, and
+> the 2026-11-13 measurement rounds (sampled-peak VRAM, the 27B rate/peak and
+> checkpoint-cost rows, the 2B CPU-layer sweep). Sections 12–18 add the median-of-three
+> tandem rows, the 27B capacity ladder and layer sweeps, the 9B tensor-core HP finding,
+> the `tc`/`tc-hp` matrix rows, the plan-engine default dispatch and the 27B 8K boundary
+> sweep. **Section 19 is the current "what is better / what is worse" list; sections
+> 18 and earlier are kept as the history at their own dates.** The best-of branch is merged
+> into `main`: both `main` and `freebuff/tandem-cpu-recovery` are at `0c393e5`. The installer source
+> pin and the `0.5.0` version identity remain a release-owner publication step, not
+> a code-complete claim.
+
+This report compares the current `freebuff/tandem-cpu-recovery` worktree with the
+stock Kindi release. §§1–24 are preserved as the history vs **0.5.0**; the current
+baseline (since 2026-11-14 evening) is **0.6.0** (see §25). It separates verified behavior
+from recorded benchmark evidence, incomplete features, and release-hygiene problems. It is
+not a claim that everything described here has been re-run on current hardware.
+
+## 1. Baselines and current state
+
+| | Stock “normal” Kindi 0.5 | Clean local 0.5 snapshot | Current worktree |
+|---|---|---|---|
+| Ref | `v0.5.0` tag, `1c4cc3e01732f0fada4ab7030ccf4f7651e01053` | `clean/kindi-0.5`, `1b0cbf780b57d464cdb3e5e9acf75ed49256d622` | `main` and `freebuff/tandem-cpu-recovery`, `0c393e5` |
+| Date | 2026-11-09 | clean snapshot of local 0.5 work | 2026-11-13 (merged state) |
+| Tracked files | 102 | 216 | 342 |
+| Test modules | **0** (`tests/` does not exist) | 25 | 55 tracked test modules |
+| Docs files | 12 | 84 | 139 tracked paths under `docs/` |
+| Git state | release tag | clean | `main` fast-forwarded to the best-of branch at `0cd58bcd223bf1afba2d8319601e64b014a97082`; generated coverage artifacts are ignored; `bench-logs/` is ignored local evidence |
+
+The primary comparison below is against the **stock `v0.5.0` tag**. `clean/kindi-0.5`
+already contains earlier local audit, CPU, server and documentation work, so it is a
+narrower comparison, not the stock release. Relative to that clean snapshot, the committed branch has **201 changed tracked paths
+with +19,091/−630 lines**.
+
+Relative to the stock tag, the committed branch (`v0.5.0..HEAD`) changes **288 tracked
+files with +33,578/−375 lines**. The generated `.coverage`/`coverage.json` artifacts
+are now ignored; `bench-logs/` remains ignored local evidence.
+
+Evidence labels used below:
+
+- **Verified now:** the current worktree was executed during this audit.
+- **Recorded measurement:** the repository contains the logs/results, but the test was
+  not re-run in this audit.
+- **Unit/CPU only:** covered by tests without a model or GPU run.
+- **Design/blocked:** the feature is explicitly not working or not integrated.
+- **Unverified:** the code or installer path exists, but no matching hardware result
+  was recorded.
+
+## 2. Bottom line
+
+The current worktree is a substantial functional expansion over stock 0.5, not a clean
+replacement release.
+
+**Genuinely better (current state, `0c393e5`):**
+
+- A real dense CPU+GPU tandem runtime that is token-exact on the 2B, 9B and 27B in both
+  placements, with a joint prompt cache and saved-opening reload, and a measured
+  CPU-layer boundary at 8K (flat exchange, §18) and 24K (capacity threshold at 16 layers, §13).
+- The **plan engine is the default** for every model it supports (§17), and it is the
+  measured winner: `tc` rows lead GPU-only 1.5-1.9x at every depth on this card (§15),
+  with `tc-hp` making the 9B plan exact (§16).
+- A portably built CPU engine with five ISA tiers, an AVX-only fallback, native Windows
+  compilation, and exactness runs on 2B/4B/9B.
+- A much more operationally complete server: bounded queue, 429 responses, optional
+  per-source rate limiting, metrics, JSON request logs, Ollama-compatible endpoints,
+  request validation and body limits.
+- A real test suite (stock 0.5 has none), generated config/support references, CI jobs
+  with a 27% line-and-branch coverage floor, secret scanning, installer guards and
+  much more documentation.
+- Native FP8 prompt-GEMM kernels, PQ2_0/Q2_0 import, and additional tensor-core/card
+  plumbing — but several of these are partial or synthetic-only, not support claims.
+
+**Still not working or not supportable:**
+
+- **27B tandem** is implemented and measured in both placements (`cpu-first` peak 7,005 MiB,
+  `gpu-first` 7,017 MiB, vs the 7,238 MiB full-GPU baseline, at 8,192 context, 2026-11-12).
+  Its rate and sampled peak are now measured at 8K and 24K against a full-GPU baseline
+  (7.2-8.4 vs 34.8-34.9 tok/s at position 100; 446 MiB less peak at 8K), and the joint
+  checkpoint costs 54.5-61.5 ms to save. Tandem still does not beat GPU-only throughput,
+  and the full-GPU engine also loads at 24K on this card, so the "larger than VRAM"
+  premise is not yet demonstrated.
+- **9B tensor-core plan** is refused (Hadamard block 4096); **4B tc** is 3 exact + 1 accepted
+  tie with the FD fallback (forced FD was 2/4); **k8v4** is absent for 9B and only 2/4 on 2B.
+- **Blackwell FP8/BF16 and real FP8 models** are not validated; the local Blackwell gate
+  correctly reports `unsupported` on the available Ada card.
+- **MoE/Gemma 4 26B** has a design and a model-free cache prototype, not a backend.
+- **Mixed-card pairs, P106, RTX 5060 Ti and Intel Arc** are installer/design targets,
+  not hardware-verified support.
+- **Release packaging is not ready:** the installer still fetches the older `fd54148`
+  commit and the version is still 0.5.0. The best-of branch is merged into `main`, but
+  publishing a new installer artifact and retargeting `SOURCE_COMMIT`/`SOURCE_SHA256`
+  remain release-owner steps. The bare-`pytest` collection failure is fixed and the
+  generated coverage artifacts are ignored.
+
+## 3. What is new or better
+
+### 3.1 Dense CPU+GPU tandem runtime — headline addition
+
+Stock 0.5 has no dense tandem runtime. The current tree adds `kindi/tandem.py`, a
+layer-range API on the GPU engine, and `TandemRunner` over a joint cache view.
+
+Recorded results:
+
+| Check | Result | Evidence |
+|---|---|---|
+| 2B, full GPU | 4/4 prompts token-exact, 40/40 tokens each, 189.9 tok/s | `docs/TANDEM-RUNTIME.md` |
+| 2B, `cpu-first` (CPU 0..5, GPU 6..23, GPU head) | 4/4 exact, 70.2 tok/s | same |
+| 2B, `gpu-first` (GPU 0..17, CPU 18..23, CPU head) | 4/4 exact, 70.9 tok/s | same |
+| 2B joint cache, both placements | extension 320 tokens and branch 256 tokens reused; all six continuations token-exact against cache-off | `bench-logs/tandem-cache/RESULTS.md` |
+| 2B HTTP restart | 344-token saved opening loaded after restart; `cached_tokens: 344` versus 0 cache-off; identical reply in both placements | `bench-logs/tandem-cache/server-results-*.json` |
+| 2B 4K/8K cache | 4,080/8,176 extension tokens; 3,072/6,144 branch tokens; exact in both placements | `LONG-CONTEXT-RESULTS.md` |
+| 9B, 512 context | 320 extension / 256 branch / 256 saved-opening tokens, exact in both placements; CPU load 105–108 s, GPU load 5.8–6.0 s | `RESULTS-9B.md` |
+| 9B 4K/8K cache | 4,080/8,176 and 3,072/6,144 cached; exact in both placements | `context-9b-4k.json`, `context-9b-8k.json` |
+| 9B checkpoint cost | 50.25 MiB joint recurrent state; 15.9/17.4 ms median save; 10.5/11.1 ms median restore; ~3.06 GiB device peak | `checkpoint-cost-9b-512.json` |
+| 27B `cpu-first` (CPU 0..15, GPU 16..63, GPU head), 8,192 context | 4/4 exact, 40/40 tokens each; combined load 385.6 s (full-model CPU load); peak **7,005 MiB** vs 7,238 MiB full-GPU baseline | `bench-logs/tandem-27b-gate/cpu-first-8192.json` |
+| 27B `gpu-first` (GPU 0..47 + embedding, CPU 48..63, CPU head), 8,192 context | 4/4 exact, 40/40 tokens each; combined load 413.3 s (full-model CPU load); peak **7,017 MiB** vs 7,238 MiB full-GPU baseline | `bench-logs/tandem-27b-gate/gpu-first-8192.json` |
+| 2B/4B/9B `cpu-first` CROSS-MODE throughput at 24,576 ctx (medians of three, 2026-11-13) | 2B read 84.3, gen 79.8/72.3/58.8/43.2/34.9; 4B read 49.3, gen 47.0/43.8/31.7/23.7/16.7; 9B read 38.1, gen 37.5/34.7/25.4/20.5/15.2 tok/s; free-after-load 6411/5431/4635 MiB | `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/` (2026-11-12 single runs kept as `bench-<model>-cpu-first-24k.log`; see §12) |
+| 27B rate + sampled peak, 8K and 24K, both placements and full GPU | tandem 7.2-8.4 tok/s at position 100 vs 34.8-34.9 full GPU; peaks 7,027 vs 7,473 MiB at 8K and 7,699 vs 7,783 MiB at 24K | [27B-8K.md](docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md) |
+| 27B joint cache at 4K/8K | saved-opening reloads exact in both placements; 149.6 MiB checkpoint, 54.5-61.5 ms save, 27.0-28.5 ms restore; checkpoint-only peaks 6,842/6,833 MiB (4K) and 7,030/7,027 MiB (8K) | same |
+| 9B saved opening at 4K/8K | extension 4,080/8,176, branch and saved opening 3,072/6,144, cache-off 0, exact in both placements; loads 33.3-39.5 s | `bench-logs/tandem-cache/saved-9b-4k.json`, `saved-9b-8k.json` |
+| 2B CPU-layer sweep, 24,576 ctx | 2/4/6/8/12 CPU layers: 118.9/41.7/39.5/22.6/18.2 tok/s at 24K; knee at 4-6 layers | `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/README.md` |
+
+The cache work also fixed a real bug: `Openings.load` assigned a NumPy K/V array into a
+CuPy view with a plain assignment, which CuPy treated as a scalar fill. It now uses the
+in-place `_to_dev` copy. A GPU-free regression test reproduces the scalar-fill failure.
+This is a concrete correctness improvement over the pre-fix state.
+
+**Not covered:** cumulative-B (33B) and MoE. The 2B/4B/9B CROSS-MODE rows, the 27B
+rate/peak rows and the 2B layer sweep are recorded, and none of them beats GPU-only.
+The 105–108 s 9B CPU load was a full-model load; the CPU engine now loads only its
+owned slice (measured owned-slice loads: 17.2 s for 4B, 32.4 s for 9B, 105.8-114.6 s
+for the 27B), so the old ≈365 s 27B full-load figure no longer describes a tandem start.
+
+### 3.2 CPU portability and CPU serving
+
+Stock 0.5 builds `kcpu.c` with `gcc -O3 -march=native` and has no explicit tier
+selection. The current tree adds five explicit tiers:
+
+`avx2-fma-f16c`, `avx2-f16c-no-fma`, `avx2-fma`, `avx2`, `avx-only`.
+
+The engine selects the best tier from host flags, supports `KINDI_CPU_ISA` to pin a
+tier, builds per-tier cached libraries with explicit flags, and checks the loaded
+library’s reported ISA. The installer reports the selected path and refuses CPU-only
+installs on a CPU without AVX.
+
+Recorded exactness (i7-8086K, native Windows, clang 18.1.8, 6 threads, ctx 1024):
+
+| Tier | 2B | 4B | 9B |
+|---|---:|---:|---:|
+| `avx2-fma-f16c` | 4/4, 43.6 tok/s | 4/4, 18.1 tok/s | 4/4, 10.7 tok/s |
+| `avx2-f16c-no-fma` | 4/4, 43.9 tok/s | 4/4, 15.8 tok/s | 4/4, 10.4 tok/s |
+| `avx2-fma` | 4/4, 31.9 tok/s | 4/4, 17.8 tok/s | 4/4, 10.9 tok/s |
+| `avx2` | 4/4, 29.1 tok/s | 4/4, 19.2 tok/s | 4/4, 11.0 tok/s |
+| `avx-only` | 4/4, 8.9 tok/s | 4/4, 3.9 tok/s | 4/4, 2.0 tok/s |
+
+Also added:
+
+- Native Windows CPU builds with clang + MSVC and libomp, without a vcvars shell.
+- CPU server chat on 2B/4B/9B, non-stream and stream, 0 errors.
+- 24K CPU generation/read benchmarks for 2B/4B/9B.
+- A compile-and-load CI smoke job for the CPU engine.
+- Installer AVX preflight and a clear error for non-AVX CPU-only machines.
+
+**Caveat:** the AVX-only and no-FMA runs are forced tiers on an AVX2 host, not native
+Sandy Bridge or native no-FMA hardware. The Xeon W-2133 and i9-13900K remain unverified.
+
+### 3.3 Server and API operations
+
+`kindi/server.py` grew from a basic one-request server into a more operable service:
+
+- Bounded queue with `429` and `Retry-After` when full.
+- Optional per-source-address fixed-window rate limit, off by default, with metrics.
+- `/metrics` with queue, cache and request counters.
+- `log_json = 1` structured request logs with request ID, status, duration, queue wait,
+  token counts and tok/s; returned as `X-Request-ID`.
+- Ollama-compatible `/api/tags`, `/api/chat`, `/api/generate`.
+- Request validation, authentication checks, a maximum request-body size, and a 413
+  response that preserves the prompt cache.
+- `/health` now hides busy/GPU/uptime/usage details unless the API key is supplied;
+  the installer still receives the five liveness fields it needs.
+- Sampling profiles and `presence_penalty` for the Bonsai backends.
+
+The rate limiter and queue are process-local; a reverse proxy still shares one source
+address. This is not a distributed quota.
+
+### 3.4 Prompt-cache improvements beyond tandem
+
+- `G4Cache` now enforces the documented 1 GiB host byte budget after every checkpoint
+  or park, evicts oldest parked conversations then active checkpoints, refuses an
+  individually oversized snapshot, and records eviction/usage/peak counters exposed by
+  `/metrics`.
+- Tandem checkpoints cover both owners’ recurrent state and K/V, and saved openings are
+  fingerprinted by placement, layer ranges, CPU ISA/threads and `tandem.py`, preventing
+  a cache made by one split from being reused by another.
+- The saved-opening scalar-fill bug fix described above.
+
+Stock 0.5 had a prompt cache, but not the joint tandem ownership, the Gemma 4 byte
+budget/telemetry, or the saved-opening fingerprinting described here.
+
+### 3.5 Formats, quantization and tensor cores
+
+- **PQ2_0 / Q2_0 import:** GGUF types 142/42 import to packs byte-identical to the
+  PTQ1_0 pack for the 2B. Both verify 4/4, and the 24K benchmark showed no meaningful
+  speed difference because the packs are identical. 4B/9B/27B files were not available.
+- **K8/V4:** V4 store/one-pass/exact chunk kernels and V4 decode/verify plan kernels
+  are implemented and selected from `tp.kv`; `KINDI_TC=1` is no longer refused for
+  k8v4. Direct GPU checks store against NumPy and compare chunk V4 with decode V4 bit
+  for bit. This remains an experimental lossy path; see the gaps below.
+- **Native FP8 prompt GEMM:** `gemma4_fp8.cu` adds E4M3/E5M2 `mma.sync` m16n8k32 kernels
+  with per-token activation scaling, selected in `linear_batch` for compute capability
+  >= 8.9, with `KINDI_G4_FP8=0` as an opt-out. Synthetic Ada timings are 0.11–0.76 ms
+  (15.1–35.5 TFLOPS). The path is **not** bit-exact with the old f32 dequantize +
+  cuBLAS path.
+- **Blackwell verification lane:** `tools/verify_blackwell_fp8.py` accepts only
+  sm_100/sm_120, exercises both FP8 formats and tail shapes, and records a machine-
+  readable result. Non-Blackwell hardware is `unsupported` exit 2, never a pass.
+- **Turing tensor cores:** `tc_turing.py`, `tc_turing.cu` and `tca_turing.cu` add the
+  sm_75 path; the installer classifies every sm_80+ card as `tc`, and support docs
+  record 2B/4B/9B/27B tc and plain results.
+- **Card plumbing:** installer card classification, dual pairing, mixed-generation
+  pairs and a P106-100 support document are present. These are described as targets
+  pending hardware verification where appropriate.
+
+### 3.6 Installer, CI, testing and documentation
+
+- Installer source archive is pinned by SHA-256 before extraction; custom sources can
+  be pinned with `KINDI_SOURCE_SHA256`.
+- GRUB edit guard, AVX preflight, card classification and mixed/dual pair handling.
+- Optional `/health` checks in all three Dockerfiles.
+- CI workflow, CPU build/smoke job, GPU smoke lane, dependency pinning and Dependabot.
+- Pre-commit secret scanning and a committed `.secrets.baseline`.
+- Generated configuration reference and support matrix, both with `--check` drift
+  detection.
+- 44 tracked test modules, a 444-test CPU/unit pass, and much more
+  benchmark/limitation documentation than stock 0.5.
+- Cross-mode CPU/GPU benchmark tables and native Windows benchmark runs.
+- The 27B tc path has a 24K server/cache record: 40.5 tok/s read, 34.7–37.6 tok/s
+  generation at 100–24K positions, 351 MiB free, and three real server save/load cycles
+  with bit-exact replies.
+
+Stock 0.5 had **no test suite at all**, so the testing and generated-reference work is
+a categorical improvement even where individual features remain incomplete.
+
+## 4. What is worse, incomplete, or does not work
+
+### 4.1 Functional gaps
+
+These are not necessarily regressions from stock 0.5 — several are new features that do
+not yet meet their own gates. They should not be presented as supported.
+
+| Area | Current state | Why it matters |
+|---|---|---|
+| **27B tandem** | exact 4/4 in both placements (`cpu-first` peak 7,005 MiB, `gpu-first` 7,017 MiB, vs 7,238 MiB full-GPU at 8,192 context, 2026-11-12); 2026-11-13 rate plus sampled peak at 8K and 24K for both placements and full GPU (7.2-8.4 vs 34.8-34.9 tok/s at 100; 446 MiB less peak at 8K, 193 MiB at 24K); joint cache exact at 4K/8K with saved-opening reloads in both placements. | The split is exact and it saves peak VRAM, but it is **4-6x slower**. On 2026-11-14 the GPU half became the plan engine by default (`--tandem-gpu`): same 24K placement, peak 6,004 MiB and 1,985 MiB free against 7,721 MiB/197 MiB for the plain owner, decode within run noise; and a 49,152-token request now keeps all 49,152 tokens where the unsplit plan engine has to reduce it to 30,976, so the capacity case is finally met on context (5.3 read, 2.0-4.9 tok/s). See [the plan-owner results](docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plan-owner/RESULTS.md). Later the same day the plain engine gained the same q8_0 K/V cache (`KINDI_KV=q8_0`, the tandem's plain owner always uses it): token-exact against the fp16 references on the 2B, 9B and 27B, and the 27B 24K `gdn:16` peak falls to ~7,110 MiB (995 MiB free), with the plan owner re-run at 6,091 MiB. See [the plain-q8 results](docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plain-q8/RESULTS.md). A genuinely larger-than-VRAM row still needs a longer context or a smaller card. |
+| **9B tensor-core plan** | Refused before graph build because the Hadamard block is 4096. | The 9B tc cell is not available; plain 9B is 4/4. |
+| **4B tensor-core plan** | 3 exact + 1 accepted llama.cpp tie with the FD fallback at 164.6 tok/s (the forced-FD run was 2/4); plain 4B is 4/4 at 114.9 tok/s. | The tc path is a conditional pass, not a general replacement; forced-FD exactness remains open. |
+| **2B/9B k8v4** | 2B k8v4 is 2/4 against q8_0; 9B k8v4 is unavailable. 4B k8v4 is 4/4. | Experimental lossy cache; do not enable by default or describe as 9B-ready. |
+| **Blackwell FP8/BF16** | No Blackwell hardware result. Local sm_89 gate returns `unsupported` exit 2. | “Blackwell FP8 support” is not established; only the verification lane exists. |
+| **Real FP8/BF16 model** | No Gemma 4 E4B BF16/FP8 GGUF available. The local `gemma4:26b` is Q4_K_M and is rejected at unsupported GGUF type 7; the Gemma 4 engine is E4B-only. | Kernel tests do not prove model-level token agreement or throughput. |
+| **MoE / Gemma 4 26B** | Model-free expert-cache state machine and design documents; no router, pack, backend or GPU copy integration. | The 26B MoE path is not implemented; do not advertise it as runnable. |
+| **Mixed cards, P106, RTX 5060 Ti, Turing hardware** | Installer offers mixed pairs and P106 single/dual profiles; docs mark them unverified. No mixed-card execution record. | Installer acceptance is not hardware validation. A user can be offered a pair that has never produced a token. |
+| **Intel Arc A770** | Separate SYCL/oneAPI backend; M0 audit only, M1 blocked on hardware. | Design-only; not part of the current support surface. |
+| **Continuous batching** | Archived as a no-go. The server serves one active request and queues the rest; the queue does not increase throughput. | The server scales operationally, not computationally. Multi-GPU replicas still need `tp.py` work. |
+| **Long-context tandem evidence** | complete for the 9B and 27B: saved-opening reloads at 4K/8K exact in both placements (9B 4,080/8,176 extension and 3,072/6,144 branch/opening, 33.3-39.5 s loads, 82-221 s cache-off read versus 0.39-0.72 s cached; 27B 8,176/6,144 with 105.8-114.6 s loads). 2B/4B/9B CROSS-MODE 24K rows and a 2B CPU-layer sweep are recorded. | Checkpoint cost grows with layer count (19.3 MiB on the 2B, 50.3 on the 9B, 149.6 on the 27B) even though context does not change it; budget host RAM accordingly. The cached-read times are harness timings, not a serving-rate claim. |
+
+### 4.2 Current-state breakage and release blockers
+
+These were problems with the worktree at audit time, separate from feature completeness.
+Some were fixed afterward; see section 8.
+
+1. **A bare `pytest -q` did not work at audit time.** It failed collection with **26 errors**.
+   The cause is `bench-logs/scan-tree-f7de617/`, an untracked copy of the repository
+   containing duplicate `tests/` and `kindi/` packages. Pytest imports the copied
+   modules, then reports basename mismatches and imports the wrong `kindi` package
+   (for example, `ModuleNotFoundError: No module named 'kindi.dtypes'`).
+   The canonical command is fine:
+
+   ```text
+   python -m pytest -q tests
+   436 passed, 19 skipped, 1 warning in 19.72s
+   ```
+
+   This was a repository-hygiene failure, not a code failure: any CI or contributor
+   that ran plain `pytest` at the root got a red result for the wrong reason. It is
+   fixed by the new `pytest.ini`; see section 8.
+
+2. **The installer does not install the current state.** `install.sh` still pins:
+
+   ```text
+   KINDI_VERSION="0.5.0"
+   SOURCE_COMMIT="fd5414889e4acfd72b46bba3138a908b8e97c5be"
+   SOURCE_SHA256="3ca1e79d..."
+   ```
+
+   `fd54148` is the old stock-0.5-era `main`, while the merged best-of `main` is now
+   `082c5da`. The installer’s default source therefore still omits the dense tandem
+   runtime, AVX-only recovery, generic-GQA support and the other verified work.
+   Its image and install metadata still say `0.5.0`. This is a release-publication
+   blocker, documented as a release-owner step in `docs/RELEASE-CHECKLIST.md`; it
+   cannot be fixed by retargeting the pin without publishing the matching artifact.
+
+3. **The branch was not self-contained at audit time (now committed and merged into
+   `main`).** At audit start it had 57 modified and 28 untracked files
+   (plus this report). The untracked set included runtime code and tests that
+   are required for the current feature set:
+
+   - `kindi/dtypes.py`, `kindi/expert_cache.py`, `kindi/gemma4_fp8.cu`
+   - 9 test modules for FP8, MoE cache, Gemma 4 cache, secret scanning, long-context
+     checking and Blackwell verification
+   - `tools/verify_blackwell_fp8.py`, `tools/check_secret_baseline.py`,
+     `tools/check_long_context.py`, `tools/dory_gguf_inventory.py`
+   - 10 design/support documents and two `.github` workflow files
+
+   The branch has since been committed and merged into `main` at `082c5da`, so
+   the verified state is no longer only a dirty worktree.
+
+4. **Version and changelog identity are stale.** `kindi/__init__.py` still says
+   `VERSION = "0.5.0"`; `README.md` and `CHANGELOG.md` still describe stock 0.5.0.
+   There is no changelog entry or tag for the tandem, CPU, FP8, server, test or
+   installer work. A user cannot distinguish a stock 0.5 install from this tree by
+   version, and the installer builds `kindi:0.5.0`.
+
+5. **Documentation is partly stale or internally inconsistent.**
+   `docs/TANDEM-STATUS.md` says near the top that the 9B check passed on 2026-11-12,
+   but its cleanup gate still says “2B passed ... 9B is still open.” It also says CPU
+   ISA detection/dispatch is absent, although the five-tier dispatch is implemented and
+   tested. `docs/TANDEM-RUNTIME.md`/`TANDEM-STATUS.md` correctly say tandem throughput
+   rows are `n/a`, while other docs describe the runtime as implemented. Treat the docs
+   as a map with stale regions, not a single consistent contract.
+
+6. **`/health` is a breaking change for existing monitors.** Stock 0.5 returned busy
+   progress, uptime, stats and GPU free/total memory unauthenticated. The current
+   server returns only `ok`, `kindi`, `commit`, `model` and `ctx` without a key. This
+   is a defensible security improvement, but an existing unauthenticated monitoring
+   integration will lose its data.
+
+7. **GPU behavior was revalidated after the audit (2026-11-12 evening).** `kindi verify`
+   reports ALL PASS on the 2B (4/4, 153.7 tok/s), 4B (4/4, 108.9) and 9B (4/4, 74.6), and
+   the 27B tandem gate is exact 4/4 in both placements — all with the refactored
+   attention code. The 2B/4B/9B CROSS-MODE tandem throughput rows are recorded. The
+   27B throughput-plus-peak row landed on 2026-11-13 (§11).
+
+8. **Shared-worktree merge risk is resolved for this branch.** Both worktrees are
+   at `0cd58bcd223bf1afba2d8319601e64b014a97082` and `T:/kindi` is clean. Future shared-file work still needs the
+   AGENTS.md lease protocol; blindly copying either worktree over the other will
+   lose work.
+
+## 5. What this means
+
+### If “normal Kindi 0.5” means the stock release
+
+The merged tree is clearly ahead in engineering breadth: tests, CPU portability,
+server operations, tandem 2B/9B/27B, cache correctness, installer guards and
+documentation. It is also substantially less release-ready: the installer points at
+an older commit and the version is unchanged. The best-of branch is merged into
+`main`; the default test command is fixed and coverage artifacts are ignored.
+The right description is **“best-of main with several verified improvements and a
+long list of explicit non-goals,”** not “Kindi 0.5 plus fixes.”
+
+### If “normal Kindi 0.5” means the clean local snapshot
+
+The delta is narrower, but the same conclusions hold. The current tree adds the dense
+tandem runtime, the latest CPU ISA fallback work, FP8/MoE experiments, mixed-split
+plumbing and the newer server/installer changes beyond `clean/kindi-0.5`; it also
+retains the same main-merge and installer-source problems.
+
+## 6. Recommended order of work
+
+1. **Finish the release decision:** the best-of branch is merged into `main` at
+   `0cd58bcd223bf1afba2d8319601e64b014a97082`. Decide the version, publish the matching installer artifact, and
+   point `SOURCE_COMMIT`/SHA-256 at the exact release commit. Do not ship an
+   installer that fetches `fd54148` while claiming the current tree.
+2. **Fix the test entry point:** exclude `bench-logs/` from pytest collection or remove
+   the duplicate `scan-tree-f7de617` copy, then make the documented command and CI use
+   the same invocation. Keep `python -m pytest -q tests` as the canonical command until
+   then.
+3. **Turn the known partials into explicit no-gos in user-facing docs:** 9B tc,
+   4B tc, 9B k8v4, Blackwell FP8, real FP8/BF16 models, MoE and mixed cards.
+   The repository already has honest limitation pages; make those the support contract,
+   not the target matrix.
+4. **Confirm the release commit:** the 2B/4B/9B `verify`, both 27B tandem gate
+   placements and the 494-test suite are recorded for the merged state; a rerun
+   on the exact release commit remains the release gate.
+5. **Keep the AGENTS.md lease protocol for any future shared-file work** so the
+   main worktree and feature worktrees do not drift again.
+
+## 7. Verification performed for this report
+
+Run in the current worktree on 2026-11-12:
+
+| Command | Result |
+|---|---|
+| `python -m pytest tests/ -q --cov=kindi --cov-branch --cov-fail-under=27` | **462 passed, 19 skipped**, total line-and-branch coverage **27.15%**, exit 0 |
+| `python -m pytest -q` (after fix) | **462 passed, 19 skipped**, exit 0 |
+| `python -m pytest -q` (audit-time, before fix) | **26 collection errors**, exit 2, caused by `bench-logs/scan-tree-f7de617/` shadowing |
+| `python -m kindi.config_reference --check` | exit 0 |
+| `python -m kindi.support_matrix --check` | exit 0 |
+| `git -c core.whitespace=cr-at-eol diff --check` | exit 0 |
+| `git status --short` | `main` and the feature branch identical at `0cd58bcd223bf1afba2d8319601e64b014a97082`; coverage artifacts ignored; `bench-logs/` ignored |
+| `git diff --stat v0.5.0..HEAD` | 288 tracked paths, +33,439/−372 |
+| `kindi verify` 2B/4B/9B (2026-11-12 evening) | ALL PASS, 153.7 / 108.9 / 74.6 tok/s |
+| 27B tandem gate, `cpu-first` (2026-11-12) | **4/4 prompts, 40/40 each; peak 7,005 MiB; 8,192 ctx; exit 0** |
+| 27B tandem gate, `gpu-first` (2026-11-12) | **4/4 prompts, 40/40 each; peak 7,017 MiB; 8,192 ctx; exit 0** |
+| `python -m pytest -q tests/` (2026-11-13, `0cd58bcd223bf1afba2d8319601e64b014a97082`) | **494 passed, 19 skipped**, exit 0 |
+| `python -m pytest -q tests/test_vram_monitor.py tests/test_verify_bench_contracts.py` | 9 passed (sampled-peak VRAM and verify/bench contracts) |
+| `python tools/project_memory.py --check`, `build_cross_mode.py --check`, `support_matrix --check`, `config_reference --check`, `compileall`, `git diff --check` | all exit 0 |
+
+The best-of work is merged into `main` at `0cd58bcd223bf1afba2d8319601e64b014a97082`. No push was performed. The
+benchmark numbers are quoted from the repository’s recorded logs and docs except
+where a run is stated.
+
+## 8. Improvements applied after this audit
+
+Two low-risk weak points were fixed without changing unverified GPU code:
+
+1. **Default test discovery.** Added `pytest.ini` with `testpaths = tests` and
+   `norecursedirs = bench-logs`. Bare `python -m pytest -q` now collects only the real
+   suite and passes with **436 passed, 19 skipped**. Focused cross-mode and docs-link
+   tests pass, and `build_cross_mode.py --check` exits 0.
+2. **Tandem documentation drift.** `docs/TANDEM-STATUS.md` no longer says CPU ISA
+   detection is absent, no longer calls the 9B tandem gate open, and now says the page
+   describes this branch. `docs/benchmarks/build_cross_mode.py` and its generated
+   `CROSS-MODE.md`/`CROSS-MODE.csv` now distinguish “runtime exists but no throughput
+   benchmark” from “runtime absent”; the rows remain `n/a` because no new timing run was
+   made.
+3. **Coverage regression floor.** The CI CPU job now runs
+   `pytest tests/ -q --cov=kindi --cov-branch --cov-report=term --cov-fail-under=27`,
+   with `pytest-cov` in the test requirements. The measured local total is 27.15%
+   line-and-branch coverage (462 passed, 19 skipped); the floor is deliberately
+   conservative and documented as an anti-regression gate, not a quality claim.
+   Requirement-based tests were added in `tests/test_requirement_coverage.py`,
+   including cache-loss pick recomputation for the tandem runner. The performance
+   half remains the existing opt-in GPU baseline gate.
+4. **Windows quickstart.** Added `docs/WINDOWS.md`, linked from README and INSTALL: the
+   verified native CPU path, clang/libomp setup, model/verify/serve commands, and explicit
+   limits. Native Windows GPU/AMD execution and the Linux installer are not claimed.
+
+Still unresolved and unchanged: the installer source commit/version publication,
+9B tc, k8v4, Blackwell/FP8 hardware validation, MoE/Gemma-4 26B backend, mixed-card
+and P106 hardware verification, and 4B/9B tandem-throughput measurements. The 27B
+head-ratio blocker, the 27B `gpu-first` gate, and the lack of a fresh GPU/model run
+were resolved as in §9 below. The 2B tandem throughput row is recorded; tandem
+still does not beat GPU-only.
+
+## 9. 27B tandem grouped-query support and the gate (2026-11-12 evening)
+
+The §4.1 head-ratio blocker is fixed. The plain GPU `Engine` now validates grouped-query
+attention generically (`Engine._gqa_groups` in `kindi/engine.py`: `G = NH/KV` must divide
+and be `<= 8`; groups other than 4 require `head_dim == 256`), and `Engine._attn_core`
+dispatches to the generic-GQA kernels that already existed in `kindi/kindi.cu`
+(`k_attn_sg`, `k_attn_vgn`, `k_attn_combn`) when `G != 4`. No new CUDA kernels were
+written. The 4:1 fast kernels are untouched: the 2B/4B/9B `kindi verify` results above
+ran *after* the refactor, which is the regression check for code that moved.
+8 CPU-only tests in `tests/test_gqa_heads.py` pin the ratios and kernel arguments, and
+the full suite is now **444 passed, 19 skipped**.
+
+The measured 27B result is recorded in §7 and in
+`bench-logs/tandem-27b-gate/RESULTS.md`: `TandemEngine` with CPU layers 0..15, GPU layers
+16..63 and the GPU head is token-exact on all four gate prompts at an 8,192-token
+context (never reduced), and its sampled peak is 233 MiB below the full-GPU plan-engine
+baseline. The gate harness's `--probe-gpu-owner` exit code was inverted (it exited 0 only
+when both GPU ranges *failed*); it now exits 0 when both construct, and both 27B ranges
+construct at 8,192 context.
+
+Updated "what is worse or no longer works" list (as of 2026-11-12 evening):
+
+- **27B `gpu-first`** — measured, and `gpu-first` now works in both placements, so the
+  partial-plan owner design the report used to call for is no longer needed on either path.
+- **Tandem throughput** — 2B/4B/9B `cpu-first` have recorded numbers at the CROSS-MODE
+  positions, and the 27B rate-plus-sampled-peak row followed on 2026-11-13 (§11). `bench`
+  accepts `--tandem cpu-first|gpu-first --tandem-cpu-layers N` and `--sample-vram`.
+- **Installer pin and version** — the installer `SOURCE_COMMIT` names
+  `fd54148`, `kindi/__init__.py` still says `0.5.0`, while `main` is merged at
+  `0cd58bcd223bf1afba2d8319601e64b014a97082`. Publishing and retargeting the installer are explicit release decisions
+  left for the release owner.
+- **9B tc** (Hadamard 4096 refused), **4B tc** (3 exact + 1 accepted tie with FD
+  fallback; forced-FD 2/4), **k8v4** (2B 2/4, 9B unavailable),
+  **Blackwell/FP8/BF16 validation**, **MoE/Gemma-4 26B backend**, **mixed-card/P106/5060 Ti/
+  Turing/Arc hardware** — all unchanged, all the same explicit non-goals as §4.1.
+- **Generated test artifacts** — `.coverage` and `coverage.json` are now ignored,
+  so normal coverage runs no longer dirty the tree.
+- **Tracked bench logs** — the force-added 4B/9B tandem raw logs initially leaked the
+  local Windows home path in the CuPy warning line and failed `test_no_secrets.py`;
+  both logs are now sanitized like the 2B log, and the full suite passes again.
+- **`git diff --check` trailing CRs** — resolved: with a clean tree both plain
+  `git diff --check` and the `cr-at-eol` form exit 0 (verified 2026-11-13).
+
+## 10. Audit-remediation and harness rounds (2026-11-12/13, `082c5da..15913b6`)
+
+Eleven commits since the `082c5da` state above. The genuinely new or better items:
+
+- **Cross-mode builder bug fixed** — `measured_tandem == MODELS` compared a list to a
+  tuple, so the generated `CROSS-MODE.md` always claimed unmeasured tandem rows remain
+  `n/a` even with all three models measured. Fixed to `list(MODELS)`, matrix
+  regenerated, regression test added. The CSV was always correct; the headline
+  markdown intro was wrong.
+- **Perf-regression gate** — `tools/check_perf_baseline.py` compares the recorded
+  CROSS-MODE numbers against `docs/benchmarks/perf-baseline.json` (9 cells, 15%
+  tolerance) and runs in the CPU CI job; `tests/test_perf_baseline.py` pins pass,
+  regression-fail and missing-cell behavior.
+- **CI static analysis** — the CUDA static-analysis harness now runs in CI
+  (`static-analysis` job: cppcheck + clang-tidy-18) via a GPU-free CuPy stub for
+  translation-unit building; verified locally (Turing TU builds, tools skip exit 0).
+- **Pinned test dependencies** — `tests/requirements-test.txt` is bounded
+  (`pytest>=7,<10`, `fastapi>=0.100,<1`, `pydantic>=2,<3`, …) with
+  `tests/test_ci_config.py` guarding the pins, the static job and SHA-pinned actions.
+- **Zero-coverage modules covered** — `kindi/catalog.py` (user-visible `kindi models`
+  fit logic) and `kindi/sched.py` (blocking-sync opt-out), then `kindi/lookup.py`
+  (prompt-lookup drafting) and `kindi/spm.py` (SentencePiece tokenizer), all with
+  requirement-based tests.
+- **Broad-except audit** — all 27 `except Exception` sites in `kindi/*.py` now carry
+  a `noqa` rationale (best-effort probes, logged fallbacks, error-response mapping);
+  no behavior changes.
+- **Handoff hygiene** — `AGENTS.md` opens with a live Current-state section, the
+  worktree table HEAD is guarded by `tests/test_agents_handoff.py` (it caught the
+  drift twice), and `docs/ROADMAP.md` was corrected to match the landed state.
+- **Secret baseline refreshed** — after reviewing every flagged line (public SHA-256
+  checksums and `API_KEY=none` only), and a new local pack path in `AGENTS.md` was
+  generalized so no machine-specific path is tracked.
+
+Updated "what is worse or no longer works" list (as of `15913b6`):
+
+- **Installer pin and version** — still `SOURCE_COMMIT=fd54148`, `KINDI_VERSION=0.5.0`;
+  the published installer therefore still delivers stock-0.5-era code without tandem,
+  owned-slice CPU load, or the server hardening. Release-owner publication step;
+  no push has been performed.
+- **Tandem still does not beat GPU-only** (2B 35.8 vs 160.6 tok/s at 24K; 4B 20.0 vs
+  79.8; 9B 16.0 vs 62.3) and the **larger-than-VRAM (27B) throughput row with sampled
+  peak** remains unmeasured. The 27B 8K saved-opening measurement is in flight
+  (512/4K saved-opening reloads pass in both placements).
+- **9B tc** (Hadamard 4096 refused), **4B tc** (3 exact + 1 accepted tie; forced-FD
+  2/4), **k8v4** (2B 2/4, 9B unavailable), **Blackwell/FP8/BF16 validation**,
+  **MoE/Gemma-4 26B backend**, **mixed-card/P106/5060 Ti/Turing/Arc hardware** —
+  unchanged explicit non-goals (§4.1). The GPU CI lane exists but no runner is
+  registered, so none of these can be verified automatically yet.
+- **Rate limiting** remains process-local per source address (documented; behind a
+  proxy all clients share one address).
+
+## 11. Measurement rounds (2026-11-13, `15913b6..0cd58bcd223bf1afba2d8319601e64b014a97082`)
+
+Six commits since §10. This section is the current statement of what is better and what is
+still worse; §10 and earlier keep their own dates.
+
+### 11.1 New or better
+
+- **`kindi bench --sample-vram` — sampled device-wide peak.** `kindi/vram.py` samples
+  `nvidia-smi` memory on a background thread and logs the peak with its idle delta and the
+  phase it happened in (`--vram-sample-s` sets the interval). A host without `nvidia-smi`
+  logs that and the benchmark still finishes. Pinned by `tests/test_vram_monitor.py`. Until
+  now the only peak sampler lived in an ignored `bench-logs/` harness, so a long-context or
+  split-memory claim could not be reproduced from the product.
+- **27B rate and sampled peak, 8K and 24K, both placements plus a full-GPU baseline.**
+
+  | ctx | engine | read | 100 | 2K | 8K | 16K | 24K | sampled peak | free at peak |
+  |---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
+  | 8K | tandem `cpu-first` | 10.5 | 7.2 | 7.9 | 5.6 | - | - | 7,027 MiB | 923 MiB |
+  | 8K | tandem `gpu-first` | 9.4 | 7.6 | 6.6 | 5.3 | - | - | 7,027 MiB | 923 MiB |
+  | 8K | full GPU | 37.2 | 34.8 | 34.3 | 33.0 | - | - | 7,473 MiB | 477 MiB |
+  | 24K | tandem `cpu-first` | 10.5 | 8.4 | 8.0 | 6.0 | 3.8 | 3.0 | 7,699 MiB | 251 MiB |
+  | 24K | full GPU | 37.4 | 34.9 | 34.2 | 33.0 | 31.6 | 30.2 | 7,783 MiB | 167 MiB |
+
+  Same session, same idle baseline, exact head. The split saves **446 MiB of peak at 8K**
+  and **193 MiB at 24K**, and costs **4-6x** decode throughput.
+- **27B joint cache at 4K/8K.** Checkpoint 149.6 MiB (37.4 CPU owner + 112.2 GPU owner),
+  54.5-61.5 ms median save and 27.0-28.5 ms median restore in both placements; saved-opening
+  reloads exact (extension 8,176, branch and opening 6,144 cached); checkpoint-only peaks
+  6,842/6,833 MiB at 4K and 7,030/7,027 MiB at 8K. The checkpoint does not grow with
+  context, because it holds recurrent state, not K/V.
+- **9B saved-opening reloads at 4K/8K — the last open cache cell.** Both placements are exact:
+  4,080/8,176 extension tokens, 3,072/6,144 branch and saved-opening tokens, cache-off 0, and the
+  cached continuation matches cache-off token for token. The owned-slice CPU load cuts the 9B
+  start to 33.3-39.5 s (from 105-108 s), and the same eight tokens take 82-221 s cache-off against
+  0.39-0.72 s cached. Evidence: `bench-logs/tandem-cache/saved-9b-4k.json`, `saved-9b-8k.json`.
+- **2B CPU-layer boundary sweep**, 24,576 context, `cpu-first`: 2 layers 122.8 read / 118.9
+  at 24K; 4 layers 110.5 / 41.7; 6 layers 94.6 / 39.5; 8 layers 85.6 / 22.6; 12 layers
+  80.0 / 18.2 tok/s. The knee is 4-6 layers; every split stays below GPU-only (160.6 at
+  24K), so the knob buys memory, not speed.
+- **Tracked benchmark evidence page.** `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md`
+  records the 27B cache, checkpoint, rate and peak numbers with commands, so the evidence is
+  reviewable in the repository instead of only in ignored logs.
+- **Contract tests for two previously untested user-visible paths.** `tests/test_verify_bench_contracts.py`
+  pins `kindi verify` reference routing (2B/4B/9B/27B, 2B default, `None` for an unknown
+  size) and the `kindi bench` refusal of the Nanbeige backend on a CPU host; both modules
+  were at 0% coverage.
+- **Handoff document fixed rather than stale.** `AGENTS.md`'s live current-state block still
+  named `f8c81b7` and 462 tests; it now names the real HEAD, 494 passed / 19 skipped, the new
+  bench flag and the revised open gates.
+
+### 11.2 Still worse or not working (as of `0cd58bcd223bf1afba2d8319601e64b014a97082`)
+
+- **Installer pin and version — unchanged.** `SOURCE_COMMIT=fd54148`, `KINDI_VERSION=0.5.0`;
+  the published installer still delivers stock-0.5-era code without tandem, owned-slice CPU
+  load or the server hardening. Release-owner publication step; no push was performed.
+- **Tandem still does not beat GPU-only, at any size.** 2B 35.8 vs 160.6 tok/s at 24K, 4B 20.0
+  vs 79.8, 9B 16.0 vs 62.3, 27B 7.2-8.4 vs 34.8-34.9 at position 100. The split is exact and
+  cheaper in peak VRAM; it is not faster.
+- **The "larger than VRAM" premise is not demonstrated on this card.** The full-GPU 27B loads
+  at 8K and at 24K (7,473 and 7,783 MiB peaks, 477 and 167 MiB free). A real capacity row
+  needs a longer context or a smaller card; the documents now say this instead of implying a
+  capacity win.
+- **Measurement variance is not controlled.** The 2B 6-layer tandem row reads 94.6 tok/s in
+  the 2026-11-13 session against 80.9 recorded on 2026-11-12 (about 17%), which is larger than
+  the perf gate's 15% tolerance. All matrix rows remain single-session, single-run numbers;
+  the gate compares the committed CSV with the committed baseline and cannot detect drift
+  between sessions.
+- **Unchanged explicit non-goals:** 9B tensor-core plan (Hadamard 4096 refused), 4B tc
+  (3 exact + 1 accepted tie), k8v4 (2B 2/4, 9B unavailable), Blackwell FP8/BF16 and real FP8
+  models, MoE/Gemma 4 26B backend, mixed-card/P106/RTX 5060 Ti/Turing/Intel Arc hardware,
+  native Sandy Bridge/no-FMA, AVX-512/VNNI, Dory D1, Raon/Gemma 26B backends.
+- **GPU CI lane has no runner**, so none of the GPU-backed gates above run automatically;
+  registration steps are in `docs/CI.md`.
+- **Rate limiting stays process-local** per source address; behind a proxy every client shares
+  one address.
+- **`/health` is still a breaking change** for unauthenticated monitors (intentional security
+  fix; §4.2 item 6).
+
+### 11.3 What was fixed in this round rather than only listed
+
+| was | now |
+|---|---|
+| No product way to measure a transient VRAM peak; only an ignored harness | `kindi bench --sample-vram` with unit tests and docs |
+| 27B "throughput row with sampled peak" open for two rounds | measured at 8K and 24K, both placements, against a full-GPU baseline |
+| 27B saved-opening reload and checkpoint cost at long context open | exact at 4K/8K; cost and peak recorded |
+| 9B saved-opening reload at 4K/8K is the last open cache cell | measured exact in both placements |
+| CPU-layer boundary unmeasured ("tune n") | 2B sweep with the knee identified and documented |
+| Capacity premise overstated in `ROADMAP`/`TANDEM-*` | restated with the measured full-GPU 24K peak |
+| `kindi/verify.py`, `kindi/bench.py` at 0% coverage | contract tests for both |
+| `AGENTS.md` live state stale by five commits | updated with the real HEAD, suite count and gates |
+
+## 12. Tandem rows re-recorded as medians (2026-11-13)
+
+§11.2 listed one measurement fault: the tandem rows in the matrix were single runs, and a
+re-measurement came back ~17% away from the 2B row. I have now replaced them with the same
+methodology as the GPU-only cells — **the median of three fresh-process runs per model**,
+one session, same machine, exact head, 24,576-token context, `cpu-first`, 6 CPU layers:
+
+| model | runs (read) | median read | median gen 100/2K/8K/16K/24K | was (single run) |
+|---|---:|---:|---|---|---:|
+| 2B | 77.3 / 84.4 / 84.3 | 84.3 | 79.8 / 72.3 / 58.8 / 43.2 / 34.9 | 80.9, 65.7/71.3/55.5/43.4/35.8 |
+| 4B | 52.8 / 49.3 / 47.8 | 49.3 | 47.0 / 43.8 / 31.7 / 23.7 / 16.7 | 62.5, 52.1/51.4/33.5/24.8/20.0 |
+| 9B | 40.1 / 38.1 / 37.0 | 38.1 | 37.5 / 34.7 / 25.4 / 20.5 / 15.2 | 39.9, 28.5/35.8/28.2/20.1/16.0 |
+
+The single runs were off by **up to 32%** (9B at position 100) and 4B read by **-21%**.
+Adopting the medians made the 15%-tolerance perf gate flag exactly those two 4B cells
+(-21% read, -17% at 24K) before I re-recorded the baseline with
+`tools/check_perf_baseline.py --update`; only the three tandem cells changed, and the
+baseline now holds the medians. `docs/benchmarks/build_cross_mode.py` generates the new
+intro (“All tandem rows below are measured on 2026-11-13, three fresh-process runs per
+model; the table uses their median”) and `runs.csv` keeps one row per run. The 2026-11-12
+single-run logs, with the old numbers, remain in the same folder as the record they were;
+§3.1 above is updated to the adopted values.
+
+Updated worse status: **the "measurement variance is not controlled" item from §11.2 is
+closed for the tandem rows** — they now carry the same median-of-three standard as the
+GPU-only rows, and the discrepancy is bounded by the observed run-to-run spread
+(±5-25% across cells) rather than hidden inside one lucky invocation.
+
+| was | now |
+|---|---|
+| Tandem matrix rows are single runs, up to 32% off a re-measurement | medians of three fresh-process runs per model; the perf baseline holds them and only the tandem cells were re-recorded |
+
+## 13. Capacity and the 27B boundary (2026-11-13)
+
+The report's remaining capacity question — a context where full-GPU cannot run but the split
+can — is now answered on the 4060 Ti, and the answer is not what the project hoped.
+
+**The loader reduces context instead of failing.** Requesting 65,536 or 131,072 tokens on the
+27B loads with fewer tokens:
+
+| requested | engine | actual context | peak | free after load | free at peak |
+|---:|---|---:|---:|---:|---:|
+| 24,576 | tandem `cpu-first` (16 layers) | 24,576 | 7,699 MiB | 687 MiB | 251 MiB |
+| 24,576 | full GPU | 24,576 | 7,783 MiB | 463 MiB | 167 MiB |
+| 65,536 | tandem `cpu-first` (16 layers) | 30,464 | 7,518 MiB | 383 MiB | 432 MiB |
+| 65,536 | full GPU | 37,120 | 7,812 MiB | 23 MiB | 138 MiB |
+| 131,072 | tandem `cpu-first` (16 layers) | 30,464 | 7,448 MiB | 383 MiB | 502 MiB |
+| 131,072 | full GPU | 37,120 | 7,806 MiB | 23 MiB | 144 MiB |
+
+Full GPU caps near **37K** and the 16-layer tandem near **30K**, and both snap to the same
+reduced size regardless of the request, so the split buys headroom, not usable context. A truly
+closing case needs a device where the full-GPU engine cannot run at a usable context yet a split
+can. Evidence: `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md`.
+
+**The 27B layer boundary was swept.** At 24,576 requested context (`cpu-first`):
+
+| CPU layers | actual ctx | read | 100 | 2K | 8K | 16K | 24K | peak | free after load |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 8 | 17,664 (reduced) | 16.1 | 14.8 | 13.6 | 9.9 | 7.6 | – | 7,723 MiB | 23 MiB |
+| 16 | 24,576 | 10.5 | 8.4 | 8.0 | 6.0 | 3.8 | 3.0 | 7,699 MiB | 687 MiB |
+| 24 | 24,576 | 6.8 | 5.6 | 5.3 | 3.6 | 2.6 | 2.1 | 6,103 MiB | 1,689 MiB |
+| 32 | 24,576 | 5.2 | 4.6 | 4.1 | 2.9 | 2.0 | 1.7 | 5,115 MiB | 2,677 MiB |
+
+8 CPU layers cannot hold a 24K context and are reduced to 17,664 tokens with 23 MiB free. From
+16 layers the requested context holds, but each added 8 layers costs 35-50% of decode rate for
+another ~1.0-1.6 GiB of peak. **16 layers is the 24K boundary** on this card; 24-32 layers are
+a memory purchase at a steep rate cost, and every split stays far below full GPU (read 37.4, 24K
+decode 30.2). A smaller card gets a different, measured answer with the same command; the tuning
+gate from §11 is closed for the 2B and 27B on this host.
+
+Also new in this round: **`kindi bench --json FILE`** writes a run's numbers (read rate, per-
+position generation, placement, context, sampled peak) in machine-readable form, so recorded
+runs no longer need log scraping (`kindi/bench.py`, `tests/test_bench_json.py`).
+
+## 14. The 9B tensor-core plan (HB 4096) (2026-11-13)
+
+The plan engine's HB 4096 refusal was stale: the kernels have dispatched the 4096 folds since the
+27B work (`ff_rmsfold<8,8>`, `ff_smfold<8>`, `ff_fold<8>`), and only the Python gate still
+refused. Lifting it and running the real verify showed:
+
+| 9B run | result | tok/s |
+|---|---|---|
+| plain (KINDI_TP=0) | 4/4 | 76.3 - 80.0 |
+| tc, default int8 activations | 3/4 (prompt 1 flips at token 36) | 125 |
+| tc, `KINDI_TC_HP=1` | 4/4 | 122.7 |
+
+The flip was isolated to activation precision: fold-split, FF, FD, ATT_TC and TMAX toggles all
+left it unchanged and only HP (two int8 rows per token) made it exact. `kindi/spec.py` now
+refuses HB 4096 unless `KINDI_TC_HP=1` (before the repack, not after), so the default tc path
+keeps refusing with the measured reason and the exact path is opt-in — the same standing rule as
+the quarantined `k8v4` cache and the 4B's FD-fallback caveat now documented in `docs/CARDS.md`,
+`docs/CARD-SUPPORT.md` and `docs/ROADMAP.md`. No regression: 2B tc is still 4/4 (388.3 tok/s)
+and the 9B tc cell now records `refused` in `tools/verify_matrix.py`. Evidence:
+`bench-logs/verify-matrix-9b-tc/`, `bench-logs/verify-matrix-9b-tc-refused2/`.
+
+## 15. Tensor-core rows in the cross-mode matrix + the 27B `gpu-first` 24K row (2026-11-13)
+
+The plan engine is now the fourth mode of the cross-mode matrix (`cpu`/`gpu`/`tc`/`tandem`), with
+three new perf-baseline cells (`tc/2b`, `tc/4b`, `tc/9b`) guarding its throughput in CI. The
+measurements are medians of three fresh-process `kindi bench` runs per model at 24,576 context
+with the exact head (`KINDI_TP=1`, `KINDI_TC=1`, `KINDI_FD=1`, `KINDI_ATT_TC=1`, `KINDI_TC_TMAX=4`,
+`KINDI_KV=q8_0`; `KINDI_TC_HP=1` for the 9B), `--sample-vram` for the sampled peak:
+
+| model | read | 100 | 2K | 8K | 16K | 24K | peak | vs GPU-only |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| 2B | 471.7 | 349.1 | 327.4 | 325.2 | 319.4 | 299.2 | 1,645 MiB | 1.9x |
+| 4B | 214.1 | 174.0 | 173.6 | 156.6 | 141.7 | 127.8 | 3,311 MiB | 1.6x |
+| 9B | 133.9 | 114.7 | 111.3 | 108.7 | 103.2 | 97.0 | 3,257 MiB | 1.6x |
+
+Evidence: `docs/benchmarks/2026-11-13-i7-8086k-rtx4060ti-tc/` (runs.csv + sanitized bench JSONs/logs).
+The generator (`docs/benchmarks/build_cross_mode.py`) gained `tc_rows()`, a tensor-core table
+section and a speedup-over-GPU-only section; `tests/test_cross_mode_benchmarks.py` now asserts
+four modes.
+
+Also measured the missing 27B matrix cell: `gpu-first` at 24,576 context reads 8.5 and generates
+7.4/6.2/4.5/3.3/2.7 tok/s at 100/2K/8K/16K/24K, with a sampled peak of 7,339 MiB (633 MiB free
+after load). The 27B table in `docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md`
+and `docs/TANDEM-RUNTIME.md` is now complete in both placements at both contexts.
+
+## 16. The verify matrix can run the 9B exact cell (`tc-hp`) (2026-11-13)
+
+`tools/verify_matrix.py` only had `plain` and `tc` modes, so after §14 the 9B tc cell could only
+ever record `refused`, even though §14 showed the run is exact with `KINDI_TC_HP=1`. A
+`tc-hp` mode is now part of the matrix (tc plus `KINDI_TC_HP=1`, and `tests/test_verify_matrix.py`
+pins that it adds only that flag). Measured: 9B tc-hp PASS 4/4 at 123.9 tok/s
+(`bench-logs/verify-matrix-9b-tc-hp/`); the same run's 2B/4B tc cells are 4/4 and 3 exact + 1 tie
+unchanged.
+
+## 17. Audit findings: the plan engine is the default, and bench JSON carries the actual ctx (2026-11-13)
+
+Two of the Buffy audit's three HIGH items are fixed here (the third — the 4B default-activations
+tie — is a hardware-path item, not a code bug, and the matrix documents it as such):
+
+- **The default engine is now the measured winner.** `kindi/engine.py make_engine` previously used
+  the plan engine by default only for the 27B; the 2B/4B/9B ran the plain engine even though the
+  cross-mode `tc` rows show the plan engine 1.5-1.9x faster at every depth on this card. Now the
+  plan engine is the default for every model it supports; `KINDI_TP=0` keeps the plain engine.
+  Verified on the card: a default 2B `kindi verify` now runs the plan engine (log line `plan
+  engine ready: 1 card`) and is still 4/4 token-exact, at 253.4 tok/s over the run (was 194.9 with
+  the plain engine). The 9B engine log now also states that HB 4096 is exact only with HP, so the
+  requirement is visible in the run, not just in the docs.
+- **`bench --json` now records the actual context.** `result['ctx']` was already `eng.ctx` (the
+  loader's reduced value), but nothing said so: a run reduced to 17,664 could be read as the
+  requested 24,576. The JSON now also carries `ctx_requested` and `ctx_reduced` so a reduced   cell is unambiguously identifiable.
+
+## 18. The 27B boundary where the split stops being worth it (2026-11-13)
+
+At 8,192 context (`cpu-first`, steps of 4 CPU layers, `--sample-vram`):
+
+| CPU layers | read | 100 | 2K | 8K | peak | saved vs full GPU |
+|---:|---:|---:|---:|---:|---:|---:|
+| 8 | 16.8 | 15.6 | 13.6 | 10.7 | 7,427 MiB | 46 MiB |
+| 12 | 12.4 | 10.9 | 10.4 | 6.7 | 6,995 MiB | 478 MiB |
+| 16 | 9.3 | 8.6 | 7.9 | 5.5 | 6,567 MiB | 906 MiB |
+| 20 | 7.4 | 6.2 | 6.0 | 4.6 | 6,139 MiB | 1,334 MiB |
+| 24 | 7.6 | 6.4 | 6.0 | 3.8 | 5,707 MiB | 1,766 MiB |
+| 28 | 6.5 | 4.2 | 3.4 | 3.2 | 5,277 MiB | 2,196 MiB |
+
+There is no knee: every step saves 428-432 MiB of peak for 15-37% of decode rate, a flat
+exchange of ~27-29 MiB saved per percent of decode rate given up, and by 28 layers the read
+rate is 1/3 of the 8-layer rate. On this card the split does not stop being worth it at a
+layer count — it is dominated on rate at every layer count above the minimum that fits, and
+the answer swaps only if the target card has fewer than ~7,427 MiB free at load. For 24K the
+boundary is the capacity threshold instead: 8 layers are auto-reduced to 17,664 with 23 MiB
+free (cannot serve 24K), while 16 layers keep 24,576 with 687 MiB free. Evidence:
+`bench-logs/tandem-cache/boundary-27b-l{8,12,16,20,24,28}-8k.{json,log}`; table in
+`docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md`.
+
+## 19. Current state vs stock 0.5, refreshed (`0c393e5`, 2026-11-13)
+
+This section supersedes the §2 bottom line and the §11.2 worse list. Numbers are from
+the recorded evidence in §§12–18; the focused gates in §7 and the suite count below
+were verified on or near this tree (full suite: **500 passed, 19 skipped**).
+
+> **Two rows of §19.2 are stale as of 2026-11-14; §21 corrects them.** `/health` still returns the
+detailed view (busy, uptime, stats, queue, GPU memory) to a caller that supplies the `api_key` - only
+the unauthenticated response is minimal - and the split no longer "buys headroom, not context": the
+plan-engine owner holds all 49,152 tokens of the 27B where the unsplit engine reduces to 30,976.
+
+### 19.1 What is new or better
+
+- **Default engine is the plan engine** (§17). `make_engine` uses the plan engine for
+  every model it supports (`KINDI_TP=0` keeps plain). A default 2B `kindi verify` is
+  4/4 via the plan engine at 253.4 tok/s (was 194.9 plain). The 9B engine log now states
+  the HB-4096 + HP requirement in the run, not just in docs.
+- **Tensor-core rows are a full matrix mode** (§15): `tc` medians of three at 24K —
+  2B read 471.7, 4B 214.1, 9B 133.9 tok/s, 1.5-1.9x GPU-only — with 12 perf-baseline
+  cells guarding them in CI, plus a `tc-hp` mode that makes the 9B cell runnable exact
+  (4/4 at 123.9 tok/s, §16).
+- **27B tandem is fully measured in both placements at 8K and 24K**, including the
+  8K CPU-layer boundary sweep (§18: 428-432 MiB peak saved per 4-layer step for 15-37%
+  decode cost, no knee) and the 24K capacity threshold (§13: 16 layers keeps 24,576;
+  8 layers reduce to 17,664).
+- **`kindi bench --json` records the actual context**: `ctx` (actual), `ctx_requested`,
+  `ctx_reduced`, so a reduced cell cannot be read as the requested size (§17). Tandem
+  matrix rows are medians of three, not single runs (§12).
+- **Repo hygiene fixed in this round:** `MuseEmber_ReviewAudit_*.txt` audit reports are now
+  covered by `.gitignore` (previously they showed as untracked dirt and could be committed
+  by accident); a stray `{0cd58bc}` template placeholder in §16 is replaced; §1/§2
+  numbers are refreshed to this tree.
+
+### 19.2 What is worse, or no longer works
+
+These are measured or verified on this tree, not speculation. **Bold** are the ones that
+are worse than stock 0.5 or than the first audit's promises; the rest are new features
+that remain partial.
+
+| Item | Status vs stock 0.5 | Fixable now? |
+|---|---|---|
+| **Installer pin stale** — `install.sh` still pins `SOURCE_COMMIT=fd54148` (stock-0.5-era) with `KINDI_VERSION=0.5.0`; the published installer delivers stock code without tandem, the plan-engine default, or the server hardening | Worse than the tree's contents claim | No — release-owner publication step: needs a published artifact + retargeted `SOURCE_COMMIT`/`SOURCE_SHA256`, then a push. Documented in `docs/RELEASE-CHECKLIST.md` |
+| **Version identity stale** — `kindi/__init__.py`, README, CHANGELOG and the installer image still say `0.5.0`; a user cannot distinguish this tree from a stock 0.5 install | Worse (identity) | No — bump only with the release publication above; `tests/test_version_consistency.py` ties pin, package and installer together |
+| **`/health` breaking change** — stock 0.5 returned busy/uptime/stats/GPU memory unauthenticated; the current server returns only `ok/kindi/commit/model/ctx` without a key | Deliberately worse for unauthenticated monitors; a security fix | No — intended; restoring the fields would reopen the leak. Add a documented opt-in if monitors need it |
+| Tandem never beats GPU-only — 27B 7.2-8.4 vs 34.8-34.9 tok/s at position 100; every 2B/4B/9B tandem row also trails GPU-only; and the split buys headroom, not context (full-GPU 27B caps at ~37K tokens, the 16-layer tandem at ~30K, §13) | New feature below its own promise | No — hardware-path rate work; the beat gate is open |
+| 4B default-activations tensor-core exactness — 3 exact + 1 accepted tie (forced-FD 2/4); only the plain engine and `tc-hp` are 4/4 | New feature partial | Hardware-path; documented in `docs/CARDS.md` / `docs/CARD-SUPPORT.md` |
+| 9B tensor-core plan without HP — refused (Hadamard block 4096) unless `KINDI_TC_HP=1`; the exact path exists but is opt-in | New feature partial | Hardware-path; the refusal message and engine log now name the requirement |
+| k8v4 cache — 2B 2/4, 9B unavailable; lossy path | New feature partial | Quarantined experimentally; not default |
+| Blackwell FP8/BF16 + real FP8/BF16 models, MoE/Gemma-4 26B backend, mixed-card/P106/5060 Ti/Turing/Arc hardware, native Sandy Bridge/no-FMA, Dory D1, Raon goldens, PQ2_0/Q2_0 4B/9B/27B downloads | Described as targets, not support | Hardware/downloads-blocked; GPU CI lane has no runner registered (`docs/CI.md`) |
+| Rate limiting stays process-local per source address (shared behind a proxy) | Same as stock, now documented | By design; a proxy-side limiter is the fix |
+
+### 19.3 What was fixed in this round rather than only listed
+
+| was | now |
+|---|---|
+| `MuseEmber_ReviewAudit_*.txt` untracked reports could be committed accidentally | `.gitignore` covers them; `git status` is clean apart from the report |
+| §16 contained a stray `{0cd58bc}` placeholder | replaced with the §14 reference |
+| §1/§2 headline numbers stale (HEAD, module count, diff stat, §2 predating §§15–18) | refreshed to `0c393e5`; §19 supersedes §2 |
+| Everything else in §19.2 | verified real and still present; not fixable without GPU/hardware, a published release, or the user's GitHub runner step — so reported, not claimed fixed |
+
+## 20. Tandem placement: the CPU layer set matters more than the layer count (2026-11-14)
+
+One improvement to the tandem runtime itself, measured on this card. `--tandem-cpu-layers` used to be a
+count of a contiguous block, which mixed the two layer types a Bonsai pack has. A **full-attention**
+layer on the CPU is the worst thing a split can do: its per-token cost grows with the context and its
+K/V is exactly what a split is supposed to move off the card. A **gated-delta (GDN)** layer has O(1)
+per-token CPU work and ~1 MiB of device state.
+
+So the flag now also takes an explicit layer set (`0,1,2,4,5,6`, `0-2,4-6`) and `gdn:N`, which moves the
+first N GDN layers and leaves every attention layer on the GPU. `kindi bench --json` records the
+resolved `cpu_range`/`gpu_range`.
+
+| model @ 24,576 ctx | placement | read | 100 | 2K | 8K | 16K | 24K | peak |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 9B | full GPU | 99.6 | 87.1 | 86.5 | 81.1 | 76.7 | 73.2 | 3,276 MiB |
+| 9B | `cpu-first` 0..5 | 27.9 | 24.4 | 23.7 | 18.7 | 14.4 | 11.0 | 3,452 MiB |
+| 9B | `gdn:6` | 23.2 | 23.3 | 27.1 | 22.6 | 25.5 | **23.6** | 3,543 MiB |
+| 27B | full GPU | 37.4 | 34.9 | 34.2 | 33.0 | 31.6 | 30.2 | 7,783 MiB |
+| 27B | `cpu-first` 0-15 | 9.9 | 8.4 | 7.2 | 5.3 | 3.7 | 2.9 | 7,434 MiB |
+| 27B | `gdn:16` | 9.2 | 8.4 | 6.7 | 6.4 | 7.7 | **7.9** | 7,744 MiB |
+
+Medians of three fresh-process runs (24K 27B `0-15` is one control run); both 9B and 27B splits are
+token-exact on the 2B/9B/27B (2B re-verified with both the integer and `gdn:` forms, 4/4). The GDN-first
+placement gives **2.1x** the 9B and **2.7x** the 27B 24K decode rate for the same number of CPU layers,
+because the contiguous split loses 55% of its rate between 2K and 24K while GDN-first loses 13%.
+
+Two honest limits came out of the same runs, and both are now documented rather than implied:
+
+- **The 9B split is pointless on this card.** The 9B-ternary pack is 2.3 GiB and the card has ~5 GiB
+  free at 8K, so the split's sampled peak (3,072-3,092 MiB) is the same as full GPU (3,098) while it
+  runs 3-4x slower. "No split" is the correct 9B placement here.
+- **A split frees much less VRAM than its layer count implies.** Offloading 16 of the 27B's 64 layers
+  cut the sampled peak only from 7,783 to 7,434 MiB. The tandem's GPU owner is the **plain** engine,
+  and `KINDI_TP=0` cannot load the full 27B at 24K at all (`0 MiB free after the weights`) while the plan
+  engine loads it at 7,783 MiB. The plan engine also runs a q8_0 K/V cache (half the bytes); the plain
+  engine has no K/V mode. Making the split pay off is therefore a plan-engine owner or a q8_0 cache in
+  the plain engine — not another layer sweep.
+
+### `auto`: the split is only as big as it must be
+
+`--tandem-cpu-layers auto` (or `auto:MiB`) computes the smallest GDN-first set that makes the requested
+context fit, from the pack's real tensor sizes, fp16 K/V per kept attention layer, the head, the f32
+file and a measured scratch allowance, against the free VRAM before loading. It is accurate to 5 MiB
+(27B at 24K: predicts 7,778 MiB, plan-engine peak measured 7,783) and it refuses instead of splitting
+when the model already fits:
+
+- 9B at 24,576: *"already fits at 24576 tokens (~3282 MiB needed, 7075 MiB free); a split would only
+  make it slower"* — the same conclusion as the §19 9B measurements, now enforced by the flag.
+- 27B at 24,576: 19 CPU layers (GDN-only), context kept at 24,576 **unreduced**, 522 MiB free after
+  load, sampled peak 7,257 MiB, read 8.3 / decode 6.3-7.0 tok/s.
+
+`KINDI_TANDEM_RESERVE_MB` (default 512) is the headroom it leaves; a hand-picked `gdn:16` is slightly
+faster (7.9 at 24K) because it leaves only 283 MiB. `auto:1024` asks for headroom *freed* instead and
+splits even when the model fits: on the 9B at 8,192 it moved 14 GDN layers, left 5,523 MiB free and ran
+17.5 read / 16.9 at 8K — a card-sharing choice, not a throughput one.
+
+One bug fixed on the way: the partial-range engine's context fit charged the GPU owner for **every**
+attention layer of the model instead of the ones it loads, so a split reduced context more than the
+memory allowed. The 27B with 8 CPU layers at 24,576 requested now holds **19,712** tokens instead of
+17,664 (+11.6%), same split, same card. Evidence: `bench-logs/tandem-improve/` (JSON + logs per run,
+with the resolved layer sets).
+
+## 21. Current state vs stock 0.5, refreshed again (`615cdca`, 2026-11-14 evening)
+
+This section supersedes §19.2 wherever they differ; §20's measurements stand. Everything here was
+checked on this tree, and the suite is **545 passed, 10 skipped** (the count after this round's new
+tests; §19's 500 is two rounds older).
+
+### 21.1 What is new or better
+
+- **The 9B tensor-core path runs exact by default.** `make_engine` sets `KINDI_TC_HP=1` for a pack
+  folded with Hadamard block 4096 before `kindi.spec` is imported, so the 9B no longer stops with
+  "refuses Hadamard 4096" and no longer needs a flag. Verified on the RTX 4060 Ti with no
+  `KINDI_TC_HP` in the environment: `kindi verify` **4/4 prompts token-exact, 122.4 tok/s** (the
+  plain engine measures 74.6-80.0). `KINDI_TC_HP=0` still refuses, with the reason in the message.
+  The trade that comes with it: with HP the verify pass is T = 4, so a drafter on such a pack drafts
+  at most 3 tokens (the 2B keeps T = 8).
+- **A plan-engine GPU owner for the split** (landed 2026-11-14 before this round):
+  `TPEngine(layers=, embed=, head=)` owns an arbitrary subset with q8_0 K/V, so the split's GPU half
+  is no longer the plain engine. 27B at 24K, same `gdn:16`: peak **6,004 MiB** (n = 5,
+  5,862-6,083) against **7,721 MiB**, decode inside noise; at 49,152 tokens the split holds all of
+  them (peak 6,876 MiB) where the unsplit plan engine reduces to 30,976.
+- **`KINDI_KV=q8_0` in the plain engine**: it reuses the plan kernels, so a `KINDI_TP=0` run or a
+  split carries half the K/V bytes (27B 24K peak 7,110 MiB against 7,721 fp16), exact 4/4 on the
+  2B/9B/27B in both owners.
+- **Prior art is recorded with gates**: `docs/EXTERNAL-ENGINES.md` and the roadmap's
+  "Prior-art follow-ups (2026-11-14)" list nine items with numeric gates (measured CPU/PCIe split
+  rule, calibration cache, KLD quality gate, determinism gate, `kindi plan` dry run, K/V prefix
+  sharing, CPU-set thread count, FP8 K/V behind the KLD gate, Windows unbuffered load). The page
+  also records that llama.cpp's reference-counted checkpoints do **not** apply here: our checkpoints
+  already copy only the recurrent state.
+- **Speculation has a measured rule instead of a table of hopes.** `docs/MTP.md` now carries
+  27B 40.0 -> 62.5 tok/s (**1.56x**, 43% acceptance) and 9B 115 -> 113 (**0.98x**, 41%) on this
+  host, with the reason: a drafter pays when the target pass is ~13x a drafter step (27B) and not
+  when it is ~5x (9B).
+- **A broken optional accelerator no longer stops the server**, and the docs guard checks something
+  again - both in 21.3, because they were bugs, not features.
+- **Harness**: `tests/README.md` publishes per-module coverage (31% total, floor stays 27% until a
+  Linux figure exists); pre-commit gained `check-merge-conflict`/`check-case-conflict`; the three
+  `tandem-cache` scripts that tracked pages tell you to run are tracked next to them; the dory goldens
+  and hashes the page cites are tracked.
+- **A measured CPU-vs-PCIe ratio now picks the tandem split.** `tools/measure_split_ratio.py` measures
+  this machine end to end (PCIe staged 4.5/2.3 GiB/s, hidden handover 0.009 ms, raw CPU GDN layer
+  4-6 ms, effective 11.7 ms in the live tandem pipeline - about half of it dispatch, not PCIe) and
+  `kindi/tandem.py` picks by that ratio through `--tandem-cpu-layers rate[:frac]` (fastest fitting
+  count, or the largest count a rate floor can afford; a fallback that says so, never fake numbers).
+  At 27B/24K the ratio predicts the smallest fitting count (11/12 CPU layers, plan owner) - the same
+  boundary as the recorded `auto` best-fit, and the earlier hand-set `gdn:16` was five steps
+  further and slightly slower. Predicted rates validate −10% to −25% against the recorded 8K sweep.
+  Evidence in `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-split-ratio/`; the beat-7.9-by-10%
+  gate clause is open pending the live rate-pick bench.
+
+### 21.2 What is worse, or no longer works (2026-11-14)
+
+All checked on this tree. **Bold** = worse than stock 0.5; the rest are new features that stay
+partial.
+
+| Item | Status vs stock 0.5 | Fixable now? |
+|---|---|---|
+| **Installer pin still delivers stock 0.5** - `install.sh` pins `SOURCE_COMMIT=fd54148` with `KINDI_VERSION=0.5.0`, so the published installer ships neither the tandem, the plan-engine default, nor the 9B default above | Worse than the tree | No - release-owner step (`docs/RELEASE-CHECKLIST.md`): publish the artifact, retarget the pin and its sha256 |
+| **Version identity** - `kindi/__init__.py`, README, CHANGELOG and the image tag still say `0.5.0` | Worse (identity) | No - same publication step; `tests/test_version_consistency.py` keeps pin, package and installer aligned |
+| **The tandem is still slower than GPU-only** - plan owner at 24K: 5.8 tok/s against 30.2 unsplit, because the CPU-owned layers dominate the token. The peak-VRAM win does not move the `>=25%` gate | New feature below its own promise | Not in a docs round: prior-art item 1 (measured CPU/PCIe ratio) is the first step and needs no new kernels |
+| `KINDI_STREAM_LOAD` is gone - documented but read nowhere since streaming became unconditional. The row is removed, so a config file that sets it gets silence (it never did anything on this tree) | Same behaviour, honest docs | Done, see 21.3 |
+| **9B + 2B drafter does not pay** - 0.98x at 41% acceptance; the installer offers the drafter to the 27B only | Not a stock feature | No: that is the measured answer, now written into `docs/MTP.md` so it is not re-tried blind |
+| **`KINDI_TC_HP` caps the verify pass at T = 4** - the 9B's new default also caps its drafter to 3 tokens | New trade, taken for 4/4 exactness | Documented; revisit only with a wider HP pass |
+| 4B tc stays 3 exact + 1 accepted tie (forced FD 2/4); k8v4 stays 2B 2/4 and 9B unavailable | New features partial | Hardware/accuracy path; both quarantined, neither is a default |
+| GPU CI lane has no runner, so no GPU-backed claim runs automatically; rate limiting is process-local per address (all clients share one behind a proxy) | Same as stock, documented | No: runner registration is the user's step (`docs/CI.md`); the limiter is by design |
+| Benchmark rows are single-session and the perf gate compares the committed CSV with a committed baseline, so it cannot see cross-session drift (a 2B row once differed 17% between sessions) | Same | Partly: `tc` rows are medians of three; the rest needs a repeat-run policy |
+
+### 21.3 What was fixed in this round rather than only listed
+
+| was | now |
+|---|---|
+| A stale `KINDI_MTP_HEAD`, a moved draft head or a bad `KINDI_SPEC_PACK` raised inside engine construction, so `kindi serve` never started because of an optional accelerator | `optional_path()`/`head_paths()` clear the variable with one `speculation off: ...` line; the head and drafter builds are guarded, and `_building_drafter` resets on the failure path too. 4 tests |
+| `KINDI_STREAM_LOAD` documented but read nowhere | row removed; `test_every_documented_switch_is_read_by_the_code` fails on any documented-but-unread switch - it failed on exactly this one before the row went |
+| `kindi bench --json` ended a finished run with a traceback when its directory did not exist | creates the directory; an `OSError` is logged and the printed numbers still stand. 1 test |
+| The docs-link guard collected **0 of 92** files (it skipped any path part named `.freebuff`, and this worktree lives under it) | compares repo-relative parts; two new guards (a label must point where the link goes, no link into gitignored evidence); six labels and seven links fixed, missing dory evidence promoted |
+| The 9B tc plan needed `KINDI_TC_HP=1` by hand | `make_engine` selects it for HB-4096 packs; verified 4/4 at 122.4 tok/s with no variable set. 1 test |
+| `docs/MTP.md` had no 9B row, so the same experiment would be repeated | the 27B/9B drafter table with acceptance and the cost rule |
+| Coverage was a single global number | per-module table in `tests/README.md` (31% total); floor unchanged until a Linux figure exists |
+
+Evidence: `615cdca` (accelerators, dead knob, bench JSON, MTP table), `549c030` (docs guard and
+links), `c449385` (prior art), the plan-owner and plain-q8 lease rows in `AGENTS.md`, and the two
+verify runs quoted above (9B with HP: 4/4 at 122.6 tok/s; 9B with no variable: 4/4 at 122.4).
+
+## 22. Current state vs stock Kindi 0.5, refreshed again (2026-11-14)
+
+This section supersedes §21 wherever they differ; §§1–20 are history at their own dates. HEAD is
+`3f42a6a` on both `main` and `freebuff/tandem-cpu-recovery`; the suite is **566 passed, 10 skipped**
+(at `2537471`; the focused rounds since add 9 KLD + 8 calib tests, all green). Tracked files: 459
+(stock 0.5: 102); test modules: 61 (stock: 0); docs paths: 203 (stock: 12).
+
+### 22.1 What is new or better
+
+- **The 0.6.0 upstream backends are in the tree** (merged 2026-11-14, §21 only knew the fork):
+  MoE (`kindi/moe*.py`), DeepSeek V4.1 Flash (`kindi/dsv41*`), Nemotron Lightning
+  (`kindi/lightning*`), the DSpine drafter (`kindi/dspine*`), container entrypoint + compose,
+  the Kindi Bridge, `install.ps1`, `/v1/tokenize` + `/detokenize`, `dry_run`, and upstream's
+  priority scheduler. Merge conflicts (18 files) were resolved best-of: upstream SCHED flow kept,
+  wrapped in the fork's `_logged` + `gate` queue bounds. Not GPU-verified for the new backends
+  (no hardware run of MoE/DeepSeek/Lightning/DSpine in this session).
+- **Both §21.2 release blockers are resolved in the tree.** The installer now pins
+  `KINDI_VERSION=0.6.0` with the published v0.6.0 tarball's sha256
+  (`613f7320…`), instead of `fd54148`/0.5.0, and `kindi/__init__.py` + README + CHANGELOG carry
+  0.6.0 (verified: `tests/test_installer_source.py` + `tests/test_version_consistency.py` pass).
+  What remains is the release owner's publication step for the *installer artifact* itself, which
+  no code change in this tree can do.
+- **A graded quality gate for every lossy cache** (`kindi kld`, ROADMAP gate 3, landed this round):
+  teacher-forced KLD + same-top share + PPL ratio vs the fp16 reference. On the 2B: q8_0 measures
+  ~2e-7 nats (distribution-lossless in practice, plain and plan engines identical, so no engine
+  confound), and `k8v4` measures 1.29e-04/2.27e-04 nats (~470–1,090x q8_0, context-growing) — the
+  quarantine now rests on those numbers, and gate 8 (FP8) must beat the q8_0 row.
+- **The per-machine tuning is persisted once** (`kindi calibrate`, ROADMAP gate 2): kernel configs,
+  split-ratio snapshot, planner picks and draft length in one keyed file. Cache parity is met on
+  this host (<=0.3% gen-rate delta); the >=20 s startup clause is hardware-bound (NVIDIA tuning is
+  0.2 s, the TC path has no g5 timing at all; the discard costs tens of seconds only on HIP).
+- **Determinism is now a measured property, first run 2026-11-14** (ROADMAP item 4): 10/10
+  identical greedy completions on the 2B (`180e7392dce5`) and 9B (`d5b027f65ade`) through one
+  server process each, exact head and speculation off. The historical 9B int8-activation flip does
+  not reproduce under default settings here. Evidence and the "legitimately breaks it" list
+  (lossy caches, dynamic offload, speculation, sampling) are in
+  `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-determinism/`.
+- **Speculation has three more measured rows** (same host/method as §21's): 27B + 2B drafter does
+  **not fit at 24K** on 8 GB (context 24,576 → 12,032, the drafter costs ~1.6 GB) but still pays
+  1.54x where it fits; **4B → 27B does not fit at all** (loader refuses a 1024-token context);
+  **2B → 4B fits fully with 45.6% acceptance and still loses** (0.88x) — the same ~13x pass-cost
+  law as the 9B row, one size smaller. A garbage MTP head is now proven end-to-end to switch
+  speculation off and let the engine generate (`tests/test_plan_engine.py`, fails on the pre-fix
+  tree).
+- **The tandem's speed half is designed** (`docs/TANDEM-OVERLAP-DESIGN.md`, ROADMAP goal row now
+  "designed, not started"): worker thread + one dispatch per run + double-buffered pinned staging,
+  against the measured dispatch gap (11.7 ms effective vs 4–6 ms raw per CPU GDN layer), with the
+  in-token chain stated serial by dependency.
+- **A real CPU-server boot is tested** (`tests/test_server_cpu.py`): the real `create_app` with
+  `KINDI_DEVICE=cpu` on a real 2B pack answers `/health`, `/v1/models`, and a greedy completion
+  over HTTP (2 passed, ~25 s), closing the hole where only stubbed engines and pack presence were
+  tested.
+
+### 22.2 What is worse, or no longer works (2026-11-14)
+
+All checked on this tree. **Bold** = worse than stock 0.5; the rest are new features that stay
+partial. Rows struck from §21.2's list are noted where they were resolved.
+
+| Item | Status vs stock 0.5 | Fixable now? |
+|---|---|---|
+| **The tandem is still slower than GPU-only** — 27B @ 24K: 8.0 tok/s at the `rate` pick (vs 30.2 unsplit); the split buys memory, not speed, and the >=25% overlap gate is designed but not implemented | New feature below its own promise | Only by implementing the drafted scheduler (a kernel-touching GPU build, not a docs round) |
+| **The installer artifact itself is still unpublished** — the pin now targets the published v0.6.0 source tarball, but publishing the installer release asset remains the release owner's step (`docs/RELEASE-CHECKLIST.md`) | Worse than the tree, not the stock release | No: release-owner step |
+| 9B + 2B drafter does not pay (0.98x, 41%); 27B + drafter does not fit at 24K on 8 GB (12K cap); 4B → 27B does not fit at all. All three are now *measured answers* in `docs/MTP.md`, not open questions | Not a stock feature | No: these are the measurements; the fit limits are tandem-slice questions |
+| `KINDI_TC_HP` caps the verify pass at T = 4 (the 9B's drafter drafts at most 3 tokens) | New trade, taken for 4/4 exactness | Documented; revisit only with a wider HP pass |
+| 4B tc stays 3 exact + 1 accepted tie; k8v4 stays quarantined (now on KLD numbers: 1.3e-04/2.3e-04 nats vs q8_0's ~2e-07, and 2/4 greedy) | New features partial | Hardware/accuracy path; both quarantined, neither is a default |
+| GPU CI lane has no runner, so no GPU-backed claim runs automatically; the four-card rig run still does not exist (P106/P4000/M4000 render `not measured`) | Same as stock | No: runner registration and the rig run are hardware/user steps |
+| No GPU run of the 0.6.0 backends (MoE/DeepSeek/Lightning/DSpine) in this session; `install.ps1` unrun | Same as stock (new surface, unverified) | Needs the registered runner or the hardware; the backends stay unclaimed until then |
+| Benchmark rows are single-session (the perf gate compares committed CSV to committed baseline, so it cannot see cross-session drift) | Same | Partly: `tc` rows are medians of three; a repeat-run policy for the rest is still open |
+
+### 22.3 What was fixed in this round rather than only listed
+
+| was | now |
+|---|---|
+| Determinism was claim-only (exactness was asserted via `verify`, never re-run the same request twice) | Measured 10/10 identical on 2B and 9B (ROADMAP item 4 first run), with the legitimate-breaker list written down; evidence dir above |
+| §21.2 listed the installer pin and version identity as the top blockers | Verified resolved in-tree (0.6.0 pin + version, consistency tests green); only the publication step remains, stated precisely |
+| The drafter table had one context (8K) and one pair each for 27B/9B | 24K fit verdict + three more pairs measured; the "installer offers the drafter to the 27B only" rule is now a four-point measurement |
+| Every optional accelerator could be an optional *failure* (the DSpine site was unwrapped by the 0.6.0 merge) | `_optional` now wraps all four build sites; the garbage-head path is proven end-to-end (a real `MTPDraft` raises on garbage, the real `_build` nulls the head, `generate_spec` still emits 20 tokens) |
+
+Evidence: `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-determinism/`,
+`docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-drafter-24k/`,
+`docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-kld-2b/`, the lease rows in `AGENTS.md`, and the
+commands in each lease row.
+
+## 23. Current state vs stock Kindi 0.5, refreshed again (2026-11-14 later)
+
+This section supersedes §22 wherever they differ; §§1–22 are history at their own dates. HEAD is
+`df818be` on both `main` and `freebuff/tandem-cpu-recovery`; the suite is **602 passed, 11 skipped**
+(one of the handoff-guard failures seen mid-round was the previous commit's stale worktree table;
+the guard is green at `df818be`). Tracked files: 465 (stock 0.5: 102); test modules: 59 (stock: 0);
+docs paths: 209 (stock: 12). Every §22.2 row was re-checked against this tree; none is fixable in a
+docs round (verdicts below), and nothing new became worse since §22.
+
+### 23.1 What is new or better since §22
+
+- **One command now covers the whole support contract.** `tools/verify_matrix.py` gained the serve/bench
+extras (`8c8037b`): per model, the catalog offer (criterion 1, fit vs the card's VRAM), a measured
+  `kindi bench --json` row (5), and a server/cache cycle (2+4: boot, two requests with the repeat a
+  cache hit, an invalid 400, restart on the same state dir, hit again, bit-identical replies),
+  landing in `results.json` with `--no-serve`/`--no-bench` opt-outs. Measured on the 4060 Ti:
+  verify 4/4, serve `cached [0, 256, 256, 253]`, bench gen 187.9 tok/s, `offered: True`. The rig
+  runbook (`docs/OLD-CARD-RIG.md`) is now that one command, and its session was dry-run end to end
+  (`592ee52`): all 19 commands across the runbook and card pages parse and behave on this host;
+  this found and fixed the P106 one/two-card sections pointing at legacy `~/.kindi/pack{,9b,27b}`
+  paths while everything else uses `~/.kindi/packs/bonsai-*` (the corrected 9B verify line passes
+  here: 4/4 at 103.7 tok/s).
+- **The overlap design's step 0 landed, with its honest verdict.** `KINDI_TANDEM_DEBUG_TIMING`
+  adds the designed per-run decomposition probe (off = the old `_run` byte for byte; `bench`
+  records `tandem_timing`), and the 27B-24K `gdn:12` plan-owner gate baseline is re-recorded:
+  **9.9 tok/s at the 24K position, read 13.6, 5,949 MiB sampled peak** (the §22-era 7.9 row predates
+  the plan owner; the ≥25% target re-derives to ≥12.4 tok/s). Decomposition over 76 tokens:
+  cpu 62.2 ms (5.18 ms/layer) + gpu 8.0 + transfer 2.85 (7/token, 0.41 ms each) + head 14.2 = 87.3 ms.
+  **The design's premise is now in question, on the record:** the 8K "~6 ms dispatch gap" does not
+  reproduce at 24K — the CPU run is already at the raw 4–6 ms kernel rate — so the worker thread
+  must be re-justified before it is built, and the head (16% of the token) and transfers come first
+  on these numbers. The head was read for free wins before this verdict: `finish()` is the output-norm
+  fold plus the exact-head GEMV and a GPU argmax — per-token compute, not sync overhead — so there
+  is no trivial cut and the remaining speed work is staged staging + head-side, as the design now says.
+  Evidence: `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-tandem-overlap/`.
+- **Two doc-vs-code lies removed.** `kindi bench` did not accept `--tandem`/`--tandem-cpu-layers`/
+  `--tandem-gpu` even though `kindi/__main__.py`'s docstring said verify/bench/serve/chat all do;
+  they are on the bench parser now, pinned by a `--help` test. (Found while landing step 0, which
+  is the first time anyone ran the design doc's own gate command.)
+- **Registry coverage widened.** `kindi/support_matrix.py`'s `CARDS` now registers the RTX 4060 Ti
+  (measured: 2B tc 4/4 @ 382.7, 4B tc failed at token 6, 9B tc refused→defaulted), the GTX 1080 and
+  the K1200 (honestly `not measured` — only old MoE speed prose exists for them, no verify payload).
+
+### 23.2 What is worse, missing, or no longer works (2026-11-14, all re-checked)
+
+All checked on this tree. **Bold** = worse than stock 0.5; the rest are new features that stay
+partial. `Fixed since §22` rows were fixed in §23.1's round rather than listed here.
+
+| Item | Status vs stock 0.5 | Fixable now? |
+|---|---|---|
+| **The tandem is still slower than GPU-only** — 27B @ 24K: 9.9 tok/s with the plan owner at 12 CPU layers, vs ~30 unsplit; the split buys memory, not speed. Step 0 (probe + baseline) is landed; the ≥25% build is re-pending re-justification, since the decomposition puts the CPU run at raw kernel rate already, the head at 14.2 ms/token and transfers at 0.41 ms each | New feature below its own promise; step 0 done | No: the remaining work (pinned staging, head-side, thread) is kernel-touching GPU implementation, and the only honest next move is the design's own re-justification |
+| **The installer artifact itself is still unpublished** — pin/version resolved to the published v0.6.0 tarball in-tree; publishing the installer release asset stays the release owner's step (`docs/RELEASE-CHECKLIST.md`, present) | Worse than the tree, not the stock release | No: release-owner step |
+| 9B + 2B drafter does not pay (0.98x); 27B + drafter does not fit at 24K on 8 GB (12K cap); 4B → 27B does not fit at all. Measured answers in `docs/MTP.md`, not open questions | Not a stock feature | No: measurements; fit is a tandem-slice question |
+| `KINDI_TC_HP` caps the verify pass at T = 4 | New trade, taken for 4/4 exactness | Needs a wider-HP kernel pass (GPU work) |
+| 4B tc 3 exact + 1 tie; k8v4 quarantined (KLD 1.3e-04/2.3e-04 nats vs q8_0 ~2e-07) | New features partial | Accuracy path; neither is a default |
+| GPU CI lane has no runner; the four-card rig run still does not exist (P106/P4000/M4000/1080/K1200 render `not measured`) | Same as stock | No: runner registration + hardware run are user steps |
+| No GPU run of the 0.6.0 backends (MoE/DeepSeek/Lightning/DSpine) in this session; `install.ps1` unrun | New surface, unverified | Needs the runner/hardware; unclaimed until then |
+| Benchmark rows are single-session (perf gate compares committed CSV to committed baseline) | Same | Repeat-run policy still an open proposal; `tc` rows are medians of three |
+
+### 23.3 What was fixed in this round rather than only listed
+
+| was | now |
+|---|---|
+| The five-point support contract took four commands (matrix cells, bench rows, serve cycle, catalog offer) | `verify_matrix` records all five per model in `results.json`; the runbook is the single command; all 19 runbook/card commands dry-run, with the P106 legacy paths found and corrected |
+| The overlap design's step 0 was prose (probe "required before any tuning change is believed", gate command unrun) | Probe landed and exercised (bench `"tandem_timing"`), gate baseline re-recorded, and the step-0 verdict recorded in the design + ROADMAP — including that its core premise fails at 24K |
+| `kindi bench --tandem*` rejected despite the docstring promising it | Flags on the bench parser, pinned by test |
+| The registry knew three cards, none measured | 4060 Ti registered from a real dual-mode run; 1080/K1200 registered with honest `not measured` cells |
+
+Evidence: `docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-tandem-overlap/`, the verify-matrix and
+P106 doc commits' test commands, the lease rows in `AGENTS.md`, and
+`docs/benchmarks/2026-11-10-i7-8086k-rtx4060ti/results.json`.
+
+## 24. Current state vs stock Kindi 0.5, refreshed again (2026-11-14, after §23)
+
+### 24.1 What is new or better since §23
+
+| item | evidence |
+|---|---|
+| Parked conversations with the same opening no longer copy its K/V per session: the shared-prefix rows are content-keyed blocks stored once and refcounted (`kindi/cache.py`, `Runner._kv_blocks`). Three parked siblings sharing a 4K opening hold four 1024-blocks with refcount 3; restores are byte-identical. | `tests/test_cache_decisions.py` (three new tests) |
+| Cache-doc and report rows updated with the roadmap gate outcomes (#5 `kindi plan` done; #6 mechanism done, ≤1.2× gate recorded as unsatisfiable jointly with the 90% dedupe rule) | `docs/ROADMAP.md` |
+
+### 24.2 What is worse, missing, or no longer works (2026-11-14, re-checked)
+
+Nothing new became worse this round. The honest-mechanism ledger now records two gates changed
+on the evidence rather than bent to fit: #6's ≤1.2× host-RAM clause (does not hold jointly with the
+90% sibling-dedupe rule and unshared per-conversation end states; blocks now cost 1/3 of the unshared
+prefix bytes) and #9's unbuffered-load gate (measured NOT met: 15.6 s unbuffered vs 14.5 s cold,
+4.7 s warm buffered on the 27B bcodes — the disk read is the bottleneck either way).
+
+### 24.3 What was fixed in this round rather than only listed
+
+| was | now |
+|---|---|
+| Parked K/V was a whole-prefix host copy per conversation; Turns' disk blocks were shared but the in-RAM parked copies were not | Shared in-RAM blocks on the same content keys; `_held()` accounting is refcount-aware; `_kv_block_keys` is now one module-level helper used by both Turns and parking |
+
+Evidence: `tests/test_cache_decisions.py` (the sharing, restore-fidelity and gate-ratio tests) and the
+lease row in `AGENTS.md`.
+
+## 25. Current state vs stock Kindi 0.6.0 (2026-11-14, late evening)
+
+Baseline: tag `v0.6.0` (`179710c`, 2026-11-12) plus the post-tag upstream head `dce89df`
+(container-registry docs, 2026-11-13). Both are ancestors of our HEAD `07e0640` — the 0.6.0
+merge landed on 2026-11-14 (commit `f635513`, 18 conflicted files over 172 diverged commits)
+and has been carried forward since. The tree vs `v0.6.0` is a **strict superset**: 349 files
+changed, +45,950/−438 lines, and **no file deleted** — the merge resolutions kept every
+upstream file and added fork behavior on top of it. The full suite at this HEAD:
+**618 passed, 11 skipped, 1 warning** (who the comparison was §22: 564 passed at the merge).
+
+### 25.1 What 0.6.0 brought that 0.5 did not have (now in the tree)
+
+| 0.6.0 item | in this tree | status here |
+|---|---|---|
+| MoE backend (`kindi/moe*.py`, `moe_cpu.c`) | present (merged) | **no GPU run in this session**; the fork adds expert-tier *planning* on top (`kindi plan` MoE strategy, `kindi/moe.py plan()`) |
+| DeepSeek-V4.1-Flash backend (`kindi/dsv41*`) | present (merged) | **GPU-unverified here** |
+| Nemotron Lightning (`kindi/lightning*`) | present (merged) | **GPU-unverified here**; `kindi plan` can describe its tiering header-only |
+| **DSpine drafter** (`kindi/dspine.py`, `kindi/dspine.cu`) | present (merged); `spec.py` hooks (`_dsp_want`, `eng.dspine`) wired | **GPU-unverified here**; the fork additionally wraps the build in `spec._optional` (audit N1) so a broken DSpine degrades to no-speculation instead of aborting startup |
+| Container entrypoint + compose, Kindi Bridge, `install.ps1` | present (merged) | `install.ps1` **not run on Windows in this session** |
+| Turn-save cache (`turn_keep`, `turn_disk_mb`), priority scheduler, `/v1/tokenize` + `/detokenize`, `dry_run` | present (merged) | CPU-tested, no Windows install run |
+| New card classes (M5000 sm_52 fix, Lightning offers, DSpine profile) | present (merged) | rig-measured cards remain `not measured` except the 4060 Ti |
+
+### 25.2 What this fork has *beyond* stock 0.6.0 (better, verified)
+
+| fork item | evidence |
+|---|---|
+| Dense tandem runtime (2B/4B/9B/27B, plan-engine GPU owner, GDN-first `gdn:N`, `auto`/`rate` planners) | measured rows in `docs/benchmarks/`; the plan owner cut the 27B 24K peak from 7,721 → 6,091 MiB and holds 49,152 tokens where the unsplit engine reduces to 30,976 |
+| `kindi kld` quality gate (q8_0 2.07–2.74e-07 nats, k8v4 quarantined on numbers) | `docs/ROADMAP.md` gate 3; `docs/benchmarks/...-kld-2b/` |
+| Calibration cache (`kindi/calib.py`, `kindi calibrate`): parity ≤0.3% 27B tuned vs cached | roadmap gate 2 (machine bound: ≥20 s startup needs HIP) |
+| `kindi plan`: dry-run placement report (dense + MoE tiers; live agreement 12 layers both ways) | prior-art #5 |
+| Physical-core thread count (104.6 vs 86.1 tok/s at 6 vs 12 threads) | prior-art #7 |
+| Parked K/V prefix blocks shared once and refcounted (not N copies) | prior-art #6 mechanism; restores byte-identical |
+| Audit fixes on top of the merge: optional-accelerator degradation, `kindi_cache_*` telemetry, reference-config section | 2026-11-14 audit round, N1/N3–N5/D3/D4 |
+| Cache/sharing/regression tests: 618 passing total vs stock 0.6.0's own suite | this report §22/§24 evidence |
+
+### 25.3 What is worse, missing, or unverified vs stock 0.6.0 (honest list)
+
+Nothing upstream was deleted. Deliberate divergences kept from the fork:
+
+| divergence | why |
+|---|---|
+| `presence_penalty` stays a config float key (upstream moved validation to the server; config defaults and `profiles.py` still read it) | local coherence; documented in the merge commit |
+| Server stats keep the fork's superset keys; `/health` unions both queue views + `drafting` | documented merge resolution (§22) |
+| Installer pins the published v0.6.0 tarball sha256 `613f7320…` | fork cannot republish upstream's artifact; the **installer release asset itself is still unpublished** (release-owner step) |
+| Turn-save entries' stored rows live under different keys than `Turns` blocks | cosmetic; no upstream rows are read by this fork |
+
+Still real and orderable against 0.6.0:
+
+- The 0.6 backends (MoE / DeepSeek / Lightning / DSpine) have **no GPU run record in this session** — the first thing to check with real hardware is that `kindi verify` passes with `KINDI_USING=dsv41`/`KINDI_BACKEND=lightning`/`KINDI_DRAFTER=dspine` on the rig, not just that the modules exist.
+- `install.ps1` has never been run on Windows hardware.
+- Tandem is still slower than GPU-only on 1 GPU (24K decode ~8 vs ~31-34 tok/s equivalent measured rows at 8K/24K); the overlap step-0 said the worker thread needs re-justification (CPU compute 62.2 ms/token dominates at 24K on the 27B-24K row).
+- FT8 K/V gate (#8, FP8) remains gated on KLD ≤ q8_0 and unmeasured; #9 (Windows unbuffered load) measured NOT met; #6's ≤1.2× clause recorded unsatisfiable with the dedupe rule (blocks cost 1/(N) of unshared instead).
+
+### 25.4 What was fixed in this round rather than only listed
+
+| was | now |
+|---|---|
+| The comparison baseline was 0.5.0 (the report title said so); §§1–24 are 0.5 history | baseline is 0.6.0 (title/header updated; §25 is the current evaluation) |
+| `main` (the worktree tree) lagged our HEAD by 3 commits | fast-forwarded to `07e0640` (identical to `freebuff/tandem-cpu-recovery`) |
+| The merge dropped no upstream file (it was 18 files conflicted, real risk of loss) | verified: `git diff --diff-filter=D v0.6.0..HEAD` is empty |
+
+Evidence: `git merge-base --is-ancestor origin/main HEAD`, the diff above, the suite run at
+`07e0640`, and the lease rows in `AGENTS.md`.

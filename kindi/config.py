@@ -18,10 +18,16 @@ DEFAULTS = {
     "port": "8093",
     "api_key": "",                      # if set, clients must send Authorization: Bearer <api_key>
     "model_name": "auto",              # infer the reported id from the selected pack
+    "max_body_mb": "16",                # largest request body the HTTP server accepts
+    "queue_max": "8",                   # requests that may wait behind the active one
+    "rate_limit_per_min": "0",          # generation requests per source address per minute (0: off)
+    "log_json": "0",                    # 1: one JSON access-log line per inference request
     # engine
     "ctx": "24576",                     # requested context; each backend clamps it to available device memory
     "head": "exact",                    # exact | fast (shortlist head, ~15% faster, approximate)
     "fast_clusters": "256",             # clusters scored by the fast head
+    "tandem_vram_mb": "0",              # tandem GPU ceiling in MiB (0: no ceiling)
+    "tandem_reserve_mb": "512",         # free card memory the tandem planner leaves for the display/driver
     # prompt cache
     "checkpoint_every": "256",          # recurrent-state checkpoint spacing (tokens)
     "prefix_max": "8",                  # saved prompt openings kept on disk
@@ -45,13 +51,60 @@ DEFAULTS = {
     "min_p": "0",                       # 0: off; else drop the tokens below min_p times the best one's probability
     "repeat_penalty": "1.0",            # 1.0: off; llama.cpp's repeat penalty (the output is then not token-exact)
     "repeat_last_n": "64",              # the tokens that repeat_penalty looks at (-1: the whole context)
+    "presence_penalty": "0",            # OpenAI's additive presence penalty: -2..2, 0 = off (Bonsai backends)
+    "sampling_profile": "default",       # default | publisher: the model publisher's sampling values (Bonsai only)
 }
 
-INT_KEYS = {"repeat_stop", "lookup", "port", "ctx", "fast_clusters", "checkpoint_every", "checkpoint_budget_mb", "prefix_max", "prefix_min", "park_max",
+INT_KEYS = {"repeat_stop", "lookup", "port", "ctx", "fast_clusters", "tandem_vram_mb", "tandem_reserve_mb",
+            "checkpoint_every", "checkpoint_budget_mb", "prefix_max", "prefix_min", "park_max",
             "turn_save", "turn_keep", "turn_disk_mb", "turn_min",
-            "max_tokens", "top_k", "repeat_last_n"}
-FLOAT_KEYS = {"temperature", "top_p", "min_p", "repeat_penalty"}
+            "max_tokens", "top_k", "repeat_last_n", "max_body_mb", "queue_max", "rate_limit_per_min", "log_json"}
+FLOAT_KEYS = {"temperature", "top_p", "min_p", "repeat_penalty", "presence_penalty"}
 PATH_KEYS = {"pack", "state_dir"}
+
+
+def _validate(cfg):
+    """Reject impossible values before a backend or socket touches them.
+
+    Type conversion alone is not enough: a negative context, a port outside the socket range or
+    ``top_p=0`` otherwise fails deep inside an engine or the HTTP server, with a traceback instead
+    of an actionable configuration error.
+    """
+    limits = (
+        ("port", 1, 65535),
+        ("max_body_mb", 1, None),
+        ("queue_max", 0, None),
+        ("rate_limit_per_min", 0, None),
+        ("log_json", 0, 1),
+        ("ctx", 1, None),
+        ("fast_clusters", 1, None),
+        ("tandem_vram_mb", 0, None),
+        ("tandem_reserve_mb", 0, None),
+        ("checkpoint_every", 1, None),
+        ("prefix_max", 0, None),
+        ("prefix_min", 0, None),
+        ("park_max", 0, None),
+        ("checkpoint_budget_mb", 0, None),
+        ("max_tokens", 1, None),
+        ("top_k", 0, None),
+        ("repeat_last_n", -1, None),
+        ("lookup", 0, None),
+        ("temperature", 0, None),
+    )
+    for key, low, high in limits:
+        value = cfg[key]
+        if value < low or (high is not None and value > high):
+            if high is None:
+                raise SystemExit("kindi: %s must be at least %s (got %r)" % (key, low, value))
+            raise SystemExit("kindi: %s must be between %s and %s (got %r)" % (key, low, high, value))
+    if not 0 < cfg["top_p"] <= 1:
+        raise SystemExit("kindi: top_p must be greater than 0 and at most 1 (got %r)" % cfg["top_p"])
+    if not 0 <= cfg["min_p"] <= 1:
+        raise SystemExit("kindi: min_p must be between 0 and 1 (got %r)" % cfg["min_p"])
+    if cfg["repeat_penalty"] <= 0:
+        raise SystemExit("kindi: repeat_penalty must be greater than 0 (got %r)" % cfg["repeat_penalty"])
+    if not -2 <= cfg["presence_penalty"] <= 2:
+        raise SystemExit("kindi: presence_penalty must be between -2 and 2 (got %r)" % cfg["presence_penalty"])
 
 
 class Config(dict):
@@ -77,6 +130,7 @@ def _candidates(explicit):
 
 def load(explicit=None, overrides=None):
     vals = dict(DEFAULTS)
+    explicit_keys = set()          # the keys the user actually set: a sampling profile does not override them
     source = None
     for p in _candidates(explicit):
         if p and os.path.exists(p):
@@ -87,6 +141,7 @@ def load(explicit=None, overrides=None):
                     if k not in DEFAULTS:
                         raise SystemExit("kindi: unknown config key %r in %s" % (k, p))
                     vals[k] = v
+                    explicit_keys.add(k)
             source = p
             break
         if explicit:
@@ -95,25 +150,41 @@ def load(explicit=None, overrides=None):
         e = os.environ.get("KINDI_" + k.upper())
         if e is not None:
             vals[k] = e
+            explicit_keys.add(k)
     for k, v in (overrides or {}).items():
         if v is not None:
             vals[k] = str(v)
+            explicit_keys.add(k)
     cfg = Config()
     for k, v in vals.items():
+        raw = v
         v = v.strip()
         if k in INT_KEYS:
-            cfg[k] = int(v)
+            try:
+                cfg[k] = int(v)
+            except ValueError:
+                raise SystemExit("kindi: %s must be an integer (got %r)" % (k, raw))
         elif k in FLOAT_KEYS:
-            cfg[k] = float(v)
+            try:
+                cfg[k] = float(v)
+            except ValueError:
+                raise SystemExit("kindi: %s must be a number (got %r)" % (k, raw))
         elif k in PATH_KEYS:
             cfg[k] = os.path.abspath(os.path.expanduser(v))
         else:
             cfg[k] = v
+    _validate(cfg)
     if cfg["model_name"] == "auto":
         manifest = os.path.join(cfg["pack"], "kindi_pack.json")
         m = json.load(open(manifest)) if os.path.isfile(manifest) else {}
-        if m.get("backend") in ("kindi_gemma4", "kindi_lightning"):
-            cfg["model_name"] = m.get("model_id", "gemma4")
+        # which family claims the pack is the adapters' answer, not a second list here: the
+        # literal tuple that used to live at this line forgot nanbeige and dsv41, so those packs
+        # reported a Bonsai id (2026-11-16 audit, F3).
+        from .modelids import adapter_model_id
+
+        claimed = adapter_model_id(m)
+        if claimed:
+            cfg["model_name"] = m.get("model_id") or claimed
         else:
             # the GGUF's general.name, then its file name: some files name the model only "Hf"
             size = None
@@ -124,5 +195,9 @@ def load(explicit=None, overrides=None):
             cfg["model_name"] = "bonsai2-%sb" % (size.group(1) if size else "2")
     if cfg["head"] not in ("exact", "fast"):
         raise SystemExit("kindi: head must be exact or fast, not %r" % cfg["head"])
+    if cfg["sampling_profile"].lower() not in ("default", "publisher"):
+        raise SystemExit("kindi: sampling_profile must be default or publisher, not %r" % cfg["sampling_profile"])
+    cfg["sampling_profile"] = cfg["sampling_profile"].lower()
+    cfg["explicit"] = frozenset(explicit_keys)
     cfg["source"] = source or "(built-in defaults)"
     return cfg

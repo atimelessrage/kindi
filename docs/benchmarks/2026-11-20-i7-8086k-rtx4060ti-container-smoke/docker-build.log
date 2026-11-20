@@ -1,0 +1,61 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 4.63kB done
+#1 DONE 0.0s
+
+#2 resolve image config for docker-image://docker.io/docker/dockerfile:1
+#2 DONE 1.1s
+
+#3 docker-image://docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+#3 resolve docker.io/docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e 0.0s done
+#3 CACHED
+
+#4 [internal] load metadata for docker.io/library/ubuntu:18.04@sha256:152dc042452c496007f07ca9127571cb9c29697f42acbfad72324b2bb2e43c98
+#4 DONE 0.7s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 2B done
+#5 DONE 0.0s
+
+#6 [internal] load build context
+#6 DONE 0.0s
+
+#7 [1/7] FROM docker.io/library/ubuntu:18.04@sha256:152dc042452c496007f07ca9127571cb9c29697f42acbfad72324b2bb2e43c98
+#7 resolve docker.io/library/ubuntu:18.04@sha256:152dc042452c496007f07ca9127571cb9c29697f42acbfad72324b2bb2e43c98 0.0s done
+#7 DONE 0.0s
+
+#6 [internal] load build context
+#6 transferring context: 6.40MB 0.3s done
+#6 DONE 0.3s
+
+#8 [2/7] RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates libxml2 python3 python3-pip     && rm -rf /var/lib/apt/lists/*
+#8 CACHED
+
+#9 [3/7] RUN wget -q --tries=5 --timeout=30 https://developer.download.nvidia.com/compute/cuda/10.2/Prod/local_installers/cuda_10.2.89_440.33.01_linux.run     && echo "560d07fdcf4a46717f2242948cd4f92c5f9b6fc7eae10dd996614da913d5ca11  cuda_10.2.89_440.33.01_linux.run" | sha256sum -c -     && sh cuda_10.2.89_440.33.01_linux.run --silent --toolkit --no-opengl-libs --override     && rm -f cuda_10.2.89_440.33.01_linux.run     && rm -rf /usr/local/cuda-10.2/doc /usr/local/cuda-10.2/samples /usr/local/cuda-10.2/nsight*               /usr/local/cuda-10.2/libnsight /usr/local/cuda-10.2/libnvvp /usr/local/cuda-10.2/extras     && rm -f /usr/local/cuda-10.2/lib64/*.a /usr/local/cuda-10.2/lib64/libnpp* /usr/local/cuda-10.2/lib64/libnvjpeg*
+#9 CACHED
+
+#10 [4/7] RUN apt-get update && apt-get install -y --no-install-recommends gcc python3-dev     && python3 -m pip install --no-cache-dir --upgrade "pip<21.4" "setuptools<60"     && python3 -m pip install --no-cache-dir "numpy==1.19.5" "fastrlock==0.8.3" "cupy-cuda102==9.6.0"        "fastapi==0.79.1" "uvicorn==0.16.0" "pydantic==1.9.2" "Jinja2==3.0.3" "MarkupSafe==2.0.1"     && apt-get purge -y python3-dev && apt-get autoremove -y     && apt-get install -y --no-install-recommends libgomp1 && rm -rf /var/lib/apt/lists/*
+#10 CACHED
+
+#11 [5/7] RUN groupadd -g 1000 kindi && useradd -u 1000 -g 1000 -m -d /home/kindi -s /usr/sbin/nologin kindi     && mkdir -p /data && chown 1000:1000 /data
+#11 CACHED
+
+#12 [6/7] COPY kindi /opt/kindi/kindi
+#12 DONE 0.1s
+
+#13 [7/7] WORKDIR /opt/kindi
+#13 DONE 0.1s
+
+#14 exporting to image
+#14 exporting layers
+#14 exporting layers 0.3s done
+#14 exporting manifest sha256:6210579cb54f44cedd0650eef11e5887975ee93b7ad62560032a7c2e805d548a 0.0s done
+#14 exporting config sha256:c570a5203a83e28a7fd348a634356dd89adf88be1eee30fd1a4474c79c1f3b17 0.0s done
+#14 exporting attestation manifest sha256:d990bb8e7f92c9c2b22c91cce6e575c6f70eacf019a4f82fd13df0b0a41bffc9 0.0s done
+#14 exporting manifest list sha256:b08916d7d25a19c87831196067a4407d0dac5d1143237b22c97dc59aa3b45af1 0.0s done
+#14 naming to docker.io/library/kindi:0.7.0-fork
+#14 naming to docker.io/library/kindi:0.7.0-fork done
+#14 unpacking to docker.io/library/kindi:0.7.0-fork
+#14 unpacking to docker.io/library/kindi:0.7.0-fork 11.1s done
+#14 DONE 11.6s

@@ -1,0 +1,170 @@
+{
+  "best": "gpu0",
+  "candidates": [
+    {
+      "args": [],
+      "env": {},
+      "name": "gpu0",
+      "why": "one card holds the whole model"
+    },
+    {
+      "args": [
+        "--tandem",
+        "cpu-first",
+        "--tandem-cpu-layers",
+        "auto"
+      ],
+      "env": {},
+      "name": "tandem-auto",
+      "why": "the smallest CPU slice that makes the context fit"
+    },
+    {
+      "args": [
+        "--tandem",
+        "cpu-first",
+        "--tandem-cpu-layers",
+        "gdn:8"
+      ],
+      "env": {},
+      "name": "tandem-gdn:8",
+      "why": "fixed CPU slice: the first 8 non-attention layers"
+    }
+  ],
+  "cards": [
+    {
+      "compute_cap": "8.9",
+      "driver": "617.42",
+      "features": {
+        "async_copy": true,
+        "bf16": true,
+        "flash_attention_2_class": true,
+        "fp4": false,
+        "fp8": true,
+        "tensor_cores": true,
+        "tf32": true
+      },
+      "index": 0,
+      "kindi": [
+        "5-trit kernels",
+        "dense CPU+GPU tandem split",
+        "plan engine (tensor-core MMA)",
+        "FP8 Gemma 4 path (on by default, KINDI_G4_FP8=0 disables)"
+      ],
+      "memory_free_mib": 6994,
+      "memory_total_mib": 8188,
+      "name": "NVIDIA GeForce RTX 4060 Ti",
+      "pci_bus_id": "00000000:01:00.0",
+      "uuid": "GPU-78de4e15-f013-ab5a-9843-1545356215e3"
+    }
+  ],
+  "cpu": {
+    "amx": null,
+    "avx512": null,
+    "build": "native (-march=native)",
+    "features": {
+      "avx": null,
+      "avx2": null,
+      "f16c": null,
+      "fma": null
+    },
+    "features_known": false,
+    "l2_kb": 1536,
+    "l3_kb": 12288,
+    "logical": 12,
+    "model": "Intel(R) Core(TM) i7-8086K CPU @ 4.00GHz",
+    "physical": 6,
+    "threads_recommended": 6,
+    "tier": "unknown",
+    "tier_label": "unknown until the compiler selects the path"
+  },
+  "ctx": 8192,
+  "model": "Ternary-Bonsai-2-2B",
+  "pack": "~/.kindi/packs/bonsai-2b",
+  "results": [
+    {
+      "args": [],
+      "argv": [
+        "python",
+        "-m",
+        "kindi",
+        "--ctx",
+        "8192",
+        "bench",
+        "--json",
+        "<temp>/kindi-autotune.json"
+      ],
+      "ctx_reduced": false,
+      "ctx_requested": 8192,
+      "env": {},
+      "error": null,
+      "gen_tok_s": 97.4,
+      "name": "gpu0",
+      "ok": true,
+      "read_tok_s": 113.0,
+      "returncode": 0,
+      "vram_peak": null
+    },
+    {
+      "args": [
+        "--tandem",
+        "cpu-first",
+        "--tandem-cpu-layers",
+        "auto"
+      ],
+      "argv": [
+        "python",
+        "-m",
+        "kindi",
+        "--ctx",
+        "8192",
+        "bench",
+        "--json",
+        "<temp>/kindi-autotune.json",
+        "--tandem",
+        "cpu-first",
+        "--tandem-cpu-layers",
+        "auto"
+      ],
+      "ctx_reduced": null,
+      "env": {},
+      "error": "kindi: this model already fits at 8192 tokens (~2410 MiB needed, 7075 MiB free); a split would only make it slower - run without --tandem, or ask for a target with --tandem-cpu-layers auto:<MiB>",
+      "gen_tok_s": null,
+      "name": "tandem-auto",
+      "ok": false,
+      "read_tok_s": null,
+      "returncode": 1,
+      "vram_peak": null
+    },
+    {
+      "args": [
+        "--tandem",
+        "cpu-first",
+        "--tandem-cpu-layers",
+        "gdn:8"
+      ],
+      "argv": [
+        "python",
+        "-m",
+        "kindi",
+        "--ctx",
+        "8192",
+        "bench",
+        "--json",
+        "<temp>/kindi-autotune.json",
+        "--tandem",
+        "cpu-first",
+        "--tandem-cpu-layers",
+        "gdn:8"
+      ],
+      "ctx_reduced": null,
+      "env": {},
+      "error": "kindi: could not run clang ([WinError 2] Das System kann die angegebene Datei nicht finden); it needs gcc with OpenMP, or clang and libomp on Windows",
+      "gen_tok_s": null,
+      "name": "tandem-gdn:8",
+      "ok": false,
+      "read_tok_s": null,
+      "returncode": 1,
+      "vram_peak": null
+    }
+  ]
+}

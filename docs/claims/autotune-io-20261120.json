@@ -1,0 +1,68 @@
+{
+  "gate": "autotune-io-20261120",
+  "title": "Autotune memory-tier rates: RAM copy, unbuffered disk and PCIe on the RTX 4060 Ti",
+  "measured": "2026-11-20",
+  "commit": "1627b96",
+  "command": "python -m kindi io --mib 64 --json docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-autotune-io/io.json",
+  "notes": "One run on this host and storage. The rates are inputs to plan/autotune slot sizing, not targets or claims about another machine; the disk probe reports unbuffered=true with FILE_FLAG_NO_BUFFERING.",
+  "evidence": [
+    "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-autotune-io/io.json",
+    "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-autotune-io/RESULTS.md"
+  ],
+  "numbers": [
+    {
+      "id": "ram-copy",
+      "display": "13,266.4 MiB/s",
+      "quoted_in": ["docs/AUTOTUNE.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-autotune-io/io.json",
+        "pointer": "/ram/mib_s",
+        "expect": 13266.4
+      }
+    },
+    {
+      "id": "disk-read",
+      "display": "2,547.5 MiB/s",
+      "quoted_in": ["docs/AUTOTUNE.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-autotune-io/io.json",
+        "pointer": "/disk/mib_s",
+        "expect": 2547.5
+      }
+    },
+    {
+      "id": "disk-unbuffered",
+      "display": "unbuffered",
+      "quoted_in": ["docs/AUTOTUNE.md"],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-autotune-io/io.json",
+        "needle": "\"unbuffered\": true"
+      }
+    },
+    {
+      "id": "pcie-h2d",
+      "display": "6.0 GiB/s H2D",
+      "quoted_in": ["docs/AUTOTUNE.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-autotune-io/io.json",
+        "pointer": "/pcie/h2d_gib_s",
+        "expect": 6.0
+      }
+    },
+    {
+      "id": "pcie-d2h",
+      "display": "6.1 GiB/s D2H",
+      "quoted_in": ["docs/AUTOTUNE.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-autotune-io/io.json",
+        "pointer": "/pcie/d2h_gib_s",
+        "expect": 6.1
+      }
+    }
+  ]
+}

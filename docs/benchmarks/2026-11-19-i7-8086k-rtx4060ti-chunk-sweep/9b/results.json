@@ -1,0 +1,730 @@
+{
+  "command": "python run_chunk_sweep.py --pack <pack> --out .",
+  "note": "p50/p95 over 3 passes of one timed request per prompt (prefill + 128 greedy steps); peak is the largest sampled device-wide nvidia-smi memory.used in the passes",
+  "raw": {
+    "128": [
+      {
+        "pass": 1,
+        "split": {
+          "4096": {
+            "decode_ms": 1492.04,
+            "decode_share": 29.8,
+            "decode_tok_s": 85.8,
+            "generated_tokens": 128,
+            "prefill_ms": 3515.56,
+            "prefill_share": 70.2,
+            "prefill_tok_s": 1165.1,
+            "prompt_tokens": 4096
+          },
+          "8192": {
+            "decode_ms": 1570.57,
+            "decode_share": 14.7,
+            "decode_tok_s": 81.5,
+            "generated_tokens": 128,
+            "prefill_ms": 9132.15,
+            "prefill_share": 85.3,
+            "prefill_tok_s": 897.1,
+            "prompt_tokens": 8192
+          }
+        },
+        "vram_peak": {
+          "available": true,
+          "baseline_used_mib": 1196,
+          "interval_s": 0.5,
+          "peak_delta_mib": 2122,
+          "peak_free_mib": 4632,
+          "peak_phase": "loaded",
+          "peak_used_mib": 3318,
+          "sample_count": 37,
+          "source": "nvidia-smi memory.used (device-wide, GPU 0)"
+        }
+      },
+      {
+        "pass": 2,
+        "split": {
+          "4096": {
+            "decode_ms": 1533.98,
+            "decode_share": 30.5,
+            "decode_tok_s": 83.4,
+            "generated_tokens": 128,
+            "prefill_ms": 3502.58,
+            "prefill_share": 69.5,
+            "prefill_tok_s": 1169.4,
+            "prompt_tokens": 4096
+          },
+          "8192": {
+            "decode_ms": 1592.78,
+            "decode_share": 15.3,
+            "decode_tok_s": 80.4,
+            "generated_tokens": 128,
+            "prefill_ms": 8828.05,
+            "prefill_share": 84.7,
+            "prefill_tok_s": 928.0,
+            "prompt_tokens": 8192
+          }
+        },
+        "vram_peak": {
+          "available": true,
+          "baseline_used_mib": 1240,
+          "interval_s": 0.5,
+          "peak_delta_mib": 2053,
+          "peak_free_mib": 4657,
+          "peak_phase": "loaded",
+          "peak_used_mib": 3293,
+          "sample_count": 36,
+          "source": "nvidia-smi memory.used (device-wide, GPU 0)"
+        }
+      },
+      {
+        "pass": 3,
+        "split": {
+          "4096": {
+            "decode_ms": 1478.61,
+            "decode_share": 29.6,
+            "decode_tok_s": 86.6,
+            "generated_tokens": 128,
+            "prefill_ms": 3523.3,
+            "prefill_share": 70.4,
+            "prefill_tok_s": 1162.5,
+            "prompt_tokens": 4096
+          },
+          "8192": {
+            "decode_ms": 1562.6,
+            "decode_share": 14.8,
+            "decode_tok_s": 81.9,
+            "generated_tokens": 128,
+            "prefill_ms": 8966.72,
+            "prefill_share": 85.2,
+            "prefill_tok_s": 913.6,
+            "prompt_tokens": 8192
+          }
+        },
+        "vram_peak": {
+          "available": true,
+          "baseline_used_mib": 1196,
+          "interval_s": 0.5,
+          "peak_delta_mib": 2071,
+          "peak_free_mib": 4683,
+          "peak_phase": "startup",
+          "peak_used_mib": 3267,
+          "sample_count": 36,
+          "source": "nvidia-smi memory.used (device-wide, GPU 0)"
+        }
+      }
+    ],
+    "256": [
+      {
+        "pass": 1,
+        "split": {
+          "4096": {
+            "decode_ms": 1489.96,
+            "decode_share": 30.4,
+            "decode_tok_s": 85.9,
+            "generated_tokens": 128,
+            "prefill_ms": 3414.99,
+            "prefill_share": 69.6,
+            "prefill_tok_s": 1199.4,
+            "prompt_tokens": 4096
+          },
+          "8192": {
+            "decode_ms": 1553.96,
+            "decode_share": 14.7,
+            "decode_tok_s": 82.4,
+            "generated_tokens": 128,
+            "prefill_ms": 9046.83,
+            "prefill_share": 85.3,
+            "prefill_tok_s": 905.5,
+            "prompt_tokens": 8192
+          }
+        },
+        "vram_peak": {
+          "available": true,
+          "baseline_used_mib": 1185,
+          "interval_s": 0.5,
+          "peak_delta_mib": 2258,
+          "peak_free_mib": 4507,
+          "peak_phase": "loaded",
+          "peak_used_mib": 3443,
+          "sample_count": 36,
+          "source": "nvidia-smi memory.used (device-wide, GPU 0)"
+        }
+      },
+      {
+        "pass": 2,
+        "split": {
+          "4096": {
+            "decode_ms": 1487.47,
+            "decode_share": 30.1,
+            "decode_tok_s": 86.1,
+            "generated_tokens": 128,
+            "prefill_ms": 3456.75,
+            "prefill_share": 69.9,
+            "prefill_tok_s": 1184.9,
+            "prompt_tokens": 4096
+          },
+          "8192": {
+            "decode_ms": 1465.71,
+            "decode_share": 14.0,
+            "decode_tok_s": 87.3,
+            "generated_tokens": 128,
+            "prefill_ms": 8978.64,
+            "prefill_share": 86.0,
+            "prefill_tok_s": 912.4,
+            "prompt_tokens": 8192
+          }
+        },
+        "vram_peak": {
+          "available": true,
+          "baseline_used_mib": 1202,
+          "interval_s": 0.5,
+          "peak_delta_mib": 2164,
+          "peak_free_mib": 4584,
+          "peak_phase": "loaded",
+          "peak_used_mib": 3366,
+          "sample_count": 36,
+          "source": "nvidia-smi memory.used (device-wide, GPU 0)"
+        }
+      },
+      {
+        "pass": 3,
+        "split": {
+          "4096": {
+            "decode_ms": 1379.85,
+            "decode_share": 30.6,
+            "decode_tok_s": 92.8,
+            "generated_tokens": 128,
+            "prefill_ms": 3135.08,
+            "prefill_share": 69.4,
+            "prefill_tok_s": 1306.5,
+            "prompt_tokens": 4096
+          },
+          "8192": {
+            "decode_ms": 1438.36,
+            "decode_share": 15.0,
+            "decode_tok_s": 89.0,
+            "generated_tokens": 128,
+            "prefill_ms": 8170.17,
+            "prefill_share": 85.0,
+            "prefill_tok_s": 1002.7,
+            "prompt_tokens": 8192
+          }
+        },
+        "vram_peak": {
+          "available": true,
+          "baseline_used_mib": 1254,
+          "interval_s": 0.5,
+          "peak_delta_mib": 2103,
+          "peak_free_mib": 4593,
+          "peak_phase": "loaded",
+          "peak_used_mib": 3357,
+          "sample_count": 33,
+          "source": "nvidia-smi memory.used (device-wide, GPU 0)"
+        }
+      }
+    ],
+    "512": [
+      {
+        "pass": 1,
+        "split": {
+          "4096": {
+            "decode_ms": 1380.9,
+            "decode_share": 30.4,
+            "decode_tok_s": 92.7,
+            "generated_tokens": 128,
+            "prefill_ms": 3154.66,
+            "prefill_share": 69.6,
+            "prefill_tok_s": 1298.4,
+            "prompt_tokens": 4096
+          },
+          "8192": {
+            "decode_ms": 1432.75,
+            "decode_share": 14.9,
+            "decode_tok_s": 89.3,
+            "generated_tokens": 128,
+            "prefill_ms": 8185.8,
+            "prefill_share": 85.1,
+            "prefill_tok_s": 1000.8,
+            "prompt_tokens": 8192
+          }
+        },
+        "vram_peak": {
+          "available": true,
+          "baseline_used_mib": 1254,
+          "interval_s": 0.5,
+          "peak_delta_mib": 2193,
+          "peak_free_mib": 4503,
+          "peak_phase": "loaded",
+          "peak_used_mib": 3447,
+          "sample_count": 33,
+          "source": "nvidia-smi memory.used (device-wide, GPU 0)"
+        }
+      },
+      {
+        "pass": 2,
+        "split": {
+          "4096": {
+            "decode_ms": 1377.49,
+            "decode_share": 30.4,
+            "decode_tok_s": 92.9,
+            "generated_tokens": 128,
+            "prefill_ms": 3150.2,
+            "prefill_share": 69.6,
+            "prefill_tok_s": 1300.2,
+            "prompt_tokens": 4096
+          },
+          "8192": {
+            "decode_ms": 1795.46,
+            "decode_share": 17.5,
+            "decode_tok_s": 71.3,
+            "generated_tokens": 128,
+            "prefill_ms": 8442.7,
+            "prefill_share": 82.5,
+            "prefill_tok_s": 970.3,
+            "prompt_tokens": 8192
+          }
+        },
+        "vram_peak": {
+          "available": true,
+          "baseline_used_mib": 1254,
+          "interval_s": 0.5,
+          "peak_delta_mib": 2193,
+          "peak_free_mib": 4503,
+          "peak_phase": "loaded",
+          "peak_used_mib": 3447,
+          "sample_count": 34,
+          "source": "nvidia-smi memory.used (device-wide, GPU 0)"
+        }
+      },
+      {
+        "pass": 3,
+        "split": {
+          "4096": {
+            "decode_ms": 1431.56,
+            "decode_share": 31.2,
+            "decode_tok_s": 89.4,
+            "generated_tokens": 128,
+            "prefill_ms": 3151.39,
+            "prefill_share": 68.8,
+            "prefill_tok_s": 1299.7,
+            "prompt_tokens": 4096
+          },
+          "8192": {
+            "decode_ms": 1461.09,
+            "decode_share": 15.1,
+            "decode_tok_s": 87.6,
+            "generated_tokens": 128,
+            "prefill_ms": 8185.36,
+            "prefill_share": 84.9,
+            "prefill_tok_s": 1000.8,
+            "prompt_tokens": 8192
+          }
+        },
+        "vram_peak": {
+          "available": true,
+          "baseline_used_mib": 1253,
+          "interval_s": 0.5,
+          "peak_delta_mib": 2194,
+          "peak_free_mib": 4503,
+          "peak_phase": "startup",
+          "peak_used_mib": 3447,
+          "sample_count": 34,
+          "source": "nvidia-smi memory.used (device-wide, GPU 0)"
+        }
+      }
+    ],
+    "1024": [
+      {
+        "pass": 1,
+        "split": {
+          "4096": {
+            "decode_ms": 1368.88,
+            "decode_share": 30.5,
+            "decode_tok_s": 93.5,
+            "generated_tokens": 128,
+            "prefill_ms": 3118.46,
+            "prefill_share": 69.5,
+            "prefill_tok_s": 1313.5,
+            "prompt_tokens": 4096
+          },
+          "8192": {
+            "decode_ms": 1453.04,
+            "decode_share": 15.3,
+            "decode_tok_s": 88.1,
+            "generated_tokens": 128,
+            "prefill_ms": 8067.84,
+            "prefill_share": 84.7,
+            "prefill_tok_s": 1015.4,
+            "prompt_tokens": 8192
+          }
+        },
+        "vram_peak": {
+          "available": true,
+          "baseline_used_mib": 1253,
+          "interval_s": 0.5,
+          "peak_delta_mib": 2378,
+          "peak_free_mib": 4319,
+          "peak_phase": "loaded",
+          "peak_used_mib": 3631,
+          "sample_count": 32,
+          "source": "nvidia-smi memory.used (device-wide, GPU 0)"
+        }
+      },
+      {
+        "pass": 2,
+        "split": {
+          "4096": {
+            "decode_ms": 1380.03,
+            "decode_share": 30.6,
+            "decode_tok_s": 92.8,
+            "generated_tokens": 128,
+            "prefill_ms": 3122.76,
+            "prefill_share": 69.4,
+            "prefill_tok_s": 1311.7,
+            "prompt_tokens": 4096
+          },
+          "8192": {
+            "decode_ms": 1449.39,
+            "decode_share": 15.2,
+            "decode_tok_s": 88.3,
+            "generated_tokens": 128,
+            "prefill_ms": 8086.24,
+            "prefill_share": 84.8,
+            "prefill_tok_s": 1013.1,
+            "prompt_tokens": 8192
+          }
+        },
+        "vram_peak": {
+          "available": true,
+          "baseline_used_mib": 1253,
+          "interval_s": 0.5,
+          "peak_delta_mib": 2378,
+          "peak_free_mib": 4319,
+          "peak_phase": "loaded",
+          "peak_used_mib": 3631,
+          "sample_count": 33,
+          "source": "nvidia-smi memory.used (device-wide, GPU 0)"
+        }
+      },
+      {
+        "pass": 3,
+        "split": {
+          "4096": {
+            "decode_ms": 1417.0,
+            "decode_share": 31.2,
+            "decode_tok_s": 90.3,
+            "generated_tokens": 128,
+            "prefill_ms": 3118.8,
+            "prefill_share": 68.8,
+            "prefill_tok_s": 1313.3,
+            "prompt_tokens": 4096
+          },
+          "8192": {
+            "decode_ms": 1446.53,
+            "decode_share": 15.2,
+            "decode_tok_s": 88.5,
+            "generated_tokens": 128,
+            "prefill_ms": 8071.4,
+            "prefill_share": 84.8,
+            "prefill_tok_s": 1014.9,
+            "prompt_tokens": 8192
+          }
+        },
+        "vram_peak": {
+          "available": true,
+          "baseline_used_mib": 1253,
+          "interval_s": 0.5,
+          "peak_delta_mib": 2378,
+          "peak_free_mib": 4319,
+          "peak_phase": "loaded",
+          "peak_used_mib": 3631,
+          "sample_count": 33,
+          "source": "nvidia-smi memory.used (device-wide, GPU 0)"
+        }
+      }
+    ]
+  },
+  "summary": {
+    "generated_tokens": 128,
+    "chunks": {
+      "128": {
+        "4096": {
+          "prefill_ms_p50": 3515.56,
+          "prefill_ms_p95": 3522.53,
+          "total_ms_p50": 5007.6,
+          "total_ms_p95": 5033.66,
+          "prefill_tok_s_p50": 1165.1,
+          "prefill_tok_s_p95": 1162.8,
+          "vram_peak_used_mib": 3318,
+          "vram_peak_delta_mib": 2122,
+          "passes": [
+            {
+              "pass": 1,
+              "prefill_ms": 3515.56,
+              "decode_ms": 1492.04,
+              "prefill_share": 70.2,
+              "peak_used_mib": 3318
+            },
+            {
+              "pass": 2,
+              "prefill_ms": 3502.58,
+              "decode_ms": 1533.98,
+              "prefill_share": 69.5,
+              "peak_used_mib": 3293
+            },
+            {
+              "pass": 3,
+              "prefill_ms": 3523.3,
+              "decode_ms": 1478.61,
+              "prefill_share": 70.4,
+              "peak_used_mib": 3267
+            }
+          ]
+        },
+        "8192": {
+          "prefill_ms_p50": 8966.72,
+          "prefill_ms_p95": 9115.61,
+          "total_ms_p50": 10529.32,
+          "total_ms_p95": 10685.38,
+          "prefill_tok_s_p50": 913.6,
+          "prefill_tok_s_p95": 898.7,
+          "vram_peak_used_mib": 3318,
+          "vram_peak_delta_mib": 2122,
+          "passes": [
+            {
+              "pass": 1,
+              "prefill_ms": 9132.15,
+              "decode_ms": 1570.57,
+              "prefill_share": 85.3,
+              "peak_used_mib": 3318
+            },
+            {
+              "pass": 2,
+              "prefill_ms": 8828.05,
+              "decode_ms": 1592.78,
+              "prefill_share": 84.7,
+              "peak_used_mib": 3293
+            },
+            {
+              "pass": 3,
+              "prefill_ms": 8966.72,
+              "decode_ms": 1562.6,
+              "prefill_share": 85.2,
+              "peak_used_mib": 3267
+            }
+          ]
+        }
+      },
+      "256": {
+        "4096": {
+          "prefill_ms_p50": 3414.99,
+          "prefill_ms_p95": 3452.57,
+          "total_ms_p50": 4904.95,
+          "total_ms_p95": 4940.29,
+          "prefill_tok_s_p50": 1199.4,
+          "prefill_tok_s_p95": 1186.4,
+          "vram_peak_used_mib": 3443,
+          "vram_peak_delta_mib": 2258,
+          "passes": [
+            {
+              "pass": 1,
+              "prefill_ms": 3414.99,
+              "decode_ms": 1489.96,
+              "prefill_share": 69.6,
+              "peak_used_mib": 3443
+            },
+            {
+              "pass": 2,
+              "prefill_ms": 3456.75,
+              "decode_ms": 1487.47,
+              "prefill_share": 69.9,
+              "peak_used_mib": 3366
+            },
+            {
+              "pass": 3,
+              "prefill_ms": 3135.08,
+              "decode_ms": 1379.85,
+              "prefill_share": 69.4,
+              "peak_used_mib": 3357
+            }
+          ]
+        },
+        "8192": {
+          "prefill_ms_p50": 8978.64,
+          "prefill_ms_p95": 9040.01,
+          "total_ms_p50": 10444.35,
+          "total_ms_p95": 10585.15,
+          "prefill_tok_s_p50": 912.4,
+          "prefill_tok_s_p95": 906.2,
+          "vram_peak_used_mib": 3443,
+          "vram_peak_delta_mib": 2258,
+          "passes": [
+            {
+              "pass": 1,
+              "prefill_ms": 9046.83,
+              "decode_ms": 1553.96,
+              "prefill_share": 85.3,
+              "peak_used_mib": 3443
+            },
+            {
+              "pass": 2,
+              "prefill_ms": 8978.64,
+              "decode_ms": 1465.71,
+              "prefill_share": 86.0,
+              "peak_used_mib": 3366
+            },
+            {
+              "pass": 3,
+              "prefill_ms": 8170.17,
+              "decode_ms": 1438.36,
+              "prefill_share": 85.0,
+              "peak_used_mib": 3357
+            }
+          ]
+        }
+      },
+      "512": {
+        "4096": {
+          "prefill_ms_p50": 3151.39,
+          "prefill_ms_p95": 3154.33,
+          "total_ms_p50": 4535.56,
+          "total_ms_p95": 4578.21,
+          "prefill_tok_s_p50": 1299.7,
+          "prefill_tok_s_p95": 1298.5,
+          "vram_peak_used_mib": 3447,
+          "vram_peak_delta_mib": 2194,
+          "passes": [
+            {
+              "pass": 1,
+              "prefill_ms": 3154.66,
+              "decode_ms": 1380.9,
+              "prefill_share": 69.6,
+              "peak_used_mib": 3447
+            },
+            {
+              "pass": 2,
+              "prefill_ms": 3150.2,
+              "decode_ms": 1377.49,
+              "prefill_share": 69.6,
+              "peak_used_mib": 3447
+            },
+            {
+              "pass": 3,
+              "prefill_ms": 3151.39,
+              "decode_ms": 1431.56,
+              "prefill_share": 68.8,
+              "peak_used_mib": 3447
+            }
+          ]
+        },
+        "8192": {
+          "prefill_ms_p50": 8185.8,
+          "prefill_ms_p95": 8417.01,
+          "total_ms_p50": 9646.45,
+          "total_ms_p95": 10178.99,
+          "prefill_tok_s_p50": 1000.8,
+          "prefill_tok_s_p95": 973.3,
+          "vram_peak_used_mib": 3447,
+          "vram_peak_delta_mib": 2194,
+          "passes": [
+            {
+              "pass": 1,
+              "prefill_ms": 8185.8,
+              "decode_ms": 1432.75,
+              "prefill_share": 85.1,
+              "peak_used_mib": 3447
+            },
+            {
+              "pass": 2,
+              "prefill_ms": 8442.7,
+              "decode_ms": 1795.46,
+              "prefill_share": 82.5,
+              "peak_used_mib": 3447
+            },
+            {
+              "pass": 3,
+              "prefill_ms": 8185.36,
+              "decode_ms": 1461.09,
+              "prefill_share": 84.9,
+              "peak_used_mib": 3447
+            }
+          ]
+        }
+      },
+      "1024": {
+        "4096": {
+          "prefill_ms_p50": 3118.8,
+          "prefill_ms_p95": 3122.36,
+          "total_ms_p50": 4502.79,
+          "total_ms_p95": 4532.5,
+          "prefill_tok_s_p50": 1313.3,
+          "prefill_tok_s_p95": 1311.8,
+          "vram_peak_used_mib": 3631,
+          "vram_peak_delta_mib": 2378,
+          "passes": [
+            {
+              "pass": 1,
+              "prefill_ms": 3118.46,
+              "decode_ms": 1368.88,
+              "prefill_share": 69.5,
+              "peak_used_mib": 3631
+            },
+            {
+              "pass": 2,
+              "prefill_ms": 3122.76,
+              "decode_ms": 1380.03,
+              "prefill_share": 69.4,
+              "peak_used_mib": 3631
+            },
+            {
+              "pass": 3,
+              "prefill_ms": 3118.8,
+              "decode_ms": 1417.0,
+              "prefill_share": 68.8,
+              "peak_used_mib": 3631
+            }
+          ]
+        },
+        "8192": {
+          "prefill_ms_p50": 8071.4,
+          "prefill_ms_p95": 8084.76,
+          "total_ms_p50": 9520.88,
+          "total_ms_p95": 9534.15,
+          "prefill_tok_s_p50": 1014.9,
+          "prefill_tok_s_p95": 1013.3,
+          "vram_peak_used_mib": 3631,
+          "vram_peak_delta_mib": 2378,
+          "passes": [
+            {
+              "pass": 1,
+              "prefill_ms": 8067.84,
+              "decode_ms": 1453.04,
+              "prefill_share": 84.7,
+              "peak_used_mib": 3631
+            },
+            {
+              "pass": 2,
+              "prefill_ms": 8086.24,
+              "decode_ms": 1449.39,
+              "prefill_share": 84.8,
+              "peak_used_mib": 3631
+            },
+            {
+              "pass": 3,
+              "prefill_ms": 8071.4,
+              "decode_ms": 1446.53,
+              "prefill_share": 84.8,
+              "peak_used_mib": 3631
+            }
+          ]
+        }
+      }
+    },
+    "passes": 3,
+    "prompts": [
+      4096,
+      8192
+    ],
+    "pack": "bonsai-9b",
+    "host_pack_note": "pack path reduced to its name"
+  }
+}

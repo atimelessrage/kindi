@@ -9,6 +9,15 @@ Unless a table says otherwise, the method is the same for the two engines. They 
 is read in segments up to each N, and the read time of N tokens is the sum of the segments. At each N, 32 tokens are
 generated. Project page: [amirhusain.com/kindi](https://amirhusain.com/kindi/).
 
+`kindi bench` also reports the prefill/decode share of one whole request: `--split-at` (default
+4096,8192) and `--split-generated` (default 128) time a real chunked prefill followed by that many
+decode steps, then print each phase's share of the wall clock. `--split-at` accepts only positive
+prompt lengths; use `none` or `off` to turn the split report off. On the 2B that request is 14% prefill
+at 512 prompt tokens, 64% at 4,096 and 82% at 8,192
+([results](benchmarks/2026-11-17-i7-8086k-rtx4060ti-bench-split/RESULTS.md)); the read and write
+columns below are separate rates and do not by themselves say which phase a request spends its
+clock in.
+
 ## Kindi 0.6.0 (in development): Nemotron 3.5 Lightning 30B-A3B (ternary, Q2_0)
 
 Model file: Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf, sha256 38854de6…, f16 K/V for both engines.
@@ -32,6 +41,37 @@ same depth. Kindi's numbers are for the default settings (exact head, no specula
 | 512 | 4,786 | 3,715 | 340.5 | 284.3 |
 | 8,192 | 4,520 | 3,663 | 325.5 | 280.5 |
 | 32,768 | 4,014 | 3,390 | 295.1 | 261.4 |
+
+### GeForce RTX 4060 Ti, 8 GB (this rig, 2026-11-16)
+
+The 8 GB card runs the model through expert tiers: the dense core and the
+shared expert stay on the card, the least-used routed experts in host memory.
+Kindi only here — llama.cpp was not run on this rig for this model, so the
+llama.cpp columns are empty rather than estimated.
+
+| context | Kindi read | llama.cpp read | Kindi write | llama.cpp write |
+|---:|---:|---:|---:|---:|
+| 512 | 788.3–821.3 | not measured | 165.96–167.41 | not measured |
+| 8,192 | not measured | not measured | not measured | not measured |
+| 32,768 | not measured | not measured | not measured | not measured |
+
+Two consecutive runs at ctx 8192, with 70–106 of the 128 experts per layer on
+the card. `kindi verify` on the same pack is 5 token-exact + 7 llama.cpp ties,
+0 fail. Evidence:
+[benchmarks/2026-11-16-i7-8086k-rtx4060ti-lightning-30b/RESULTS.md](benchmarks/2026-11-16-i7-8086k-rtx4060ti-lightning-30b/RESULTS.md).
+
+**8K/32K follow-up blocked, 2026-11-20.** No Lightning GGUF or
+`kindi_lightning` pack existed on the host: `kindi models` listed
+`lightning-30b` without a presence label, and both `--ctx 8288` and
+`--ctx 32864` bench attempts exited 1 at the missing
+`.../packs/nemotron-lightning-30b/kindi_pack.json`, before weights loaded.
+No 8K or 32K prefill, decode or peak-VRAM number is claimed. The 2026-11-16
+run used ctx 8192, so the 8K row was skipped (`lightning_cli.bench` includes N
+only when `N + 96 <= eng.ctx`); use `--ctx 8288`/`32864` or more when the pack
+exists. Peak VRAM also needs a measurement path: `kindi bench` dispatches
+Lightning before creating `VramMonitor`, so `--sample-vram` is inert there.
+The catalog file is 9,472,656,320 bytes (SHA-256 `38854de6…`); fetching it
+is an owner download, not a benchmark result.
 
 Write test on cards with host-memory experts (the GTX 1080 and the RTX 2060 with 6 GB held back): the random prompt
 of `kindi bench` makes the next tokens use a small set of experts again and again, and that makes the decode slots
@@ -241,12 +281,117 @@ On the RTX 3090, Kindi writes the 33B 17% to 23% faster and the 9B 2% to 4% fast
 
 In the initial test (the 65 tasks of kbench and 50 LiveCodeBench problems, one run each), the 33B solved 98 and the 27B solved 96.
 
+## 2026-11-09: GeForce RTX 4060 Ti 8 GB · 2B, 4B, 9B
+
+Windows 10, i7-8086K, RTX 4060 Ti 8 GB (sm_89), 24,576-token context, exact head, three fresh runs per model. Median tokens/s; read is the synthetic 1,000-token prompt read, 24K is generation at position 24,000.
+
+| Model | Current read | v0.4.0 + Windows loader read | Current 24K | v0.4.0 + Windows loader 24K |
+|---|---:|---:|---:|---:|
+| 2B | 190.0 | 161.5 | 160.6 | 165.5 |
+| 4B | 129.0 | 132.9 | 79.8 | 82.1 |
+| 9B | 90.3 | 90.8 | 62.3 | 62.7 |
+
+The current branch and `v0.4.0` have byte-identical `kindi/bench.py` and `kindi/engine.py`; only the native-Windows driver selection differs on this path. The 24K differences are -3.0%, -2.8% and -0.6%, and are not a code-level speedup or regression. Full method, variance, per-run CSV/JSON and raw logs: [benchmarks/2026-11-09-i7-8086k-rtx4060ti/README.md](benchmarks/2026-11-09-i7-8086k-rtx4060ti/README.md).
+
+The separate 2B plan engine at the same 24K context measured 302.4 tok/s against 170.6 plain, 1.77x, with `KINDI_TP=1 KINDI_TC=1 KINDI_TC_TMAX=4` and no speculative drafting. That result is in the same report.
+
+## Cross-mode: CPU-only, GPU-only and GPU+CPU tandem (one machine)
+
+The same i7-8086K + RTX 4060 Ti rig, 24,576-token context, exact head. The full matrix for the 2B, 4B and 9B at
+positions 100 to 24,000, with read speeds and sources, is generated at
+[benchmarks/CROSS-MODE.md](benchmarks/CROSS-MODE.md) (`python docs/benchmarks/build_cross_mode.py`).
+
+| Model | CPU-only 24K | GPU-only 24K | GPU / CPU | Tandem 24K |
+|---|---:|---:|---:|---:|
+| 2B | 8.2 | 160.6 | 19.6x | 37.4 |
+| 4B | 2.9 | 79.8 | 27.5x | 14.4 |
+| 9B | 2.4 | 62.3 | 26.0x | 14.8 |
+
+CPU-only and tandem are the 2026-11-19/20 controlled same-context pairs (6-thread native Windows,
+one fresh process per placement for 2B/4B, three for 9B); GPU-only is the median of three Windows
+runs. The 2026-11-10 CPU and 2026-11-13 tandem rows remain as history, and the old WSL2 CPU
+cells are archived in the 2026-11-09 benchmark page. The dense tandem runtime and its current
+status are in [TANDEM-STATUS.md](TANDEM-STATUS.md) and [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md).
+
+Every tandem row is faster than CPU-only at 24K: **4.6x (2B), 5.0x (4B), 6.2x (9B)**, but each is
+3.9-5.5x slower than GPU-only, so this is a capacity trade rather than a win for a model that fits the
+card. The 2B pair and the 9B's first pair verified 4/4 in both placements; the 4B tandem was 3/4 with one
+llama.cpp top-2 tie, so its rate is throughput evidence, not an exactness claim. The 9B's three-run
+spread and the run-2 decision are recorded in its page. The measured capacity-bound case is outside the 4060 Ti table:
+AH-Nanbeige4.3-33B IQ3_XXS on a
+12 GB Quadro K6000 keeps 13 layers in host memory and computes 55% of their FFN rows on the CPU, and
+writes 3.85/3.55/3.56 tok/s at 480/2,016/8,160 tokens against llama.cpp's 2.19/1.96/1.52 (4.4-5.0 vs
+2.5-2.7 at 1,024; Kindi 0.4.0, the K6000 section below). It is a dense 33B model. No big-MoE CPU-compute
+throughput row exists yet; that lane is design-only in [MOE-TANDEM.md](MOE-TANDEM.md).
+
+## 2026-11-09: CPU engine · Intel Core i7-8086K
+
+WSL2 Ubuntu 24.04, GCC 13.3, i7-8086K (6 cores / 12 threads), 15 GiB visible to WSL2, 24,576-token
+context, exact head, one run per configuration. Verify uses a 1,024-token context. Six threads (one
+per physical core) is the recommended configuration. This is a Kindi-only run; no llama.cpp
+comparison was made here.
+
+| Model | Verify | Tokens/s | Read | 100 | 2,000 | 8,000 | 16,000 | 24,000 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 2B | 4/4 | 28.1 | 35.2 | 28.2 | 21.3 | 12.2 | 6.7 | 4.6 |
+| 4B | 4/4 | 13.0 | 14.2 | 11.8 | 9.1 | 3.9 | 2.3 | 1.6 |
+| 9B | 4/4 | 5.6 | 7.6 | 6.8 | 5.8 | 3.2 | 2.0 | 1.4 |
+
+`Tokens/s` in the Verify column is the verify rate. Twelve threads is 6-20x slower and is not a
+usable configuration: a 2B probe reads 1.3 tokens/s with 12 threads under `close`, `spread` or no
+binding, and 12.5 with the active spin-wait off, so libgomp spins the hyperthread pairs into each
+other at the kernel's per-row-block barriers. `kindi/cpu.py` now defaults to the physical-core count. The native Windows build is measured in the next section. Full method, raw logs
+and limitations: [benchmarks/2026-11-09-i7-8086k-cpu/README.md](benchmarks/2026-11-09-i7-8086k-cpu/README.md).
+The support status is tracked in [CPU-SUPPORT.md](CPU-SUPPORT.md).
+
+## 2026-11-10: CPU engine on native Windows · Intel Core i7-8086K
+
+Windows 10 (10.0.19045), i7-8086K @ 4.00 GHz, clang 18.1.8 with MSVC 14.51, Python 3.13.6,
+six threads (one per physical core, resolved through the Windows topology API). One run per model.
+The verify uses a 1,024-token context; the benchmark uses 24,576. This is a Kindi-only correctness
+and speed run; no llama.cpp speed comparison was made.
+
+| Model | Verify | Tokens/s | Engine ready |
+|---|---:|---:|---:|
+| 2B | 4/4 | 33.7 | 22.8 s |
+| 4B | 4/4 | 16.7 | 50.7 s |
+| 9B | 4/4 (13/13 on prompt 3) | 9.1 | 112.3 s |
+
+The same verifies read 28.1, 13.0 and 5.6 tokens/s under WSL2, so the native build is faster on
+this CPU. A second native run measured 33.5/14.3/7.3; these are single runs and vary by up to a
+quarter. The native CPU server also answered 2B/4B/9B chat requests, non-stream and stream, at 32.9/19.2/11.5
+tokens/s generation with 0 errors and no GPU memory.
+
+At 24,576 tokens, six threads, exact head, one run per model:
+
+| Model | Read | 100 | 2,000 | 8,000 | 16,000 | 24,000 |
+|---|---:|---:|---:|---:|---:|---:|
+| 2B | 45.1 | 35.9 | 29.3 | 19.4 | 11.9 | 8.2 |
+| 4B | 19.2 | 15.2 | 13.4 | 6.8 | 4.3 | 3.1 |
+| 9B | 9.9 | 8.7 | 7.7 | 4.9 | 3.5 | 2.6 |
+
+The 24K generation rates are 8.2/3.1/2.6 tokens/s, up from the WSL2 4.6/1.6/1.4. The native CPU
+cells now feed the cross-mode table above; the GPU cells are still the 2026-11-09 median of three
+and the two blocks were not interleaved. Full method, build command and raw logs:
+[benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md](benchmarks/2026-11-10-i7-8086k-windows-cpu/README.md).
+
+## 2026-11-15: CPU engine Python overhead profile · Intel Core i7-8086K
+
+i7-8086K, native Windows, clang 18.1.8, 2B pack, 512-token context. `cProfile` over 40 `feed()`
+calls: **1.027 s total, all inside the single `kc_step` C call (25.6 ms/feed); Python overhead
+0.000 s** (the only Python call visible is `ctypes.byref`). Wall-clock check: 100 feeds in
+2.78 s (27.8 ms/feed), consistent with the profile. Conclusion: the CPU engine is kernel-bound;
+there is no Python-side performance left in this path, so the tandem step-0 verdict (CPU already
+at the raw-kernel rate) stands, and deeper CPU speed now means kernel work in `kcpu.c`, measured
+against this baseline. The per-token stop-sequence check in the server had O(n²) behaviour instead;
+that one is fixed (windowed tail scan, ~4.8× on a 20K-token reply, growing with length).
+
 ## Kindi 0.4.0: Tesla P100 (sm_60)
 
 Two rented machines gave the numbers. Do not mix them. Box A: 2x Tesla P100-SXM2-16GB (NVLink, 300 W), driver 535.230.02,
 Kindi pascal-p100 b8c6e3f and p100-fp16-prompt 56d896d. Box B: 2x Tesla P100 16 GB (PCIe, 200 W). llama.cpp: Prism fork
-c96baf4, CUDA 12.8, `-ngl 99 -fa 1`, 3 runs. The 27B uses q8_0 K/V in both engines. Details and raw rows:
-`docs/dev/bench-0.4.0/p100.md`.
+c96baf4, CUDA 12.8, `-ngl 99 -fa 1`, 3 runs. The 27B uses q8_0 K/V in both engines. The per-row setup notes are
+internal measurement notes and are not part of this release.
 
 27B, box A. Read: a prompt of N tokens from position 0. Write: generation at depth N.
 
@@ -535,6 +680,10 @@ not load the 2B as a draft model for the 27B: the two files have different Hadam
 The K420 has compute capability 3.0 (sm_30). CUDA 11 and later cannot compile code for it, and current llama.cpp
 does not build with CUDA 10.2, the last toolkit for this card. The Vulkan backend runs on it with all layers on the
 GPU, so the Vulkan build is the fair comparison. On the K1200 (sm_50) host, only the Vulkan build was available.
+One more compile floor applies to every CUDA build, including the PrismML ternary fork: CUDA 13 dropped
+offline compilation below sm_75, so a CUDA 13.3 build is Turing and later only; Maxwell/Pascal baselines need a
+CUDA 12.4 build (which targets `50-virtual`/`61-virtual` and up) or the Vulkan build. R580 is also the last
+driver branch for Maxwell/Pascal/Volta — see [OLD-CARD-RIG.md](OLD-CARD-RIG.md).
 
 ## Other published results
 
@@ -547,3 +696,44 @@ please tell us.
 
 `kindi verify` checks the output against llama.cpp. `kindi bench` gives the write speed at several positions and
 the prompt reading speed. [CARDS.md](CARDS.md) gives the settings for each card.
+
+`kindi bench --sample-vram` additionally samples device-wide VRAM from `nvidia-smi` (every 0.5 s by
+default, `--vram-sample-s` to change it) and logs the peak with its delta over the idle baseline:
+
+```sh
+kindi --pack ~/.kindi/packs/bonsai-2b bench --sample-vram
+kindi --pack ~/.kindi/packs/bonsai-2b --ctx 8192 bench --tandem cpu-first --tandem-cpu-layers 6 --sample-vram
+```
+
+The peak includes the desktop and any other process (it is device-wide), so record the baseline in
+the same run; without `nvidia-smi` the line says so and the benchmark still completes. The sample is
+taken from the card the engine runs on (its CUDA device ordinal, mapped through
+`CUDA_VISIBLE_DEVICES`), not always GPU 0, so a two-card host records the split's card. Use it for
+larger-than-VRAM capacity claims: free memory after load alone does not show the transient peak.
+
+`--json FILE` writes the same numbers in machine-readable form (read rate, generation rate per
+position, placement, context and any sampled peak), so recorded runs do not have to be scraped back
+out of the log:
+
+```sh
+kindi --pack ~/.kindi/packs/bonsai-2b bench --sample-vram --json bench-2b.json
+```
+
+`kindi kld --json FILE` is the quality gate for lossy K/V caches (roadmap gate 3): teacher-forced
+KLD + same-top-token share + PPL ratio of each lossy cache against the fp16 whole-model reference,
+at 2K and 8K on the configured pack (the 2B default). Example:
+
+```sh
+kindi --pack ~/.kindi/packs/bonsai-2b kld --json kld-2b.json
+```
+
+The current numbers live with the dated evidence under [benchmarks/](benchmarks/).
+
+`kindi calibrate` persists the per-machine tuning once (`kindi/calib.py`): the keyed file
+(`~/.cache/kindi/calib/<gpu>-<pack-sha>.json`, `KINDI_CALIB_DIR` overrides) holds the measured
+5-trit kernel configs - the shapes `tp.g5_tuned` would otherwise re-time at every start on the
+non-TC plan path and HIP - plus the split-ratio snapshot, the planner's placement picks and the
+effective draft length as data. Later starts read the configs instead of timing; on the NVIDIA
+tensor-core path there is no g5 timing to persist (measured: 0.2 s there, and the TC path does
+not call `g5_tuned` at all). The cached file is stamped with the engine build (version + kernel
+source hash), so a kernel change is a miss, never stale configs.

@@ -20,6 +20,7 @@ import ctypes
 import glob
 import hashlib
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -218,6 +219,245 @@ def lib():
         L.dsv_dspark_draft.restype = I
         _lib = L
     return _lib
+
+
+def _positive_int(text):
+    """A single positive integer, rejected at argparse time with its valid set."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = 0
+    if value <= 0:
+        raise argparse.ArgumentTypeError("context must be a positive integer (got %r)" % (text,))
+    return value
+
+
+def _ctx_arg(text):
+    """Context sizes: one or more comma-separated positive integers (e.g. 2048,8192)."""
+    parts = [part.strip() for part in str(text).split(",")]
+    try:
+        if not parts or any(not part for part in parts):
+            raise ValueError
+        values = [int(part) for part in parts]
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            "context sizes must be comma-separated positive integers, e.g. 2048,8192 (got %r)" % (text,))
+    if any(value <= 0 for value in values):
+        raise argparse.ArgumentTypeError(
+            "context sizes must be comma-separated positive integers, e.g. 2048,8192 (got %r)" % (text,))
+    return values
+
+
+def _cal_arg(text):
+    """A calibration pair a,b: exactly two comma-separated finite numbers."""
+    parts = [part.strip() for part in str(text).split(",")]
+    try:
+        if len(parts) != 2 or any(not part for part in parts):
+            raise ValueError
+        values = tuple(float(part) for part in parts)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            "calibration must be two comma-separated finite numbers: a,b (got %r)" % (text,))
+    if not all(math.isfinite(value) for value in values):
+        raise argparse.ArgumentTypeError(
+            "calibration must be two comma-separated finite numbers: a,b (got %r)" % (text,))
+    return values
+
+
+def _range_arg(text):
+    """A prompt id range a-b: two non-negative integers with a <= b (e.g. 0-9)."""
+    parts = [part.strip() for part in str(text).split("-")]
+    try:
+        if len(parts) != 2 or any(not part for part in parts):
+            raise ValueError
+        lo, hi = int(parts[0]), int(parts[1])
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError(
+            "prompt id range must be non-negative integers a-b with a <= b, e.g. 0-9 (got %r)" % (text,))
+    if lo < 0 or hi < 0 or lo > hi:
+        raise argparse.ArgumentTypeError(
+            "prompt id range must be non-negative integers a-b with a <= b, e.g. 0-9 (got %r)" % (text,))
+    return (lo, hi)
+
+
+def _readable_file(text):
+    """An existing readable file, e.g. prompts.jsonl."""
+    path = os.path.expanduser(str(text))
+    try:
+        if not path or not os.path.isfile(path):
+            raise OSError
+        with open(path, "rb"):
+            pass
+    except OSError:
+        raise argparse.ArgumentTypeError(
+            "must be an existing readable file, e.g. prompts.jsonl (got %r)" % (text,)) from None
+    return path
+
+
+def _prompts_arg(text):
+    """A JSONL prompts file: every line is an object with an integer id and a string text."""
+    path = _readable_file(text)
+    count = 0
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for lineno, line in enumerate(fh, 1):
+                try:
+                    prompt = json.loads(line)
+                except ValueError:
+                    raise argparse.ArgumentTypeError(
+                        "prompts line %d is not valid JSON" % lineno) from None
+                if not isinstance(prompt, dict):
+                    raise argparse.ArgumentTypeError(
+                        "prompts line %d must be a JSON object" % lineno)
+                if isinstance(prompt.get("id"), bool) or not isinstance(prompt.get("id"), int):
+                    raise argparse.ArgumentTypeError(
+                        "prompts line %d needs an integer id" % lineno)
+                if not isinstance(prompt.get("text"), str):
+                    raise argparse.ArgumentTypeError(
+                        "prompts line %d needs a string text" % lineno)
+                count += 1
+    except (OSError, UnicodeError):
+        raise argparse.ArgumentTypeError(
+            "must be a readable UTF-8 JSONL prompts file (got %r)" % (text,)) from None
+    if not count:
+        raise argparse.ArgumentTypeError("prompts file has no JSON lines")
+    return path
+
+
+def _ref_arg(text):
+    """A reference file of GEN tok:margin ... continuation lines, parsed before loading.
+
+    Non-GEN lines are ignored, as the verify/teacher readers do (a log may carry a header);
+    a file with no GEN line, or a GEN line whose tokens/margins are malformed, is refused.
+    """
+    path = _readable_file(text)
+    count = 0
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for lineno, line in enumerate(fh, 1):
+                words = line.split()
+                if not words or words[0] != "GEN":
+                    continue
+                parts = words[1:]
+                if not parts:
+                    raise argparse.ArgumentTypeError(
+                        "reference line %d has no continuation tokens" % lineno)
+                try:
+                    for part in parts:
+                        token, margin = part.split(":")
+                        token = int(token)
+                        margin = float(margin)
+                        if not 0 <= token < VOCAB or not math.isfinite(margin):
+                            raise ValueError
+                except ValueError:
+                    raise argparse.ArgumentTypeError(
+                        "reference line %d must be GEN token:margin ... with token ids 0..%d "
+                        "and finite margins" % (lineno, VOCAB - 1)) from None
+                count += 1
+    except (OSError, UnicodeError):
+        raise argparse.ArgumentTypeError(
+            "must be a readable UTF-8 reference file (got %r)" % (text,)) from None
+    if not count:
+        raise argparse.ArgumentTypeError("reference file has no GEN continuation lines")
+    return path
+
+
+def _ids_arg(text):
+    """A readable file of whitespace-separated token ids in 0..VOCAB-1."""
+    try:
+        path = _readable_file(text)
+    except argparse.ArgumentTypeError:
+        raise argparse.ArgumentTypeError(
+            "must be a readable file of whitespace-separated token ids 0..%d (got %r)"
+            % (VOCAB - 1, text)) from None
+    try:
+        with open(path, encoding="utf-8") as fh:
+            ids = [int(token) for token in fh.read().split()]
+    except (OSError, ValueError):
+        ids = []
+    if not ids or any(token < 0 or token >= VOCAB for token in ids):
+        raise argparse.ArgumentTypeError(
+            "must be a readable file of whitespace-separated token ids 0..%d (got %r)"
+            % (VOCAB - 1, text))
+    return ids
+
+
+def _out_arg(text):
+    """A file path whose parent directory exists and is writable."""
+    path = os.path.expanduser(str(text))
+    parent = os.path.dirname(os.path.abspath(path))
+    invalid = (not path or path.endswith(("/", "\\")) or os.path.isdir(path)
+               or not os.path.isdir(parent) or not os.access(parent, os.W_OK)
+               or (os.path.exists(path) and not os.access(path, os.W_OK)))
+    if invalid:
+        raise argparse.ArgumentTypeError(
+            "must be a file path in an existing writable directory, e.g. out/results.jsonl (got %r)"
+            % (text,))
+    return path
+
+
+def _dspark_dir(text):
+    """A DSpark directory with the three files dspark_load opens."""
+    path = os.path.expanduser(str(text))
+    names = ("kindi-dspark.bin", "kindi-dspark.bin.json", "config.json")
+    try:
+        if not os.path.isdir(path):
+            raise OSError
+        for name in names:
+            with open(os.path.join(path, name), "rb"):
+                pass
+    except OSError:
+        raise argparse.ArgumentTypeError(
+            "must be a DSpark directory with kindi-dspark.bin, kindi-dspark.bin.json and "
+            "config.json (got %r)" % (text,)) from None
+    return path
+
+
+def _free_gb_arg(text):
+    """A finite non-negative number of GB, e.g. 12 or 0.5."""
+    try:
+        value = float(str(text).strip())
+    except (TypeError, ValueError):
+        value = -1.0
+    if not math.isfinite(value) or value < 0:
+        raise argparse.ArgumentTypeError(
+            "must be a finite non-negative number of GB, e.g. 12 or 0.5 (got %r)" % (text,))
+    return value
+
+
+def _positive_count_arg(text):
+    """A positive integer count, 1 or more."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = 0
+    if value <= 0:
+        raise argparse.ArgumentTypeError(
+            "must be a positive integer, 1 or more (got %r)" % (text,))
+    return value
+
+
+def _non_negative_int_arg(text):
+    """A non-negative integer, 0 or more."""
+    try:
+        value = int(str(text).strip())
+    except (TypeError, ValueError):
+        value = -1
+    if value < 0:
+        raise argparse.ArgumentTypeError(
+            "must be a non-negative integer, 0 or more (got %r)" % (text,))
+    return value
+
+
+def _finite_float_arg(text):
+    """A finite number (nan and inf are rejected)."""
+    try:
+        value = float(str(text).strip())
+    except (TypeError, ValueError):
+        value = float("nan")
+    if not math.isfinite(value):
+        raise argparse.ArgumentTypeError("must be a finite number (got %r)" % (text,))
+    return value
 
 
 def _cpus(text):
@@ -859,7 +1099,7 @@ def verify(a, model, max_tie=0.75, min_agree=0.985):
     prompts = a.prompts or os.path.join(GATE_DIR, "gate_prompts.jsonl")
     ref = a.ref or os.path.join(GATE_DIR, "gate_ref.txt")
     refs = [[(int(x.split(":")[0]), float(x.split(":")[1])) for x in line.split()[1:]]
-            for line in open(ref) if line.startswith("GEN")]
+            for line in open(ref) if line.split()[:1] == ["GEN"]]
     tot = agree = 0
     worst = 0.0
     t0 = time.time()
@@ -889,35 +1129,68 @@ def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m kindi.dsv41")
     ap.add_argument("cmd", choices=["generate", "bench", "tokens", "bench-dense", "teacher", "verify", "numa", "gpucmp",
                                     "specbench", "cachetest"])
-    ap.add_argument("--spec", type=int, default=4, help="specbench: positions per verify step (1 + drafts)")
-    ap.add_argument("--dspark", default=None, help="specbench: DSpark drafter directory (converted)")
-    ap.add_argument("--conf", type=float, default=0.0, help="specbench --dspark: draft while confidence logit >= this")
-    ap.add_argument("--auto", default=None, help="specbench --dspark: choose k by expected tokens per ms; "
-                    "calibration a,b of p = sigmoid(a * conf + b)")
+    ap.add_argument("--spec", type=_positive_count_arg, default=4,
+                    help="specbench: positions per verify step (1 + drafts); a positive integer")
+    ap.add_argument("--dspark", type=_dspark_dir, default=None,
+                    help="specbench: DSpark drafter directory with kindi-dspark.bin, "
+                         "kindi-dspark.bin.json and config.json")
+    ap.add_argument("--conf", type=_finite_float_arg, default=0.0,
+                    help="specbench --dspark: draft while confidence logit >= this (a finite number)")
+    ap.add_argument("--auto", type=_cal_arg, default=None, help="specbench --dspark: choose k by expected tokens per ms; "
+                    "calibration a,b (two finite comma-separated numbers) of p = sigmoid(a * conf + b)")
     ap.add_argument("model")
     ap.add_argument("--prompt", default="")
     ap.add_argument("--system", default=None)
     ap.add_argument("--chat", action="store_true", help="wrap the prompt in the chat format")
     ap.add_argument("--think", action="store_true")
-    ap.add_argument("-n", type=int, default=64)
-    ap.add_argument("--ctx", default="8192")
-    ap.add_argument("--tmax", type=int, default=64)
-    ap.add_argument("--gen", type=int, default=32)
-    ap.add_argument("--prompts", default=None)
-    ap.add_argument("--ids", default=None, help="file of token ids (instead of --prompt)")
-    ap.add_argument("--range", default=None, help="prompt ids a-b (with --prompts)")
-    ap.add_argument("--out", default=None)
-    ap.add_argument("--ref", default=None, help="teacher: reference continuations, one line per prompt: "
-                    "GEN tok:margin ...")
-    ap.add_argument("--dump", default=None, help="write per-layer tensors to this file")
+    ap.add_argument("-n", type=_non_negative_int_arg, default=64,
+                    help="tokens to generate (a non-negative integer; default: 64)")
+    ap.add_argument("--ctx", type=_ctx_arg, default=[8192],
+                    help="context length(s): comma-separated positive integers (default: 8192)")
+    ap.add_argument("--tmax", type=_positive_count_arg, default=64,
+                    help="chunk size (a positive integer; default: 64)")
+    ap.add_argument("--gen", type=_positive_count_arg, default=32,
+                    help="bench decode steps (a positive integer; default: 32)")
+    ap.add_argument("--prompts", type=_prompts_arg, default=None,
+                    help="JSONL prompts file (each line an object with an integer id and a string "
+                         "text; required for tokens, specbench, cachetest and teacher)")
+    ap.add_argument("--ids", type=_ids_arg, default=None,
+                    help="file of whitespace-separated token ids in 0..%d (instead of --prompt)" % (VOCAB - 1))
+    ap.add_argument("--range", type=_range_arg, default=None,
+                    help="prompt ids a-b: non-negative integers a <= b (with --prompts)")
+    ap.add_argument("--out", type=_out_arg, default=None,
+                    help="write JSONL here; the parent directory must exist and be writable")
+    ap.add_argument("--ref", type=_ref_arg, default=None,
+                    help="teacher/verify: reference continuations, one line per prompt: GEN tok:margin ... "
+                         "(parsed before loading; required for teacher)")
+    ap.add_argument("--dump", type=_out_arg, default=None,
+                    help="write per-layer tensors to this file; the parent directory must exist and be writable")
     ap.add_argument("--flags", type=int, default=None)
     ap.add_argument("--sha", action="store_true", help="verify: also check every shard's sha256 first (slow)")
-    ap.add_argument("--free1", default="12", help="numa: GB to keep free on node 1")
+    ap.add_argument("--free1", type=_free_gb_arg, default=12.0,
+                    help="numa: GB to keep free on node 1 (a finite non-negative number; default: 12)")
     ap.add_argument("--interleave", action="store_true", help="numa: spread the expert shards 2:1 over the nodes")
     ap.add_argument("--rowsplit", action="store_true", help="numa: each expert's first rows on node 0, the rest on node 1 "
                     "(the rows each node's threads compute; share KINDI_MOE_SHARE0)")
     a = ap.parse_args(argv)
-    ctxs = [int(x) for x in a.ctx.split(",")]
+    if a.cmd in ("tokens", "cachetest", "specbench", "teacher") and not a.prompts:
+        ap.error("--prompts FILE.jsonl is required for %s" % a.cmd)
+    if a.cmd == "teacher" and not a.ref:
+        ap.error("--ref FILE is required for teacher")
+    if a.cmd == "verify":
+        gate = (("--prompts", a.prompts, _prompts_arg, os.path.join(GATE_DIR, "gate_prompts.jsonl")),
+                ("--ref", a.ref, _ref_arg, os.path.join(GATE_DIR, "gate_ref.txt")))
+        for flag, value, validate, default in gate:
+            path = value or default
+            if not os.path.isfile(path) or not os.access(path, os.R_OK):
+                ap.error("%s gate file not found or unreadable: %s (pass --prompts/--ref or set KINDI_DSV_GATE)"
+                         % (flag, path))
+            if value is None:
+                try:
+                    validate(path)
+                except argparse.ArgumentTypeError as exc:
+                    ap.error("%s gate file: %s" % (flag, exc))
+    ctxs = a.ctx
     if a.cmd == "numa":
         # make room on NUMA node 1 for the node-bound dense weights: move page-cache pages of the model (largest
         # shard first) to node 0, until node 1 has --free1 GB free
@@ -925,7 +1198,7 @@ def main(argv=None):
             for line in open("/sys/devices/system/node/node1/meminfo"):
                 if "MemFree" in line:
                     return int(line.split()[-2]) * 1024
-        need = int(float(a.free1) * 2**30)
+        need = int(a.free1 * 2**30)
         if a.rowsplit:
             share0 = float(os.environ.get("KINDI_MOE_SHARE0", "0.667"))
             gu_rows = int(round(2304 // 4 * share0)) * 4      # the split of moe_layer_direct (lroundf of the groups)
@@ -933,7 +1206,7 @@ def main(argv=None):
             for f in shards(a.model):
                 g = GGUF(f)
                 offs, lens, nodes = [], [], []
-                for name, ne, ty, off in g.tensors:
+                for name, ne, _ty, off in g.tensors:
                     if not name.endswith("_exps.weight"):
                         continue
                     cols, rows, ne_ = ne[0], ne[1], ne[2]
@@ -990,7 +1263,7 @@ def main(argv=None):
     if a.cmd == "teacher":
         # feed the reference's greedy continuation; at every position compare Kindi's top-1 with the reference token
         refs = [[(int(x.split(":")[0]), float(x.split(":")[1])) for x in line.split()[1:]]
-                for line in open(a.ref) if line.startswith("GEN")]
+                for line in open(a.ref) if line.split()[:1] == ["GEN"]]
         fo = open(a.out, "w", encoding="utf-8") if a.out else sys.stdout
         for j, ref in zip(map(json.loads, open(a.prompts, encoding="utf-8")), refs):
             model.reset()
@@ -1016,7 +1289,7 @@ def main(argv=None):
         model.dspark_load(a.dspark)
     if a.cmd == "specbench":
         # each prompt: plain greedy, then prompt-lookup speculation from the same start; the tokens must be equal
-        p0, p1 = (int(x) for x in a.range.split("-")) if a.range else (0, 1 << 30)
+        p0, p1 = a.range if a.range else (0, 1 << 30)
         tot = {"plain_s": 0.0, "spec_s": 0.0, "tokens": 0}
         for j in map(json.loads, open(a.prompts, encoding="utf-8")):
             if not p0 <= j["id"] <= p1:
@@ -1029,7 +1302,7 @@ def main(argv=None):
             if a.dspark:
                 g2, _, d2 = model.generate_dspark(ids, a.n, conf_min=a.conf, kmax=a.spec, stop_eos=False, stats=st,
                                                   auto=a.auto is not None,
-                                                  cal=tuple(float(x) for x in (a.auto or "1,0").split(",")))
+                                                  cal=a.auto if a.auto is not None else (1.0, 0.0))
                 if os.environ.get("KINDI_DS_LOG"):
                     with open(os.environ["KINDI_DS_LOG"], "a") as fl:
                         fl.write(json.dumps({"id": j["id"], "conf_acc": st.get("conf_log", [])}) + chr(10))
@@ -1098,7 +1371,7 @@ def main(argv=None):
         return
     if a.cmd == "generate":
         if a.prompts:
-            p0, p1 = (int(x) for x in a.range.split("-")) if a.range else (0, 1 << 30)
+            p0, p1 = a.range if a.range else (0, 1 << 30)
             fo = open(a.out, "w", encoding="utf-8") if a.out else sys.stdout
             for line in open(a.prompts, encoding="utf-8"):
                 j = json.loads(line)
@@ -1118,7 +1391,7 @@ def main(argv=None):
                       file=sys.stderr)
             return
         if a.ids:
-            ids = [int(x) for x in open(a.ids).read().split()]
+            ids = a.ids
         else:
             ids = model.tok.encode(chat_prompt(a.prompt, a.system, a.think) if a.chat else a.prompt)
 

@@ -1,0 +1,94 @@
+{
+  "gate": "tandem-27b-20261112",
+  "title": "27B tandem: joint checkpoint peaks, cost and capacity boundary",
+  "measured": "2026-11-13",
+  "commit": "60a039b",
+  "command": "python -m kindi bench --tandem cpu-first|gpu-first --tandem-cpu-layers 16 --sample-vram at 8K/24K, plus the joint checkpoint harness",
+  "notes": "The 2026-11-11 placement gate peaks are recorded on this page so the roadmap's 7,005/7,017 quote has a tracked home; the 2026-11-13 table is the later joint-checkpoint and capacity run.",
+  "evidence": [
+    "docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md",
+    "docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/README.md"
+  ],
+  "numbers": [
+    {
+      "id": "cpu-first-peak",
+      "display": "7,005",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md",
+                "needle": "7,005 MiB"}
+    },
+    {
+      "id": "gpu-first-peak",
+      "display": "7,017",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md",
+                "needle": "7,017 MiB"}
+    },
+    {
+      "id": "full-gpu-peak",
+      "display": "7,238",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md",
+                "needle": "7,238 MiB"}
+    },
+    {
+      "id": "save-low",
+      "display": "54.5",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md",
+                "needle": "54.5 ms"}
+    },
+    {
+      "id": "save-high",
+      "display": "61.5",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md",
+                "needle": "61.5 ms"}
+    },
+    {
+      "id": "restore-low",
+      "display": "27.0",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md",
+                "needle": "27.0 ms"}
+    },
+    {
+      "id": "restore-high",
+      "display": "28.5",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md",
+                "needle": "28.5 ms"}
+    },
+    {
+      "id": "checkpoint",
+      "display": "149.6",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md",
+                "needle": "149.6 MiB"}
+    },
+    {
+      "id": "full-capacity",
+      "display": "37,120",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md",
+                "needle": "37,120"}
+    },
+    {
+      "id": "tandem-capacity",
+      "display": "30,464",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-12-i7-8086k-rtx4060ti-tandem/27B-8K.md",
+                "needle": "30,464"}
+    }
+  ]
+}

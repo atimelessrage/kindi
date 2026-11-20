@@ -25,7 +25,7 @@ import shutil
 import sys
 import time
 
-PREPARE_FOR = ("serve", "verify", "bench", "chat", "info", "fast-head")
+PREPARE_FOR = ("serve", "verify", "bench", "kld", "calibrate", "chat", "info", "fast-head")
 SIDE = ".kindi-container.json"
 
 

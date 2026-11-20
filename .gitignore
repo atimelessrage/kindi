@@ -10,12 +10,46 @@ state/
 kindi.conf
 *.local.*
 .env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+.envrc
+.direnv/
+.npmrc
+.pypirc
+.netrc
+_netrc
 # python / tooling
 __pycache__/
 *.pyc
 *.log
+.coverage
+coverage.json
 .vscode/
 .idea/
+# raw local evidence and scratch audits (may contain local paths or prompts)
+# generated render of CURRENT-VS-KINDI-0.6.md (reproduce with pandoc; not a source file)
+current-vs-kindi-0.6-preview.html
+bench-logs/
+optimizing-mixed-gpu-rig.json
+*_ReviewAudit_*.txt
+*_ProblemsOnly_*.txt
+ConsultProposals*.txt
+manual_help_needed.txt
+# key material
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+*.jks
+*.keystore
+*.ppk
+*.kdbx
+*.ovpn
 
 # receipts and logs of tools/ship_images.sh
 ship-images/
+# locally built release artifacts (the source archive and its .sha256 sidecar)
+dist/

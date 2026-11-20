@@ -1,0 +1,34 @@
+python -m kindi --pack ~/.kindi/packs/bonsai-2b --ctx 512 bench
+
+<python>\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+[kindi 19:25:38] blocking sync: Could not find module 'libcuda.so.1' (or one of its dependencies). Try using the full path with constructor syntax. - driver default kept
+[kindi 19:25:45] GPU: NVIDIA GeForce RTX 4060 Ti, sm_89, 34 SMs, 8187 MiB
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "<stock-v0.6.1>\kindi\__main__.py", line 231, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "<stock-v0.6.1>\kindi\__main__.py", line 225, in main
+    return {"convert": cmd_convert, "fast-head": cmd_fast_head, "verify": cmd_verify, "bench": cmd_bench,
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            "serve": cmd_serve, "chat": cmd_chat, "head": cmd_head, "info": cmd_info,
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            "models": cmd_models, "use": cmd_use}[a.cmd](cfg, a)
+            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "<stock-v0.6.1>\kindi\__main__.py", line 76, in cmd_bench
+    return run(cfg, log=log)
+  File "<stock-v0.6.1>\kindi\bench.py", line 37, in run
+    eng = make_engine(pack, ctx=cfg["ctx"], clusters=dict(np.load(cl)) if os.path.exists(cl) else None, log=log)
+  File "<stock-v0.6.1>\kindi\engine.py", line 486, in make_engine
+    return Engine(pack, ctx=ctx, clusters=clusters, log=log)
+  File "<stock-v0.6.1>\kindi\engine.py", line 208, in __init__
+    _chunk1.reserve(self)                      # the chunked prompt path's buffers, before the context fit
+    ~~~~~~~~~~~~~~~^^^^^^
+  File "<stock-v0.6.1>\kindi\chunk1.py", line 63, in reserve
+    drv = ctypes.CDLL("libcuda.so.1")
+  File "<python>\Lib\ctypes\__init__.py", line 390, in __init__
+    self._handle = _dlopen(self._name, mode)
+                   ~~~~~~~^^^^^^^^^^^^^^^^^^
+FileNotFoundError: Could not find module 'libcuda.so.1' (or one of its dependencies). Try using the full path with constructor syntax.

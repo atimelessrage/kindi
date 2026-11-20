@@ -4,51 +4,70 @@
 computer can run, with the best one first, and then downloads and checks the models, converts them, checks the
 output against llama.cpp and starts the servers as services.
 
-```bash
-curl -fsSL https://amirhusain.com/kindi/install.sh | bash
-```
+This installer is **Linux-only**. Windows users can follow [WINDOWS.md](WINDOWS.md) for the
+verified native CPU path and [the measured 2B source-tree GPU run](WINDOWS.md#native-windows-gpu-validation-2026-11-19).
+Native Windows GPU execution is not covered by this Linux installer and is not a general support claim: the 2026-11-19 result
+covers one 2B pack on an RTX 4060 Ti 8 GB from the source tree; the 4B/9B/27B packs, other cards,
+AMD and the installer's GPU profiles remain unmeasured. For a supported GPU setup, use the Linux
+Docker image or WSL2.
 
-On Windows 10 or 11, use the PowerShell installer instead. It sets up WSL2 and then runs this installer inside it
-(see [WINDOWS.md](WINDOWS.md)):
+## Install (Linux x86-64)
 
-```powershell
-irm https://amirhusain.com/kindi/install.ps1 | iex
-```
-For Docker Compose, Podman, servers and automated installs, there are also ready-made images (no build):
-[CONTAINERS.md](CONTAINERS.md). The installer builds the same images on your computer.
-
-To see each step and each command before anything changes, do a dry run first:
+Download the script, compare its sha256 with the value below, read it, and then run it. This is
+the path the project supports: the checksum covers the file you actually execute.
 
 ```bash
-curl -fsSL https://amirhusain.com/kindi/install.sh | bash -s -- --dry-run
-```
-
-## Install with a checksum check
-
-Download the script, compare its sha256 with the value below, read it, and then run it:
-
-```bash
-curl -fsSLO https://amirhusain.com/kindi/install.sh
-echo "31c4a86025c4c25303b94ba7ff7436a34b2486de0621ac44a57f4b805f0a5a1c  install.sh" | sha256sum -c -
-bash install.sh --dry-run
+curl -fsSLO https://github.com/atimelessrage/kindi/releases/download/v0.7.0-fork/install.sh
+echo "b38de76f9f9beef216d4ac3c832c3c0ce881e08f2db5b11ee04e067e5f28fd40  install.sh" | sha256sum -c -
+bash install.sh --dry-run     # show every step and command first
 bash install.sh
 ```
 
+`curl ... | bash` is convenient but verifies nothing; if you use that form, it runs the hosted file
+without the checksum block. The fork release tag is `v0.7.0-fork`; the older `v0.5.0-installer`
+tag predates this tree and is not the current installer.
+
+On Windows 10 or 11, use the PowerShell installer. It sets up WSL2 and then runs this installer
+inside it (see [WINDOWS.md](WINDOWS.md)). Download it and compare the hash below with a reviewed
+copy before running rather than piping it straight into `iex`:
+
+```powershell
+Invoke-WebRequest https://github.com/atimelessrage/kindi/releases/download/v0.7.0-fork/install.ps1 -OutFile install.ps1
+Get-FileHash install.ps1      # compare with the table below
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+```
+
+For Docker Compose, Podman, servers and automated installs, there are also ready-made images (no build):
+[CONTAINERS.md](CONTAINERS.md). The installer builds the same images on your computer.
+
 | File | sha256 |
 |---|---|
-| `install.sh` (Kindi 0.6.1) | `31c4a86025c4c25303b94ba7ff7436a34b2486de0621ac44a57f4b805f0a5a1c` |
+| `install.sh` (Kindi 0.7.0-fork) | `b38de76f9f9beef216d4ac3c832c3c0ce881e08f2db5b11ee04e067e5f28fd40` |
+| `install.ps1` (Kindi 0.7.0-fork) | `0c25abe5f6806ee57070b52b8dd04c1509f4a1cda583fef729b407a9a7ef2888` |
+| `kindi-0.7.0-fork.tar.gz` (source archive) | `cb03cc938cfcda6bf2ff7afa4467153e0bf6ef770e2c704951295c2e114ae61b` |
 
-If `sha256sum -c` does not print `install.sh: OK`, do not run the script. The same script is in the repository root
-and in the 0.6.1 release.
+**What those values hash.** They are the exact release assets: the two installers and the source
+archive. The archive is built from the release tree and excludes the installers, the two
+checksum-bearing release pages and the secret-scanner baseline, so its hash does not depend on
+itself. The installers are uploaded
+as separate assets. Older tags, including `v0.5.0-installer`, hash differently; a mismatch means a
+stale or modified artifact, not tampering.
+
+If `sha256sum -c` does not print `install.sh: OK`, do not run the script. The checksum is for the
+fork `install.sh` in the release bundle (the shared tree plus the fork's pinned source archive, card
+classes and verify-speed fallback; LF line endings - a copy re-saved with CRLF hashes differently).
+The upstream 0.6.0 release's own `install.sh` hashes to
+`ec0f3f19cf5c5c2d6f0f660db1efb9a6e289a4cfaf0a7c8decfb996f5e4471dc`; that value is historical and
+is not used by this fork release.
 
 ## What it does
 
 | Step | What it does | sudo |
 |---|---|---|
-| 1. Check the machine | Linux x86-64, RAM, free disk, each NVIDIA GPU with its compute capability, and each AMD RDNA3 or RDNA 3.5 GPU. No GPU: the CPU engine. | no |
+| 1. Check the machine | Linux x86-64, AVX for the CPU engine, RAM, free disk, each NVIDIA GPU with its compute capability, and each AMD RDNA3 or RDNA 3.5 GPU. Without AVX, GPU setups remain available but CPU setups are not offered. | no |
 | 2. Docker and GPU access | Finds Docker, and the NVIDIA Container Toolkit or the AMD devices `/dev/kfd` and `/dev/dri`. If something is missing, it asks before it installs it (apt). Without the toolkit, it gives the container the NVIDIA devices and the driver libraries directly. | only to install |
 | 3. Select the setup | Shows each setup for this computer, the recommended one first, and asks which one (below). | no |
-| 4. Build the image | Builds `kindi:0.6.1` (CUDA 10.2), `kindi-rocm:0.6.1` (ROCm 6.3, RDNA3) or `kindi-rocm7:0.6.1` (ROCm 7, RDNA 3.5) from the release source, and checks that the Kindi modules load. A re-run with the same source does not build again. | no |
+| 4. Build the image | Builds `kindi:0.7.0-fork` (CUDA 10.2), `kindi-rocm:0.7.0-fork` (ROCm 6.3, RDNA3) or `kindi-rocm7:0.7.0-fork` (ROCm 7, RDNA 3.5) from the release source, and checks that the Kindi modules load. A re-run with the same source does not build again. | no |
 | 5. Download the models | Downloads each GGUF from Hugging Face. The sha256 must match the value in the script (table below). | no |
 | 6. Convert and verify | `kindi convert`, then `kindi verify` one time for each model on each kind of card. | no |
 | 7. Start the servers | One Docker container for each server, with `--restart unless-stopped`, on `127.0.0.1`. It waits until each `/health` answers. | no |
@@ -103,10 +122,11 @@ To select without questions, add `--auto`: the installer takes the recommended s
 |---|---|---|
 | cpu | no GPU, or `--gpu cpu` | 24,576 |
 | kepler | sm_30-sm_37 | 24,576; 65,536 at 1.5 GB or more; 23,808 for the 4B on a 2 GB card |
-| maxwell | other cards below sm_61 or below 7.5 GB | 24,576 |
-| k1200x2 | two cards of 3.8 GB or more, sm_50-sm_60 | 24,576 |
-| pascal8 | sm_61 or newer, 7.5 GB or more | 65,536 |
-| tc | sm_80 or newer, 9.5 GB or more | 131,072 |
+| maxwell | below sm_61, or sm_61-sm_79 below 7.5 GB | 24,576 |
+| k1200x2 | two supported cards below sm_80, or a mixed pair that is not two sm_80+ cards; Kepler is single-card | 24,576 |
+| pascal8 | sm_61-sm_79, 7.5 GB or more | 65,536 |
+| tc | sm_80 or newer | 131,072; 24,576 on an 8 GB card |
+| tc2 | two sm_80 or newer cards | 24,576 (8 GB pair) or 65,536 |
 | rocm-gfx1103 | AMD Radeon 780M | 24,576 |
 | rocm-gfx1151, rocm-gfx1152 | AMD Radeon 8060S, Radeon 840M (RDNA 3.5) | 24,576 |
 
@@ -143,7 +163,27 @@ The script pins these files. It does not use a file with a different sha256.
 | 9B | `Ternary-Bonsai-2-9B-PTQ1_0.gguf` | 1,997,486,976 | `3561df7ac7d26a71ffa991ac2db740b10841c3a350aa2676ccd3ff5d428b4e8b` |
 | 27B | `Ternary-Bonsai-2-27B-PTQ1_0.gguf` | 5,946,648,928 | `53107f530aa52eb00912263ab1ee29bd199261c87cd7b4ad4ca1318c1fe33ee3` |
 | Nemotron | `NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q3_K_XL.gguf` (unsloth) | 4,219,133,120 | `3f8032b9d2c18536c4ac51b97959a563cc27434de99823640c98147edc62ce9b` |
+| Nanbeige 33B | `AH-Nanbeige4.3-33B-IQ3_XXS.gguf` | 13,108,685,952 | `9d4f18e8a22573c94b18a455147e807a8b9d2cd4b30302f2a4639c2db0a6c239` |
 
+### Use a model you already downloaded in Ollama
+
+Ollama stores its weights as content-addressed blobs (`blobs/sha256-<hash>`), which Kindi cannot
+name. This helper reads Ollama's manifests and links each model under a readable `.gguf` name,
+without copying or downloading anything:
+
+```sh
+python tools/ollama_links.py --dry-run    # list what it would link
+python tools/ollama_links.py              # $OLLAMA_MODELS, else ~/.ollama/models
+python tools/ollama_links.py -m <ollama-root>/models -o <ollama-links>
+```
+
+It links into `~/.kindi/models/ollamaLinks` by default, named after the manifest (`gemma3/4b` ->
+`gemma3-4b.gguf`), and then `python3 -m kindi convert ~/.kindi/models/ollamaLinks/gemma3-4b.gguf`
+works like any other GGUF. A symbolic link is made when the host allows it; otherwise a hard link,
+which needs the output on the same drive as the blobs (the script says so when they differ, and
+`-o` moves it). Manifests whose blob is missing are reported, `--force` replaces a file that is
+not the same model, and `--dry-run` changes nothing. On Windows, `tools/ollama_links.ps1` is the
+same script for PowerShell.
 ## Options
 
 | Option | What it does |
@@ -152,7 +192,7 @@ The script pins these files. It does not use a file with a different sha256.
 | `--yes`, `-y` | Answers yes to each question (for scripts) and takes the recommended setup. Kernel changes are never answered. |
 | `--auto` | Takes the recommended setup and continues with no questions. Kernel changes are only described. |
 | `--config N` | Setup N of the list; `N,M` for several servers; `NxK` for setup N on K cards. |
-| `--model M` | Lists only the setups with this model: `2b`, `4b`, `9b`, `27b` or `nemotron`. |
+| `--model M` | Lists only the setups with this model: `2b`, `4b`, `9b`, `27b`, `nemotron` or `nanbeige`. |
 | `--ctx N` | The context length in tokens. |
 | `--gpu G` | `N` (one NVIDIA card), `N,M` (two cards), `amd` or `amdN`, `all`, or `cpu`. |
 | `--port P` | The port of the first server on 127.0.0.1 (default 8093). Later servers take the next free ports. |
@@ -184,7 +224,7 @@ curl http://<address>:8093/v1/chat/completions -H 'Content-Type: application/jso
 | `--name N` | The name of the first container (default `kindi`; later ones are `N-2`, `N-3`, ...). |
 | `--threads N` | The CPU engine: the number of threads. |
 | `--memory M` | The container memory limit, for example `8g`. |
-| `--source S` | The Kindi source: a folder, or a `.tar.gz` path or URL (default: the 0.6.1 release). |
+| `--source S` | The Kindi source: a folder, or a `.tar.gz` path or URL (default: the 0.7.0-fork release). |
 | `--with-bridge` | Also installs Kindi Bridge, the terminal workspace for agents on Kindi (see below). |
 | `--no-bridge` | Does not ask about Kindi Bridge. |
 | `--bridge-source D` | Installs Kindi Bridge from folder D (default: `bridge/` in the Kindi source). |
@@ -220,8 +260,9 @@ bash install.sh --uninstall --purge  # also ~/.kindi
 
 ## Tested
 
-Each test is a real install, a chat request, a tool-call request and `--uninstall --purge` (Kindi 0.3.0-dev,
-2026-10-24).
+These are the last recorded full installer tests: a real install, a chat request, a tool-call request and
+`--uninstall --purge` (Kindi 0.3.0-dev, 2026-10-24). They have not been re-run for every 0.5.0 card; the
+0.5.0 hardware evidence is in [CARDS.md](CARDS.md) and [BENCHMARKS.md](BENCHMARKS.md).
 
 | Computer | Setup | Result |
 |---|---|---|

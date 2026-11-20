@@ -1,6 +1,6 @@
 # Kindi on AMD graphics
 
-Kindi 0.3.0 runs on AMD RDNA3 graphics through ROCm. We tested it on the **Radeon 780M**, the graphics unit inside
+Kindi 0.7.0-fork runs on AMD RDNA3 graphics through ROCm. We tested it on the **Radeon 780M**, the graphics unit inside
 the AMD Ryzen 7 7840HS, Ryzen 9 7940HS and similar chips. Our test computer is a Minisforum UM790 Pro mini PC with a
 Ryzen 9 7940HS and 64 GB of DDR5-5600.
 
@@ -27,7 +27,7 @@ verify` passes on both. The installer builds the `kindi-rocm7` image for them (R
 The installer finds the 780M and lists the 27B first:
 
 ```bash
-curl -fsSL https://amirhusain.com/kindi/install.sh | bash
+curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.5.0-installer/install.sh | bash
 ```
 
 It builds the `kindi-rocm` image (ROCm 6.3.3 and CuPy 14.2.0) for RDNA3 graphics, and the `kindi-rocm7` image (ROCm 7

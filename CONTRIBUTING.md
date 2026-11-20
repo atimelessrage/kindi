@@ -1,7 +1,41 @@
 # Contributing to Kindi
 
 Bug reports, questions, test results and ideas are welcome. You do not need to sign a contributor agreement to
-open an issue or use Kindi.
+open an issue or use Kindi. For security reports, use the private process in [SECURITY.md](SECURITY.md).
+
+## Before you open a pull request
+
+Run the CPU-only gate from the repository root; it needs no GPU, model pack or Docker:
+
+```sh
+python -m compileall -q kindi
+python -m pytest tests/ -q
+bash -n install.sh
+```
+
+For installer changes, also run the GRUB fixture test and ShellCheck:
+
+```sh
+python -m pytest tests/test_installer_grub.py -q
+shellcheck --severity=warning install.sh
+```
+
+`tests/README.md` describes the optional Turing/CUDA reference suite and static analysis. Report which checks
+you ran, and say explicitly when a hardware-dependent path was not tested.
+
+## Project memory
+
+Internal requirements, architecture, decisions, lessons and operational knowledge live in
+`docs/development/`. Read the relevant record before changing behavior, and update it when
+the change lands. Requirements are one `REQ-NNNN.md` file each; after committing a
+requirement change, run `python tools/project_memory.py` and commit the regenerated
+`REQUIREMENTS-HISTORY.md`. The project-local workflow is
+`.agents/skills/project-memory/SKILL.md`.
+
+User-visible changes also need the relevant `README.md`, `docs/*.md` page and examples
+updated. Run `python tools/project_memory.py --check`,
+`python -m pytest tests/test_project_memory.py tests/test_docs_links.py -q` and the normal
+gate above.
 
 ## Code and other submitted material
 

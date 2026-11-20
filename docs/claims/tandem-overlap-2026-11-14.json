@@ -1,0 +1,47 @@
+{
+  "gate": "tandem-overlap-2026-11-14",
+  "title": "Overlap step 0 (first probe): per-token decomposition at 27B/24K",
+  "measured": "2026-11-14",
+  "commit": "7c456bb",
+  "command": "python -m kindi bench --tandem cpu-first with KINDI_TANDEM_DEBUG_TIMING (baseline probe on/off JSONs in the run directory)",
+  "notes": "This is the run that killed the dispatch-gap premise: the CPU side was already at raw kernel rate, so the worker thread had nothing to overlap. The 2026-11-15 re-measurement in the sibling gate repeated it.",
+  "evidence": [
+    "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-tandem-overlap/RESULTS.md",
+    "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-tandem-overlap/baseline-no-probe.json",
+    "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-tandem-overlap/baseline-probe.json"
+  ],
+  "numbers": [
+    {
+      "id": "cpu-per-layer",
+      "display": "5.18 ms/layer",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-tandem-overlap/RESULTS.md",
+                "needle": "**5.18 ms/layer**"}
+    },
+    {
+      "id": "head",
+      "display": "14.2 ms",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-tandem-overlap/RESULTS.md",
+                "needle": "**head 14.2 ms**"}
+    },
+    {
+      "id": "transfer",
+      "display": "2.85 ms",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-tandem-overlap/RESULTS.md",
+                "needle": "transfer 2.85 ms"}
+    },
+    {
+      "id": "baseline-rate",
+      "display": "9.9 tok/s",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-tandem-overlap/RESULTS.md",
+                "needle": "9.9 tok/s at the 24K position"}
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+# stock v0.6.1 (7fececb) + native-Windows libcuda -> nvcuda.dll shim (no engine changes)
+# separate position harness (pos512_stock.py), not `kindi bench`; pass 2 of 5
+cd bench-logs/stock-v0.6.1
+python pos512_stock.py ~/.kindi/packs/bonsai-9b 8192
+
+<python>\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+blocking sync: card 0 primary context flags 0x4 (set: 0)
+GPU: NVIDIA GeForce RTX 4060 Ti, sm_89, 34 SMs, 8187 MiB
+engine ready: ctx 8192, head plain (8.3s)
+GPU memory: 4371 MiB free of 8188 with a 8192-token context
+stock v0.6.1 position harness (separate from the bench sweep)
+generation (exact head) at position   100:  83.8 tokens/s
+generation (exact head) at position   512:  82.8 tokens/s

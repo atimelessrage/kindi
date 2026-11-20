@@ -1,0 +1,9 @@
+date: Tue Nov 10 11:50:47     2026
+Windows-10-10.0.19045-SP0
+python 3.13.6 (tags/v3.13.6:4e66535, Aug  6 2025, 14:36:00) [MSC v.1944 64 bit (AMD64)]
+clang version 18.1.8
+Target: x86_64-pc-windows-msvc
+Thread model: posix
+HEAD: fd3fba57a6ae3de385e5cf43bc091b38ab670350
+12
+Intel(R) Core(TM) i7-8086K CPU @ 4.00GHz

@@ -1,0 +1,64 @@
+{
+  "gate": "kld-2b",
+  "title": "Lossy-cache quality gate (KLD) on the 2B, q8_0 vs k8v4",
+  "measured": "2026-11-14",
+  "commit": "7c456bb",
+  "command": "python -m kindi kld (plain-q8, tp-q8, tp-k8v4 at ctx 2048 and 8192)",
+  "notes": "Teacher-forced KLD against the fp16 whole-model reference, 1983/8127 steps. The quarantine of k8v4 is derived from this row, so the numbers here are the reason it is refused by default.",
+  "evidence": [
+    "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-kld-2b/kld-2b.json",
+    "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-kld-2b/RESULTS.md"
+  ],
+  "numbers": [
+    {
+      "id": "q8-2k",
+      "display": "2.74e-07",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-kld-2b/kld-2b.json",
+                "pointer": "/1/kld_nats", "expect": 2.74e-07}
+    },
+    {
+      "id": "q8-8k",
+      "display": "2.07",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-kld-2b/kld-2b.json",
+                "pointer": "/3/kld_nats", "expect": 2.07e-07}
+    },
+    {
+      "id": "k8v4-2k",
+      "display": "1.29e-04",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "tolerance": 0.005,
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-kld-2b/kld-2b.json",
+                "pointer": "/2/kld_nats", "expect": 1.29e-04}
+    },
+    {
+      "id": "k8v4-8k",
+      "display": "2.27e-04",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "tolerance": 0.005,
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-kld-2b/kld-2b.json",
+                "pointer": "/5/kld_nats", "expect": 2.27e-04}
+    },
+    {
+      "id": "drift-2k",
+      "display": "~470x",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "tolerance": 0.005,
+      "check": {"kind": "ratio",
+                "a": {"file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-kld-2b/kld-2b.json", "pointer": "/2/kld_nats"},
+                "b": {"file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-kld-2b/kld-2b.json", "pointer": "/1/kld_nats"},
+                "expect": 470}
+    },
+    {
+      "id": "drift-8k",
+      "display": "~1,090x",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "tolerance": 0.005,
+      "check": {"kind": "ratio",
+                "a": {"file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-kld-2b/kld-2b.json", "pointer": "/5/kld_nats"},
+                "b": {"file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-kld-2b/kld-2b.json", "pointer": "/3/kld_nats"},
+                "expect": 1090}
+    }
+  ]
+}

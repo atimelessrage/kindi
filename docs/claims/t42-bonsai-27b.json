@@ -1,0 +1,29 @@
+{
+  "gate": "t42-bonsai-27b",
+  "title": "T4.2 Bonsai adapter gate on the 27B pack (source_file fallback)",
+  "measured": "2026-11-16",
+  "commit": "7c456bb",
+  "command": "python -m kindi verify and python -m kindi bench through the registry adapter and through KINDI_LEGACY_ENGINE_PATH=1",
+  "notes": "The pack at ~/.kindi/packs/bonsai-27b names its manifest model \"Hf\", which is why resolution needed the source_file fallback; the page records both paths.",
+  "evidence": [
+    "docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-t42-bonsai-27b/RESULTS.md"
+  ],
+  "numbers": [
+    {
+      "id": "verify-27b",
+      "display": "verify is 4/4 on both paths",
+      "quoted_in": ["docs/BACKENDS.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-t42-bonsai-27b/RESULTS.md",
+                "needle": "ALL PASS 4/4 @ 34.5 tok/s"}
+    },
+    {
+      "id": "bench-parity-27b",
+      "display": "bench agrees within ~1%",
+      "quoted_in": ["docs/BACKENDS.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-16-i7-8086k-rtx4060ti-t42-bonsai-27b/RESULTS.md",
+                "needle": "agree within ~1% everywhere"}
+    }
+  ]
+}

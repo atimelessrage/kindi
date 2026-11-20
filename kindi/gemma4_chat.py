@@ -32,4 +32,4 @@ def render(model_path,messages,tools=None,template_kwargs=None,add_generation_pr
             "bos_token":bos,"eos_token":eos,"enable_thinking":False,"conversational_mode":False}
     values.update(template_kwargs or {})
     try: return tpl.render(**values)
-    except Exception as e: raise ValueError("kindi Gemma 4 chat template failed: %s" % e)
+    except Exception as e: raise ValueError("kindi Gemma 4 chat template failed: %s" % e)  # noqa: BLE001 - template errors surface as ValueError, by design

@@ -1,0 +1,14 @@
+# fork worktree at 549e0cf, plain engine (KINDI_TP=0), --split-at off; pass 10 of 20
+KINDI_TP=0 python -m kindi --pack ~/.kindi/packs/bonsai-9b --ctx 8192 bench --split-at off
+
+<python>\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+[kindi 04:06:05] blocking sync: card 0 primary context flags 0x4 (set: 0)
+[kindi 04:06:05] GPU: NVIDIA GeForce RTX 4060 Ti, sm_89, 34 SMs, 8187 MiB
+[kindi 04:06:12] engine ready: ctx 8192, head plain (7.8s)
+[kindi 04:06:13] kindi: ~/.kindi/packs/bonsai-9b -> the bonsai backend (bonsai2-9b)
+[kindi 04:06:13] GPU memory: 4369 MiB free of 8188 with a 8192-token context
+[kindi 04:06:13] prompt reading:        54.2 tokens/s
+[kindi 04:06:13] generation (exact head) at position   100:  86.2 tokens/s
+[kindi 04:06:13] generation (exact head) at position  2000:  84.2 tokens/s
+[kindi 04:06:14] generation (exact head) at position  8000:  79.9 tokens/s

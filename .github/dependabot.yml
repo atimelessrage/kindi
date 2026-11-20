@@ -1,0 +1,19 @@
+# Reviewed dependency updates (review finding D6/D8, 2026-11-11).
+#
+# CI used floating action tags (actions/checkout@v4) and open-ended test ranges; this opens a
+# weekly PR for each instead of leaving them to drift. The test requirements are in tests/, so
+# that is the pip directory Dependabot scans. Pin the merged versions in the same PR if a range
+# turns out to matter.
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/tests"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

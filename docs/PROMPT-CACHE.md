@@ -85,6 +85,39 @@ The Bonsai models use the same three kinds of saved state. Their checkpoints als
 Gated-DeltaNet layers, and they can save the start of a conversation to disk, so that it is available after a
 restart. See [HOW-IT-WORKS.md](HOW-IT-WORKS.md).
 
+A tandem CPU+GPU split uses the same cache through `TandemRunner`: a checkpoint contains both owners' recurrent
+state; each engine keeps its K/V arrays in place. Saved openings also store both owners' K/V and are fingerprinted by the placement, layer ranges and
+CPU ISA/thread count, so a state made by one split is never shared with another.
+
+On 2026-11-12, a real 2B tandem check used a 320-token prefix request, a 256-token branch, and a
+new runner that loaded the branch's 256-token opening from disk in both placements. All cached and
+`KINDI_PROMPT_CACHE=0` continuations were token-identical. The same check through `kindi serve`
+saved a 344-token opening, restarted the server, and loaded it again: the response reported 344
+cached tokens and matched the cache-off reply. The same harness then passed at 4K and 8K context
+with 1,024- and 2,048-token checkpoints, reusing 4,080/8,176 tokens for extensions and restoring
+3,072/6,144-token branches. The 9B pack then passed the 512-context check in both placements with
+6 CPU layers: extension 320, branch and saved opening 256, all exact; see
+[RESULTS-9B.md](benchmarks/tandem-cache/RESULTS-9B.md). This run also fixed the CuPy K/V restore
+in `Openings.load` (it now uses the existing `_to_dev` copy instead of a plain assignment). See
+[benchmarks/tandem-cache/RESULTS.md](benchmarks/tandem-cache/RESULTS.md) and
+[LONG-CONTEXT-RESULTS.md](benchmarks/tandem-cache/LONG-CONTEXT-RESULTS.md).
+
+## Invariants
+
+These rules are why a resumed request is safe; break one and the cache can return wrong output.
+
+- A saved opening is reused only when its engine fingerprint matches. The fingerprint covers the model path,
+  K/V type, chunk/attention/tensor-core/speculation settings, head mode and the code of every compiled kernel
+  (all `*.cu`/`*.c` files in `kindi/`) plus the explicit Python arithmetic files.
+- A checkpoint is a copy of the complete recurrent and attention state at a token boundary. Resume starts at
+  the last checkpoint at or before the first differing token; the position-indexed K/V suffix is then valid.
+- Parked conversations are moved whole (tokens, checkpoints, end state and K/V). They are not mixed with another
+  conversation, and `park_max`/`checkpoint_budget_mb` may evict them but never truncate a live state.
+- A damaged or foreign opening is ignored, not repaired in place. The cache must never resume a state made by a
+  different engine configuration.
+- Eviction drops the least-recently-used opening or the oldest checkpoint that is not needed by a live request.
+  The final state after a request is never removed while that request is active.
+
 ## Settings
 
 | Setting | Default | What it does |
@@ -95,3 +128,10 @@ restart. See [HOW-IT-WORKS.md](HOW-IT-WORKS.md).
 | `KINDI_G4_PARK_MAX` | 4 | the number of conversations kept in host memory |
 
 Each parked conversation uses about 16 KB of host memory for each token, plus about 42 MB for each checkpoint.
+
+The Gemma 4 host cache also enforces a 1 GiB pinned-memory budget (`G4Cache.DEFAULT_BUDGET_BYTES`). When a new
+checkpoint or parked conversation would exceed it, the oldest parked conversation is dropped first, then the
+oldest active checkpoint; an individual snapshot that cannot fit is not created. The cache logs the freed bytes
+and exposes `budget_bytes`, `used_bytes`, `peak_bytes`, `evictions`, `evicted_bytes`, `checkpoints_dropped` and
+`parked_dropped` counters through `G4Cache.metrics()` and the server's `/metrics` endpoint. The budget is separate
+from the Bonsai `checkpoint_budget_mb` setting.

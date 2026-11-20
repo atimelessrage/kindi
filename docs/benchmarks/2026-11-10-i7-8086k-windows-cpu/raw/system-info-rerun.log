@@ -1,0 +1,10 @@
+date: 2026-11-10 23:14:21
+HEAD: 22ac35e76a385c45037d00252ba78bd250bc62c9
+Windows-10-10.0.19045-SP0
+python 3.13.6 (tags/v3.13.6:4e66535, Aug  6 2025, 14:36:00) [MSC v.1944 64 bit (AMD64)]
+logical_cpu_count 12
+cpu Intel64 Family 6 Model 158 Stepping 10, GenuineIntel
+clang version 18.1.8
+Target: x86_64-pc-windows-msvc
+Thread model: posix
+KINDI_DEVICE=cpu; ctx=24576; threads=auto; head=exact; GPU=unused
