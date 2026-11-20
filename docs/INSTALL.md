@@ -18,7 +18,7 @@ the path the project supports: the checksum covers the file you actually execute
 
 ```bash
 curl -fsSLO https://github.com/atimelessrage/kindi/releases/download/v0.7.0-fork/install.sh
-echo "d5c90e8dfdbb03c3b38573b09fd20fd0ff55176b71cd58497f603c777e2aff77  install.sh" | sha256sum -c -
+echo "b38de76f9f9beef216d4ac3c832c3c0ce881e08f2db5b11ee04e067e5f28fd40  install.sh" | sha256sum -c -
 bash install.sh --dry-run     # show every step and command first
 bash install.sh
 ```
@@ -42,9 +42,9 @@ For Docker Compose, Podman, servers and automated installs, there are also ready
 
 | File | sha256 |
 |---|---|
-| `install.sh` (Kindi 0.7.0-fork) | `d5c90e8dfdbb03c3b38573b09fd20fd0ff55176b71cd58497f603c777e2aff77` |
+| `install.sh` (Kindi 0.7.0-fork) | `b38de76f9f9beef216d4ac3c832c3c0ce881e08f2db5b11ee04e067e5f28fd40` |
 | `install.ps1` (Kindi 0.7.0-fork) | `0c25abe5f6806ee57070b52b8dd04c1509f4a1cda583fef729b407a9a7ef2888` |
-| `kindi-0.7.0-fork.tar.gz` (source archive) | `6427b5cadf3e69f2130570e81232f0bbe808711a6c053df099dac80ceb68f3bd` |
+| `kindi-0.7.0-fork.tar.gz` (source archive) | `cb03cc938cfcda6bf2ff7afa4467153e0bf6ef770e2c704951295c2e114ae61b` |
 
 **What those values hash.** They are the exact release assets: the two installers and the source
 archive. The archive is built from the release tree and excludes the installers, the two

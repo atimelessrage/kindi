@@ -8,10 +8,10 @@ registry keep it distinct from upstream.
 
 - Official baseline: `v0.6.1` (`7fececb`), published 2026-11-16.
 - Shared base: `dce89df`; `v0.6.1` is one commit past that base and is **not** an ancestor of this
-  fork. The release-code baseline is `a2c450f` on `freebuff/tandem-cpu-recovery`; the checksum-pin
-  commit follows it.
-- Current range at that baseline: `git rev-list --count v0.6.1..a2c450f` = **672 commits**;
-  `git diff --shortstat v0.6.1..a2c450f` = **891 files, +125,457/−1,406**.
+  fork. The release-code baseline is `20e2ea0` on `freebuff/tandem-cpu-recovery`; the final
+  checksum-pin commit follows it.
+- Current range at that baseline: `git rev-list --count v0.6.1..20e2ea0` = **674 commits**;
+  `git diff --shortstat v0.6.1..20e2ea0` = **891 files, +125,461/−1,406**.
 - The **649**-commit figure in `detailed-fork-changelog.md` was the `3002a40` snapshot. The
   `CURRENT-VS-KINDI-0.6.md` audit recorded 666 at `3fed704`; the integration adds six commits.
   Do not repeat 649 as the current count.
@@ -34,9 +34,9 @@ registry keep it distinct from upstream.
 
 | Artifact | sha256 |
 |---|---|
-| `dist/kindi-0.7.0-fork.tar.gz` | `6427b5cadf3e69f2130570e81232f0bbe808711a6c053df099dac80ceb68f3bd` |
+| `dist/kindi-0.7.0-fork.tar.gz` | `cb03cc938cfcda6bf2ff7afa4467153e0bf6ef770e2c704951295c2e114ae61b` |
 | `dist/kindi-0.7.0-fork.tar.gz.sha256` | sidecar containing the archive hash |
-| `install.sh` | `d5c90e8dfdbb03c3b38573b09fd20fd0ff55176b71cd58497f603c777e2aff77` |
+| `install.sh` | `b38de76f9f9beef216d4ac3c832c3c0ce881e08f2db5b11ee04e067e5f28fd40` |
 | `install.ps1` | `0c25abe5f6806ee57070b52b8dd04c1509f4a1cda583fef729b407a9a7ef2888` |
 
 The archive is built from the working tree with:
@@ -47,7 +47,7 @@ python scripts/build_release_archive.py
 ```
 
 It includes tracked files plus non-ignored untracked files (including the two new
-`token_classes` files), and excludes `.git`, `dist/`, both installers, `docs/INSTALL.md`, this
+`token_classes` files), and excludes `.git`, `dist/`, `AGENTS.md`, both installers, `docs/INSTALL.md`, this
 checklist and `.secrets.baseline`. The exclusions are deliberate: the installers and checksum pages
 are separate assets, and the secret-scanner baseline follows the installer hash, so including them
 would make the archive hash depend on itself. The archive writes the base HEAD
@@ -70,7 +70,7 @@ outputs: [container smoke evidence](benchmarks/2026-11-20-i7-8086k-rtx4060ti-con
 The image label records revision `1627b96312509e6e2bdaad805116f7f6459b88f3-dirty`; the
 `kindi/COMMIT` placeholder still makes `/health` report `commit: null`. No image was published.
 
-The archive above was rebuilt from `a2c450f` after the Python 3.6 fix, so it contains the
+The archive above was rebuilt from `20e2ea0` after the Python 3.6 fix, so it contains the
 repaired `kindi/sessions.py`; the image label still records its earlier dirty build.
 
 ## 1. Verify the tree before building
