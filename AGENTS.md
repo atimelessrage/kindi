@@ -12,18 +12,18 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `f4418ae` on `freebuff/tandem-cpu-recovery` (**main** fast-forwards to the handoff commit; guarded by `tests/test_agents_handoff.py`); the 2026-11-18 audit round, the ternary-MoE census correction, the host-mapped Q2 lane, the fresh k=1 A/B and the mixed card/CPU Q2 combine contract are committed (`31d10cc` code, `d28397f` evidence and claim, `26309d2` multi-slot gate); the 2026-11-19 consolidation adds request-shape validation, Windows secret-scan batching, the controlled 2B/4B/9B pairs, the 9B chunk sweep, the context-growth and ternary-MoE pages and the Q2 lane move to `tools/` (`f75253b`, `84b6686`); full CPU gate **1,357 passed, 28 skipped, 0 failed**; Engine wiring and the model row remain blocked by the absent Lightning pack.
+- **HEAD:** `82a72bf` on `freebuff/tandem-cpu-recovery` (**main** fast-forwards to the handoff commit; guarded by `tests/test_agents_handoff.py`); the 2026-11-20 integration lands the `0.7.0-fork` release surface, local archive builder, read-only Intel probe, dense placement portfolio, process-shared token-class grammar masks, stricter request validation and autotune/parity fixes, with the controlled benchmark, container-smoke and claims evidence tracked; the earlier 2026-11-19 round remains in history; Engine wiring and the model row remain blocked by the absent Lightning pack.
 
 ### Python quality ratchet
 
 Audit F9's Python quality ratchet is `tools/check_python_quality.py`: Ruff 0.16.0 (`F`, `E9`, `B`, `I`)
 over the Python tree, mypy 2.4.0 over first-party production
 code, Pyright 1.1.414 (`basic`, all platforms) and Pylint 4.1.3 (`E`, `F`, import-error
-disabled) at Python 3.10 over the same production targets, recorded as **321 Ruff findings / 59 mypy
-errors / 1,035 Pyright errors / 255 Pylint findings** in
+disabled) at Python 3.10 over the same production targets, recorded as **314 Ruff findings / 59 mypy
+errors / 991 Pyright errors / 255 Pylint findings** in
 `tools/python_quality_baseline.json`. CI runs it; a new or increased file/rule count fails, while
 existing debt is tolerated and `--update --reason "..."` lowers the baseline after review; it refuses growth and records the reason and delta, so it cannot launder a new finding.
-`tests/test_python_quality.py` + `tests/test_ci_config.py` **14 passed**; no full-suite or GPU run. Dependency scanning is report-only in CI (`tools/check_dependencies.py`, `requirements-runtime.txt`); the gate waits for a reviewed baseline. The prior test task is below.
+`tests/test_python_quality.py` + `tests/test_ci_config.py` **14 passed**; no GPU run. Dependency scanning is report-only in CI (`tools/check_dependencies.py`, `requirements-runtime.txt`); the gate waits for a reviewed baseline. The prior test task is below.
 
 ### MTP smoke guard
 
@@ -41,7 +41,7 @@ suite plus CI job, and pinned every workflow's actions. The forward-slash drive-
 
 ### Full CPU gate
 
-The final coverage run at `539a504` is **1,241 passed, 28 skipped, 0 failed** in 277.17 s at **46.36%** line+branch coverage (23,504 statements and 8,394 branches); the plain suite at that commit is 1,241 / 28 / 0 in 227.62 s. The consolidated 2026-11-19 content commits (`f75253b` + `84b6686`) are **1,357 passed, 28 skipped, 0 failed** in 229.53 s; the final handoff commit `53198e5` changes only `AGENTS.md` and its history. Every skip is inventoried by node ID and exact reason in `tests/README.md`.
+The 2026-11-20 integration gate at `82a72bf` is **1,412 passed, 28 skipped, 0 failed** in 250.33 s (plain CPU suite, no coverage rerun). The last coverage-measured run remains `539a504`: **1,241 passed, 28 skipped, 0 failed** in 277.17 s at **46.36%** line+branch coverage (23,504 statements and 8,394 branches); its plain suite was 1,241 / 28 / 0 in 227.62 s. The consolidated 2026-11-19 content commits (`f75253b` + `84b6686`) remain **1,357 passed, 28 skipped, 0 failed** in 229.53 s. Every skip is inventoried by node ID and exact reason in `tests/README.md`.
 
 ### Upstream v0.6.1 and comparison
 
@@ -165,8 +165,8 @@ state - and at a 200-token document the average *falls* to 463 ms/token against 
 whitespace-permitting constraint lets the greedy 2B spend the whole budget on whitespace (200 tokens, 9 characters) (`docs/API.md`,
 `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/RESULTS.md`), and the two harnesses behind it are tracked as `tools/grammar_cost.py` and
 `tools/grammar_cost_serve.py` so a clean checkout re-derives the rows instead of trusting the JSON artifact. The numbers those docs quote are no longer prose:
-`python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (21 gates, 124 numbers across `docs/claims/*.json`, 4 citations
-listed as reasoned debt), and refuses a benchmark citation no claim accounts for - schema and procedure in `docs/claims/README.md`.
+`python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (36 gates, 263 numbers across `docs/claims/*.json`, six
+claimed docs and zero citations listed as debt), and refuses a benchmark citation no claim accounts for - schema and procedure in `docs/claims/README.md`.
 
 ### Dated evidence
 
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `f4418ae` | main checkout; clean; fast-forwarded to the handoff commit |
-| `<worktree>` | `freebuff/tandem-cpu-recovery` | `f4418ae` | this session; checked out here |
+| `T:/kindi` | `main` | `82a72bf` | main checkout; clean; fast-forwarded to the integration commit |
+| `<worktree>` | `freebuff/tandem-cpu-recovery` | `82a72bf` | this session; checked out here |
 
 The main worktree at `T:/kindi` carries the same committed handoff after a fast-forward.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
@@ -399,7 +399,7 @@ Run from the repository root. The no-GPU gate is cheap and must pass before any 
 | `python -m kindi.config_reference --check` | python | the generated configuration reference matches the code |
 | `python tools/project_memory.py --check` | python | the requirement history matches git |
 | `python tools/check_perf_baseline.py` | python | the committed CROSS-MODE rows are within 15% of the perf baseline |
-| `python tools/check_claims.py` | python, git | every number the three claimed docs quote is re-derived from its tracked run, and every benchmark citation has a claim or a reasoned debt entry |
+| `python tools/check_claims.py` | python, git | every number the six claimed docs quote is re-derived from its tracked run, and every benchmark citation has a claim |
 | `python tools/check_secret_history.py` | python, git | no new credential or personal-data row in git history (tracked-file scans cannot see a deleted line) |
 | `python tools/check_secret_baseline.py` | python, `detect-secrets==1.5.0` | `.secrets.baseline` still matches the tracked tree |
 | `git diff --check` | git | no whitespace damage |
