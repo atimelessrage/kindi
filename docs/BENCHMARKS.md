@@ -52,11 +52,26 @@ llama.cpp columns are empty rather than estimated.
 | context | Kindi read | llama.cpp read | Kindi write | llama.cpp write |
 |---:|---:|---:|---:|---:|
 | 512 | 788.3–821.3 | not measured | 165.96–167.41 | not measured |
+| 8,192 | not measured | not measured | not measured | not measured |
+| 32,768 | not measured | not measured | not measured | not measured |
 
 Two consecutive runs at ctx 8192, with 70–106 of the 128 experts per layer on
 the card. `kindi verify` on the same pack is 5 token-exact + 7 llama.cpp ties,
 0 fail. Evidence:
 [benchmarks/2026-11-16-i7-8086k-rtx4060ti-lightning-30b/RESULTS.md](benchmarks/2026-11-16-i7-8086k-rtx4060ti-lightning-30b/RESULTS.md).
+
+**8K/32K follow-up blocked, 2026-11-20.** No Lightning GGUF or
+`kindi_lightning` pack existed on the host: `kindi models` listed
+`lightning-30b` without a presence label, and both `--ctx 8288` and
+`--ctx 32864` bench attempts exited 1 at the missing
+`.../packs/nemotron-lightning-30b/kindi_pack.json`, before weights loaded.
+No 8K or 32K prefill, decode or peak-VRAM number is claimed. The 2026-11-16
+run used ctx 8192, so the 8K row was skipped (`lightning_cli.bench` includes N
+only when `N + 96 <= eng.ctx`); use `--ctx 8288`/`32864` or more when the pack
+exists. Peak VRAM also needs a measurement path: `kindi bench` dispatches
+Lightning before creating `VramMonitor`, so `--sample-vram` is inert there.
+The catalog file is 9,472,656,320 bytes (SHA-256 `38854de6…`); fetching it
+is an owner download, not a benchmark result.
 
 Write test on cards with host-memory experts (the GTX 1080 and the RTX 2060 with 6 GB held back): the random prompt
 of `kindi bench` makes the next tokens use a small set of experts again and again, and that makes the decode slots
@@ -290,19 +305,19 @@ positions 100 to 24,000, with read speeds and sources, is generated at
 |---|---:|---:|---:|---:|
 | 2B | 8.2 | 160.6 | 19.6x | 37.4 |
 | 4B | 2.9 | 79.8 | 27.5x | 14.4 |
-| 9B | 2.4 | 62.3 | 26.5x | 15.8 |
+| 9B | 2.4 | 62.3 | 26.0x | 14.8 |
 
-CPU-only and tandem are the 2026-11-19 controlled same-context pairs (6-thread native Windows,
-one fresh process per placement for 2B/4B, two for 9B); GPU-only is the median of three Windows
+CPU-only and tandem are the 2026-11-19/20 controlled same-context pairs (6-thread native Windows,
+one fresh process per placement for 2B/4B, three for 9B); GPU-only is the median of three Windows
 runs. The 2026-11-10 CPU and 2026-11-13 tandem rows remain as history, and the old WSL2 CPU
 cells are archived in the 2026-11-09 benchmark page. The dense tandem runtime and its current
 status are in [TANDEM-STATUS.md](TANDEM-STATUS.md) and [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md).
 
-Every tandem row is faster than CPU-only at 24K: **4.6x (2B), 5.0x (4B), 6.7x (9B)**, but each is
+Every tandem row is faster than CPU-only at 24K: **4.6x (2B), 5.0x (4B), 6.2x (9B)**, but each is
 3.9-5.5x slower than GPU-only, so this is a capacity trade rather than a win for a model that fits the
 card. The 2B pair and the 9B's first pair verified 4/4 in both placements; the 4B tandem was 3/4 with one
-llama.cpp top-2 tie, so its rate is throughput evidence, not an exactness claim. The 9B's two-run
-spread is recorded in its page. The measured capacity-bound case is outside the 4060 Ti table:
+llama.cpp top-2 tie, so its rate is throughput evidence, not an exactness claim. The 9B's three-run
+spread and the run-2 decision are recorded in its page. The measured capacity-bound case is outside the 4060 Ti table:
 AH-Nanbeige4.3-33B IQ3_XXS on a
 12 GB Quadro K6000 keeps 13 layers in host memory and computes 55% of their FFN rows on the CPU, and
 writes 3.85/3.55/3.56 tok/s at 480/2,016/8,160 tokens against llama.cpp's 2.19/1.96/1.52 (4.4-5.0 vs

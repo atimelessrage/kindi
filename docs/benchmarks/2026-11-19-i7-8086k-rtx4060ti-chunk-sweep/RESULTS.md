@@ -1,9 +1,10 @@
-# KINDI_CHUNK prefill sweep: 2B and 9B at 4K and 8K
+# KINDI_CHUNK prefill sweep: 2B, 4B and 9B at 4K and 8K
 
 Measured 2026-11-19 on the i7-8086K + RTX 4060 Ti 8 GB, native Windows 10 22H2, Python 3.13.6,
-CuPy 14.2.0 and driver 617.42, with the `bonsai-2b` and `bonsai-9b` packs (both 5-trit). Three
-fresh-process passes per chunk size; each table reports p50/p95 over those passes. The packs were
-run separately; the 9B output is under `9b/`.
+CuPy 14.2.0 and driver 617.42, with the `bonsai-2b` and `bonsai-9b` packs; the `bonsai-4b` arm
+was added 2026-11-20 on the same host and toolchain. All three packs are 5-trit. Three fresh-process
+passes per chunk size; each table reports p50/p95 over those passes. The packs were run separately;
+the 9B output is under `9b/`, the 4B under `4b/`.
 
 ## Method
 
@@ -17,6 +18,7 @@ every 0.5 s and reports the peak.
 ```sh
 python run_chunk_sweep.py --pack ~/.kindi/packs/bonsai-2b --out .
 python run_chunk_sweep.py --pack ~/.kindi/packs/bonsai-9b --out 9b
+python run_chunk_sweep.py --pack ~/.kindi/packs/bonsai-4b --out 4b
 ```
 
 Both prompt lengths run in one process at the 8K context (8,192 + 128 fits 8,320), so every chunk
@@ -63,28 +65,53 @@ p50-p95 spread is 3.6 ms at 4K and 13.4 ms at 8K, narrower than the correspondin
 --pack ~/.kindi/packs/bonsai-9b verify` printed `ALL PASS` and 40/40 tokens on each of the four
 prompts. The transcript is in [`9b/verify-1024.txt`](9b/verify-1024.txt).
 
+## 4B measurement
+
+The 4B fits the same 8,320-token context: the loader reported 5,675 MiB free after the 5-trit lane
+and K/V cache were allocated. Three fresh-process passes were run for each chunk; the sampled peak
+is device-wide. The full artifact is [`4b/results.json`](4b/results.json); the per-pass JSONs are
+under `4b/logs/`.
+
+| chunk | 4K prefill p50 / p95 | 4K total p50 / p95 | 8K prefill p50 / p95 | 8K total p50 / p95 | peak used (delta) |
+|---:|---:|---:|---:|---:|---:|
+| 128 | 2,587.26 / 2,588.61 ms (1,583 tok/s) | 3,523.69 / 3,527.49 ms | 7,056.09 / 7,057.38 ms (1,161 tok/s) | 8,046.39 / 8,049.14 ms | 2,281 MiB (+1,261) |
+| 256 | 2,456.43 / 2,456.79 ms (1,667 tok/s) | 3,390.93 / 3,393.68 ms | 6,805.34 / 6,806.10 ms (1,204 tok/s) | 7,794.66 / 7,797.59 ms | 2,323 MiB (+1,303) |
+| 512 | 2,326.57 / 2,328.72 ms (1,760 tok/s) | 3,260.21 / 3,271.87 ms | 6,558.49 / 6,559.40 ms (1,249 tok/s) | 7,547.47 / 7,550.50 ms | 2,389 MiB (+1,369) |
+| 1024 | **2,254.26 / 2,254.89 ms** (1,817 tok/s) | **3,188.25 / 3,196.80 ms** | **6,331.19 / 6,331.60 ms** (1,294 tok/s) | **7,322.49 / 7,322.72 ms** | 2,527 MiB (+1,507) |
+
+Prefill is 70.7-73.5% of the 4K request and 86.5-87.7% of the 8K request. The 1024 p50-p95 spread
+is 0.6 ms at 4K and 0.4 ms at 8K.
+
+**1024 is the measured 4B optimum at both prompt lengths.** It is 3.1% faster than 512 at 4K and
+3.5% faster at 8K, and 8.2%/7.0% faster than 256; it costs 138 MiB over 512 and 204 MiB over 256
+in sampled peak. `KINDI_CHUNK=1024` verifies 4/4 on the 4B: the transcript is in
+[`4b/verify-1024.txt`](4b/verify-1024.txt) and printed `ALL PASS` with 40/40 tokens on each
+prompt.
+
 ## What it decides
 
-- **256 is the measured optimum at both prompt lengths, and it is already the default.** It is
-  the fastest cell at 4K and 8K; 512 and 1024 are 1.3-2.0% slower in prefill and 1.3-1.4% slower
-  end to end, while raising the sampled peak by 54 and 159 MiB over 256.
-- **128 is a real loss, not noise.** It is 22.6% slower at 4K and 15.9% at 8K prefill, and 15.3%
-  / 13.4% slower per request; the p50-p95 spread is under 5 ms in every cell, so the ordering is
-  not pass-to-pass variance.
-- **No global default change.** The fixed heuristic (`256`, or `512` on fp16-prompt cards) already
-  matches the 2B; 128 is a real loss there, and 512/1024 cost 1.3-2.0% in 2B prefill while raising
-  peak. The 9B's 1024 optimum is model-specific, not evidence for changing the 2B default.
-- **The 9B arm changes the model-specific answer.** 1024 is the 9B optimum, 1.0-1.4% ahead of 512
-  and 9.5-11.2% ahead of 256. A future per-model/autotune candidate should use 1024 on the 9B; the
-  current global default stays 256 until the 4B and the other models are measured.
-- **`KINDI_CHUNK=256` still verifies 4/4 on the 2B, and `KINDI_CHUNK=1024` verifies 4/4 on the 9B.**
-  `python -m kindi --pack ~/.kindi/packs/bonsai-2b verify` with `KINDI_CHUNK=256` printed ALL PASS,
-  40/40 tokens on each of the four prompts; the 9B run is noted above.
+- **256 is the measured 2B optimum at both prompt lengths, and it is already the default.** It is
+  the fastest 2B cell at 4K and 8K; 512 and 1024 are 1.3-2.0% slower in prefill and 1.3-1.4% slower
+  end to end, while raising the 2B sampled peak by 54 and 159 MiB over 256.
+- **128 is a real loss for the 2B, not noise.** It is 22.6% slower at 4K and 15.9% at 8K prefill,
+  and 15.3% / 13.4% slower per request; the p50-p95 spread is under 5 ms in every cell, so the
+  ordering is not pass-to-pass variance.
+- **4B and 9B are model-specific 1024 cases.** The 4B's 1024 cell is 3.1%/3.5% faster than 512
+  and 8.2%/7.0% faster than 256 at 4K/8K, at +138/+204 MiB sampled peak; the 9B's is 1.0%/1.4%
+  ahead of 512 and 9.5%/11.2% ahead of 256, at +184 MiB over 512. The 4B result confirms the shape;
+  it does not make 1024 a global default.
+- **No global default change.** The fixed heuristic (`256`, or `512` on fp16-prompt cards) stays:
+  a global 1024 would make the 2B 1.6-1.7% slower and raise its sampled peak by 159 MiB, and 512
+  would still regress the 2B while giving up the 4B/9B best cell. Use 1024 as a per-model/autotune
+  candidate for the 4B and 9B; the 27B remains unmeasured.
+- **All three measured verify cells pass 4/4.** `KINDI_CHUNK=256` on the 2B,
+  `KINDI_CHUNK=1024` on the 4B and `KINDI_CHUNK=1024` on the 9B all printed `ALL PASS`; the 4B and
+  9B transcripts are under `4b/` and `9b/`.
 
 ## Not verified
 
-One card and two packs: the 2B and 9B only. The 9B fits at 8,320 context; the 4B and 27B arms were
-not run, nor were other chunk sizes. One request at a time, greedy decode, no speculation, no server
-queueing or tokenizer time, and one 8,320-token context for both prompt lengths. The peak is
+One card and three packs: the 2B, 4B and 9B only. The 4B and 9B fit at 8,320 context; the 27B arm
+was not run, nor were other chunk sizes. One request at a time, greedy decode, no speculation, no
+server queueing or tokenizer time, and one 8,320-token context for both prompt lengths. The peak is
 device-wide, so it includes the desktop's ~934-1,253 MiB; the delta column is the figure to compare
 across chunks.

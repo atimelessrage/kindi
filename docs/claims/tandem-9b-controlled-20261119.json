@@ -1,10 +1,10 @@
 {
   "gate": "tandem-9b-controlled-20261119",
-  "title": "9B CPU-only vs CPU+GPU tandem: two controlled runs at 24,576",
-  "measured": "2026-11-19",
-  "commit": "3002a40",
-  "command": "KINDI_DEVICE=cpu python -m kindi --pack ~/.kindi/packs/bonsai-9b --ctx 24576 bench --split-at none --json cpu.json; python -m kindi --pack ~/.kindi/packs/bonsai-9b --ctx 24576 bench --tandem cpu-first --tandem-cpu-layers 6 --sample-vram --split-at none --json tandem.json; then the same pair again into cpu-2.json and tandem-2.json (one fresh process per placement)",
-  "notes": "This is the controlled replacement for the old cross-run 9B tandem-to-CPU ratio. The 2B/4B rows remain one pair; the 9B row is the median of two fresh-process pairs because run 2 was 23-38% slower on the CPU side. The shallow ratio is 3.0x in run 1 and 4.1x in run 2, so the two-run median is 3.5x; the 3.0x reading is not stable. Run 1 verified 4/4 and 133/133 at both placements; run 2 was throughput only. The full-GPU 9B rows remain the 2026-11-17 capacity run, and no thermal control was applied.",
+  "title": "9B CPU-only vs CPU+GPU tandem: three controlled runs at 24,576",
+  "measured": "2026-11-20",
+  "commit": "60a039b (working tree; run 3 uncommitted)",
+  "command": "OMP_NUM_THREADS=6 KINDI_DEVICE=cpu python -m kindi --pack ~/.kindi/packs/bonsai-9b --ctx 24576 bench --split-at none --json cpu.json; OMP_NUM_THREADS=6 python -m kindi --pack ~/.kindi/packs/bonsai-9b --ctx 24576 bench --tandem cpu-first --tandem-cpu-layers 6 --sample-vram --split-at none --json tandem.json; then the same pair into cpu-2.json/tandem-2.json and cpu-3.json/tandem-3.json (one fresh process per placement; pair 3 after a passive >7 h cooldown)",
+  "notes": "This is the controlled replacement for the old cross-run 9B tandem-to-CPU ratio. The 2B/4B rows remain one pair; the 9B row is the median of three fresh-process pairs. Run 3 reproduced run 2's tandem row within 8% and its CPU row within 4-10% at every CPU cell except 24K, where CPU-only 1.8 -> 2.4 tok/s (+33%), so run 2 was not a run-wide outlier; run 1 is the high side. The three-run median makes the shallow ratio 4.1x (range 3.0x-4.2x) and the 24K row 6.2x (per-run range 5.8x-8.2x). Run 1 verified 4/4 and 133/133 at both placements; runs 2-3 were throughput only. The full-GPU 9B rows remain the 2026-11-17 capacity run; pair 3 followed a passive >7 h idle cooldown at 32 C, not an instrumented thermal control.",
   "evidence": [
     "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs.json",
     "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/RESULTS.md",
@@ -13,6 +13,9 @@
     "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs-2.json",
     "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/cpu-2.json",
     "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/tandem-2.json",
+    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/runs-3.json",
+    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/cpu-3.json",
+    "docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/tandem-3.json",
     "docs/benchmarks/CROSS-MODE.csv",
     "docs/benchmarks/CROSS-MODE.md"
   ],
@@ -20,7 +23,7 @@
     {
       "id": "cpu-24k",
       "display": "2.4",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md", "docs/BENCHMARKS.md"],
       "check": {
         "kind": "csv",
         "file": "docs/benchmarks/CROSS-MODE.csv",
@@ -31,44 +34,44 @@
     },
     {
       "id": "tandem-24k",
-      "display": "15.8",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "display": "14.8",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md", "docs/BENCHMARKS.md"],
       "check": {
         "kind": "csv",
         "file": "docs/benchmarks/CROSS-MODE.csv",
         "where": {"mode": "tandem", "model": "9b"},
         "field": "gen_24000",
-        "expect": 15.8
+        "expect": 14.8
       }
     },
     {
       "id": "ratio-24k",
-      "display": "6.7x",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "display": "6.2x",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md", "docs/BENCHMARKS.md"],
       "check": {
         "kind": "text",
         "file": "docs/benchmarks/CROSS-MODE.md",
-        "needle": "| 9B | 3.5x | 3.8x | 4.8x | 5.7x | 6.7x |"
+        "needle": "| 9B | 4.1x | 4.0x | 5.2x | 5.6x | 6.2x |"
       }
     },
     {
       "id": "ratio-100",
-      "display": "3.5x",
+      "display": "4.1x",
       "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
       "check": {
         "kind": "text",
         "file": "docs/benchmarks/CROSS-MODE.md",
-        "needle": "| 9B | 3.5x | 3.8x | 4.8x | 5.7x | 6.7x |"
+        "needle": "| 9B | 4.1x | 4.0x | 5.2x | 5.6x | 6.2x |"
       }
     },
     {
       "id": "range-100",
-      "display": "3.0x-4.1x",
+      "display": "3.0x-4.2x",
       "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
       "check": {
         "kind": "text",
         "file": "docs/benchmarks/CROSS-MODE.md",
-        "needle": "3.0x-4.1x"
+        "needle": "3.0x-4.2x"
       }
     }
   ]

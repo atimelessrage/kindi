@@ -1,0 +1,77 @@
+{
+  "gate": "cross-mode-20261119",
+  "title": "Cross-mode 24K rows: CPU-only and tandem against the GPU-only baseline",
+  "measured": "2026-11-19/20",
+  "commit": "60a039b",
+  "command": "python docs/benchmarks/build_cross_mode.py from the controlled pairs and the 2026-11-09 GPU medians",
+  "notes": "The 9B has its own three-run claim; this gate covers the 2B/4B rows and the ratio tables that BENCHMARKS quotes. CPU-only and tandem are the controlled pairs, GPU-only is the 2026-11-09 median of three.",
+  "evidence": [
+    "docs/benchmarks/CROSS-MODE.csv",
+    "docs/benchmarks/CROSS-MODE.md"
+  ],
+  "numbers": [
+    {
+      "id": "cpu-2b-24k",
+      "display": "8.2",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "csv", "file": "docs/benchmarks/CROSS-MODE.csv",
+                "where": {"mode": "cpu", "model": "2b"}, "field": "gen_24000", "expect": 8.2}
+    },
+    {
+      "id": "cpu-4b-24k",
+      "display": "2.9",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "csv", "file": "docs/benchmarks/CROSS-MODE.csv",
+                "where": {"mode": "cpu", "model": "4b"}, "field": "gen_24000", "expect": 2.9}
+    },
+    {
+      "id": "tandem-2b-24k",
+      "display": "37.4",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "csv", "file": "docs/benchmarks/CROSS-MODE.csv",
+                "where": {"mode": "tandem", "model": "2b"}, "field": "gen_24000", "expect": 37.4}
+    },
+    {
+      "id": "tandem-4b-24k",
+      "display": "14.4",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "csv", "file": "docs/benchmarks/CROSS-MODE.csv",
+                "where": {"mode": "tandem", "model": "4b"}, "field": "gen_24000", "expect": 14.4}
+    },
+    {
+      "id": "gpu-cpu-2b",
+      "display": "19.6x",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/CROSS-MODE.md",
+                "needle": "| 2B | 6.1x | 5.9x | 9.5x | 14.9x | 19.6x |"}
+    },
+    {
+      "id": "gpu-cpu-4b",
+      "display": "27.5x",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/CROSS-MODE.md",
+                "needle": "| 4B | 7.5x | 8.6x | 13.6x | 22.9x | 27.5x |"}
+    },
+    {
+      "id": "gpu-cpu-9b",
+      "display": "26.0x",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/CROSS-MODE.md",
+                "needle": "| 9B | 9.3x | 10.7x | 15.2x | 20.4x | 26.0x |"}
+    },
+    {
+      "id": "tandem-cpu-2b",
+      "display": "4.6x",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/CROSS-MODE.md",
+                "needle": "| 2B | 2.6x | 2.9x | 3.5x | 3.8x | 4.6x |"}
+    },
+    {
+      "id": "tandem-cpu-4b",
+      "display": "5.0x",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/CROSS-MODE.md",
+                "needle": "| 4B | 2.8x | 3.2x | 3.9x | 4.7x | 5.0x |"}
+    }
+  ]
+}

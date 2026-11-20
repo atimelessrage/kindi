@@ -2,8 +2,8 @@
 
 Two layers of tests:
 
-* the repository's own claims must reproduce from their tracked artifacts and the three docs must
-  still quote them (`tools/check_claims.py` run for real), and
+* the repository's own claims must reproduce from their tracked artifacts and all six registered
+  docs must still quote them (`tools/check_claims.py` run for real), and
 * the checker itself must fail when a doc number drifts, when an artifact moves, when evidence is
   not tracked, or when a doc starts citing a benchmark run no claim accounts for. A checker that
   cannot fail is worse than none, so the negative cases are built on a small fixture tree.
@@ -68,7 +68,7 @@ def _problems(root):
 
 
 def test_repository_claims_reproduce():
-    """Every number the three docs quote is re-derived here, from tracked evidence."""
+    """Every claimed number in the six docs is re-derived here, from tracked evidence."""
     result = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_claims.py"),
                              ROOT], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             universal_newlines=True)
@@ -97,10 +97,22 @@ def test_repository_evidence_is_tracked():
 
 def test_repository_citations_are_accounted_for():
     claims = check_claims.load_claims(ROOT)
-    problems, _registry, outstanding, cites = check_claims.check_registry(claims, ROOT)
+    problems, registry, outstanding, cites = check_claims.check_registry(claims, ROOT)
     assert not problems, problems
     assert cites, "the registry's docs cite no benchmark runs; the coverage rule would be vacuous"
-    assert outstanding <= 4, "benchmark citations listed as debt grew to %d" % outstanding
+    assert set(check_claims.load_registry(ROOT)["docs"]) == {
+        "docs/BACKENDS.md", "docs/ROADMAP.md", "CURRENT-VS-KINDI-0.6.md",
+        "docs/AUTOTUNE.md", "docs/FP8-BF16.md", "docs/BENCHMARKS.md",
+    }
+    assert registry["unclaimed"] == []
+    assert outstanding == 0, "benchmark citations listed as debt grew to %d" % outstanding
+
+
+def test_bare_benchmark_scripts_are_not_run_citations():
+    """A link to benchmarks/build_cross_mode.py is a script, not a measured-run directory."""
+    registry = {"docs": ["docs/BENCHMARKS.md"], "unclaimed": []}
+    cites = check_claims.cited_dirs(registry, ROOT)
+    assert "build_cross_mode.py" not in cites
 
 
 def test_a_fixture_claim_passes_and_then_a_doc_drift_fails(tmp_path):

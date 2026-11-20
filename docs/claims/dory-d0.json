@@ -1,0 +1,42 @@
+{
+  "gate": "dory-d0",
+  "title": "Dory1.0-4B D0 reference evidence: architecture and golden protocol",
+  "measured": "2026-11-11",
+  "commit": "1c3cdd2",
+  "command": "dory-golden.exe -m <Dory Q5_K_M.gguf> -p <fixed prompt> -n 32 -k 1|2|4 -t 6 -ngl 0 (12 fresh processes)",
+  "notes": "D0 reference audit, not a Kindi support claim. The roadmap quotes the model architecture and context from the tracked page; the 12 prompt/k goldens are the pinned reference artifact.",
+  "evidence": [
+    "docs/benchmarks/dory-d0/README.md",
+    "docs/benchmarks/dory-d0/goldens/goldens.json"
+  ],
+  "numbers": [
+    {
+      "id": "physical-layers",
+      "display": "72 physical layers",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/dory-d0/README.md",
+                "needle": "72 physical layers, 16 input + 40 recurrent + 16 output"}
+    },
+    {
+      "id": "layer-blocks",
+      "display": "16 input + 40 shared recurrent + 16 output blocks",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/dory-d0/README.md",
+                "needle": "16 input + 40 recurrent + 16 output"}
+    },
+    {
+      "id": "attention-pattern",
+      "display": "27 sliding-window + 9 full-attention layers",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/dory-d0/README.md",
+                "needle": "27 sliding-attention + 9 full-attention"}
+    },
+    {
+      "id": "context-length",
+      "display": "262,144-token context",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/dory-d0/README.md",
+                "needle": "262,144 context, 1,024 sliding window"}
+    }
+  ]
+}

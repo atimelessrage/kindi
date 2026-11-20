@@ -1,0 +1,25 @@
+{
+  "gate": "fp8-ada-refusal",
+  "title": "Blackwell FP8 lane on the only available Ada device: unsupported",
+  "measured": "2026-11-12",
+  "commit": "60a039b",
+  "command": "python tools/verify_blackwell_fp8.py --arch auto (RTX 4060 Ti, Ada sm_89)",
+  "notes": "The lane is a hardware gate, not a pass: a non-Blackwell device is recorded as unsupported and exits 2. The page quotes this as proof that no Blackwell result exists.",
+  "evidence": ["docs/benchmarks/blackwell-fp8-ada-refusal-20261112/RESULTS.md"],
+  "numbers": [
+    {
+      "id": "status",
+      "display": "unsupported (exit 2)",
+      "quoted_in": ["docs/FP8-BF16.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/blackwell-fp8-ada-refusal-20261112/RESULTS.md",
+                "needle": "Status: **unsupported**"}
+    },
+    {
+      "id": "ada-arch",
+      "display": "compute capability 89",
+      "quoted_in": ["docs/FP8-BF16.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/blackwell-fp8-ada-refusal-20261112/RESULTS.md",
+                "needle": "compute capability 89"}
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "gate": "autotune-2b-20261117",
+  "title": "2B autotune: selected gpu0 decode, read and peak VRAM",
+  "measured": "2026-11-17",
+  "commit": "60a039b",
+  "command": "kindi --pack ~/.kindi/packs/bonsai-2b --ctx 8192 autotune --max-runs 6 --json tune.json",
+  "notes": "AUTOTUNE quotes the measured range; this claim checks the final selected run (97.4/111.7/3,050). The adjacent 97.6 tok/s run is recorded in the page note rather than in this report.",
+  "evidence": [
+    "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/autotune-2b.json",
+    "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/RESULTS.md"
+  ],
+  "numbers": [
+    {
+      "id": "gpu0-decode",
+      "display": "97.4",
+      "quoted_in": ["docs/AUTOTUNE.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/autotune-2b.json",
+                "pointer": "/results/0/gen_tok_s", "expect": 97.4}
+    },
+    {
+      "id": "gpu0-read",
+      "display": "111.7",
+      "quoted_in": ["docs/AUTOTUNE.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/autotune-2b.json",
+                "pointer": "/results/0/read_tok_s", "expect": 111.7}
+    },
+    {
+      "id": "gpu0-peak",
+      "display": "3,050 MiB",
+      "quoted_in": ["docs/AUTOTUNE.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/autotune-2b.json",
+                "pointer": "/results/0/vram_peak/peak_used_mib", "expect": 3050}
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 """The perf-regression gate (tools/check_perf_baseline.py) must pass on the recorded
 matrix and fail on a real regression or a disappeared baseline cell. The CPU-only and
-tandem cells are the 2026-11-19 controlled same-context pairs (one run per placement for
-2B/4B, two for 9B); the GPU and tensor-core cells are the 2026-11-09/13 medians. The 4B tandem verify is
+tandem cells are the 2026-11-19/20 controlled same-context pairs (one run per placement
+for 2B/4B, three for 9B); the GPU and tensor-core cells are the 2026-11-09/13 medians. The 4B tandem verify is
 3/4 with one llama.cpp tie, so its baseline is throughput evidence, not an exactness
 claim. The 2026-11-10 CPU and 2026-11-13 tandem rows remain history.
 """

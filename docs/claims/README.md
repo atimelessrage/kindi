@@ -10,8 +10,9 @@ python tools/check_claims.py --list   # gate -> measured date and number ids
 python -m pytest tests/test_claims.py -q
 ```
 
-`docs/BACKENDS.md`, `docs/ROADMAP.md` and `CURRENT-VS-KINDI-0.6.md` are the docs under this rule
-(`REGISTRY.json` lists them). The checker enforces three things for every one of them:
+`docs/BACKENDS.md`, `docs/ROADMAP.md`, `CURRENT-VS-KINDI-0.6.md`, `docs/AUTOTUNE.md`,
+`docs/FP8-BF16.md` and `docs/BENCHMARKS.md` are the docs under this rule (`REGISTRY.json` lists
+them). The checker enforces three things for every one of them:
 
 1. **The quoted text is still there.** Each number names the exact `display` string and the docs that
    quote it. Editing a number in the prose without updating the claim fails with
@@ -23,9 +24,10 @@ python -m pytest tests/test_claims.py -q
    nobody can reproduce is not evidence. Runs that only exist locally stay out of the registry and the
    doc says so.
 
-A fourth rule keeps the registry from being optional: **every `docs/benchmarks/<dir>` the three docs
-cite must be claimed, or listed under `unclaimed` in `REGISTRY.json` with a reason.** A new citation
-with no claim and no entry fails the check, so evidence cannot appear in a doc without an owner.
+A fourth rule keeps the registry from being optional: **every `docs/benchmarks/<dir>` any of the
+six docs cite must be claimed, or listed under `unclaimed` in `REGISTRY.json` with a reason.** A new
+citation with no claim and no entry fails the check, so evidence cannot appear in a doc without an
+owner.
 
 ## One file per gate
 
@@ -83,12 +85,10 @@ file to `docs/development/AGENTS-HISTORY.md`-style history or delete it with the
 
 ## Coverage today
 
-21 gates, 124 numbers. Four citations are listed as debt in `REGISTRY.json` with the reason each one
-cannot be claimed yet (a page that keeps the breakdown but not the cell the doc quotes, a page that
-adds provenance rather than a measurement, architecture constants, and a summary line the run's page
-never states). `python tools/check_claims.py` prints the debt count on every run, so the gap is
-visible instead of forgotten.
+35 gates, 253 numbers. No citation is listed as debt: every `docs/benchmarks/<dir>` cited by the six
+docs has an owning claim, including the autotune report and the promoted FP8 MMA log. The checker
+prints the gate, number and debt counts on every run.
 
-The rule is deliberately narrow: it covers these three docs and the gates behind them. A number in
-another page — `docs/AUTOTUNE.md`, `docs/FP8-BF16.md`, `docs/BENCHMARKS.md` — is still prose. Widening
-the `docs` list in `REGISTRY.json` is what extends the harness; the checker does the rest.
+The rule covers these six docs and the gates behind them. A number in another page is still prose;
+widening the `docs` list in `REGISTRY.json` is what extends the harness, and the checker does the
+rest.

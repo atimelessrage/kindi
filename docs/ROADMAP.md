@@ -1,6 +1,6 @@
 # Roadmap
 
-Status: **living document, updated 2026-11-17.** The generated capability tables are in
+Status: **living document, updated 2026-11-20.** The generated capability tables are in
 [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md); this page is the single index of what was tried and
 rejected, why it was rejected, and what evidence would reopen it. The detailed documents stay as
 appendices and are linked from their rows.
@@ -234,7 +234,7 @@ candidate, not as an MoE backend.
 | Nemotron Cascade 2 30B-A3B | `nemotron_h_moe` | converter/validator only (`kindi_cascade`): header + exact F32/Q5_0/Q8_0/Q4_K dequant + pinned-reference gate (`kindi/cascade.py`, reference generator `tools/cascade_reference.py`) | GPU K-quant Nemotron-H matmul kernels so `kindi verify` can do token comparison against the pinned reference |
 | Gemma 4 26B-A4B (MoE) | `gemma4` MoE | recognized, refused: backend is E4B-only (42 layers, width 2560) | separate 26B backend + pinned reference (contract in [GEMMA4-26B-MOE.md](GEMMA4-26B-MOE.md)) |
 | Qwen3-Coder-30B-A3B | `qwen3moe` | recognized, refused | Qwen3-MoE loader + pinned reference |
-| Qwen 3.6-35B-A3B (True MoE) | `qwen35moe` | recognized, refused; 40 layers (`10 × (3 Gated DeltaNet → 1 Gated Full Attention)`), hidden 2048, 248,320 padded vocab, 262,144 native ctx; 256 experts/layer (top-8 + 1 shared, intermediate 512) | **Q0 pinned GGUF/reference gate: byte-pinned Bartowski Q4_K_M (22.29 GB, Apache-2.0) or Unsloth UD-Q4_K_M, tensor inventory over every tensor, llama.cpp Q0 reference run.** Then Q1 Gated DeltaNet state/recurrence (30 layers; 16 QK + 32 V heads, head_dim 128, SSM inner 4096, conv kernel 4, time-step rank 32), Q2 Gated Full Attention (10 layers at 3/7/…/39; 16 Q / 2 KV heads, head_dim 256, partial RoPE 64, attn/output gate, mRoPE `[11,11,10]`), Q3 MoE router + experts (`ffn_gate_inp` `(256,2048)` no bias/correction; fused `ffn_{gate,up,down}_exps` + shared `ffn_*_shexp`; ~32.2 B expert params), Q4 host-resident expert cache, Q5 tokenizer/chat/no-vision text-only `kindi verify` |
+| Qwen 3.6-35B-A3B (True MoE) | `qwen35moe` | recognized, refused; 40 layers (`10 × (3 Gated DeltaNet → 1 Gated Full Attention)`), hidden 2048, 248,320 padded vocab, 262,144 native ctx; 256 experts/layer (top-8 + 1 shared, intermediate 512) | **Q0 pinned GGUF/reference gate: one byte-pinned `qwen35moe` GGUF (current 16 GB candidate: Unsloth `UD-IQ2_M`, 11.5 GB / 11,522,702,304 B at revision `a483e9e6...`, Apache-2.0), tensor inventory over every tensor, and one fixed greedy run under pinned upstream llama.cpp; this is a stock-llama.cpp reference, not yet a Kindi run.** Then Q1 Gated DeltaNet state/recurrence (30 layers; 16 QK + 32 V heads, head_dim 128, SSM inner 4096, conv kernel 4, time-step rank 32), Q2 Gated Full Attention (10 layers at 3/7/…/39; 16 Q / 2 KV heads, head_dim 256, partial RoPE 64, attn/output gate, mRoPE `[11,11,10]`), Q3 MoE router + experts (`ffn_gate_inp` `(256,2048)` no bias/correction; separate `ffn_gate_exps`/`ffn_up_exps` + `ffn_down_exps`, or fused `ffn_gate_up_exps`; shared `ffn_*_shexp`; ~32.2 B expert params), Q4 host-resident expert cache, Q5 tokenizer/chat/no-vision text-only `kindi verify` |
 | GLM-4.7-Flash | `glm4moelite` | recognized, refused | GLM4-MoE-Lite loader, MLA/KV attention path, routed-plus-shared expert path + pinned reference |
 | North Mini Code 1.0 (30B/~3B) | `cohere2moe` | recognized, refused | Cohere2-MoE loader, chat template and tokenizer checks + pinned reference |
 | Recursive Flint 40B/2.5B | `flint` | recognized, refused | loader, router and expert path + pinned reference |
@@ -242,16 +242,17 @@ candidate, not as an MoE backend.
 **Qwen 3.6 Q0 first gate (do not start the backend before this):** pin one text-only GGUF at a
 repository revision, record its SHA-256 and Apache-2.0 license chain, and dump a tensor inventory
 that proves the layer pattern (30 `blk.N.ssm_*` GDN blocks; no `ssm_*` on blocks 3, 7, 11, …, 39),
-the full-attention tensors, and every `ffn_gate_inp` / `ffn_{gate,up,down}_exps` /
-`ffn_*_shexp` tensor. The same artifact runs once under the pinned upstream llama.cpp
-`qwen35moe` reference for a fixed 1K-2K greedy prompt; its logits/tokens are the gate every later
-DeltaNet, attention and MoE milestone is compared against. Vision and MTP are explicitly out of
-scope for this text-only backend. Do **not** use the Ollama-converted layout as the first pin:
-it has been observed to differ (`ssm_dt` without `.bias`, `rope.dimension_sections` length 3 vs 4);
-use a Bartowski/Unsloth llama.cpp-compatible GGUF, or normalize those two deltas in a Kindi
-converter with byte-level tests first.
+the full-attention tensors, and every router, routed-expert and shared-expert tensor. The same
+artifact runs once under the pinned upstream llama.cpp `qwen35moe` reference for a fixed 1K-2K
+greedy prompt; its logits/tokens are the gate every later DeltaNet, attention and MoE milestone is
+compared against. Vision and MTP are explicitly out of scope for this text-only backend: pin the
+LM GGUF only (the separate `mmproj-*.gguf` is not part of Q0) and record whether the main file
+carries an MTP block. Do **not** use the Ollama-converted layout as the first pin: it has been
+observed to differ (`ssm_dt` without `.bias`, `rope.dimension_sections` length 3 vs 4); use an
+Unsloth llama.cpp-compatible GGUF, or normalize those deltas in a Kindi converter with byte-level
+tests first.
 
-**Standard llama.cpp GGUF route for a 16 GB NVIDIA card (checked 2026-11-18):**
+**Standard llama.cpp GGUF route for a 16 GB NVIDIA card (checked 2026-11-19):**
 [unsloth/Qwen3.6-35B-A3B-GGUF](https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF) publishes ordinary
 llama.cpp files whose `general.architecture` is `qwen35moe`; upstream llama.cpp has a loader and
 model implementation for it
@@ -290,12 +291,99 @@ quality reference, not a second required pin. Until that backend lands, the conc
 is stock llama.cpp with an IQ2 or IQ3 file, and the ternary community builds remain
 Q0-ineligible (their census is linked below).
 
-**Qwen3.6-35B-A3B ternary community builds (external, checked 2026-11-17):** the community builds,
+### Qwen3.6 Q0 audit (2026-11-19)
+
+**Recognition-only today.** `kindi/moe_compat.py` maps `general.architecture = qwen35moe` to
+Qwen3.6-35B-A3B and returns a specific refusal; `tests/test_moe_compat.py` pins the label. There is
+no `qwen35moe` converter, loader, engine, catalog entry, installer asset or support-matrix row.
+Nothing in this audit adds one, and the Apple-only community files are not recognized by this path
+at all.
+
+**Name and card audit.** The official Hugging Face config is `model_type: qwen3_5_moe` (class
+`Qwen3_5MoeForConditionalGeneration`, current revision `345d467b...`); the llama.cpp/GGUF
+architecture string is `qwen35moe`. `moe_compat.py` sees only the GGUF name, so a future loader
+must map the two or consume GGUF only. The official card/config confirm 40 layers (30 Gated DeltaNet
++ 10 Gated Full Attention), hidden 2048, 248,320 padded vocab, 256 experts per layer with top-8 + 1
+shared, expert intermediate 512, 262,144 native context, a vision encoder, and a separate one-block
+MTP module. The Unsloth GGUF card (revision `a483e9e6...`) is the ordinary `qwen35moe` route; its
+`UD-IQ2_M` file is 11,522,702,304 B and `UD-Q4_K_M` is 22,134,528,992 B, with a separate
+`mmproj-*.gguf`. Those are publisher metadata, not a local download or hash. The benchmark scores
+in the census remain external card claims, not gate evidence.
+
+**Header check (not a payload hash).** A 16 MiB range read of the current `UD-IQ2_M` at that
+revision parses as GGUF v3 with **733 tensors**, `data_start = 10,990,048`, `general.file_type = 29`
+(mostly IQ2_M) and `general.license = apache-2.0`. The metadata says `block_count = 40`,
+`rope.dimension_sections = [11, 11, 10, 0]`, 16 Q / 2 KV heads with head_dim 256, 256 experts top-8
+plus one shared expert (both intermediate 512), and GDN conv 4 / inner 4096 / state 128 / rank 32 /
+16 groups. The 30 GDN blocks each have 19 tensors (including `ssm_dt.bias`); the 10 full-attention
+blocks each have 16 (separate `attn_q`, `attn_k`, `attn_v`, `attn_output`, Q/K norms and no
+`ssm_*`). Every block uses separate `ffn_gate_exps` + `ffn_up_exps` (not fused `ffn_gate_up_exps`)
+and the four `ffn_*_shexp` tensors. There is no `blk.40` and no MTP tensor; the only top-level
+tensors are `token_embd`, `output_norm` and `output`. This is header evidence only: no payload was
+hashed and no token/logit was produced.
+
+**Q0 reference checklist (still open).** One artifact is enough, but it must be pinned and its
+inventory must be explicit:
+
+1. Download the chosen text-only GGUF at a fixed revision and record its local SHA-256, byte size
+   and Apache-2.0 chain. Do not treat the HF LFS object id or card size as a verified local hash.
+2. Check `general.architecture = qwen35moe`, `block_count = 40`, `context_length = 262144`,
+   `expert_count = 256`, `expert_used_count = 8`, expert/shared intermediate 512, 16 Q / 2 KV
+   heads with head_dim 256, and the GDN values (conv kernel 4, inner 4096, state 128, time-step
+   rank 32, group count 16). Record `full_attention_interval = 4` or the equivalent recurrent-layer
+   array. The official mRoPE section is `[11, 11, 10]`; llama.cpp requires a four-entry
+   `rope.dimension_sections`, and the audited file uses `[11, 11, 10, 0]`, so keep the fourth value
+   explicit and do not normalize it away without a byte-level test.
+3. Inventory 40 trunk blocks. GDN blocks (0-2, 4-6, …, 36-38) need `attn_qkv`, `attn_gate`,
+   `ssm_conv1d`, `ssm_dt.bias`, `ssm_a`, `ssm_beta`, `ssm_alpha`, `ssm_norm` and `ssm_out`; full
+   attention blocks (3, 7, …, 39) need the Q+gate form (`attn_q`, or fused `attn_qkv` if the file
+   uses it), `attn_k`, `attn_v`, `attn_output`, `attn_q_norm` and `attn_k_norm`, and must carry no
+   `ssm_*`. Every block needs `attn_norm`, `post_attention_norm`, `ffn_gate_inp`, either
+   `ffn_gate_up_exps` or separate `ffn_gate_exps` + `ffn_up_exps`, `ffn_down_exps`, and the shared
+   `ffn_gate_inp_shexp` / `ffn_gate_shexp` / `ffn_up_shexp` / `ffn_down_shexp` set; record the
+   top-level `token_embd`, `output_norm` and `output` (or tied fallback). The audited file has 19
+   tensors per GDN block and 16 per full-attention block, with separate `ffn_gate_exps` +
+   `ffn_up_exps`; record the same counts for the pinned hash.
+4. Record whether the file contains an MTP block. The audited `UD-IQ2_M` has none (`block_count =
+   40`, no `blk.40`); if another pin carries one, a text-only Q0 run must skip it and prove the
+   trunk output is unchanged. Build the pinned upstream llama.cpp `qwen35moe` commit, run a fixed
+   1K-2K greedy prompt, and store tokens/logits, prompt, context and sampling settings. No Kindi
+   `verify` is possible before the loader exists.
+
+**Converter and backend work (not started).** The existing converter cannot turn this file into a
+Kindi pack: `kindi/convert.py` has no `qwen35moe` path and its Bonsai reader accepts only
+PTQ1_0/PQ2_0/Q2_0 plus F32/BF16/FP8, while `UD-IQ2_M` is IQ2_M. A first backend therefore needs
+the following, in order:
+
+- a GGUF loader/pack for the pinned quant types, the 248,320-token tokenizer and the text-only chat
+  template, with vision and MTP explicitly rejected or skipped;
+- Gated DeltaNet recurrence: conv state (kernel 4), delta rule, A/beta/alpha/dt, gated norm and
+  f32 state across the 30 GDN layers;
+- Gated Full Attention: Q+gate, 16 Q / 2 KV heads, head_dim 256, partial RoPE 64, mRoPE
+  `[11,11,10]`, Q/K RMS norm, sigmoid output gate across the 10 full-attention layers;
+- MoE: softmax top-8 of 256 with no bias/correction, routed gate/up/down experts (fused or
+  separate as pinned), the gated shared expert, and 40 layers of expert packing;
+- token-exact `kindi verify` against the Q0 tokens/logits, then the existing KLD/PPL gate, and only
+  then a catalog/installer/support-matrix entry. The host-resident expert cache (Q4) is a later
+  performance follow-up, not a correctness prerequisite.
+
+**Qwen3.6-35B-A3B ternary community builds (external, checked 2026-11-19):** the community builds,
 their contents, formats and why none is a llama.cpp-compatible Q0 artifact are in the canonical
 [ternary-MoE census](TERNARY_MOE.md). Neither replaces the pinned-GGUF Q0 gate or gives
 this repository a 16 GB fit today. A later, separate experiment may test ternary gate/up plus a
 higher-bit down projection, but only after a byte-pinned GGUF export (or a converter with
 bit-level dequant tests) and a token-exact `kindi verify` plus the existing KLD/PPL quality gate.
+
+**External card claims (not Kindi measurements).** The official
+[Qwen3.6-35B-A3B card](https://huggingface.co/Qwen/Qwen3.6-35B-A3B) reports **SWE-bench Verified
+73.4** and **LiveCodeBench v6 80.4** for the base model. The
+[russellwmy ternary card](https://huggingface.co/russellwmy/qwen3.6-35b-a3b-ternary) reports
+**HumanEval pass@1 140/164 Python** and **108/156 Rust**, with **reply perplexity 1.227**, against
+**153/164**, **142/156** and **1.102** for its 4-bit MLX source. These are the publishers' harness
+results, not Kindi runs, and they say nothing about an NVIDIA or standard-GGUF path. The
+Apple-only/ironbark limitation is unchanged: the ternary bundle still needs an Apple Silicon Mac
+plus `ironbark` and is not loadable by `transformers`, `mlx-lm` or `mlx-vlm`; the other ternary
+build remains TurboQuant-MLX on Apple Silicon.
 
 ### Ternary-MoE census (2026-11-18)
 
@@ -432,7 +520,7 @@ so the baseline is set by the sweep, not by the 831-1,737 states of the constrai
 
 | item | direction | baseline the gate must beat | gate | status |
 |---|---|---|---|---|
-| Constrained-decoding mask cost ([REQ-0027](development/requirements/REQ-0027.md)) | compute the mask once per state instead of once per token pair: either a **token-class table** (group ids by the character/prefix class the state accepts, so a mask is assembled from a few precomputed sets) or an **on-card mask** (accept test as a gather/compare kernel over the token-text table, ids returned in device memory) | **231 ms/token** for `json_schema` and **2,720 ms/token** for the unrolled `json.gbnf` on the 2B (22-token document, greedy); 57 and 463 ms/token at 200 tokens | same host, pack, document and harness (`tools/grammar_cost.py`): `json_schema` at most **23 ms/token** and the unrolled grammar at most **272 ms/token** (a 10x improvement), with the 200-token rows 57 → 6 and 463 → 46; the mask must equal today's `vocab_allowed` set for every vocabulary entry (CPU test, no GPU), keep the §39 structured-output exactness cell, and leave unconstrained decode within 1%. A miss on either row is a no-go recorded here | **planned, not started**; direction named only |
+| Constrained-decoding mask cost ([REQ-0027](development/requirements/REQ-0027.md)) | compute the mask once per state instead of once per token pair: either a **token-class table** (group ids by the character/prefix class the state accepts, so a mask is assembled from a few precomputed sets) or an **on-card mask** (accept test as a gather/compare kernel over the token-text table, ids returned in device memory) | **231 ms/token** for `json_schema` and **2,720 ms/token** for the unrolled `json.gbnf` on the 2B (22-token document, greedy); 57 and 463 ms/token at 200 tokens | same host, pack, document and harness (`tools/grammar_cost.py`): `json_schema` at most **23 ms/token** and the unrolled grammar at most **272 ms/token** (a 10x improvement), with the 200-token rows 57 → 6 and 463 → 46; the mask must equal today's `vocab_allowed` set for every vocabulary entry (CPU test, no GPU), keep the §39 structured-output exactness cell, and leave unconstrained decode within 1%. A miss on either row is a no-go recorded here | **measured 2026-11-20 (token-class table): 15 ms/token `json_schema` and 212 ms/token unrolled GBNF at 22 tokens; 3 ms/token and 30 ms/token at 200; all four gate rows pass.** [run](benchmarks/2026-11-20-i7-8086k-rtx4060ti-grammar-mask/RESULTS.md) |
 
 Not in this item: the whitespace trap. Both constraints permit `[ \t\n\r]*`, and a greedy 2B spends a
 whole 200-token budget on it (9 characters of reply) — measured in the same run. A faster mask does not
@@ -454,7 +542,7 @@ claim; each item needs its own numeric or acceptance gate before it becomes a fe
 | Static analysis and secret scanning | **done 2026-11-12:** secret scanning is wired into pre-commit and CI (`secret-scan` job + baseline), and the CUDA static-analysis harness (`tests/static/run_static_analysis.py`) runs in CI as the `static-analysis` job (cppcheck + clang-tidy-18, GPU-free CuPy stub) | a baseline with no new secret, plus a CI static-analysis job for the CUDA TUs |
 | Sampled-peak VRAM in `kindi bench` | a larger-than-VRAM capacity claim needs the transient device peak, and the only measurement harness lived in `bench-logs/` | **done 2026-11-13:** `kindi bench --sample-vram` samples device-wide `nvidia-smi` memory on a background thread (`kindi/vram.py`) and logs the peak with its delta over the idle baseline and the phase it occurred in; `--vram-sample-s` sets the interval, and a host without `nvidia-smi` logs that and still finishes. `tests/test_vram_monitor.py` pins peak/delta, no-GPU and CLI-flag behavior. The 27B 8K tandem throughput row uses it. |
 | Coverage and performance regression gates | the CPU suite is broad, but coverage and tok/s have no enforced floor | **done 2026-11-12:** the CPU job enforces a 27% `kindi` line-and-branch coverage floor (27.15% measured locally; hardware/model paths are excluded from the claim, not the denominator), and `tools/check_perf_baseline.py` gates the recorded CROSS-MODE numbers (15% tolerance, 9 cells) in the same job. A same-runner GPU throughput regeneration remains the manual lane's job. |
-| Windows install documentation | native CPU and GPU paths exist, but the installer is Linux-only | **done 2026-11-12:** [WINDOWS.md](WINDOWS.md) records the verified native CPU quickstart, clang/libomp setup, server commands, thread/context limits and the explicit non-claim for native Windows GPU/AMD. The installer remains Linux-only. Native Windows GPU runs already exist in the benchmark records (2026-11-09: Windows 10, CuPy 14.2.0, driver 617.42), but no clean current-tree support run is recorded; the non-claim is reopened as follow-up #1 below. |
+| Windows install documentation | native CPU and a source-tree GPU path exist, but the installer is Linux-only | **done 2026-11-12; GPU non-claim narrowed 2026-11-20:** [WINDOWS.md](WINDOWS.md) records the verified native CPU quickstart, clang/libomp setup, server commands, thread/context limits and the explicit non-claim for native Windows AMD and unmeasured GPU cases. The installer remains Linux-only. The 2026-11-19 source-tree run measures the 2B on an RTX 4060 Ti 8 GB (plain and tensor-core verify 4/4, an 8K bench and one server request), so native GPU is no longer a blanket non-claim; it is not an installer/WSL2 or general Windows GPU support claim. Windows 11, the 4B/9B/27B packs, speculation/MTP, tandem, cache restart, other cards and AMD remain unmeasured. Follow-up #1 below carries the remaining gate. |
 | Structured request logging | the server logs free-form lines; request IDs and latency fields are not stable | **done 2026-11-11:** `log_json = 1` writes one JSON line per inference request with request id, status, duration, queue wait and token counts, and sets `X-Request-ID` |
 | `AGENTS.md` trim and ownership index | the handoff file is large and mixes history with current instructions | **done 2026-11-12, completed 2026-11-14:** `AGENTS.md` opens with a live "Current state" section (HEAD, shipped work, open gates, shared-file ownership) and the worktree HEAD is guarded by `tests/test_agents_handoff.py`; the dated Snapshot, Handoff, full lease table, old plan and resume protocol were moved verbatim to `docs/development/AGENTS-HISTORY.md`, leaving a ~215-line live handoff (was 1,057). The live Test/Definition-of-done sections now name the real gate (`pytest -q`, `project_memory --check`, `config_reference --check`, the perf baseline, `git diff --check`) |
 | Dependency and GitHub Actions pinning | CI uses floating action tags and unpinned test dependencies | **done 2026-11-11:** workflow actions are pinned to commit SHAs (`actions/checkout@11d5960`, `actions/setup-python@a26af69`, `actions/upload-artifact@ea165f8`) and `.github/dependabot.yml` opens weekly reviewed PRs for the test requirements and those pins |
@@ -471,10 +559,81 @@ gates, written before the work, per the standing rules.
 | # | item | why it is worth doing | first gate | status |
 |---|---|---|---|---|
 | 1 | Native Windows GPU: validate the path the benchmarks already use, then either claim it or correct the docs | `docs/WINDOWS.md` says native CUDA/CuPy has not been validated and makes no claim, while `docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/README.md` records GPU runs on Windows 10 with CuPy 14.2.0 and driver 617.42. That contradiction hides a working path behind WSL2/Docker and makes the support matrix understate this host. | a clean native Windows 10/11 run of the current tree on the RTX 4060 Ti: `kindi verify` 2B/4B/9B 4/4, one streamed `/v1/chat/completions` request, pack hashes and CUDA/CuPy/driver recorded; then `WINDOWS.md` says exactly what was validated and `CARD-SUPPORT.md` keeps other Windows cards unmeasured. If it fails, record the failure and keep the WSL2-only non-claim. | **partially validated 2026-11-19; measured scope is the 2B on the RTX 4060 Ti 8 GB.** The source-tree run passed plain and tensor-core 2B `verify` 4/4, an 8K `bench` at 212.7-226.1 generation tok/s, and one server request on Windows 10 22H2 with CuPy 14.2.0 and driver 617.42. The gate's 4B/9B cells and pack hashes were not run or recorded, so this is a 2B source-tree result, not an installer/WSL or Windows GPU support claim; other cards and Windows AMD remain unmeasured. Evidence: [WINDOWS.md](WINDOWS.md#native-windows-gpu-validation-2026-11-19), [CARD-SUPPORT.md](CARD-SUPPORT.md). |
-| 2 | Prefill chunk-size sweep (`KINDI_CHUNK`) | `kindi bench` measured 64% of a 4K request and 82% of an 8K request in prefill, and the chunk size is a fixed heuristic (256, or 512 on fp16-prompt cards), never tuned on this host. It is the largest remaining latency knob for long prompts and changes no arithmetic. | 2B (and 9B if it fits), 4K/8K prompts, chunks 128/256/512/1024, three runs each: p50/p95 prefill and whole-request time plus sampled peak; `kindi verify` 4/4 with the winning value; record in `docs/benchmarks/<date>-<host>-chunk-sweep/`. Change a default only after the sweep; otherwise add it as an `autotune` candidate. | **measured 2026-11-19 on the 2B and 9B (RTX 4060 Ti): 256 wins on the 2B and is already the default; the 9B's measured optimum is 1024.** On the 2B, three-pass p50 at 4K/8K is **962.15**/**2602.72** ms for 256 against **1179.81**/**3015.29** ms for 128; 512 and 1024 sit between. The 9B fits the same 8,320 context and, over three passes, 1024 gives **3118.80**/**8071.40** ms p50 against **3151.39**/**8185.80** for 512 and **3414.99**/**8978.64** for 256; 1024 is 1.0-1.4% ahead of 512 and 9.5-11.2% ahead of 256. No global default change: 256 remains the 2B optimum, 1024's 9B gain over 512 is small and its peak is higher, and the 4B is unmeasured; 1024 is a 9B-specific/autotune candidate. `KINDI_CHUNK=1024` 9B verify is 4/4 (`ALL PASS`). Evidence: [chunk-sweep page](benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/RESULTS.md) (p50/p95, peak and per-pass rows; 9B under `9b/`). |
+| 2 | Prefill chunk-size sweep (`KINDI_CHUNK`) | `kindi bench` measured 64% of a 4K request and 82% of an 8K request in prefill, and the chunk size is a fixed heuristic (256, or 512 on fp16-prompt cards), never tuned on this host. It is the largest remaining latency knob for long prompts and changes no arithmetic. | 2B, 4B and 9B, 4K/8K prompts, chunks 128/256/512/1024, three runs each: p50/p95 prefill and whole-request time plus sampled peak; `kindi verify` 4/4 with the winning value; record in `docs/benchmarks/<date>-<host>-chunk-sweep/`. Change a default only after the sweep; otherwise add it as an `autotune` candidate. | **measured 2026-11-19 on the 2B and 9B, and 2026-11-20 on the 4B (RTX 4060 Ti): 256 wins on the 2B and is already the default; 1024 wins on the 4B and 9B.** On the 2B, three-pass p50 at 4K/8K is **962.15**/**2602.72** ms for 256 against **1179.81**/**3015.29** ms for 128; 512 and 1024 sit between. The 4B fits the same 8,320 context: 1024 gives **2254.26**/**6331.19** ms p50 against **2326.57**/**6558.49** for 512 and **2456.43**/**6805.34** for 256, 3.1-3.5% ahead of 512 and 7.0-8.2% ahead of 256; its sampled peak is **2527** MiB against **2323** at 256 (+204), and `KINDI_CHUNK=1024` 4B verify is 4/4 (`ALL PASS`). The 9B over three passes, 1024 gives **3118.80**/**8071.40** ms p50 against **3151.39**/**8185.80** for 512 and **3414.99**/**8978.64** for 256; 1024 is 1.0-1.4% ahead of 512 and 9.5-11.2% ahead of 256. **No global default change:** 256 remains the 2B optimum; a global 1024 would make the 2B 1.6-1.7% slower and raise its peak by 159 MiB, while 512 would still regress the 2B and give up the 4B/9B best cell. 1024 is a 4B/9B-specific/autotune candidate; the 27B is unmeasured. `KINDI_CHUNK=1024` 9B verify is 4/4 (`ALL PASS`). Evidence: [chunk-sweep page](benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/RESULTS.md) (p50/p95, peak and per-pass rows; 4B under `4b/`, 9B under `9b/`). |
 | 3 | Intel M1 probe/report (`kindi intel-info --json`) | The A770 arrival gates REQ-0020; the first hour's PCI/DRM/Level Zero/oneAPI/ReBAR state is easy to lose, and the current checklist is prose. A read-only report makes M1 reproducible and gives M2 a baseline without pretending a backend exists. | CPU-only fixture tests over synthetic DRM/DRI trees; then on the A770 capture `lspci -nnk`, `/dev/dri`, `sycl-ls`, `clinfo`, Level Zero/oneAPI/OpenVINO versions, ReBAR and PCIe link state into one JSON/Markdown file under `docs/benchmarks/<date>-<host>-arc-a770/`; no model load, no support claim. Reuse the tracked fork's `discover()`/device naming only as prior art. | **accepted, part of REQ-0020 M1** |
 | 4 | OpenAI Responses endpoint (`POST /v1/responses`) | `kindi serve` speaks OpenAI chat, Ollama and (proposed) Anthropic shapes, but not the Responses API that current OpenAI SDKs and agent harnesses use; without it they need a proxy. It is a translation over the existing chat path, so it does not touch decoding or exactness. | app-level test through `create_app` with an OpenAI-SDK-shaped Responses request (streaming and one tool call), plus one real harness run; same tokens as the chat path; the Anthropic endpoint (REQ-0028) stays a separate dialect. | **proposed; gate only** |
-| 5 | No-thinking Pi adapter for ternary models (Qwen3.8-pi pattern) | The published [Qwen3.8-27B-pi-adapted](https://huggingface.co/harness-hub/Qwen3.8-27B-pi-adapted) is a rank-32 LoRA on **dense Qwen3.8-27B**, not a Bonsai or Nemotron ternary pack, so it cannot be loaded by Kindi as a ternary adapter. The reusable part is the harness-specific no-thinking objective and the [pi-llama](https://github.com/huggingface/pi-llama) serving path; Kindi already exposes `enable_thinking: false` and `thinking_budget_tokens` on its chat path. | First run the no-training version through `kindi serve` on a fixed Pi task set (tool calls, repair and terminal tasks) with `enable_thinking: false`, on the 2B and 9B (and 27B/Lightning when their packs are present): pass rate no worse than the thinking-on baseline, fewer generated tokens and turns, and no tool-call regression. Only if that fails, train a Pi-trajectory LoRA on the matching BF16 base, merge and export to PTQ1_0, run `kindi convert`, then require `kindi verify` 4/4 plus the task-suite delta; do not merge the Qwen3.8 LoRA into a Bonsai pack. Record the suite, sampling, token/turn counts and pack hashes under `docs/benchmarks/<date>-<host>-pi-nothink/`. | **proposed; gate only.** The external adapter is Qwen3.8-27B-specific and its published pass/token figures are its author's, not a Kindi measurement; no ternary adapter, pack or benchmark exists here. |
+| 5 | No-thinking Pi adapter for ternary models (Qwen3.8-pi pattern) | The published [Qwen3.8-27B-pi-adapted](https://huggingface.co/harness-hub/Qwen3.8-27B-pi-adapted) is a rank-32 LoRA on **dense Qwen3.8-27B**, not a Bonsai or Nemotron ternary pack, so it cannot be loaded by Kindi as a ternary adapter. The reusable part is the harness-specific no-thinking objective and the [pi-llama](https://github.com/huggingface/pi-llama) serving path; Kindi already exposes `enable_thinking: false` and `thinking_budget_tokens` on its chat path. | **`pi-nothink-v1` (12 fixed tasks, defined below):** 2B and 9B, three runs per task per arm; thinking-on `enable_thinking=true` with `thinking_budget_tokens=2048` against no-thinking `enable_thinking=false`. Pass only if the baseline reaches 9/12, no-thinking matches or beats it with no baseline-passing task regressing, total completion tokens are <=75% of baseline (no task >125%), turns do not increase, tool calls are 100% valid, no-thinking emits no reasoning, and `kindi verify` is 4/4. Training is not part of this gate. | **proposed; gate only.** No adapter, fixture or benchmark exists. The external adapter is Qwen3.8-27B-specific and its published pass/token figures are its author's, not a Kindi measurement; no ternary adapter, pack or benchmark exists here. |
+
+### pi-nothink-v1 gate (proposed)
+
+`pi-nothink-v1` is a fixed 12-task local proxy for the Pi harness, not the Pi benchmark itself.
+The suite is frozen before the first run in `tools/pi_nothink_tasks/tasks.jsonl`; each task names
+one fixture directory, one literal prompt, the fixed tool schema and one deterministic
+`check.py`. A run copies the fixture into a fresh temporary workspace, serves one `kindi serve`
+process, drives the OpenAI chat/tool loop with the same system prompt, and scores the workspace
+with `check.py`; there is no model judge and no network.
+
+**Fixed conditions.** 2B and 9B packs on the RTX 4060 Ti 8 GB; `KINDI_TC=0`, `KINDI_TP=1`,
+`KINDI_SPEC=0`, `KINDI_HEAD=exact`, `KINDI_CTX=8192`, `KINDI_KV=q8_0`; `temperature=0`,
+`max_completion_tokens=4096`, `max_turns=8`, `parallel_tool_calls=false`; tools are
+`read_file(path)`, `write_file(path, content)`, `apply_patch(unified_diff)` and
+`run_shell(command)` (30 s timeout, 8 KiB output cap). Three runs per task per arm. The
+thinking-on arm sets `enable_thinking=true` and `thinking_budget_tokens=2048`; the no-thinking
+arm sets `enable_thinking=false`. 27B/Lightning are not in v1; they get separate rows when their
+packs exist.
+
+| id | group | fixture and fixed prompt | deterministic pass check |
+|---|---|---|---|
+| `tool-single` | tool call | `get_weather` fixture; prompt: "Use `get_weather` to get the weather for Paris. Then answer with the temperature and sky condition." | exactly one `get_weather` call with `city=Paris`; final answer contains `18` and `clear` |
+| `tool-two` | tool call | two-city fixture; prompt: "Use `get_weather` for Paris and Rome, then summarize both." | calls for exactly Paris and Rome; both conditions in the final answer; at most 3 turns |
+| `tool-retry` | tool call | `get_weather` rejects `Pari`, accepts `Paris`; prompt: "Call `get_weather` for `Pari`. If it reports an unknown city, correct it to `Paris` and retry once, then answer." | first call `Pari`, second `Paris`, no third call; final answer present |
+| `tool-none` | tool call | arithmetic prompt: "What is 17 + 25? Answer directly and do not call a tool." | zero tool calls; final answer is `42` |
+| `repair-python` | repair | `add.py` returns `a - b`; `test_add.py` expects `2 + 3 == 5`; prompt: "Run `pytest -q`, fix `add.py` so the test passes, and rerun `pytest -q`. Do not edit the test." | `pytest` exits 0; `add.py` changed; test file hash unchanged |
+| `repair-shell` | repair | `run.sh` uses unquoted `$FILES` with a space-containing filename; prompt: "Run `./run.sh`. Fix its quoting so filenames with spaces work, then rerun it. Do not rename the input files." | script exits 0; both files processed; only `run.sh` changed |
+| `repair-json` | repair | invalid `config.json`; `check.py` requires `name=kindi` and `enabled=true`; prompt: "Make `config.json` valid JSON while keeping `name` as `kindi` and `enabled` as `true`; run `python check.py`." | JSON parses; both values present; `check.py` exits 0 |
+| `repair-patch` | repair | `mul` is `a + b`; `fix.patch` has stale context; `test_mul.py` expects `12` for `3 * 4`; prompt: "Apply `fix.patch` with `apply_patch`. If it does not apply, repair the change so `python test_mul.py` passes; do not edit the test." | test exits 0; `mul(3, 4) == 12`; test hash unchanged |
+| `terminal-find` | terminal | `src/alpha.py` and `src/beta.py`, with `NEEDLE` only in beta; prompt: "Find the file under `src/` that defines `NEEDLE` and report its relative path. Do not edit anything." | answer is `src/beta.py`; no files changed |
+| `terminal-run` | terminal | `tests/test_ok.py` with three passing tests; prompt: "Run `python -m pytest -q tests/test_ok.py` and report how many tests passed. Do not edit anything." | answer reports `3` passed; no files changed |
+| `terminal-write` | terminal | empty `out/` directory; prompt: "Create `out/answer.txt` containing exactly `kindi-pi-ok` followed by one newline. Report its SHA-256." | file bytes exact; reported hash equals the file hash |
+| `terminal-clean` | terminal | git fixture with `keep.txt`, `delete.me` and `nested/delete.me`; prompt: "Delete only `delete.me` in the repository root. Leave `keep.txt` and `nested/delete.me`; show `git status --short`." | root file gone; `keep.txt` and `nested/delete.me` present; status lists only that deletion |
+
+**Metrics.** A task passes when `check.py` exits 0 in at least 2 of its 3 runs. `pass_rate` is
+tasks passed / 12. `tokens` is the sum over tasks of the median `usage.completion_tokens` across
+the three runs (reasoning and content included); `turns` is the same sum of median assistant
+messages, where a tool-result message is not a turn. Tool calls, invalid calls and calls to a
+tool not in the schema are counted separately. `reasoning` is the non-empty reasoning channel
+(or thought text in `content`); the baseline may have it, no-thinking must not.
+
+**Pass/fail threshold.** The gate passes only when all of these hold for the same pack and build:
+(1) the thinking-on baseline is calibrated at **>=9/12**; below that, record "suite too hard" and
+do not compare; (2) no-thinking `pass_rate` is **>=** thinking-on, with **zero** baseline-passing
+tasks regressing; (3) total completion tokens are **<=75%** of thinking-on, and no task passed by
+both arms uses **>125%** of its baseline tokens; (4) total turns are **<=** thinking-on, and no
+task uses more turns; (5) invalid and unoffered tool calls are **0** (100% valid); (6) no-thinking
+emits no reasoning, and `kindi verify` is 4/4 on the same pack. Record the result under
+`docs/benchmarks/<date>-<host>-pi-nothink/` with exact prompts, `KINDI_*` environment, pack
+hashes, per-task run rows and the three medians.
+
+Training is not authorized by this gate. A failure is a no-go result, not a reason to start a
+LoRA in this task; any later adapter proposal needs its own gate and must not merge the Qwen3.8
+LoRA into a Bonsai pack.
+
+## Pascal follow-ups (2026-11-20)
+
+Three gate-only rows from the Pascal research. None is implemented, measured or a support claim:
+no sm_61 run exists, no kernel changed, and the proposed items stay "gate only" until the runs
+below exist. They sit beside the Cards notes ([CARDS.md](CARDS.md), [OLD-CARD-RIG.md](OLD-CARD-RIG.md)).
+
+Provenance: the external P100 9B user report (426,752-token context, 41.3 tokens/s; scuderiapk,
+GitHub issue #22, recorded in [CARDS.md](CARDS.md)) and every llama.cpp row in
+[BENCHMARKS.md](BENCHMARKS.md) are **theirs**, not Kindi measurements. The 9B report is sm_60,
+not sm_61, and neither source is a gate baseline or evidence for the rows below.
+
+| # | item | why it is worth doing | first gate | status |
+|---|---|---|---|---|
+| 1 | `KINDI_TC=1` + MTP on sm_61 (2B) | `pascal8` leaves `KINDI_TC` off, and `docs/MTP.md` says MTP is sm_80+ only, but the attach path has no sm_80 check: with `KINDI_TC=1` the sm_61 `tcp.cu` dp4a plans use the same tc-layout weights the head's output GEMV reads. Forcing the existing path tests that contradiction without a new kernel. | On a P106-100 or P4000, 2B pack and a registered MTP head: `KINDI_TC=1 KINDI_SPEC=mtp KINDI_MTP_HEAD=<registered head>`; require `/health` `drafting.mode=mtp` (not a fallback), `kindi verify --spec mtp` 4/4 token-exact, and `drafted`/`accepted` > 0; then three passes at 512/2K/8K against `KINDI_SPEC=0` on the same TC path and `KINDI_TC=0`. Exactness/attach is a pass, not a speed claim: adoption needs p50 generation >=1.05x at 512 and >=1.00x at 2K; otherwise record the measured ratio as a no-go. | **proposed; gate only.** No sm_61 run exists; the P100/sm_60 row and the sm_80+ MTP rows are not evidence. `docs/MTP.md`'s sm_80-only sentence is corrected only from a result. |
+| 2 | CUDA graph replay on sm_61 (2B, T=1..8) | CUDA `Graph` is already the default for TC plans, but `KINDI_TC_GRAPHS` only selects `Replay` on HIP; no sm_61 graph run is recorded. A graph that builds but replays a stale token/position, or fails on the 470 driver, is a correctness/portability bug that a compile check cannot catch. | On a P106-100 or P4000, `KINDI_TC=1` and `KINDI_TC_TMAX=8`: build and launch the T=1..8 plans; `kindi verify` 4/4; ten identical greedy completions from one process; at 512/2K, three passes against a test-only eager node-by-node launch of the same plans: graph p50 decode must be <=1.02x eager and token-identical. Record graph build time, first-request latency, driver/CUDA version and any `cuGraph*` return code. A failed replay is a no-go; do not hide an eager production path behind a flag. | **proposed; gate only.** No sm_61 graph run or eager A/B exists; CUDA graphs remain the TC default until the gate says otherwise. |
+| 3 | 2B/9B chunk and tile-shape sweep on sm_61 | The 2026-11-19 `KINDI_CHUNK` sweep is RTX 4060 Ti; Pascal's SM count, bandwidth and dp4a path differ, so its 256/1024 optima need not transfer. On the 2B/9B, `KINDI_CHUNK_TILE=64` switches the chunk attention to its small tile; `128` only selects the 2-bit `k_mm_g4` tile, which these 5-trit packs do not use. Chunk size, attention tile and split are the shapes to sweep. | On a P106-100 or P4000, 2B and 9B (if 8K fits; otherwise record the reduced context), 4K/8K, three passes: first `KINDI_CHUNK` 128/256/512/1024; then, at the best chunk, `KINDI_CHUNK_TILE` 64/128, `KINDI_CHUNK_TS` 32/64 and `KINDI_CHUNK_SPLIT` 1/4/8 one variable at a time, plus one combined cell. Record p50/p95 prefill and whole-request time, sampled peak and the effective settings; the winning cell must pass `kindi verify` 4/4. Change a default only for a repeatable >=5% prefill win at 4K or 8K, with no >1% decode regression and no peak that reduces the fitted context; otherwise record the table and leave the defaults. | **proposed; gate only.** The 4060 Ti 2B/9B sweep is not Pascal evidence; `KINDI_CHUNK_TILE` is included as the 64/128 attention-tile test; its 128 setting changes only the 2-bit chunk GEMM. |
 
 ## Standing rules
 

@@ -6,16 +6,16 @@ NVIDIA GeForce RTX 4060 Ti 8 GB, at a 24,576-token context, exact head, greedy, 
 drafting.
 
 - **CPU only:** `KINDI_DEVICE=cpu` on native Windows 10, 6 threads (one per physical core),
-  24,576-token context. One fresh-process run per model for 2B/4B, two for 9B; no WSL. The
-  2B/4B/9B rows are the CPU half of the 2026-11-19 controlled pairs below.
+  24,576-token context. One fresh-process run per model for 2B/4B, three for 9B; no WSL. The
+  2B/4B/9B rows are the CPU half of the 2026-11-19/20 controlled pairs below.
 - **GPU only:** the card runs every layer; the CPU only drives the process (Windows 10, CuPy
   14.2.0). Three fresh-process runs per model; the table uses their median.
 - **GPU tensor-core (plan):** `KINDI_TP=1` `KINDI_TC=1` (plan engine, tensor cores) on the
   same card; the 9B runs with `KINDI_TC_HP=1` (4096 Hadamard blocks are refused otherwise).
   Three fresh-process runs per model; the table uses their median.
 - **GPU+CPU tandem:** the dense `TandemEngine` exists and is token-exact on the 2B/9B (`docs/TANDEM-RUNTIME.md`). All three rows are controlled CPU-only/tandem pairs from
-  2026-11-19; the 2B/4B pairs are one run per placement, the 9B is the median of
-  two, so no tandem-to-CPU ratio is cross-run.
+  2026-11-19/20; the 2B/4B pairs are one run per placement, the 9B is the median of
+  three, so no tandem-to-CPU ratio is cross-run.
 
 "Read" is the benchmark's 1,000-token prompt-reading probe. 100, 2K, 8K, 16K and 24K are
 generation at that token position in the allocated 24,576-token context. Tokens/s.
@@ -32,16 +32,16 @@ generation at that token position in the allocated 24,576-token context. Tokens/
 | 4B | GPU+CPU tandem | 53.3 | 39.6 | 37.9 | 26.2 | 18.4 | 14.4 |
 | 9B | GPU only | 90.3 | 77.8 | 76.8 | 71.6 | 67.4 | 62.3 |
 | 9B | GPU tensor-core (plan) | 133.9 | 114.7 | 111.3 | 108.7 | 103.2 | 97.0 |
-| 9B | CPU only | 11.0 | 9.9 | 8.4 | 5.4 | 3.5 | 2.4 |
-| 9B | GPU+CPU tandem | 39.8 | 34.4 | 31.6 | 26.2 | 19.5 | 15.8 |
+| 9B | CPU only | 9.3 | 8.4 | 7.2 | 4.7 | 3.3 | 2.4 |
+| 9B | GPU+CPU tandem | 36.5 | 34.2 | 28.8 | 24.3 | 18.4 | 14.8 |
 
 Sources: [2026-11-09-i7-8086k-rtx4060ti](2026-11-09-i7-8086k-rtx4060ti/README.md) (GPU-only)
 and the controlled pair pages below. The CPU-only and tandem cells are one run per placement
-for 2B/4B and the median of two for 9B; the GPU and tensor-core cells are medians of three.
+for 2B/4B and the median of three for 9B; the GPU and tensor-core cells are medians of three.
 The old 2026-11-10 CPU cells and 2026-11-12/13 tandem cells stay in the repository as history.
 
 Controlled 2B/4B pair: [2026-11-19-i7-8086k-rtx4060ti-2b-4b-controlled](2026-11-19-i7-8086k-rtx4060ti-2b-4b-controlled/RESULTS.md).
-Controlled 9B pair (two runs): [2026-11-19-i7-8086k-rtx4060ti-9b-controlled](2026-11-19-i7-8086k-rtx4060ti-9b-controlled/RESULTS.md).
+Controlled 9B runs (three): [2026-11-19-i7-8086k-rtx4060ti-9b-controlled](2026-11-19-i7-8086k-rtx4060ti-9b-controlled/RESULTS.md).
 Tensor-core source: [2026-11-13-i7-8086k-rtx4060ti-tc](2026-11-13-i7-8086k-rtx4060ti-tc/README.md).
 
 ## GPU-only speedup over CPU-only
@@ -50,7 +50,7 @@ Tensor-core source: [2026-11-13-i7-8086k-rtx4060ti-tc](2026-11-13-i7-8086k-rtx40
 |---|---:|---:|---:|---:|---:|
 | 2B | 6.1x | 5.9x | 9.5x | 14.9x | 19.6x |
 | 4B | 7.5x | 8.6x | 13.6x | 22.9x | 27.5x |
-| 9B | 7.8x | 9.1x | 13.1x | 19.5x | 26.5x |
+| 9B | 9.3x | 10.7x | 15.2x | 20.4x | 26.0x |
 
 The ratio grows with depth because the CPU attention path slows down faster than the GPU path.
 
@@ -68,10 +68,10 @@ The ratio grows with depth because the CPU attention path slows down faster than
 |---|---:|---:|---:|---:|---:|
 | 2B | 2.6x | 2.9x | 3.5x | 3.8x | 4.6x |
 | 4B | 2.8x | 3.2x | 3.9x | 4.7x | 5.0x |
-| 9B | 3.5x | 3.8x | 4.8x | 5.7x | 6.7x |
+| 9B | 4.1x | 4.0x | 5.2x | 5.6x | 6.2x |
 
 Every measured tandem cell above is faster than CPU-only; at 24K the gain is
-**4.6x-6.7x**. The same rows are 3.9x-5.5x slower than GPU-only, so this is a capacity trade, not a win for a model that fits the card.
+**4.6x-6.2x**. The same rows are 4.2x-5.5x slower than GPU-only, so this is a capacity trade, not a win for a model that fits the card.
 The measured capacity-bound case is outside this table: AH-Nanbeige4.3-33B IQ3_XXS
 on a 12 GB Quadro K6000 keeps 13
 layers in host memory and computes 55% of their FFN rows on the CPU; it writes
@@ -83,19 +83,20 @@ dense 33B model, not a MoE. A big-MoE CPU-compute row still needs the CPU expert
 The 2B and 4B rows are direct A/B pairs. The 2B verified 4/4 in both placements
 (160/160 tokens); the 4B CPU placement verified 4/4, but the tandem placement was 3/4
 with one llama.cpp top-2 tie (159/160 tokens), so the 4B row is throughput evidence, not
-an exactness claim. The 9B was measured twice: its CPU-only run 2 was 23-38% slower than
-run 1, while tandem fell 11-27% at read and 2K-24K and was flat at 100 (+1%). The two-run
-median row is used here, so the shallow ratio ranges 3.0x-4.1x (median 3.5x), not a stable
-3.0x; at 24K it ranges 5.8x-8.2x (median 6.7x). Both 9B placements verified 4/4
-(133/133) in run 1; run 2 was throughput only. Tandem sampled peaks were 1,627 / 2,385 MiB
-device-wide for 2B/4B (605 / 1,373 MiB over idle), with 6,577 / 5,895 MiB free after load.
-The 9B's two runs peaked at 2,864 / 2,968 MiB (1,939 / 1,863 MiB over idle), with
-5,086 / 4,982 MiB free at peak and 5,245 MiB free after load in both. CPU-only placements
+an exactness claim. The 9B was measured three times: run 3 reproduced run 2's tandem row
+within 3-8% and its CPU row within 4-10% at every CPU cell except 24K, where 1.8 -> 2.4
+tok/s (+33%). Run 2 is therefore not a run-wide outlier; run 1 is the high side. The three-run
+median makes the shallow ratio 3.0x-4.2x (median 4.1x), not a stable 3.0x; at 24K it is
+5.8x-8.2x (median 6.2x). Both 9B placements verified 4/4 (133/133) in run 1; runs 2-3 were
+throughput only. Tandem sampled peaks were 1,627 / 2,385 MiB device-wide for 2B/4B
+(605 / 1,373 MiB over idle), with 6,577 / 5,895 MiB free after load. The 9B's three runs
+peaked at 2,864 / 2,968 / 2,959 MiB (1,939 / 1,863 / 1,939 MiB over idle), with 5,086 /
+4,982 / 4,991 MiB free at peak and 5,245 MiB free after load in all three. CPU-only placements
 have no GPU allocation.
 
 ## Tandem status and the gate for a number
 
-All tandem cells are from the 2026-11-19 controlled pairs (9B: median of two).
+All tandem cells are from the 2026-11-19/20 controlled pairs (9B: median of three).
 [TANDEM-STATUS.md](../TANDEM-STATUS.md)
 requires, in order:
 
@@ -118,11 +119,12 @@ tandem row stays `n/a`.
   larger models are GPU targets.
 - **CPU is native Windows, not WSL2.** The 2026-11-09 WSL2 page is kept as history; its CPU cells
   are no longer the cross-mode source.
-- **One or two runs per CPU/tandem cell.** The 2B/4B pairs are one run per placement; the 9B
-  has two, and its run-to-run spread is wide (CPU-only -23% to -38%; tandem 11-27% slower
-  deeper, flat at 100). The 9B row is a median, not a stability claim. The GPU and tensor-core
-  cells have three runs and a spread of a few percent. The 4B tandem verify is 3/4 with one tie;
-  do not read that row as exactness.
+- **One or three runs per CPU/tandem cell.** The 2B/4B pairs are one run per placement; the 9B
+  has three. Run 1 is the high side, run 3 tracks run 2 except CPU-only 24K; the row is a
+  median, not a stability claim. The third pair followed a passive >7 h cooldown, with the GPU
+  at 32 C at start; there was no instrumented thermal control. The GPU and tensor-core cells have
+  three runs and a spread of a few percent. The 4B tandem verify is 3/4 with one tie; do not
+  read that row as exactness.
 - **Tensor-core cells are medians of three fresh-process runs (2026-11-13).** The 9B cell
   runs with `KINDI_TC_HP=1`; without it the engine refuses HB 4096 (see `kindi/spec.py`).
 - **24K is the deepest measured position.** The packs advertise 262,144 tokens, but no 32K/64K

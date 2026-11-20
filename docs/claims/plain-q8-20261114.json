@@ -1,0 +1,51 @@
+{
+  "gate": "plain-q8-20261114",
+  "title": "Plain-engine q8_0 K/V: 27B owner peaks at 24,576 tokens",
+  "measured": "2026-11-14",
+  "commit": "60a039b",
+  "command": "python -m kindi bench --tandem cpu-first --tandem-cpu-layers gdn:16 --tandem-gpu <plain|plan> --sample-vram (three fresh processes per owner)",
+  "notes": "This is the provenance page for the plain owner q8_0 peak and the same-day plan-owner re-run. The roadmap quotes the two peaks and the free-memory deltas.",
+  "evidence": ["docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plain-q8/RESULTS.md"],
+  "numbers": [
+    {
+      "id": "plain-peak",
+      "display": "7,110 MiB",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plain-q8/RESULTS.md",
+                "needle": "7,110 MiB"}
+    },
+    {
+      "id": "plan-peak",
+      "display": "6,091 MiB",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plain-q8/RESULTS.md",
+                "needle": "6,091 MiB"}
+    },
+    {
+      "id": "plain-free",
+      "display": "995 MiB",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plain-q8/RESULTS.md",
+                "needle": "995 MiB"}
+    },
+    {
+      "id": "plan-free",
+      "display": "1,985 MiB",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plain-q8/RESULTS.md",
+                "needle": "1,985 MiB"}
+    },
+    {
+      "id": "accounted",
+      "display": "225 MiB",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text",
+                "file": "docs/benchmarks/2026-11-14-i7-8086k-rtx4060ti-plain-q8/RESULTS.md",
+                "needle": "225 MiB"}
+    }
+  ]
+}

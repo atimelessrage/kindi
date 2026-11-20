@@ -2,8 +2,8 @@
 """Build the cross-mode benchmark matrix: CPU-only, GPU-only, GPU tensor-core (plan engine),
 GPU+CPU tandem.
 
-The CPU-only and GPU+CPU tandem cells come from the 2026-11-19 controlled same-context pairs;
-the 9B is the median of two fresh-process pairs and the 2B/4B are one pair each. The GPU cells
+The CPU-only and GPU+CPU tandem cells come from the 2026-11-19/20 controlled same-context pairs;
+the 9B is the median of three fresh-process pairs and the 2B/4B are one pair each. The GPU cells
 are the earlier median of three; tensor-core rows come from the 2026-11-13 tc
 folder, where the 9B needs `KINDI_TC_HP=1` (see `kindi/spec.py`). The old 2026-11-12 tandem rows
 remain in the repository as history. `--check` exits 1 when CROSS-MODE.md or CROSS-MODE.csv is
@@ -27,7 +27,8 @@ CONTROLLED_9B = HERE / "2026-11-19-i7-8086k-rtx4060ti-9b-controlled"
 CONTROLLED_RUNS = {
     "2b": [CONTROLLED_2B4B / "runs-2b.json"],
     "4b": [CONTROLLED_2B4B / "runs-4b.json"],
-    "9b": [CONTROLLED_9B / "runs.json", CONTROLLED_9B / "runs-2.json"],
+    "9b": [CONTROLLED_9B / "runs.json", CONTROLLED_9B / "runs-2.json",
+           CONTROLLED_9B / "runs-3.json"],
 }
 MD = HERE / "CROSS-MODE.md"
 CSV = HERE / "CROSS-MODE.csv"
@@ -248,8 +249,8 @@ def render_md(rows):
     missing_tandem = [m for m in MODELS if m not in measured_tandem]
     if measured_tandem == list(MODELS):
         tandem_intro = ("All three rows are controlled CPU-only/tandem pairs from\n"
-                        "  2026-11-19; the 2B/4B pairs are one run per placement, the 9B is the median of\n"
-                        "  two, so no tandem-to-CPU ratio is cross-run.")
+                        "  2026-11-19/20; the 2B/4B pairs are one run per placement, the 9B is the median of\n"
+                        "  three, so no tandem-to-CPU ratio is cross-run.")
     elif measured_tandem:
         tandem_intro = ("Measured tandem rows in the table below are the median of three fresh-process runs\n"
                         "  per model (2026-11-13) (models: %s); the other tandem rows say `n/a` because they have\n"
@@ -270,8 +271,8 @@ def render_md(rows):
         "drafting.",
         "",
         "- **CPU only:** `KINDI_DEVICE=cpu` on native Windows 10, 6 threads (one per physical core),",
-        "  24,576-token context. One fresh-process run per model for 2B/4B, two for 9B; no WSL. The",
-        "  2B/4B/9B rows are the CPU half of the 2026-11-19 controlled pairs below.",
+        "  24,576-token context. One fresh-process run per model for 2B/4B, three for 9B; no WSL. The",
+        "  2B/4B/9B rows are the CPU half of the 2026-11-19/20 controlled pairs below.",
         "- **GPU only:** the card runs every layer; the CPU only drives the process (Windows 10, CuPy",
         "  14.2.0). Three fresh-process runs per model; the table uses their median.",
         "- **GPU tensor-core (plan):** `KINDI_TP=1` `KINDI_TC=1` (plan engine, tensor cores) on the",
@@ -293,14 +294,14 @@ def render_md(rows):
         "",
         "Sources: [2026-11-09-i7-8086k-rtx4060ti](2026-11-09-i7-8086k-rtx4060ti/README.md) (GPU-only)",
         "and the controlled pair pages below. The CPU-only and tandem cells are one run per placement",
-        "for 2B/4B and the median of two for 9B; the GPU and tensor-core cells are medians of three.",
+        "for 2B/4B and the median of three for 9B; the GPU and tensor-core cells are medians of three.",
         "The old 2026-11-10 CPU cells and 2026-11-12/13 tandem cells stay in the repository as history.",
         ""]
     if "2b" in measured_tandem and "4b" in measured_tandem:
         lines.append("Controlled 2B/4B pair: [2026-11-19-i7-8086k-rtx4060ti-2b-4b-controlled]"
                      "(2026-11-19-i7-8086k-rtx4060ti-2b-4b-controlled/RESULTS.md).")
     if "9b" in measured_tandem:
-        lines.append("Controlled 9B pair (two runs): [2026-11-19-i7-8086k-rtx4060ti-9b-controlled]"
+        lines.append("Controlled 9B runs (three): [2026-11-19-i7-8086k-rtx4060ti-9b-controlled]"
                      "(2026-11-19-i7-8086k-rtx4060ti-9b-controlled/RESULTS.md).")
     if any(("tc", m) in by and by[("tc", m)]["available"] == 1 for m in MODELS):
         lines.append("Tensor-core source: [2026-11-13-i7-8086k-rtx4060ti-tc](2026-11-13-i7-8086k-rtx4060ti-tc/README.md).")
@@ -328,7 +329,7 @@ def render_md(rows):
             lines.append("| %s | %s |" % (model.upper(), " | ".join(
                 "%.1fx" % (t[k] / g[k]) for k in METRICS[1:])))
     if measured_tandem == list(MODELS):
-        tandem_status = "All tandem cells are from the 2026-11-19 controlled pairs (9B: median of two)."
+        tandem_status = "All tandem cells are from the 2026-11-19/20 controlled pairs (9B: median of three)."
     elif measured_tandem:
         tandem_status = ("The %s tandem cell(s) are recorded from 2026-11-13; the %s cell(s) are not "
                          "recorded because the same single-run throughput benchmark has not been run "
@@ -374,14 +375,15 @@ def render_md(rows):
             "The 2B and 4B rows are direct A/B pairs. The 2B verified 4/4 in both placements",
             "(160/160 tokens); the 4B CPU placement verified 4/4, but the tandem placement was 3/4",
             "with one llama.cpp top-2 tie (159/160 tokens), so the 4B row is throughput evidence, not",
-            "an exactness claim. The 9B was measured twice: its CPU-only run 2 was 23-38% slower than",
-            "run 1, while tandem fell 11-27% at read and 2K-24K and was flat at 100 (+1%). The two-run",
-            "median row is used here, so the shallow ratio ranges 3.0x-4.1x (median 3.5x), not a stable",
-            "3.0x; at 24K it ranges 5.8x-8.2x (median 6.7x). Both 9B placements verified 4/4",
-            "(133/133) in run 1; run 2 was throughput only. Tandem sampled peaks were 1,627 / 2,385 MiB",
-            "device-wide for 2B/4B (605 / 1,373 MiB over idle), with 6,577 / 5,895 MiB free after load.",
-            "The 9B's two runs peaked at 2,864 / 2,968 MiB (1,939 / 1,863 MiB over idle), with",
-            "5,086 / 4,982 MiB free at peak and 5,245 MiB free after load in both. CPU-only placements",
+            "an exactness claim. The 9B was measured three times: run 3 reproduced run 2's tandem row",
+            "within 3-8% and its CPU row within 4-10% at every CPU cell except 24K, where 1.8 -> 2.4",
+            "tok/s (+33%). Run 2 is therefore not a run-wide outlier; run 1 is the high side. The three-run",
+            "median makes the shallow ratio 3.0x-4.2x (median 4.1x), not a stable 3.0x; at 24K it is",
+            "5.8x-8.2x (median 6.2x). Both 9B placements verified 4/4 (133/133) in run 1; runs 2-3 were",
+            "throughput only. Tandem sampled peaks were 1,627 / 2,385 MiB device-wide for 2B/4B",
+            "(605 / 1,373 MiB over idle), with 6,577 / 5,895 MiB free after load. The 9B's three runs",
+            "peaked at 2,864 / 2,968 / 2,959 MiB (1,939 / 1,863 / 1,939 MiB over idle), with 5,086 /",
+            "4,982 / 4,991 MiB free at peak and 5,245 MiB free after load in all three. CPU-only placements",
             "have no GPU allocation.",
         ]
     lines += [
@@ -411,11 +413,12 @@ def render_md(rows):
         "  larger models are GPU targets.",
         "- **CPU is native Windows, not WSL2.** The 2026-11-09 WSL2 page is kept as history; its CPU cells",
         "  are no longer the cross-mode source.",
-        "- **One or two runs per CPU/tandem cell.** The 2B/4B pairs are one run per placement; the 9B",
-        "  has two, and its run-to-run spread is wide (CPU-only -23% to -38%; tandem 11-27% slower",
-        "  deeper, flat at 100). The 9B row is a median, not a stability claim. The GPU and tensor-core",
-        "  cells have three runs and a spread of a few percent. The 4B tandem verify is 3/4 with one tie;",
-        "  do not read that row as exactness.",
+        "- **One or three runs per CPU/tandem cell.** The 2B/4B pairs are one run per placement; the 9B",
+        "  has three. Run 1 is the high side, run 3 tracks run 2 except CPU-only 24K; the row is a",
+        "  median, not a stability claim. The third pair followed a passive >7 h cooldown, with the GPU",
+        "  at 32 C at start; there was no instrumented thermal control. The GPU and tensor-core cells have",
+        "  three runs and a spread of a few percent. The 4B tandem verify is 3/4 with one tie; do not",
+        "  read that row as exactness.",
         "- **Tensor-core cells are medians of three fresh-process runs (2026-11-13).** The 9B cell",
         "  runs with `KINDI_TC_HP=1`; without it the engine refuses HB 4096 (see `kindi/spec.py`).",
         "- **24K is the deepest measured position.** The packs advertise 262,144 tokens, but no 32K/64K",

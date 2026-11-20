@@ -1,0 +1,26 @@
+{
+  "gate": "stock-parity",
+  "title": "Official v0.6.1 vs fork greedy token parity on the 2B and 9B",
+  "measured": "2026-11-20",
+  "commit": "working tree (uncommitted at measurement)",
+  "command": "python tools/stock_parity.py --check --json docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-stock-parity/parity-report.json",
+  "notes": "Six stock rows (2 models x 3 prefix lengths) and the six fork rows must match the official-tag token ids. This is token parity, not a speed claim.",
+  "evidence": [
+    "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-stock-parity/goldens.json",
+    "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-stock-parity/parity-report.json",
+    "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-stock-parity/RESULTS.md"
+  ],
+  "numbers": [
+    {
+      "id": "rows-exact",
+      "display": "12/12",
+      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-stock-parity/parity-report.json",
+        "pointer": "/rows_exact",
+        "expect": 12
+      }
+    }
+  ]
+}

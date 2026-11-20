@@ -1,0 +1,8 @@
+run=3
+started=2026-11-20T04:06:44Z
+prior_pair_log_mtime=2026-11-19T21:13:22+01:00
+cooldown=prior pair to this run (>7h idle; GPU 32 C at start)
+2026/11/20 05:06:44.564, 0 %, 1020 MiB, 32
+finished=2026-11-20T04:09:25Z
+exit=0
+2026/11/20 05:09:25.456, 10 %, 1020 MiB, 34

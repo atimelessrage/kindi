@@ -1,0 +1,39 @@
+{
+  "gate": "bench-split-20261117",
+  "title": "2B prefill/decode wall-clock shares at 4K and 8K",
+  "measured": "2026-11-17",
+  "commit": "60a039b",
+  "command": "KINDI_PACK=<bonsai-2b> KINDI_CTX=4224|8448 python -m kindi bench --split-at ... --split-generated 128 --json ... (two runs per context)",
+  "notes": "BENCHMARKS quotes the rounded shares in its method paragraph; the JSON rows carry the exact values (13.7/64.1/82.2 in the r1 runs).",
+  "evidence": [
+    "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-bench-split/RESULTS.md",
+    "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-bench-split/split-4k-r1.json",
+    "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-bench-split/split-8k-r1.json"
+  ],
+  "numbers": [
+    {
+      "id": "512-share",
+      "display": "14%",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json",
+                "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-bench-split/split-4k-r1.json",
+                "pointer": "/split/512/prefill_share", "expect": 13.7}
+    },
+    {
+      "id": "4096-share",
+      "display": "64%",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json",
+                "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-bench-split/split-4k-r1.json",
+                "pointer": "/split/4096/prefill_share", "expect": 64.1}
+    },
+    {
+      "id": "8192-share",
+      "display": "82%",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json",
+                "file": "docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-bench-split/split-8k-r1.json",
+                "pointer": "/split/8192/prefill_share", "expect": 82.2}
+    }
+  ]
+}

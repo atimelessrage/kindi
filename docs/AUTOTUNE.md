@@ -169,6 +169,8 @@ Bonsai 2B pack, `--ctx 8192`, RTX 4060 Ti + i7-8086K, one card:
 | `tandem-auto` | — | — | — | refused by the planner: "this model already fits at 8192 tokens (~2410 MiB needed, 7075 MiB free); a split would only make it slower" |
 | `tandem-gdn:8` | — | — | — | failed: "could not run clang … it needs gcc with OpenMP, or clang and libomp on Windows" |
 
+Raw report: [autotune-2b.json](benchmarks/2026-11-17-i7-8086k-rtx4060ti-autotune/autotune-2b.json).
+
 Both failures are the tuner behaving correctly rather than a tuner bug: the planner refuses a split
 that would only cost decode (the 9B/27B measurements in [TANDEM-RUNTIME.md](TANDEM-RUNTIME.md) say
 the same), and this shell has no compiler on `PATH`, which `kindi caps` now reports up front.

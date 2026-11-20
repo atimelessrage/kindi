@@ -333,7 +333,9 @@ def check_claim(claim, root=None, tracked=True):
 
 def cited_dirs(registry, root=None):
     """Every docs/benchmarks/<dir> the claimed docs cite, with the docs that cite it."""
-    pattern = re.compile(r"(?:docs/)?benchmarks/([A-Za-z0-9][A-Za-z0-9._-]*)")
+    # A citation to a run is a directory containing the page/artifact, not a bare
+    # script such as benchmarks/build_cross_mode.py at the benchmarks root.
+    pattern = re.compile(r"(?:docs/)?benchmarks/([A-Za-z0-9][A-Za-z0-9._-]*)/")
     cites = {}
     for doc in registry["docs"]:
         try:

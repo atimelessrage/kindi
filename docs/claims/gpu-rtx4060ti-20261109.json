@@ -1,0 +1,141 @@
+{
+  "gate": "gpu-rtx4060ti-20261109",
+  "title": "RTX 4060 Ti native-Windows GPU table and loader provenance",
+  "measured": "2026-11-09",
+  "commit": "2abf9ad",
+  "command": "python -m kindi --pack <pack> --ctx 24576 bench (three fresh processes per model/source, plain exact head); separate 2B plan-vs-plain run",
+  "notes": "The main 2B/4B/9B table and the separate 2B plan row are both tracked. The environment block is the provenance for the native-Windows path; no performance number is inferred from it.",
+  "evidence": [
+    "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json",
+    "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/2b-plan-vs-plain-24k.json",
+    "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/README.md"
+  ],
+  "numbers": [
+    {
+      "id": "2b-read",
+      "display": "190.0",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json",
+                "pointer": "/stats/current/2b/prompt/median", "expect": 190.0}
+    },
+    {
+      "id": "2b-24k",
+      "display": "160.6",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json",
+                "pointer": "/stats/current/2b/gen/24000/median", "expect": 160.6}
+    },
+    {
+      "id": "2b-base-read",
+      "display": "161.5",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json",
+                "pointer": "/stats/v0.4.0+native-loader/2b/prompt/median", "expect": 161.5}
+    },
+    {
+      "id": "2b-base-24k",
+      "display": "165.5",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json",
+                "pointer": "/stats/v0.4.0+native-loader/2b/gen/24000/median", "expect": 165.5}
+    },
+    {
+      "id": "4b-read",
+      "display": "129.0",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json",
+                "pointer": "/stats/current/4b/prompt/median", "expect": 129.0}
+    },
+    {
+      "id": "4b-24k",
+      "display": "79.8",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json",
+                "pointer": "/stats/current/4b/gen/24000/median", "expect": 79.8}
+    },
+    {
+      "id": "4b-base-read",
+      "display": "132.9",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json",
+                "pointer": "/stats/v0.4.0+native-loader/4b/prompt/median", "expect": 132.9}
+    },
+    {
+      "id": "4b-base-24k",
+      "display": "82.1",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json",
+                "pointer": "/stats/v0.4.0+native-loader/4b/gen/24000/median", "expect": 82.1}
+    },
+    {
+      "id": "9b-read",
+      "display": "90.3",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json",
+                "pointer": "/stats/current/9b/prompt/median", "expect": 90.3}
+    },
+    {
+      "id": "9b-24k",
+      "display": "62.3",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json",
+                "pointer": "/stats/current/9b/gen/24000/median", "expect": 62.3}
+    },
+    {
+      "id": "9b-base-read",
+      "display": "90.8",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json",
+                "pointer": "/stats/v0.4.0+native-loader/9b/prompt/median", "expect": 90.8}
+    },
+    {
+      "id": "9b-base-24k",
+      "display": "62.7",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json",
+                "pointer": "/stats/v0.4.0+native-loader/9b/gen/24000/median", "expect": 62.7}
+    },
+    {
+      "id": "plan-24k",
+      "display": "302.4",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/2b-plan-vs-plain-24k.json",
+                "pointer": "/stats/plan/gen/24000/median", "expect": 302.4}
+    },
+    {
+      "id": "plain-24k",
+      "display": "170.6",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/2b-plan-vs-plain-24k.json",
+                "pointer": "/stats/plain/gen/24000/median", "expect": 170.6}
+    },
+    {
+      "id": "plan-ratio",
+      "display": "1.77x",
+      "quoted_in": ["docs/BENCHMARKS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/2b-plan-vs-plain-24k.json",
+                "pointer": "/speedup/24000/ratio", "expect": 1.772567409144197}
+    },
+    {
+      "id": "win10",
+      "display": "Windows 10",
+      "quoted_in": ["docs/BENCHMARKS.md", "docs/ROADMAP.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json",
+                "needle": "Microsoft Windows 10"}
+    },
+    {
+      "id": "cupy",
+      "display": "CuPy 14.2.0",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/README.md",
+                "needle": "| CuPy | 14.2.0 |"}
+    },
+    {
+      "id": "driver",
+      "display": "617.42",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/summary.json",
+                "needle": "617.42"}
+    }
+  ]
+}

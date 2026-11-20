@@ -1,0 +1,18 @@
+<local-home>\AppData\Local\Programs\Python\Python313\Lib\site-packages\cupy\_environment.py:286: UserWarning: CUDA path could not be detected. Set CUDA_PATH environment variable if CuPy fails to load.
+  warnings.warn(
+[kindi 05:09:20] kindi-cpu ready: Ternary-Bonsai-2-9B, avx2-fma-f16c, 6 threads, ctx 24576 (28.6s)
+[kindi 05:09:20] blocking sync: card 0 primary context flags 0x4 (set: 0)
+[kindi 05:09:20] plan engine: the other backend embeds (no token_embd on this side)
+[kindi 05:09:21] card 0: 1.45 GB of weights (1s)
+[kindi 05:09:21] plan engine ready: 1 card, ctx 24576, K/V q8_0, weights 5-trit lane (1.3s)
+[kindi 05:09:21] tandem cpu-first: CPU layers 0..5, plan engine on layers 6..31, 24576-token context, GPU head
+[kindi 05:09:21] kindi: ~/.kindi\packs\bonsai-9b -> the bonsai backend (bonsai2-9b)
+[kindi 05:09:21] GPU memory: 5245 MiB free of 8188 with a 24576-token context
+[kindi 05:09:22] prompt reading:        35.4 tokens/s
+[kindi 05:09:22] generation (exact head) at position   100:  32.1 tokens/s
+[kindi 05:09:23] generation (exact head) at position  2000:  28.8 tokens/s
+[kindi 05:09:23] generation (exact head) at position  8000:  23.4 tokens/s
+[kindi 05:09:24] generation (exact head) at position 16000:  18.0 tokens/s
+[kindi 05:09:25] generation (exact head) at position 24000:  14.4 tokens/s
+[kindi 05:09:25] VRAM peak (sampled, device-wide): 2959 MiB used (1939 MiB over idle), 4991 MiB free, peak in loaded, 61 samples
+[kindi 05:09:25] wrote docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/tandem-3.json

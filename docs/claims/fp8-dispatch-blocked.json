@@ -1,0 +1,25 @@
+{
+  "gate": "fp8-dispatch-blocked",
+  "title": "Blackwell FP8 manual dispatch attempt: blocked before a runner job",
+  "measured": "2026-11-12",
+  "commit": "60a039b",
+  "command": "manual workflow_dispatch attempt for .github/workflows/blackwell-fp8.yml (no authenticated Actions client, no runner)",
+  "notes": "The dispatch page records why no sm_100/sm_120 job was produced. It is cited only to prevent the absence of a run from becoming a hardware claim.",
+  "evidence": ["docs/benchmarks/blackwell-fp8-dispatch-20261112/DISPATCH-BLOCKED.md"],
+  "numbers": [
+    {
+      "id": "blocked",
+      "display": "blocked before any runner job",
+      "quoted_in": ["docs/FP8-BF16.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/blackwell-fp8-dispatch-20261112/DISPATCH-BLOCKED.md",
+                "needle": "blocked before any runner job"}
+    },
+    {
+      "id": "no-hardware-result",
+      "display": "Neither Blackwell architecture has a hardware result",
+      "quoted_in": ["docs/FP8-BF16.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/blackwell-fp8-dispatch-20261112/DISPATCH-BLOCKED.md",
+                "needle": "no sm_100 or sm_120 hardware result"}
+    }
+  ]
+}

@@ -10,7 +10,7 @@
   "speculation": "off",
   "placement": "cpu-first",
   "cpu_layers": 6,
-  "note": "Second of two fresh-process pairs; throughput only, exactness is from run 1.",
+  "note": "Second of three fresh-process pairs; throughput only, exactness is from run 1.",
   "cpu": {
     "device": "cpu",
     "threads": 6,

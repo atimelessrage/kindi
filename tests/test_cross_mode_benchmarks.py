@@ -49,7 +49,7 @@ def test_matrix_shows_all_four_modes():
     assert two_b["available"] == 1 and two_b["source"].startswith(
         "2026-11-19 controlled pair (cpu-first")
     nine_b = next(r for r in tandem if r["model"] == "9b")
-    assert nine_b["available"] == 1 and nine_b["runs"] == 2
+    assert nine_b["available"] == 1 and nine_b["runs"] == 3
 
 
 def test_gpu_comparison_follows_the_measured_ratio():
