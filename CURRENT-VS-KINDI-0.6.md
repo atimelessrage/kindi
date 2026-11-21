@@ -2,7 +2,7 @@
 
 ## TLDR - too long didnt read
 
-**The comparison:** official Kindi **v0.6.1** (still the latest release when rechecked 2026-11-21; upstream `main` is the release commit `7fececb`) against this fork at reported baseline **`96acdea`** (code baseline `66eebd3`, checkpoint `e57f6bd`). The fork is **680 commits / 897 files ahead**, with **28 numbered requirements**, **998 tracked files vs 172 upstream**, and **zero upstream file deletions**. Fourteen pull requests (**#47-#60**) are open upstream; together they cover **51 of the 897 changed paths**.
+**The comparison:** official Kindi **v0.6.1** (still the latest release when rechecked 2026-11-21; upstream `main` is the release commit `7fececb`) against this fork at reported baseline **`69b08d2`** (code baseline `66eebd3`, checkpoint `e57f6bd`; the parent of this docs-only refresh). The fork is **681 commits / 897 files ahead**, with **28 numbered requirements**, **998 tracked files vs 172 upstream**, and **zero upstream file deletions**. Fifteen pull requests (**#47-#61**) are open upstream; together they cover **54 of the 897 changed paths**. #61 is stacked on #54 and its 12-file diff includes #54's 8-file engine; #54 remains engine-only.
 
 **Biggest measured wins**
 
@@ -16,25 +16,25 @@
 
 - **Planning and tuning:** `kindi plan`, `kindi caps`, `kindi autotune`, `kindi kld`, `kindi io`.
 - **Sessions:** persistent store plus CLI and HTTP endpoints, resume, prune and stats.
-- **API and constrained decoding:** backend plugin contract with adapters, OpenAI error envelope and conformance harness, JSON-schema/GBNF decoding.
+- **API and constrained decoding:** backend plugin contract with adapters, OpenAI error envelope and conformance harness, JSON-schema/GBNF decoding (engine in #54, server `response_format` wiring in #61).
 - **Release and runtime:** committed **0.7.0-fork** identity, local archive builder, passing Python 3.6 container smoke, per-card tandem VRAM ceiling/reserve controls.
 - **Platform:** Windows install and CPU capability paths; a bit-identical Q2_0 CPU expert-lane gate (implemented but not wired).
 
-**Caveats:** the **0.7.0-fork** release is still unpublished (no fork images or installer assets), local `/health` still reports `commit: null`, hardware coverage is incomplete, and DeepSeek V4.1, DSpine, Nanbeige 4.3, Gemma 4 E4B, non-dense GPU grammar gates and GPU CI remain unverified.
+**Caveats:** the **0.7.0-fork** release is still unpublished (no fork images or installer assets), local `/health` still reports `commit: null`, hardware coverage is incomplete, and DeepSeek V4.1, DSpine, Nanbeige 4.3, Gemma 4 E4B, the Lightning/Nanbeige structured-output request paths (refused by #61 until their adapters filter tokens) and GPU CI remain unverified.
 
-**Upstream status (2026-11-21):** fourteen pull requests (**#47-#60**) are open, all non-draft, all `mergeable: clean`, every title carries the CLA 1.1 statement, and the repository has **no CI check suites**; no maintainer review has landed. They carry 15 commits (13 one-commit PRs; #48 has two) and cover **51 unique paths**, 35 from #47-#55 and 19 from #56-#60 (three paths shared). The rest of the `0.7.0-fork` surface is verified here but **not proposed**; §3a maps covered against uncovered.
+**Upstream status (2026-11-21):** fifteen pull requests (**#47-#61**) are open, all non-draft, all `mergeable: clean`, every title carries the CLA 1.1 statement, and the repository has **no CI check suites**; no maintainer review has landed. They carry 18 commits (13 one-commit PRs; #48 has two and #61 has three) and cover **54 unique paths**, 35 from #47-#55, 19 from #56-#60 and 3 new paths from #61, with three paths shared across the first fourteen. The rest of the `0.7.0-fork` surface is verified here but **not proposed**; §3a maps covered against uncovered.
 
 Report date: **2026-11-21** (latest official release rechecked 2026-11-21). Baseline: official **Kindi 0.6.1** (tag `v0.6.1`, commit
-`7fececb`, published 2026-11-16T21:49:20Z) against this fork at reported baseline **`96acdea`** (code baseline **`66eebd3`**, checkpoint `e57f6bd`; the previous report baseline was **`ee2ba46`**, before it **`60a039b`**; the round-3 audit baseline was **`3fed704`**). The `0.7.0-fork` version string, installers and image tags are committed in this baseline. The dated speed and quality measurements below remain the `60a039b` runs; the release integration, VRAM controls and the 2026-11-21 checkpoint were not re-benchmarked for this refresh.
+`7fececb`, published 2026-11-16T21:49:20Z) against this fork at reported baseline **`69b08d2`** (code baseline **`66eebd3`**, checkpoint `e57f6bd`; the parent of this docs-only refresh; the previous report baseline was **`ee2ba46`**, before it **`60a039b`**; the round-3 audit baseline was **`3fed704`**). The `0.7.0-fork` version string, installers and image tags are committed in this baseline. The dated speed and quality measurements below remain the `60a039b` runs; the release integration, VRAM controls and the 2026-11-21 checkpoint were not re-benchmarked for this refresh.
 Upstream `main` still points at the release commit itself (`7fececb`), so there is no
 post-release upstream commit left to port. This page keeps the current comparison only;
 the round-by-round history has moved verbatim to `detailed-fork-changelog.md`. The 2026-11-19 engine/test/evidence round is committed through `53198e5`, the round-3 audit fixes are in `3fed704`, the 2026-11-20 integration runs through `ee2ba46`, and the 2026-11-21 checkpoint is `e57f6bd` (`66eebd3` refreshes AGENTS only).
 
-> **Changed since the last report:** the code baseline is still `66eebd3`; two docs-only commits (`741d3f5`, `96acdea`) bring the branch to `96acdea` (**680 commits, +127,186/−1,417; 897 files unchanged**). The speed and quality tables were not re-run. The new content is §3a's **14 open PRs (#47-#60)** covering **51 of 897 changed paths**; #56-#60 are the 2026-11-21 batch.
+> **Changed since the last report:** the code baseline is still `66eebd3`; three docs-only commits (`741d3f5`, `96acdea`, `69b08d2`) bring the branch to `69b08d2` (**681 commits, +127,204/−1,417; 897 files unchanged**). The speed and quality tables were not re-run. The new content is §3a's **15 open PRs (#47-#61)** covering **54 of 897 changed paths**; #56-#60 are the 2026-11-21 batch and #61 is the stacked server-wiring follow-up to #54.
 
-**Short answer.** This fork is **680 commits and 897 files ahead** of `v0.6.1` at the reported
-baseline `96acdea` (**+127,186/−1,417** lines), with **zero file deletions** against the official tree.
-That is **two docs-only commits and +102 lines** beyond the `66eebd3` code baseline. The measured advantages are the fork's own plan engine and tensor-core path, the tandem
+**Short answer.** This fork is **681 commits and 897 files ahead** of `v0.6.1` at the reported
+baseline `69b08d2` (**+127,204/−1,417** lines), with **zero file deletions** against the official tree.
+That is **three docs-only commits and +120 lines** beyond the `66eebd3` code baseline. The measured advantages are the fork's own plan engine and tensor-core path, the tandem
 memory split, the KLD quality gate, mode A's corrected k=1 default, `kindi plan` /
 `kindi caps` / `kindi autotune`, and the session and API work. The release identity is committed:
 package, both installers and image tags say **0.7.0-fork**, not official 0.6.1. The older **649**-commit figure was the `3002a40` snapshot in
@@ -44,11 +44,11 @@ slower opt-in paths. Nothing upstream is missing: both code changes in 0.6.1 are
 
 | question | answer |
 |---|---|
-| **What is different** | 680 commits / 897 files ahead at reported baseline `96acdea` (code baseline `66eebd3`), 998 tracked files against 172 upstream; 28 numbered requirements; no upstream file deleted. Fourteen upstream PRs (#47-#60) cover 51 of the changed paths; the rest is not proposed (§3a). The 2026-11-20 integration adds the committed `0.7.0-fork` release surface, local archive builder, read-only Intel probe, dense placement portfolio, process-shared token-class grammar masks, stricter request validation, autotune/parity fixes, the container-smoke and stock-parity evidence, and the per-card tandem VRAM ceiling/reserve. The earlier 2026-11-19 round adds the k=1 default, the Q2_0 expert lane, the chunk sweep and the controlled 9B pairs, plus the round-3 cold-reader teardown and quality-ratchet fixes. |
+| **What is different** | 681 commits / 897 files ahead at reported baseline `69b08d2` (code baseline `66eebd3`), 998 tracked files against 172 upstream; 28 numbered requirements; no upstream file deleted. Fifteen upstream PRs (#47-#61) cover 54 of the changed paths; #61 is stacked on #54 and includes its engine commit, while #54 remains engine-only. The rest is not proposed (§3a). The 2026-11-20 integration adds the committed `0.7.0-fork` release surface, local archive builder, read-only Intel probe, dense placement portfolio, process-shared token-class grammar masks, stricter request validation, autotune/parity fixes, the container-smoke and stock-parity evidence, and the per-card tandem VRAM ceiling/reserve. The earlier 2026-11-19 round adds the k=1 default, the Q2_0 expert lane, the chunk sweep and the controlled 9B pairs, plus the round-3 cold-reader teardown and quality-ratchet fixes. |
 | **Better, measured** | Dense tandem + plan-owner placement; the default tensor-core plan path (2B and 9B generation far ahead of stock's plain engine, in the separate TC configuration); 2B/9B same-settings decode parity; 27B peak reduced 7,721 -> 6,091 MiB; KLD quality gate; adaptive draft policy (+15.8% on the 2B, parity on the 27B); mode A's new k=1 default (4/4 token-exact on the live 2B check); physical-core thread count. Details in §3 and §4.6. |
-| **New here** | `kindi plan`, `kindi kld`, `kindi caps`, `kindi autotune`, `kindi io`; sessions store/CLI/HTTP/resume/prune/stats; backend plugin contract + adapters; OpenAI error envelope and conformance harness; JSON-schema/GBNF constrained decoding; Windows install and CPU capability paths; a bit-identical Q2_0 CPU expert-lane gate (not wired). |
+| **New here** | `kindi plan`, `kindi kld`, `kindi caps`, `kindi autotune`, `kindi io`; sessions store/CLI/HTTP/resume/prune/stats; backend plugin contract + adapters; OpenAI error envelope and conformance harness; JSON-schema/GBNF constrained decoding (engine #54, server request path #61); Windows install and CPU capability paths; a bit-identical Q2_0 CPU expert-lane gate (not wired). |
 | **Worse** | The release bundle is prepared locally but not published: no fork `0.7.0-fork` images or installer assets exist yet. The local `kindi:0.7.0-fork` image, rebuilt on 2026-11-20 with Python 3.6.9, passes `/health` and one non-streaming chat on the **unmodified** image; `/health` still reports `commit: null` from the `kindi/COMMIT` placeholder, and no image has been pushed. An explicit `KINDI_SPEC_K=4` still costs **0.66x**, but it is no longer the default (mode A now defaults to k=1, measured 1.12-1.13x at 512/24K); the tandem split remains a memory feature, not a speed win; FP8 K/V is lossy; recursive GBNF is expensive by design. Details in §4.1-§4.4 and `docs/RELEASE-CHECKLIST.md`. |
-| **Unverified** | DeepSeek V4.1, DSpine, Nanbeige 4.3, Gemma 4 E4B, non-dense GPU grammar gates, a complete Windows install, two-card TP/mixed cards, the five legacy cards, Arc A770, Intel iGPU, AVX-512/AMX, the calibration >=20 s clause, the Q2_0 expert-lane model row, and GPU CI. Details in §4.3. |
+| **Unverified** | DeepSeek V4.1, DSpine, Nanbeige 4.3, Gemma 4 E4B, the Lightning/Nanbeige structured-output request paths, a complete Windows install, two-card TP/mixed cards, the five legacy cards, Arc A770, Intel iGPU, AVX-512/AMX, the calibration >=20 s clause, the Q2_0 expert-lane model row, and GPU CI. Details in §4.3. |
 
 ## What changed since the last report update
 
@@ -68,7 +68,7 @@ The report numbers move with the baseline: **669 → 676 commits**, **827 → 89
 
 **2026-11-21 checkpoint and PR refresh.** Two commits follow `ee2ba46`: `e57f6bd` (28 files, +1,424/−131) is the 2026-11-20 checkpoint, and `66eebd3` refreshes the handoff. Totals move **676 → 678 commits**, **891 → 897 files**, **+125,781/−1,407 → +127,084/−1,417**, **992 → 998 tracked files**. This refresh adds no measurement; its new content is the upstream pull-request status in §3a.
 
-**2026-11-21 PR status refresh (reported baseline `96acdea`).** Two docs-only commits follow `66eebd3`: `741d3f5` (3 files, +109/−45: this comparison, `AGENTS.md` and the regenerated configuration reference) and `96acdea` (`docs/ROADMAP.md`, +38: the parked TokenEconomizer note). Totals move **678 → 680 commits** and **+127,084 → +127,186** lines; the changed-file count stays **897** and tracked files stay **998**, because both commits edit existing files. No measurement was re-run. §3a now records 14 open PRs (#47-#60) and 51 covered paths.
+**2026-11-21 PR status refresh (reported baseline `69b08d2`).** Three docs-only commits follow `66eebd3`: `741d3f5` (3 files, +109/−45: this comparison, `AGENTS.md` and the regenerated configuration reference), `96acdea` (`docs/ROADMAP.md`, +38: the parked TokenEconomizer note) and `69b08d2` (`AGENTS.md` + this comparison, +69/−51: the 14-PR table refresh). Totals move **678 → 681 commits** and **+127,084 → +127,204** lines; the changed-file count stays **897** and tracked files stay **998**, because all three commits edit existing files. No measurement was re-run. §3a now records 15 open PRs (#47-#61) and 54 covered paths; #61 is stacked on #54.
 
 ## 1. Baseline
 
@@ -78,9 +78,10 @@ release API was checked again on 2026-11-20; **v0.6.1 remains the latest officia
 release**. `git ls-remote origin refs/heads/main` returns `7fececb` on 2026-11-20, the
 release commit itself, so there is no post-release upstream commit left to port; `v0.6.0` (`179710c`) is still
 an ancestor of `main`, and the shared base remains `dce89df`. The comparison range is
-therefore `v0.6.1..96acdea`. **`96acdea` is the reported baseline; `66eebd3` is the code baseline**
-(the two later commits are docs-only: `741d3f5` refreshes this comparison and `96acdea` records
-the parked TokenEconomizer note). The range and figures below use the current tree. The `0.7.0-fork` version string, installers and image
+therefore `v0.6.1..69b08d2`. **`69b08d2` is the reported baseline; `66eebd3` is the code baseline**
+(the three later commits are docs-only: `741d3f5` refreshes this comparison, `96acdea` records
+the parked TokenEconomizer note, and `69b08d2` refreshes the comparison and PR table; this
+refresh follows it). The range and figures below use the current tree. The `0.7.0-fork` version string, installers and image
 tags are committed as part of the 2026-11-20 integration (`82a72bf`..`3b9224a`); the local
 image was built from that working tree, not an older release tree. Section 4 keeps the dated
 `3fed704`/`ee2ba46` analysis and says so. The 2026-11-20 commits since `60a039b` are listed
@@ -90,16 +91,16 @@ above; `detailed-fork-changelog.md` §44-§46 list the earlier rounds.
 git merge-base --is-ancestor v0.6.0 HEAD       # yes
 git merge-base --is-ancestor v0.6.1 HEAD       # no: v0.6.1 is one commit past dce89df
 git merge-base v0.6.1 HEAD                     # dce89df
-git log --oneline v0.6.1..HEAD | wc -l         # 680 commits
-git diff --shortstat v0.6.1..HEAD             # 897 files, +127,186/-1,417
+git log --oneline v0.6.1..HEAD | wc -l         # 681 commits
+git diff --shortstat v0.6.1..HEAD             # 897 files, +127,204/-1,417
 git diff --diff-filter=D --name-only v0.6.1..HEAD  # (empty: zero file deletions)
 git ls-tree -r --name-only v0.6.1 | wc -l      # 172 upstream files
 git ls-tree -r --name-only HEAD | wc -l        # 998 tracked files
 ls docs/development/requirements/REQ-*.md | wc -l  # 28 numbered requirements
 ```
 
-The code baseline `66eebd3` is **678 commits / +127,084**; the two later commits are docs-only
-(4 files, +147/-45), which is why the file and tracked-file counts do not move.
+The code baseline `66eebd3` is **678 commits / +127,084**; the three later commits are docs-only
+(4 files, +216/-96), which is why the file and tracked-file counts do not move.
 
 The published `v0.6.0..v0.6.1` range is **16 files, +336/−43**: it includes
 `dce89df`'s container packaging commit and `a6f4891`'s README acknowledgement as
@@ -188,14 +189,16 @@ The preview chips are computed at render time from the committed baseline and it
 
 ## 3a. Upstream pull-request coverage (2026-11-21)
 
-Fourteen pull requests are open against `ahtx/kindi` from this fork, all targeting `v0.6.1`
-(`7fececb`). All are non-draft and `mergeable: clean`; 13 carry one commit and #48 carries two
-(15 commits total). Every title
-carries the CLA 1.1 statement (the nine #47-#55 titles add a trailing period). The repository
-has **no CI check suites** and **no maintainer reviews**. Together they touch **51 unique paths**
-of the **897** changed paths (**5.7%**); the other **846 paths are not proposed**. #47-#55 cover
-**35** paths, #56-#60 add **19**, and three paths are shared (`kindi/__main__.py`,
-`kindi/cpu.py`, `docs/CONFIGURATION.md`).
+Fifteen pull requests are open against `ahtx/kindi` from this fork, all targeting `v0.6.1`
+(`7fececb`). All are non-draft and `mergeable: clean`; 13 carry one commit, #48 carries two
+and #61 carries three (18 commits total). Every title
+carries the CLA 1.1 statement (the nine #47-#55 titles and #61 add a trailing period). The repository
+has **no CI check suites** and **no maintainer reviews**. Together they touch **54 unique paths**
+of the **897** changed paths (**6.0%**); the other **843 paths are not proposed**. #47-#55 cover
+**35** paths, #56-#60 add **19**, and #61 adds **3** beyond #54; three paths are shared across the
+first fourteen (`kindi/__main__.py`, `kindi/cpu.py`, `docs/CONFIGURATION.md`). #61 is stacked on
+#54: its 12-file diff includes #54's 8 engine files, and only `kindi/constrained.py`,
+`kindi/sampling.py` and `tests/test_server_grammar.py` are new to the union.
 
 | PR | state | proposal | head | files | lines | focused evidence |
 |---:|---|---|---|---:|---:|---|
@@ -213,15 +216,21 @@ of the **897** changed paths (**5.7%**); the other **846 paths are not proposed*
 | #58 | open | OpenAI-style API error envelope | `c1ca43b` | 4 | +105/−4 | 4 passed; `_err`/`_overflow` wired |
 | #59 | open | host-side BF16 / FP8 codecs | `ec52897` | 2 | +192/−0 | 7 passed |
 | #60 | open | link Ollama GGUFs under readable names | `3d83926` | 2 | +376/−0 | 12 passed |
+| #61 | open, stacked on #54 | wire `response_format`/GBNF into the server + request tests | `3fc8428` | 12* | +2,852/−14* | 13 passed; 58 engine tests; 3 new paths |
 
-**Covered by those 14:** Windows driver loading, the cgroup RAM cap, tokenizer pack consistency,
+\* #61's diff includes #54's 8-file engine because it is stacked. #54 remains the engine-only PR;
+#61's own two commits after #54 add 4 files, 3 of them new to the union.
+
+**Covered by those 15:** Windows driver loading, the cgroup RAM cap, tokenizer pack consistency,
 JSON handle closure, sampled VRAM peaks, the host memory-tier probe, the Intel probe/refusal, the
-GBNF/JSON-schema/token-class engine, the adaptive draft-length policy, `kindi caps` with the CPU
-feature/tier report and explicit ISA builds, the generated configuration reference, the OpenAI
-error envelope, the host BF16/FP8 codecs, and the Ollama link tool. Three limits matter: #54 ships
-the grammar **engine only** (no request path calls it yet), #55 runs only on the tensor-core spec
-path (`tc_step`, `KINDI_TC=1`), and #58 does not add route-level 404/422 handlers or request-field
-validation.
+GBNF/JSON-schema/token-class engine (#54) and its server `response_format`/GBNF wiring (#61), the
+adaptive draft-length policy, `kindi caps` with the CPU feature/tier report and explicit ISA builds,
+the generated configuration reference, the OpenAI error envelope, the host BF16/FP8 codecs, and the
+Ollama link tool. Four limits matter: #54 ships the grammar **engine only**; #61 is stacked on #54,
+and its wiring covers dense and Gemma 4 while refusing Lightning/Nanbeige until their adapters carry
+a token filter; #55 runs only on the tensor-core spec path (`tc_step`, `KINDI_TC=1`); and #58 does
+not add route-level 404/422 handlers or request-field validation beyond #61's `response_format`
+checks.
 
 **Verified in the fork but not covered by any PR:**
 
@@ -230,9 +239,8 @@ validation.
 | `kindi plan` + `kindi autotune` + `--portfolio` + per-card VRAM ceiling/reserve | `test_plan.py`/`test_autotune.py`; 27B 24K peak 6,091 MiB; `--vram-budget-mib`/`--vram-reserve-mib` | ~1,300 lines across `plan.py`, `autotune.py`, `ltfit.py`; the planner contract needs maintainer design feedback |
 | `support_matrix` generator | `test_support_matrix.py` (fork) | still upstream-coupled: the fork's scanner reads `convert.TERNARY` and `tp.kv_mode()`, neither exists in v0.6.1, and its tests assert `kindi/backends/registry.py`; #57 ships only `config_reference` |
 | backend plugin interface + five adapters | Bonsai gate closed 2B/4B/9B/27B; Lightning gate closed; Nanbeige/Gemma 4/DSV4.1 adapters CPU-tested | ~2,000 lines across registry and adapters; three GPU gates still blocked by packs |
-| server/API hardening | `test_server*`, session tests; bounded queue/429, rate limit, JSON access log, `/metrics`, body caps, OpenAI error envelope, sessions | +1,408 lines in `server.py` alone; #58 covers only the envelope and `_err`/`_overflow`; route handlers and request validation are still open |
+| server/API hardening | `test_server*`, session tests; bounded queue/429, rate limit, JSON access log, `/metrics`, body caps, OpenAI error envelope, sessions | +1,408 lines in `server.py` alone; #58 covers the envelope and `_err`/`_overflow`, #61 covers `response_format` validation and constrained decoding; route handlers and the remaining request fields are still open |
 | speculation harnesses | `verify --spec`, `bench --spec`, `tools/verify_matrix.py`, `tools/spec_ab.py`; 12/12 byte-identical A/B | depends on `spec.py` and model packs; #55 covers only the policy |
-| grammar server wiring | `kindi/constrained.py` + server `response_format` tests | #54 ships the engine only; wiring is a separate PR after it |
 | dense tandem + joint cache + owned-slice CPU load | `test_tandem.py`; 2B/4B/9B/27B exactness, rate and peak rows | measured conclusion is “tandem does not beat GPU-only”; needs a maintainer capacity decision |
 | MoE expert cache / cold-expert tier | `test_expert_cache.py`/`test_cold_experts.py`; prefetch, slots and byte accounting | unit-tested only: no larger-than-RAM pack, GPU run or tok/s claim |
 | model backends (Gemma 4, Nanbeige, Lightning, DSV4.1) | family tests, CLI/server validation, Lightning GPU gate | packs absent or corrupt; each backend is a large PR on its own |
@@ -256,7 +264,7 @@ title folds three different questions together, so they are separate below; each
 would move it, and the linked benchmark pages and `docs/MTP.md` hold the dated runs behind them.
 
 **The short answer.** Nothing upstream is deleted or unported: every file of `v0.6.1` is still present
-(`git diff --diff-filter=D --name-only v0.6.1..96acdea` is empty), and the release's two code changes are
+(`git diff --diff-filter=D --name-only v0.6.1..69b08d2` is empty), and the release's two code changes are
 in `f934a55`. The official release publishes `0.6.1-cuda`, `0.6.1-rocm6` and `0.6.1-rocm7` plus the
 source and installer hashes. This fork now prepares its own `0.7.0-fork` package, installer and
 container tags, explicitly marked as a fork release rather than official 0.6.1. What remains
@@ -448,16 +456,17 @@ arbitrary-draft-GGUF harness stays a separate gate.
   `diff --shortstat`, `diff --diff-filter=D`, `ls-tree`, `ls-files`).
 - Latest official release check (2026-11-21): GitHub `/repos/ahtx/kindi/releases/latest` -> [`v0.6.1`](https://github.com/ahtx/kindi/releases/tag/v0.6.1),
   published 2026-11-16T21:49:20Z; `git ls-remote origin refs/heads/main` -> `7fececb`.
-- Counts at reported baseline `96acdea`: **680 commits**, **897 files**, `+127,186/−1,417`, **998 tracked files**,
+- Counts at reported baseline `69b08d2`: **681 commits**, **897 files**, `+127,204/−1,417`, **998 tracked files**,
   **28 numbered requirements**, zero file deletions (`git rev-list`, `git diff --shortstat`,
   `git diff --diff-filter=D`, `git ls-tree`). The code baseline `66eebd3` is 678 commits / +127,084;
-  `741d3f5` + `96acdea` are docs-only (4 files, +147/−45).
-- Upstream PR status (2026-11-21, GitHub API): **14 open** (#47-#60), all non-draft and
-  `mergeable: clean`, 15 commits (13 one-commit PRs; #48 has two), **0 CI check runs** and
-  **0 reviews**. The union of their changed files is **51 unique paths** (35 from #47-#55, 19
-  from #56-#60, 3 shared); **846 of the 897 changed paths are not proposed**. The CLA 1.1
-  statement is in every title (the nine #47-#55 titles add a trailing period); per-commit
-  author/committer is `Kindi Maintainers <noreply@kindi.invalid>`.
+  `741d3f5` + `96acdea` + `69b08d2` are docs-only (4 files, +216/−96).
+- Upstream PR status (2026-11-21, GitHub API): **15 open** (#47-#61), all non-draft and
+  `mergeable: clean`, 18 commits (13 one-commit PRs; #48 has two and #61 has three), **0 CI check runs** and
+  **0 reviews**. The union of their changed files is **54 unique paths** (35 from #47-#55, 19
+  from #56-#60, 3 new from #61, 3 shared); **843 of the 897 changed paths are not proposed**. The CLA 1.1
+  statement is in every title (the nine #47-#55 titles and #61 add a trailing period); per-commit
+  author/committer is `Kindi Maintainers <noreply@kindi.invalid>`. #61 is stacked on #54 and
+  includes #54's engine commit; #54 remains the engine-only PR.
 - Container smoke status (2026-11-20): the rebuilt `kindi:0.7.0-fork` image
   (`sha256:b08916d7…`, Python 3.6.9) passes the **unmodified-image** smoke on the RTX 4060 Ti:
   `/health` 200, one non-streaming chat 200 in **0.2337 s**, GPU passthrough and 2B pack load
