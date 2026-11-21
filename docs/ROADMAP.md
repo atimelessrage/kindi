@@ -238,6 +238,44 @@ planned only: no code exists for these yet, and each needs its gate measured bef
 | 8 | FP8 E4M3 K/V cache, decided by gate 3 | llama.cpp v1.0.0 `-ctk/-ctv f8_e4m3` | 8 bits per value against q8_0's 8.5 (6% smaller), wider dynamic range for outliers, hardware conversion on Ada+; we already ship FP8 kernels and the `KINDI_KV` plumbing; groundwork 2026-11-14: the host f32→FP8 reference codec (`f32_to_fp8`, round-to-nearest ties-to-even) is now in `kindi/dtypes.py` with all-pattern round-trip tests, tracked as [REQ-0014](development/requirements/REQ-0014.md) (experimental). **Implemented 2026-11-15 (decode-only):** `k_store_fp8` / `k_attn_sf8t` / `k_attn_vf8w` behind `KINDI_KV=fp8` (opt-in, experimental), prompt/chunk/tensor-core/batch paths disabled because their kernels are q8-only; the cache uses the q8 layout (8.5 bits/value), not a static-scale 8-bit layout. | behind `KINDI_KV=fp8`: KLD no worse than q8_0 at the same context, 4/4 exact against the fp16 reference at verify length on Ada, and the peak measured against q8_0 — **measured 2026-11-15 on the 2B (RTX 4060 Ti): NOT met.** KLD 2.48e-06 (2K) / 2.80e-06 (8K), ~9-14x the q8_0 rows (2.78e-07 / 2.06e-07), 100% same-top, PPL ratio 1.00006/1.00008 (k8v4 1.30e-04/2.26e-04); verify 3/4 (prompt 1 flips at token 30; q8_0 4/4); same cache size as q8_0 (8.5 bits/value), sampled peak 2,856 vs 2,895 MiB at 8K (saving is the disabled chunk buffers). Verdict: an experimental **lossy** opt-in, nicer than k8v4 and not lossless; do not use as a default. Evidence: gitignored `bench-logs/req0014-fp8-kld/kld.json`, [REQ-0014](development/requirements/REQ-0014.md) |
 | 9 | Windows unbuffered pack load | llama.cpp v1.0.0 DirectIO parity | our `file_to_card` drops the page cache per chunk on Linux and does nothing on Windows, where a 5-7 GB pack load competes with the file cache | **measured 2026-11-14, gate NOT met**: `FILE_FLAG_NO_BUFFERING` + 64 KB-aligned chunk reads prototype (correct bytes verified against the buffered path) on the 27B bcodes (T: drive, 6.3 GiB): unbuffered 15.6 s vs buffered 14.5 s cold and 4.7 s cache-warm. NO_BUFFERING is not a speedup here — the disk read is the bottleneck either way (430 MB/s), and skipping the cache only forfeits the warm-reload benefit, at the cost of 64 KB-alignment plumbing in the hot load path. Keep the buffered path; a cache-cleanup knob would only help the multi-server footprint case, which is unmeasured. |
 
+## Agent-side token economy (2026-11-21)
+
+**Parked, complementary — not an engine change.** [TokenEconomizer](https://github.com/microsoft/TokenEconomizer)
+is an external controller for coding agents (Claude Code, Codex, Copilot CLI), not an inference engine.
+It learns per repository across sessions and applies three mechanisms: micro-skills (short operational
+facts injected at session start), tool pruning (tool definitions the agent never uses are removed through
+the agent's own settings), and a failure-loop guard (a judge model redirects a stuck turn, at most once).
+The paper reports 18.4-30.9% lower mean billed cost on 277 SWE-Bench tasks across five agent-model
+settings, 16-21% on Web-Bench and 6-20% on security-audit tasks; Pass@1 improved in four settings and
+fell 1.0 point in the fifth, and the savings include the controller's own model calls. Its state lives
+in `~/.tokeneconomizer`; it is Python 3.10+ and stdlib-only.
+
+**Why Kindi does not implement it.** The mechanisms act on the agent's prompt, tool list and control
+flow. A server cannot apply them without rewriting client requests, which would change agent semantics
+and is out of scope. The compatible path is agent -> TokenEconomizer -> Kindi: Codex and other
+OpenAI-shaped clients can point at `kindi serve` today; Claude Code needs
+[REQ-0028](development/requirements/REQ-0028.md)'s `/v1/messages`. Kindi already returns
+`prompt_tokens_details.cached_tokens` and has a prefix cache, so the ledger's cache accounting has a
+real signal.
+
+**Why fewer tokens can still be faster here.** Less prompt/tool/history text means shorter prefill and
+a smaller K/V working set, which matters most on old cards. But the plugin's judge and fact-proposer
+calls run through the same agent and consume local decode time; its dollar model assumes frontier API
+prices and hard-fails on an unknown billed model id in experiment mode (live mode has a labeled
+fallback). Tool pruning also changes the prompt prefix, which can miss Kindi's prefix cache and pay a
+full re-prefill; the plugin waits for an idle hour for exactly that reason. It reduces the number of
+tokens the agent sends, not the per-token cost of the engine.
+
+**Gate before any claim.** On an old card, run the same repository/task sequence paired with and without
+the plugin, and record per task: prompt/completion/cached tokens, prefill and decode seconds,
+wall-clock, and pass/fail. The gate is >=15% fewer prompt tokens and >=10% lower median task wall-clock,
+including the plugin's own calls, with no pass-rate drop. A dollar saving alone is not a Kindi result.
+No Kindi run exists yet, and no code is proposed.
+
+**Licensing.** The repository's README badge says MIT while `pyproject.toml` declares Apache-2.0;
+resolve that before vendoring any of it. Running it as an external agent plugin does not put its code
+in Kindi.
+
 ## Small-MoE compatibility (2026-11-14)
 
 The small MoEs below are recognized by `kindi/moe_compat.py` (and, for Cascade 2,
