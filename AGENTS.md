@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `96acdea` on `wip/local-round-2026-11-20` (the docs-only commits `741d3f5` and `96acdea` follow the `66eebd3` code baseline; guarded by `tests/test_agents_handoff.py`); the 2026-11-20 integration lands the `0.7.0-fork` release surface, local archive builder, read-only Intel probe, dense placement portfolio, process-shared token-class grammar masks, stricter request validation and autotune/parity fixes, with the controlled benchmark, container-smoke and claims evidence tracked; the earlier 2026-11-19 round remains in history; Engine wiring and the model row remain blocked by the absent Lightning pack. The 2026-11-20 follow-up adds a per-card dense-tandem VRAM ceiling (`--vram-budget-mib` / `tandem_vram_mb`) and display reserve (`--vram-reserve-mib` / `tandem_reserve_mb`), applied as `min(free - reserve, ceiling)` by `auto`/`rate`, the runtime and autotune (over-budget peaks are not recommended); full CPU suite 1420 passed / 28 skipped. The 2026-11-21 refresh regenerates the stale configuration reference and updates the upstream PR coverage map in `CURRENT-VS-KINDI-0.6.md` to 14 open PRs (#47-#60, 51 of 897 changed paths); `docs/ROADMAP.md` records TokenEconomizer as a parked agent-side token-economy idea.
+- **HEAD:** `c68fb69` on `wip/local-round-2026-11-20` (the docs-only commits `741d3f5`, `96acdea`, `69b08d2` and `c68fb69` follow the `66eebd3` code baseline; guarded by `tests/test_agents_handoff.py`); the 2026-11-20 integration lands the `0.7.0-fork` release surface, local archive builder, read-only Intel probe, dense placement portfolio, process-shared token-class grammar masks, stricter request validation and autotune/parity fixes, with the controlled benchmark, container-smoke and claims evidence tracked; the earlier 2026-11-19 round remains in history; Engine wiring and the model row remain blocked by the absent Lightning pack. The 2026-11-20 follow-up adds a per-card dense-tandem VRAM ceiling (`--vram-budget-mib` / `tandem_vram_mb`) and display reserve (`--vram-reserve-mib` / `tandem_reserve_mb`), applied as `min(free - reserve, ceiling)` by `auto`/`rate`, the runtime and autotune (over-budget peaks are not recommended); full CPU suite 1420 passed / 28 skipped. The 2026-11-21 refresh regenerates the stale configuration reference and updates the upstream PR coverage map in `CURRENT-VS-KINDI-0.6.md` to 15 open PRs (#47-#61, 54 of 897 changed paths, with #61 stacked on #54); `docs/ROADMAP.md` records TokenEconomizer as a parked agent-side token-economy idea.
 
 ### Python quality ratchet
 
@@ -235,7 +235,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `741d3f5` | main checkout; clean; one docs commit behind this session |
-| `<worktree>` | `wip/local-round-2026-11-20` | `96acdea` | this session; PR-status refresh |
+| `<worktree>` | `wip/local-round-2026-11-20` | `c68fb69` | this session; PR-status refresh |
 
 The main worktree at `T:/kindi` is at `741d3f5`; this session adds the PR-status refresh at `96acdea`.
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
