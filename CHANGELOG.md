@@ -11,6 +11,13 @@ installer hashes are recorded in `docs/INSTALL.md`; publication is still a relea
 
 ### Added
 
+- **Looped GGUFs now have a reusable execution plan and coverage check** — `kindi/looped.py`
+  returns the full logical layer order with the stored block, phase and loop pass for each step,
+  and reports stored blocks that are missing from or unexpected in the GGUF tensor index. The new
+  host-only `kindi loop-info MODEL.gguf [--json]` prints the plan and coverage without loading
+  tensor data, and a changed `block_count` is refused with its measured family and counts instead
+  of the generic architecture error. This is map validation only; there is still no looped loader,
+  pack, catalog entry or support claim (REQ-0031).
 - **The first structured request no longer pays the vocabulary build** — `kindi serve` starts
   `token_classes.prewarm` in a daemon thread after the engine loads, building the process-shared
   index, trie, character sets and id sets for the dense and Gemma paths

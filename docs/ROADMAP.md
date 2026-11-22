@@ -231,6 +231,12 @@ catalog, the installer or the generated support matrix.
 
 **Ecosystem caveat.** The official GGUF is not stock-llama.cpp-compatible: the card builds [OpenSenseNova/llama.cpp at `24ea7bb`](https://github.com/OpenSenseNova/llama.cpp/tree/24ea7bb78410e0f0f7bbb362e37c60cd9ecfc761), and the upstream [support issue #31571](https://github.com/ggml-org/llama.cpp/issues/31571) is still open. vLLM and SGLang support is in pull requests rather than releases. This is enough for a pinned Q0 reference, but not a plug-and-play Kindi pack.
 
+**Shared map check (2026-11-22).** `kindi/looped.py` now turns either measured map into a full
+logical execution plan (logical layer, stored block, phase and loop pass) and checks the GGUF
+tensor index for missing or unexpected stored blocks. `kindi loop-info FILE.gguf [--json]` prints
+that report without loading tensor data, and a changed `block_count` is refused by name. This is
+host-side map validation for the eventual loader, not a pack, engine or support claim.
+
 **Do not start with ternary.** The low-memory option is the official 4-bit AWQ/GGUF weights, not a naive `{-1, 0, +1}` PTQ. The 24 shared layers are reused twice, so rounding error is applied twice; the mHC routing and attention projections are sensitive and stay higher precision in the reference. Any ternary experiment keeps embeddings, attention and mHC at higher precision, quantizes only selected MLP/linear weights, and compares KLD, PPL and task outputs against the 4-bit baseline. It is lossy and opt-in; QAT is a separate step only if mixed-precision PTQ fails. A generic 2-bit container without a ternary kernel is not a memory or speed win.
 
 | phase | gate | status |

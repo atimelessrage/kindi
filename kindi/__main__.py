@@ -402,6 +402,29 @@ def cmd_intel_info(cfg, a):
     return 0
 
 
+def cmd_loop_info(cfg, a):
+    """Inspect a looped-transformer GGUF map without loading any tensor data (REQ-0031)."""
+    from . import looped
+    from .gguf import GGUF
+
+    try:
+        g = GGUF(a.gguf)
+    except Exception as e:  # noqa: BLE001 - a malformed GGUF is a CLI error, not a traceback
+        raise SystemExit("kindi loop-info: %s" % e) from None
+    changed = looped.mismatch(g)
+    if changed:
+        raise SystemExit("kindi loop-info: " + changed)
+    report = looped.layout(g)
+    if report is None:
+        raise SystemExit("kindi loop-info: %s is not a recognized looped GGUF (REQ-0031)" % a.gguf)
+    if a.json:
+        print(json.dumps(looped.report_dict(report), indent=2, sort_keys=True))
+    else:
+        for line in looped.render(report):
+            print(line)
+    return 1 if (report.missing or report.unexpected) else 0
+
+
 def cmd_io(cfg, a):
     from . import io_probe
     return io_probe.run(a.mib, a.disk_dir, a.skip, a.json)
@@ -626,6 +649,9 @@ def _build_parser():
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("intel-info", help="read-only Intel M1 probe: CPU, display, NPU, Level Zero and OpenVINO")
     s.add_argument("--json", action="store_true", help="print the whole probe as JSON")
+    s = sub.add_parser("loop-info", help="inspect a looped-transformer GGUF map (no tensor data loaded)")
+    s.add_argument("gguf")
+    s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("io", help="measure this host's memory-tier rates: RAM copy, disk read, PCIe copies")
     s.add_argument("--mib", type=int, default=128, help="buffer/file size per probe in MiB (default 128)")
     s.add_argument("--disk-dir", default=None, help="where to create the temporary disk-probe file (default: the system temp dir)")
@@ -694,6 +720,7 @@ _COMMANDS = {
     "info": cmd_info,
     "caps": cmd_caps,
     "intel-info": cmd_intel_info,
+    "loop-info": cmd_loop_info,
     "io": cmd_io,
     "autotune": cmd_autotune,
     "backends": cmd_backends,

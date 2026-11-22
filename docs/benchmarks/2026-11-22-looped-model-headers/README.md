@@ -74,6 +74,7 @@ is a separate file and is not part of this inventory.
 - It does **not** establish the full-file SHA-256 (the weights were not downloaded), a tokenizer
   round-trip, any output token, any speed or any memory measurement.
 - It is not a support claim. `kindi convert` recognizes both architectures and refuses them with
-  this map; no pack, catalog entry or engine path exists yet.
+  this map; `kindi loop-info FILE.gguf [--json]` prints the same logical plan and checks the tensor
+  index for missing stored blocks. No pack, catalog entry or engine path exists yet.
 
 The machine-readable form is [headers.json](headers.json).
