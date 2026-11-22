@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `551b8f5` on `merge/upstream-0.7.0` (the 0.7.0 merge; guarded by
+- **HEAD:** `157d2f1` on `merge/upstream-0.7.0` (the 0.7.0 merge commit is `551b8f5`; guarded by
   `tests/test_agents_handoff.py`). **2026-11-23: official Kindi v0.7.0 (`8298a0f`) is merged in.** The merge base was
   `dce89df`; the fork was 701 commits ahead and v0.7.0 two ahead (`v0.6.1` + the squashed 0.7.0 commit), so the branch is
   now 0 behind and 702 commits / 931 changed files ahead (+133,113/-1,946), 1,066 tracked files vs 216, no upstream file
@@ -234,10 +234,10 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `551b8f5` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `551b8f5` | this session; 2026-11-23 Kindi 0.7.0 merge |
+| `T:/kindi` | `main` | `157d2f1` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `157d2f1` | this session; 2026-11-23 Kindi 0.7.0 merge |
 
-The main worktree at `T:/kindi` is fast-forwarded to this round; the table names the previous commit `551b8f5` (rule 5a).
+The main worktree at `T:/kindi` is fast-forwarded to this round; the table names the previous commit `157d2f1` (rule 5a).
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
 **Shared files:** `AGENTS.md`, `README.md`, `WHY.md`, `CHANGELOG.md`, `install.sh`,
