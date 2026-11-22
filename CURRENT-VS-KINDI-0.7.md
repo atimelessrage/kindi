@@ -3,7 +3,7 @@
 ## TLDR - too long didnt read
 
 **The comparison:** official Kindi **v0.7.0** (tag `v0.7.0`, commit `8298a0f`, released 2026-11-23) against this fork at the
-**0.7.0 merge** on `merge/upstream-0.7.0`. The merge base is `dce89df`; the fork was 701 commits ahead and 0.7.0 two commits
+**0.7.0 merge commit `551b8f5`** on `merge/upstream-0.7.0`. The merge base is `dce89df`; the fork was 701 commits ahead and 0.7.0 two commits
 ahead (`v0.6.1` + the squashed "Kindi 0.7.0" commit), so after the merge the fork is **0 commits behind and 702 commits /
 931 changed files ahead** (+133,113/−1,946), with **1,066 tracked files against 216 upstream** and **no upstream file
 missing**.
@@ -37,7 +37,7 @@ container cgroup limit), #49 (a tokenizer pack inconsistency fails loudly), #72 
 #76 (Hadamard-4096 packs default to exact tensor-core activations) - because upstream squashes a release into one
 commit; they can be closed upstream as included.
 
-Report date: **2026-11-23**. Baseline: official **Kindi 0.7.0** (tag `v0.7.0`, commit `8298a0f`, released
+Report date: **2026-11-23**. Baseline: this fork at **`551b8f5`** (the merge commit) against official **Kindi 0.7.0** (tag `v0.7.0`, commit `8298a0f`, released
 2026-11-23) against this fork's `merge/upstream-0.7.0` branch. The earlier comparison, its 0.6.1 measurements and the
 round-by-round history stay in `detailed-fork-changelog.md`; the speeds and quality figures below are the 0.6.1-era runs
 at `60a039b` unless a table says otherwise.
@@ -46,7 +46,7 @@ at `60a039b` unless a table says otherwise.
 
 | question | answer |
 |---|---|
-| **What was merged** | `v0.7.0` (`8298a0f`) into `wip/local-round-2026-11-20` (`50a973b`), branch `merge/upstream-0.7.0`. Merge base `dce89df`; 701 fork commits and 2 upstream commits. Upstream's side is 106 files, +24,385/-490. |
+| **What was merged** | `v0.7.0` (`8298a0f`) into `wip/local-round-2026-11-20` (`50a973b`), branch `merge/upstream-0.7.0`; merge commit **`551b8f5`**. Merge base `dce89df`; 701 fork commits and 2 upstream commits. Upstream's side is 106 files, +24,385/-490. |
 | **Conflicts** | 39 files / 69 hunks, all resolved by hand. The fork's implementation wins where it has tests and evidence; upstream's self-contained fixes were ported. |
 | **Ported from 0.7.0** | `packcheck` size + sha256 gate (B16), the B16 `g5_<key>.src` source stamp, `bench --split-at` curve positions (#33), `gpudrv.libcuda()`/`libcuda_name()`, the cgroup parent walk and usage in `hostram.py` (#48), `chunk.py`'s `_cublas`/`_gemm16`/`f16_gemm_ok` GPU-path fixes (#4/#33), `tp.py`'s B15 split fixes, `tc_hp_for(man, card)` with the Turing carve-out (#76), `kindi place`/`kindi route`/`kindi cards`, `oai.check` (#38), the per-card installer detection, and the 0.7.0 docs. |
 | **Present but not wired** | `slots.py` and the multi-slot server path (`--slots`, `KINDI_SLOTS_*`; `spec.py` has the `*_R` kernels and `build_plan(..., slots=...)`, but the fork's `server.py` still serves one engine), the Flash-Next adapter (`qwen4exp_gen.py`/`qwen4exp_gpu.py`, `KINDI_BACKEND` unchanged), the Windows launcher/tray monitor (built separately), and the `kindi place` portfolio as a server placement. Each needs a GPU run this host cannot do. |

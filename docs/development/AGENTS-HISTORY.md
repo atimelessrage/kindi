@@ -1560,3 +1560,12 @@ pair of rates was not a request decomposition (`docs/benchmarks/2026-11-17-i7-80
 The one commit message that named the knowledge-base folder in full was rewritten on 2026-11-17 to `$KINDI_AI_INVENTORY`; that commit and the 32 after it were
 re-hashed with identical trees and dates, both worktree branches were moved together, and every short hash cited below, in `CURRENT-VS-KINDI-0.7.md`, in the
 requirements history and in `docs/claims/` now names the rewritten commit.
+
+### 2026-11-23 Kindi 0.7.0 merge
+
+Task: merge official `v0.7.0` (`8298a0f`) and refresh the comparison report. 39 conflicted files / 69
+hunks resolved by hand; merge commit `551b8f5`; 0 behind, 702 ahead, 931 changed files. Kept the fork's
+server path and structured-output grammar; ported upstream's self-contained fixes; exposed upstream's
+`plan` as `kindi place`. Multi-slot serving and the Flash-Next engine stay unwired (no GPU here) and are
+outside Pyright/Pylint scope until wired. Gates: 1,450 passed / 58 skipped; quality 207/59/884/245.
+`CURRENT-VS-KINDI-0.6.md` was renamed to `CURRENT-VS-KINDI-0.7.md` (30 files' references updated).

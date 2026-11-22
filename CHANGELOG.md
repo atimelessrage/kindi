@@ -9,6 +9,18 @@ recorded 666 at `3fed704`, and the current range is 669. The package, both insta
 now say `0.7.0-fork`, so the fork cannot be mistaken for an official `0.6.1` patch. The source archive and
 installer hashes are recorded in `docs/INSTALL.md`; publication is still a release-owner step.
 
+### Upstream merge (2026-11-23)
+
+Official **Kindi v0.7.0** (`8298a0f`, released 2026-11-23) is merged in as `551b8f5`, so the branch is
+0 commits behind and 702 ahead (931 changed files, `+133,113/−1,946`, 1,066 tracked files vs 216). 39
+conflicted files were resolved by hand. What came across: the Flash-Next engine (`qwen4exp_*`, `qx_cpu.c`,
+`qx_gpu.cu`), the multi-slot serving stack (`slots.py`, `--slots`, `KINDI_SLOTS_*`), `kindi place` /
+`kindi route` / `kindi cards`, the packcheck size+sha256 gate, the request validator (`oai.py`), DeepSeek
+V4.1 expert-card calibration and the Windows launcher/tray monitor. **The multi-slot path and the Flash-Next
+engines are not wired into this fork's server** - neither could be run here; that is stated in
+`CURRENT-VS-KINDI-0.7.md` and in `AGENTS.md`. #48, #49, #72 and #76 are part of 0.7.0 by
+content; the other 29 fork PRs are still open.
+
 ### Added
 
 - **One-command install check** — `kindi selftest [--json FILE]` loads the selected pack once, calls
