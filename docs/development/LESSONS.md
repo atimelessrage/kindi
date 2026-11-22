@@ -162,3 +162,18 @@ tests in `tests/test_cold_experts.py` (hit, free slot, LRU eviction, routed-slot
 **Practice:** A cache needs its own ownership table, updated by the same code that fills it, and
 a test whose second lookup must hit. Do not derive "already cached" from a table another
 subsystem owns unless that subsystem stores the same keys.
+
+## L-0011: Level Zero can advertise COPY on a group that silently ignores copy commands
+
+**Observation:** On the Windows A770 driver, a command list on queue group 0 (`flags=0x7`,
+compute+copy+cooperative) accepted `zeCommandListAppendMemoryCopy`, closed, executed and
+synchronized with every return code 0, but the device-to-host destination stayed all zeros. The
+same commands on group 1 (`flags=0x2`, copy-only) produced the expected bytes. `zeMemCopy` is not
+exported by loader 1.33.1, and a host-USM destination also stayed zero; shared USM works.
+
+**Evidence:** `kindi/intel_l0.py` and `tests/test_intel_l0.py`; the real 16 MiB run is
+`docs/benchmarks/2026-11-22-i7-8086k-arc-a770/l0-smoke.json` (0 mismatches, copy group 1).
+
+**Practice:** Query `zeDeviceGetCommandQueueGroupProperties` and prefer a copy-only group for
+copies; verify the destination bytes. A zero return code from a queue API is not proof that a
+command ran, and a capability flag is not proof that the engine honors the command.

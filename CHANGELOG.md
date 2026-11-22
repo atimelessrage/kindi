@@ -11,6 +11,13 @@ installer hashes are recorded in `docs/INSTALL.md`; publication is still a relea
 
 ### Added
 
+- **Intel Arc A770 has an executable Level Zero memory path** — the new host-only
+  `kindi intel-smoke [--mib 16] [--device 0] [--json]` creates a Level Zero context on the
+  installed A770, allocates device and shared USM, copies a known pattern through a command
+  list/queue and verifies the round trip. On the Windows rig a 16 MiB run passes with zero
+  mismatches in 11.6 ms. The copy group is selected by its advertised COPY capability after the
+  measured driver ignored copy commands on group 0; `zeMemCopy` is absent from loader 1.33.1, so
+  copies use a command list. There is no kernel, GEMM, model, engine or support claim (REQ-0020).
 - **Looped GGUFs now have a reusable execution plan and coverage check** — `kindi/looped.py`
   returns the full logical layer order with the stored block, phase and loop pass for each step,
   and reports stored blocks that are missing from or unexpected in the GGUF tensor index. The new

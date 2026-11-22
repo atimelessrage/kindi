@@ -1,0 +1,67 @@
+{
+  "backend": "level-zero memory path only; no kernel or engine",
+  "bytes": 16777216,
+  "context": true,
+  "copy_queue_group": 1,
+  "copy_round_trip": true,
+  "device": {
+    "driver_index": 0,
+    "ordinal": 0
+  },
+  "device_count": 1,
+  "device_index": 0,
+  "device_usm": true,
+  "elapsed_ms": 11.616,
+  "error": null,
+  "first_mismatch": null,
+  "loader": {
+    "available": true,
+    "error": null,
+    "name": "ze_loader.dll"
+  },
+  "mib": 16,
+  "mismatches": 0,
+  "probe": "intel-l0-smoke",
+  "queue_groups": [
+    {
+      "flags": "0x7",
+      "num_queues": 1,
+      "ordinal": 0
+    },
+    {
+      "flags": "0x2",
+      "num_queues": 1,
+      "ordinal": 1
+    }
+  ],
+  "read_only": false,
+  "result": "pass",
+  "returncodes": {
+    "zeCommandListAppendMemoryCopyD2H": "0x00000000",
+    "zeCommandListAppendMemoryCopyH2D": "0x00000000",
+    "zeCommandListClose": "0x00000000",
+    "zeCommandListCreate": "0x00000000",
+    "zeCommandListDestroy": "0x00000000",
+    "zeCommandQueueCreate": "0x00000000",
+    "zeCommandQueueDestroy": "0x00000000",
+    "zeCommandQueueExecuteCommandLists": "0x00000000",
+    "zeCommandQueueSynchronize": "0x00000000",
+    "zeContextCreate": "0x00000000",
+    "zeContextDestroy": "0x00000000",
+    "zeDeviceGetCommandQueueGroupProperties": "0x00000000",
+    "zeDeviceGetCommandQueueGroupPropertiesQuery": "0x00000000",
+    "zeDriverGet": "0x00000000",
+    "zeDriverGetHandles": "0x00000000",
+    "zeInit": "0x00000000",
+    "zeMemAllocDevice": "0x00000000",
+    "zeMemAllocSharedOutput": "0x00000000",
+    "zeMemAllocSharedSource": "0x00000000",
+    "zeMemFree": "0x00000000",
+    "zeMemFreeSharedOutput": "0x00000000",
+    "zeMemFreeSharedSource": "0x00000000"
+  },
+  "schema": 1,
+  "scope": "device USM allocation and H2D/D2H copy; no kernel launch or model",
+  "shared_usm": true,
+  "support_claim": false
+}

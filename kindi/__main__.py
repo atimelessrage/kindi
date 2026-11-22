@@ -402,6 +402,19 @@ def cmd_intel_info(cfg, a):
     return 0
 
 
+def cmd_intel_smoke(cfg, a):
+    """Level Zero device-memory round trip on an Intel GPU; no kernel or model."""
+    from . import intel_l0
+
+    report = intel_l0.run_smoke(a.mib, loader=a.loader, device=a.device)
+    if a.json:
+        print(intel_l0.dumps(report))
+    else:
+        for line in intel_l0.render(report):
+            print(line)
+    return 0 if report["result"] == "pass" else 1
+
+
 def cmd_loop_info(cfg, a):
     """Inspect a looped-transformer GGUF map without loading any tensor data (REQ-0031)."""
     from . import looped
@@ -649,6 +662,11 @@ def _build_parser():
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("intel-info", help="read-only Intel M1 probe: CPU, display, NPU, Level Zero and OpenVINO")
     s.add_argument("--json", action="store_true", help="print the whole probe as JSON")
+    s = sub.add_parser("intel-smoke", help="Level Zero device-memory round trip on an Intel GPU (no kernel)")
+    s.add_argument("--mib", type=int, default=1, help="device USM allocation in MiB (default 1, max 256)")
+    s.add_argument("--device", type=int, default=0, help="Level Zero device index (default 0)")
+    s.add_argument("--loader", default=None, help="Level Zero loader name/path (default: the host loader)")
+    s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("loop-info", help="inspect a looped-transformer GGUF map (no tensor data loaded)")
     s.add_argument("gguf")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
@@ -720,6 +738,7 @@ _COMMANDS = {
     "info": cmd_info,
     "caps": cmd_caps,
     "intel-info": cmd_intel_info,
+    "intel-smoke": cmd_intel_smoke,
     "loop-info": cmd_loop_info,
     "io": cmd_io,
     "autotune": cmd_autotune,

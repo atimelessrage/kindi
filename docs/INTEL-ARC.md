@@ -4,9 +4,11 @@ Status: **planning and architecture audit, 2026-11-10; updated 2026-11-22.** The
 in Kindi yet, and no Intel support claim. The A770 16 GB is now **installed in the Windows test rig**,
 and M1 hardware qualification has been measured there: the card is visible at 16 GiB, its display
 driver registers a Level Zero driver, and the loader enumerates one driver and one device
-([run](benchmarks/2026-11-22-i7-8086k-arc-a770/README.md)). The kernel half is unchanged: no
-oneAPI/SYCL toolchain, no kernel, no model run. The plan's first support target remains Linux; the
-Windows run qualifies the hardware and nothing else (tracked as
+([run](benchmarks/2026-11-22-i7-8086k-arc-a770/README.md)). The first M2 memory-path slice now runs
+on the same host: `kindi intel-smoke` allocates 16 MiB of device USM, stages it through shared USM and
+round-trips it with zero mismatches. The kernel half is unchanged: no oneAPI/SYCL toolchain, no
+kernel, no GEMM, no model run. The plan's first support target remains Linux; the Windows run
+qualifies the hardware and the Level Zero memory path, not Kindi support (tracked as
 [REQ-0020](development/requirements/REQ-0020.md)).
 
 ## Goal
@@ -194,7 +196,7 @@ arithmetic path: no `KINDI_TC`, `KINDI_SPEC`, `KINDI_FD`, fast head or `k8v4` in
 |---|---|---|
 | **M0** Architecture audit | this page; 22-kernel inventory; backend boundary and scope | this page names every affected path and the unsupported options |
 | **M1** Hardware qualification | one A770 16 GB on Linux; oneAPI/SYCL/Level Zero; `sycl-ls`; ReBAR and PCIe state | device is visible with 16 GB; ReBAR state recorded; CPU and llama.cpp SYCL baselines run |
-| **M2** Backend smoke test | `libksycl.so`, USM, vector-add/GEMM and device selection | the smoke binary runs on the A770 with no CPU fallback |
+| **M2** Backend smoke test | memory path (partial: device/shared USM round trip); still needs `libksycl.so`, vector-add/GEMM and device selection | the smoke binary runs on the A770 with no CPU fallback |
 | **M3** Single-card 2B exact | plain engine, exact head, `kindi verify` | 4/4 Bonsai prompts token-exact; no fast/spec/TC |
 | **M4** Server and cache | `kindi serve`, non-stream/stream, prompt cache, health/metrics | same outputs as M3; cache save/restore works |
 | **M5** 4B/9B/27B | model matrix and context fit | exact verify for each advertised model; 8K/24K stability measured |
@@ -214,9 +216,31 @@ M1 is **partly measured on the Windows host (2026-11-22)**. The card is installe
 
 That is hardware qualification, **not M1 passed**: the gate also asks for the pinned oneAPI/SYCL
 toolchain, the ReBAR/PCIe record and the llama.cpp baseline, and none of those exist on this host.
-Windows is not the first support target, so this run does not move the support claim either. M2 still
-needs a SYCL compiler; the next useful step is oneAPI on Windows (the compile half) or a Linux host
-(the plan's target). Record every future run in `docs/benchmarks/<date>-<host>-arc-a770/`.
+Windows is not the first support target, so this run does not move the support claim either. M2's
+memory half is now measured; its kernel/GEMM half still needs a SYCL compiler. The next useful step
+is oneAPI on Windows (the compile half) or a Linux host (the plan's target). Record every future run
+in `docs/benchmarks/<date>-<host>-arc-a770/`.
+
+### M2 memory path (partial, 2026-11-22)
+
+`python -m kindi intel-smoke --mib 16 --json` passes on the Windows A770 through the installed Level
+Zero loader. It creates a context, allocates one device-USM buffer and two shared-USM staging
+buffers, fills a known byte pattern into the source, copies host -> device -> host through a command
+list and a synchronous command queue, and compares all 16 MiB. Measured: **pass, 0 mismatches,
+11.6 ms** ([l0-smoke.json](benchmarks/2026-11-22-i7-8086k-arc-a770/l0-smoke.json)). The command is
+implemented with `ctypes` in `kindi/intel_l0.py`; there is no compiled kernel and no CPU fallback.
+
+Three driver findings are recorded because each one made a successful-looking call produce zeros:
+
+- `zeMemCopy` is absent from loader 1.33.1; copies must go through a command list and queue.
+- Queue group 0 advertises `COMPUTE|COPY|COOPERATIVE` (`flags=0x7`) and accepts copy commands, but the
+  copy does not happen. Group 1 is the copy-only engine (`flags=0x2`) and executes it. Selection now
+  prefers a copy-only group instead of assuming ordinal 0.
+- A host-USM destination produced zeros after the copy; shared USM is the working host-side staging
+  buffer on this driver.
+
+This is the memory/queue half of M2 only. It does not run a kernel, GEMM, model or Kindi engine, and
+it is **not M2 passed** and not an Intel support claim.
 
 ### Arrival checklist (M1, run when the card is installed)
 
@@ -256,7 +280,8 @@ KINDI_DEVICE=cpu python -m kindi --pack <pack> verify
 ```
 
 M1 passes when: the device is visible with 16 GB, the ReBAR state is recorded, and both baselines
-run. Only then does M2 (backend smoke test) start.
+run. Only then does the M2 kernel/GEMM half start; the Level Zero memory/queue half is already
+measured on Windows.
 
 ### CPU tuning hypotheses from `cputune.py` (record during M1)
 

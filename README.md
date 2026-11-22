@@ -362,6 +362,7 @@ of 295 agent turns were the same). The details are in [docs/PROMPT-CACHE.md](doc
 |---|---|
 | `kindi convert MODEL.gguf [--out DIR] [--force]` | build the weight pack (default: the configured `pack`) |
 | `kindi loop-info MODEL.gguf [--json]` | inspect a recognized looped model's logical plan and stored-block coverage (map check only) |
+| `kindi intel-smoke [--mib 16] [--device 0] [--json]` | Level Zero device/shared-USM round trip on an Intel GPU (no kernel or model) |
 | `kindi fast-head [--clusters N]` | build the fast-head cluster file (stop the server first: needs ~300 MB of GPU memory) |
 | `kindi verify` | check greedy output against llama.cpp's reference |
 | `kindi bench` | speed at several context positions, prompt read speed, GPU memory |

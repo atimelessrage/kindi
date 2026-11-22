@@ -1,9 +1,10 @@
 # Intel Arc A770 16 GB: M1 hardware and Level Zero qualification (2026-11-22)
 
 The A770 is now installed in the i7-8086K rig. This page records what the host can prove **without a
-Kindi Intel backend**: the card's identity, its memory, the Level Zero runtime, and the CPU baseline.
-No model ran on the Arc, no SYCL kernel exists, and nothing here is a support claim
-([REQ-0020](../../development/requirements/REQ-0020.md), [INTEL-ARC.md](../../INTEL-ARC.md)).
+Kindi Intel backend**: the card's identity, its memory, the Level Zero runtime, the first Level Zero
+memory-path smoke, and the CPU baseline. No model ran on the Arc, no SYCL kernel exists, and nothing
+here is a support claim ([REQ-0020](../../development/requirements/REQ-0020.md),
+[INTEL-ARC.md](../../INTEL-ARC.md)).
 
 ## Host
 
@@ -55,6 +56,25 @@ context 1,024, `KINDI_DEVICE=cpu`:
 Build time is the first-run clang compile of `kcpu.c` into `~/.cache/kindi`; later runs reuse it.
 These are CPU-engine numbers on the A770 host, not Arc numbers.
 
+## M2 memory path (partial)
+
+`python -m kindi intel-smoke --mib 16 --json` exercises Level Zero without a compiler: context
+creation, one 16 MiB device-USM allocation, shared-USM host staging, a command list and a synchronous
+queue, and a host -> device -> host copy of a known byte pattern. It passes with **0 mismatches** in
+11.6 ms on the A770 ([l0-smoke.json](l0-smoke.json)); the queue group used for copies is group 1,
+the copy-only engine.
+
+Three findings from the run are part of the result:
+
+- `zeMemCopy` is not exported by loader 1.33.1; the copy goes through `zeCommandListAppendMemoryCopy`.
+- Queue group 0 advertises compute and copy (`flags=0x7`) and returns success for every copy call, but
+  the destination stays zero. Group 1 (`flags=0x2`, copy-only) performs the copy; the command now
+  selects a copy-only group by capability instead of using ordinal 0.
+- A host-USM destination also stayed zero; shared USM works as the host-side staging buffer.
+
+This is not M2 passed: it has no kernel, GEMM, model, engine or CPU fallback, and the kernel/GEMM half
+still needs oneAPI/SYCL. It is a measured memory/queue path, not Arc support.
+
 ## M1 verdict
 
 The plan's M1 is worded for Linux ([REQ-0020](../../development/requirements/REQ-0020.md)):
@@ -72,9 +92,9 @@ host:
 | llama.cpp SYCL baseline | **not run** — no SYCL toolchain |
 
 So: **hardware and Level Zero are qualified; M1 is not passed** (toolchain, ReBAR, PCIe and the
-llama.cpp baseline are open), and Windows is not the plan's first support target. M2 still has
-nothing to compile with: a SYCL kernel needs oneAPI (or a Linux oneAPI host), and an unverifiable
-kernel would be a claim rather than a feature.
+llama.cpp baseline are open), and Windows is not the plan's first support target. M2's memory/queue
+half is measured above; its kernel/GEMM half still has nothing to compile with: a SYCL kernel needs
+oneAPI (or a Linux oneAPI host), and an unverifiable kernel would be a claim rather than a feature.
 
 ## Notes
 
@@ -85,3 +105,5 @@ kernel would be a claim rather than a feature.
   Zero/SYCL anyway; this is recorded to avoid a later "OpenCL was there all along" claim.
 - The probe records `driver=n/a` for a Windows adapter: the display class exposes a driver
   *version*, not the Linux `i915`/`xe` service name that `eligible()` checks.
+- The M2 smoke is deliberately separate from `kindi intel-info`: `intel-info` stays read-only, while
+  `intel-smoke` allocates device memory and runs commands. Neither loads a model.
