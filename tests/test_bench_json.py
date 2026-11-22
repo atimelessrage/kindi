@@ -50,6 +50,9 @@ def test_bench_json_records_the_printed_numbers(tmp_path, monkeypatch):
     assert got["ctx_reduced"] is False
     assert got["tandem"] == "off"
     assert got["device"] == "cpu"
+    assert got["runtime"]["loaded"] is True
+    assert got["runtime"]["engine"] == "FakeEngine"
+    assert got["runtime"]["ctx_active"] == 24576
     # every printed rate appears in the JSON, cell by cell
     text = "\n".join(logged)
     assert ("%.1f" % got["read_tok_s"]) in text

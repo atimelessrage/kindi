@@ -44,7 +44,7 @@ from typing import Any
 
 import numpy as np
 
-from . import COMMIT, __version__, chat
+from . import COMMIT, __version__, chat, runtime as runtime_view
 from .api import errors as api_errors
 from .api.auth import bearer_matches
 from .cache import Cancelled, Runner
@@ -1355,6 +1355,7 @@ def create_app(cfg, log=print):
         log("[kindi] engine construction failed")
         raise
     log("[kindi] engine ready for %s" % cfg.get("model_name", "model"))
+    log("[kindi] " + runtime_view.render(runtime_view.describe(cfg, getattr(K, "eng", None), K)))
     requested_spec = os.environ.get("KINDI_SPEC", "0") or "0"
     if (requested_spec not in ("", "0", "off")
             and getattr(K, "nanbeige", None) is None
@@ -1680,8 +1681,10 @@ def create_app(cfg, log=print):
             busy = {"phase": b["phase"], "elapsed_s": round(time.time() - b["started"]),
                     "prompt_tokens": b["prompt_tokens"], "reused": b["cached"],
                     "prompt_read": "%d/%d" % (b["read"], b["prompt_tokens"] - b["cached"]), "generated": b["generated"]}
-        body.update({"head": K.head_active(), "uptime_s": round(time.time() - K.t0), "busy": busy, "stats": K.stats,
-                     "drafting": K.drafting(),
+        rt = runtime_view.describe(cfg, K.eng, K)
+        body.update({"head": rt["head"], "uptime_s": round(time.time() - K.t0), "busy": busy, "stats": K.stats,
+                     "drafting": rt["spec"],
+                     "runtime": rt,
                      "queue": {"waiting": gate.waiting, "max": gate.max_queue, "rejected": gate.rejected,
                                "scheduler": dict(SCHED.counts(), yields=getattr(K, "yields", 0))},
                      "rate_limit_per_min": limiter.per_minute, "rate_limited": limiter.rejected,

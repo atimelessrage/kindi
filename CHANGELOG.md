@@ -11,6 +11,13 @@ installer hashes are recorded in `docs/INSTALL.md`; publication is still a relea
 
 ### Added
 
+- **Diagnostics read one effective runtime state** — `kindi/runtime.py` resolves the engine,
+  TC/HP state, K/V format, context, effective speculation mode and head digest, chunk size,
+  threads and VRAM budget/reserve once. The startup log, `/health` (new `runtime` block),
+  `kindi info` and `bench --json` all publish that object, so they cannot disagree about what is
+  running. `head` is the head that runs (a requested fast head without a fast-head engine reports
+  `exact`) and `spec` is the same effective view `/health.drafting` exposes. Before a load the
+  block says `loaded: false` and reports the requests; `kindi plan` keeps its pre-load planner.
 - **The A770 runs exact compute kernels without oneAPI** — the new host-only
   `kindi intel-cl [--n 1048576] [--dim 128] [--repeats 5] [--json]` compiles a float32 vector-add
   and square GEMM with the driver's own OpenCL C compiler and checks them against a host reference

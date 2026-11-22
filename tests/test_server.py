@@ -783,6 +783,12 @@ def test_health_without_a_key_keeps_the_detailed_view(app_client):
     assert body["ok"] is True and body["model"] == "bonsai2-2b"
     assert body["queue"]["max"] == server.MAX_QUEUE
     assert "gpu_free_mib" in body and "uptime_s" in body
+    # one resolver: the runtime block, the head and the drafting state cannot disagree
+    rt = body["runtime"]
+    assert rt["loaded"] is True and rt["engine"]
+    assert rt["ctx_active"] == body["ctx"] and rt["ctx_requested"] == 4096
+    assert rt["head"] == body["head"]
+    assert rt["spec"] == body["drafting"]
 
 
 class _SpecEngine(_FakeEngine):

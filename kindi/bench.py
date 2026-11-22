@@ -9,6 +9,8 @@ import json
 import os
 import time
 
+from . import runtime as runtime_view
+
 POSITIONS = (100, 2000, 8000, 16000, 24000)
 # A request is a prompt plus a reply, so the two rates decide different things: a 4K prompt with a
 # 128-token reply spends most of its wall clock in prefill, and tuning decode would not move it.
@@ -180,7 +182,8 @@ def _run(cfg, log=print):
               "tandem": cfg.get("tandem", "off"), "cpu_layers": cfg.get("tandem_cpu_layers"),
               "vram_budget_mib": cfg.get("tandem_vram_mb") or None,
               "vram_reserve_mib": cfg.get("tandem_reserve_mb"),
-              "device": "gpu" if cp is not None else "cpu", "read_tok_s": None, "gen_tok_s": {}}
+              "device": "gpu" if cp is not None else "cpu", "read_tok_s": None, "gen_tok_s": {},
+              "runtime": runtime_view.describe(cfg, eng)}
     if hasattr(eng, "cpu_range"):
         result["cpu_range"] = list(eng.cpu_range)
         result["gpu_range"] = list(eng.gpu_range)

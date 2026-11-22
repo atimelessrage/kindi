@@ -481,6 +481,8 @@ def cmd_info(cfg, a):
     # the requested mode and the head's registry verdict, which is what can be known before an engine
     # loads; the effective mode is the serve log's "speculation: requested ... effective ..." (REQ-0024)
     print("speculation: %s" % mtp_heads.report())
+    from . import runtime as runtime_view
+    print(runtime_view.render(runtime_view.describe(cfg)))
     print("config: %s" % cfg["source"])
     for k in sorted(C.DEFAULTS):
         v = cfg[k]

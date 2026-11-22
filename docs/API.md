@@ -175,7 +175,11 @@ simultaneous tag post and status post cannot overwrite each other.
 ## Observability
 
 - `GET /health`: liveness plus (loopback or authenticated) queue, stats,
-  drafting and GPU memory.
+  drafting, GPU memory and a `runtime` block with the effective engine, TC/HP state,
+  K/V format, context, speculation mode and head digest, chunk size, threads and VRAM
+  budget/reserve. The same resolver (`kindi/runtime.py`) feeds the startup log, `kindi info`
+  and `bench --json`; before a model loads it reports requests and `loaded: false` instead of
+  an effective state. `kindi plan` keeps its separate pre-load planner output.
 - `GET /metrics`: Prometheus text (requests, tokens, speculative stats and the effective
   `kindi_spec_mode_effective` mode, queue, uptime). The richer per-request metrics in T5.5 are not
   implemented yet.
