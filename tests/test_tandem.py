@@ -6,6 +6,7 @@ covered by the code-level checks in the release gate; this test suite keeps the 
 (which backend owns the embedding, head and each layer) and the two placement modes honest.
 """
 import json
+import types
 from pathlib import Path
 
 import numpy as np
@@ -150,6 +151,18 @@ def fake_backends(monkeypatch):
     # the owner choice is a property of the machine (a card is visible or not): pin it so these tests
     # do not change behaviour with the host. The plan owner is covered by its own tests below.
     monkeypatch.setenv("KINDI_TANDEM_GPU", "plain")
+
+
+@pytest.fixture
+def fake_cuda(monkeypatch):
+    """A one-card CUDA runtime: owner/auto placement must not depend on the host's GPU."""
+    fake = types.SimpleNamespace(
+        cuda=types.SimpleNamespace(
+            runtime=types.SimpleNamespace(
+                getDeviceCount=lambda: 1,
+                memGetInfo=lambda: (8 << 30, 8 << 30))))
+    monkeypatch.setattr("kindi.engine.cp", fake)
+    return fake
 
 
 def test_cpu_first_owns_the_prefix_and_the_gpu_head(fake_pack, fake_backends):
@@ -512,7 +525,7 @@ def test_owner_table_matches_the_placement(fake_pack, fake_backends):
         assert all((o is eng.cpu) == (il in cpu_layers) for il, o in enumerate(eng._owners))
 
 
-def test_auto_placement_resolves_before_the_backends_are_built(fake_pack, fake_backends, monkeypatch):
+def test_auto_placement_resolves_before_the_backends_are_built(fake_pack, fake_backends, fake_cuda, monkeypatch):
     dims = {"layers": 4, "full_attention_interval": 2, "kv_heads": 1, "head_dim": 8}
     (Path(fake_pack) / "kindi_pack.json").write_text(json.dumps({"dimensions": dims}), encoding="utf-8")
     sizes = {"layers": {il: 1 for il in range(4)}, "embed": 1, "head": 1, "f32": 1}
@@ -523,7 +536,7 @@ def test_auto_placement_resolves_before_the_backends_are_built(fake_pack, fake_b
     assert eng.cpu_range == (1, 2) and eng.gpu_range == (0, 3)
 
 
-def test_auto_placement_passes_the_vram_budget_to_the_planner(fake_pack, fake_backends, monkeypatch):
+def test_auto_placement_passes_the_vram_budget_to_the_planner(fake_pack, fake_backends, fake_cuda, monkeypatch):
     dims = {"layers": 4, "full_attention_interval": 2, "kv_heads": 1, "head_dim": 8}
     (Path(fake_pack) / "kindi_pack.json").write_text(json.dumps({"dimensions": dims}), encoding="utf-8")
     sizes = {"layers": {il: 1 for il in range(4)}, "embed": 1, "head": 1, "f32": 1}
@@ -539,7 +552,7 @@ def test_auto_placement_passes_the_vram_budget_to_the_planner(fake_pack, fake_ba
     assert seen[-1]["reserve_mib"] == 512
 
 
-def test_auto_placement_refuses_when_the_model_already_fits(fake_pack, fake_backends, monkeypatch):
+def test_auto_placement_refuses_when_the_model_already_fits(fake_pack, fake_backends, fake_cuda, monkeypatch):
     monkeypatch.setattr(tandem, "pack_bytes", lambda pack, man=None: {"layers": {0: 1, 1: 1}, "embed": 1,
                                                                         "head": 1, "f32": 1})
     monkeypatch.setattr(tandem, "gpu_estimate", lambda *a, **k: 1)
@@ -653,7 +666,7 @@ def test_layer_tensor_selection_keeps_only_owned_layers_and_optional_ends():
 
 
 # --------------------------------------------------------------- the GPU owner: plan or plain
-def test_the_gpu_owner_defaults_to_the_plan_engine_on_one_card(monkeypatch):
+def test_the_gpu_owner_defaults_to_the_plan_engine_on_one_card(fake_cuda, monkeypatch):
     """The plan owner is the default because it loads only the owned layers and keeps q8_0 K/V."""
     monkeypatch.setattr(tandem, "PlanEngine", object)
     monkeypatch.delenv("KINDI_TP", raising=False)

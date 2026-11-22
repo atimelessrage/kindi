@@ -32,6 +32,10 @@ coverage.json
 # generated render of CURRENT-VS-KINDI-0.6.md (reproduce with pandoc; not a source file)
 current-vs-kindi-0.6-preview.html
 bench-logs/
+# linked worktrees used for PR/scratch work: full checkouts, never source
+.worktrees/
+# a downloaded distro package is not source
+*.deb
 optimizing-mixed-gpu-rig.json
 *_ReviewAudit_*.txt
 *_ProblemsOnly_*.txt

@@ -47,7 +47,9 @@ def cpu_app(tmp_path_factory):
     from shutil import which
     # Booting the real engine builds libkcpu on a cold cache; without a compiler that is an
     # environment gap, not a test failure — skip instead of erroring out of the fixture.
-    if not os.path.exists(_cpu._so_path(None, _cpu.select_isa())) and not (which("gcc") or which("clang")):
+    cc = os.environ.get("KINDI_CC")
+    if not os.path.exists(_cpu._so_path(None, _cpu.select_isa())) and not any(
+            which(c) for c in (cc, "gcc", "clang") if c):
         pytest.skip("no cached CPU library and no gcc/clang to build it")
     saved = {name: os.environ.get(name) for name in ["KINDI_DEVICE"] + _CLEAR}
     os.environ["KINDI_DEVICE"] = "cpu"

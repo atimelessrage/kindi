@@ -2,7 +2,8 @@
 
 Kindi runs a local inference server, and the installer can optionally build a Docker image, install a
 third-party kernel module and change the host's kernel command line. Treat the installer and a
-network-exposed server as privileged, security-sensitive components.
+network-exposed server as privileged, security-sensitive components. The repository's own secrets,
+history-redaction and push policy is [docs/SECURITY.md](docs/SECURITY.md).
 
 ## Reporting a vulnerability
 
@@ -24,8 +25,9 @@ Please do not test against systems you do not own or have permission to test.
 
 - **Network exposure.** The API key is a bearer token, not transport encryption. The default bind is
   `127.0.0.1`; if you set `host = 0.0.0.0`, put the server behind a TLS-terminating reverse proxy and
-  a firewall. `/health` is intentionally unauthenticated and reports model, queue and GPU details;
-  do not expose it to an untrusted network.
+  a firewall. `/health` always answers liveness, version, model and context; its detailed view
+  (GPU memory, queue, counters, live progress) is withheld unless the request carries the API key,
+  or the bind is loopback. Do not expose it to an untrusted network either way.
 - **Image input.** The current text-only packs have no vision weights. Image content is rejected with
   HTTP 400 instead of being silently ignored. Do not assume a future vision pack accepts remote URLs
   without an explicit, guarded fetch policy.

@@ -27,7 +27,7 @@ NO_FMA_PACKS = tuple(p for p in os.environ.get("KINDI_CPU_NO_FMA_PACKS", "").spl
 def _require_toolchain():
     """Skip when the C/OpenMP toolchain this test needs is not installed."""
     if os.name == "nt":
-        if not (os.environ.get("KINDI_CC") or shutil.which("clang")):
+        if not shutil.which(os.environ.get("KINDI_CC") or "clang"):
             pytest.skip("clang is not installed; set KINDI_CC to build the AVX-only fallback")
     elif not shutil.which("gcc"):
         pytest.skip("gcc is not installed; it is needed to build the AVX-only fallback")

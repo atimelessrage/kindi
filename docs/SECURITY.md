@@ -13,7 +13,11 @@ not just the current tree.
   deleted lines. The history baseline records legacy hits; it is a counted snapshot, not an
   approval of those values. The forward-slash drive-root rule is current-tree-only: the reviewed
   history snapshot predates it, so a path added and deleted in one commit is the remaining gap.
-  Keep reviewing diffs for machine paths; the current-tree guard is the primary check.
+  Keep reviewing diffs for machine paths; the current-tree guard is the primary check. The
+  `local drive path` rule allows the default Windows system roots (`%WINDIR%` and
+  `%ProgramFiles%`) because a recorded driver registration path is evidence, not a person's
+  layout; test fixtures are exempt from that one rule, while a user home directory is still
+  caught by `local home path`.
 - A real key that reaches a commit must be rotated first. Removing it from the working tree or
   rewriting local history does not revoke it.
 - Report a suspected leak privately to the repository owner rather than opening a public issue

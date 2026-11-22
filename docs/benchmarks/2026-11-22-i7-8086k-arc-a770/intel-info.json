@@ -1,0 +1,209 @@
+{
+  "backend": "not implemented",
+  "commands": {
+    "clinfo": {
+      "available": false,
+      "command": [
+        "clinfo"
+      ],
+      "error": "command not found: [WinError 2] Das System kann die angegebene Datei nicht finden",
+      "returncode": null,
+      "stderr": "",
+      "stdout": ""
+    },
+    "lscpu": {
+      "available": false,
+      "command": [
+        "lscpu"
+      ],
+      "error": "command not found: [WinError 2] Das System kann die angegebene Datei nicht finden",
+      "returncode": null,
+      "stderr": "",
+      "stdout": ""
+    },
+    "lspci": {
+      "available": false,
+      "command": [
+        "lspci",
+        "-nnk"
+      ],
+      "error": "command not found: [WinError 2] Das System kann die angegebene Datei nicht finden",
+      "returncode": null,
+      "stderr": "",
+      "stdout": ""
+    },
+    "sycl-ls": {
+      "available": false,
+      "command": [
+        "sycl-ls",
+        "--verbose"
+      ],
+      "error": "command not found: [WinError 2] Das System kann die angegebene Datei nicht finden",
+      "returncode": null,
+      "stderr": "",
+      "stdout": ""
+    },
+    "win-cpu": {
+      "available": true,
+      "command": [
+        "powershell",
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "Get-CimInstance Win32_Processor | ForEach-Object { $_.Manufacturer + '|' + $_.Name + '|' + $_.NumberOfCores + '|' + $_.NumberOfLogicalProcessors }"
+      ],
+      "error": null,
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "GenuineIntel|Intel(R) Core(TM) i7-8086K CPU @ 4.00GHz|6|12\n"
+    },
+    "win-video": {
+      "available": true,
+      "command": [
+        "powershell",
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "Get-CimInstance Win32_VideoController | ForEach-Object { $_.Name + '|' + $_.DriverVersion + '|' + $_.PNPDeviceID + '|' + $_.Status }"
+      ],
+      "error": null,
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "Intel(R) Arc(TM) A770 Graphics|32.0.101.9175|PCI\\VEN_8086&DEV_56A0&SUBSYS_60101849&REV_08\\6&32EDF95&0&00080008|OK\n"
+    },
+    "win-vram": {
+      "available": true,
+      "command": [
+        "powershell",
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "0..15 | ForEach-Object { $p = 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\' + ('{0:d4}' -f $_); $v = Get-ItemProperty $p -ErrorAction SilentlyContinue; if ($v.'HardwareInformation.qwMemorySize') { $v.DriverDesc + '|' + $v.'HardwareInformation.qwMemorySize' } }"
+      ],
+      "error": null,
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "NVIDIA GeForce GT 1030|2147483648\nNVIDIA GeForce RTX 4060 Ti|8585740288\nIntel(R) Arc(TM) A770 Graphics|17179869184\n"
+    }
+  },
+  "cpu": {
+    "family": null,
+    "features": {
+      "amx": null,
+      "avx2": null,
+      "avx_vnni": null,
+      "fma": null
+    },
+    "logical": 12,
+    "model": "Intel(R) Core(TM) i7-8086K CPU @ 4.00GHz",
+    "model_id": null,
+    "physical": 6,
+    "source": "win32",
+    "stepping": null,
+    "vendor": "GenuineIntel"
+  },
+  "devices": [
+    {
+      "arch": "Xe-HPG",
+      "bdf": "",
+      "device_id": 22176,
+      "driver": "",
+      "driver_version": "32.0.101.9175",
+      "integrated": false,
+      "memory_mb": 16384,
+      "name": "Intel(R) Arc(TM) A770 Graphics",
+      "pci_id": "",
+      "pnp": "PCI\\VEN_8086&DEV_56A0&SUBSYS_60101849&REV_08\\6&32EDF95&0&00080008",
+      "render_node": "",
+      "source": "win32",
+      "status": "OK",
+      "vendor_id": 32902
+    }
+  ],
+  "level_zero": {
+    "available": false,
+    "devices": [],
+    "error": "command not found: [WinError 2] Das System kann die angegebene Datei nicht finden",
+    "runtime": {
+      "command": {
+        "available": true,
+        "command": [
+          "powershell",
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          "0..15 | ForEach-Object { $p = 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\' + ('{0:d4}' -f $_); $v = Get-ItemProperty $p -ErrorAction SilentlyContinue; if ($v.LevelZeroDriverPath) { $v.DriverDesc + '|' + $v.LevelZeroDriverPath + '|' + (Get-Item $v.LevelZeroDriverPath).VersionInfo.FileVersion + '|' + $v.OpenCLDriverName } }"
+        ],
+        "error": null,
+        "returncode": 0,
+        "stderr": "",
+        "stdout": "Intel(R) Arc(TM) A770 Graphics|C:\\WINDOWS\\System32\\DriverStore\\FileRepository\\iigd_dch_d.inf_amd64_c97642900856f9fd\\ze_intel_gpu64.dll|32.0.101.9175|C:\\WINDOWS\\System32\\DriverStore\\FileRepository\\iigd_dch_d.inf_amd64_c97642900856f9fd\\igdrcl64.dll\n"
+      },
+      "enumeration": {
+        "available": true,
+        "devices": 1,
+        "driver_devices": [
+          1
+        ],
+        "drivers": 1,
+        "error": null,
+        "loader": "ze_loader.dll",
+        "returncodes": {
+          "zeDriverGet": 0,
+          "zeDriverGetHandles": 0,
+          "zeInit": 0
+        }
+      },
+      "loader": {
+        "error": null,
+        "path": "C:\\WINDOWS\\System32\\ze_loader.dll",
+        "present": true,
+        "version": "1.33.1"
+      },
+      "registered": [
+        {
+          "device": "Intel(R) Arc(TM) A770 Graphics",
+          "level_zero_driver": "C:\\WINDOWS\\System32\\DriverStore\\FileRepository\\iigd_dch_d.inf_amd64_c97642900856f9fd\\ze_intel_gpu64.dll",
+          "opencl_driver": "C:\\WINDOWS\\System32\\DriverStore\\FileRepository\\iigd_dch_d.inf_amd64_c97642900856f9fd\\igdrcl64.dll",
+          "version": "32.0.101.9175"
+        }
+      ],
+      "source": "windows display class"
+    },
+    "source": "sycl-ls"
+  },
+  "npu": {
+    "available": false,
+    "devices": [],
+    "error": "accel sysfs not available",
+    "present": false,
+    "source": "/sys/class/accel"
+  },
+  "oneapi": {
+    "present": false,
+    "root": "C:\\Program Files (x86)\\Intel\\oneAPI",
+    "source": "default"
+  },
+  "openvino": {
+    "available": false,
+    "devices": [],
+    "error": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    import json, openvino as ov; print(json.dumps({'version': getattr(ov, '__version__', None), 'devices': list(ov.Core().available_devices)}))\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^\nModuleNotFoundError: No module named 'openvino'",
+    "version": null
+  },
+  "paths": {
+    "accel": "/sys/class/accel",
+    "cpuinfo": "/proc/cpuinfo",
+    "dri": "/dev/dri",
+    "drm": "/sys/class/drm"
+  },
+  "probe": "intel-info",
+  "read_only": true,
+  "rebar": {
+    "note": "not exposed by sysfs or the Windows display stack; capture it with `lspci -vv` (Linux) or Intel Arc Control/GPU-Z (Windows)",
+    "source": null,
+    "state": null
+  },
+  "schema": 1,
+  "support_claim": false,
+  "system": "windows"
+}

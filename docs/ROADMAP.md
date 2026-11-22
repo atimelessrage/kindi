@@ -1,6 +1,6 @@
 # Roadmap
 
-Status: **living document, updated 2026-11-20.** The generated capability tables are in
+Status: **living document, updated 2026-11-22.** The generated capability tables are in
 [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md); this page is the single index of what was tried and
 rejected, why it was rejected, and what evidence would reopen it. The detailed documents stay as
 appendices and are linked from their rows.
@@ -143,6 +143,26 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   proxy; it changes no decoding, so the gate is an app-level test with a Claude-Code-shaped request
   plus one real harness run, not a benchmark. Proposed by the external knowledge-base scan of
   2026-11-17 (`docs/development/AI-INVENTORY-SCAN.md`), which is inspiration only.
+- **n8n workflow integration ([REQ-0029](development/requirements/REQ-0029.md), proposed):** a
+  self-hosted n8n workflow should use `kindi serve` as an OpenAI-compatible provider without a
+  Kindi-specific node: an HTTP Request node posting `/v1/chat/completions`, or the OpenAI Chat
+  Model node with a custom `/v1` base URL and the exact model id from `/health`. The first gate
+  is a recorded end-to-end run plus a Docker-host variant (non-loopback bind, API key,
+  `host.docker.internal` or LAN address), serialized execution with bounded retries, and a
+  stable system/tool prefix so the cache is exercised. Chat completions are the surface;
+  `/v1/responses` is separate. No engine or API change is proposed until a recorded run names a
+  concrete gap.
+- **Selectable native hot paths ([REQ-0030](development/requirements/REQ-0030.md), proposed):** keep
+  Python as the reference and default, but allow a measured pure-Python hot function to be swapped
+  for a C or Rust implementation at runtime (`KINDI_NATIVE=python|c|rust`). C is built through the
+  existing compiler/cache path and checked with cppcheck; Rust uses the same C ABI as a `cdylib`
+  and is checked with cargo fmt/clippy/test. Start with a profile, not a rewrite: the 2026-11-22
+  2B/9B profile in REQ-0030 leaves the constrained-decoding mask as the only qualifying candidate;
+  the BPE tokenizer and stream framing were removed, and no native code was added. `kcpu.c` and
+  the CUDA kernels are already native and excluded. A swap is adopted only if it is token/mask/byte-identical and
+  improves the measured function by at least 1.25x with at least 5% end-to-end p50, with no >1%
+  unconstrained-decode regression; otherwise it stays Python. The external sketch's 15-35%
+  numbers are not measurements of this tree and are not adopted.
 - **Hardware identification and autotuning ([REQ-0022](development/requirements/REQ-0022.md),
   experimental):** `kindi caps` reports every card the driver sees (compute capability, total/free
   VRAM, PCI bus, UUID, driver) with pynvml and CuPy fallbacks, keeps the hardware fact table
@@ -199,6 +219,7 @@ catalog, the installer or the generated support matrix.
 | Kindi tandem scheduler (tandem.cpp-grade overlap) | CPU+GPU overlap instead of capacity only: a CPU worker thread plus double-buffered pinned staging, a numerically measured CPU/PCIe split rule instead of a fixed byte budget, and an LRU hot-weight cache in RAM; the current layer split becomes "capacity mode" | beat the 27B at 24K tandem row (re-recorded 9.9 tok/s at the 24K position, same CPU layer budget) by >=25% with token-exact 4/4 (`kindi verify` TC=0 vs tandem vs full GPU for every tuning change) | **designed 2026-11-14; step 0 landed** — the decomposition probe (`KINDI_TANDEM_DEBUG_TIMING`, per-token CPU/GPU/transfer/head split) and the re-recorded baseline are in [tandem-overlap RESULTS](benchmarks/2026-11-14-i7-8086k-rtx4060ti-tandem-overlap/RESULTS.md): the CPU run at 24K is already at the raw kernel rate (5.18 ms/layer), so the 8K "~6 ms dispatch gap" premise does not hold at the gate row and the worker thread must be re-justified before it is built (head 14.2 ms and 7 boundary transfers 2.85 ms come first on these numbers) — **re-measured 2026-11-15** ([fresh RESULTS](benchmarks/2026-11-15-i7-8086k-rtx4060ti-tandem-overlap/RESULTS.md): cpu 74.7 ms/token = 6.2 ms/layer, head 17.6 ms, transfer 3.09 ms, 8.2-8.4 tok/s at 24K on the Windows native CPU build), so the worker thread is **not justified and should not be built** — the plan-engine owner (peak 6,004 MiB vs 7,721 MiB at the same 27B 24K placement) is the memory half; [TANDEM-OVERLAP-DESIGN.md](TANDEM-OVERLAP-DESIGN.md) drafts the speed half, its status line now carrying the step-0 verdict. The split rule now has an external reference: tandem.cpp measures CPU against PCIe and uses a 2.25 factor over Strata's 1.85 for +2.7% on one host, and its gains appear only on capacity-bound models (a fitting 35B-A3B gains 1.04x, a budget-bound one 1.4-1.9x), so the >=25% gate must be run on a capacity-bound row. Prior-art item 1 measured our own ratio first |
 | Dory1.0-4B (looped nGPT) | 4 B-parameter looped (latent-recurrent) model: 72 physical layers in 16 input + 40 shared recurrent + 16 output blocks, 27 sliding-window + 9 full-attention layers, 262,144-token context, and 1-4 recurrent loops chosen at inference; official BF16, MXFP8, NVFP4 and Q5_K_M GGUF exports | D0: tensor manifest plus a pinned llama.cpp/vLLM golden command; then D1: GGUF import 4/4 greedy-exact against pinned llama.cpp at k=1 | **D0 reference evidence complete; D1 pending** — manifest, hashes and k=1/2/4 goldens in [benchmarks/dory-d0/README.md](benchmarks/dory-d0/README.md); architecture, memory/KV envelopes, D1-D7 phases and acceptance matrix in [DORY.md](DORY.md) |
 | SenseNova-Loop-9B (looped dense, multimodal) | ~9B distinct / ~14.6B inference-equivalent; 32 stored decoder layers, layers 4-27 executed twice (56 layer executions); two-stream mHC with Sinkhorn 20; three linear-attention + one full-attention layer per four-layer group; 512K context; text+images -> text; official BF16, 4-bit AWQ and GGUF (Q4_K_M 5.82GB; 4-bit weights ~4.9GB per the model card) | Q0: pin one text-only Q4_K_M GGUF and a fixed greedy prompt under the official OpenSenseNova/llama.cpp fork; record SHA-256, Apache-2.0, tensor/loop/mHC/attention inventory and the vendor memory table. Then Q1: Kindi loader + 32/56 execution + mHC + hybrid attention, `kindi verify` 4/4 at 2K text-only against the pinned reference. No vision, MTP or ternary in Q1 | **proposed; no backend, pack, catalog entry or support claim** — official release 2026-11-17; GGUF needs the vendor's llama.cpp fork (stock llama.cpp does not load `sensenova_loop` yet). Details, ternary caveat and gate ladder in [SenseNova-Loop-9B](#sensenova-loop-9b-2026-11-20) |
+| Inkling 2 Mini (looped MoE, multimodal) | 26.4B total / 3.4B active (5.4B weight activations per token with the loop); 24 stored decoder layers, layers 6-17 executed three times (48 applications); 128 routed experts, top-8; hybrid local/global attention with a 1K sliding window; 1M context; text+images -> text; mixed NVFP4/MXFP8 experts; public GGUF 7.8-22.9GB (Q4_K_M 16.6GB), bundled DSpark drafter | I0: pin one public GGUF and a greedy reference under a pinned mainline llama.cpp build (the mirror ships mainline-support copies); record SHA-256, Apache-2.0, tensor/loop/MoE inventory and the 24->48 map. Then I1: host-RAM expert lane + loop remap, `kindi verify` 4/4 at 2K text-only | **proposed; header inventoried 2026-11-22, no backend, pack, catalog entry or support claim** - 24 stored blocks serve 48 logical layers; the Q4_K_M file is 16.6GB, so an 8GB card cannot hold it and the first target is the host-RAM lane, not a fit. Gates and the measured map in [Inkling 2 Mini](#inkling-2-mini-2026-11-22) and [REQ-0031](development/requirements/REQ-0031.md) |
 
 ## SenseNova-Loop-9B (2026-11-20)
 
@@ -214,11 +235,69 @@ catalog, the installer or the generated support matrix.
 
 | phase | gate | status |
 |---|---|---|
-| Q0 reference | Pin one text-only **Q4_K_M GGUF** (SHA-256, byte size, Apache-2.0 chain) and one fixed greedy prompt under the vendor's `24ea7bb` llama.cpp fork; record the 32-layer/56-execution config, mHC fields, 3:1 attention map, tokenizer and output tokens/logits. No vision or MTP. | **open; needs a download.** |
+| Q0 reference | Pin one text-only **Q4_K_M GGUF** (SHA-256, byte size, Apache-2.0 chain) and one fixed greedy prompt under the vendor's `24ea7bb` llama.cpp fork; record the 32-layer/56-execution config, mHC fields, 3:1 attention map, tokenizer and output tokens/logits. No vision or MTP. | **header inventory done 2026-11-22; full SHA-256 and the reference run open.** |
 | Q1 backend | A Kindi loader/converter for the pinned format plus CPU tensor/layout tests; `kindi verify` 4/4 token-exact at 2K text-only against Q0, with the looped and mHC execution order asserted. | **proposed; no code.** |
 | Q2 memory | On the RTX 4060 Ti, 2B-class baseline not applicable: load Q4_K_M and record sampled peak at 4K/8K/16K/64K where it fits, requested versus actual context, and the KV format. An 8GB 64K run is expected to fail the vendor minimum; record it as a no-go, not a reduced-context pass. Repeat on a 16GB card if one is available. | **proposed; hardware-dependent.** |
 | Q3 speed | Same host, same pack, same context: p50 prefill and decode for 4K/8K, with mHC stream-mixing fused and unfused; no number is adopted until measured. | **proposed; after Q1.** |
 | T0 ternary | Mixed-precision PTQ on selected MLP/linear weights only; KLD, PPL and a fixed task set against the 4-bit baseline; a memory or speed win with a named lossy tolerance. QAT only if PTQ misses. | **parked behind Q1/Q2; not a support claim.** |
+
+### SenseNova Q0 header inventory (2026-11-22)
+
+A 32MiB range request read the public Q4_K_M header without downloading the weights. The file's
+`block_count` is **57 logical**, but the tensor names cover only **33 stored blocks**: 0-27 and
+52-56. Logical 28-51 are the second pass over 4-27 and have no tensors of their own, so
+`blk.28`-`blk.51` do not exist. The post-loop layers keep their logical indices (52-55) and the
+nextn layer is 56; Inkling below uses the opposite convention, which is why the map lives in
+`kindi/looped.py` per family. Also measured: `loop.start=4`, `loop.end=28`, `loop.count=2`;
+mHC on 4-28 with 2 streams and 20 Sinkhorn iterations; `full_attention_interval=4`; 16 query /
+4 KV heads at key/value length 256; SSM groups 16, state 128, time step rank 32; context 524,288;
+490 tensors in F32/Q4_K/Q6_K. Upstream [issue #31571](https://github.com/ggml-org/llama.cpp/issues/31571)
+is still open (checked 2026-11-22), so Q0's reference still needs the vendor
+`OpenSenseNova/llama.cpp` at `24ea7bb`. Full table:
+[REQ-0031](development/requirements/REQ-0031.md); gates in
+[REQ-0031](development/requirements/REQ-0031.md).
+
+## Inkling 2 Mini (2026-11-22)
+
+**Status: proposed, no backend, no pack, no catalog entry and no support claim.**
+[Inkling 2 Mini](https://huggingface.co/thinkingmachines/Inkling-2-Mini) is Thinking Machines
+Lab's local model (released 2026-11-20, Apache-2.0): a **looped MoE** with **26.4B total** and
+**3.4B active** parameters (the model card and the HF launch post also give **5.4B weight
+activations per token** because the loop touches more weights), 24 stored decoder layers whose
+middle 12 (6-17) run **three times**, giving 48 layer applications, 128 routed experts at top-8
+with no shared expert, hybrid local/global attention with a 1K sliding window, and a 1M-token
+context. It accepts text and images and generates text.
+
+**Why it is interesting and why it is not a small-card model.** The loop buys depth without
+storing another copy of the middle layers, and the bundled 3-layer DSpark drafter is the same
+drafter family the DeepSeek path already carries. But the smallest public GGUF is **7.8GB** and
+the Q4_K_M file is **16.6GB**; the full model needs about 18GB of memory. An 8GB card cannot hold
+the file at all, so any "runs on 8GB" claim is false. The plausible Kindi target is the
+host-RAM/expert lane (Lightning and Nanbeige already keep experts in host memory), not the dense
+fit that SenseNova's ~9-10GiB minimum still allows at short context.
+
+**Measured header (2026-11-22).** `general.architecture=inkling2`, `block_count=48` logical over
+**24 stored blocks** (0-23); logical 18-41 are the second and third passes over 6-17 and have no
+tensors, and the post-loop blocks 42-47 are stored at the **physical** indices 18-23. `loop.core_start=6`,
+`loop.core_end=18`, `num_loops=3`, `loop.gate_rank=64`; global `loop_res_query` and
+`loop_kv_res_query` tensors; 128 experts, top-8, expert FFN 1152; embedding 2304; context
+1,048,576; sliding window 1024; SITU activations; final logit softcap 30; vocab 201,024; 734
+tensors in F32/Q8_0/Q5_K/IQ4_XS/MXFP4-class. Full table:
+[REQ-0031](development/requirements/REQ-0031.md).
+
+**Reference.** Unlike SenseNova, the GGUF mirror ships `Mainline_Support/` copies and the HF
+launch post lists llama.cpp support, so I0 can pin a mainline build instead of a vendor fork;
+the exact binary and revision are still to be recorded. Vision, the DSpark drafter and any
+ternary experiment stay out of I4.
+
+| phase | gate | status |
+|---|---|---|
+| I0 reference | Pin one public GGUF (SHA-256, byte size, Apache-2.0 chain) and a greedy text-only run under a pinned mainline llama.cpp build; record the tokenizer revision, output token ids and the 24->48 map. No vision or DSpark. | **open; header inventoried 2026-11-22.** |
+| I1 loader | Host-RAM expert lane plus the loop remap and the MoE router; CPU tensor/layout tests; `kindi convert` must reject a missing stored block instead of reusing a neighbour. | **proposed; no code.** |
+| I2 exactness | `kindi verify` 4/4 token-exact at 2K text-only against I0, asserting the three loop passes and the top-8 router. | **proposed; needs I0/I1.** |
+| I3 memory | Record requested vs actual context and sampled peak; 8GB is expected to fail on file size, so record it as a no-go, not a reduced-context pass. Repeat on a 24GB card if available. | **hardware-dependent.** |
+| I4 speed | Same host, pack and context: p50 prefill/decode with the loop fused and unfused; DSpark measured separately, not folded into the base claim. | **after I2.** |
+| T0 precision | Any ternary/low-bit experiment compares KLD, PPL and task output against the official mixed-precision baseline; the loop applies the error on every pass. | **parked behind I2.** |
 
 ## Prior-art follow-ups (2026-11-14)
 
@@ -619,7 +698,7 @@ gates, written before the work, per the standing rules.
 |---|---|---|---|---|
 | 1 | Native Windows GPU: validate the path the benchmarks already use, then either claim it or correct the docs | `docs/WINDOWS.md` says native CUDA/CuPy has not been validated and makes no claim, while `docs/benchmarks/2026-11-09-i7-8086k-rtx4060ti/README.md` records GPU runs on Windows 10 with CuPy 14.2.0 and driver 617.42. That contradiction hides a working path behind WSL2/Docker and makes the support matrix understate this host. | a clean native Windows 10/11 run of the current tree on the RTX 4060 Ti: `kindi verify` 2B/4B/9B 4/4, one streamed `/v1/chat/completions` request, pack hashes and CUDA/CuPy/driver recorded; then `WINDOWS.md` says exactly what was validated and `CARD-SUPPORT.md` keeps other Windows cards unmeasured. If it fails, record the failure and keep the WSL2-only non-claim. | **partially validated 2026-11-19; measured scope is the 2B on the RTX 4060 Ti 8 GB.** The source-tree run passed plain and tensor-core 2B `verify` 4/4, an 8K `bench` at 212.7-226.1 generation tok/s, and one server request on Windows 10 22H2 with CuPy 14.2.0 and driver 617.42. The gate's 4B/9B cells and pack hashes were not run or recorded, so this is a 2B source-tree result, not an installer/WSL or Windows GPU support claim; other cards and Windows AMD remain unmeasured. Evidence: [WINDOWS.md](WINDOWS.md#native-windows-gpu-validation-2026-11-19), [CARD-SUPPORT.md](CARD-SUPPORT.md). |
 | 2 | Prefill chunk-size sweep (`KINDI_CHUNK`) | `kindi bench` measured 64% of a 4K request and 82% of an 8K request in prefill, and the chunk size is a fixed heuristic (256, or 512 on fp16-prompt cards), never tuned on this host. It is the largest remaining latency knob for long prompts and changes no arithmetic. | 2B, 4B and 9B, 4K/8K prompts, chunks 128/256/512/1024, three runs each: p50/p95 prefill and whole-request time plus sampled peak; `kindi verify` 4/4 with the winning value; record in `docs/benchmarks/<date>-<host>-chunk-sweep/`. Change a default only after the sweep; otherwise add it as an `autotune` candidate. | **measured 2026-11-19 on the 2B and 9B, and 2026-11-20 on the 4B (RTX 4060 Ti): 256 wins on the 2B and is already the default; 1024 wins on the 4B and 9B.** On the 2B, three-pass p50 at 4K/8K is **962.15**/**2602.72** ms for 256 against **1179.81**/**3015.29** ms for 128; 512 and 1024 sit between. The 4B fits the same 8,320 context: 1024 gives **2254.26**/**6331.19** ms p50 against **2326.57**/**6558.49** for 512 and **2456.43**/**6805.34** for 256, 3.1-3.5% ahead of 512 and 7.0-8.2% ahead of 256; its sampled peak is **2527** MiB against **2323** at 256 (+204), and `KINDI_CHUNK=1024` 4B verify is 4/4 (`ALL PASS`). The 9B over three passes, 1024 gives **3118.80**/**8071.40** ms p50 against **3151.39**/**8185.80** for 512 and **3414.99**/**8978.64** for 256; 1024 is 1.0-1.4% ahead of 512 and 9.5-11.2% ahead of 256. **No global default change:** 256 remains the 2B optimum; a global 1024 would make the 2B 1.6-1.7% slower and raise its peak by 159 MiB, while 512 would still regress the 2B and give up the 4B/9B best cell. 1024 is a 4B/9B-specific/autotune candidate; the 27B is unmeasured. `KINDI_CHUNK=1024` 9B verify is 4/4 (`ALL PASS`). Evidence: [chunk-sweep page](benchmarks/2026-11-19-i7-8086k-rtx4060ti-chunk-sweep/RESULTS.md) (p50/p95, peak and per-pass rows; 4B under `4b/`, 9B under `9b/`). |
-| 3 | Intel M1 probe/report (`kindi intel-info --json`) | The A770 arrival gates REQ-0020; the first hour's PCI/DRM/Level Zero/oneAPI/ReBAR state is easy to lose, and the current checklist is prose. A read-only report makes M1 reproducible and gives M2 a baseline without pretending a backend exists. | CPU-only fixture tests over synthetic DRM/DRI trees; then on the A770 capture `lspci -nnk`, `/dev/dri`, `sycl-ls`, `clinfo`, Level Zero/oneAPI/OpenVINO versions, ReBAR and PCIe link state into one JSON/Markdown file under `docs/benchmarks/<date>-<host>-arc-a770/`; no model load, no support claim. Reuse the tracked fork's `discover()`/device naming only as prior art. | **accepted, part of REQ-0020 M1** |
+| 3 | Intel M1 probe/report (`kindi intel-info --json`) | The A770 arrival gates REQ-0020; the first hour's PCI/DRM/Level Zero/oneAPI/ReBAR state is easy to lose, and the current checklist is prose. A read-only report makes M1 reproducible and gives M2 a baseline without pretending a backend exists. | CPU-only fixture tests over synthetic DRM/DRI trees; then on the A770 capture `lspci -nnk`, `/dev/dri`, `sycl-ls`, `clinfo`, Level Zero/oneAPI/OpenVINO versions, ReBAR and PCIe link state into one JSON/Markdown file under `docs/benchmarks/<date>-<host>-arc-a770/`; no model load, no support claim. Reuse the tracked fork's `discover()`/device naming only as prior art. | **done 2026-11-22 for the probe; M1 open.** Windows CIM/registry discovery and a read-only Level Zero enumeration (1 driver / 1 device) run on the installed A770, and the CPU 2B/4B/9B baselines are 4/4 token-exact. oneAPI/SYCL, ReBAR/PCIe and the llama.cpp SYCL baseline remain open. Evidence: the 2026-11-22 M1 entry in [REQ-0020](development/requirements/REQ-0020.md), which links the run page. |
 | 4 | OpenAI Responses endpoint (`POST /v1/responses`) | `kindi serve` speaks OpenAI chat, Ollama and (proposed) Anthropic shapes, but not the Responses API that current OpenAI SDKs and agent harnesses use; without it they need a proxy. It is a translation over the existing chat path, so it does not touch decoding or exactness. | app-level test through `create_app` with an OpenAI-SDK-shaped Responses request (streaming and one tool call), plus one real harness run; same tokens as the chat path; the Anthropic endpoint (REQ-0028) stays a separate dialect. | **proposed; gate only** |
 | 5 | No-thinking Pi adapter for ternary models (Qwen3.8-pi pattern) | The published [Qwen3.8-27B-pi-adapted](https://huggingface.co/harness-hub/Qwen3.8-27B-pi-adapted) is a rank-32 LoRA on **dense Qwen3.8-27B**, not a Bonsai or Nemotron ternary pack, so it cannot be loaded by Kindi as a ternary adapter. The reusable part is the harness-specific no-thinking objective and the [pi-llama](https://github.com/huggingface/pi-llama) serving path; Kindi already exposes `enable_thinking: false` and `thinking_budget_tokens` on its chat path. | **`pi-nothink-v1` (12 fixed tasks, defined below):** 2B and 9B, three runs per task per arm; thinking-on `enable_thinking=true` with `thinking_budget_tokens=2048` against no-thinking `enable_thinking=false`. Pass only if the baseline reaches 9/12, no-thinking matches or beats it with no baseline-passing task regressing, total completion tokens are <=75% of baseline (no task >125%), turns do not increase, tool calls are 100% valid, no-thinking emits no reasoning, and `kindi verify` is 4/4. Training is not part of this gate. | **proposed; gate only.** No adapter, fixture or benchmark exists. The external adapter is Qwen3.8-27B-specific and its published pass/token figures are its author's, not a Kindi measurement; no ternary adapter, pack or benchmark exists here. |
 

@@ -113,6 +113,10 @@ def convert(gguf_path, out_dir, log=print):
     selftest()
     g = GGUF(gguf_path)
     arch = g.kv.get("general.architecture")
+    from .looped import refusal as looped_refusal
+    loop_reason = looped_refusal(g)
+    if loop_reason:
+        raise SystemExit("kindi convert: " + loop_reason)
     from .moe_compat import unsupported_reason
     if arch == "gemma4":
         from .gemma4 import inspect_model

@@ -36,6 +36,7 @@ def _fake_engine():
     eng.NL = 3
     eng.ctx = 4
     eng.lib = _FakeLib()
+    eng.head_rows = None
     return eng
 
 
@@ -97,7 +98,7 @@ def test_cpu_isa_tiers_agree_on_tokens_and_hidden_close(monkeypatch, tmp_path):
     tolerance — accumulation order differs per tier, so byte-identical floats are NOT the claim,
     but a wider atol than the fp32 length-2560 sum rounding (~1e-4 rel) is."""
     from shutil import which
-    if not (which("gcc") or which("clang")):
+    if not any(which(c) for c in (os.environ.get("KINDI_CC"), "gcc", "clang") if c):
         pytest.skip("no gcc/clang to build the ISA tier libraries")
     ids = [1, 2, 3, 4, 5, 6, 7, 8]
     seen = {}

@@ -316,6 +316,21 @@ def test_hb_4096_packs_get_the_exact_activations_for_the_tensor_core_path(monkey
     assert _eng.tc_hp_for({"hadamard_block": 4096}) is None
 
 
+def test_hb_4096_packs_do_not_auto_enable_hp_on_turing(monkeypatch):
+    """tc_turing.cu has no KINDI_TC_HP path: its k_tc_q8 does not take the HP argument.
+
+    The HB-4096 default is for tc.cu (Ampere and later).  A Turing card must keep the existing
+    refusal/plain-engine route instead of being handed a backend that cannot run the HP plan.
+    """
+    from kindi import engine as _eng
+    monkeypatch.setenv("KINDI_TC", "1")
+    monkeypatch.delenv("KINDI_TC_HP", raising=False)
+    monkeypatch.setattr(_eng, "_is_turing", lambda card: True)
+    assert _eng.tc_hp_for({"hadamard_block": 4096}, card=0) is None
+    monkeypatch.setattr(_eng, "_is_turing", lambda card: False)
+    assert _eng.tc_hp_for({"hadamard_block": 4096}, card=0) == "1"
+
+
 def test_the_hp_line_waits_for_a_confirmed_tensor_core_layout(spec_tp, monkeypatch):
     """A card without a tensor-core backend, or a repack that declines the layout, runs the 5-trit
     lane: it must not announce the 9B tensor-core path. The announcement follows the repack and the
@@ -390,6 +405,139 @@ def test_tensor_parallel_plans_refuse_hadamard_4096(spec_tp):
     _, tp = spec_tp
     with pytest.raises(SystemExit, match=r"needs Hadamard blocks of 1024"):
         tp.Shard.build_plans(_probe(4096))
+
+
+def test_hb_4096_without_a_tensor_core_backend_falls_back(spec_tp, monkeypatch):
+    """KINDI_TC=1 on a card with no tensor-core backend must load the plain path, not stop."""
+    spec, tp = spec_tp
+    shard_cls = tp.Shard
+    saved = (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
+             spec._chunk.reserve, spec._chunk.build)
+    calls = []
+
+    def fallback(shard):
+        calls.append(shard)
+
+    monkeypatch.setattr(shard_cls, "_load", fallback)
+    monkeypatch.setattr(spec, "_tc_backend", lambda card: None)
+    monkeypatch.setattr(spec, "HP", False)
+    monkeypatch.setenv("KINDI_TC", "1")
+    try:
+        spec._installed[0] = False
+        spec.install(log=lambda *a, **k: None)
+        shard = types.SimpleNamespace(
+            card=0, tp=types.SimpleNamespace(W=1, kv="q8_0"),
+            HB=4096, g5l=True, log=lambda *a, **k: None)
+        tp.Shard._load(shard)
+        assert calls == [shard]
+    finally:
+        (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
+         spec._chunk.reserve, spec._chunk.build) = saved
+        spec._installed[0] = False
+
+
+def test_hb_4096_with_a_tc_backend_still_refuses_without_hp(spec_tp, monkeypatch):
+    """The guard still fires when repack confirms the tensor-core layout and HP is off."""
+    spec, tp = spec_tp
+    shard_cls = tp.Shard
+    saved = (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
+             spec._chunk.reserve, spec._chunk.build)
+    calls = []
+
+    def fallback(shard):
+        calls.append(shard)
+
+    def confirmed(shard, log):
+        shard.tc_layout, shard.tc_lane = True, False
+
+    monkeypatch.setattr(shard_cls, "_load", fallback)
+    monkeypatch.setattr(spec, "_tc_backend", lambda card: object())
+    monkeypatch.setattr(spec, "HP", False)
+    monkeypatch.setattr(spec, "load_stream", lambda shard: True)
+    monkeypatch.setattr(spec, "SpecKernels", lambda backend: object())
+    monkeypatch.setattr(spec, "repack", confirmed)
+    monkeypatch.setattr(spec._tc, "pascal", lambda card: False)
+    monkeypatch.setenv("KINDI_TC", "1")
+    try:
+        spec._installed[0] = False
+        spec.install(log=lambda *a, **k: None)
+        shard = types.SimpleNamespace(
+            card=0, tp=types.SimpleNamespace(W=1, kv="q8_0"),
+            HB=4096, g5l=True, log=lambda *a, **k: None)
+        with pytest.raises(SystemExit, match="refuses Hadamard blocks of 4096"):
+            tp.Shard._load(shard)
+        assert calls == []
+    finally:
+        (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
+         spec._chunk.reserve, spec._chunk.build) = saved
+        spec._installed[0] = False
+
+
+def test_hb_4096_with_a_tc_backend_and_a_declined_layout_falls_back(spec_tp, monkeypatch):
+    """A tensor-core backend whose repack declines the layout must take the plain path, not stop."""
+    spec, tp = spec_tp
+    shard_cls = tp.Shard
+    saved = (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
+             spec._chunk.reserve, spec._chunk.build)
+    calls, said = [], []
+
+    def fallback(shard):
+        calls.append("fallback")
+
+    def declined(shard, log):
+        calls.append("repack")
+        log("card 0: weights do not fit the tc layout; KINDI_TC is ignored for this model")
+
+    monkeypatch.setattr(shard_cls, "_load", fallback)
+    monkeypatch.setattr(spec, "_tc_backend", lambda card: object())
+    monkeypatch.setattr(spec, "HP", False)
+    monkeypatch.setattr(spec, "load_stream", lambda shard: False)
+    monkeypatch.setattr(spec, "SpecKernels", lambda backend: object())
+    monkeypatch.setattr(spec, "repack", declined)
+    monkeypatch.setattr(spec._tc, "pascal", lambda card: False)
+    monkeypatch.setenv("KINDI_TC", "1")
+    try:
+        spec._installed[0] = False
+        spec.install(log=said.append)
+        shard = types.SimpleNamespace(
+            card=0, tp=types.SimpleNamespace(W=1, kv="q8_0"),
+            HB=4096, g5l=True, log=said.append)
+        tp.Shard._load(shard)                 # must not raise: repack declined the layout
+        assert calls == ["fallback", "repack"]
+        assert not getattr(shard, "tc_layout", False)
+    finally:
+        (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
+         spec._chunk.reserve, spec._chunk.build) = saved
+        spec._installed[0] = False
+
+
+def test_hb_4096_without_a_tc_layout_uses_plain_plans(spec_tp, monkeypatch):
+    """A repack that declines the tensor-core layout must not hit the HB-4096 refusal."""
+    spec, tp = spec_tp
+    shard_cls = tp.Shard
+    saved = (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
+             spec._chunk.reserve, spec._chunk.build)
+    calls = []
+
+    def plain(shard):
+        calls.append(shard)
+        raise AttributeError("plain plans")
+
+    monkeypatch.setattr(shard_cls, "build_plans", plain)
+    monkeypatch.setattr(spec, "HP", False)
+    monkeypatch.setenv("KINDI_TC", "1")
+    try:
+        spec._installed[0] = False
+        spec.install(log=lambda *a, **k: None)
+        probe = _probe(4096)
+        probe.tc_layout = False
+        with pytest.raises(AttributeError, match="plain plans"):
+            tp.Shard.build_plans(probe)
+        assert calls == [probe]
+    finally:
+        (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
+         spec._chunk.reserve, spec._chunk.build) = saved
+        spec._installed[0] = False
 
 
 def test_tensor_parallel_plans_accept_hadamard_1024(spec_tp):
@@ -484,8 +632,10 @@ def test_plan_engine_refuses_the_9b_unless_hp(spec_tp, monkeypatch):
     monkeypatch.setenv("KINDI_TC", "1")
     try:
         spec.install(log=lambda *a, **k: None)
+        probe = _probe(4096)
+        probe.tc_layout = True
         with pytest.raises(SystemExit, match=r"refuses Hadamard blocks of 4096 unless KINDI_TC_HP=1"):
-            tp.Shard.build_plans(_probe(4096))
+            tp.Shard.build_plans(probe)
     finally:
         (shard_cls._slices, shard_cls.build_plans, shard_cls._load,
          spec._chunk.reserve, spec._chunk.build) = saved
@@ -503,9 +653,13 @@ def test_plan_engine_accepts_the_9b_with_hp(spec_tp, monkeypatch):
     monkeypatch.setattr(spec, "HP", True)          # HP is read at import time
     probe = _probe(4096)
     probe.tp = types.SimpleNamespace(W=1)          # one card: the tp.py guard accepts HB 4096 with W == 1
+    probe.tc_layout = True
+    def guard_passed():
+        raise AttributeError("guard passed")
+    monkeypatch.setattr(spec._tp, "_drv", guard_passed)
     try:
         spec.install(log=lambda *a, **k: None)
-        with pytest.raises(AttributeError):   # the guard passed; the next statement reads s.hA
+        with pytest.raises(AttributeError, match="guard passed"):
             tp.Shard.build_plans(probe)
     finally:
         (shard_cls._slices, shard_cls.build_plans, shard_cls._load,

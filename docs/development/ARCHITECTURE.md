@@ -18,6 +18,8 @@ supported.
 | CPU+GPU tandem | `kindi/tandem.py` | Splits dense Bonsai layers across CPU and GPU in `cpu-first`/`gpu-first` placements, with a joint prompt cache. |
 | Cache and prefix reuse | `kindi/cache.py`, `kindi/chunk.py` | Recurrent-state checkpoints, parked conversations and saved openings. |
 | HTTP boundary | `kindi/server.py` | OpenAI/Ollama-compatible endpoints, validation, API key, bounded queue, metrics. |
+| HTTP auth | `kindi/api/auth.py` | One constant-time bearer check shared by the OpenAI and DeepSeek servers (DEC-0010). |
+| Looped-model gate | `kindi/looped.py` | Recognizes `sensenova_loop` and `inkling2`, maps their logical layers to the stored blocks, and refuses them with REQ-0031 (no loader yet). |
 | Installer | `install.sh` | Hardware classification, safe host edits, model download, service setup. |
 | Generated references | `kindi/config_reference.py`, `kindi/support_matrix.py`, `docs/benchmarks/build_cross_mode.py` | Render docs from code or measured tables and fail on drift. |
 | Project memory | `tools/project_memory.py`, `docs/development/` | Requirements, architecture, decisions, lessons, knowledge and git history. |

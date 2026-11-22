@@ -50,6 +50,11 @@ PATTERNS = [
     ("email address", re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")),
 ]
 
+# The default Windows system roots are installed on every Windows host: a recorded driver
+# registration path is evidence, not this machine's layout. A user home directory is still caught
+# by the separate "local home path" rule, which is deliberately not allowlisted here.
+SYSTEM_ROOT = re.compile(r"(?i)^[A-Z]:[\\/]+(?:windows|program files(?: \(x86\))?)[\\/]")
+
 # Forward-slash drive roots (a drive letter, then `/` and at least one directory) are the same
 # machine-local layout as the backslash form above, which the 2026-11-18 audit found was missed.
 # The rule is separate from
@@ -86,6 +91,8 @@ def hits_in_line(line):
         if not match or ALLOW.search(match.group(0)):
             continue
         if name == "email address" and allowed_email(match.group(0)):
+            continue
+        if name == "local drive path" and SYSTEM_ROOT.match(match.group(0)):
             continue
         found.append(name)
     match = GENERIC.search(line)

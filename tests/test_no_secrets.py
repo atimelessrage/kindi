@@ -57,6 +57,11 @@ def findings():
             text = raw.decode("utf-8", "replace")
         for lineno, line in enumerate(text.splitlines(), 1):
             for name in hits_in_line(line):
+                # A test fixture names a drive root on purpose (a fake driver path, a CuPy
+                # warning). The home-path rule is not exempted, so a real user home directory
+                # cannot hide in a test file.
+                if rel.startswith("tests/") and name == "local drive path":
+                    continue
                 yield rel, lineno, name
             if not rel.startswith("tests/") and forward_roots(line):
                 yield rel, lineno, "forward-slash drive root"
@@ -103,6 +108,39 @@ def test_the_local_drive_path_rule_is_not_vacuous():
     assert drive.search("pack is at " + "D:" + "\\" + "ollamaModels" + "\\" + "gemma4")
     assert not drive.search("pack `~/.kindi/packs/bonsai-27b`")
     assert not drive.search("the T:/kindi worktree")
+
+
+def test_windows_system_roots_are_not_machine_data():
+    """A driver registration path under the system root is evidence, not a person's layout.
+
+    The 2026-11-22 Intel evidence records the Level Zero driver path from the registry, and the
+    first version of the rule flagged every drive path alike. The user home root stays a finding.
+    """
+    system = "C:" + "\\" + "WINDOWS" + "\\" + "System32" + "\\" + "DriverStore" + "\\" + "x.dll"
+    assert hits_in_line("driver at " + system) == ()
+    programs = "C:" + "\\" + "Program Files (x86)" + "\\" + "Intel" + "\\" + "oneAPI"
+    assert hits_in_line("oneAPI at " + programs) == ()
+    home = "C:" + "\\" + "Users" + "\\" + "alice" + "\\" + "models"
+    assert "local home path" in hits_in_line("pack at " + home)
+    other = "D:" + "\\" + "models" + "\\" + "bonsai"
+    assert "local drive path" in hits_in_line("pack at " + other)
+
+
+def test_a_test_fixture_may_name_a_drive_root_but_not_a_home_directory(tmp_path, monkeypatch):
+    """Fixtures are exempt from the generic drive-path rule, never from the home-path rule."""
+    repo = tmp_path / "repo"
+    (repo / "tests").mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=str(repo), check=True)
+    (repo / "tests" / "fixture.py").write_text(
+        'DRIVE = r"C:' + "\\" + 'Windows' + "\\" + 'System32"' + "\n"
+        'HOME = r"C:' + "\\" + 'Users' + "\\" + 'alice' + "\\" + 'models"' + "\n",
+        encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=str(repo), check=True)
+    monkeypatch.setattr(sys.modules[__name__], "ROOT", repo)
+
+    found = list(findings())
+    assert not any(name == "local drive path" for _rel, _line, name in found), found
+    assert ("tests/fixture.py", 2, "local home path") in found, found
 
 
 def test_the_cloud_storage_rule_is_not_vacuous():

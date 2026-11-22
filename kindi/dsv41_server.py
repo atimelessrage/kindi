@@ -56,6 +56,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import numpy as np
 
 from . import dsv41
+from .api.auth import bearer_matches
 
 MODEL_ID = "deepseek-v4.1-flash"
 # the per-session part an agent puts at the end of its system prompt (hermes: "Conversation started: <date>",
@@ -1227,9 +1228,7 @@ def make_handler(E):
             return self._json(200, {"prompt": text, "content": text})
 
         def _auth(self):
-            if not E.a.api_key:
-                return True
-            if self.headers.get("Authorization", "") == "Bearer " + E.a.api_key:
+            if bearer_matches(self.headers.get("Authorization", ""), E.a.api_key):
                 return True
             self._err(401, "invalid API key", "authentication_error")
             return False

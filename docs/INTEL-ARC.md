@@ -1,10 +1,13 @@
 # Intel Arc A770 support: goal and implementation plan
 
-Status: **planning and architecture audit, 2026-11-10; updated 2026-11-19.** There is no Intel backend
-in Kindi yet. The test computer has only an NVIDIA RTX 4060 Ti; no Arc GPU is visible, `sycl-ls` and
-`clinfo` are not installed, and no Intel result has been measured. **One A770 16 GB has been purchased
-and is in transit (not installed yet)** — that unblocks M1 the day it arrives, but until then this page
-is a goal and a plan, **not a support claim** (tracked as [REQ-0020](development/requirements/REQ-0020.md)).
+Status: **planning and architecture audit, 2026-11-10; updated 2026-11-22.** There is no Intel backend
+in Kindi yet, and no Intel support claim. The A770 16 GB is now **installed in the Windows test rig**,
+and M1 hardware qualification has been measured there: the card is visible at 16 GiB, its display
+driver registers a Level Zero driver, and the loader enumerates one driver and one device
+([run](benchmarks/2026-11-22-i7-8086k-arc-a770/README.md)). The kernel half is unchanged: no
+oneAPI/SYCL toolchain, no kernel, no model run. The plan's first support target remains Linux; the
+Windows run qualifies the hardware and nothing else (tracked as
+[REQ-0020](development/requirements/REQ-0020.md)).
 
 ## Goal
 
@@ -199,9 +202,21 @@ arithmetic path: no `KINDI_TC`, `KINDI_SPEC`, `KINDI_FD`, fast head or `k8v4` in
 | **M7** CPU + Arc tandem | per-layer CPU API, scheduler, 1/2 Arc | exact; at least 1.15x Arc-only, or it enables a model/context that Arc-only cannot fit |
 | **M8** Installer and support claim | Intel container, detection, docs, CI/manual matrix | installed setup passes the same checks as the NVIDIA rows; no hidden environment override |
 
-M1 is **unblocked in transit**: an A770 16 GB is on its way (purchased 2026-11-15, not installed yet).
-No Arc code has been executed anywhere, so M2 onward are not started. The day the card lands, run the
-arrival checklist below and record the run in `docs/benchmarks/<date>-<host>-arc-a770/`.
+M1 is **partly measured on the Windows host (2026-11-22)**. The card is installed and enumerable:
+
+| evidence | value |
+|---|---|
+| device | Intel Arc A770, PCI `8086:56A0`, 16,384 MiB |
+| driver | 32.0.101.9175; the display class also registers `ze_intel_gpu64.dll` 32.0.101.9175 |
+| Level Zero | loader 1.33.1, `zeInit` 0, 1 driver / 1 device |
+| CPU baseline | 2B/4B/9B `verify` 4/4 token-exact, 22.2/11.1/6.5 tok/s at ctx 1,024 |
+| open | oneAPI/SYCL (`sycl-ls`), ReBAR, PCIe link state, llama.cpp SYCL baseline |
+
+That is hardware qualification, **not M1 passed**: the gate also asks for the pinned oneAPI/SYCL
+toolchain, the ReBAR/PCIe record and the llama.cpp baseline, and none of those exist on this host.
+Windows is not the first support target, so this run does not move the support claim either. M2 still
+needs a SYCL compiler; the next useful step is oneAPI on Windows (the compile half) or a Linux host
+(the plan's target). Record every future run in `docs/benchmarks/<date>-<host>-arc-a770/`.
 
 ### Arrival checklist (M1, run when the card is installed)
 
@@ -342,8 +357,9 @@ the backend work starts:
 
 ## Risks
 
-- **No Arc hardware on the test host.** This is the immediate blocker; no amount of code review
-  substitutes for `sycl-ls` and a token-exact run.
+- **Hardware is present, the toolchain is not.** The Windows host has an enumerable A770 and no
+  SYCL compiler; a Linux host with pinned oneAPI is still the first support target. No amount of
+  code review substitutes for `sycl-ls` and a token-exact run.
 - **Kernel-port effort.** The core Bonsai path is custom CUDA; a thin CuPy replacement does not
   exist. The 22 kernels, plan engine and tensor-core paths are not a configuration change.
 - **Numerical exactness.** Subgroup sizes, FP16/FMA contraction and reduction order can change

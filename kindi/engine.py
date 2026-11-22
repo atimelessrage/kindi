@@ -789,7 +789,16 @@ class Engine(object):
 PLAN_SMALL_HIP = ("gfx1151",)      # the AMD GPUs where the 2B / 4B / 9B take the plan engine (measured)
 
 
-def tc_hp_for(man):
+def _is_turing(card):
+    """True when this card takes the Turing tensor-core backend, whose kernels have no KINDI_TC_HP path."""
+    try:
+        from . import tc_turing
+        return bool(tc_turing.supported(card))
+    except Exception:  # noqa: BLE001 - no CUDA or no probe: keep the Ampere default
+        return False
+
+
+def tc_hp_for(man, card=None):
     """The activation precision the tensor-core path should use for this pack: "1", or None to leave
     the environment alone.
 
@@ -804,10 +813,17 @@ def tc_hp_for(man):
     ignores `KINDI_TC_HP`, so this returns None and a default run does not claim high-precision activations
     it is not using. It is read once, when `kindi.spec` is imported, and caps the verify pass at T = 4, so a
     process that loads an HB-4096 pack first keeps that cap for any later pack.
+
+    On a Turing card (``card`` names a device for which ``tc_turing.supported()`` is true) this
+    returns None even for HB-4096: ``tc_turing.cu`` has no KINDI_TC_HP path, so the tensor-core
+    plans would pass an HP argument their q8 kernel does not take.  The pack then hits the
+    existing HB-4096 refusal and must use the plain engine (KINDI_TP=0).
     """
     if os.environ.get("KINDI_TC", "0") != "1":
         return None
     if "KINDI_TC_HP" in os.environ:
+        return None
+    if card is not None and _is_turing(card):
         return None
     try:
         hb = int(man.get("hadamard_block", 512))
@@ -964,7 +980,7 @@ def make_engine_legacy(pack, ctx=4096, clusters=None, log=print, tandem="off", c
         arch = (arch.decode() if isinstance(arch, bytes) else str(arch)).split(":")[0]
         plan_model = plan_model or arch in PLAN_SMALL_HIP
     if force == "1" or (force != "0" and (plan_model or (two and weights > 0.9 * cp.cuda.runtime.memGetInfo()[1]))):
-        hp = tc_hp_for(man)
+        hp = tc_hp_for(man, card=cp.cuda.Device().id)
         if hp is not None:
             os.environ["KINDI_TC_HP"] = hp         # before kindi.spec is imported: it reads this once
             # spec._load logs the setting once the tensor-core path actually builds; a 5-trit

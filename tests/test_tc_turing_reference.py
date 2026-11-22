@@ -33,6 +33,7 @@ is JIT-compiled, so the suite also runs on newer cards (it has been run on sm_89
 import sys
 
 import numpy as np
+import pytest
 
 try:
     import cupy as cp
@@ -40,6 +41,19 @@ except Exception:                                        # cupy missing: the tes
     cp = None
 
 EPS = 2.0 ** -24                                         # fp32 unit roundoff
+
+
+def _cuda_ready():
+    if cp is None:
+        return False
+    try:
+        return int(cp.cuda.runtime.getDeviceCount()) > 0
+    except Exception:  # noqa: BLE001 - no driver/device: skip, do not fail the CPU gate
+        return False
+
+
+pytestmark = pytest.mark.skipif(not _cuda_ready(),
+                                reason="needs a CUDA device for the Turing PTX kernels")
 
 
 # ==================================================================================== the CPU model (NumPy only)

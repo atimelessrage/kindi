@@ -38,6 +38,9 @@ the state at that commit.
 | [REQ-0026](requirements/REQ-0026.md) | `kindi bench` can measure a speculation mode | proposed | `3ececca68d4a` | `3ececca68d4a` |
 | [REQ-0027](requirements/REQ-0027.md) | A constrained-decoding mask that does not sweep the vocabulary per state | active | `62ea1a6828f0` | `82a72bff163d` |
 | [REQ-0028](requirements/REQ-0028.md) | An Anthropic Messages endpoint for agent harnesses | proposed | `8c4decde1d0f` | `8c4decde1d0f` |
+| [REQ-0029](requirements/REQ-0029.md) | Self-hosted n8n can call a local Kindi server | proposed | uncommitted | uncommitted |
+| [REQ-0030](requirements/REQ-0030.md) | Selectable native accelerators for measured hot Python paths | proposed | uncommitted | uncommitted |
+| [REQ-0031](requirements/REQ-0031.md) | Looped-transformer model family (SenseNova-Loop-9B, Inkling 2 Mini) | active | uncommitted | uncommitted |
 
 `uncommitted` means the requirement file is not in `HEAD` yet. Commit the requirement
 and run the generator again to record its real added/last-modified hashes.

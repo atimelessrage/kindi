@@ -33,7 +33,6 @@ import asyncio
 import codecs
 import concurrent.futures
 import contextvars
-import hmac
 import json
 import math
 import os
@@ -47,6 +46,7 @@ import numpy as np
 
 from . import COMMIT, __version__, chat
 from .api import errors as api_errors
+from .api.auth import bearer_matches
 from .cache import Cancelled, Runner
 from .constrained import STRUCTURED_TYPES, is_structured
 from .engine import EOS
@@ -1442,11 +1442,7 @@ def create_app(cfg, log=print):
         return _err(429, str(e), "server_busy", {"Retry-After": "1"})
 
     def _auth(request):
-        key = cfg["api_key"]
-        if not key:
-            return True
-        supplied = request.headers.get("authorization", "")
-        return hmac.compare_digest(supplied.encode("utf-8"), ("Bearer " + key).encode("utf-8"))
+        return bearer_matches(request.headers.get("authorization", ""), cfg["api_key"])
 
     def _rate_limited(request):
         """A 429 response when this source address exhausted its generation budget, else None."""

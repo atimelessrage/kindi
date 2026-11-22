@@ -173,3 +173,20 @@ Use this shape:
 - Consequences: capability changes still have to be made in both places until then. Every
   new family must register a `model_id_for_manifest` hook so the reported id cannot drift
   again, and the migration is a named round, not a side effect of a feature commit.
+
+## DEC-0010: One constant-time bearer check for every HTTP server
+
+- Status: accepted
+- Date: 2026-11-22
+- Requirements: none (2026-11-22 audit follow-up)
+- Context: `kindi/server.py` compared `Authorization` with `hmac.compare_digest`, but
+  `kindi/dsv41_server.py` compared the same header with `==`. Two servers, two answers to one
+  security question; a future server could copy either one.
+- Decision: `kindi.api.auth.bearer_matches(header, key)` is the only implementation. It treats an
+  empty key as "no authentication" (the loopback default) and compares the full `Bearer <key>`
+  value in constant time. Both servers call it.
+- Consequences: a new HTTP surface must import the helper, and `tests/test_server_auth.py` fails
+  if a server contains a literal `== "Bearer "`. The helper has no FastAPI or HTTP dependency, so
+  it is unit-tested on a CPU-only host and stays Python 3.6-safe. The audit's engine/spec findings
+  (broad `except` in `_is_turing`, the HB-4096 refusal after the repack) were left for the
+  in-flight engine round that owns those uncommitted files.

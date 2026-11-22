@@ -10,7 +10,8 @@ from pathlib import Path
 from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
-SKIP_DIRS = {".git", ".freebuff", ".pytest_cache", "bench-logs", "node_modules", "__pycache__"}
+SKIP_DIRS = {".git", ".freebuff", ".pytest_cache", ".worktrees", "bench-logs", "node_modules",
+             "__pycache__"}
 LINK = re.compile(r"!?\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+[\"'][^\"']*[\"'])?\s*\)")
 
 
