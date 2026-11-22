@@ -152,6 +152,12 @@ PYTHONPATH=. python tests/test_tc_turing_reference.py      # same, with the per-
 It builds the kernels through the production path (`kindi.spec.SpecKernels(backend=tc_turing)`), so
 the loader and the full translation unit are exercised too. All 9 tests passed on 2026-11-07 (sm_89).
 
+On a host with no CUDA device the module skips as a unit with the reason `needs a CUDA device for
+the Turing PTX kernels`; the 10 node IDs are `test_reference_layout`, `test_turing_names`,
+`test_activations`, `test_int8_shift_compensation_is_required`, `test_pack_layout`, `test_products`,
+`test_token_counts`, `test_shapes_and_merges`, `test_sum` and `test_whole_chain`. That is an
+environment skip, not a pass.
+
 ### Why the reference is independent
 
 The NumPy model does not call or transcribe the CUDA code. It works from the documented format:
