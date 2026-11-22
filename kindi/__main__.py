@@ -535,8 +535,8 @@ def _tandem_args(s):
     _vram_args(s)
 
 
-def main(argv=None):
-    _malloc_tuning()
+def _build_parser():
+    """The complete command-line grammar: global options plus every subcommand."""
     p = argparse.ArgumentParser(prog="kindi", description="Kindi %s - native CUDA inference for ternary models and Gemma 4" % __version__)
     p.add_argument("--config")
     p.add_argument("--pack")
@@ -648,10 +648,11 @@ def main(argv=None):
     s = sub.add_parser("use", help="download a model, build its pack and select it")
     s.add_argument("model")
     s.add_argument("--gguf", help="use this GGUF file instead of downloading it")
-    a = p.parse_args(argv)
-    if not a.cmd:
-        p.print_help()
-        return 1
+    return p
+
+
+def _apply_overrides(a):
+    """Merge the global CLI options into the config; command-only values stay on `a`."""
     ov = {k: getattr(a, k, None) for k in ("pack", "state_dir", "ctx", "host", "port", "api_key", "head")}
     cfg = C.load(a.config, ov)
     if getattr(a, "tandem", None) is not None:
@@ -676,10 +677,45 @@ def main(argv=None):
         cfg["split_generated"] = a.split_generated
     if getattr(a, "vram_sample_s", None) is not None:
         cfg["vram_sample_s"] = a.vram_sample_s
-    return {"convert": cmd_convert, "fast-head": cmd_fast_head, "verify": cmd_verify, "bench": cmd_bench, "kld": cmd_kld, "calibrate": cmd_calibrate,
-            "plan": cmd_plan, "serve": cmd_serve, "chat": cmd_chat, "head": cmd_head, "info": cmd_info,
-            "caps": cmd_caps, "intel-info": cmd_intel_info, "io": cmd_io, "autotune": cmd_autotune,
-            "backends": cmd_backends, "models": cmd_models, "use": cmd_use, "sessions": cmd_sessions}[a.cmd](cfg, a)
+    return cfg
+
+
+_COMMANDS = {
+    "convert": cmd_convert,
+    "fast-head": cmd_fast_head,
+    "verify": cmd_verify,
+    "bench": cmd_bench,
+    "kld": cmd_kld,
+    "calibrate": cmd_calibrate,
+    "plan": cmd_plan,
+    "serve": cmd_serve,
+    "chat": cmd_chat,
+    "head": cmd_head,
+    "info": cmd_info,
+    "caps": cmd_caps,
+    "intel-info": cmd_intel_info,
+    "io": cmd_io,
+    "autotune": cmd_autotune,
+    "backends": cmd_backends,
+    "models": cmd_models,
+    "use": cmd_use,
+    "sessions": cmd_sessions,
+}
+
+
+def _dispatch(cfg, a):
+    """Call the selected command through the module global, so it stays replaceable."""
+    return getattr(sys.modules[__name__], _COMMANDS[a.cmd].__name__)(cfg, a)
+
+
+def main(argv=None):
+    _malloc_tuning()
+    p = _build_parser()
+    a = p.parse_args(argv)
+    if not a.cmd:
+        p.print_help()
+        return 1
+    return _dispatch(_apply_overrides(a), a)
 
 
 if __name__ == "__main__":
