@@ -11,6 +11,12 @@ installer hashes are recorded in `docs/INSTALL.md`; publication is still a relea
 
 ### Added
 
+- **One-command install check** — `kindi selftest [--json FILE]` loads the selected pack once, calls
+  `/health`, runs one short greedy `/v1/chat/completions` request through the real in-process app,
+  and prints the effective runtime state, pack hash and timings. A missing pack, tokenizer or engine
+  failure, a non-200 health check or an empty generation exits non-zero. Fake-engine tests cover
+  those paths; live CPU runs pass on the 2B (24.5 s) and 9B (112.1 s). It binds no port and adds no
+  dependency; the installer does not call it yet, and no GPU run was made.
 - **Diagnostics read one effective runtime state** — `kindi/runtime.py` resolves the engine,
   TC/HP state, K/V format, context, effective speculation mode and head digest, chunk size,
   threads and VRAM budget/reserve once. The startup log, `/health` (new `runtime` block),

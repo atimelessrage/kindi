@@ -74,7 +74,9 @@ irm https://github.com/atimelessrage/kindi/releases/download/v0.7.0-fork/install
 ```
 
 The installer finds your cards and shows the setups that they support, the recommended setup first. It downloads
-the model, checks its sha256, runs `kindi verify` and starts the server on `127.0.0.1:8093`. Add `--dry-run` to see
+the model, checks its sha256, runs `kindi verify` and starts the server on `127.0.0.1:8093`. After an install,
+`kindi selftest` proves the selected pack, tokenizer, engine and chat route in one command, without starting a
+second server. Add `--dry-run` to see
 each step first. For the checksum-verified download-and-run form (and the Windows reviewed-download step), use
 [docs/INSTALL.md](docs/INSTALL.md); Windows details are in [docs/WINDOWS.md](docs/WINDOWS.md).
 DeepSeek-V4.1-Flash has its own installer ([docs/DEEPSEEK.md](docs/DEEPSEEK.md)).
@@ -366,6 +368,7 @@ of 295 agent turns were the same). The details are in [docs/PROMPT-CACHE.md](doc
 | `kindi intel-cl [--dim 128] [--json]` | Runtime-compiled OpenCL vector-add/GEMM exactness smoke on an Intel GPU (no SYCL, model or engine) |
 | `kindi fast-head [--clusters N]` | build the fast-head cluster file (stop the server first: needs ~300 MB of GPU memory) |
 | `kindi verify` | check greedy output against llama.cpp's reference |
+| `kindi selftest [--json FILE]` | prove the pack, tokenizer, engine and HTTP route work (one short generation; no server process) |
 | `kindi bench` | speed at several context positions, prompt read speed, GPU memory |
 | `kindi serve [--host H] [--port P] [--api-key K] [--head exact\|fast]` | the OpenAI-compatible server |
 | `kindi chat [--system TEXT]` | terminal chat |

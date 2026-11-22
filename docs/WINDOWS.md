@@ -296,11 +296,15 @@ The 2B is the recommended first model:
 python -m kindi models
 python -m kindi use bonsai-2b
 python -m kindi verify
+python -m kindi selftest
 ```
 
 `kindi use` downloads the GGUF, builds the pack under the configured state directory and selects
 it. The pack load is the slow part on Windows (about 23 s for the 2B in the recorded run; the 9B
 took about 112 s). `kindi verify` compares greedy output token-for-token with the reference.
+`kindi selftest` then loads the same pack once, checks `/health` and runs one short chat request
+through the real route, printing the effective runtime state, pack hash and timings; it exits
+non-zero if the pack, tokenizer, engine or route fails. Add `--json FILE` to keep the report.
 
 For the 4B or 9B, use `python -m kindi use bonsai-4b` or `python -m kindi use bonsai-9b`.
 The 27B is not a native Windows CPU target.

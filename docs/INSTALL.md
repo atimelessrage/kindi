@@ -80,6 +80,11 @@ clients and for pi (one provider for each server). It writes no secrets and asks
 
 If your user is not in the `docker` group, the script uses `sudo docker`.
 
+Afterwards, `kindi selftest` (or `python -m kindi selftest` from a source tree) loads the selected
+pack, calls `/health`, runs one short chat request through the real HTTP route and prints the
+effective runtime state, pack hash and timings. It exits non-zero on a missing pack, a tokenizer or
+engine failure, a failed health check or an empty generation. The installer does not call it yet.
+
 ## Select a setup
 
 The installer lists each setup that your computer can run. A computer with an RTX 3060 and a GTX 1080 shows:

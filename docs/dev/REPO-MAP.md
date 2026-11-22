@@ -38,7 +38,8 @@ maintainer.
 |---|---|---|
 | `server.py` | FastAPI OpenAI-compatible server; `Kindi` engine facade; queue/scheduler; metrics | no |
 | `runtime.py` | one effective runtime-configuration view for `/health`, the startup log, `kindi info` and `bench --json` | no |
-| `__main__.py` | CLI (`convert verify bench serve chat info use ...`) | no |
+| `selftest.py` | `kindi selftest`: load the pack, check `/health` and one chat route, report runtime/pack hash/timings | no |
+| `__main__.py` | CLI (`convert verify selftest bench serve chat info use ...`) | no |
 | `dsv41_server.py` | DeepSeek V4.1 stdlib-HTTP server (separate from `server.py`) | no |
 | `container.py` | container entrypoint (model fetch, pack build, serve) | no |
 | `config.py`, `config_reference.py` | config defaults/layering; generated config reference | no |

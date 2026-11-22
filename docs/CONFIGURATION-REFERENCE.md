@@ -115,7 +115,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:585` |
 | `KINDI_CONFIG` | (unset) | `kindi/config.py:125` (+1 more) |
 | `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:213` (+4 more) |
-| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:476` (+1 more) |
+| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:484` (+1 more) |
 | `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:47` |
 | `KINDI_D1` | `1` or `0` | `kindi/spec.py:727` (+1 more) |
 | `KINDI_DATA` | `/data` | `kindi/container.py:243` |
@@ -249,7 +249,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_Q8X2` | `1` | `kindi/chunk.py:272` |
 | `KINDI_SAMPLER_ORDER` | `llama` | `kindi/sampling.py:19` |
 | `KINDI_SM2` | (empty) | `kindi/spec.py:747` |
-| `KINDI_SPEC` | `0` | `kindi/__main__.py:230` (+15 more) |
+| `KINDI_SPEC` | `0` | `kindi/__main__.py:231` (+15 more) |
 | `KINDI_SPEC_B0_K2_MAX` | `1024` | `kindi/spec.py:59` |
 | `KINDI_SPEC_B2_MAX` | `0` | `kindi/spec.py:60` |
 | `KINDI_SPEC_CTX` | (unset) | `kindi/spec.py:1969` |

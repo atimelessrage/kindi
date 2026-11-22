@@ -3,6 +3,7 @@
   kindi convert MODEL.gguf      build the weight pack from a PTQ1_0/PQ2_0/Q2_0 GGUF (once; ~1 minute)
   kindi fast-head               build the cluster file for the fast head (optional; ~2 minutes)
   kindi verify                  check greedy output against llama.cpp's reference (token for token)
+  kindi selftest                prove the pack, tokenizer, engine and HTTP route work (one short generation)
   kindi bench                   measure speed and GPU memory
   kindi kld                     teacher-forced KLD quality gate for lossy K/V caches (vs fp16)
   kindi calibrate               measure the per-machine tuning once (5-trit configs, placement, draft length)
@@ -237,6 +238,13 @@ def cmd_bench(cfg, a):
     _setup_gpu_env(cfg)
     from .bench import run
     return run(cfg, log=log)
+
+
+def cmd_selftest(cfg, a):
+    _require_pack(cfg)
+    _setup_gpu_env(cfg)
+    from .selftest import run
+    return run(cfg, log=log, max_tokens=a.max_tokens, json_path=a.json)
 
 
 def cmd_plan(cfg, a):
@@ -609,6 +617,10 @@ def _build_parser():
                    help="verify under this speculation mode (same as KINDI_SPEC; the mode's own variables, "
                         "KINDI_MTP_HEAD or KINDI_SPEC_PACK, are read as usual); the effective mode is printed "
                         "and a drafter that did not attach exits non-zero")
+    s = sub.add_parser("selftest", help="prove the pack, tokenizer, engine and HTTP route work")
+    s.add_argument("--max-tokens", dest="max_tokens", type=int, default=8,
+                   help="tokens to generate in the one smoke request (default 8)")
+    s.add_argument("--json", default=None, metavar="FILE", help="also record the report in a machine-readable JSON file")
     s = sub.add_parser("bench", help="measure speed")
     _tandem_args(s)
     s.add_argument("--json", default=None, metavar="FILE", help="also record the numbers in a machine-readable JSON file")
@@ -751,6 +763,7 @@ _COMMANDS = {
     "convert": cmd_convert,
     "fast-head": cmd_fast_head,
     "verify": cmd_verify,
+    "selftest": cmd_selftest,
     "bench": cmd_bench,
     "kld": cmd_kld,
     "calibrate": cmd_calibrate,
