@@ -415,6 +415,20 @@ def cmd_intel_smoke(cfg, a):
     return 0 if report["result"] == "pass" else 1
 
 
+def cmd_intel_cl(cfg, a):
+    """Runtime-compiled OpenCL vector-add and GEMM on an Intel GPU; no model."""
+    from . import intel_cl
+
+    report = intel_cl.run_smoke(a.n, dim=a.dim, repeats=a.repeats, loader=a.loader,
+                                device=a.device)
+    if a.json:
+        print(intel_cl.dumps(report))
+    else:
+        for line in intel_cl.render(report):
+            print(line)
+    return 0 if report["result"] == "pass" else 1
+
+
 def cmd_loop_info(cfg, a):
     """Inspect a looped-transformer GGUF map without loading any tensor data (REQ-0031)."""
     from . import looped
@@ -667,6 +681,13 @@ def _build_parser():
     s.add_argument("--device", type=int, default=0, help="Level Zero device index (default 0)")
     s.add_argument("--loader", default=None, help="Level Zero loader name/path (default: the host loader)")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
+    s = sub.add_parser("intel-cl", help="compile and run OpenCL vector-add/GEMM on an Intel GPU (no model)")
+    s.add_argument("--n", type=int, default=1048576, help="vector-add elements (default 1048576, max 16777216)")
+    s.add_argument("--dim", type=int, default=128, help="square GEMM dimension (default 128, 8-512)")
+    s.add_argument("--repeats", type=int, default=5, help="timed GEMM launches (default 5, max 50)")
+    s.add_argument("--device", type=int, default=0, help="Intel OpenCL GPU index (default 0)")
+    s.add_argument("--loader", default=None, help="OpenCL loader name/path (default: the host loader)")
+    s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("loop-info", help="inspect a looped-transformer GGUF map (no tensor data loaded)")
     s.add_argument("gguf")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
@@ -739,6 +760,7 @@ _COMMANDS = {
     "caps": cmd_caps,
     "intel-info": cmd_intel_info,
     "intel-smoke": cmd_intel_smoke,
+    "intel-cl": cmd_intel_cl,
     "loop-info": cmd_loop_info,
     "io": cmd_io,
     "autotune": cmd_autotune,

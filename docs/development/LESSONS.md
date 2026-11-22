@@ -177,3 +177,22 @@ exported by loader 1.33.1, and a host-USM destination also stayed zero; shared U
 **Practice:** Query `zeDeviceGetCommandQueueGroupProperties` and prefer a copy-only group for
 copies; verify the destination bytes. A zero return code from a queue API is not proof that a
 command ran, and a capability flag is not proof that the engine honors the command.
+
+## L-0012: The Intel graphics driver ships an OpenCL compiler even when oneAPI is absent
+
+**Observation:** This host has no `icpx`/`sycl-ls` and no oneAPI install, but `OpenCL.dll` enumerates
+the A770 (`Intel(R) OpenCL Graphics (discrete)`, OpenCL 3.0 NEO) and compiles OpenCL C 1.2 at
+runtime. Two exact kernels then run on the card with no CPU fallback, so the missing SYCL toolchain
+was not the whole kernel gate. Three API details made the first probe fail or mislabel the device:
+`CL_PLATFORM_NAME`/`VENDOR` are `0x0902`/`0x0903` (not `0x0900`/`0x0901`, which are profile/version);
+`clCreateBuffer` rejects a non-NULL host pointer without `CL_MEM_COPY_HOST_PTR` (`-37`); and
+`CL_DEVICE_MAX_COMPUTE_UNITS` is `0x1002` (`0x1003` is the work-item dimension count, which reads 3).
+
+**Evidence:** `kindi/intel_cl.py` and `tests/test_intel_cl.py`; the real run is
+`docs/benchmarks/2026-11-22-i7-8086k-arc-a770/cl-smoke.json` (0 mismatches on both kernels, 512
+compute units).
+
+**Practice:** Check the driver's own runtime before declaring a kernel gate blocked on a toolchain:
+OpenCL exposes a runtime compiler on this Intel driver. Use the Khronos header's exact constant
+values rather than remembered ones, and treat a successful-looking call as unproven until the return
+code and the result bytes both check out.

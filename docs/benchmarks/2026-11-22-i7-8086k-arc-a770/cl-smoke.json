@@ -1,0 +1,90 @@
+{
+  "backend": "opencl runtime-compiled kernels only; no sycl, model or engine",
+  "build": {
+    "log": null,
+    "ok": true,
+    "source_bytes": 626
+  },
+  "device": {
+    "compute_units": 512,
+    "device_version": "OpenCL 3.0 NEO ",
+    "driver_version": "32.0.101.9175",
+    "global_mem_mib": 15932,
+    "max_clock_mhz": 2400,
+    "max_work_group_size": 1024,
+    "name": "Intel(R) Arc(TM) A770 Graphics",
+    "opencl_c_version": "OpenCL C 1.2 ",
+    "vendor": "Intel(R) Corporation"
+  },
+  "device_count": 1,
+  "device_index": 0,
+  "error": null,
+  "gemm": {
+    "dim": 128,
+    "elapsed_ms": 0.666,
+    "gflops": 31.47,
+    "max_abs_error": 0.0,
+    "mismatches": 0,
+    "repeats": 5
+  },
+  "loader": {
+    "available": true,
+    "error": null,
+    "name": "OpenCL.dll"
+  },
+  "platform": "Intel(R) OpenCL Graphics (discrete)",
+  "platforms": [
+    {
+      "gpu_devices": 1,
+      "index": 0,
+      "name": "Intel(R) OpenCL Graphics (discrete)",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.0 "
+    }
+  ],
+  "probe": "intel-cl-smoke",
+  "read_only": false,
+  "result": "pass",
+  "returncodes": {
+    "clBuildProgram": "0x00000000",
+    "clCreateBufferGemmA": "0x00000000",
+    "clCreateBufferGemmB": "0x00000000",
+    "clCreateBufferGemmOut": "0x00000000",
+    "clCreateBufferVecAddA": "0x00000000",
+    "clCreateBufferVecAddB": "0x00000000",
+    "clCreateBufferVecAddOut": "0x00000000",
+    "clCreateCommandQueue": "0x00000000",
+    "clCreateContext": "0x00000000",
+    "clCreateKernelGemm": "0x00000000",
+    "clCreateKernelVecadd": "0x00000000",
+    "clCreateProgramWithSource": "0x00000000",
+    "clEnqueueNDRangeKernelGemm": "0x00000000",
+    "clEnqueueNDRangeKernelVecAdd": "0x00000000",
+    "clEnqueueReadBufferGemm": "0x00000000",
+    "clEnqueueReadBufferVecAdd": "0x00000000",
+    "clFinishGemm": "0x00000000",
+    "clFinishVecAdd": "0x00000000",
+    "clGetPlatformIDs": "0x00000000",
+    "clGetPlatformIDsHandles": "0x00000000",
+    "clReleaseCommandQueue": "0x00000000",
+    "clReleaseContext": "0x00000000",
+    "clReleaseKernel0": "0x00000000",
+    "clReleaseKernel1": "0x00000000",
+    "clReleaseMemObject0": "0x00000000",
+    "clReleaseMemObject1": "0x00000000",
+    "clReleaseMemObject2": "0x00000000",
+    "clReleaseMemObject3": "0x00000000",
+    "clReleaseMemObject4": "0x00000000",
+    "clReleaseMemObject5": "0x00000000",
+    "clReleaseProgram": "0x00000000"
+  },
+  "schema": 1,
+  "scope": "vector-add and square GEMM on an Intel GPU, checked against a host reference",
+  "support_claim": false,
+  "vector_add": {
+    "elapsed_ms": 6.496,
+    "max_abs_error": 0.0,
+    "mismatches": 0,
+    "n": 1048576
+  }
+}

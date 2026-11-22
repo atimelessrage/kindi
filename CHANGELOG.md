@@ -11,6 +11,14 @@ installer hashes are recorded in `docs/INSTALL.md`; publication is still a relea
 
 ### Added
 
+- **The A770 runs exact compute kernels without oneAPI** — the new host-only
+  `kindi intel-cl [--n 1048576] [--dim 128] [--repeats 5] [--json]` compiles a float32 vector-add
+  and square GEMM with the driver's own OpenCL C compiler and checks them against a host reference
+  that must match bit for bit. On the Windows A770 both kernels pass with zero mismatches:
+  1,048,576 adds in 6.5 ms and a 128x128 GEMM at 31.5 GFLOP/s (5 launches, wall clock), with 512
+  compute units and driver 32.0.101.9175. This is M2's kernel/GEMM half measured through OpenCL,
+  not a SYCL backend: there is no `libksycl.so`, Kindi device selection, model, engine or support
+  claim (REQ-0020).
 - **Intel Arc A770 has an executable Level Zero memory path** — the new host-only
   `kindi intel-smoke [--mib 16] [--device 0] [--json]` creates a Level Zero context on the
   installed A770, allocates device and shared USM, copies a known pattern through a command

@@ -1,4 +1,4 @@
-# Intel Arc A770 16 GB: M1 hardware and Level Zero qualification (2026-11-22)
+# Intel Arc A770 16 GB: M1 hardware, Level Zero and OpenCL kernel qualification (2026-11-22)
 
 The A770 is now installed in the i7-8086K rig. This page records what the host can prove **without a
 Kindi Intel backend**: the card's identity, its memory, the Level Zero runtime, the first Level Zero
@@ -72,8 +72,31 @@ Three findings from the run are part of the result:
   selects a copy-only group by capability instead of using ordinal 0.
 - A host-USM destination also stayed zero; shared USM works as the host-side staging buffer.
 
-This is not M2 passed: it has no kernel, GEMM, model, engine or CPU fallback, and the kernel/GEMM half
-still needs oneAPI/SYCL. It is a measured memory/queue path, not Arc support.
+Both M2 halves now have host-local evidence: the Level Zero memory/queue path above and the
+runtime-compiled OpenCL kernel path below. It is still not M2 passed and not Arc support: there is no
+`libksycl.so`, no Kindi device selection or backend, no model and no engine run.
+
+## M2 kernel path (partial)
+
+`python -m kindi intel-cl --json` uses the Intel OpenCL 3.0 NEO runtime (`OpenCL.dll`, driver
+32.0.101.9175) and its built-in compiler, so no oneAPI install is needed. It compiles two kernels and
+runs them on the A770: a 1,048,576-element float32 vector-add and a 128x128 GEMM (5 launches timed).
+Both inputs are small integers, so every partial sum is exactly representable and the host reference
+must match bit for bit. Measured: **pass**, 0 mismatches on both, 6.5 ms for the vector-add and
+0.666 ms for the GEMM (31.5 GFLOP/s wall) ([cl-smoke.json](cl-smoke.json)). The driver reports 512
+compute units, 15,932 MiB, OpenCL C 1.2 and max work-group size 1,024.
+
+Three API findings from the first run are recorded because each one made the probe fail or mislabel
+the device:
+
+- `CL_PLATFORM_NAME` and `CL_PLATFORM_VENDOR` are `0x0902`/`0x0903`; the `0x0900`/`0x0901` pair is
+  profile/version, which labelled the platform `FULL_PROFILE`.
+- `clCreateBuffer` returns `CL_INVALID_HOST_PTR` (-37) for a non-NULL host pointer unless
+  `CL_MEM_COPY_HOST_PTR` is set; output buffers pass NULL.
+- `CL_DEVICE_MAX_COMPUTE_UNITS` is `0x1002`; `0x1003` is the work-item dimension count and read 3.
+
+This is not M2 passed and not Arc support: the path is OpenCL C, not SYCL, and there is no
+`libksycl.so`, Kindi device selection/backend, model or engine run.
 
 ## M1 verdict
 
@@ -93,16 +116,17 @@ host:
 
 So: **hardware and Level Zero are qualified; M1 is not passed** (toolchain, ReBAR, PCIe and the
 llama.cpp baseline are open), and Windows is not the plan's first support target. M2's memory/queue
-half is measured above; its kernel/GEMM half still has nothing to compile with: a SYCL kernel needs
-oneAPI (or a Linux oneAPI host), and an unverifiable kernel would be a claim rather than a feature.
+and OpenCL kernel halves are measured above; what remains is the SYCL path (`libksycl.so`), Kindi
+device selection and a model run, none of which is claimed here.
 
 ## Notes
 
 - The RTX 4060 Ti and GT 1030 appear only as non-present PnP nodes (Status Unknown), and
   `nvidia-smi` could not query a device, so this run has no CUDA comparison.
-- The display class registers `igdrcl64.dll` (OpenCL), but no Khronos `OpenCL\Vendors` key is present
-  in either registry view, so the OpenCL ICD loader would not find it. Kindi's plan is Level
-  Zero/SYCL anyway; this is recorded to avoid a later "OpenCL was there all along" claim.
+- `OpenCL.dll` does enumerate the Intel platform and the A770 (`Intel(R) OpenCL Graphics (discrete)`,
+  OpenCL 3.0 NEO, driver 32.0.101.9175), even though no Khronos `OpenCL\Vendors` key is visible in
+  the registry views that `intel-info` reads. The loader and the driver's runtime compiler are what
+  `kindi intel-cl` uses; the Level Zero/SYCL plan is unchanged.
 - The probe records `driver=n/a` for a Windows adapter: the display class exposes a driver
   *version*, not the Linux `i915`/`xe` service name that `eligible()` checks.
 - The M2 smoke is deliberately separate from `kindi intel-info`: `intel-info` stays read-only, while
