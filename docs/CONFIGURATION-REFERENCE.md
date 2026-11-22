@@ -151,18 +151,18 @@ variables, and are therefore not listed twice here.
 | `KINDI_G4_CKPT_MAX` | `16` | `kindi/gemma4_cache.py:34` |
 | `KINDI_G4_DP4A` | `"1" if cc=="hip" or int(cc)>=61 else "0"` | `kindi/gemma4.py:84` |
 | `KINDI_G4_FP8` | `1` | `kindi/gemma4.py:118` |
-| `KINDI_G4_GRAPH` | `1` | `kindi/gemma4.py:828` |
+| `KINDI_G4_GRAPH` | `1` | `kindi/gemma4.py:837` |
 | `KINDI_G4_IQ4_DP4A` | `1` | `kindi/gemma4.py:79` |
-| `KINDI_G4_K4` | `1` | `kindi/gemma4.py:598` |
+| `KINDI_G4_K4` | `1` | `kindi/gemma4.py:607` |
 | `KINDI_G4_KQ_DP4A` | `1` | `kindi/gemma4.py:81` |
 | `KINDI_G4_MMQ` | `1` | `kindi/gemma4.py:82` |
-| `KINDI_G4_PAD` | `1` | `kindi/gemma4.py:599` |
+| `KINDI_G4_PAD` | `1` | `kindi/gemma4.py:608` |
 | `KINDI_G4_PARK_MAX` | `4` | `kindi/gemma4_cache.py:35` |
-| `KINDI_G4_PLE_HOST` | `auto` | `kindi/gemma4.py:482` |
+| `KINDI_G4_PLE_HOST` | `auto` | `kindi/gemma4.py:490` |
 | `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:725` |
 | `KINDI_G4_PROMPT_CACHE` | `1` | `kindi/gemma4_cache.py:33` |
 | `KINDI_G4_Q5_DP4A` | `1` | `kindi/gemma4.py:80` |
-| `KINDI_G4_RESERVE_MB` | `1024` | `kindi/gemma4.py:543` |
+| `KINDI_G4_RESERVE_MB` | `1024` | `kindi/gemma4.py:552` |
 | `KINDI_G4_TC` | `1` | `kindi/gemma4.py:88` (+3 more) |
 | `KINDI_G4_TP` | `auto` | `kindi/backends/gemma4.py:46` |
 | `KINDI_G4_WARPS` | `2560` | `kindi/gemma4.py:123` |

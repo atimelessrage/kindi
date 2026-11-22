@@ -464,10 +464,18 @@ class TensorFile:
     def raw(self,name):
         t=self.tensors[name]; block,size=_QUANTS[t["type"]]; n=int(np.prod(t["shape"]))
         return memoryview(self.map)[t["offset"]:t["offset"]+(n//block)*size]
+    @staticmethod
+    def _upload(cupy,data):
+        """GGUF bytes -> card with a plain synchronous copy (issue #44): ``cupy.asarray`` stages the
+        whole tensor in a pinned host buffer and leaves it in CuPy's pool, so a large model keeps
+        host RAM it never uses again.  ``empty`` + ``set`` copies through a transient buffer."""
+        value=cupy.empty(data.shape,dtype=np.uint8)
+        value.set(np.ascontiguousarray(data),stream=cupy.cuda.Stream.null)
+        return value
     def gpu(self,name,cupy,max_cache_bytes=512*1024*1024):
         if name in self._gpu_cache:
             value,size=self._gpu_cache.pop(name); self._gpu_cache[name]=(value,size); return value
-        value=cupy.asarray(np.frombuffer(self.raw(name),dtype=np.uint8)); size=int(value.nbytes)
+        value=self._upload(cupy,np.frombuffer(self.raw(name),dtype=np.uint8)); size=int(value.nbytes)
         if size<=max_cache_bytes:
             while self._gpu_cache and self._gpu_cache_bytes+size>max_cache_bytes:
                 _,(_,old)=self._gpu_cache.popitem(last=False); self._gpu_cache_bytes-=old
@@ -487,8 +495,9 @@ class TensorFile:
         if required+reserve_bytes>free:
             raise MemoryError("packed weights need %d MiB + %d MiB reserve; %d MiB is free on %s" %
               (required//1048576,reserve_bytes//1048576,free//1048576,name))
-        self._resident={n:cupy.asarray(np.frombuffer(self.raw(n),dtype=np.uint8)) for n in self.tensors if n not in self.host}
+        self._resident={n:self._upload(cupy,np.frombuffer(self.raw(n),dtype=np.uint8)) for n in self.tensors if n not in self.host}
         cupy.cuda.Stream.null.synchronize()
+        cupy.get_default_pinned_memory_pool().free_all_blocks()
         return {"device":name,"weight_bytes":required,"free_bytes":free,"total_bytes":total,"host_tensors":sorted(self.host)}
     def layer(self,index):
         prefix="blk.%d." % int(index)
@@ -998,7 +1007,7 @@ def build_fast_head(model_path,out_dir,K=1024,iters=10,log=print):
         if t["type"]!=11 or width%256:
             raise ValueError("Kindi fast head currently requires a Q3_K token embedding")
         kernels=Kernels()
-        packed=cp.asarray(np.frombuffer(tf.raw("token_embd.weight"),dtype=np.uint8))
+        packed=tf._upload(cp,np.frombuffer(tf.raw("token_embd.weight"),dtype=np.uint8))
         dequant=kernels.k_g4_dequant_q3_rows
         K=min(int(K),int(rows))
         if K<2: raise ValueError("Kindi fast head needs at least two clusters")

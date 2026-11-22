@@ -134,6 +134,17 @@ class G4Cache(object):
         a.get(stream=cp.cuda.get_current_stream(), out=buf)
         return buf
 
+    @staticmethod
+    def _free_pinned():
+        """Give CuPy's free pinned blocks back to the OS (issue #44).  Only free blocks are
+        released: parked data and live checkpoints stay valid.  A test stub or CPU-only runtime
+        need not expose the pool."""
+        try:
+            import cupy as cp
+            cp.get_default_pinned_memory_pool().free_all_blocks()
+        except Exception:  # noqa: BLE001 - no CuPy/pool in a stub or CPU-only runtime
+            pass
+
     def _rings_host(self):
         return self._each(lambda s: {i: (self._to_host(c["k"]), self._to_host(c["v"])) for i, c in s.cache.items() if i in s.local})
 
@@ -183,6 +194,7 @@ class G4Cache(object):
         """set the card up for ids and return how many leading positions are already there"""
         if not self.on:
             self.tokens, self.ckpts, self.parked = [], [], []
+            self._free_pinned()
             return 0
         here, snap = self._resume_point(self.tokens, self.ckpts, ids)
         # a parked conversation that shares more of ids comes back to the card
@@ -202,6 +214,8 @@ class G4Cache(object):
             self.log("prompt cache: conversation of %d tokens back from host memory, %d positions reused"
                      % (len(P["tokens"]), p))
             self._enforce_budget()
+            del P                                   # the globals copy is no longer referenced
+            self._free_pinned()
             return p
         if here < 0.5 * len(self.tokens) and len(self.tokens) >= 1024:
             self._park_active(ids)
@@ -240,6 +254,7 @@ class G4Cache(object):
         self._note_usage()
         self.log("prompt cache: conversation of %d tokens parked in host memory (%d parked)" % (n, len(self.parked)))
         self._enforce_budget()
+        self._free_pinned()
 
     def advanced(self, tokens, checkpoint=False):
         """the card now holds tokens (call after each prompt batch, at the prompt's end and after generated tokens)"""

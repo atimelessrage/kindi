@@ -138,6 +138,21 @@ def test_parking_does_not_double_count_the_active_checkpoint(make_cache):
     assert m["used_bytes"] == 33024
 
 
+def test_parking_and_restoring_return_free_pinned_blocks(make_cache, monkeypatch):
+    """Upstream #44: the host copies must not stay in CuPy's pinned pool."""
+    calls = []
+    monkeypatch.setattr(G4Cache, "_free_pinned", staticmethod(lambda: calls.append(1)))
+    monkeypatch.setattr(G4Cache, "_globals_set", lambda self, g, n: None)
+    monkeypatch.setattr(G4Cache, "_rings_set", lambda self, snap: None)
+    g4 = make_cache(budget_bytes=40000)
+    g4.tokens = list(range(1024))
+    g4._park_active(None)
+    assert calls                                  # parking gives the pool back
+    calls.clear()
+    assert g4.prepare(list(range(1024)) + [1024]) == 1024
+    assert calls                                  # restoring gives the parked globals back
+
+
 def test_zero_checkpoint_limit_does_not_keep_a_ring_snapshot(make_cache):
     g4 = make_cache(budget_bytes=40000)
     g4.ckpt_max = 0

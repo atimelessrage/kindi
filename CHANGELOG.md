@@ -320,6 +320,7 @@ installer hashes are recorded in `docs/INSTALL.md`; publication is still a relea
 
 ### Fixed
 
+- **Gemma 4 gives back the host RAM its uploads and prompt cache pin ([upstream #44](https://github.com/ahtx/kindi/issues/44))** — the weight upload (`TensorFile.gpu`/`load_resident`) copied with `cupy.asarray`, which stages each tensor in a pinned host buffer and leaves it in CuPy's pool, and `G4Cache` parked conversations in `cupyx.empty_pinned` without returning the free blocks. The upload now uses `empty` + `set` like `engine._upload` and frees the pool after the resident load; parking and restoring a conversation calls `free_all_blocks`, which releases only free blocks. `tests/test_gemma4_tensorfile.py` and `tests/test_gemma4_cache.py` pin both paths without a GPU; the upstream GTX 1070 measurement is not re-run here.
 - **Cold-tier readers now have a real teardown path** — `lightning.Engine` created a
   `ColdExpertReader` and a daemon lookahead thread but never closed either, so a process exit could
   kill the thread mid-read and leave the file handle to the OS. `Engine.close()` now joins the
