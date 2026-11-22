@@ -40,6 +40,11 @@ PYRIGHT_CONFIG = ROOT / "pyrightconfig.json"
 PYRIGHT_TARGETS = MYPY_TARGETS
 PYLINT_TARGETS = MYPY_TARGETS
 PYLINT_PY_VERSION = "3.10"          # Ruff/mypy/Pyright target 3.10; Pylint would otherwise use the host Python
+# 0.7.0's Flash-Next GPU modules (and the qx_* kernels they call) are vendored but not wired into this
+# fork: no host here can run them, so their torch/CUDA type idioms stay outside the analyser scope until
+# a GPU run makes them part of the served surface (AGENTS.md records the decision). Ruff and mypy do
+# cover them; this tuple gates only the two tools whose findings are torch/CUDA false positives.
+VENDORED_UNWIRED = ("kindi/qwen4exp_", "kindi/qx_")
 
 
 def _dedupe_targets(targets: tuple[str, ...]) -> tuple[str, ...]:
@@ -167,6 +172,9 @@ def _pylint_findings(pylint):
         raise QualityError("pylint produced invalid JSON: %s" % exc) from exc
     groups = {}
     for row in rows:
+        rel = (row.get("path") or "?").replace("\\", "/")
+        if any(rel.startswith(prefix) for prefix in VENDORED_UNWIRED):
+            continue
         _add(groups, row.get("path") or "?", row.get("message-id") or "no-code")
     if proc.returncode == 2 and not groups:
         raise QualityError("pylint failed without a parseable error: %s"

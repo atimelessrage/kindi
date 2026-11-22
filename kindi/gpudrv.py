@@ -100,9 +100,20 @@ def driver_name():
     return "nvcuda.dll" if os.name == "nt" else "libcuda.so.1"
 
 
+
+def libcuda_name():
+    """the CUDA driver library: nvcuda.dll on native Windows (issue #4), libcuda.so.1 elsewhere (Linux, WSL)"""
+    return "nvcuda.dll" if os.name == "nt" else "libcuda.so.1"
+
+
+def libcuda():
+    """the NVIDIA CUDA driver library (OSError if there is none). A new handle each call: the argument types that
+    driver()'s users set stay on driver()'s own handle."""
+    return ctypes.CDLL(libcuda_name())
+
 def driver():
     """libcuda (NVIDIA; nvcuda.dll on Windows) or its HIP stand-in (ROCm). On NVIDIA the caller sets the argument
     types as before."""
     if _drv[0] is None:
-        _drv[0] = _HipAsCuda() if HIP else ctypes.CDLL(driver_name())
+        _drv[0] = _HipAsCuda() if HIP else libcuda()
     return _drv[0]

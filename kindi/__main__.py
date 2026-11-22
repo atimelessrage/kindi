@@ -31,6 +31,7 @@ import time
 
 from . import __version__
 from . import config as C
+from .jsonio import load_json
 
 
 def log(msg):
@@ -40,7 +41,7 @@ def log(msg):
 
 def cmd_sessions(cfg, a):
     """kindi sessions list|show|export|triage|tag|status|import (host-only; reads state_dir/sessions)."""
-    from .sessions import SessionStore, STATUSES
+    from .sessions import STATUSES, SessionStore
     st = SessionStore(os.path.join(cfg["state_dir"], "sessions"))
 
     def _flags(r):
@@ -214,7 +215,7 @@ def cmd_convert(cfg, a):
 def cmd_fast_head(cfg, a):
     _setup_gpu_env(cfg)
     manifest_path=os.path.join(cfg["pack"],"kindi_pack.json")
-    manifest=json.load(open(manifest_path)) if os.path.isfile(manifest_path) else {}
+    manifest=load_json(manifest_path) if os.path.isfile(manifest_path) else {}
     if manifest.get("backend")=="kindi_gemma4":
         from .gemma4 import build_fast_head
         build_fast_head(manifest["model_path"],cfg["pack"],K=a.clusters,iters=a.iters,log=log)
@@ -245,6 +246,21 @@ def cmd_selftest(cfg, a):
     _setup_gpu_env(cfg)
     from .selftest import run
     return run(cfg, log=log, max_tokens=a.max_tokens, json_path=a.json)
+
+
+def cmd_cards(cfg, a):
+    from . import cards
+    return cards.main(["--json"] if getattr(a, "json", False) else [])
+
+
+def cmd_place(cfg, a):
+    from .place import main as place_main
+    return place_main(a.rest)
+
+
+def cmd_route(cfg, a):
+    from .route import main as route_main
+    return route_main(a.rest)
 
 
 def cmd_plan(cfg, a):
@@ -292,6 +308,10 @@ def _require_pack(cfg):
 def cmd_serve(cfg, a):
     _require_pack(cfg)
     _setup_gpu_env(cfg)
+    if getattr(a, "slots", None):
+        cfg["slots"] = a.slots
+    if int(cfg.get("slots") or 1) > 1:                  # decode slots: the engine reads KINDI_SLOTS (kindi/slots.py)
+        os.environ["KINDI_SLOTS"] = str(int(cfg["slots"]))
     from .server import serve
     serve(cfg, log=log)
     return 0
@@ -359,7 +379,7 @@ def cmd_head(cfg, a):
 
 def cmd_models(cfg, a):
     from .catalog import list_models
-    list_models(cfg, log=log)
+    list_models(cfg, log=log, as_json=getattr(a, "json", False))
     return 0
 
 
@@ -497,7 +517,7 @@ def cmd_info(cfg, a):
         print("  %-17s %s" % (k, "(set)" if k == "api_key" and v else v))
     man = os.path.join(cfg["pack"], "kindi_pack.json")
     if os.path.exists(man):
-        m = json.load(open(man))
+        m = load_json(man)
         print("pack: %s - %s, from %s" % (cfg["pack"], m.get("model"), m.get("source_file")))
         if m.get("backend") == "kindi_cascade":
             print("backend: Kindi Cascade (Nemotron Cascade 2 converter/validator; GPU kernels pending)")
@@ -723,7 +743,16 @@ def _build_parser():
     s.add_argument("--json", default=None, metavar="FILE", help="record the candidates, every run and the winner")
     s = sub.add_parser("backends", help="list registered backend plugins")
     s.add_argument("--json", action="store_true", help="print registered backends as JSON")
-    sub.add_parser("models", help="list the models and what fits this machine")
+    s = sub.add_parser("models", help="list the models and what fits this machine")
+    s.add_argument("--json", action="store_true", help="one JSON list (id, what, size_gb, fits, downloaded)")
+    s = sub.add_parser("cards", help="list every GPU: VRAM, free memory, PCIe link, bandwidth, supported or not")
+    s.add_argument("--json", action="store_true", help="print the card inventory as JSON")
+    s = sub.add_parser("place", help="place models on the cards and write the plan file (kindi place --help)",
+                       add_help=False)
+    s.add_argument("rest", nargs=argparse.REMAINDER)
+    s = sub.add_parser("route", help="one OpenAI endpoint in front of the plan's servers (kindi route --help)",
+                       add_help=False)
+    s.add_argument("rest", nargs=argparse.REMAINDER)
     s = sub.add_parser("use", help="download a model, build its pack and select it")
     s.add_argument("model")
     s.add_argument("--gguf", help="use this GGUF file instead of downloading it")
@@ -780,6 +809,9 @@ _COMMANDS = {
     "io": cmd_io,
     "autotune": cmd_autotune,
     "backends": cmd_backends,
+    "cards": cmd_cards,
+    "place": cmd_place,
+    "route": cmd_route,
     "models": cmd_models,
     "use": cmd_use,
     "sessions": cmd_sessions,
@@ -792,6 +824,13 @@ def _dispatch(cfg, a):
 
 
 def main(argv=None):
+    args = sys.argv[1:] if argv is None else list(argv)
+    if args and args[0] in ("place", "route"):     # their own options (kindi place --help), no config needed
+        if args[0] == "place":
+            from . import place
+            return place.main(args[1:])
+        from . import route
+        return route.main(args[1:])
     _malloc_tuning()
     p = _build_parser()
     a = p.parse_args(argv)

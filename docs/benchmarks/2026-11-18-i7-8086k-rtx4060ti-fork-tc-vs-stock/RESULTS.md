@@ -2,7 +2,7 @@
 
 **Different configuration, not a same-settings A/B.** This page adds the fork's
 default tensor-core plan path at `--ctx 8192` to the 2B and 9B rows in §4.6 of
-`CURRENT-VS-KINDI-0.6.md`. The stock reference rows are the 2026-11-17
+`CURRENT-VS-KINDI-0.7.md`. The stock reference rows are the 2026-11-17
 same-settings medians already quoted there; no stock process was run in this
 capture. Stock v0.6.1 has no plan engine or tensor-core path, so its rows cannot
 be used as a controlled estimate of the effect of those settings.

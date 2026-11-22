@@ -15,7 +15,7 @@ for _b in range(256):
         _BS.append(_b)
         _CS.append(256 + _n)
         _n += 1
-_B2U = dict(zip(_BS, [chr(c) for c in _CS]))
+_B2U = dict(zip(_BS, [chr(c) for c in _CS], strict=False))
 
 
 def gpt2_bytes(s):

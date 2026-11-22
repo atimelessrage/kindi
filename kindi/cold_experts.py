@@ -501,7 +501,7 @@ class ColdExpertReader(object):
         got = self._read_spans(missing, self.coalesce)
         self.prefetch_requests += len(missing)
         self.prefetched_bytes += sum(n for _, n in missing)
-        return sum(1 for span, raw in zip(missing, got) if self._cache_put(span, raw))
+        return sum(1 for span, raw in zip(missing, got, strict=False) if self._cache_put(span, raw))
 
     def read_many(self, spans, coalesce=None, read_ahead=None):
         """Read ranges in file order, consuming queued prefetches and coalescing adjacent gaps.
@@ -535,7 +535,7 @@ class ColdExpertReader(object):
                 missing.append(i)
         if missing:
             got = self._read_spans([spans[i] for i in missing], ahead)
-            for i, raw in zip(missing, got):
+            for i, raw in zip(missing, got, strict=False):
                 out[i] = raw
         self.requested_bytes += sum(n for _, n in spans)
         return out

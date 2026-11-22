@@ -81,6 +81,8 @@ UNRESOLVED_SITES = [
     ('kindi/tp.py', 'f', 'kernel expression is not a static k_* attribute'),
     ('kindi/tp.py', 'fs', 'kernel expression is not a static k_* attribute'),
     ('kindi/tp.py', 'f', 'kernel expression is not a static k_* attribute'),
+    ('kindi/spec.py', '(FO[k * QL:], KN[k * L:], _tp.Dyn(pk, s.cos_t.data.ptr, r...', 'argument count is not a literal tuple'),
+    ('kindi/spec.py', '(KRO[k * L:], VB[k * L:], _tp.Dyn(pk, S["Kq"][kvi].data.p...', 'argument count is not a literal tuple'),
 ]
 
 
@@ -429,10 +431,10 @@ def test_measured_sites_are_the_pinned_count():
     """A pin on the number checked, so a silent drop in coverage is a failure too."""
     counts = {path: len(check_module(path)[0]) for path in MODULES}
     total = sum(counts.values())
-    assert total == 105, counts
+    assert total == 118, counts
     assert counts["kindi/dspine.py"] == 37, counts
     assert counts["kindi/spec.py"] >= 26, counts
-    assert len(UNRESOLVED_SITES) == 37
+    assert len(UNRESOLVED_SITES) == 39
 
 
 def _mutate(path, kernel_expr, args_expr, mode="drop"):
@@ -493,7 +495,7 @@ def test_every_checked_site_is_detected_when_mutated():
             else:
                 missed.append("%s:%d %s (%s)" % (path, want, name, last_reason))
     assert not missed, "mutations that no check caught:\n" + "\n".join(missed)
-    assert len(detected) == 105, len(detected)
+    assert len(detected) == 118, len(detected)
 
 
 def check_module_from_source(src, name):

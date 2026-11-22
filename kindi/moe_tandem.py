@@ -228,13 +228,13 @@ class MoeTandem(object):
         chunk = plan_chunk(self.cache, copy_requests)
 
         pairs = {}
-        for (token, assigned), plan in zip(router_pairs, chunk.plans):
+        for (token, assigned), plan in zip(router_pairs, chunk.plans, strict=False):
             # plan.entries is the token's copy keys in router order, so it lines up with
             # the COPY pairs of `assigned` (card and cpu pairs hold no slot)
             copy_at = [i for i, pair in enumerate(assigned) if pair.lane == COPY]
             if len(copy_at) != len(plan.entries):
                 raise RuntimeError("chunk plan and assignment disagree for token %r" % (token,))
-            for i, entry in zip(copy_at, plan.entries):
+            for i, entry in zip(copy_at, plan.entries, strict=False):
                 assigned[i] = assigned[i]._replace(slot=entry.slot)
             if self.combine_order == "expert":
                 # Gemma 4's reference loop is one layer per plan, so the layer term only

@@ -2,7 +2,7 @@
 
 Kindi is an OpenAI-compatible endpoint. Use these values:
 
-- Base URL: `http://<host>:8093/v1`.
+- Base URL: `http://<host>:8093/v1` (on the same computer: `http://127.0.0.1:8093/v1`).
 - Model: `bonsai2-2b` (or your `model_name`).
 - API key: your `api_key`. If you did not set an `api_key`, any string works.
 - Log probabilities: only the Gemma 4 backend returns them. On Bonsai and Nanbeige, `logprobs: true` is rejected with HTTP 400 rather than silently omitting the field.
@@ -108,13 +108,15 @@ CORS policy would turn a LAN key into a browser-readable credential.
 
 ```python
 from openai import OpenAI
-client = OpenAI(base_url="http://localhost:8093/v1", api_key="none", timeout=3600, max_retries=1)
+client = OpenAI(base_url="http://127.0.0.1:8093/v1", api_key="none", timeout=3600, max_retries=1)
 ```
 
 **Agents for code that have an OpenAI-compatible provider setting** (for example pi, or similar terminal agents):
 
-1. Add a provider with these values:
-   - Base URL: `http://localhost:8093/v1`.
+1. Add a provider with these values (for pi, the exact `models.json` entry is in
+   [DOCKER.md](DOCKER.md#pi-and-other-agents-beside-the-container); do not use pi's built-in OpenAI provider, which
+   talks to OpenAI's servers):
+   - Base URL: `http://127.0.0.1:8093/v1`.
    - API style: "openai-completions" / "chat completions".
    - Model: `bonsai2-2b`.
    - Context window: `24576`.

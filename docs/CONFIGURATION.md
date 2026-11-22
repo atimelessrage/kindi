@@ -44,6 +44,7 @@ Relative path values are resolved against the server process's current working d
 | key | default | |
 |---|---|---|
 | `ctx` | `24576` | context length in tokens (prompt + answer). For GPU memory, see the notes below the table |
+| `slots` | `1` | requests written at the same time (`kindi serve --slots N`, `KINDI_SLOTS=N`, at most 8). Each slot is one conversation with its own K/V cache, recurrent state and prompt cache; one pass of the model writes one token for every slot that is writing, so the weight reads are shared. Each slot's greedy output is the same as when it runs alone. Needs the plan engine on one card with the tensor-core plans (`KINDI_TC=1`, and `KINDI_TP=1` for the 2B, 4B and 9B). The context fit gives every slot the same context. Speculative decoding (drafting: `KINDI_SPEC`, the MTP head, DSpine) is off with more than one slot; the log says so. The default is one slot, and nothing sets more by itself: the installer leaves it at 1 |
 | `head` | `exact` | `exact` = full output head (token-exact with llama.cpp); `fast` = shortlist head (needs `kindi fast-head`). `kindi head exact\|fast` overrides it at run time |
 | `fast_clusters` | `256` | clusters the fast head scores exactly (of 1,024). Fewer is faster and less exact (see the notes below the table) |
 | `tandem_vram_mb` | `0` | ceiling in MiB for the GPU side of a CPU+GPU tandem split; `0` = no explicit ceiling. The planner uses `min(free - reserve, tandem_vram_mb)`, so a 6 GiB P106-100 can use `6144` and a display card can keep a lower barrier (`KINDI_TANDEM_VRAM_MB` is the same setting) |
@@ -133,6 +134,7 @@ and the rest).
 | `KINDI_TP` | (auto) | `1` = the plan engine (the default for every model it supports: 1.5-1.9x the single-card engine on the measured card), `0` = the single-card engine |
 | `KINDI_TP_SPLIT` | `equal` | Two-card plan: `auto` gives each card a share of GDN groups, attention heads, FFN blocks and output-head rows from its free VRAM (after a 512 MiB reserve; aligned to the pack's Hadamard block, so on the 27B the GDN and attention splits stay equal while FFN and head move). `equal` keeps the historical 50/50 layout. The 10% deadband keeps equal-capacity cards equal under `auto`. The installer selects `auto` for a pair of unequal-capacity cards (for example 6 GB + 8 GB), while equal-capacity pairs retain `equal` |
 | `KINDI_CARDS` | (all, at most 2) | the number of cards for the plan engine |
+| `KINDI_TP_SPLIT` | `auto` | two cards: when the halves do not leave room for the context on the card with less free memory, `auto` gives the other card a larger part of the FFN and of the output head, so both cards have the same room for the context. That card then does more of the work, so the halves stay whenever they fit. `even` = the halves; a number (0.1 to 0.9) = card 0's part |
 | `KINDI_CHUNK` | `256` | prompt tokens per chunk; `0` = one token at a time. The default is `128` on Kepler (sm_30) |
 | `KINDI_CHUNK_MIN` | `32` | the smallest part of a prompt that goes through a chunk |
 | `KINDI_CHUNK_Q8` | `1` | sm_61 and later: int8 activations in the chunk products (dp4a). `0` = fp32 |
@@ -144,6 +146,7 @@ and the rest).
 | `KINDI_FD` | `0` (`1` with drafting) | `1` = the split flash-decode attention of the 27B on one card (with `KINDI_TC=1`). When drafting is on (`KINDI_SPEC` set) with `KINDI_TC=1` and `KINDI_FD` is not set, Kindi uses `1`: with `0`, a drafted answer can differ from plain decoding at near-ties |
 | `KINDI_TC_DP4A` | `0` | `1` = the Pascal dp4a kernels of the `KINDI_TC=1` path (tcp.cu) on a newer card, for tests. On sm_61 they are always used |
 | `KINDI_D1` | `0` (`1` on Pascal) | `1` = the one-pass RMS fold (Hadamard block 512 or 1024, with `KINDI_TC=1`) |
+| `KINDI_TC_HP` | `0` | `1` = the `KINDI_TC=1` products take two int8 rows per token (about 14 bits of activation precision instead of 8), at most 4 tokens per pass. The 8-bit products move the logits by up to about 0.15 from the default path, which changes the token at near-ties (#31) |
 | `KINDI_ATT_TC` | `0` | `1` = the attention of the prompt chunks on the tensor cores (sm_80 and later, with `KINDI_TC=1`) |
 | `KINDI_CKPT_VRAM` | `0` | `1` = checkpoints in card memory; the copy to the host waits until the server is idle (one card) |
 | `KINDI_CKPT_PINNED` | `1` under WSL2, else `0` | `1` = the host copies of the checkpoints are in pinned memory. Under Windows (WDDM), this makes the first token faster |

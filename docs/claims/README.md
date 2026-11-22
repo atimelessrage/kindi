@@ -10,7 +10,7 @@ python tools/check_claims.py --list   # gate -> measured date and number ids
 python -m pytest tests/test_claims.py -q
 ```
 
-`docs/BACKENDS.md`, `docs/ROADMAP.md`, `CURRENT-VS-KINDI-0.6.md`, `docs/AUTOTUNE.md`,
+`docs/BACKENDS.md`, `docs/ROADMAP.md`, `CURRENT-VS-KINDI-0.7.md`, `docs/AUTOTUNE.md`,
 `docs/FP8-BF16.md` and `docs/BENCHMARKS.md` are the docs under this rule (`REGISTRY.json` lists
 them). The checker enforces three things for every one of them:
 
@@ -67,7 +67,7 @@ the figure, not that the figure was recomputed. Prefer a JSON or CSV row when th
 `git` is for claims about the repository itself: a tag's diffstat, commits since a tag, tracked-file
 counts at a commit. There is no artifact to read - the tag is the evidence - so the claim names it in
 `evidence` as `ref:v0.6.1`, which the checker resolves to a commit; a moved or deleted tag fails as
-missing evidence. `tools/check_claims.py` gates `CURRENT-VS-KINDI-0.6.md` this way.
+missing evidence. `tools/check_claims.py` gates `CURRENT-VS-KINDI-0.7.md` this way.
 
 ## Adding or changing a gate
 

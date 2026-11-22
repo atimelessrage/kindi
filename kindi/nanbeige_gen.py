@@ -141,8 +141,8 @@ class Sorter(object):
 class NanbeigeBackend(object):
     def __init__(self, man, cfg, log=print):
         from .gguf import GGUF
-        from .spm import SPM
         from .nanbeige import Engine, attach_mtp
+        from .spm import SPM
         self.log = log
         self.tok = SPM(GGUF(man["model_path"]).kv)
         # every control token ends the turn (</s>, <|im_end|>, <|endoftext|>, a new <|im_start|>), as llama.cpp's
@@ -163,7 +163,7 @@ class NanbeigeBackend(object):
         """before the first request: the same greedy tokens from single steps (twice) and from one check pass, and
         not a degenerate run. The first use of the prompt and check buffers happens here, not in a client's
         request. A failure raises, so that the service restarts."""
-        from .nanbeige_chat import render, prompt_ids
+        from .nanbeige_chat import prompt_ids, render
         eng = self.eng
         ids = prompt_ids(self.tok, render([{"role": "user", "content": "Count from one to ten in words."}],
                                           enable_thinking=False))
@@ -216,11 +216,10 @@ class NanbeigeBackend(object):
         return Sampler._pick(cand, sc, temperature, top_p, top_k, rng)
 
     def generate(self, K, req, cancel=None):
-        from .nanbeige_chat import render, prompt_ids
+        from .nanbeige_chat import prompt_ids, render
         cfg = K.cfg
-        tools = req.get("tools") or None
-        if req.get("tool_choice") == "none":
-            tools = None
+        from .oai import check
+        tools, _ = check(req, can_force=False, structured=True)   # #38; the schema is this path's own grammar
         kw = req.get("chat_template_kwargs") or {}
         jgrammar = _response_grammar(req)
         jstate = jgrammar.start() if jgrammar is not None else None
@@ -252,7 +251,7 @@ class NanbeigeBackend(object):
         stop_win = max((len(x) for x in stop_seq), default=0)
         stop_from = 0
         repeat_stop = bool(cfg.get("repeat_stop"))
-        from .server import _looping, THINK_CLOSE
+        from .server import THINK_CLOSE, _looping
         budget = req.get("thinking_budget_tokens") or req.get("thinking_budget") or cfg.get("thinking_budget") or 0
         budget = int(budget) if thinking else 0
         forced = False

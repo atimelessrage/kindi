@@ -16,7 +16,7 @@
       "id": "health-status",
       "display": "200",
       "quoted_in": [
-        "CURRENT-VS-KINDI-0.6.md"
+        "CURRENT-VS-KINDI-0.7.md"
       ],
       "check": {
         "kind": "text",
@@ -28,7 +28,7 @@
       "id": "chat-status-latency",
       "display": "0.2337 s",
       "quoted_in": [
-        "CURRENT-VS-KINDI-0.6.md"
+        "CURRENT-VS-KINDI-0.7.md"
       ],
       "check": {
         "kind": "text",

@@ -23,8 +23,10 @@ import os
 import struct
 import time
 
-import numpy as np
 import cupy as cp
+import numpy as np
+
+from .jsonio import load_json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LAYERS = (1, 16, 31, 46, 61)
@@ -217,7 +219,7 @@ class DSpine(object):
         self.e = eng
         s = self.s = eng.cards[0]
         self.log = log
-        cfg = json.load(open(os.path.join(d, "config.json")))
+        cfg = load_json(os.path.join(d, "config.json"))
         dc = cfg["dflash_config"]
         if tuple(dc["target_layer_ids"]) != LAYERS:
             raise SystemExit("kindi dspine: target layers %r (Kindi exports %r)" % (dc["target_layer_ids"], LAYERS))

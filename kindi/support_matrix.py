@@ -142,7 +142,7 @@ def catalog():
         if (isinstance(stmt, ast.Assign) and len(stmt.targets) == 1
                 and isinstance(stmt.targets[0], ast.Name) and stmt.targets[0].id == "MODELS"):
             out = {}
-            for key, value in zip(stmt.value.keys, stmt.value.values):
+            for key, value in zip(stmt.value.keys, stmt.value.values, strict=False):
                 fields = {}
                 for kw in value.keywords:
                     try:
@@ -163,7 +163,7 @@ def formats():
             continue
         target, value = stmt.targets[0], stmt.value
         if isinstance(target, ast.Tuple) and isinstance(value, ast.Tuple):
-            for name, item in zip(target.elts, value.elts):
+            for name, item in zip(target.elts, value.elts, strict=False):
                 try:
                     consts[name.id] = ast.literal_eval(item)
                 except ValueError:
@@ -173,7 +173,7 @@ def formats():
     if ternary is None:
         raise SystemExit("kindi: convert.TERNARY not found")
     out = []
-    for key, value in zip(ternary.keys, ternary.values):
+    for key, value in zip(ternary.keys, ternary.values, strict=False):
         group, block, label = ast.literal_eval(value)
         out.append({"format": label, "type": consts[key.id], "group": group, "block": block,
                     "bpw": block * 8.0 / group})

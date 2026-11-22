@@ -58,7 +58,7 @@ def _tensor_types(g):
 def unsupported_reason(g):
     """Return the compatibility refusal for a recognized small MoE file, else None."""
     arch = _arch(g)
-    name = _name(g)
+    _name(g)
 
     if arch in _SMALL_MOE:
         model, why = _SMALL_MOE[arch]

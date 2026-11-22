@@ -7,8 +7,8 @@ one-pass attention over the fp16 cache. Engine.feed_batch(toks, pos) feeds whole
 KINDI_CHUNK=0: off (the engine as before)."""
 import os
 
-import numpy as np
 import cupy as cp
+import numpy as np
 
 from . import chunk as _c
 
@@ -60,6 +60,7 @@ def reserve(eng):
         # 8-byte shared memory banks (Kepler; the float4 tile loads) and the larger shared memory split (CUDA only;
         # on ROCm the bank layout is fixed)
         import ctypes
+
         from . import gpudrv
         drv = gpudrv.driver()
         fp = ctypes.c_void_p(eng.ck.k_mm_g4k.kernel.ptr)

@@ -17,6 +17,7 @@ import os
 import numpy as np
 
 from .gguf import GGUF
+from .jsonio import load_json
 
 F32, Q5_0, Q8_0, Q4_K = 0, 6, 8, 12
 
@@ -301,7 +302,7 @@ def check_reference(man, log=print):
             "fixed prompts, token ids + expected tokens + top-2 gaps), then re-run "
             "kindi verify; the file must carry source_sha256 and llama_cpp_commit")
         return False
-    ref = json.load(open(rp, encoding="utf-8"))
+    ref = load_json(rp)
     if ref.get("source_sha256") != man.get("source_sha256"):
         log("reference %s is for a different GGUF (source_sha256 mismatch)" % os.path.basename(rp))
         return False

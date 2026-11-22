@@ -8,12 +8,11 @@ the UTF-8 bytes of the text plus one. Generation is a seeded pseudo-random strea
 over the same byte vocabulary, or a scripted output when ``scripted_text`` is
 given; scripted output is what the tool-call parser tests (T5.2) will drive.
 """
-import json
 import random
 import time
 
-from .base import Backend, BackendCapabilities, CancelToken, GenerationEvent
 from . import registry
+from .base import Backend, BackendCapabilities, CancelToken, GenerationEvent
 
 EOS = 0
 

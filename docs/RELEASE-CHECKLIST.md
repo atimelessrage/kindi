@@ -13,7 +13,7 @@ registry keep it distinct from upstream.
 - Current range at that baseline: `git rev-list --count v0.6.1..20e2ea0` = **674 commits**;
   `git diff --shortstat v0.6.1..20e2ea0` = **891 files, +125,461/−1,406**.
 - The **649**-commit figure in `detailed-fork-changelog.md` was the `3002a40` snapshot. The
-  `CURRENT-VS-KINDI-0.6.md` audit recorded 666 at `3fed704`; the integration adds six commits.
+  `CURRENT-VS-KINDI-0.7.md` audit recorded 666 at `3fed704`; the integration adds six commits.
   Do not repeat 649 as the current count.
 - Why `0.7.0-fork`: the fork adds substantial runtime, CLI, API and test surface and must not call
   itself `0.6.1`. The suffix prevents a fork build from being read as an official upstream patch,

@@ -8,7 +8,9 @@
   "exclude": [
     "**/__pycache__",
     "**/.pytest_cache",
-    "bench-logs"
+    "bench-logs",
+    "kindi/qwen4exp_*.py",
+    "kindi/qx_*.py"
   ],
   "pythonVersion": "3.10",
   "pythonPlatform": "All",

@@ -11,6 +11,8 @@ state_dir = ~/.kindi/state
 # --- server
 host = 127.0.0.1
 port = 8093
+# slots = 1   # (0.7.0) requests written at the same time, plan engine with KINDI_TC=1
+#             # registered, not wired into this fork's server yet
 # api_key = choose-a-long-random-string
 model_name = auto
 # largest request body accepted (MiB) and requests allowed to wait behind the active one

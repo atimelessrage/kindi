@@ -27,12 +27,14 @@ import json
 import math
 import os
 import time
+from typing import Any
 
 import cupy as cp
 import numpy as np
 
 from . import calib as _calib
 from . import hostram, layout
+from . import slots as _slots
 from .engine import DEFAULT_DIMS, VOCAB, Kernels
 from .jsonio import load_json
 
@@ -246,7 +248,7 @@ def g5_tuned(s, name, R, NG, rowpar):
                     ev1.record()
                     ev1.synchronize()
                     ms = cp.cuda.get_elapsed_time(ev0, ev1) / len(Wt)
-                    if ms < best[0]:
+                    if best is None or ms < best[0]:
                         best, fz = (ms, nt, rpt, sp), True
     var = "s" if fz else "r"
     if rt.is_hip and not s.g5l and os.environ.get("KINDI_G5_AB", "1") == "1":
@@ -260,19 +262,19 @@ def g5_tuned(s, name, R, NG, rowpar):
                         continue
                     f = fab[rpt]
 
-                    def run():
+                    def run_ab():
                         f((gx, sp), (nt,), (W5, s.gpart, i32(R), i32(NG), x))
                         if sp > 1 and not rowpar:
                             K.k_sumparts(((R + 255) // 256,), (256,), (s.gpart, s.y if R <= s.y.size else s.gpart, i32(R), i32(sp)))
                     for _ in range(3):
-                        run()
+                        run_ab()
                     ev0.record()
                     for W5 in Wt:
                         run()
                     ev1.record()
                     ev1.synchronize()
                     ms = cp.cuda.get_elapsed_time(ev0, ev1) / len(Wt) + (0.00002 * sp if rowpar else 0.0)
-                    if ms < best[0]:
+                    if best is None or ms < best[0]:
                         best, var = (ms, nt, rpt, sp), "a"
                     if sp > 1 and not rowpar and gx <= s.g5cnt.size:
                         # the same with the parts added by the last block (k_g5a*s: no k_sumparts launch)
@@ -286,9 +288,10 @@ def g5_tuned(s, name, R, NG, rowpar):
                         ev1.record()
                         ev1.synchronize()
                         ms = cp.cuda.get_elapsed_time(ev0, ev1) / len(Wt)
-                        if ms < best[0]:
+                        if best is None or ms < best[0]:
                             best, var = (ms, nt, rpt, sp), "as"
     s.__dict__.setdefault("g5var", {})[key] = var
+    assert best is not None                    # every call has at least one candidate (the first one)
     if os.environ.get("KINDI_G5_TUNELOG"):
         print("g5 tune %s: %s %s %.1f us, %.0f GB/s" % (key, best[1:], var, best[0] * 1e3, R * NG * 28 / best[0] / 1e6), flush=True)
         cache[key] = best[1:]
@@ -367,6 +370,10 @@ class Plan(object):
     def __init__(self):
         self.segs = [[]]                 # a new segment starts at every exchange
         self.dyn = []                    # (holder, Dyn)
+        self.cores: Any = None           # chunk.py's segment bookkeeping (row-parallel exchanges)
+        self.xch: Any = None
+        self.rv: Any = None              # the decode slots' row values (spec.py *_R launches)
+        self.keep: Any = None
 
     def cut(self):
         if self.segs[-1]:
@@ -507,6 +514,7 @@ class Shard(object):
         tern, flt = self._slices()
         tern_load = {} if self.g5 else tern       # 5-trit weights: the cache files, made from the slices below if missing
         bparts, dparts, bi = [], [], {}
+        bc_all = dp_all = np.empty(0, dtype=np.uint8)   # filled below on the 2-bit path, unused on the 5-trit one
         bo = do = 0
         if not self.g5:
             # the 2-bit weights of this card, written straight into one array each: one host copy (the parts and their
@@ -550,11 +558,31 @@ class Shard(object):
             # a cache without one of this card's tensors (made before the tied-head alias: the 2B / 4B's output.weight)
             # is made again
             stale = os.path.exists(ipath) and not set(tern) <= set(load_json(ipath))
+            # B16: a cache records the sha256 of the bcodes.bin it was made from (g5_KEY.src); a cache of other bcodes
+            # is made again, and before a cache is made the pack's files are checked in full
+            from . import packcheck
+            src = packcheck.source_of(tp.man)
+            spath = os.path.join(tp.pack, "g5_%s.src" % key)
+            if src and os.path.exists(spath) and open(spath).read().strip() != src:
+                self.log("card %d: the 5-trit cache was made from other bcodes.bin; it is made again" % self.card)
+                stale = True
+            elif src and not os.path.exists(spath) and os.path.exists(cpath):
+                try:                                  # a cache from before 0.7.0: the pack must still be the one recorded
+                    packcheck.check(tp.pack, "fast", tp.man)
+                except packcheck.PackError as e:
+                    raise SystemExit("kindi: %s" % e) from None
             if stale or not (os.path.exists(cpath) and os.path.exists(ipath)) or \
                     ((self.g5l or dual) and not os.path.exists(lpath)):
                 # one tensor at a time, from the pack's memory maps to the cache files (the row layout, and the 16-row
                 # lane layout when it is used: k_g5n4 decode, or the chunked prompt GEMM next to row decode): the host
                 # holds one tensor's blob, not the card's weights (a 2 GiB container loads the 27B)
+                if src and not getattr(tp, "_pack_checked", False):
+                    self.log("checking the pack files (sha256) before the 5-trit cache is made ...")
+                    try:
+                        packcheck.check(tp.pack, "full", tp.man)
+                    except packcheck.PackError as e:
+                        raise SystemExit("kindi: %s" % e) from None
+                    tp._pack_checked = True
                 offs, o = {}, 0
                 fr = open(cpath + ".tmp", "wb")
                 fl = open(lpath + ".tmp", "wb") if (self.g5l or dual) else None
@@ -586,6 +614,9 @@ class Shard(object):
                     fl.close()
                     os.replace(lpath + ".tmp", lpath)
                 json.dump(offs, open(ipath, "w"))
+                if src:
+                    with open(spath, "w") as f:
+                        f.write(src + "\n")
             offs = {n: tuple(v) for n, v in load_json(ipath).items()}
             lane = self.g5l and os.path.exists(lpath)
             if self.g5l and not lane:
@@ -712,10 +743,11 @@ class Shard(object):
     def alloc_ctx(self, ctx):
         self.ctx = ctx
         z = lambda n, t=cp.float32: cp.zeros(n, dtype=t)  # noqa: E731
+        rows = ctx + (1 if _slots.wanted() > 1 else 0)    # decode slots: a scratch position for idle rows (slots.py)
         with cp.cuda.Device(self.card):
             self.sbuf = z(self.NH * ctx)
             self.apart = z(((ctx + 255) // 256) * self.NH * self.HD)
-            th = np.arange(ctx, dtype=np.float64)[:, None] * self.tp.inv_freq[None, :]
+            th = np.arange(rows, dtype=np.float64)[:, None] * self.tp.inv_freq[None, :]
             self.cos_t = cp.asarray(np.cos(th).astype(np.float32))
             self.sin_t = cp.asarray(np.sin(th).astype(np.float32))
             # one allocation per array kind, a view per layer: 64 separate arrays each lose up to a 2 MiB page to
@@ -810,7 +842,7 @@ class Shard(object):
                     if s.nsm % gx:
                         continue
                     gy = s.nsm // gx
-                    if gy > nph:
+                    if gy > nph or (gy > 1 and gy * R0 > s.part.size):
                         continue
                     cost = -(-(-(-ng // gx)) // 32) * -(-nph // gy)
                     if best is None or cost < best[0]:
@@ -819,6 +851,12 @@ class Shard(object):
                 if gy > 1:
                     args[2] = s.part
                 P.add(K.k_g4, (gx, gy), (1024,), tuple(args) + (x, a[0][3]))
+                if gy > 1 and R0 != D:
+                    # not a row-parallel output (the head of one card's half of the vocabulary on two cards): no
+                    # exchange follows to add the gy parts, so they are added here (before 0.7.0 they were left in
+                    # s.part and the head read zeros: B15)
+                    P.add(K.k_sumparts, ((R0 + 255) // 256,), (256,), (s.part, outs[0], i32(R0), i32(gy)))
+                    return 1
                 return gy
             P.add(K.k_g4, (s.nsm,), (1024,), tuple(args) + (x, a[0][3]))
             return 1
@@ -827,7 +865,7 @@ class Shard(object):
             """5-trit products, one launch per tensor. A row-parallel output (part given, D rows) leaves its column
             parts in `part` for the next norm to add (returns their count); any other output adds its parts here."""
             ret = 1
-            for n, out in zip(names, outs):
+            for n, out in zip(names, outs, strict=False):
                 _, W5, R, C = s.w[n]
                 R, NG = int(R), int(C) // 128
                 nt, rpt, sp = g5_tuned(s, n, R, NG, part is not None and R == D)
@@ -836,7 +874,9 @@ class Shard(object):
                      {1: K.k_g5a1, 2: K.k_g5a2, 4: K.k_g5a4, 8: K.k_g5a8})[rpt]
                 gx = g5_gx(R, nt, rpt)
                 if part is not None and R == D:
-                    P.add(f, (gx, sp), (nt,), (W5, part, i32(R), i32(NG), x))
+                    # one part (sp 1) goes straight to out: with one part the next norm reads out, not part (a
+                    # latent fault found with B15; the tuner has not picked sp 1 for these shapes so far)
+                    P.add(f, (gx, sp), (nt,), (W5, part if sp > 1 else out, i32(R), i32(NG), x))
                     ret = sp
                 elif sp == 1:
                     P.add(f, (gx, 1), (nt,), (W5, out, i32(R), i32(NG), x))
@@ -1244,6 +1284,8 @@ class TPEngine(object):
         self.tied_head = "output.weight" not in self.bi   # tied embeddings (2B, 4B): the head is token_embd
         if self.tied_head:
             self.bi["output.weight"] = self.bi["token_embd.weight"]
+        if self.W == 2:
+            self._auto_split(int(ctx), log)
         self.bcm = np.memmap(os.path.join(pack, "bcodes.bin"), dtype=np.uint8, mode="r")
         self.dpm = np.memmap(os.path.join(pack, "dpm.bin"), dtype=np.uint16, mode="r")
         self.flm = np.memmap(os.path.join(pack, "f32.bin"), dtype=np.float32, mode="r")
@@ -1262,7 +1304,13 @@ class TPEngine(object):
         if not self.partial:
             _chunk.reserve(self)               # the chunked prompt path's buffers, before the context fit
         reserve = int(os.environ.get("KINDI_MEM_RESERVE_MB", "32")) * 2 ** 20
-        fit = min((s.free_bytes() - reserve) // s.per_pos_bytes() for s in self.cards) // 256 * 256
+        ns = _slots.wanted() if self.W == 1 else 1
+        if ns > 1:
+            # decode slots: N K/V caches and N - 1 more GDN states, each slot's plans and the batched plans (slots.py)
+            extra = (ns - 1) * (_slots.state_bytes(self.cards[0]) + _slots.PLAN_MB * 2 ** 20) + ns * _slots.PLAN_MB * 2 ** 20
+            fit = (self.cards[0].free_bytes() - reserve - extra) // (ns * self.cards[0].per_pos_bytes()) // 256 * 256
+        else:
+            fit = min((s.free_bytes() - reserve) // s.per_pos_bytes() for s in self.cards) // 256 * 256
         self.ctx = int(min(int(ctx), fit))
         # A tandem owner only has to hold the context the split asked for: it has no chunked prompt path
         # and no batch plan, so the 1024-token floor of the full engine (which needs room for those) does
@@ -1302,6 +1350,60 @@ class TPEngine(object):
         self.ylog_n, self.ylog_map = VOCAB, None
         self._state_views()
         log("plan engine ready: %d card%s, ctx %d, K/V %s, weights %s (%.1fs)" % (self.W, "s" if self.W > 1 else "", self.ctx, self.kv, ("5-trit lane" if self.cards[0].g5l else "5-trit") if self.cards[0].g5 else "2-bit", time.time() - t0))
+
+    def _auto_split(self, ctx, log):
+        """VRAM auto-split (0.7.0): on two cards with different free memory (mixed cards, or a card that also drives a
+        display) where the halves do not leave room for the requested context on the smaller card, the FFN (gate/up
+        rows and down columns, the same range) and the output head rows are split so that both cards keep the same
+        free memory for the context. The GDN and attention heads stay in half (the K/V cache per position is the same
+        on both cards). The card with the larger part does more of each layer's work, so the halves stay whenever they
+        hold the context. KINDI_TP_SPLIT: auto (the default), even (the old halves), or card 0's part (0.1 .. 0.9)."""
+        want = os.environ.get("KINDI_TP_SPLIT", "auto").strip().lower()
+        if want == "even":
+            return
+        tc = os.environ.get("KINDI_TC", "0") == "1"
+        U = 1024 if tc else self.HB                          # FFN columns move in whole units (tc: 1024-column units)
+        if self.NFFg % U:
+            return
+        bpw = 28.0 / 128                                     # bytes per ternary weight in the 5-trit / tc layouts
+        ffn_col = 3 * self.D * bpw * self.NL                 # one FFN column: a gate row, an up row, a down column
+        head_row = self.D * bpw
+        total = ffn_col * self.NFFg + head_row * VOCAB
+        if want == "auto":
+            free = []
+            for c in range(2):
+                with cp.cuda.Device(c):
+                    free.append(rt.memGetInfo()[0])
+            # the context the halves leave on the smaller card (an estimate: half of all card weights, the K/V of
+            # half the heads per position, 768 MB for the buffers)
+            tern = sum(r["rows"] * r["ne0"] for n, r in self.bi.items() if n != "token_embd.weight") * bpw
+            natt = self.NL // self.dims["full_attention_interval"]
+            per_pos = natt * 2 * (self.NHKVg // 2) * (self.HD + self.HD // 32 * 2) + (self.NHg // 2) * (4 + self.HD * 4 // 256)
+            room = (min(free) - tern / 2 - (768 << 20)) / per_pos
+            if room >= ctx or abs(free[0] - free[1]) < U * ffn_col:
+                return
+            # card 0 takes f of the split weights: free0 - f total = free1 - (1 - f) total
+            f = (free[0] - free[1] + total) / (2.0 * total)
+            why = "free memory %d / %d MiB, the halves leave room for about %d of %d positions" % (
+                free[0] >> 20, free[1] >> 20, max(0, room), ctx)
+        else:
+            try:
+                f = float(want)
+            except ValueError:
+                raise SystemExit("kindi: KINDI_TP_SPLIT must be auto, even or a fraction, not %r" % want) from None
+            why = "KINDI_TP_SPLIT=%s" % want
+        f = min(0.9, max(0.1, f))
+        m = int(round(f * self.NFFg / U)) * U
+        m = min(self.NFFg - U, max(U, m))
+        even = self.ffn_cols[0][1] if not tc else self.ffn_rows[0][1]
+        if m == even and want == "auto":
+            return
+        h = int(round(f * VOCAB / 256)) * 256
+        self.ffn_rows = self.ffn_cols = [(0, m), (m, self.NFFg)]
+        self.head_split = [0, h, VOCAB]
+        self.split_tag = "-s%d" % m
+        log("VRAM auto-split (%s): card 0 takes FFN columns [0, %d) of %d and head rows [0, %d) of %d (%.0f%% of "
+            "%.2f GB)" % (why, m, self.NFFg, h, VOCAB, 100.0 * m / self.NFFg, total / 1e9))
 
     def _host_buffers(self):
         flags = rt.hostAllocMapped | rt.hostAllocPortable
@@ -1605,9 +1707,13 @@ class DynT(Dyn):
         Dyn.__init__(self, "tok%d" % k, 0, 1)
 
 
-def _plan_set(self, tok, pos, toks=None):
+def _plan_set(self, tok, pos, toks=None, vals=None):
+    """set the Dyn holders: pos, tok, tok<k> = toks[k]; vals: a dict of named variables (the decode slots' p<k>,
+    q<k>, w<k>, tok<k>), which wins"""
     for h, d in self.dyn:
-        if d.var == "pos":
+        if vals is not None and d.var in vals:
+            h.value = d.a + d.b * vals[d.var]
+        elif d.var == "pos":
             h.value = d.a + d.b * pos
         elif d.var == "tok":
             h.value = d.a + d.b * tok
@@ -1640,7 +1746,7 @@ def build_batch_plan(s, NB):
     def gemv(P, names, x, outs, part):
         if s.g5:
             ret = 1
-            for n, out in zip(names, outs):
+            for n, out in zip(names, outs, strict=False):
                 _, W5, R, C = s.w[n]
                 R, NG = int(R), int(C) // 128
                 nt, rpt, sp = g5_tuned(s, n, R, NG, part is not None and R == D)
@@ -1649,7 +1755,9 @@ def build_batch_plan(s, NB):
                      {1: K.k_g5a1, 2: K.k_g5a2, 4: K.k_g5a4, 8: K.k_g5a8})[rpt]
                 gx = g5_gx(R, nt, rpt)
                 if part is not None and R == D:
-                    P.add(f, (gx, sp), (nt,), (W5, part, i32(R), i32(NG), x))
+                    # one part (sp 1) goes straight to out: with one part the next norm reads out, not part (a
+                    # latent fault found with B15; the tuner has not picked sp 1 for these shapes so far)
+                    P.add(f, (gx, sp), (nt,), (W5, part if sp > 1 else out, i32(R), i32(NG), x))
                     ret = sp
                 elif sp == 1:
                     P.add(f, (gx, 1), (nt,), (W5, out, i32(R), i32(NG), x))

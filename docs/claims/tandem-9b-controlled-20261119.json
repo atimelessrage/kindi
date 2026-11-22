@@ -23,7 +23,7 @@
     {
       "id": "cpu-24k",
       "display": "2.4",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md", "docs/BENCHMARKS.md"],
+      "quoted_in": ["CURRENT-VS-KINDI-0.7.md", "docs/BENCHMARKS.md"],
       "check": {
         "kind": "csv",
         "file": "docs/benchmarks/CROSS-MODE.csv",
@@ -35,7 +35,7 @@
     {
       "id": "tandem-24k",
       "display": "14.8",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md", "docs/BENCHMARKS.md"],
+      "quoted_in": ["CURRENT-VS-KINDI-0.7.md", "docs/BENCHMARKS.md"],
       "check": {
         "kind": "csv",
         "file": "docs/benchmarks/CROSS-MODE.csv",
@@ -47,7 +47,7 @@
     {
       "id": "ratio-24k",
       "display": "6.2x",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md", "docs/BENCHMARKS.md"],
+      "quoted_in": ["CURRENT-VS-KINDI-0.7.md", "docs/BENCHMARKS.md"],
       "check": {
         "kind": "text",
         "file": "docs/benchmarks/CROSS-MODE.md",
@@ -57,7 +57,7 @@
     {
       "id": "ratio-100",
       "display": "4.1x",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "quoted_in": ["CURRENT-VS-KINDI-0.7.md"],
       "check": {
         "kind": "text",
         "file": "docs/benchmarks/CROSS-MODE.md",
@@ -67,7 +67,7 @@
     {
       "id": "range-100",
       "display": "3.0x-4.2x",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "quoted_in": ["CURRENT-VS-KINDI-0.7.md"],
       "check": {
         "kind": "text",
         "file": "docs/benchmarks/CROSS-MODE.md",

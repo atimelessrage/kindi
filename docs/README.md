@@ -13,7 +13,7 @@ others are kept as history, design notes or evidence and are not maintained in p
 | Server API | [AGENTS.md](AGENTS.md) | `docker-compose` and server behavior are in [DOCKER.md](DOCKER.md) |
 | Installer and setup | [INSTALL.md](INSTALL.md); client setup in [WINDOWS.md](WINDOWS.md) | [DOCKER.md](DOCKER.md) for containers |
 | Operations and safety | [SECURITY.md](SECURITY.md) (secrets, history redaction, push policy) and [BACKUP.md](BACKUP.md) (verified offsite bundle) | [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md) is the release procedure |
-| Claims | [claims/README.md](claims/README.md) (one `claims.json` per measured gate, checked by `tools/check_claims.py`), [ROADMAP.md](ROADMAP.md) status cells, [VERIFICATION.md](VERIFICATION.md) for how a claim is checked | [CURRENT-VS-KINDI-0.6.md](../CURRENT-VS-KINDI-0.6.md) is the dated comparison (§25 of the 0.5 file is the first 0.6.0 pass) |
+| Claims | [claims/README.md](claims/README.md) (one `claims.json` per measured gate, checked by `tools/check_claims.py`), [ROADMAP.md](ROADMAP.md) status cells, [VERIFICATION.md](VERIFICATION.md) for how a claim is checked | [CURRENT-VS-KINDI-0.7.md](../CURRENT-VS-KINDI-0.7.md) is the dated comparison (§25 of the 0.5 file is the first 0.6.0 pass) |
 | Ternary-MoE census | [TERNARY_MOE.md](TERNARY_MOE.md) (canonical rows and counts, checked by `scripts/check_ternary_moe.py`) | [ROADMAP.md](ROADMAP.md) keeps the Qwen3.6 backend gates and a link, not a second copy |
 | What we take from other engines | [EXTERNAL-ENGINES.md](EXTERNAL-ENGINES.md) (llama.cpp, Strata, tandem.cpp: learning → verdict → roadmap item) | the roadmap rows it creates are dated "Prior-art follow-ups (2026-11-14)" |
 

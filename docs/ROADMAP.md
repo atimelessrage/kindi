@@ -639,7 +639,7 @@ the small-MoE rows already own it, and the Anthropic request surface is REQ-0028
 
 ## Engine-liveness follow-ups (2026-11-17)
 
-Drawn from the 0.6.1 port (§41 of `CURRENT-VS-KINDI-0.6.md`): the MTP head's CUDA graph had not
+Drawn from the 0.6.1 port (§41 of `CURRENT-VS-KINDI-0.7.md`): the MTP head's CUDA graph had not
 built since 0.5.0, the engine logged one line about it, `/health` still reported drafting as
 enabled, `kindi verify` cannot run under `KINDI_SPEC` at all, and the only way to get a speculation
 number was to start a server by hand and `curl` it. The general lesson is not "MTP"; it is that a

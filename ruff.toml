@@ -8,3 +8,8 @@ extend-exclude = ["bench-logs", "__pycache__", ".pytest_cache"]
 
 [lint]
 select = ["F", "E9", "B", "I"]
+
+[lint.per-file-ignores]
+# The adapter imports are in registration order: `kindi backends` lists them in it, and an
+# alphabetical sort would turn a documented order into an accident (tests/test_backends_cli.py).
+"kindi/backends/__init__.py" = ["I001"]

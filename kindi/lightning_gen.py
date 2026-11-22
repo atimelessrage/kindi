@@ -226,6 +226,7 @@ def pick_candidates(eng, greedy, temperature, top_p, top_k, rng, min_p=0.0, pena
 class LightningBackend(object):
     # The engine is built in __init__ and released by close(); see the server's matching annotation.
     eng: Any
+    name = "Lightning"                  # (the log's prefix; the Flash-Next backend reuses this class)
 
     def __init__(self, man, cfg, log=print):
         from .gguf import GGUF
@@ -233,7 +234,12 @@ class LightningBackend(object):
         from .lightning_tokenizer import LightningTokenizer
         self.log = log
         self.path = man["model_path"]
-        self.tok = LightningTokenizer(GGUF(self.path).kv)
+        # <think>, </think>, <tool_call>, <tool_response> (and their closing tags) as one token each, as the model was
+        # trained (B19; KINDI_LT_ADDED_TAGS=0 splits them into text pieces, as 0.6.0 and llama.cpp do)
+        self.tok = LightningTokenizer(GGUF(self.path).kv,
+                                      added_tags=os.environ.get("KINDI_LT_ADDED_TAGS", "1") != "0")
+        if self.tok.added:
+            log("Lightning: tags as whole tokens: %s" % " ".join(self.tok.added))
         self.tok.tokens = self.tok.vocab
         # the tokens that end a turn: every control token of the GGUF (type 3: <|im_end|> = EOS, </s>, <|im_start|>,
         # [INST], ...). A control token never belongs in a reply, and <|im_start|> would start a new turn.
@@ -306,9 +312,8 @@ class LightningBackend(object):
         from .lightning_chat import render
         from .server import THINK_CLOSE, _looping
         cfg = K.cfg
-        tools = req.get("tools") or None
-        if req.get("tool_choice") == "none":
-            tools = None
+        from .oai import check
+        tools, _ = check(req, can_force=False, structured=True)   # #38; the schema is this path's own grammar
         kw = req.get("chat_template_kwargs") or {}
         jgrammar = _response_grammar(req)
         jstate = jgrammar.start() if jgrammar is not None else None
@@ -386,19 +391,19 @@ class LightningBackend(object):
                     constrained=jgrammar is not None)
                 if token in self.stop_ids:
                     if os.environ.get("KINDI_LOG_RAW"):
-                        self.log("Lightning: stop token %d %r" % (token, self.tok.decode_bytes(token)))
+                        self.log(self.name + ": stop token %d %r" % (token, self.tok.decode_bytes(token)))
                     finish = "stop"
                     break
                 generated.append(token)
                 K.busy["generated"] = len(generated)
                 loop = repeat_stop and len(generated) % 16 == 0 and _looping(generated)
                 if loop and sorter.mode != "think":
-                    self.log("Lightning: the reply repeats a block of tokens; stopped (repeat_stop)")
+                    self.log(self.name + ": the reply repeats a block of tokens; stopped (repeat_stop)")
                     finish = "stop"
                     break
                 if sorter.mode == "think" and not forced and (loop or (budget and len(generated) >= budget)):
                     forced = True             # thinking budget spent: close the thinking, then let the model answer
-                    self.log("Lightning: thinking budget of %d tokens reached; closing the thinking"
+                    self.log(self.name + ": thinking budget of %d tokens reached; closing the thinking"
                              % (budget or len(generated)))
                     queue = self.tok.encode(THINK_CLOSE)
                 full = self.eng.pos >= self.eng.ctx        # the context is full: this token is the last
@@ -429,7 +434,7 @@ class LightningBackend(object):
                     got[kind].append(part)
                     yield kind, part
                 if sorter.stopped:
-                    self.log("Lightning: the reply wrote a role marker; stopped there")
+                    self.log(self.name + ": the reply wrote a role marker; stopped there")
                     finish = "stop"
                     break
                 if tools and sorter.tail and sorter.tail.count(CALL_CLOSE) > closes:
@@ -447,7 +452,7 @@ class LightningBackend(object):
                             sorter.tail = sorter.tail[:last + len(CALL_CLOSE)] if last >= 0 else sorter.tail
                         else:
                             sorter.tail = sorter.tail[:last + len(CALL_CLOSE)]
-                        self.log("Lightning: %s; stopped after the call%s" % (
+                        self.log(self.name + ": %s; stopped after the call%s" % (
                             "a call repeated an earlier one" if parallel else "one tool call per reply",
                             "s" if parallel else ""))
                         finish = "stop"
@@ -497,7 +502,7 @@ class LightningBackend(object):
         K.stats["prompt_tokens"] += len(ids)
         K.stats["cached_tokens"] += reuse
         K.stats["completion_tokens"] += len(generated)
-        self.log("Lightning: prompt %d (%d reused, %.2f s), %d tokens at %.1f tok/s, %s" % (
+        self.log(self.name + ": prompt %d (%d reused, %.2f s), %d tokens at %.1f tok/s, %s" % (
             len(ids), reuse, prompt_done - started, len(generated), len(generated) / elapsed, finish))
         yield "done", {"content": "".join(got["text"]).strip(), "tool_calls": calls,
                        "reasoning": "".join(got["reasoning"]).strip() or None, "finish": finish, "logprobs": None,

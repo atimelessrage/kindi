@@ -1,6 +1,6 @@
 # Detailed fork changelog
 
-Round-by-round history moved verbatim from `CURRENT-VS-KINDI-0.6.md` on 2026-11-18.
+Round-by-round history moved verbatim from `CURRENT-VS-KINDI-0.7.md` on 2026-11-18.
 The live comparison now keeps only the current 0.6.1 status; these sections retain
 their original numbering, order and evidence, including the round notes that were
 written against earlier baselines. They are a record, not a second current report.
@@ -727,7 +727,7 @@ release artifact exists.
 ## 43. Audit follow-up, full-suite rerun and report refresh (2026-11-18)
 
 This section records the audit/release refresh that follows the v0.6.1 release
-notes in §42. The live comparison is `CURRENT-VS-KINDI-0.6.md`; this is its dated
+notes in §42. The live comparison is `CURRENT-VS-KINDI-0.7.md`; this is its dated
 history.
 
 - **Latest official release checked.** The GitHub releases API still reports
@@ -774,7 +774,7 @@ The later report/docs commit is documentation-only.
 ## 44. Comparison refresh at `3002a40` (2026-11-19)
 
 This section re-bases the live report on the tree as it stands on 2026-11-19. It is the
-history behind `CURRENT-VS-KINDI-0.6.md`; the live report keeps only the current status.
+history behind `CURRENT-VS-KINDI-0.7.md`; the live report keeps only the current status.
 
 - **Latest official release checked.** The GitHub releases API still reports **v0.6.1** as
   `latest` on 2026-11-19 (annotated tag `116532a` peeled to `7fececb`, published
@@ -843,7 +843,7 @@ the worktree.
 
 - **Latest official release rechecked.** The GitHub release API and `git ls-remote --tags
   origin` still report **v0.6.1** (`7fececb`) as latest on 2026-11-19; there is no v0.6.2, and
-  `origin/main` still points at the release commit. The baseline in `CURRENT-VS-KINDI-0.6.md`
+  `origin/main` still points at the release commit. The baseline in `CURRENT-VS-KINDI-0.7.md`
   is unchanged.
 - **Committed baseline.** `v0.6.1..3002a40` is still **649 commits, 736 files, +97,703/−1,283**,
   with zero file deletions, **839 tracked files** and 28 numbered requirements.
@@ -884,7 +884,7 @@ the worktree.
 ## 46. Consolidated tree and live comparison at `53198e5` (2026-11-19)
 
 This is the first section in which the live comparison names a tree with no uncommitted
-engine or evidence changes behind it. `CURRENT-VS-KINDI-0.6.md` and
+engine or evidence changes behind it. `CURRENT-VS-KINDI-0.7.md` and
 `docs/claims/upstream-delta.json` now name **`53198e5`**; `main` and
 `freebuff/tandem-cpu-recovery` are the same commit and both worktrees are clean.
 

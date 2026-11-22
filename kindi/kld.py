@@ -123,6 +123,7 @@ def _free(cp):
 def compare(pack, ctx, variant, log=print):
     """One teacher-forced pass of the reference and one variant in lockstep at context `ctx`."""
     import cupy as cp
+
     from .tokenizer import Tok
     ref = _engine(pack, ctx, "ref", log, cp)
     var = _engine(pack, ctx, variant, log, cp)

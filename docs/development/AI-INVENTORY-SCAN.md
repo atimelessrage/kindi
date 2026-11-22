@@ -27,7 +27,7 @@ Files read: `README.md`, `HERMES_CRON_TASK.md`, `docs/KINDI.md` (opening), `docs
 | prefill dominates wall clock | commit-review measurement: 67% of wall clock is prefill; `qwen2.5-coder:14b` reads at 10.1 tok/s but decodes at 2.75 tok/s `[M]` (`docs/COMMIT_REVIEW_MODEL.md`, summarised in `LOCAL_ENGINE_TUNING.md` §1) | `kindi bench` prints `prompt reading: N tokens/s` (`kindi/bench.py`) | **parked, cheap.** Kindi reports the two rates but never their share of a request mix, which is exactly what decides whether to tune read or decode. Gate: our own measured split on the 2B/27B packs at 4K and 8K (`kindi bench`), recorded in a `docs/benchmarks/` results file. |
 | "Flash Attention is a mandatory prerequisite for KV cache quantization" | the popular write-up claim did not survive their measurement on Ollama 0.34.4 `[M]` | irrelevant: Kindi's q8 cache is its own store kernel (`kindi/engine.py`), with no Flash Attention coupling | **rejected (not applicable).** Recorded so the next scan does not re-raise it. |
 | CPU engine anchors | Ryzen 9 7940HS: 64.8 vs llama.cpp 23.6 tok/s (2.7×); Core i7-8700 1.6× `[P]`, their box | our own CPU/llama.cpp ratio is the measured 8.0 vs 7.9 tok/s in `docs/EXTERNAL-ENGINES.md` (beat clause not met) | **reference only.** The i7-8700 is the closest published anchor to the i7-8086K here; it is their number, not a claim, and it is not comparable to a different pack and context. |
-| the knowledge base as a source for upstream Kindi state | `docs/KINDI_CHANGELOG.md` tracks upstream `v0.3.0` (feed check 2026-10-30); `docs/KINDI.md` is explicitly research-only, `[?]`, "never run here" | this tree contains upstream `v0.6.0` (`CURRENT-VS-KINDI-0.6.md`) | **rejected as a source.** Three minor versions stale; read upstream `CHANGELOG.md`/releases directly when upstream state matters. |
+| the knowledge base as a source for upstream Kindi state | `docs/KINDI_CHANGELOG.md` tracks upstream `v0.3.0` (feed check 2026-10-30); `docs/KINDI.md` is explicitly research-only, `[?]`, "never run here" | this tree contains upstream `v0.6.0` (`CURRENT-VS-KINDI-0.7.md`) | **rejected as a source.** Three minor versions stale; read upstream `CHANGELOG.md`/releases directly when upstream state matters. |
 
 Nothing was adopted in this scan, so no roadmap or requirement step was created and nothing was
 implemented — which is the expected outcome of a baseline scan.
@@ -143,7 +143,7 @@ Windows User and Machine scopes, so the base was not read and no knowledge-base 
 is recorded. The ranking in [ROADMAP.md](../../docs/ROADMAP.md) "Follow-ups from the 2026-11-20
 review" is repository-derived: the current v0.6.1 comparison, the 9B default-vs-TC smoke page, the
 grammar-cost page, the handoff tests and the release checklist. Files reviewed for this pass:
-`docs/ROADMAP.md`, `CURRENT-VS-KINDI-0.6.md`, `docs/development/AI-INVENTORY-SCAN.md`,
+`docs/ROADMAP.md`, `CURRENT-VS-KINDI-0.7.md`, `docs/development/AI-INVENTORY-SCAN.md`,
 `docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-9b-default-vs-tc/RESULTS.md`,
 `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/RESULTS.md`, `docs/API.md`, and
 `tests/test_agents_handoff.py`. Nothing was adopted from the knowledge base; the roadmap items are

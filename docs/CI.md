@@ -56,7 +56,7 @@ comparable on the same runner, card, driver and CuPy/CUDA build, so re-recording
 pins the gate behaviour.
 
 The same job runs `python tools/check_claims.py`: every number quoted in `docs/BACKENDS.md`,
-`docs/ROADMAP.md`, `CURRENT-VS-KINDI-0.6.md`, `docs/AUTOTUNE.md`, `docs/FP8-BF16.md` and
+`docs/ROADMAP.md`, `CURRENT-VS-KINDI-0.7.md`, `docs/AUTOTUNE.md`, `docs/FP8-BF16.md` and
 `docs/BENCHMARKS.md` is re-derived from the tracked artifact of its run (a JSON row, a
 `CROSS-MODE.csv` cell, a ratio of two cells, a max gap between two files, or a verbatim line in
 the run's `RESULTS.md`), and a doc that stops quoting the number fails. It also

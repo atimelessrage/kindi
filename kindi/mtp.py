@@ -4,10 +4,9 @@ KINDI_SPEC=mtp (or auto), KINDI_MTP_HEAD=<head.npz>: after every pass of the mai
 verified rows into its own K/V window and drafts KINDI_SPEC_K tokens. The main model verifies the draft in one
 pass (the speculative verify path), so the output is exactly the main model's (greedy)."""
 import json
-import os
 
-import numpy as np
 import cupy as cp
+import numpy as np
 
 from . import mtp_heads as _heads
 

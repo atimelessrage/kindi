@@ -5,7 +5,7 @@ two code trees: stock upstream `v0.6.1` (tag commit
 `7fececbff13adc88bf21b8f07dea4e1c91996a9d`, extracted with
 `git archive v0.6.1`) and this fork's worktree at `a79137f`. It closes the "run
 `v0.6.1` and this tree on the same pack, flags and card" row that §4.3 of
-`CURRENT-VS-KINDI-0.6.md` carried as unverified.
+`CURRENT-VS-KINDI-0.7.md` carried as unverified.
 
 Host: i7-8086K + NVIDIA GeForce RTX 4060 Ti, 8,188 MiB, driver 617.42, native
 Windows, Python 3.13.6, CuPy 14.2.0, CUDA runtime 12.9 (12090). Packs:

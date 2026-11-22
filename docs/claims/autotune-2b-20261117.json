@@ -18,7 +18,7 @@
       "quoted_in": [
         "docs/AUTOTUNE.md",
         "docs/ROADMAP.md",
-        "CURRENT-VS-KINDI-0.6.md"
+        "CURRENT-VS-KINDI-0.7.md"
       ],
       "check": {
         "kind": "json",
@@ -33,7 +33,7 @@
       "quoted_in": [
         "docs/AUTOTUNE.md",
         "docs/ROADMAP.md",
-        "CURRENT-VS-KINDI-0.6.md"
+        "CURRENT-VS-KINDI-0.7.md"
       ],
       "check": {
         "kind": "json",
@@ -48,7 +48,7 @@
       "quoted_in": [
         "docs/AUTOTUNE.md",
         "docs/ROADMAP.md",
-        "CURRENT-VS-KINDI-0.6.md"
+        "CURRENT-VS-KINDI-0.7.md"
       ],
       "check": {
         "kind": "json",
@@ -63,7 +63,7 @@
       "quoted_in": [
         "docs/AUTOTUNE.md",
         "docs/ROADMAP.md",
-        "CURRENT-VS-KINDI-0.6.md"
+        "CURRENT-VS-KINDI-0.7.md"
       ],
       "check": {
         "kind": "json",
@@ -78,7 +78,7 @@
       "quoted_in": [
         "docs/AUTOTUNE.md",
         "docs/ROADMAP.md",
-        "CURRENT-VS-KINDI-0.6.md"
+        "CURRENT-VS-KINDI-0.7.md"
       ],
       "check": {
         "kind": "json",

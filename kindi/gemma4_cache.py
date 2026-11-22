@@ -16,8 +16,6 @@ Copyright (c) 2026 Amir Husain. SPDX-License-Identifier: AGPL-3.0-only. See LICE
 """
 import os
 
-import numpy as np
-
 
 def _lcp(a, b):
     n = min(len(a), len(b))
@@ -150,7 +148,7 @@ class G4Cache(object):
 
     def _rings_set(self, snap):
         import cupy as cp
-        for (c, s), r in zip(self._cards(), snap):
+        for (c, s), r in zip(self._cards(), snap, strict=False):
             def put(s=s, r=r):
                 for i, (k, v) in r.items():
                     s.cache[i]["k"].set(k); s.cache[i]["v"].set(v)
@@ -165,7 +163,7 @@ class G4Cache(object):
 
     def _globals_set(self, g, n):
         import cupy as cp
-        for (c, s), r in zip(self._cards(), g):
+        for (c, s), r in zip(self._cards(), g, strict=False):
             def put(s=s, r=r):
                 for i, (k, v) in r.items():
                     s.cache[i]["k"][:n].set(k[:n]); s.cache[i]["v"][:n].set(v[:n])

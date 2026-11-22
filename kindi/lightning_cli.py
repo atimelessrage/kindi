@@ -6,6 +6,8 @@ import os
 import random
 import time
 
+from .jsonio import load_json
+
 SUPPORTED_TYPES = {0, 8, 42}                       # F32, Q8_0, Q2_0
 
 
@@ -74,8 +76,10 @@ def verify(cfg, man, log=print):
     if not os.path.exists(rp):
         log("no llama.cpp reference for this model in this version of Kindi")
         return 2
-    ref = json.load(open(rp))
+    ref = load_json(rp)
     floor = noise_floor(ref)
+    # llama.cpp splits the added tags (<think>, ...: normal tokens in the GGUF) into text pieces; the reference ids are
+    # llama.cpp's, so the BPE and the template are checked with the same split. The server keeps the tags whole (B19).
     tok = LightningTokenizer(GGUF(man["model_path"]).kv)
     ok_tok = True
     for r in ref["prompts"]:

@@ -33,6 +33,7 @@ from .cache import Runner
 from .cpu import Engine as CPUEngine
 from .engine import MOE_BACKENDS, VOCAB
 from .engine import Engine as GPUEngine
+from .jsonio import load_json
 
 MODES = ("cpu-first", "gpu-first")
 PlanEngine = None          # kindi.tp.TPEngine, imported on first use (it needs CuPy at import time)
@@ -197,9 +198,9 @@ def pack_bytes(pack, man=None):
     whole f32 file; the plan engine reads per tensor, so only the owned layers' norms reach the card. These
     are the engine's device bytes, not the pack's.
     """
-    man = man if man is not None else json.load(open(os.path.join(pack, "kindi_pack.json")))
-    bi = json.load(open(os.path.join(pack, "bcodes_index.json")))["tensors"]
-    idx = json.load(open(os.path.join(pack, "index.json")))["tensors"]
+    man = man if man is not None else load_json(os.path.join(pack, "kindi_pack.json"))
+    bi = load_json(os.path.join(pack, "bcodes_index.json"))["tensors"]
+    idx = load_json(os.path.join(pack, "index.json"))["tensors"]
 
     def nbytes(name):
         rec = bi.get(name)
@@ -421,7 +422,7 @@ def plan_cpu_layers_rate(dims, sizes, ctx, free_bytes, reserve_mib=512, rate_flo
     budget = vram_budget_bytes(free_bytes, reserve_mib, vram_budget_mib)
     if ratio is None:
         ratio = load_ratio(pack_sha=pack_sha)
-    feeds = (ratio or {}).get("predicted_tok_s") or {}
+    (ratio or {}).get("predicted_tok_s") or {}
     full_rate = _predicted_rate(ratio, 0, ctx) if ratio else None
     floor_rate = None if (rate_floor is None or full_rate is None) else rate_floor * full_rate
 
@@ -569,7 +570,7 @@ class TandemEngine(object):
                  vram_budget_mib=None, reserve_mib=None):
         self.log = log or (lambda *a: None)
         manifest = os.path.join(pack, "kindi_pack.json")
-        man = json.load(open(manifest))
+        man = load_json(manifest)
         # Before the GPU is inspected: an unsupported family is a manifest fact, and refusing here keeps
         # the error the user sees about their model instead of about a missing card.
         backend = man.get("backend")
@@ -852,7 +853,7 @@ class TandemEngine(object):
             return None
         t = self.timing
         n = max(1, t["tokens"])
-        layers = max(1, t["cpu_layers"] + t["gpu_layers"])
+        max(1, t["cpu_layers"] + t["gpu_layers"])
         return {
             "tokens": t["tokens"],
             "cpu_ms_per_token": round(1000 * t["cpu_s"] / n, 3),

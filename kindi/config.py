@@ -5,9 +5,10 @@ The config file is INI with a [kindi] section; it is looked for at --config, $KI
 ~/.kindi/kindi.conf, in that order. See kindi.conf.example for every key.
 """
 import configparser
-import json
 import os
 import re
+
+from .jsonio import load_json
 
 DEFAULTS = {
     # where things live
@@ -24,6 +25,7 @@ DEFAULTS = {
     "log_json": "0",                    # 1: one JSON access-log line per inference request
     # engine
     "ctx": "24576",                     # requested context; each backend clamps it to available device memory
+    "slots": "1",                       # requests written at the same time (decode slots, plan engine with KINDI_TC=1)
     "head": "exact",                    # exact | fast (shortlist head, ~15% faster, approximate)
     "fast_clusters": "256",             # clusters scored by the fast head
     "tandem_vram_mb": "0",              # tandem GPU ceiling in MiB (0: no ceiling)
@@ -55,7 +57,7 @@ DEFAULTS = {
     "sampling_profile": "default",       # default | publisher: the model publisher's sampling values (Bonsai only)
 }
 
-INT_KEYS = {"repeat_stop", "lookup", "port", "ctx", "fast_clusters", "tandem_vram_mb", "tandem_reserve_mb",
+INT_KEYS = {"repeat_stop", "lookup", "port", "ctx", "slots", "fast_clusters", "tandem_vram_mb", "tandem_reserve_mb",
             "checkpoint_every", "checkpoint_budget_mb", "prefix_max", "prefix_min", "park_max",
             "turn_save", "turn_keep", "turn_disk_mb", "turn_min",
             "max_tokens", "top_k", "repeat_last_n", "max_body_mb", "queue_max", "rate_limit_per_min", "log_json"}
@@ -176,7 +178,7 @@ def load(explicit=None, overrides=None):
     _validate(cfg)
     if cfg["model_name"] == "auto":
         manifest = os.path.join(cfg["pack"], "kindi_pack.json")
-        m = json.load(open(manifest)) if os.path.isfile(manifest) else {}
+        m = load_json(manifest) if os.path.isfile(manifest) else {}
         # which family claims the pack is the adapters' answer, not a second list here: the
         # literal tuple that used to live at this line forgot nanbeige and dsv41, so those packs
         # reported a Bonsai id (2026-11-16 audit, F3).
@@ -185,6 +187,8 @@ def load(explicit=None, overrides=None):
         claimed = adapter_model_id(m)
         if claimed:
             cfg["model_name"] = m.get("model_id") or claimed
+        elif m.get("backend") == "kindi_qwen4exp":
+            cfg["model_name"] = m.get("model_id") or "flashnext"
         else:
             # the GGUF's general.name, then its file name: some files name the model only "Hf"
             size = None

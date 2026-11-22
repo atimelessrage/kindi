@@ -4,6 +4,8 @@ import json
 import os
 import time
 
+from .jsonio import load_json
+
 SUPPORTED_TYPES = {0, 12, 13, 18, 21, 22}         # F32, Q4_K, Q5_K, IQ3_XXS, IQ3_S, IQ2_S
 TIE_GAP = 0.01                                     # nats: a dead heat between llama.cpp's top two tokens
 
@@ -67,15 +69,15 @@ def verify(cfg, man, log=print):
     is such a point (Kindi gives the token of the alt run there, or the top-2 gap is under TIE_GAP) is a tie and
     ends there. Any other difference fails. The tokenizer and the chat template are checked on the same prompts."""
     from .gguf import GGUF
+    from .nanbeige_chat import prompt_ids, render
     from .spm import SPM
-    from .nanbeige_chat import render, prompt_ids
     here = os.path.dirname(os.path.abspath(__file__))
     want_kv = (cfg or {}).get("kv_cache") or os.environ.get("KINDI_KV_CACHE") or ""
     rp = _reference(here, man, want_kv if want_kv in ("f16", "q8_0") else "f16")
     if rp is None:
         log("no llama.cpp reference for this model in this version of Kindi")
         return 2
-    ref = json.load(open(rp))
+    ref = load_json(rp)
     need = max(len(r["ids"]) + len(r["expected"]) for r in ref["prompts"])
     eng = _engine(cfg, man, need + 64, log)
     if eng.kv != (want_kv or "f16"):                   # kv_cache auto: the reference of the cache the engine chose
@@ -83,7 +85,7 @@ def verify(cfg, man, log=print):
         if eng.kv != "f16" and (rp is None or not os.path.basename(rp).endswith("-%s.json" % eng.kv)):
             log("no llama.cpp reference for kv_cache %s" % eng.kv)
             return 2
-        ref = json.load(open(rp))
+        ref = load_json(rp)
     log("reference %s: %s" % (os.path.basename(rp), ref["source"].split(";")[0]))
     tok = SPM(GGUF(man["model_path"]).kv)
     ok_tok = True
@@ -125,7 +127,7 @@ def verify(cfg, man, log=print):
         # as many as llama.cpp's own q8_0 run keeps (the cache drifts from f16 no more than llama.cpp's q8_0 does)
         log("against llama.cpp q8_0: %d of %d prompts token-exact, %d at a tie, %d differ (information only)"
             % (n - ties - fails, n, ties, fails))
-        base = json.load(open(_reference(here, man, "f16")))
+        base = load_json(_reference(here, man, "f16"))
         agree = 0
         for r in base["prompts"]:
             want = r["expected"]

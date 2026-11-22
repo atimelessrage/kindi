@@ -18,12 +18,11 @@ Copyright (c) 2026 Amir Husain. SPDX-License-Identifier: AGPL-3.0-only. See LICE
 import concurrent.futures
 import copy
 import ctypes
-import os
 import threading
 
 import numpy as np
 
-from .gemma4 import Engine, TensorFile, inspect_model, _QUANTS
+from .gemma4 import _QUANTS, Engine, TensorFile, inspect_model
 
 
 class SliceFile(TensorFile):

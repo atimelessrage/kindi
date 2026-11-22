@@ -26,21 +26,21 @@ Speculative decoding (greedy requests; the server calls spec_begin / spec_end ar
   defaults to 1 after its depth measurement). Sampled requests use speculative sampling
   (KINDI_SPEC_SAMPLE=0: greedy requests only)."""
 import ctypes
-import json
 import os
 import re
 import time
 
-import numpy as np
 import cupy as cp
+import numpy as np
 
-from . import tp as _tp
 from . import chunk as _chunk
+from . import dspine as _dsp
+from . import mtp as _mtp
+from . import sampling
 from . import tc as _tc
 from . import tc_turing as _tc_turing
-from . import sampling
-from . import mtp as _mtp
-from . import dspine as _dsp
+from . import tp as _tp
+from .jsonio import load_json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 i32, f32t = np.int32, np.float32
@@ -49,7 +49,7 @@ WRAP = _chunk.WRAP + ("k_argmax", "k_softmax_rows", "k_attn_vq8w", "k_attn_vq4w"
 FUSED = ("k_rmsfold_qT", "k_smfold_qT", "k_fold_fwht_qT", "k_softmax_m", "k_attn_vq8w_m", "k_attn_vq4w_m", "k_attn_combn_m", "k_attn_sq8m",
          "k_deq_emb4_p", "k_copyf", "k_fd_q8_4", "k_fd_q8_6", "k_fd_q8_8", "k_fd_comb",
          "k_rmsfold2_1024", "k_rmsfold2_512", "k_smfold2_1024", "k_smfold2_512", "k_att_tc_T",
-         "k_rmsfold_qa", "k_smfold_qa", "k_fold_qa", "k_mix8_q")
+         "k_rmsfold_qa", "k_smfold_qa", "k_fold_qa", "k_mix8_q", "k_fd_q8_4R", "k_fd_q8_6R", "k_fd_q8_8R", "k_fd_comb_R")
 FD_CH = 512                              # positions per block of the split flash-decode attention (tcf.cu; SpecKernels)
 QB = 4                                   # queries per verify attention launch (k_attn_sq8m)
 # KINDI_SPEC=auto thresholds (positions), measured on an RTX 3080 at 190 W and an RTX 3060 (docs/MTP.md):
@@ -192,9 +192,9 @@ class SpecKernels(object):
                 tcs += "\n" + open(os.path.join(HERE, "tcl.cu"), encoding="utf-8").read()
             mod = cp.RawModule(code=base + "\n" + wr + "\n" + own + "\n" + tcs + "\n" + tcf)
         elif hip:
-            # RDNA3: dp4a is v_dot4_i32_iu8; tca.cu (k_att_tc_T) is mma.sync only
+            # AMD: dp4a is kindi.cu's kdp4a (v_dot4_i32_iu8, RDNA2 v_dot4_i32_i8); tca.cu (k_att_tc_T) is mma.sync only
             tcf = tcf.replace('asm("dp4a.s32.s32 %0, %1, %2, %3;" : "=r"(d) : "r"(a), "r"(b), "r"(c));',
-                              "d = __builtin_amdgcn_sudot4(true, a, true, b, c, false);")
+                              "d = kdp4a(a, b, c);")   # kindi.cu's (RDNA3 sudot4, RDNA2 sdot4)
             # the fused quantisers store the int8 rows in tc_hip.cu's 5-column order (tcq_word5)
             for old, new in _TCF_HIP:
                 assert tcf.count(old) == 1, old
@@ -212,6 +212,7 @@ class SpecKernels(object):
                                           "sm_%d%d" % (p["major"], p["minor"]))
         self.mod = mod
         for k in ([w + "_T" for w in WRAP] + ["k_sgdn_pre_T", "k_sgdn_deltan_T", "k_sgdn_deltan_C", "k_sconv_C", "k_xsum_T"] +
+                  ["k_sgdn_pre_R", "k_sgdn_deltan_R", "k_rope2_R", "k_store_q8_R"] +
                   list(names) + (["k_g5t4"] + ["k_g5t2_%d" % n for n in (2, 3, 4)] + ["k_g5t1_%d" % n for n in (5, 6, 7, 8)]
                    if pas and _tc.lane() else []) +
                   [f for f in FUSED if not ((hip or pas) and f == "k_att_tc_T")]):
@@ -300,10 +301,11 @@ class Graph(object):
         self.ctx = ctypes.c_void_p()
         d.cuCtxGetCurrent(ctypes.byref(self.ctx))
 
-    def launch(self, toks=None, pos=None):
-        """toks/pos (optional): set the plan's Dyn holders first (the same call as Replay.launch on HIP)"""
-        if toks is not None:
-            self.plan.set(toks[0], pos, toks)
+    def launch(self, toks=None, pos=None, vals=None):
+        """toks/pos (optional): set the plan's Dyn holders first (the same call as Replay.launch on HIP); vals: named
+        plan variables (decode slots)"""
+        if toks is not None or vals is not None:
+            self.plan.set(toks[0] if toks else 0, pos or 0, toks, vals)
         d = _gdrv()
         if d.cuCtxSetCurrent(self.ctx):
             raise RuntimeError("kindi: cuCtxSetCurrent failed")
@@ -323,10 +325,10 @@ class Replay(object):
         self.nodes = [n for seg in plan.segs for n in seg]
         self.L = _gdrv().hipModuleLaunchKernel
 
-    def launch(self, toks=None, pos=None):
+    def launch(self, toks=None, pos=None, vals=None):
         if toks is None:
-            toks, pos = [0] * TMAX, 0
-        self.plan.set(toks[0], pos, toks)
+            toks, pos = [0] * TMAX, pos or 0
+        self.plan.set(toks[0], pos, toks, vals)
         L = self.L
         for fn, g, b, arr, _ in self.nodes:
             if L(fn, g[0], g[1], g[2], b[0], b[1], b[2], 0, None, arr, None):
@@ -503,7 +505,7 @@ def tune3(s, Rs, C):
         return cache[key]
     SK = s.sk
     ws = [s.w[next(n for n, (_, _, r, c) in s.w.items() if int(r) == R and int(c) == C)][1] for R in Rs]
-    NG, NU = C // 128, (C + 1023) // 1024
+    NG, _NU = C // 128, (C + 1023) // 1024
     XQ = cp.zeros(TMAX * NG * 32, dtype=cp.uint32)
     XS = cp.zeros(TMAX * NG, dtype=cp.float32)
     XA = cp.zeros(TMAX * NG, dtype=cp.int32)
@@ -557,6 +559,11 @@ def reserve(eng):
         _reserve_card(eng, s)
 
 
+def _slots_wanted():
+    from . import slots as _sl
+    return _sl.wanted()
+
+
 def _reserve_card(eng, s):
     with cp.cuda.Device(s.card):
         z = lambda n, t=cp.float32: cp.zeros(int(n), dtype=t)  # noqa: E731
@@ -593,7 +600,8 @@ def _reserve_card(eng, s):
         # KINDI_FD=1: the split flash-decode attention's per-chunk sums and (max, exp-sum), QB queries
         if os.environ.get("KINDI_FD", "0") == "1":
             nfd = (cx + FD_CH - 1) // FD_CH
-            b["FDP"], b["FDM"] = z(QB * nfd * NH * 256), z(QB * nfd * NH * 2)
+            nq = max(QB, min(TMAX, _slots_wanted()))   # (decode slots: one query per row, slots.py)
+            b["FDP"], b["FDM"] = z(nq * nfd * NH * 256), z(nq * nfd * NH * 2)
             b["fps"], b["fms"] = nfd * NH * 256, nfd * NH * 2
         interval = s.dims["full_attention_interval"]
         gl = [il for il in range(s.NL) if (il + 1) % interval]
@@ -628,9 +636,12 @@ def kv_plan(tp):
     return "k_store_q8_T", "k_attn_vq8w", "k_attn_vq8w_m", 1
 
 
-def build_plan(s, T, head, wb, aout=None, tokp=None):
+def build_plan(s, T, head, wb, aout=None, tokp=None, slots=None):
     """aout: where the argmaxes go (default the AOUT buffer); tokp: T = 1 only, the token id is read from this device
-    int (a draft step chained to the step before) instead of a plan argument"""
+    int (a draft step chained to the step before) instead of a plan argument. slots (decode slots, kindi/slots.py): a
+    list of T state sets {M, conv, Kq, Kd, Vq, Vd}; row k is one token of slot k at its own position (plan variables
+    p<k>, q<k> = the positions its attention reads, w<k> = the GDN write-back flag), and the per-token parts are the
+    T = 1 decode launches on that slot's state"""
     tp, K, SK, b = s.tp, s.k, s.sk, s.tcb
     D, HB, HK, HD = s.D, s.HB, s.HK, s.HD
     NK, NV, NH, NHKV, NFF, CC = s.NK, s.NV, s.NH, s.NHKV, s.NFF, s.CONV_CH
@@ -640,6 +651,18 @@ def build_plan(s, T, head, wb, aout=None, tokp=None):
     P = _tp.Plan()
     st = {"h": b["HA"], "h2": b["HB"], "pending": 0}
     TT = i32(T)
+    # decode slots: the per-row launches as one launch over the rows (spec.cu *_R), unless KINDI_SLOTS_ROWS=0. The row
+    # values (position, attention length, GDN write-back) are in P.rv, written before each pass (slots.py)
+    rows1 = slots is not None and os.environ.get("KINDI_SLOTS_ROWS", "1") != "0"
+    if slots is not None:
+        P.rv = cp.zeros(3 * T, dtype=cp.int32)
+        P.keep = []
+
+    def ptab(cols):
+        """a device table of row pointers: cols = [[row 0 .. T-1 pointers of argument j] for each j]"""
+        a = cp.asarray(np.array([int(x) for c in cols for x in c], dtype=np.uint64))
+        P.keep.append(a)
+        return a
     hp = i32(1 if HP else 0)
     TQ = i32(2 * T if HP else T)                   # the products' token count: int8 rows
     HPB = (1 << 30) if HP else 0                   # tc.cu tc_hp
@@ -658,7 +681,7 @@ def build_plan(s, T, head, wb, aout=None, tokp=None):
         (returns the part count)"""
         _, Wt, R, C = s.w[name]
         R, C = int(R), int(C)
-        NG, NU = C // 128, (C + 1023) // 1024
+        NG, _NU = C // 128, (C + 1023) // 1024
         if getattr(s, "tc_lane", False):
             # sm_60: the lane-table product of the fp32 rows X (k_g5t4 for one token: four tiles per warp)
             sp = lane_sp(s, R, C)
@@ -696,7 +719,7 @@ def build_plan(s, T, head, wb, aout=None, tokp=None):
     def gemm3(names, outs):
         """products of the same input in one launch (no splits)"""
         if getattr(s, "tc_lane", False):
-            for n, o in zip(names, outs):
+            for n, o in zip(names, outs, strict=False):
                 gemm(n, XP, work, o, False)
             return
         ws = [s.w[n][1] for n in names]
@@ -750,19 +773,60 @@ def build_plan(s, T, head, wb, aout=None, tokp=None):
             return {512: SK.k_smfold2_512, 1024: SK.k_smfold2_1024}[hb], hb
         return SK.k_smfold_qT, 512
 
+    def gdn_rows(il, p, L, nblk):
+        assert slots is not None            # only called for decode slots (see gdn)
+        q0 = [k * 2 * NK * HK for k in range(T)]
+        pre = ptab([[XN[k * D:].data.ptr for k in range(T)], [L["GB"][k * NV:].data.ptr for k in range(T)],
+                    [L["GG"][k * NV:].data.ptr for k in range(T)], [L["QKV"][k * CC:].data.ptr for k in range(T)],
+                    [slots[k]["conv"][il].data.ptr for k in range(T)], [L["CS"][k * CC:].data.ptr for k in range(T)],
+                    [L["QK"][q0[k]:].data.ptr for k in range(T)]])
+        P.add(SK.k_sgdn_pre_R, (nblk, 1, T), (256,), (pre, P.rv, TT, i32(D), s.f(p + "ssm_beta.weight"),
+                                                      s.f(p + "ssm_alpha.weight"), s.f(p + "ssm_dt.bias"), s.f(p + "ssm_a"),
+                                                      i32(NV), i32(D), i32(CC), s.f(p + "ssm_conv1d.weight"), i32(CC),
+                                                      i32(2 * NK * HK), i32(CC), i32(NV), i32(NK), i32(HK)))
+        dl = ptab([[slots[k]["M"][il].data.ptr for k in range(T)], [L["QK"][q0[k]:].data.ptr for k in range(T)],
+                   [L["QK"][q0[k] + NK * HK:].data.ptr for k in range(T)],
+                   [L["CS"][k * CC + 2 * NK * HK:].data.ptr for k in range(T)], [L["GG"][k * NV:].data.ptr for k in range(T)],
+                   [L["GB"][k * NV:].data.ptr for k in range(T)], [OUT[k * NV * HK:].data.ptr for k in range(T)]])
+        P.add(SK.k_sgdn_deltan_R, (NV, T), (HK,), (dl, P.rv, TT, i32(2 * NK * HK), i32(CC), i32(NV),
+                                                   s.f(p + "ssm_norm.weight"), i32(NV * HK), f32t(1.0 / np.sqrt(HK)), i32(NK)))
+
+    def gdn_slots(il, p, L, nblk):
+        assert slots is not None
+        if rows1:
+            return gdn_rows(il, p, L, nblk)
+        for k in range(T):                         # each row: the decode launches on its slot's own state
+            S = slots[k]
+            w = _tp.Dyn("w%d" % k, 0, 1)
+            P.add(SK.k_sgdn_pre_T, (nblk, 1), (256,), (XN[k * D:], i32(D), s.f(p + "ssm_beta.weight"), s.f(p + "ssm_alpha.weight"),
+                                                       s.f(p + "ssm_dt.bias"), s.f(p + "ssm_a"), L["GB"][k * NV:], L["GG"][k * NV:],
+                                                       i32(NV), i32(D), L["QKV"][k * CC:], i32(CC), S["conv"][il],
+                                                       s.f(p + "ssm_conv1d.weight"), L["CS"][k * CC:], i32(CC),
+                                                       L["QK"][k * 2 * NK * HK:], i32(2 * NK * HK), i32(CC), i32(NV), i32(NK),
+                                                       i32(HK), i32(1), w))
+            q0 = k * 2 * NK * HK
+            P.add(SK.k_sgdn_deltan_T, (NV,), (HK,), (S["M"][il], L["QK"][q0:], L["QK"][q0 + NK * HK:], i32(2 * NK * HK),
+                                                     L["CS"][k * CC + 2 * NK * HK:], i32(CC), L["GG"][k * NV:],
+                                                     L["GB"][k * NV:], i32(NV), s.f(p + "ssm_norm.weight"),
+                                                     OUT[k * NV * HK:], i32(NV * HK), f32t(1.0 / np.sqrt(HK)), i32(NK),
+                                                     i32(1), _tp.Dyn("w%d" % k, 0, 1)))
+
     def gdn(il):
         p = "blk.%d." % il
         L = b["L"][il]
         mixin(p + "attn_norm.weight")
         gemm3([p + "attn_qkv.weight", p + "attn_gate.weight"], [L["QKV"], b["ZV"]])
         nblk = NV + 2 * NK + (NV * HK + 255) // 256
-        P.add(SK.k_sgdn_pre_T, (nblk, T), (256,), (XN, i32(D), s.f(p + "ssm_beta.weight"), s.f(p + "ssm_alpha.weight"),
-                                                   s.f(p + "ssm_dt.bias"), s.f(p + "ssm_a"), L["GB"], L["GG"], i32(NV), i32(D),
-                                                   L["QKV"], i32(CC), s.conv[il], s.f(p + "ssm_conv1d.weight"), L["CS"], i32(CC),
-                                                   L["QK"], i32(2 * NK * HK), i32(CC), i32(NV), i32(NK), i32(HK), TT, i32(wb)))
-        P.add(SK.k_sgdn_deltan_T, (NV,), (HK,), (s.M[il], L["QK"], L["QK"][NK * HK:], i32(2 * NK * HK), L["CS"][2 * NK * HK:],
-                                                 i32(CC), L["GG"], L["GB"], i32(NV), s.f(p + "ssm_norm.weight"), OUT,
-                                                 i32(NV * HK), f32t(1.0 / np.sqrt(HK)), i32(NK), TT, i32(wb)))
+        if slots is not None:
+            gdn_slots(il, p, L, nblk)
+        else:
+            P.add(SK.k_sgdn_pre_T, (nblk, T), (256,), (XN, i32(D), s.f(p + "ssm_beta.weight"), s.f(p + "ssm_alpha.weight"),
+                                                       s.f(p + "ssm_dt.bias"), s.f(p + "ssm_a"), L["GB"], L["GG"], i32(NV), i32(D),
+                                                       L["QKV"], i32(CC), s.conv[il], s.f(p + "ssm_conv1d.weight"), L["CS"], i32(CC),
+                                                       L["QK"], i32(2 * NK * HK), i32(CC), i32(NV), i32(NK), i32(HK), TT, i32(wb)))
+            P.add(SK.k_sgdn_deltan_T, (NV,), (HK,), (s.M[il], L["QK"], L["QK"][NK * HK:], i32(2 * NK * HK), L["CS"][2 * NK * HK:],
+                                                     i32(CC), L["GG"], L["GB"], i32(NV), s.f(p + "ssm_norm.weight"), OUT,
+                                                     i32(NV * HK), f32t(1.0 / np.sqrt(HK)), i32(NK), TT, i32(wb)))
         if fsplit:
             P.add(SK.k_smfold_qa, (NV * HK // 512, T), (512,), (b["ZV"], OUT, s.sV, XP, i32(HK), i32(NK), i32(NV // NK), TT,
                                                                 i32(NV * HK), i32(NV * HK), i32(work), i32(NV * HK)))
@@ -772,6 +836,61 @@ def build_plan(s, T, head, wb, aout=None, tokp=None):
             P.add(smf, (NV * HK // HB, T), (smb,), (b["ZV"], OUT, s.sV, XP, i32(HK), i32(NK), i32(NV // NK), i32(HB),
                                                     TT, i32(NV * HK), i32(NV * HK), i32(work), i32(NV * HK), XQ, XS, XA) + ((hp,) if smf is SK.k_smfold_qT else ()))
         st["pending"] = gemm(p + "ssm_out.weight", XP, work, Y, False, resid=True)
+
+    def attn_slots(kvi, L, QL, QN, KRO, VB, KN, FO, QR, QQ, QD):
+        """RoPE, the K/V store and the attention of each row: the decode launches on its slot's cache and position"""
+        assert slots is not None
+        rd = s.cos_t.shape[1]
+        nb0 = L // 32
+        if rows1:
+            rp = ptab([[FO[k * QL:].data.ptr for k in range(T)], [KN[k * L:].data.ptr for k in range(T)],
+                       [QR[k * QL:].data.ptr for k in range(T)], [KRO[k * L:].data.ptr for k in range(T)]])
+            P.add(SK.k_rope2_R, (NH + NHKV, T), (256,), (rp, P.rv, TT, s.cos_t, s.sin_t, i32(rd), i32(NH), i32(HD)))
+            sp = ptab([[KRO[k * L:].data.ptr for k in range(T)], [VB[k * L:].data.ptr for k in range(T)]] +
+                      [[slots[k][n][kvi].data.ptr for k in range(T)] for n in ("Kq", "Kd", "Vq", "Vd")])
+            P.add(SK.k_store_q8_R, ((64 * nb0 + 1023) // 1024, T), (min(1024, 64 * nb0),), (sp, P.rv, TT, i32(L), i32(nb0)))
+        for k in range(T if not rows1 else 0):
+            S = slots[k]
+            pk = "p%d" % k
+            P.add(SK.k_rope2_T, (NH + NHKV, 1), (256,),
+                  (FO[k * QL:], KN[k * L:], _tp.Dyn(pk, s.cos_t.data.ptr, rd * 4, ptr=True),
+                   _tp.Dyn(pk, s.sin_t.data.ptr, rd * 4, ptr=True), QR[k * QL:], KRO[k * L:], i32(NH), i32(HD), i32(1))
+                  + tuple(i32(x) for x in (QL, L, rd, rd, QL, L)))
+            P.add(SK.k_store_q8_T, ((64 * nb0 + 1023) // 1024, 1), (min(1024, 64 * nb0),),
+                  (KRO[k * L:], VB[k * L:], _tp.Dyn(pk, S["Kq"][kvi].data.ptr, L, ptr=True),
+                   _tp.Dyn(pk, S["Kd"][kvi].data.ptr, nb0 * 2, ptr=True), _tp.Dyn(pk, S["Vq"][kvi].data.ptr, L, ptr=True),
+                   _tp.Dyn(pk, S["Vd"][kvi].data.ptr, nb0 * 2, ptr=True), i32(nb0), i32(1))
+                  + tuple(i32(x) for x in (L, L, L, nb0, L, nb0)))
+        tadd(SK.k_q8row_T, (QL + 1023) // 1024, (1024,), (QR, QQ, QD, i32(QL // 32)), (QL, QL, QL // 32))
+        nch = (s.ctx + 255) // 256
+        if rows1 and "FDP" in b:
+            nfd = (s.ctx + FD_CH - 1) // FD_CH
+            fps, fms = np.uint64(b["fps"]), np.uint64(b["fms"])
+            fp = ptab([[slots[k][n][kvi].data.ptr for k in range(T)] for n in ("Kq", "Kd", "Vq", "Vd")])
+            fdk = {4: SK.k_fd_q8_4R, 6: SK.k_fd_q8_6R, 8: SK.k_fd_q8_8R}[s.G]
+            P.add(fdk, (NHKV, nfd, T), (256,), (fp, P.rv, TT, QQ, QD, i32(QL), b["FDP"], fps, b["FDM"], fms, i32(NHKV)))
+            P.add(SK.k_fd_comb_R, (NH, T), (256,), (P.rv, TT, b["FDP"], fps, b["FDM"], fms, QN, i32(2 * QL), OUT, i32(QL),
+                                                    i32(NH)))
+            return
+        for k in range(T):
+            S = slots[k]
+            n = lambda k=k: _tp.Dyn("q%d" % k, 0, 1)  # noqa: E731
+            qq, qd, qn_, out = QQ[k * QL:], QD[k * QL // 32:], QN[k * 2 * QL:], OUT[k * QL:]
+            if "FDP" in b:
+                nfd = (s.ctx + FD_CH - 1) // FD_CH
+                fps, fms = np.uint64(b["fps"]), np.uint64(b["fms"])
+                fdk = {4: SK.k_fd_q8_4, 6: SK.k_fd_q8_6, 8: SK.k_fd_q8_8}[s.G]
+                P.add(fdk, (NHKV, nfd, 1), (256,), (S["Kq"][kvi], S["Kd"][kvi], S["Vq"][kvi], S["Vd"][kvi], qq, qd, i32(QL),
+                                                    b["FDP"], fps, b["FDM"], fms, n(), i32(NHKV)))
+                P.add(SK.k_fd_comb, (NH, 1), (256,), (b["FDP"], fps, b["FDM"], fms, qn_, i32(2 * QL), out, i32(QL), n(),
+                                                      i32(NH)))
+            else:
+                P.add(K.k_attn_sq8t, (NHKV, nch), (256,), (S["Kq"][kvi], S["Kd"][kvi], qq, qd, s.sbuf, n(), i32(NHKV),
+                                                           i32(s.G)))
+                P.add(K.k_softmax_rows, (NH,), (256,), (s.sbuf, n()))
+                P.add(K.k_attn_vq8w, (NHKV, 1, nch), (128,), (s.sbuf, S["Vq"][kvi], S["Vd"][kvi], s.apart, n(), i32(NH),
+                                                              i32(NHKV), i32(s.G)))
+                P.add(K.k_attn_combn, (NH,), (256,), (s.apart, qn_, out, n(), i32(NH)))
 
     def attn(il, kvi):
         p = "blk.%d." % il
@@ -889,7 +1008,7 @@ def build_draft(s, k, M0, C0):
     position pos + i and the token step i - 1 chose (AOUT[i - 1], on the card); the k choices land in AOUT[0 .. k)"""
     SK, b = s.sk, s.tcb
     P = _tp.Plan()
-    _copies(P, SK, list(zip(s.M, M0)) + list(zip(s.conv, C0)))
+    _copies(P, SK, list(zip(s.M, M0, strict=False)) + list(zip(s.conv, C0, strict=False)))
     for i in range(k):
         Pi = build_plan(s, 1, True, 1, aout=b["AOUT"][i:], tokp=None if i == 0 else b["AOUT"][i - 1:])
         for _h, d in Pi.dyn:
@@ -902,7 +1021,7 @@ def build_draft(s, k, M0, C0):
 
 def build_restore(s, M0, C0):
     P = _tp.Plan()
-    _copies(P, s.sk, list(zip(M0, s.M)) + list(zip(C0, s.conv)))
+    _copies(P, s.sk, list(zip(M0, s.M, strict=False)) + list(zip(C0, s.conv, strict=False)))
     return P
 
 
@@ -1582,8 +1701,8 @@ class Draft2B(object):
             # (the next agent turn re-renders the reply, so it often differs right after it) resumes from it
             self.M1 = [m.copy() for m in s.M]
             self.C1 = [c.copy() for c in s.conv]
-        self.save1 = _Copy(s, list(zip(s.M, self.M1)) + list(zip(s.conv, self.C1)))
-        self.load1 = _Copy(s, list(zip(self.M1, s.M)) + list(zip(self.C1, s.conv)))
+        self.save1 = _Copy(s, list(zip(s.M, self.M1, strict=False)) + list(zip(s.conv, self.C1, strict=False)))
+        self.load1 = _Copy(s, list(zip(self.M1, s.M, strict=False)) + list(zip(self.C1, s.conv, strict=False)))
         self.snap = None                         # (base, position, tokens) of the saved state
         self.base = 0                            # the main model's position of the draft model's position 0
         self.rebases = 0
@@ -1702,7 +1821,7 @@ def load_stream(self):
         return False
     t0 = time.time()
     tern, flt = self._slices()
-    offs = {n: tuple(v) for n, v in json.load(open(ipath)).items()}
+    offs = {n: tuple(v) for n, v in load_json(ipath).items()}
     if not set(tern) <= set(offs):
         return False                     # a cache from before the tied-head alias: Shard._load rebuilds it
     nw = os.path.getsize(lpath) // 4

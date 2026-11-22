@@ -9,7 +9,6 @@ choice, and the exact command that follows it — from the manifest, `index.json
 numbers. The `--assume-*` flags let the P106/M4000 roadmaps' placements be tested before the
 hardware exists. Always exits 0; a placement that fits nothing is reported, not raised.
 """
-import json
 import os
 import shlex
 import subprocess
@@ -20,13 +19,14 @@ import numpy as np
 from . import cold_experts as _cold
 from . import ltfit as _ltfit
 from . import tandem as _t
+from .jsonio import load_json
 
 
 def _manifest(pack):
     path = os.path.join(pack, "kindi_pack.json")
     if not os.path.isfile(path):
         raise SystemExit("kindi: %s does not hold a kindi pack (no kindi_pack.json)" % pack)
-    return json.load(open(path))
+    return load_json(path)
 
 
 def _free_vram_gib():
@@ -513,7 +513,7 @@ def describe_moe(pack, ctx, free_bytes, usage_path=None, moe_cache_mib=None,
     weighted placement and measured-use share come from `kindi/moe.py` and the usage file."""
     from .gguf import GGUF
     from .lightning import Spec
-    from .moe import MoESpec, Usage, plan as moe_plan
+    from .moe import MoESpec, Usage
 
     man = _manifest(pack)
     gguf_path = man.get("model_path")

@@ -39,6 +39,7 @@ class _FakeG4Tok(object):
 
 class _FakeLT(object):
     vocab = ["a", "b", "<|im_start|>"]
+    added = ()
     types = (0, 0, 3)
     eos = 2
     sid = {"<|im_start|>": 2}

@@ -9,7 +9,6 @@ experts do not fit, the least used experts of each layer stay in pinned host mem
 
 A step replays one CUDA graph: the token, the position and the routing stay on the card. A prompt goes through in
 chunks: the MoE layers group the chunk's tokens by expert."""
-import json
 import mmap
 import os
 import threading
@@ -18,9 +17,9 @@ import time
 import numpy as np
 
 from . import ltfit
-from .cold_experts import (ColdExpertReader, cold_enabled, cold_slot_plan, host_budget_bytes,
-                           split_host_tiers, split_q2)
+from .cold_experts import ColdExpertReader, cold_enabled, cold_slot_plan, host_budget_bytes, split_host_tiers, split_q2
 from .gguf import GGUF
+from .jsonio import load_json
 from .moe import MoESpec, Usage, plan
 from .nanbeige import _capture, _free_bytes, module
 
@@ -137,7 +136,9 @@ class Engine(object):
         self.k = {n: mod.get_function(n) for n in KERNELS + (K35_KERNELS if self.k35 else ())}
         if self.k35 and self.cc < 50:                      # Kepler: 8-byte shared memory banks for the tile loads
             import ctypes
-            cu = ctypes.CDLL("libcuda.so.1")
+
+            from .gpudrv import libcuda
+            cu = libcuda()
             for n in ("lt_mmk_q2", "lt_mmk32_q2", "lt_mmf_q2", "lt_mmf32_q2"):
                 cu.cuFuncSetSharedMemConfig(ctypes.c_void_p(getattr(self.k[n], "kernel", self.k[n]).ptr), 2)
         # tensor cores for the prompt on sm_75+ (lightning_tc.cu; Turing: LT_SM75); the other cards use lt_mm_q2
@@ -301,14 +302,14 @@ class Engine(object):
         """expert order per layer, most used first (lightning-experts.json, measured on a mixed text; else index)"""
         p = os.path.join(HERE, "lightning-experts.json")
         if os.path.exists(p):
-            return {int(k): v for k, v in json.load(open(p))["order"].items()}
+            return {int(k): v for k, v in load_json(p)["order"].items()}
         return {}
 
     def _usage_counts(self):
         """measured pick counts per layer, when the usage file has them"""
         p = os.path.join(HERE, "lightning-experts.json")
         if os.path.exists(p):
-            return {int(k): v for k, v in json.load(open(p)).get("counts", {}).items()}
+            return {int(k): v for k, v in load_json(p).get("counts", {}).items()}
         return {}
 
     def _tiers(self, il, order):
@@ -550,7 +551,7 @@ class Engine(object):
             cold = [(i, e) for i, e in enumerate(w.hoff) if e in w.hcold]
             self._join_prefetch()             # a decode lookahead may still be filling the queue
             spans = [self._cold_span(w, e) for _, e in cold]
-            for (i, e), raw in zip(cold, self.cold_reader.read_many(spans, coalesce=1)):
+            for (i, e), raw in zip(cold, self.cold_reader.read_many(spans, coalesce=1), strict=False):
                 codes, scales = split_q2(raw, w.rows, w.cols // 64)
                 host[base + i * w.cw:base + (i + 1) * w.cw] = codes
                 host[base + nh * w.cw + i * w.sw:base + nh * w.cw + (i + 1) * w.sw] = scales

@@ -14,7 +14,7 @@
     {
       "id": "rows-exact",
       "display": "12/12",
-      "quoted_in": ["CURRENT-VS-KINDI-0.6.md"],
+      "quoted_in": ["CURRENT-VS-KINDI-0.7.md"],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-stock-parity/parity-report.json",

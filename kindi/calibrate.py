@@ -8,18 +8,20 @@ configured context, and the effective draft length - so they are stored in one k
 of living in chat logs. KINDI_SPEC_K and an explicit `--tandem-cpu-layers` still win at runtime;
 the file records what was measured, it does not override the user.
 """
-import json
 import os
+
+from .jsonio import load_json
 
 
 def run(cfg, log=print):
     import cupy as cp
+
     from . import calib
     from .engine import make_engine
 
     pack = cfg["pack"]
     man_path = os.path.join(pack, "kindi_pack.json")
-    man = json.load(open(man_path)) if os.path.exists(man_path) else {}
+    man = load_json(man_path) if os.path.exists(man_path) else {}
     pack_sha = man.get("source_sha256")
     gpu = calib.gpu_identity()
     if not gpu:
@@ -29,7 +31,7 @@ def run(cfg, log=print):
         log("kindi calibrate: the pack manifest names no source_sha256; calibration keys on the pack hash")
         return 2
 
-    eng = make_engine(pack, ctx=cfg.get("ctx", 24576), log=log,
+    make_engine(pack, ctx=cfg.get("ctx", 24576), log=log,
                       kv_cache=cfg.get("kv_cache"))   # times + stores the g5 configs
     saved = calib.read(gpu, pack_sha) or {}
     shapes = len((saved.get("g5") or {}).get("lane") or {}) + len((saved.get("g5") or {}).get("row") or {})

@@ -10,13 +10,15 @@ k_q8row, k_attn_sq8t, k_attn_vq8w), half the memory, and a different - lossy - c
 import json
 import os
 import time
+from typing import Any
 
 import numpy as np
 
 try:
     import cupy as cp
-except ImportError:                   # a CPU-only host (KINDI_DEVICE=cpu)
-    cp = None
+    _CP_ERR = None
+except ImportError as _e:             # a CPU-only host (KINDI_DEVICE=cpu), or no GPU in the container
+    cp, _CP_ERR = None, _e
 
 
 def _cupy_arch_fix():
@@ -108,6 +110,7 @@ def _upload(a):
 
 
 class Kernels(object):
+    k_sumparts: Any                    # set from KERNELS in __init__; named here for the type checkers (tp.py's calibration)
     def __init__(self):
         mod = cp.RawModule(code=open(CU, encoding="utf-8").read())
         for k in KERNELS:
@@ -786,7 +789,7 @@ class Engine(object):
         return out
 
 
-PLAN_SMALL_HIP = ("gfx1151",)      # the AMD GPUs where the 2B / 4B / 9B take the plan engine (measured)
+PLAN_SMALL_HIP = ("gfx1151", "gfx1030")   # the AMD GPUs where the 2B / 4B / 9B take the plan engine (measured)
 
 
 def _is_turing(card):
@@ -874,6 +877,15 @@ def make_engine(pack, ctx=4096, clusters=None, log=print, tandem="off", cpu_laye
     builds the base engine `kindi serve` would build for the same pack. The server's draft
     sources (``lookup``, ``mtp_head``) are not gateway inputs: this path does not draft.
     """
+    if os.environ.get("KINDI_DEVICE", "gpu") == "intel":
+        raise SystemExit("kindi: KINDI_DEVICE=intel is not implemented yet - the SYCL backend "
+                         "(REQ-0020/REQ-0021) needs hardware to verify. Use KINDI_DEVICE=cpu for "
+                         "the CPU engine or the default CUDA/ROCm path for a discrete GPU.")
+    from .packcheck import PackError, check
+    try:
+        check(pack, "size")             # B16: a pack file that changed size after `kindi convert` stops here
+    except PackError as e:
+        raise SystemExit("kindi: %s" % e) from None
     man = None
     try:
         with open(os.path.join(pack, "kindi_pack.json")) as f:
@@ -957,6 +969,13 @@ def make_engine_legacy(pack, ctx=4096, clusters=None, log=print, tandem="off", c
             log("the fast head is not available in tandem mode: exact head")
         return TandemEngine(pack, ctx=ctx, cpu_layers=cpu_layers, mode=mode, log=log, gpu=gpu)
     if os.environ.get("KINDI_DEVICE", "gpu") == "cpu" or cp is None:
+        if os.environ.get("KINDI_DEVICE", "gpu") != "cpu":
+            # B11: a container started without --gpus has no CUDA driver library, CuPy does not load, and the server
+            # ran on the CPU without a word. Say so (KINDI_DEVICE=cpu, as the installer sets for the CPU, is quiet).
+            why = str(_CP_ERR).splitlines()[0][:160] if _CP_ERR and str(_CP_ERR) else "CuPy is not installed"
+            log("WARNING: no GPU is visible (%s). Kindi runs on the CPU engine, much slower. In Docker, start the "
+                "container with --gpus all (NVIDIA) or the AMD devices, also when you publish the port to the "
+                "network; set KINDI_DEVICE=cpu to use the CPU on purpose" % why)
         from .cpu import Engine as CPUEngine
         if clusters is not None:
             log("the fast head is not available on the CPU: exact head")
@@ -967,14 +986,14 @@ def make_engine_legacy(pack, ctx=4096, clusters=None, log=print, tandem="off", c
     force = os.environ.get("KINDI_TP", "")
     weights = int(man.get("bcodes_bytes", 0)) + int(man.get("dpm_bytes", 0))
     two = cp.cuda.runtime.getDeviceCount() >= 2
-    dims = man.get("dimensions", {})
     # the plan engine (kindi.tp) also runs on one card: it is the one that has the 27B's kernels (6 q heads per K/V
     # head, Hadamard blocks of 1024, q8_0 K/V). It is also the faster engine on the models that have it:
     # 2B tc read 471 vs 190 plain, 4B 214 vs 129, 9B 134 vs 90 tok/s (CROSS-MODE tc rows). So by default the
     # plan engine is used for every model it supports, not only the 27B; KINDI_TP=0 keeps the plain engine.
     plan_model = True
     # AMD GPUs with many CUs (Strix Halo, gfx1151): the 2B, 4B and 9B (512- and 4096-point folds) also run faster on
-    # the plan engine's 5-trit products (2B write 173 -> 259, 9B 52 -> 89 tokens/s); measured there only
+    # the plan engine's 5-trit products (2B write 173 -> 259, 9B 52 -> 89 tokens/s); the Radeon PRO W6800 (gfx1030,
+    # 60 CUs): 2B write 209 -> 253, read 2,164 -> 4,463 tokens/s at 512
     if cp.cuda.runtime.is_hip and int(man.get("hadamard_block", 512)) in (512, 4096) and not two:
         arch = cp.cuda.runtime.getDeviceProperties(cp.cuda.Device().id).get("gcnArchName", b"")
         arch = (arch.decode() if isinstance(arch, bytes) else str(arch)).split(":")[0]

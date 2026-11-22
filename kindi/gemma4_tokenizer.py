@@ -38,7 +38,7 @@ class Tok:
         self.ids = {}
         self.special = {}
         self.byte_reverse = {}
-        for idx, (piece, typ) in enumerate(zip(self.tokens, self.types)):
+        for idx, (piece, typ) in enumerate(zip(self.tokens, self.types, strict=False)):
             self.ids.setdefault(piece, idx)
             if int(typ) in (2, 3, 4) and piece:            # unknown, control, user-defined
                 self.special[piece] = idx

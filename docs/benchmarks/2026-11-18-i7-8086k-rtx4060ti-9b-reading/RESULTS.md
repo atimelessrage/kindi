@@ -8,7 +8,7 @@ paired bootstrap interval includes zero. No 9B reading difference is claimed.
 
 ## Why this run exists
 
-The same-settings A/B in `CURRENT-VS-KINDI-0.6.md` §4.6 recorded the 9B
+The same-settings A/B in `CURRENT-VS-KINDI-0.7.md` §4.6 recorded the 9B
 prompt-reading cell as unresolved: stock 83.9 (range 52.0-92.7) and fork 72.4
 (56.2-89.7), five passes each. Those distributions overlap, but the medians were
 11.5 tok/s apart. This run adds passes and measures the GPU clock and power

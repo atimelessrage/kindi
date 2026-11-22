@@ -9,6 +9,7 @@ host, because the penalty can move the best token and the band."""
 import os
 
 import numpy as np
+
 try:
     import cupy as cp
 except ImportError:               # the CPU engine

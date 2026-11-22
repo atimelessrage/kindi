@@ -32,11 +32,10 @@ for each, runs the expert kernels, then `cache.release(plan.token)` for every
 plan in `chunk.plans`. This module does no I/O and owns no stream; it is not
 thread-safe, like the cache it plans against.
 """
-import json
 
 __all__ = ["ChunkPlan", "plan_chunk"]
 
-from .expert_cache import ExpertCache, ExpertCacheFull, LOADING, _key
+from .expert_cache import LOADING, ExpertCache, _key
 
 
 class ChunkPlan(object):

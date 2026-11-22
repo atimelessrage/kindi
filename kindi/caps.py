@@ -62,7 +62,7 @@ def parse_smi(text):
             values = parts[:4] + [""] + parts[4:]
         else:
             continue
-        row = dict(zip(SMI_FIELDS, values))
+        row = dict(zip(SMI_FIELDS, values, strict=False))
         row["index"] = _int(row["index"])
         row["memory_total_mib"] = _int(row["memory_total_mib"])
         row["memory_free_mib"] = _int(row["memory_free_mib"])

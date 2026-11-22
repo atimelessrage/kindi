@@ -101,7 +101,7 @@ def test_repository_citations_are_accounted_for():
     assert not problems, problems
     assert cites, "the registry's docs cite no benchmark runs; the coverage rule would be vacuous"
     assert set(check_claims.load_registry(ROOT)["docs"]) == {
-        "docs/BACKENDS.md", "docs/ROADMAP.md", "CURRENT-VS-KINDI-0.6.md",
+        "docs/BACKENDS.md", "docs/ROADMAP.md", "CURRENT-VS-KINDI-0.7.md",
         "docs/AUTOTUNE.md", "docs/FP8-BF16.md", "docs/BENCHMARKS.md",
     }
     assert registry["unclaimed"] == []

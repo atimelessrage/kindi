@@ -12,44 +12,53 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `da58e88` on `wip/local-round-2026-11-20` (the docs-only commits `741d3f5`, `96acdea`, `69b08d2` and `c68fb69` follow the `66eebd3` code baseline; guarded by `tests/test_agents_handoff.py`); the 2026-11-20 integration lands the `0.7.0-fork` release surface, local archive builder, read-only Intel probe, dense placement portfolio, process-shared token-class grammar masks, stricter request validation and autotune/parity fixes, with the controlled benchmark, container-smoke and claims evidence tracked; the earlier 2026-11-19 round remains in history; Engine wiring and the model row remain blocked by the absent Lightning pack. The 2026-11-20 follow-up adds a per-card dense-tandem VRAM ceiling (`--vram-budget-mib` / `tandem_vram_mb`) and display reserve (`--vram-reserve-mib` / `tandem_reserve_mb`), applied as `min(free - reserve, ceiling)` by `auto`/`rate`, the runtime and autotune (over-budget peaks are not recommended); full CPU suite 1420 passed / 28 skipped. The 2026-11-21 refresh regenerates the stale configuration reference and updates the upstream PR coverage map in `CURRENT-VS-KINDI-0.6.md` to 15 open PRs (#47-#61, 54 of 897 changed paths, with #61 stacked on #54); `docs/ROADMAP.md` records TokenEconomizer as a parked agent-side token-economy idea. The 2026-11-22 A770 qualification makes `kindi intel-info` read Windows CIM/registry and enumerate Level Zero (16,384 MiB, 1 driver/1 device) with the 2B/4B/9B CPU baselines 4/4 at 22.2/11.1/6.5 tok/s; there is no Intel backend or support claim (evidence `docs/benchmarks/2026-11-22-i7-8086k-arc-a770/`). The 2026-11-22 audit follow-up adds one constant-time bearer check (`kindi/api/auth.py`) shared by both HTTP servers, ignores linked worktrees and downloaded packages, fixes the `/health` description in `SECURITY.md`, and refreshes this handoff; the audit's README/comparison counts were re-verified at their anchored commits and were already correct. The 2026-11-22 looped-model start adds `kindi/looped.py` with the measured stored-to-logical maps (SenseNova 33/57, Inkling 24/48), a specific converter refusal, `tests/test_looped.py`, REQ-0031 and the Q4_K_M header-evidence page; there is no loader, pack or support claim. The 2026-11-22 consolidation lands the A770 qualification, the confirmed-layout HB-4096 fix (a declined tensor-core layout falls back instead of stopping, and Turing never auto-enables HP), the shared bearer check, the looped-model maps and REQ-0029/REQ-0030, plus CUDA-less test guards; the full CPU suite is 1,419 passed / 58 skipped, 0 failed. The 2026-11-22 Gemma 4 memory fix answers upstream issue #44: tensor uploads use a plain synchronous copy instead of `cupy.asarray`, the resident load returns the pinned pool, and the prompt cache gives free pinned blocks back when parking or restoring; the regression tests run without a GPU. The 2026-11-22 structured-output prewarm adds `token_classes.prewarm` (index, trie, character and id sets) and starts it in a daemon thread from `kindi serve` for the dense/Gemma paths (`KINDI_PREWARM_GRAMMAR=0` opts out); on the 2B the prewarm is 2,475 ms and the first mask falls from 2,350 ms to 20 ms, with the REQ-0027 gate at 15/124 ms/token for `json_schema`/unrolled GBNF at 22 tokens and 3/20 at 200. No GPU A4/A5 or post-change server TTFT was measured. The full CPU suite is 1,423 passed / 58 skipped; quality is 312 Ruff / 59 mypy / 930 Pyright / 255 Pylint. The 2026-11-22 CLI refactor splits `main` into `_build_parser`, `_apply_overrides` and `_COMMANDS` (dispatch resolves the module global, so a patched command is honoured); no CLI behavior changed, and the full suite remains 1,423 passed / 58 skipped. The 2026-11-22 looped execution-plan slice adds `execution_plan`, tensor-index `layout` and `kindi loop-info FILE.gguf [--json]` (logical plan plus missing/unexpected stored blocks; no weights loaded), makes a changed `block_count` a specific refusal, and records the map-check scope in REQ-0031/ROADMAP/CHANGELOG; the full CPU suite is 1,426 passed / 58 skipped, 0 failed, quality is 312 Ruff / 59 mypy / 930 Pyright / 255 Pylint and claims are 37 gates / 265 numbers / 0 debt. The 2026-11-22 ARC memory-path slice adds `kindi intel-smoke` and `kindi/intel_l0.py`: on the installed A770 it creates a Level Zero context, allocates device/shared USM and passes a 16 MiB host-to-device-to-host round trip with 0 mismatches in 11.6 ms. The copy group is selected by COPY capability because the measured driver accepted copy commands on group 0 but produced zeros; `zeMemCopy` is absent from loader 1.33.1. This is M2 memory-path partial only: no kernel, GEMM, model, engine or support claim; focused Level Zero tests 7 passed, full CPU suite 1,433 passed / 58 skipped, quality 312 Ruff / 59 mypy / 930 Pyright / 255 Pylint, claims 37 gates / 265 numbers / 0 debt. The 2026-11-22 ARC kernel-path slice adds `kindi intel-cl` and `kindi/intel_cl.py`: the driver's own OpenCL C compiler builds a float32 vector-add and a 128x128 GEMM, and both are bit-exact on the A770 (0 mismatches; 1,048,576 adds in 6.5 ms, GEMM 0.666 ms for 5 launches at 31.5 GFLOP/s wall; 512 CUs, 15,932 MiB, driver 32.0.101.9175). `CL_PLATFORM_NAME`/`VENDOR` are 0x0902/0x0903, `clCreateBuffer` needs `CL_MEM_COPY_HOST_PTR` for a host pointer, and `CL_DEVICE_MAX_COMPUTE_UNITS` is 0x1002; the real run is `docs/benchmarks/2026-11-22-i7-8086k-arc-a770/cl-smoke.json`, focused OpenCL tests 7 passed, full CPU suite 1,440 passed / 58 skipped, quality 312 Ruff / 59 mypy / 930 Pyright / 255 Pylint, claims 37 gates / 265 numbers / 0 debt. This is M2's kernel/GEMM half through OpenCL, not a SYCL backend: no `libksycl.so`, device selection, model, engine or support claim. The 2026-11-22 runtime-config slice adds `kindi/runtime.py`: one resolver for the effective engine, TC/HP, K/V, context, speculation mode and head digest, chunk, threads and VRAM budget/reserve, read by the startup log, `/health` (new `runtime` block), `kindi info` and `bench --json`. `head` is the head that runs (a requested fast head on a no-fast-head engine reports exact) and `spec` is the same effective view `/health.drafting` exposes; before a load the block reports requests and `loaded: false`. Live 9B CPU smoke: the startup log and `/health` agree on engine=Engine (qwen35), tc=no, ctx 24576/24576, spec=off, head=exact, 6 threads and vram=0/512 MiB; `kindi plan` keeps its pre-load planner output. Full CPU suite 1,445 passed / 58 skipped, quality 312 Ruff / 59 mypy / 930 Pyright / 255 Pylint, claims 37 gates / 265 numbers / 0 debt. The 2026-11-22 selftest slice adds `kindi selftest [--json FILE]`: it loads the selected pack once, checks `/health` and runs one short greedy `/v1/chat/completions` request through the real in-process app, printing the effective runtime state, pack hash and timings; a missing pack, a tokenizer or engine load failure, a non-200 health check and an empty generation all exit non-zero. Fake-engine tests cover those paths, the JSON report and the CLI wiring; live `KINDI_DEVICE=cpu` runs pass on the 2B (24.5 s; `/health` 5.3 ms, 2 tokens in 434 ms) and 9B (112.1 s; `/health` 5.7 ms, 2 tokens in 1,913 ms). No GPU run (no CUDA here) and the installer does not call it yet. Full CPU suite 1,450 passed / 58 skipped, quality 312 Ruff / 59 mypy / 930 Pyright / 255 Pylint, claims 37 gates / 265 numbers / 0 debt.
+- **HEAD:** `50a973b` on `merge/upstream-0.7.0` (the 0.7.0 merge; parent `50a973b`, guarded by
+  `tests/test_agents_handoff.py`). **2026-11-23: official Kindi v0.7.0 (`8298a0f`) is merged in.** The merge base was
+  `dce89df`; the fork was 701 commits ahead and v0.7.0 two ahead (`v0.6.1` + the squashed 0.7.0 commit), so the branch is
+  now 0 behind and 702 commits / 931 changed files ahead (+133,113/-1,946), 1,066 tracked files vs 216, no upstream file
+  missing. 39 conflicted files (69 hunks) were resolved by hand: the fork keeps the implementations with tests, and
+  upstream's self-contained fixes were ported (`packcheck` size+sha256 gate and the `g5_*.src` source stamp, bench curve
+  positions #33, `gpudrv.libcuda()`, the cgroup parent walk #48, `chunk.py`'s GPU-path fixes, `tp.py`'s B15 split fixes,
+  `tc_hp_for(man, card)` #76, `kindi place`/`route`/`cards`, `oai.check` #38, installer card detection, 0.7.0 docs).
+  Upstream's `kindi plan` is exposed as **`kindi place`** because the fork already had `kindi plan`. Multi-slot serving
+  (`slots.py`, `--slots`, `KINDI_SLOTS_*`; `spec.py` has the `*_R` plans and `build_plan(..., slots=...)`) and the
+  Flash-Next adapter (`qwen4exp_*`, `qx_*`) are **present but not wired into the fork's server** - both need a GPU run
+  this host cannot do. Structured output still works: `oai.check(..., structured=True)` leaves `json_object`/
+  `json_schema`/`grammar` to the fork's decode grammar. Merge defects fixed before the gate: undefined
+  `slots`/`_slots`/`bc_all`/`dp_all`, a duplicate `tc_hp_for`, a shadowed `_busy` (every 429 was a 500), the streaming
+  path's nonexistent `K.acquire`, `qwen4exp_mtp`'s undefined `hst`, and 43 naked `json.load(open())` sites moved to
+  `jsonio.load_json`. Verification: pytest **1,450 passed / 58 skipped / 0 failed**; quality **207 Ruff / 59 mypy /
+  884 Pyright / 245 Pylint** (under the ratchet); config reference, support matrix, project memory, claims and
+  `bash -n install.sh` pass. No GPU, pack or Windows run; the vendored unwired `qwen4exp_*`/`qx_*` modules are outside
+  Pyright's and Pylint's scope until a GPU run wires them (`pyrightconfig.json`, `VENDORED_UNWIRED`).
 
 ### Python quality ratchet
 
 Audit F9's Python quality ratchet is `tools/check_python_quality.py`: Ruff 0.16.0 (`F`, `E9`, `B`, `I`)
 over the Python tree, mypy 2.4.0 over first-party production
 code, Pyright 1.1.414 (`basic`, all platforms) and Pylint 4.1.3 (`E`, `F`, import-error
-disabled) at Python 3.10 over the same production targets, recorded as **314 Ruff findings / 59 mypy
-errors / 991 Pyright errors / 255 Pylint findings** in
+disabled) at Python 3.10 over the same production targets, recorded as **207 Ruff findings / 59 mypy
+errors / 884 Pyright errors / 245 Pylint findings** in
 `tools/python_quality_baseline.json`. CI runs it; a new or increased file/rule count fails, while
 existing debt is tolerated and `--update --reason "..."` lowers the baseline after review; it refuses growth and records the reason and delta, so it cannot launder a new finding.
 `tests/test_python_quality.py` + `tests/test_ci_config.py` **14 passed**; no GPU run. Dependency scanning is report-only in CI (`tools/check_dependencies.py`, `requirements-runtime.txt`); the gate waits for a reviewed baseline. The prior test task is below.
-
-### MTP smoke guard
-
-`tests/test_mtp_smoke.py` is a CPU-only negative test for the
-post-request guard: a `drafting.last` block with `method="ngram"` raises
-`SmokeError`, naming the method and `not mtp`. The guard is
-`tools/mtp_smoke.py:_check_last_method`, so it is testable without a GPU;
-`python -m pytest tests/test_mtp_smoke.py -q` **3 passed**; record-bearing GPU smokes passed on 2026-11-19 (RTX 4060 Ti, ctx 4096; k=4 2 passes / 8 drafted / 3 accepted and k=1 3/3/2, one request each; `docs/MTP.md`). The tool also prints and writes a run record (pack, head and digest, ctx, `KINDI_SPEC_K`, GPU, serve command with its `KINDI_*` environment, request count) at the top of `--log`.
-
-### Audit follow-up
-
-The 2026-11-18 audit follow-up moved local machine roots out of tracked docs/evidence and benchmark logs, closed the DSV4.1 body-error keep-alive path (the
-413 now half-closes and drains a bounded prefix before closing; a socket-level test sends an oversized body followed by a valid request), added a Bridge smoke
-suite plus CI job, and pinned every workflow's actions. The forward-slash drive-root rule now lives in `tools/secret_patterns.py`; `findings()` applies it to non-test files and keeps the repository's `T:/kindi/` checkout allowed. The remaining ignored proposal report was redacted locally. The Nanbeige gateway is explicitly non-drafting: only the serve wrapper loads the `mtp_head`/`lookup` draft sources, while the adapter and verify/bench (`nanbeige_cli`) build the base engine, and `tests/test_served_engines.py` pins that split. The Bridge smoke job is pinned to the README command it runs by `tests/test_ci_config.py`.
 
 ### Full CPU gate
 
 The 2026-11-22 prewarm gate at `4bab483` is **1,423 passed, 58 skipped, 0 failed** in 138.50 s (plain CPU suite, no coverage rerun). The 2026-11-20 integration gate at `82a72bf` is **1,412 passed, 28 skipped, 0 failed** in 250.33 s (plain CPU suite, no coverage rerun). The last coverage-measured run remains `539a504`: **1,241 passed, 28 skipped, 0 failed** in 277.17 s at **46.36%** line+branch coverage (23,504 statements and 8,394 branches); its plain suite was 1,241 / 28 / 0 in 227.62 s. The consolidated 2026-11-19 content commits (`f75253b` + `84b6686`) remain **1,357 passed, 28 skipped, 0 failed** in 229.53 s. Every skip is inventoried by node ID and exact reason in `tests/README.md`.
 
-### Upstream v0.6.1 and comparison
+### Upstream v0.7.0 and comparison
+
+**2026-11-23:** upstream `v0.7.0` (`8298a0f`) is merged into this branch; the current comparison is
+`CURRENT-VS-KINDI-0.7.md` (0 commits behind, 702 ahead, 931 changed files). The PR status rechecked the same day:
+**33 fork PRs (#47-#79) open, 0 merged, 7 drafts**, external #37 open and dirty; #48, #49, #72 and #76 are in v0.7.0 by
+content and can be closed as included. The paragraphs below are the 0.6.1-era record that produced this tree.
 
 Stock moved to upstream `v0.6.1` (`7fececb`, fetched 2026-11-17) and one of its fixes was a bug this fork had: `kindi/mtp.py` never passed `k_rmsfold_qT`'s
 `hp`, so the MTP head's CUDA graph did not build and mode A speculation was dead on the tensor-core layout (fixed in `f934a55`, with
 `tests/test_kernel_arity.py`); measured after the fix, mode A at the old default `KINDI_SPEC_K=4` costs 0.66x on the 2B; at
 `KINDI_SPEC_K=1` it is 1.12-1.13x at 512 and 24K tokens of context and a wash at 8K (4-run medians, 2026-11-17, `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-mtp-context/RESULTS.md`), so mode A now
-defaults to k=1 (`docs/MTP.md`), and `CURRENT-VS-KINDI-0.6.md` records the current official v0.6.1 comparison (664-commit / 827-file
+defaults to k=1 (`docs/MTP.md`), and `CURRENT-VS-KINDI-0.7.md` records the current official v0.6.1 comparison (664-commit / 827-file
 delta at `53198e5`; the 2026-11-19 round adds request-shape validation, Windows secret-scan batching, MTP k=1, the Q2 expert lane, the controlled pairs and the chunk sweep; upstream `main` now points at the release commit `7fececb` (no post-release commit to port); round history in
 `detailed-fork-changelog.md`); §4.6 closes the same-settings A/B with stock `v0.6.1` (tag source, loader shim) and this
 tree at `a79137f` on the same 2B/9B packs at ctx 8192, plain engine and exact head, five passes each: every decode median is within 2.6% and the ranges overlap,
@@ -60,13 +69,10 @@ medians with ranges (the pages note that the 9B prompt-reading ranges overlap, s
 / missing / unverified tables with a closure condition per row; it distinguishes the 16-file `v0.6.0..v0.6.1` range from the 15-file 0.6.1 commit (the compose
 surface is present from `dce89df`) and records the MoE backend's status (exercised on GPU through Lightning). Upstream `v0.6.0` (`179710c`) + `origin/main` head
 (`dce89df`, v0.6.1's parent) both contained, while `v0.6.1` itself is one commit past `dce89df`; vs `v0.6.0` the tree is a strict superset; comparison report in
-`CURRENT-VS-KINDI-0.6.md`.
+`CURRENT-VS-KINDI-0.7.md`.
 
-### Bench split
-
-`kindi bench` now reports the prefill/decode share of one whole request (`--split-at`, default 4096,8192): on the 2B with a 128-token reply it is 13.6% prefill
-at 512 prompt tokens, 64.1% at 4K and 82.2% at 8K, and the chunked prefill runs at 4,349/3,215 tok/s against the 302 tok/s single-token read line, so the old
-pair of rates was not a request decomposition (`docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-bench-split/RESULTS.md`).
+Dated notes (MTP smoke guard, bench split, audit follow-up, commit-history redaction) moved to
+[docs/development/AGENTS-HISTORY.md](docs/development/AGENTS-HISTORY.md) on 2026-11-23.
 
 ### Engine-liveness roadmap
 
@@ -97,12 +103,6 @@ each pinned expert once while its byte totals stay per matrix, decode keeps a pe
 evicted and a repeated expert takes no read; `cold_stats()` reports `slot_hits`), the decode graph is disabled on this opt-in path, and the per-layer stream
 sync plus blocking current-layer read stay open (C9; no tok/s claimed), unit-tested only with **no larger-than-RAM pack, verify, GPU run or tok/s claimed**, and
 the Strata/KTransformers/BigMoeOnEdge triage is in `docs/EXTERNAL-ENGINES.md`.
-
-### Commit-history redaction
-
-The one commit message that named the knowledge-base folder in full was rewritten on 2026-11-17 to `$KINDI_AI_INVENTORY`; that commit and the 32 after it were
-re-hashed with identical trees and dates, both worktree branches were moved together, and every short hash cited below, in `CURRENT-VS-KINDI-0.6.md`, in the
-requirements history and in `docs/claims/` now names the rewritten commit.
 
 ### Suite and recent additions
 
@@ -234,10 +234,10 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `da58e88` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `wip/local-round-2026-11-20` | `da58e88` | this session; 2026-11-22 ARC memory and OpenCL kernel path |
+| `T:/kindi` | `main` | `50a973b` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `50a973b` | this session; 2026-11-23 Kindi 0.7.0 merge |
 
-The main worktree at `T:/kindi` is fast-forwarded to this round; the table names the previous commit `da58e88` (rule 5a).
+The main worktree at `T:/kindi` is fast-forwarded to this round; the table names the previous commit `50a973b` (rule 5a).
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
 **Shared files:** `AGENTS.md`, `README.md`, `WHY.md`, `CHANGELOG.md`, `install.sh`,

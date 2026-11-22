@@ -4,11 +4,12 @@ Spherical k-means of the 248,320 head rows (ternary x fp16 scales, in the folded
 rows are dequantised on the GPU chunk by chunk, normalised, assigned to the nearest unit centroid by cosine and the
 centroids re-estimated with scatter-adds. Writes <pack>/head_clusters.npz (assign [R], centroids [K, D]).
 About 2 minutes on a K420; needs ~300 MB of GPU memory (stop `kindi serve` first)."""
-import json
 import os
 import time
 
 import numpy as np
+
+from .jsonio import load_json
 
 DEQ_SRC = r'''
 extern "C" __global__ void deq(const unsigned char* __restrict__ b, const unsigned short* __restrict__ s,
@@ -31,8 +32,8 @@ DEQ_THREADS = 256                                  # threads per block of the de
 def build(pack, K=1024, iters=12, log=print):
     import cupy as cp
     import cupyx
-    head = json.load(open(os.path.join(pack, "kindi_pack.json"))).get("head", "token_embd.weight")
-    rec = json.load(open(os.path.join(pack, "bcodes_index.json")))["tensors"][head]
+    head = load_json(os.path.join(pack, "kindi_pack.json")).get("head", "token_embd.weight")
+    rec = load_json(os.path.join(pack, "bcodes_index.json"))["tensors"][head]
     R, C = rec["rows"], rec["ne0"]
     ns, P = C // 4, C // 128
     bc = np.fromfile(os.path.join(pack, "bcodes.bin"), dtype=np.uint8, count=ns * R,

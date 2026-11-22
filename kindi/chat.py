@@ -12,6 +12,7 @@ import os
 import re
 import uuid
 
+from .jsonio import load_json
 
 TOOL_INSTR = ('\n\nIf you choose to call a function ONLY reply in the following format with NO suffix:\n\n<tool_call>\n'
               '<function=example_function_name>\n<parameter=example_parameter_1>\nvalue_1\n</parameter>\n'
@@ -55,7 +56,7 @@ def template_variant(src):
     before the manifest stored the template falls back to the model and source file names."""
     if isinstance(src, str) and os.path.isdir(src):
         try:
-            src = json.load(open(os.path.join(src, "kindi_pack.json")))
+            src = load_json(os.path.join(src, "kindi_pack.json"))
         except (OSError, ValueError):
             return "qwen35"
     if isinstance(src, dict):

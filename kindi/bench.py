@@ -12,6 +12,19 @@ import time
 from . import runtime as runtime_view
 
 POSITIONS = (100, 2000, 8000, 16000, 24000)
+CURVE = (100, 2000, 8000, 16000, 24000)
+
+
+def curve_positions(ctx):
+    """the positions of the generation curve that fit a ctx-token context (each step takes 20 positions), plus the
+    deepest 100th position that fits when the context reaches well past the last fixed one (a 43,008-token context
+    ends the curve at 42,900); and the fixed positions that do not fit. Issue #33: the curve went missing without a
+    word when the context was smaller than the fixed positions."""
+    pos = [x for x in CURVE if x + 20 < ctx]
+    end = (ctx - 21) // 100 * 100
+    if pos and end >= pos[-1] + 4000:
+        pos.append(end)
+    return pos, [x for x in CURVE if x + 20 >= ctx]
 # A request is a prompt plus a reply, so the two rates decide different things: a 4K prompt with a
 # 128-token reply spends most of its wall clock in prefill, and tuning decode would not move it.
 # `--split-at` times that whole request and reports each phase's share of the clock.
@@ -211,9 +224,14 @@ def _run(cfg, log=print):
     result["read_tok_s"] = round(1000 / ms, 1)
     log("prompt reading:       %5.1f tokens/s" % (1000 / ms))
     modes = [("exact", 0)] + ([("fast", cfg["fast_clusters"])] if eng.hsl is not None else [])
+    pos, skip = curve_positions(eng.ctx)
+    log("generation curve: positions %s (context %d)" % (", ".join(str(p) for p in pos), eng.ctx))
+    if skip:
+        log("generation curve: positions %s are past the %d-token context and are not measured" % (
+            ", ".join(str(p) for p in skip), eng.ctx))
     for name, M in modes:
         eng.shortlist = M
-        for p in [x for x in POSITIONS if x + 20 < eng.ctx]:
+        for p in pos:
             ms = timed(lambda i: eng.step(2000 + i, p + i), 10)
             result["gen_tok_s"]["%s:%d" % (name, p)] = round(1000 / ms, 1)
             log("generation (%s head) at position %5d: %5.1f tokens/s" % (name, p, 1000 / ms))

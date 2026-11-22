@@ -48,8 +48,9 @@ def test_fits_no_cards_is_too_large():
 
 
 def test_model_dir_is_next_to_the_pack():
-    assert catalog.model_dir({"pack": "/x/packs/bonsai-2b"}) == os.path.join("/x/packs", "models")
-    assert catalog.model_dir({"pack": "/x/packs/bonsai-2b/"}) == os.path.join("/x/packs", "models")
+    pack = os.path.join(os.sep, "x", "packs", "bonsai-2b")   # the layout `kindi use` writes
+    assert catalog.model_dir({"pack": pack}) == os.path.join(os.sep, "x", "models")
+    assert catalog.model_dir({"pack": pack + os.sep}) == os.path.join(os.sep, "x", "models")   # a trailing slash
 
 
 def _small_catalog(tmp_path, files):
@@ -86,7 +87,7 @@ def test_blocking_sync_opt_out_is_honored(monkeypatch):
     monkeypatch.setenv("KINDI_BLOCKING_SYNC", "0")
     logged = []
     sched.blocking_sync(log=logged.append)
-    assert logged == []
+    assert logged == ["blocking sync: off (KINDI_BLOCKING_SYNC=0)"]   # 0.7.0 names the explicit opt-out
     assert sched._done[0] is False  # opt-out does not consume the once-per-process slot
 
 

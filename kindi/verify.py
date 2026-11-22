@@ -1,16 +1,17 @@
 """kindi verify: greedy output vs llama.cpp's reference for the same model file (4 prompts, the first 40 tokens
 llama.cpp generated from them at temperature 0). Every token must match. reference.json is the 2B; reference-4b.json,
 -9b.json and -27b.json the others (the 27B with llama.cpp's q8_0 K/V cache, as Kindi's 27B engine)."""
-import json
 import os
 import re
 import time
+
+from .jsonio import load_json
 
 
 def reference_for(pack):
     """the reference file of the pack's model (by the size in its source file name), or None"""
     here = os.path.dirname(os.path.abspath(__file__))
-    man = json.load(open(os.path.join(pack, "kindi_pack.json")))
+    man = load_json(os.path.join(pack, "kindi_pack.json"))
     m = re.search(r"-(\d+)B[-_.]", man.get("source_file", "") + ".") or re.search(r"(\d+)B", man.get("model", ""))
     size = (m.group(1) + "b") if m else "2b"
     p = os.path.join(here, "reference.json" if size == "2b" else "reference-%s.json" % size)
@@ -29,7 +30,7 @@ def run_gemma4(cfg, man, log=print):
     if not os.path.exists(rp):
         log("no llama.cpp reference for this model in this version of Kindi")
         return 2
-    ref = json.load(open(rp))
+    ref = load_json(rp)
     man = dict(man, pack_path=cfg["pack"])
     from .server import _two_cards
     if _two_cards():
@@ -116,14 +117,18 @@ def run(cfg, log=print):
         import cupy as cp
     except ImportError:
         cp = None
-    from .engine import make_engine
     import numpy as np
+
+    from .engine import make_engine
     pack = cfg["pack"]
-    man = json.load(open(os.path.join(pack, "kindi_pack.json")))
+    man = load_json(os.path.join(pack, "kindi_pack.json"))
     if man.get("backend") == "kindi_gemma4":
         return run_gemma4(cfg, man, log=log)
     if man.get("backend") == "kindi_nanbeige":
         from .nanbeige_cli import verify
+        return verify(cfg, man, log=log)
+    if man.get("backend") == "kindi_qwen4exp":
+        from .qwen4exp_cli import verify
         return verify(cfg, man, log=log)
     if man.get("backend") == "kindi_lightning":
         from .lightning_cli import verify
@@ -140,15 +145,28 @@ def run(cfg, log=print):
     if rp is None:
         log("no llama.cpp reference for this model in this version of Kindi")
         return 2
-    ref = json.load(open(rp))
+    ref = load_json(rp)
+    from .packcheck import PackError, check
+    try:                                    # B16: every pack file as kindi convert wrote it (sha256)
+        n = check(pack, "full", man)
+    except PackError as e:
+        log("FAIL: %s" % e)
+        return 1
+    pack_line = ("pack files: %s" % ("%d checked (size and sha256)" % n if n else
+                                    "no record (a pack from before 0.7.0; kindi convert --force adds it)"))
     cl = os.path.join(pack, "head_clusters.npz")
-    eng = make_engine(pack, ctx=1024, clusters=dict(np.load(cl)) if os.path.exists(cl) else None, log=log,
+    said = []
+    eng = make_engine(pack, ctx=1024, clusters=dict(np.load(cl)) if os.path.exists(cl) else None, log=said.append,
                        tandem=cfg.get("tandem", "off"), cpu_layers=cfg.get("tandem_cpu_layers"),
                        gpu=cfg.get("tandem_gpu"), kv_cache=cfg.get("kv_cache"))
     # the first line names the mode that will generate, so a PASS is never read as the plain engine's
-    # when speculation was on - or the reverse (REQ-0025 A1); a drafter that did not attach stops here (A4)
+    # when speculation was on - or the reverse (REQ-0025 A1); a drafter that did not attach stops here (A4).
+    # The engine's own setup lines follow it (0.7.0's pack check logs from make_engine).
     spec_mode, spec_line, refusal = spec_state(eng)
     log(spec_line)
+    for line in said:
+        log(line)
+    log(pack_line)
     if refusal:
         log("FAIL: %s" % refusal)
         return 2
@@ -167,11 +185,11 @@ def run(cfg, log=print):
             got, sp = eng.generate(r["ids"], len(r["expected"])), None
         sync()
         t = time.time() - t0
-        n = sum(1 for a, b in zip(got, r["expected"]) if a == b)
+        n = sum(1 for a, b in zip(got, r["expected"], strict=False) if a == b)
         ok = got == r["expected"]
         state, j, gap = "PASS" if ok else "FAIL", None, None
         if not ok:
-            j = next(k for k, (a, b) in enumerate(zip(got, r["expected"])) if a != b)
+            j = next(k for k, (a, b) in enumerate(zip(got, r["expected"], strict=False)) if a != b)
             gap = r["gap"][j] if r.get("gap") and j < len(r["gap"]) else None
             alt = r.get("alt") or []
             if (gap is not None and gap < TIE_GAP) or (j < len(alt) and alt[:j + 1] == got[:j + 1]):

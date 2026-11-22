@@ -103,7 +103,7 @@ def config_keys():
     if defaults is None:
         raise SystemExit("kindi: config.DEFAULTS not found in %s" % CONFIG_PY)
     out, group = [], ""
-    for key, value in zip(defaults.keys, defaults.values):
+    for key, value in zip(defaults.keys, defaults.values, strict=False):
         name = key.value
         found = _group_above(lines, key.lineno - 1)
         if found:

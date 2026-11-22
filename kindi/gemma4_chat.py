@@ -1,7 +1,10 @@
 """Native Kindi rendering of a Gemma 4 GGUF chat template."""
 import json
-from jinja2 import Environment, ChainableUndefined
+
+from jinja2 import ChainableUndefined, Environment
+
 from .gguf import GGUF
+
 
 def _raise(message):
     raise ValueError(str(message))

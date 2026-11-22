@@ -1,9 +1,12 @@
 """Kindi-owned Gemma 4 GGUF reader and CUDA primitives."""
 import mmap
-from collections import OrderedDict
 import os
+from collections import OrderedDict
+
 import numpy as np
+
 from .gguf import GGUF
+
 
 def ctypes_ptr(v):
     import ctypes
@@ -21,8 +24,9 @@ def _ptx_module(src,arch):
     """NVRTC 10.2 has no sm_80+ target: compile for compute_75, raise the PTX version and target, and let the driver
     build it for this card (the way tc.cu is loaded). The CUDA headers' directory is passed explicitly."""
     import re
+
     import cupy as cp
-    from cupy.cuda import compiler,function
+    from cupy.cuda import compiler, function
     inc=os.path.join(cp.cuda.get_cuda_path() or "/usr/local/cuda","include")
     ptx,_=compiler._NVRTCProgram(src,"gemma4_tc.cu").compile(("-arch=compute_75","-I"+inc))
     if isinstance(ptx,bytes): ptx=ptx.decode()
@@ -36,7 +40,8 @@ def _fp8_module():
     sm_89 is the first target that has it; the sm_89 form is portable, so a Blackwell driver JITs
     the same PTX for sm_100/sm_120 tensor cores."""
     import re
-    from cupy.cuda import compiler,function
+
+    from cupy.cuda import compiler, function
     src=open(os.path.join(os.path.dirname(__file__),"gemma4_fp8.cu"),encoding="utf-8").read()
     ptx,_=compiler._NVRTCProgram(src,"gemma4_fp8.cu").compile(("-arch=compute_75",))
     if isinstance(ptx,bytes): ptx=ptx.decode()
@@ -87,7 +92,7 @@ class Ops:
         self.hgemm=None
         if cc!="hip" and int(cc)>=70 and os.environ.get("KINDI_G4_TC","1")!="0":     # cuBLAS on tensor cores
             from cupy_backends.cuda.libs import cublas
-            ctypes_mod=__import__("ctypes")
+            __import__("ctypes")
             one=np.array([1.0],dtype=np.float32); zero=np.array([0.0],dtype=np.float32)
             own=cublas.create()      # a handle of its own: CuPy's handle and its state are never touched
             cublas.setPointerMode(own,0)
@@ -525,7 +530,7 @@ class EmbeddingPipeline:
         raw=self.file._resident[name]
         return raw.view(self.cp.float32).reshape(shape)
     def inputs(self,token):
-        cp=self.cp; token=int(token)
+        token=int(token)
         if token<0 or token>=self.info["dimensions"]["vocab"]:
             raise ValueError("token id is outside the Gemma 4 vocabulary")
         w=self.file._resident
@@ -815,6 +820,7 @@ class Engine(object):
         if self.ple_host: self._ple_row.set(self._ple_table[int(token)])    # ordered before the graph (blocking stream)
         if g is None:
             import ctypes
+
             from . import gpudrv
             drv=gpudrv.driver(); P=ctypes.c_void_p                     # libcuda, or its HIP stand-in on ROCm
             st=cp.zeros(2,dtype=cp.int32); stream=cp.cuda.Stream()      # blocking: ordered with the null stream
@@ -832,7 +838,7 @@ class Engine(object):
         assert g["drv"].cuGraphLaunch(g["exec"],ctypes_ptr(g["stream"].ptr))==0
         return g["out"]
     def forward(self,token,pos,logits=True):
-        cp=self.cp; token=int(token); pos=int(pos)
+        token=int(token); pos=int(pos)
         if pos<0 or pos>=self.ctx: raise OverflowError("Gemma 4 context limit reached")
         if logits and self.shortlist<=0 and self.graph_ok and os.environ.get("KINDI_G4_GRAPH","1")!="0":
             return self._graph_forward(token,pos)
@@ -997,9 +1003,9 @@ class Engine(object):
 
 def build_fast_head(model_path,out_dir,K=1024,iters=10,log=print):
     """Build Kindi's optional centroid shortlist for a GGUF Q3_K output embedding."""
+
     import cupy as cp
     import cupyx
-    from pathlib import Path
     tf=TensorFile(model_path)
     try:
         t=tf.tensors["token_embd.weight"]

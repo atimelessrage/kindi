@@ -40,18 +40,19 @@ import re
 import threading
 import time
 import uuid
-from typing import Any
+from typing import Any, NoReturn
 
 import numpy as np
 
-from . import COMMIT, __version__, chat, runtime as runtime_view
+from . import COMMIT, __version__, chat
+from . import runtime as runtime_view
 from .api import errors as api_errors
 from .api.auth import bearer_matches
 from .cache import Cancelled, Runner
 from .constrained import STRUCTURED_TYPES, is_structured
 from .engine import EOS
+from .jsonio import load_json
 from .sampling import Sampler
-
 
 THINK_CLOSE = "\n\nI have thought enough; time to act.\n</think>\n\n"
 
@@ -80,7 +81,7 @@ class RequestError(ValueError):
         self.param = param          # the request field at fault, named in the error envelope
 
 
-def _request_error(msg, param=None):
+def _request_error(msg, param=None) -> NoReturn:
     raise RequestError(msg, param=param)
 
 
@@ -557,7 +558,7 @@ class Kindi(object):
         pack = cfg["pack"]
         if not os.path.exists(os.path.join(pack, "kindi_pack.json")):
             raise SystemExit("kindi: no model pack at %s - run: kindi convert <model.gguf>" % pack)
-        man = json.load(open(os.path.join(pack, "kindi_pack.json")))
+        man = load_json(os.path.join(pack, "kindi_pack.json"))
         family = served_backend(man)
         self.pack_id = (man.get("source_sha256") or "pack")[:12]
         self.native = family == "kindi_gemma4"
@@ -721,11 +722,11 @@ class Kindi(object):
         return Sampler._pick(allowed,scores.astype(np.float64),temperature,top_p,top_k,rng)
 
     def _generate_gemma(self,req,cancel=None):
-        from .gemma4_chat import render as render_gemma
         from . import gemma4_tools
+        from .gemma4_chat import render as render_gemma
         cfg=self.cfg; messages=gemma4_tools.prepare_messages(req.get("messages") or [])
-        tools=req.get("tools") or None
-        if req.get("tool_choice")=="none": tools=None
+        from . import oai
+        tools,_=oai.check(req,can_force=False,structured=True)   # #38, but the schema is this path's own grammar
         kw=dict(req.get("chat_template_kwargs") or {})
         kw["enable_thinking"]=bool(kw.get("enable_thinking",req.get("enable_thinking",False)))
         kw["conversational_mode"]=bool(kw.get("conversational_mode",False))
@@ -908,8 +909,8 @@ class Kindi(object):
         """after a request has been answered, on the engine thread: queue the end-of-turn state for disk.
         locked: the caller holds self.lock already (the stream generator)."""
         r = getattr(self, "runner", None)
-        if r is None or not hasattr(r, "turn_end"):
-            return
+        if r is None or not hasattr(r, "turn_end") or getattr(self, "slot_views", None):
+            return                                   # (decode slots: each slot saves its turn before it is freed)
         if locked:
             r.turn_end()
         else:
@@ -958,6 +959,13 @@ class Kindi(object):
 
     def progress(self):
         """the request being served: phase, tokens reused, read and to read, generated"""
+        if getattr(self, "slot_views", None):
+            act = [v for v in self.slot_views if v.busy["active"]]
+            if not act:
+                return None
+            p = act[0].progress()
+            p["slots_busy"] = len(act)
+            return p
         b = self.busy
         if not b["active"]:
             return None
@@ -980,10 +988,12 @@ class Kindi(object):
             self._grammar_texts_for()
         cfg = self.cfg
         messages = req.get("messages") or []
-        tools = req.get("tools") or None
-        if req.get("tool_choice") == "none":
-            tools = None
+        from . import oai
+        tools, force = oai.check(req, can_force=True, structured=True)   # #38; schemas compile below
         think = bool((req.get("chat_template_kwargs") or {}).get("enable_thinking", req.get("enable_thinking", False)))
+        if force is not None:
+            think = False                                # a forced call is the whole reply: no thinking block first
+        forced = oai.forced_call_prefix(force) if force is not None else ""
         budget = req.get("thinking_budget_tokens") or req.get("thinking_budget") or cfg.get("thinking_budget") or 0
         budget = int(budget) if think else 0
         from .profiles import sampling_defaults
@@ -1016,7 +1026,7 @@ class Kindi(object):
         body, gp = chat.render(messages, tools, think, variant=self.variant, reasoning_effort=effort,
                                preserve_thinking=kw.get("preserve_thinking"))
         Tb = self.tok.encode(body)
-        T = Tb + self.tok.encode(gp)
+        T = Tb + self.tok.encode(gp + forced)             # a forced call: the reply starts with the call's opening
         ctx = self.eng.ctx
         if len(T) + 1 >= ctx:
             raise ContextOverflow(len(T), ctx)
@@ -1053,7 +1063,9 @@ class Kindi(object):
             else:                                              # speculative decoding (KINDI_SPEC), min-p included
                 self.eng.spec_begin(temperature <= 0, temperature, top_p, top_k, rng, min_p)
         dec = codecs.getincrementaldecoder("utf-8")(errors="replace")
-        text, gen, finish = "", [], "length"
+        text, gen, finish = forced, [], "length"
+        if forced:
+            yield "text", forced                          # so a stream holds the call back as it does for a written one
         # while thinking, pieces go out as ("reasoning", ...) - the last 8 characters are held back in case they are
         # the start of "</think>"; after it, as ("text", ...)
         st = {"think": think, "sent": 0, "forced": False, "lead": think}
@@ -1297,15 +1309,48 @@ class _Yield(object):
         self.cancel.set()
 
 
+# the speeds of the last finished request, for /health (Kindi Monitor and Bridge read them)
+LAST: dict = {}
+
+
+def _note_last(info, t0, t_first):
+    """the "done" info of a request -> LAST: prompt and write speeds. The engines that report "timing" give their
+    own; the others are timed here (from the start of the request to its first piece, then to its end)."""
+    now = time.time()
+    u = info.get("usage") or {}
+    tm = info.get("timing") or {}
+    n = int(u.get("completion_tokens") or 0)
+    new = int(tm.get("prompt_new_tokens", int(u.get("prompt_tokens") or 0) -
+                     int((u.get("prompt_tokens_details") or {}).get("cached_tokens") or 0)))
+    if tm:
+        ps, gs, wt = float(tm.get("prompt_s") or 0), float(tm.get("gen_s") or 0), float(tm.get("gen_tok_s") or 0)
+    else:
+        tf = t_first or now
+        ps, gs = max(0.0, tf - t0), max(0.0, now - tf)
+        wt = (n - 1) / gs if n > 1 and gs > 0 else 0.0
+    LAST.clear()
+    LAST.update(prompt_tokens=int(u.get("prompt_tokens") or 0), prompt_new=new, tokens=n,
+                prompt_s=round(ps, 3), write_s=round(gs, 3), prompt_tps=round(new / ps, 1) if ps > 0 and new > 0 else 0.0,
+                write_tps=round(wt, 2), finished=round(now, 1))
+
+
 def run_generate(K, req, cancel, prio):
     """K.generate with the priority classes: a background request that yields to chat requests runs them here, then
     starts again (from the prompt cache). Yields what K.generate yields."""
     while True:
-        c = _Yield(cancel, K) if prio >= PRIO_BACKGROUND else cancel
+        # (decode slots: requests do not wait for one another, so a background request does not yield)
+        c = _Yield(cancel, K) if prio >= PRIO_BACKGROUND and getattr(K, "slot", None) is None else cancel
         done = False
+        t0, t_first = time.time(), None
         for item in K.generate(req, c):
+            if t_first is None and item[0] in ("text", "reasoning"):
+                t_first = time.time()
             if item[0] == "done":
                 done = True
+                try:
+                    _note_last(item[1], t0, t_first)
+                except Exception:  # noqa: BLE001 - telemetry only
+                    pass
             yield item
         if done or cancel.is_set() or not getattr(c, "fired", False):
             return
@@ -1479,6 +1524,14 @@ def create_app(cfg, log=print):
 
     def _busy(e):
         return _err(429, str(e), "server_busy", {"Retry-After": "1"})
+
+    def _bad(e):
+        """a ValueError of a request as HTTP 400; an oai.RequestError also names the field (#38)"""
+        p = getattr(e, "param", None)
+        if p:
+            return JSONResponse({"error": {"message": str(e), "type": "invalid_request_error", "param": p,
+                                           "code": "unsupported_" + p}}, status_code=400)
+        return _err(400, str(e))
 
     def _auth(request):
         return bearer_matches(request.headers.get("authorization", ""), cfg["api_key"])
@@ -1656,6 +1709,19 @@ def create_app(cfg, log=print):
             return _err(500, "kindi: %s" % e, "server_error")
         finally:
             gate.release()
+
+    on_gpu = K.cp is not None and os.environ.get("KINDI_DEVICE", "gpu") != "cpu"
+    card = {}
+    if on_gpu:   # the card this server runs on, so a monitor can match it with NVML (CUDA_VISIBLE_DEVICES renumbers)
+        try:
+            dev = K.cp.cuda.Device()
+            card["gpu_pci"] = str(dev.pci_bus_id).lower()
+            u = bytes(K.cp.cuda.runtime.getDeviceProperties(dev.id).get("uuid", b"") or b"")[:16]
+            if len(u) == 16:
+                h = u.hex()
+                card["gpu_uuid"] = "GPU-%s-%s-%s-%s-%s" % (h[:8], h[8:12], h[12:16], h[16:20], h[20:])
+        except Exception:  # noqa: BLE001 - telemetry only
+            pass
 
     @app.get("/health")
     def health(request: Request):
@@ -2082,7 +2148,11 @@ def create_app(cfg, log=print):
                 return _busy(e)
 
             def sse():
-                with K.lock:
+                for item in _sse(K):
+                    yield item
+
+            def _sse(V):
+                with V.lock:
                     mine["started"] = True
                     yield chunk({"role": "assistant", "content": ""})
                     held, in_call = "", False
@@ -2124,10 +2194,10 @@ def create_app(cfg, log=print):
                         yield "data: " + json.dumps({"error": {"message": str(e), "type": "invalid_request_error"}}) + "\n\n"
                     except Exception as e:  # noqa: BLE001 - engine failure becomes an SSE error event, by design
                         yield "data: " + json.dumps({"error": {"message": "kindi: %s" % e, "type": "server_error"}}) + "\n\n"
-                        _after_engine_error(K, e)
+                        _after_engine_error(V, e)
                     yield "data: [DONE]\n\n"
                     if not cancel.is_set():
-                        K.after_turn(locked=True)     # the client has its answer; the next request waits for this
+                        V.after_turn(locked=True)     # the client has its answer; the next request waits for this
             async def relay():
                 # the generator runs in a worker thread; if the client disconnects, Starlette cancels this
                 # coroutine, the finally sets `cancel`, and the engine stops at its next token
@@ -2201,7 +2271,6 @@ def create_app(cfg, log=print):
             _after_engine_error(K, e)
             return 500, {"error": {"message": "kindi: %s" % e, "type": "server_error", "code": "server_error"}}
 
-        loop = asyncio.get_event_loop()
         # kindi_keepalive (or the header X-Kindi-Keepalive: 1): a non-streaming client behind a proxy with an idle
         # timeout gets a space every KEEPALIVE_S until the JSON answer. JSON allows whitespace before the value, but
         # the status is then 200 before the answer is known: an error comes as an {"error": ...} body with status
