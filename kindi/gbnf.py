@@ -638,7 +638,7 @@ class Grammar(object):
         if self._mask_texts is not texts:
             from .token_classes import TokenClassTable
 
-            self._mask_table = TokenClassTable(texts, self._step, self._token_safe_sets)
+            self._mask_table = TokenClassTable(texts, self._step, self._token_safe_sets, prefer_trie=True)
             self._mask_texts = texts
             self._vocab_cache.clear()
         table = self._mask_table

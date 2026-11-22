@@ -149,3 +149,4 @@ and the rest).
 | `KINDI_CKPT_PINNED` | `1` under WSL2, else `0` | `1` = the host copies of the checkpoints are in pinned memory. Under Windows (WDDM), this makes the first token faster |
 | `KINDI_HOST_RAM_CHECK` | `1` | before the weights of a card load, the plan engine stops when the free host RAM is too small. `0` = no check |
 | `KINDI_BLOCKING_SYNC` | `1` | the host thread sleeps while it waits for the card, and does not use a CPU core. `0` = it waits in a loop (the driver default) |
+| `KINDI_PREWARM_GRAMMAR` | `1` | `kindi serve` builds the dense/Gemma structured-output vocabulary index and trie in a background thread after the engine loads, so the first `json_schema` or `grammar` request does not pay the cold build. `0` = lazy build on the first constrained request |

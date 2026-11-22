@@ -29,6 +29,11 @@ import numpy as np
 # new grammar in the same process does not rebuild them.  The cache is bounded:
 # a server normally has one pack, while tests create many small vocabularies.
 _INDEX_CACHE_LIMIT = 2
+# A first-character exact scan is cheaper than building the trie up to this many
+# candidate ids.  The 2B vocabulary's JSON start state keeps ~107K and scans in
+# ~70 ms.  The trie is the default for both grammars; this limit applies only to
+# a table built with prefer_trie=False.
+_FIRST_CHAR_LIMIT = 150000
 _INDEX_CACHE: "collections.OrderedDict[int, tuple[object, _VocabularyIndex]]" = collections.OrderedDict()
 _INDEX_LOCK = threading.Lock()
 
@@ -36,14 +41,15 @@ _INDEX_LOCK = threading.Lock()
 class _VocabularyIndex(object):
     """The vocabulary-only part of a token-class table."""
 
-    __slots__ = ("texts", "by_first", "by_char", "charsets", "alphabet",
+    __slots__ = ("texts", "by_first", "char_masks", "char_bits", "all_mask", "alphabet",
                  "all_ids", "safe_ids", "outside_ids", "outside_tries", "root", "lock")
 
-    def __init__(self, texts, by_first, by_char, charsets, alphabet):
+    def __init__(self, texts, by_first, char_masks, char_bits, alphabet):
         self.texts = texts
         self.by_first = by_first
-        self.by_char = by_char
-        self.charsets = charsets
+        self.char_masks = char_masks
+        self.char_bits = char_bits
+        self.all_mask = (1 << len(char_bits)) - 1
         self.alphabet = alphabet
         self.all_ids = np.arange(len(texts), dtype=np.int64)
         self.safe_ids = {}
@@ -56,20 +62,22 @@ class _VocabularyIndex(object):
 def _build_index(texts):
     """Build the vocabulary-only indexes for ``texts``."""
     by_first = collections.defaultdict(list)
-    by_char = collections.defaultdict(list)
-    charsets = []
+    char_masks = []
+    char_bits = {}
     alphabet = set()
     for token_id, text in enumerate(texts):
-        first = text[:1]
-        by_first[first].append(token_id)
-        chars = frozenset(text)
-        charsets.append(chars)
-        alphabet.update(chars)
-        for ch in chars:
-            by_char[ch].append(token_id)
+        by_first[text[:1]].append(token_id)
+        mask = 0
+        for ch in set(text):
+            bit = char_bits.get(ch)
+            if bit is None:
+                bit = 1 << len(char_bits)          # one bit per character in the alphabet
+                char_bits[ch] = bit
+                alphabet.add(ch)
+            mask |= bit
+        char_masks.append(mask)
     by_first = {k: np.asarray(v, dtype=np.int64) for k, v in by_first.items()}
-    by_char = {k: np.asarray(v, dtype=np.int64) for k, v in by_char.items()}
-    return _VocabularyIndex(texts, by_first, by_char, charsets, frozenset(alphabet))
+    return _VocabularyIndex(texts, by_first, char_masks, char_bits, frozenset(alphabet))
 
 
 def _index_for(texts):
@@ -94,8 +102,8 @@ class _Node(object):
     def __init__(self):
         self.children = {}
         self.ids = []
-        self.all_ids = ()
-        self.chars = frozenset()
+        self.all_ids = None
+        self.chars = None
 
 
 class TokenClassTable(object):
@@ -112,14 +120,18 @@ class TokenClassTable(object):
     use; the server and the backends already build it once and keep it.
     """
 
-    def __init__(self, texts, step, safe_sets):
+    def __init__(self, texts, step, safe_sets, prefer_trie=True):
         self.texts = texts
         self._step = step
         self._safe_sets = safe_sets
+        # The trie is the default for both grammars.  The exact first-character
+        # path remains available for a caller that explicitly turns the trie off.
+        self._prefer_trie = prefer_trie
         self._index = _index_for(texts)
         self._by_first = self._index.by_first
-        self._by_char = self._index.by_char
-        self._charsets = self._index.charsets
+        self._char_masks = self._index.char_masks
+        self._char_bits = self._index.char_bits
+        self._all_mask = self._index.all_mask
         self._alphabet = self._index.alphabet
         self._all_ids = self._index.all_ids
         self._safe_ids = self._index.safe_ids
@@ -135,6 +147,12 @@ class TokenClassTable(object):
             # complement small, so only tokens containing a non-loop character
             # need the exact check.  Narrow loops go to the trie.
             chosen = max(safe, key=len)
+            # A narrow class (whitespace before a JSON value, digits, a GBNF
+            # character class) is cheaper through the prewarmed trie than a
+            # full-vocabulary safe-set scan.  Broad classes (a JSON string
+            # body) still take the one-slice fast path below.
+            if self._prefer_trie and len(chosen) * 8 < len(self._alphabet):
+                return self._trie_allowed(state, safe)
             ids = self._safe_ids_for(chosen)
             if len(ids) * 2 >= len(self.texts):
                 outside = self._outside_ids_for(chosen)
@@ -142,10 +160,18 @@ class TokenClassTable(object):
                     kept = self._subset_allowed(state, outside, chosen)
                     ids = np.union1d(ids, kept)
                 return ids
+            # A narrow safe set (for example the whitespace before a JSON
+            # value) should not pay for the whole trie when the first-character
+            # buckets are cheap to check exactly.
+            if not self._prefer_trie:
+                exact = self._first_char_allowed(state)
+                if exact is not None:
+                    return exact
             return self._trie_allowed(state, safe)
-        ids = self._first_char_allowed(state)
-        if ids is not None:
-            return ids
+        if not self._prefer_trie:
+            ids = self._first_char_allowed(state)
+            if ids is not None:
+                return ids
         return self._trie_allowed(state, safe)
 
     def _advance(self, state, text):
@@ -160,21 +186,16 @@ class TokenClassTable(object):
             cached = self._safe_ids.get(chars)
             if cached is not None:
                 return cached
-            outside_chars = [c for c in self._alphabet if c not in chars]
-            expected = sum(len(self._by_char[c]) for c in outside_chars)
-            if expected <= len(self.texts) * 4:
-                pieces = [self._by_char[c] for c in outside_chars if c in self._by_char]
-                outside = (np.unique(np.concatenate(pieces)) if pieces else
-                           np.empty(0, dtype=np.int64))
-                self._outside_ids[chars] = outside
-                ids = np.setdiff1d(self._all_ids, outside)
-            else:
-                # A narrow loop: scanning the token character sets is cheaper than
-                # materializing almost the whole vocabulary as an outside union.
+            safe_bits = 0
+            for ch in chars:
+                safe_bits |= self._char_bits.get(ch, 0)
+            outside = self._all_mask & ~safe_bits
+            if outside:
                 ids = np.fromiter(
-                    (i for i, token_chars in enumerate(self._charsets)
-                     if token_chars <= chars),
+                    (i for i, mask in enumerate(self._char_masks) if not (mask & outside)),
                     dtype=np.int64)
+            else:
+                ids = self._all_ids
             self._safe_ids[chars] = ids
             return ids
 
@@ -204,7 +225,7 @@ class TokenClassTable(object):
             if ch == "" or self._step(state, ch) is not None:
                 pieces.append(ids)
                 kept += len(ids)
-        if kept > 50000:
+        if kept > _FIRST_CHAR_LIMIT:
             return None
         return self._exact_candidates(state, pieces)
 
@@ -242,53 +263,135 @@ class TokenClassTable(object):
         return np.asarray(sorted(out), dtype=np.int64)
 
     def _build_trie(self):
+        return _trie_for(self._index)
+
+    def _chars_under(self, node):
+        """The characters below ``node``, computed once and cached."""
+        cached = node.chars
+        if cached is not None:
+            return cached
         with self._index.lock:
-            if self._index.root is not None:
-                return self._index.root
-            root = _Node()
-            for token_id, text in enumerate(self.texts):
-                node = root
-                for ch in text:
-                    node = node.children.setdefault(ch, _Node())
-                node.ids.append(token_id)
+            stack = [(node, False)]
+            while stack:
+                current, seen = stack.pop()
+                if current.chars is not None:
+                    continue
+                if seen:
+                    chars = set()
+                    for ch, child in current.children.items():
+                        chars.add(ch)
+                        chars.update(child.chars)
+                    current.chars = frozenset(chars)
+                else:
+                    stack.append((current, True))
+                    stack.extend((child, False) for child in current.children.values()
+                                 if child.chars is None)
+            return node.chars
 
-            def finish(node):
-                all_ids = list(node.ids)
-                chars = set()
-                for ch, child in node.children.items():
-                    chars.add(ch)
-                    child_ids, child_chars = finish(child)
-                    all_ids.extend(child_ids)
-                    chars.update(child_chars)
-                node.all_ids = tuple(all_ids)
-                node.chars = frozenset(chars)
-                return node.all_ids, node.chars
-
-            finish(root)
-            self._index.root = root
-            return root
+    def _ids_under(self, node):
+        """All ids below ``node``, collected once on demand and cached."""
+        cached = node.all_ids
+        if cached is not None:
+            return cached
+        with self._index.lock:
+            if node.all_ids is not None:
+                return node.all_ids
+            out = []
+            stack = [node]
+            while stack:
+                current = stack.pop()
+                out.extend(current.ids)
+                stack.extend(current.children.values())
+            node.all_ids = np.asarray(out, dtype=np.int64)
+            return node.all_ids
 
     def _trie_allowed(self, state, safe):
         """Walk the character trie, pruning subtrees covered by ``safe``."""
         root = self._build_trie()
-        out = []
+        pieces = []
         stack = [(root, state)]
         while stack:
             node, node_state = stack.pop()
             if node_state is None:
                 continue
-            if any(node.chars <= chars for chars in safe):
-                out.extend(node.all_ids)
+            if any(self._chars_under(node) <= chars for chars in safe):
+                pieces.append(self._ids_under(node))
                 continue
             if node.ids:
-                out.extend(node.ids)
+                pieces.append(np.asarray(node.ids, dtype=np.int64))
             for ch, child in node.children.items():
                 next_state = self._step(node_state, ch)
                 if next_state is not None:
                     stack.append((child, next_state))
-        if not out:
+        if not pieces:
             return np.empty(0, dtype=np.int64)
-        return np.asarray(sorted(out), dtype=np.int64)
+        return np.unique(np.concatenate(pieces))
 
 
-__all__ = ["TokenClassTable"]
+def _trie_for(index):
+    """Build (once) and return the character trie for a shared vocabulary index."""
+    with index.lock:
+        if index.root is not None:
+            return index.root
+        root = _Node()
+        for token_id, text in enumerate(index.texts):
+            node = root
+            for ch in text:
+                node = node.children.setdefault(ch, _Node())
+            node.ids.append(token_id)
+        index.root = root
+        return root
+
+
+def _chars_for_all(root):
+    """Fill every node's character set bottom-up (prewarm only)."""
+    stack = [(root, False)]
+    while stack:
+        node, seen = stack.pop()
+        if node.chars is not None:
+            continue
+        if seen:
+            chars = set()
+            for ch, child in node.children.items():
+                chars.add(ch)
+                chars.update(child.chars)
+            node.chars = frozenset(chars)
+        else:
+            stack.append((node, True))
+            stack.extend((child, False) for child in node.children.values()
+                         if child.chars is None)
+
+
+def _ids_for_all(root):
+    """Fill every node's id tuple bottom-up (prewarm only)."""
+    stack = [(root, False)]
+    while stack:
+        node, seen = stack.pop()
+        if node.all_ids is not None:
+            continue
+        if seen:
+            ids = list(node.ids)
+            for child in node.children.values():
+                ids.extend(child.all_ids)
+            node.all_ids = tuple(ids)
+        else:
+            stack.append((node, True))
+            stack.extend((child, False) for child in node.children.values()
+                         if child.all_ids is None)
+
+
+def prewarm(texts):
+    """Build the vocabulary index, trie, character sets and id sets before the first request.
+
+    The trie is grammar-independent, so a server can build it at startup (in the
+    background) and a later structured request only pays its per-state mask.
+    """
+    index = _index_for(texts)
+    root = _trie_for(index)
+    with index.lock:
+        _chars_for_all(root)
+        _ids_for_all(root)
+    return root
+
+
+__all__ = ["TokenClassTable", "prewarm"]

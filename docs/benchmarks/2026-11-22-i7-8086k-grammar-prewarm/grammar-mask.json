@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-22",
+  "host": "i7-8086K, Windows 10; CPU filter measurement, no GPU",
+  "pack": "~/.kindi/packs/bonsai-2b",
+  "vocab_entries": 248320,
+  "short": {
+    "json_schema": {"tokens": 22, "misses": 17, "filter_ms": 340.0, "ms_per_token": 15.0},
+    "gbnf_json_d1": {"tokens": 22, "misses": 18, "filter_ms": 2724.0, "ms_per_token": 124.0,
+                     "states": 1737},
+    "gbnf_json_d2": {"tokens": 22, "misses": 18, "filter_ms": 1829.0, "ms_per_token": 83.0,
+                     "states": 3195},
+    "gbnf_json_d3": {"tokens": 22, "misses": 18, "filter_ms": 1853.0, "ms_per_token": 84.0,
+                     "states": 9483},
+    "gbnf_record": {"tokens": 22, "misses": 19, "filter_ms": 1547.0, "ms_per_token": 70.0,
+                    "states": 1061}
+  },
+  "long": {
+    "json_schema": {"tokens": 200, "misses": 43, "filter_ms": 632.0, "ms_per_token": 3.0},
+    "gbnf_ordered_record": {"tokens": 200, "misses": 55, "filter_ms": 3951.0,
+                             "ms_per_token": 20.0, "states": 831}
+  },
+  "cold_start": {
+    "first_mask_without_prewarm_ms": 2350.3,
+    "repeat_mask_ms": 2.5,
+    "prewarm_ms_runs": [2473.0, 2475.0, 2571.0],
+    "prewarm_median_ms": 2475.0,
+    "first_mask_after_prewarm_ms_runs": [19.6, 20.0, 20.0],
+    "first_mask_after_prewarm_median_ms": 20.0
+  }
+}

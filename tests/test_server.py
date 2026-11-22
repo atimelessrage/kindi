@@ -16,7 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from gbnf_fixtures import CANONICAL_JSON
-from kindi import server
+from kindi import server, token_classes
 
 
 def test_kindi_close_releases_the_engine_once():
@@ -34,6 +34,34 @@ def test_kindi_close_releases_the_engine_once():
     kindi.close()
     assert kindi.eng is None
     assert engine.closed == 1
+
+
+def test_the_structured_output_prewarm_runs_in_the_background(monkeypatch):
+    class Tok(object):
+        tokens = ["{", "}", "true", " ", '"a"']
+
+        def decode_bytes(self, i):
+            return self.tokens[i].encode("utf-8")
+
+    messages = []
+    kindi = server.Kindi.__new__(server.Kindi)
+    kindi.variant = "qwen35"
+    kindi.tok = Tok()
+    kindi.log = messages.append
+    kindi._grammar_texts = None
+    kindi._grammar_texts_lock = threading.Lock()
+
+    monkeypatch.delenv("KINDI_PREWARM_GRAMMAR", raising=False)
+    thread = kindi.start_grammar_prewarm()
+    assert thread is not None
+    thread.join(5)
+    assert not thread.is_alive()
+    texts = kindi._grammar_texts
+    assert token_classes._index_for(texts).root is not None
+    assert any("ready" in message for message in messages)
+
+    monkeypatch.setenv("KINDI_PREWARM_GRAMMAR", "0")
+    assert kindi.start_grammar_prewarm() is None
 
 
 def test_the_server_names_only_families_it_can_serve():

@@ -159,7 +159,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_G4_PAD` | `1` | `kindi/gemma4.py:608` |
 | `KINDI_G4_PARK_MAX` | `4` | `kindi/gemma4_cache.py:35` |
 | `KINDI_G4_PLE_HOST` | `auto` | `kindi/gemma4.py:490` |
-| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:725` |
+| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:765` |
 | `KINDI_G4_PROMPT_CACHE` | `1` | `kindi/gemma4_cache.py:33` |
 | `KINDI_G4_Q5_DP4A` | `1` | `kindi/gemma4.py:80` |
 | `KINDI_G4_RESERVE_MB` | `1024` | `kindi/gemma4.py:552` |
@@ -244,6 +244,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:976` (+1 more) |
 | `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:977` |
 | `KINDI_PIPE` | `1` | `kindi/dsv41.py:683` |
+| `KINDI_PREWARM_GRAMMAR` | `1` | `kindi/server.py:648` |
 | `KINDI_PROMPT_CACHE` | `1` | `kindi/cache.py:769` (+1 more) |
 | `KINDI_Q8X2` | `1` | `kindi/chunk.py:272` |
 | `KINDI_SAMPLER_ORDER` | `llama` | `kindi/sampling.py:19` |

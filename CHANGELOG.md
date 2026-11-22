@@ -11,6 +11,14 @@ installer hashes are recorded in `docs/INSTALL.md`; publication is still a relea
 
 ### Added
 
+- **The first structured request no longer pays the vocabulary build** — `kindi serve` starts
+  `token_classes.prewarm` in a daemon thread after the engine loads, building the process-shared
+  index, trie, character sets and id sets for the dense and Gemma paths
+  (`KINDI_PREWARM_GRAMMAR=0` opts out). On the 2B the build is 2,475 ms and the first mask falls
+  from 2,350 ms to 20 ms; repeat masks are 2.5 ms. The same change keeps the REQ-0027 gate at
+  15/124 ms/token for `json_schema`/unrolled GBNF at 22 tokens and 3/20 at 200. A4/A5 GPU
+  exactness and the post-change server TTFT remain unmeasured. Evidence:
+  `docs/benchmarks/2026-11-22-i7-8086k-grammar-prewarm/RESULTS.md`.
 - **The dense tandem portfolio is comparable before a model is loaded** — `kindi plan --portfolio`
   prices full GPU, `cpu-first` and `gpu-first` in one dry run with the planner's own byte estimate,
   labelled against free VRAM and with a capacity-first recommendation (full GPU wins whenever it

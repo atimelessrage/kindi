@@ -613,12 +613,54 @@ class Kindi(object):
                       "spec_passes": 0, "spec_drafted": 0, "spec_accepted": 0,
                       "errors": 0, "gen_seconds": 0.0, "last_tok_s": 0.0}
         self.t0 = time.time()
+        self._grammar_texts = None
+        self._grammar_texts_lock = threading.Lock()
 
     def close(self):
         """Release engine-owned OS resources (the Lightning cold reader and its lookahead)."""
         eng, self.eng = getattr(self, "eng", None), None
         if eng is not None:
             getattr(eng, "close", lambda: None)()
+
+    def _grammar_texts_for(self):
+        """The token texts shared by every grammar, built once.
+
+        The prewarm and the first structured request must pass the same list
+        object: the token-class index is keyed by its identity.
+        """
+        lock = getattr(self, "_grammar_texts_lock", None)
+        if lock is None:                     # a test double built without Kindi.__init__
+            lock = self._grammar_texts_lock = threading.Lock()
+        with lock:
+            texts = getattr(self, "_grammar_texts", None)
+            if texts is None:
+                tokens = getattr(self.tok, "tokens", None)
+                n = len(tokens) if tokens is not None else len(self.tok.vocab)
+                texts = [self.tok.decode_bytes(i).decode("utf-8", "replace")
+                         for i in range(n)]
+                self._grammar_texts = texts
+            return texts
+
+    def start_grammar_prewarm(self):
+        """Build the structured-output vocabulary index and trie off the request path."""
+        if self.variant not in ("qwen35", "bonsai27", "gemma4"):
+            return None
+        if os.environ.get("KINDI_PREWARM_GRAMMAR", "1") == "0":
+            return None
+        thread = threading.Thread(target=self._prewarm_grammar, name="kindi-grammar-prewarm",
+                                  daemon=True)
+        thread.start()
+        return thread
+
+    def _prewarm_grammar(self):
+        try:
+            from .token_classes import prewarm
+
+            started = time.time()
+            prewarm(self._grammar_texts_for())
+            self.log("structured-output vocabulary ready in %.1fs" % (time.time() - started))
+        except Exception as e:  # noqa: BLE001 - prewarm is an optimization, not a startup gate
+            self.log("structured-output prewarm skipped: %s" % e)
 
     def head_mode(self):
         """exact | fast: the state file (written by `kindi head`) wins over the config."""
@@ -669,9 +711,7 @@ class Kindi(object):
     def _g4_json_token(self,logits,grammar,gstate,temperature,top_p,top_k,rng):
         """the next token inside a structured-output reply: the best grammar-legal one, from the full vocabulary,
         so the finished reply parses against the schema by construction (same allowed-set rule as the dense path)."""
-        if not hasattr(self,"_grammar_texts"):
-            self._grammar_texts=[self.tok.decode_bytes(i).decode("utf-8","replace") for i in range(len(self.tok.tokens))]
-        allowed=grammar.vocab_allowed(gstate,self._grammar_texts)
+        allowed=grammar.vocab_allowed(gstate,self._grammar_texts_for())
         if grammar.done(gstate):
             allowed=np.concatenate([allowed,np.array(sorted(self.tok.stop_ids),dtype=np.int64)])
         if allowed.size==0:
@@ -937,9 +977,7 @@ class Kindi(object):
         if is_structured(rf):
             grammar = _response_format_grammar(rf, req)
             gstate = grammar.start()
-            if not hasattr(self, "_grammar_texts"):
-                self._grammar_texts = [self.tok.decode_bytes(i).decode("utf-8", "replace")
-                                        for i in range(len(self.tok.vocab))]
+            self._grammar_texts_for()
         cfg = self.cfg
         messages = req.get("messages") or []
         tools = req.get("tools") or None
@@ -2211,6 +2249,9 @@ def create_app(cfg, log=print):
 def serve(cfg, log=print):
     import uvicorn
     app = create_app(cfg, log)
+    engine = getattr(app.state, "kindi", None)
+    if engine is not None and hasattr(engine, "start_grammar_prewarm"):
+        engine.start_grammar_prewarm()
     log("serving on http://%s:%d/v1 (model %s)" % (cfg["host"], cfg["port"], cfg["model_name"]))
     try:
         uvicorn.run(app, host=cfg["host"], port=int(cfg["port"]), log_level="warning")

@@ -174,6 +174,39 @@ def test_the_vocabulary_index_is_built_once_for_two_grammars(monkeypatch):
     assert len(builds) == 1
 
 
+def test_the_trie_keeps_descendant_ids_lazy():
+    """Building the trie must not copy every id into every ancestor (cold-start cost)."""
+    texts = list(TEXTS)
+    grammar = grammar_from_schema({"type": "string"})
+    table = grammar._vocab_table(texts)
+    root = table._build_trie()
+    stack = [root]
+    while stack:
+        node = stack.pop()
+        assert node.all_ids is None
+        assert node.chars is None
+        stack.extend(node.children.values())
+
+
+def test_prewarm_builds_the_shared_trie_once():
+    texts = list(TEXTS)
+    root = token_classes.prewarm(texts)
+    assert root is token_classes._index_for(texts).root
+    assert root.chars is not None          # prewarm leaves no lazy trie work
+    assert root.all_ids is not None
+    table = grammar_from_schema({"type": "string"})._vocab_table(texts)
+    assert table._build_trie() is root
+
+
+def test_the_exact_first_char_path_still_matches():
+    texts = list(TEXTS)
+    grammar = grammar_from_schema({"type": "object", "properties": {"s": {"type": "string"}},
+                                   "required": ["s"]})
+    table = grammar._vocab_table(texts)
+    table._prefer_trie = False
+    _same_mask(grammar, texts, [grammar.start()])
+
+
 def test_a_shared_index_does_not_change_either_language():
     """The process cache shares only vocabulary data, never grammar proofs or state caches."""
     texts = list(TEXTS)
