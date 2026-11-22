@@ -40,7 +40,7 @@ the state at that commit.
 | [REQ-0028](requirements/REQ-0028.md) | An Anthropic Messages endpoint for agent harnesses | proposed | `8c4decde1d0f` | `8c4decde1d0f` |
 | [REQ-0029](requirements/REQ-0029.md) | Self-hosted n8n can call a local Kindi server | proposed | `7e675235290d` | `7e675235290d` |
 | [REQ-0030](requirements/REQ-0030.md) | Selectable native accelerators for measured hot Python paths | proposed | `7e675235290d` | `4bab483f9257` |
-| [REQ-0031](requirements/REQ-0031.md) | Looped-transformer model family (SenseNova-Loop-9B, Inkling 2 Mini) | active | `7e675235290d` | `7e675235290d` |
+| [REQ-0031](requirements/REQ-0031.md) | Looped-transformer model family (SenseNova-Loop-9B, Inkling 2 Mini) | active | `7e675235290d` | `d619328243c1` |
 
 `uncommitted` means the requirement file is not in `HEAD` yet. Commit the requirement
 and run the generator again to record its real added/last-modified hashes.
