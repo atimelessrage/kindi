@@ -97,6 +97,8 @@ class G4Cache(object):
             self.evicted_bytes += freed
             self.log("prompt cache: evicted %d host snapshot(s), %.1f MiB, to stay within %.1f MiB (%.1f MiB used)"
                      % (dropped, freed / 2 ** 20, self.budget / 2 ** 20, self._used_bytes() / 2 ** 20))
+            P = snap = None                   # the dropped copies are unreferenced now
+            self._give_back()
 
     def metrics(self):
         """eviction telemetry for /metrics and tests"""
@@ -133,10 +135,11 @@ class G4Cache(object):
         return buf
 
     @staticmethod
-    def _free_pinned():
-        """Give CuPy's free pinned blocks back to the OS (issue #44).  Only free blocks are
-        released: parked data and live checkpoints stay valid.  A test stub or CPU-only runtime
-        need not expose the pool."""
+    def _give_back():
+        """dropped host copies go back to the OS (issue #44). A dropped cupyx.empty_pinned buffer returns to CuPy's
+        pinned pool, which reuses a block only for a request of the same size and never frees it by itself, so the
+        server grew with every parked conversation and checkpoint. cache._recycle does the same for the 27B's
+        checkpoints; a test stub or CPU-only runtime need not expose the pool."""
         try:
             import cupy as cp
             cp.get_default_pinned_memory_pool().free_all_blocks()
@@ -192,7 +195,7 @@ class G4Cache(object):
         """set the card up for ids and return how many leading positions are already there"""
         if not self.on:
             self.tokens, self.ckpts, self.parked = [], [], []
-            self._free_pinned()
+            self._give_back()
             return 0
         here, snap = self._resume_point(self.tokens, self.ckpts, ids)
         # a parked conversation that shares more of ids comes back to the card
@@ -213,7 +216,7 @@ class G4Cache(object):
                      % (len(P["tokens"]), p))
             self._enforce_budget()
             del P                                   # the globals copy is no longer referenced
-            self._free_pinned()
+            self._give_back()
             return p
         if here < 0.5 * len(self.tokens) and len(self.tokens) >= 1024:
             self._park_active(ids)
@@ -221,7 +224,10 @@ class G4Cache(object):
         if snap is not None:
             self._rings_set(snap)
         self.tokens = list(self.tokens[:here])
+        before = len(self.ckpts)
         self.ckpts = [c for c in self.ckpts if c[0] <= here]
+        if len(self.ckpts) < before:
+            self._give_back()                 # the ring copies past the resume point are unreferenced now
         self._enforce_budget()
         return here
 
@@ -238,6 +244,7 @@ class G4Cache(object):
                      % (n, need / 2 ** 20, self.budget / 2 ** 20))
             return
         parked_bytes = sum(self._parked_bytes(P) for P in self.parked)
+        evicted = 0
         while self.parked and need + parked_bytes > self.budget:
             P = self.parked.pop(0)
             freed = self._parked_bytes(P)
@@ -245,14 +252,19 @@ class G4Cache(object):
             self.evictions += 1
             self.evicted_bytes += freed
             self.parked_dropped += 1
+            evicted += 1
             self.log("prompt cache: evicted a parked conversation, %.1f MiB, to make room for a %d-token conversation"
                      % (freed / 2 ** 20, n))
+        if evicted:
+            P = None                          # the evicted conversations are unreferenced now
+            self._give_back()
         self.parked.append({"tokens": list(self.tokens), "globals": self._globals_host(n), "ckpts": ck})
+        del ck                                # the local list would keep a dropped ring copy alive
         self.tokens, self.ckpts = [], []       # the active checkpoints are now owned by the parked conversation
         self._note_usage()
         self.log("prompt cache: conversation of %d tokens parked in host memory (%d parked)" % (n, len(self.parked)))
         self._enforce_budget()
-        self._free_pinned()
+        self._give_back()
 
     def advanced(self, tokens, checkpoint=False):
         """the card now holds tokens (call after each prompt batch, at the prompt's end and after generated tokens)"""
@@ -278,6 +290,8 @@ class G4Cache(object):
                 self.checkpoints_dropped += dropped
                 self.log("prompt cache: evicted %d checkpoint(s), %.1f MiB, over the %d-checkpoint limit"
                          % (dropped, freed / 2 ** 20, self.ckpt_max))
+                old = None                    # the dropped ring copies are unreferenced now
+                self._give_back()
             self._enforce_budget()
 
     def append(self, token):

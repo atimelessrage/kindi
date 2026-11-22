@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `157d2f1` on `merge/upstream-0.7.0` (the 0.7.0 merge commit is `551b8f5`; guarded by
+- **HEAD:** `2c11bbc` on `merge/upstream-0.7.0` (the 0.7.0 merge commit is `551b8f5`; guarded by
   `tests/test_agents_handoff.py`). **2026-11-23: official Kindi v0.7.0 (`8298a0f`) is merged in.** The merge base was
   `dce89df`; the fork was 701 commits ahead and v0.7.0 two ahead (`v0.6.1` + the squashed 0.7.0 commit), so the branch is
   now 0 behind and 702 commits / 931 changed files ahead (+133,113/-1,946), 1,066 tracked files vs 216, no upstream file
@@ -30,7 +30,9 @@ line of evidence (command + result). A task must be resumable from this file alo
   `jsonio.load_json`. Verification: pytest **1,450 passed / 58 skipped / 0 failed**; quality **207 Ruff / 59 mypy /
   884 Pyright / 245 Pylint** (under the ratchet); config reference, support matrix, project memory, claims and
   `bash -n install.sh` pass. No GPU, pack or Windows run; the vendored unwired `qwen4exp_*`/`qx_*` modules are outside
-  Pyright's and Pylint's scope until a GPU run wires them (`pyrightconfig.json`, `VENDORED_UNWIRED`).
+  Pyright's and Pylint's scope until a GPU run wires them (`pyrightconfig.json`, `VENDORED_UNWIRED`). The Gemma 4
+  pinned-host fix (#44) now follows 0.7.0's naming and release points (`_to_card`, `_give_back` on every dropped
+  copy) with the fork's host budget kept on top; `tests/test_gemma4_cache.py` pins all of them.
 
 ### Python quality ratchet
 
@@ -234,10 +236,10 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `157d2f1` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `157d2f1` | this session; 2026-11-23 Kindi 0.7.0 merge |
+| `T:/kindi` | `main` | `2c11bbc` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `2c11bbc` | this session; 2026-11-23 Kindi 0.7.0 merge |
 
-The main worktree at `T:/kindi` is fast-forwarded to this round; the table names the previous commit `157d2f1` (rule 5a).
+The main worktree at `T:/kindi` is fast-forwarded to this round; the table names the previous commit `2c11bbc` (rule 5a).
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
 **Shared files:** `AGENTS.md`, `README.md`, `WHY.md`, `CHANGELOG.md`, `install.sh`,

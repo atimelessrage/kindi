@@ -141,7 +141,7 @@ def test_parking_does_not_double_count_the_active_checkpoint(make_cache):
 def test_parking_and_restoring_return_free_pinned_blocks(make_cache, monkeypatch):
     """Upstream #44: the host copies must not stay in CuPy's pinned pool."""
     calls = []
-    monkeypatch.setattr(G4Cache, "_free_pinned", staticmethod(lambda: calls.append(1)))
+    monkeypatch.setattr(G4Cache, "_give_back", staticmethod(lambda: calls.append(1)))
     monkeypatch.setattr(G4Cache, "_globals_set", lambda self, g, n: None)
     monkeypatch.setattr(G4Cache, "_rings_set", lambda self, snap: None)
     g4 = make_cache(budget_bytes=40000)
@@ -160,3 +160,47 @@ def test_zero_checkpoint_limit_does_not_keep_a_ring_snapshot(make_cache):
     g4._park_active(None)
     assert g4.parked[0]["ckpts"] == []
     assert g4.metrics()["used_bytes"] == 32768
+
+
+def test_dropped_checkpoints_return_their_pinned_blocks(make_cache, monkeypatch):
+    """Upstream #44: trimming a checkpoint list must also give the dropped ring copies back."""
+    calls = []
+    monkeypatch.setattr(G4Cache, "_give_back", staticmethod(lambda: calls.append(1)))
+    g4 = make_cache(budget_bytes=1 << 20)
+    g4.ckpt_max = 1
+    g4.advanced(list(range(1024)), checkpoint=True)
+    assert len(g4.ckpts) == 1
+    calls.clear()
+    g4.advanced(list(range(1026)), checkpoint=True)   # drops the 1024 checkpoint
+    assert len(g4.ckpts) == 1
+    assert calls
+
+
+def test_prepare_shrink_returns_the_dropped_checkpoints(make_cache, monkeypatch):
+    """Upstream #44: resuming from an earlier point drops the checkpoints past it."""
+    calls = []
+    monkeypatch.setattr(G4Cache, "_give_back", staticmethod(lambda: calls.append(1)))
+    monkeypatch.setattr(G4Cache, "_rings_set", lambda self, snap: None)
+    g4 = make_cache(budget_bytes=1 << 20)
+    g4.advanced(list(range(1024)), checkpoint=True)
+    g4.advanced(list(range(1026)), checkpoint=True)
+    assert len(g4.ckpts) == 2
+    calls.clear()
+    assert g4.prepare(list(range(1024)) + [9999]) == 1024   # keeps the 1024 checkpoint, drops the 1026 one
+    assert [c[0] for c in g4.ckpts] == [1024]
+    assert calls
+
+
+def test_budget_evictions_return_the_pinned_blocks(make_cache, monkeypatch):
+    """Upstream #44: the pool must get the blocks of an evicted parked conversation."""
+    calls = []
+    monkeypatch.setattr(G4Cache, "_give_back", staticmethod(lambda: calls.append(1)))
+    g4 = make_cache(budget_bytes=33025)          # room for one 1024-token park (33,024 B)
+    g4.tokens = list(range(1024))
+    g4._park_active(None)
+    assert len(g4.parked) == 1
+    calls.clear()
+    g4.tokens = list(range(1024))
+    g4._park_active(None)                        # the second park evicts the first
+    assert len(g4.parked) == 1
+    assert calls
