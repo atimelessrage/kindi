@@ -7,7 +7,8 @@ driver registers a Level Zero driver, and the loader enumerates one driver and o
 ([run](benchmarks/2026-11-22-i7-8086k-arc-a770/README.md)). Both M2 halves now run on the same host
 without oneAPI: `kindi intel-smoke` round-trips 16 MiB through Level Zero device/shared USM, and
 `kindi intel-cl` compiles and runs exact vector-add and GEMM kernels with the driver's OpenCL C
-compiler. There is still no SYCL backend, Kindi engine path or model run. The plan's first support
+compiler, and `kindi intel-ternary` runs a packed ternary GEMV over the pack's 4-trit/byte layout
+with a bit-exact host check. There is still no SYCL backend, Kindi engine path or model run. The plan's first support
 target remains Linux; the Windows run qualifies the hardware, the memory path and the device kernel
 path, not Kindi support (tracked as [REQ-0020](development/requirements/REQ-0020.md)).
 
@@ -266,6 +267,30 @@ the device:
 This is the kernel/GEMM half of M2 measured through OpenCL, not SYCL: it proves device compute and
 exactness on the card, but there is no `libksycl.so`, no Kindi backend or engine path, no model and
 no support claim. `kindi intel-cl` is a qualification probe, not a backend entry point.
+
+### M2 packed ternary GEMV probe (2026-11-23)
+
+`kindi intel-ternary` is the first probe over the pack's actual ternary layout instead of dense
+float kernels. It builds a matrix with `convert.phase_bytes` (4 trits per byte, byte = t0 + 3*t1 +
+9*t2 + 27*t3, stored `[column/4][row]`) and one fp16 scale per 128 weights (`[column/128][row]`,
+widened to float32 on the host), uploads those two buffers unchanged, and runs one OpenCL C GEMV
+kernel on the A770. The host reference decodes the same packed bytes; the activations are small
+integers and the scales are 1.0/0.5/2.0/1.5, so every result must match bit for bit rather than
+within a tolerance.
+
+Measured on the A770 (driver 32.0.101.9175), one work-item per row, one warm-up and five timed
+launches:
+
+| rows x cols | mismatches | warm-up | 5 launches | GFLOP/s (wall) |
+|---|---|---|---|---|
+| 64 x 1024 | 0 | 4.989 ms | 0.944 ms | 0.694 |
+| 128 x 4096 | 0 | 4.637 ms | 2.470 ms | 2.123 |
+| 512 x 4096 | 0 | 4.807 ms | 2.437 ms | 8.604 |
+
+Reports: `docs/benchmarks/2026-11-23-i7-8086k-arc-a770/`. This is the on-disk pack layout, not the
+engine's load-time 5-trit lane repack (`kindi/layout.py`); the activation is not quantized and one
+work-item per row is not a throughput design, so the rates are observations, not a claim. It adds no
+backend, model, SYCL path or support row: M2 stays partial.
 
 ### M2 next step: SYCL vector-add smoke (planned 2026-11-23, not run)
 

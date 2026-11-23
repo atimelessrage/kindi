@@ -58,6 +58,15 @@ content; the other 29 fork PRs are still open.
   compute units and driver 32.0.101.9175. This is M2's kernel/GEMM half measured through OpenCL,
   not a SYCL backend: there is no `libksycl.so`, Kindi device selection, model, engine or support
   claim (REQ-0020).
+- **The A770 decodes Kindi's packed ternary weights in a kernel** — the new host-only
+  `kindi intel-ternary [--rows 64] [--cols 1024] [--repeats 5] [--json]` builds a matrix in the
+  pack file's layout (4 trits per byte, `byte = t0 + 3 t1 + 9 t2 + 27 t3`, stored `[column/4][row]`;
+  one fp16 scale per 128 weights), uploads those buffers unchanged and runs an OpenCL C GEMV on
+  the A770. A host reference that decodes the same bytes matches bit for bit: 0 mismatches at
+  64x1024, 128x4096 and 512x4096, with 5 launches in 0.944/2.470/2.437 ms and 0.694/2.123/8.604
+  GFLOP/s wall. The probe covers the on-disk pack layout, not the engine's 5-trit lane repack;
+  there is no activation quantization, SYCL path, backend, model, engine or support claim
+  (REQ-0020).
 - **Intel Arc A770 has an executable Level Zero memory path** — the new host-only
   `kindi intel-smoke [--mib 16] [--device 0] [--json]` creates a Level Zero context on the
   installed A770, allocates device and shared USM, copies a known pattern through a command

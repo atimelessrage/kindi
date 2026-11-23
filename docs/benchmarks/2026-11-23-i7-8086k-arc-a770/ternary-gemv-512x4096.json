@@ -1,0 +1,97 @@
+{
+  "backend": "opencl packed-ternary gemv probe; no sycl, model, engine or backend",
+  "build": {
+    "log": null,
+    "ok": true,
+    "source_bytes": 1047
+  },
+  "device": {
+    "compute_units": 512,
+    "device_version": "OpenCL 3.0 NEO ",
+    "driver_version": "32.0.101.9175",
+    "global_mem_mib": 15932,
+    "max_clock_mhz": 2400,
+    "max_work_group_size": 1024,
+    "name": "Intel(R) Arc(TM) A770 Graphics",
+    "opencl_c_version": "OpenCL C 1.2 ",
+    "vendor": "Intel(R) Corporation"
+  },
+  "device_count": 1,
+  "device_index": 0,
+  "error": null,
+  "gemv": {
+    "cols": 4096,
+    "elapsed_ms": 2.437,
+    "first_mismatch": null,
+    "gflops": 8.604,
+    "max_abs_error": 0.0,
+    "mismatches": 0,
+    "repeats": 5,
+    "rows": 512,
+    "warmup_ms": 4.807
+  },
+  "layout": {
+    "scales": "fp16 per 128 weights, [column/128][row]; widened to float32 on the host",
+    "weight": "trit - 1, scaled by the 128-weight group's scale",
+    "weights": "4 trits per byte, byte = t0 + 3*t1 + 9*t2 + 27*t3; [column/4][row]"
+  },
+  "loader": {
+    "available": true,
+    "error": null,
+    "name": "OpenCL.dll"
+  },
+  "pack": {
+    "bcodes_sha256": "3274f2f0ad5a368ab5ded92e4e382a718cf47250caf01ebd8c2e60eaaa1a9e13",
+    "dpm_sha256": "dbf38577be247be799dcb68923835a157fe975e5546f39d76950060c97b926e1",
+    "seed": 7
+  },
+  "platform": "Intel(R) OpenCL Graphics (discrete)",
+  "platforms": [
+    {
+      "gpu_devices": 1,
+      "index": 0,
+      "name": "Intel(R) OpenCL Graphics (discrete)",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.0 "
+    }
+  ],
+  "probe": "intel-ternary-gemv",
+  "read_only": false,
+  "result": "pass",
+  "returncodes": {
+    "clBuildProgram": "0x00000000",
+    "clCreateBufferCodes": "0x00000000",
+    "clCreateBufferScales": "0x00000000",
+    "clCreateBufferX": "0x00000000",
+    "clCreateBufferY": "0x00000000",
+    "clCreateCommandQueue": "0x00000000",
+    "clCreateContext": "0x00000000",
+    "clCreateKernel": "0x00000000",
+    "clCreateProgramWithSource": "0x00000000",
+    "clEnqueueNDRangeKernel": "0x00000000",
+    "clEnqueueNDRangeKernelWarmup": "0x00000000",
+    "clEnqueueReadBuffer": "0x00000000",
+    "clFinish": "0x00000000",
+    "clFinishWarmup": "0x00000000",
+    "clGetPlatformIDs": "0x00000000",
+    "clGetPlatformIDsHandles": "0x00000000",
+    "clReleaseCommandQueue": "0x00000000",
+    "clReleaseContext": "0x00000000",
+    "clReleaseKernel": "0x00000000",
+    "clReleaseMemObject0": "0x00000000",
+    "clReleaseMemObject1": "0x00000000",
+    "clReleaseMemObject2": "0x00000000",
+    "clReleaseMemObject3": "0x00000000",
+    "clReleaseProgram": "0x00000000"
+  },
+  "schema": 1,
+  "scope": "packed ternary GEMV (4 trits/byte, one fp16 scale per 128 weights), checked against an exact host reference",
+  "shape": {
+    "cols": 4096,
+    "packed_bytes": 524288,
+    "phases": 32,
+    "rows": 512,
+    "scale_bytes": 32768
+  },
+  "support_claim": false
+}

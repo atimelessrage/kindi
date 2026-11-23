@@ -366,6 +366,7 @@ of 295 agent turns were the same). The details are in [docs/PROMPT-CACHE.md](doc
 | `kindi loop-info MODEL.gguf [--json]` | inspect a recognized looped model's logical plan and stored-block coverage (map check only) |
 | `kindi intel-smoke [--mib 16] [--device 0] [--json]` | Level Zero device/shared-USM round trip on an Intel GPU (no kernel or model) |
 | `kindi intel-cl [--dim 128] [--json]` | Runtime-compiled OpenCL vector-add/GEMM exactness smoke on an Intel GPU (no SYCL, model or engine) |
+| `kindi intel-ternary [--rows 64] [--cols 1024] [--json]` | Packed ternary GEMV probe over the pack's 4-trit/byte layout, bit-exact against a host reference (no backend, model or support claim) |
 | `kindi fast-head [--clusters N]` | build the fast-head cluster file (stop the server first: needs ~300 MB of GPU memory) |
 | `kindi verify` | check greedy output against llama.cpp's reference |
 | `kindi selftest [--json FILE] [--url URL]` | prove the pack, tokenizer, engine and HTTP route in process, or check a server that is already running with `--url` (one short generation) |

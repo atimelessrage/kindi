@@ -459,6 +459,20 @@ def cmd_intel_cl(cfg, a):
     return 0 if report["result"] == "pass" else 1
 
 
+def cmd_intel_ternary(cfg, a):
+    """Packed ternary GEMV probe on an Intel GPU; no backend, model or support claim."""
+    from . import intel_ternary
+
+    report = intel_ternary.run_probe(a.rows, cols=a.cols, repeats=a.repeats, loader=a.loader,
+                                     device=a.device)
+    if a.json:
+        print(intel_ternary.dumps(report))
+    else:
+        for line in intel_ternary.render(report):
+            print(line)
+    return 0 if report["result"] == "pass" else 1
+
+
 def cmd_loop_info(cfg, a):
     """Inspect a looped-transformer GGUF map without loading any tensor data (REQ-0031)."""
     from . import looped
@@ -719,6 +733,13 @@ def _build_parser():
     s.add_argument("--device", type=int, default=0, help="Level Zero device index (default 0)")
     s.add_argument("--loader", default=None, help="Level Zero loader name/path (default: the host loader)")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
+    s = sub.add_parser("intel-ternary", help="packed ternary GEMV probe on an Intel GPU (no backend)")
+    s.add_argument("--rows", type=int, default=64, help="matrix rows (default 64, 1-1024)")
+    s.add_argument("--cols", type=int, default=1024, help="matrix columns, a multiple of 128 (default 1024)")
+    s.add_argument("--repeats", type=int, default=5, help="timed launches (default 5, max 50)")
+    s.add_argument("--device", type=int, default=0, help="Intel OpenCL GPU index (default 0)")
+    s.add_argument("--loader", default=None, help="OpenCL loader name/path (default: the host loader)")
+    s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("intel-cl", help="compile and run OpenCL vector-add/GEMM on an Intel GPU (no model)")
     s.add_argument("--n", type=int, default=1048576, help="vector-add elements (default 1048576, max 16777216)")
     s.add_argument("--dim", type=int, default=128, help="square GEMM dimension (default 128, 8-512)")
@@ -809,6 +830,7 @@ _COMMANDS = {
     "intel-info": cmd_intel_info,
     "intel-smoke": cmd_intel_smoke,
     "intel-cl": cmd_intel_cl,
+    "intel-ternary": cmd_intel_ternary,
     "loop-info": cmd_loop_info,
     "io": cmd_io,
     "autotune": cmd_autotune,
