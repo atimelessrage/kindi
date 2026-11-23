@@ -11,7 +11,7 @@ installer hashes are recorded in `docs/INSTALL.md`; publication is still a relea
 
 ### Upstream merge (2026-11-23)
 
-Official **Kindi v0.7.0** (`8298a0f`, released 2026-11-23) is merged in as `551b8f5`, so the branch is
+Official **Kindi v0.7.0** (`8298a0f`, released 2026-11-23) is merged in as `35e4697`, so the branch is
 0 commits behind and 702 ahead (931 changed files, `+133,113/−1,946`, 1,066 tracked files vs 216). 39
 conflicted files were resolved by hand. What came across: the Flash-Next engine (`qwen4exp_*`, `qx_cpu.c`,
 `qx_gpu.cu`), the multi-slot serving stack (`slots.py`, `--slots`, `KINDI_SLOTS_*`), `kindi place` /

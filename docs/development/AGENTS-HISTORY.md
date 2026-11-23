@@ -1564,7 +1564,7 @@ requirements history and in `docs/claims/` now names the rewritten commit.
 ### 2026-11-23 Kindi 0.7.0 merge
 
 Task: merge official `v0.7.0` (`8298a0f`) and refresh the comparison report. 39 conflicted files / 69
-hunks resolved by hand; merge commit `551b8f5`; 0 behind, 702 ahead, 931 changed files. Kept the fork's
+hunks resolved by hand; merge commit `35e4697` (history rebuilt once to restore `kindi/gemma4_cache.py`'s CRLF bytes: the fix's 15 logic lines are the whole diff); 0 behind, 702 ahead, 931 changed files. Kept the fork's
 server path and structured-output grammar; ported upstream's self-contained fixes; exposed upstream's
 `plan` as `kindi place`. Multi-slot serving and the Flash-Next engine stay unwired (no GPU here) and are
 outside Pyright/Pylint scope until wired. Gates: 1,450 passed / 58 skipped; quality 207/59/884/245.
