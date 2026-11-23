@@ -283,9 +283,9 @@ that was not observed. It supplies the DPC++ compiler driver (`icx-cl` on Window
 | part | state on this host, 2026-11-23 | check |
 |---|---|---|
 | graphics driver + Level Zero device | present, driver 32.0.101.9175 | `python -m kindi intel-info --json` |
-| Level Zero loader and SDK | `ze_loader.dll`; SDK 1.33.1 at `C:/Program Files/LevelZeroSDK/1.33.1` | `python -m kindi intel-smoke --mib 16` |
-| Visual Studio C++ toolset | VS Community 2026 18.9.1, MSVC 14.51 under `T:/VisualStudio/18/Community` | `vcvars64.bat`, then compile a hello-world with `cl` |
-| Windows SDK | not at the default `C:/Program Files (x86)/Windows Kits/10` path; `vcvars64.bat` must find it | the same hello-world build |
+| Level Zero loader and SDK | `ze_loader.dll`; SDK 1.33.1 under `%ProgramFiles%/LevelZeroSDK/1.33.1` | `python -m kindi intel-smoke --mib 16` |
+| Visual Studio C++ toolset | VS Community 2026 18.9.1, MSVC 14.51 (record its install path) | `vcvars64.bat`, then compile a hello-world with `cl` |
+| Windows SDK | not at the default `%ProgramFiles(x86)%/Windows Kits/10` path; `vcvars64.bat` must find it | the same hello-world build |
 | oneAPI Base Toolkit | **not installed** (`intel-info` reports `oneapi.present: false`; no `sycl-ls`, `icx-cl`, `ocloc`) | `icx-cl --version`; `sycl-ls --verbose` |
 | SPIR-V tools (fallback only) | absent (`llvm-spirv`, `spirv-val`) | `llvm-spirv --version` |
 
@@ -337,8 +337,7 @@ record the compiler and VS versions, stop. Exactness failure: record the first m
 both values, stop. Do not weaken the kernel or the acceptance values to get a pass.
 
 **Fallback if oneAPI cannot be installed (raw Level Zero SPIR-V).** The Level Zero SDK 1.33.1
-headers/libs and the clang 18.1.8 install under
-`C:/Program Files/clang+llvm-18.1.8-x86_64-pc-windows-msvc/bin` are already on the host; the missing
+headers/libs and the clang 18.1.8 install the CPU engine already uses are on the host; the missing
 piece is a SPIR-V producer: `clang -target spir64 -x cl -cl-std=CL2.0 -O0 -emit-llvm -c vecadd.cl -o
 vecadd.bc`, then `llvm-spirv vecadd.bc -o vecadd.spv` (SPIRV-LLVM-Translator matching LLVM 18) and
 `spirv-val --target-env spv1.2 vecadd.spv`; launch through `zeModuleCreate` with
