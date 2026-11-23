@@ -1,0 +1,93 @@
+{
+  "date": "2026-11-23",
+  "host": "i7-8086K, Windows 10; CPU engine (KINDI_DEVICE=cpu); CUDA unavailable (cudaErrorNoDevice)",
+  "pack": "~/.kindi/packs/bonsai-2b",
+  "model": "bonsai2-2b",
+  "request": {
+    "response_format": "json_schema (SCHEMA from tools/grammar_cost.py)",
+    "prompt_tokens": 49,
+    "max_tokens": 2,
+    "stream": true,
+    "temperature": 0
+  },
+  "command": "python -m kindi --pack ~/.kindi/packs/bonsai-2b --ctx 4096 serve --port PORT (KINDI_DEVICE=cpu; KINDI_PREWARM_GRAMMAR unset for the prewarm rows, 0 for prewarm_off)",
+  "method": "every run is a fresh server process; TTFT is request send to the first content delta; readiness is the first /health answer; the prewarm rows waited for the 'structured-output vocabulary ready' log line only in prewarm_ready",
+  "cases": {
+    "prewarm_ready": {
+      "detail": "request sent when the server is ready (the ready line is in the log)",
+      "runs": 3,
+      "ttft_s": [
+        0.915,
+        0.989,
+        1.134
+      ],
+      "ttft_median_s": 0.989,
+      "readiness_s": [
+        26.376,
+        26.477,
+        26.409
+      ],
+      "readiness_median_s": 26.41,
+      "process_to_first_token_s": [
+        27.291,
+        27.466,
+        27.543
+      ],
+      "process_to_first_token_median_s": 27.466
+    },
+    "prewarm_immediate": {
+      "detail": "request sent at the first /health answer",
+      "runs": 3,
+      "ttft_s": [
+        0.927,
+        0.909,
+        1.035
+      ],
+      "ttft_median_s": 0.927,
+      "readiness_s": [
+        27.369,
+        26.324,
+        26.326
+      ],
+      "readiness_median_s": 26.33,
+      "process_to_first_token_s": [
+        28.296,
+        27.233,
+        27.361
+      ],
+      "process_to_first_token_median_s": 27.361
+    },
+    "prewarm_off": {
+      "detail": "KINDI_PREWARM_GRAMMAR=0, lazy build inside the request",
+      "runs": 3,
+      "ttft_s": [
+        3.603,
+        3.603,
+        3.637
+      ],
+      "ttft_median_s": 3.603,
+      "readiness_s": [
+        23.208,
+        23.672,
+        23.168
+      ],
+      "readiness_median_s": 23.21,
+      "process_to_first_token_s": [
+        26.811,
+        27.275,
+        26.805
+      ],
+      "process_to_first_token_median_s": 26.811
+    }
+  },
+  "support_claim": false,
+  "request_path_gain": {
+    "ttft_saved_s": 2.614,
+    "ttft_reduction_pct": 72.6
+  },
+  "notes": [
+    "the prewarm row's readiness median is 3.2 s later than prewarm_off: the startup absorbs the build",
+    "in every prewarm run the ready line preceded the first successful /health poll, so the early-request lock wait did not occur here",
+    "streaming chunks carried no usage object, so these rows record TTFT, not tok/s"
+  ]
+}
