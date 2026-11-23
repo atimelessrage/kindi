@@ -242,9 +242,11 @@ def cmd_bench(cfg, a):
 
 
 def cmd_selftest(cfg, a):
+    from .selftest import run, run_url
+    if a.url:
+        return run_url(a.url, log=log, max_tokens=a.max_tokens, json_path=a.json)
     _require_pack(cfg)
     _setup_gpu_env(cfg)
-    from .selftest import run
     return run(cfg, log=log, max_tokens=a.max_tokens, json_path=a.json)
 
 
@@ -641,6 +643,8 @@ def _build_parser():
     s.add_argument("--max-tokens", dest="max_tokens", type=int, default=8,
                    help="tokens to generate in the one smoke request (default 8)")
     s.add_argument("--json", default=None, metavar="FILE", help="also record the report in a machine-readable JSON file")
+    s.add_argument("--url", default=None, metavar="URL",
+                   help="check a server that is already running at URL instead of loading the pack (no engine load)")
     s = sub.add_parser("bench", help="measure speed")
     _tandem_args(s)
     s.add_argument("--json", default=None, metavar="FILE", help="also record the numbers in a machine-readable JSON file")

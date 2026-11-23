@@ -72,7 +72,7 @@ is not used by this fork release.
 | 4. Build the image | Builds `kindi:0.7.0-fork` (CUDA 10.2), `kindi-rocm:0.7.0-fork` (ROCm 6.3, RDNA2/RDNA3) or `kindi-rocm7:0.7.0-fork` (ROCm 7, RDNA 3.5) from the release source, and checks that the Kindi modules load. A re-run with the same source does not build again. | no |
 | 5. Download the models | Downloads each GGUF from Hugging Face. The sha256 must match the value in the script (table below). | no |
 | 6. Convert and verify | `kindi convert`, then `kindi verify` one time for each model on each kind of card. | no |
-| 7. Start the servers | One Docker container for each server, with `--restart unless-stopped`, on `127.0.0.1`. It waits until each `/health` answers. | no |
+| 7. Start the servers | One Docker container for each server, with `--restart unless-stopped`, on `127.0.0.1`. It waits until each `/health` answers, then runs `kindi selftest --url` inside that container (`--no-selftest` skips the check). | no |
 
 At the end it shows each server's address, model, context and the speed of the check, and the settings for OpenAI
 clients and for pi (one provider for each server). It writes no secrets and asks for no keys. The servers listen on
@@ -83,7 +83,10 @@ If your user is not in the `docker` group, the script uses `sudo docker`.
 Afterwards, `kindi selftest` (or `python -m kindi selftest` from a source tree) loads the selected
 pack, calls `/health`, runs one short chat request through the real HTTP route and prints the
 effective runtime state, pack hash and timings. It exits non-zero on a missing pack, a tokenizer or
-engine failure, a failed health check or an empty generation. The installer does not call it yet.
+engine failure, a failed health check or an empty generation. The installer runs the same check against each
+server it starts: `kindi selftest --url http://127.0.0.1:PORT` in that container, once `/health` answers, and
+`--no-selftest` skips it. `--url` loads no pack, so it costs one short request and does not compete with the
+server for the card.
 
 ## Select a setup
 

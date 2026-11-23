@@ -14,7 +14,8 @@
 #   4. builds the Kindi image from the release source (CUDA, or ROCm for AMD GPUs);
 #   5. downloads the model GGUF from Prism ML on Hugging Face and checks its sha256;
 #   6. converts it (kindi convert) and checks the output against llama.cpp's reference (kindi verify);
-#   7. starts the server as a service (Docker, restart unless-stopped) on 127.0.0.1 and prints how to use it.
+#   7. starts the server as a service (Docker, restart unless-stopped) on 127.0.0.1, proves it with
+#      `kindi selftest --url` (skip with --no-selftest) and prints how to use it.
 # Run it again to upgrade or repair; the downloads and the converted model are kept. It never asks for or stores a
 # password or a key. Copyright (c) 2026 Amir Husain. SPDX-License-Identifier: AGPL-3.0-only.
 set -euo pipefail
@@ -72,6 +73,7 @@ DRY=0
 YES=0
 MODE=install
 PURGE=0
+NO_SELFTEST=0     # --no-selftest: do not run kindi selftest against each server after it is up
 THREADS=""
 MEMORY=""
 AUTO=0            # --auto: take the recommended setup and answer yes (never for kernel changes)
@@ -98,6 +100,7 @@ Options:
   --dry-run        print every step and command, change nothing
   --no-dspine      the 27B on tensor-core cards drafts with the 2B, not Tencent's DSpine (4 GB, Apache-2.0)
   --no-mtp         Flash-Next: leave out the MTP head (the drafter; fetched from Qwen's release and converted here)
+  --no-selftest    do not run `kindi selftest` against each server after it answers /health (it runs by default)
   --yes, -y        answer yes to every question (for scripts); takes the recommended setup
   --auto           choose the recommended setup and continue without questions (kernel changes are only
                    described, never made)
@@ -139,6 +142,7 @@ while [ $# -gt 0 ]; do
     --dry-run) DRY=1 ;;
     --no-dspine) NO_DSPINE=1 ;;
     --no-mtp) NO_MTP=1 ;;
+    --no-selftest) NO_SELFTEST=1 ;;
     --yes|-y) YES=1 ;;
     --auto) AUTO=1; YES=1 ;;
     --config) CHOICE="$2"; shift ;;
@@ -185,6 +189,24 @@ run() {   # print, then run unless --dry-run
   echo "    \$ $*" >&3
   [ "$DRY" = 1 ] || "$@"
 }
+selftest_server() {   # $1 = container, $2 = server number, $3 = 1 for --dry-run; NO_SELFTEST=1 skips it
+  local nm=$1 n=$2 dry=$3 out rc
+  if [ "${NO_SELFTEST:-0}" = 1 ]; then info "server ${n}: selftest skipped (--no-selftest)"; return 0; fi
+  if [ "$dry" = 1 ]; then
+    info "\$ $DOCKER exec ${nm} python3 -m kindi selftest --url http://127.0.0.1:8093 --json /data/selftest-${n}.json"
+    return 0
+  fi
+  # the server is up and owns the card: --url proves the served pack, route and a generation without a second load
+  rc=0
+  out=$($DOCKER exec "$nm" python3 -m kindi selftest --url http://127.0.0.1:8093 --json "/data/selftest-${n}.json" 2>&1) || rc=$?
+  echo "$out" | grep -E "selftest: (PASS|FAIL|/health|generation)" | sed -n 1,4p | sed 's/^/    /'
+  if [ "$rc" != 0 ]; then
+    warn "server ${n}: selftest failed (${DIR}/selftest-${n}.json)"
+    return 1
+  fi
+  ok "server ${n}: selftest passes the pack, the route and one generation (${DIR}/selftest-${n}.json)"
+}
+
 ask() {   # ask "question" -> 0 for yes
   [ "$YES" = 1 ] && { info "$1 yes (--yes)"; return 0; }
   [ "$DRY" = 1 ] && { info "$1 (dry run: no)"; return 1; }
@@ -1563,6 +1585,7 @@ for i in $(seq 0 $((NS - 1))); do
   v=$(echo "$HEALTH" | sed -n 's/.*"kindi": *"\([^"]*\)".*/\1/p'); [ -n "$v" ] && GOT_VER=$v
   v=$(echo "$HEALTH" | sed -n 's/.*"commit": *"\([0-9a-f]*\)".*/\1/p'); [ -n "$v" ] && GOT_SHA=$v
   ok "${nm} answers on http://127.0.0.1:${pt}"
+  selftest_server "$nm" "$((i + 1))" "$DRY" || die "kindi selftest did not pass for ${nm} (log: ${DIR}/selftest-$((i + 1)).json). Run with --no-selftest to skip it."
   JSON="${JSON:+$JSON,
 }  {\"container\": \"${nm}\", \"image\": \"${IMAGE}\", \"port\": ${pt}, \"backend\": \"${b}\", \"profile\": \"${PROFILE}\", \"model\": \"${M}\", \"ctx\": ${GOT_CTX[$i]}, \"gpus\": \"${SV_C[$i]}\"}"
 done

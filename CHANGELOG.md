@@ -23,6 +23,12 @@ content; the other 29 fork PRs are still open.
 
 ### Added
 
+- **The installer proves the server it starts** — after each server answers `/health`, the installer runs
+  `kindi selftest --url http://127.0.0.1:8093` inside that container and stops if it fails; `--no-selftest`
+  skips the check. `--url` is standard-library only and loads no pack, so it costs one short request and does
+  not compete with the server for the card. The in-process mode now calls the ASGI app directly instead of
+  fastapi's test client, which needed `httpx`/`requests` that the images do not install. No GPU run.
+
 - **One-command install check** — `kindi selftest [--json FILE]` loads the selected pack once, calls
   `/health`, runs one short greedy `/v1/chat/completions` request through the real in-process app,
   and prints the effective runtime state, pack hash and timings. A missing pack, tokenizer or engine

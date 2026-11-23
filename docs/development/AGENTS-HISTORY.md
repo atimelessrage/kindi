@@ -1569,3 +1569,10 @@ server path and structured-output grammar; ported upstream's self-contained fixe
 `plan` as `kindi place`. Multi-slot serving and the Flash-Next engine stay unwired (no GPU here) and are
 outside Pyright/Pylint scope until wired. Gates: 1,453 passed / 58 skipped; quality 207/59/884/245.
 `CURRENT-VS-KINDI-0.6.md` was renamed to `CURRENT-VS-KINDI-0.7.md` (30 files' references updated).
+
+### Ollama links
+
+`tools/ollama_links.py` links the GGUF models Ollama already downloaded under readable names (`$OLLAMA_MODELS`, else `~/.ollama/models`, `-m` to point
+elsewhere; the manifest's largest model layer, with a blob scan for the `GGUF` magic when there are no manifests), using a symlink when the host allows it and a
+same-volume hard link otherwise into `~/.kindi/models/ollamaLinks` (`-o` to move it) - `tools/ollama_links.ps1` is now a thin wrapper over the same script and
+twelve tests cover the naming, the fallbacks, the environment variable, dry run, idempotence and the failure hints.

@@ -4,9 +4,12 @@ The fake Kindi implements only what the health and chat routes touch; the point 
 selftest drives `server.create_app` and both HTTP routes, so a broken route or a silent empty
 generation fails the command rather than printing a misleading PASS.
 """
+import http.server
 import json
 import threading
 import time
+
+import pytest
 
 from kindi import __main__ as cli
 from kindi import selftest, server
@@ -140,5 +143,105 @@ def test_selftest_a_failed_generation_is_not_a_pass(monkeypatch, tmp_path):
 def test_selftest_is_wired_into_the_cli():
     a = cli._build_parser().parse_args(["selftest", "--max-tokens", "4"])
     assert a.cmd == "selftest"
+    assert a.url is None
     assert a.max_tokens == 4
+    a = cli._build_parser().parse_args(["selftest", "--url", "http://127.0.0.1:8093"])
+    assert a.url == "http://127.0.0.1:8093"
     assert cli._COMMANDS["selftest"] is cli.cmd_selftest
+
+
+class _Server(http.server.BaseHTTPRequestHandler):
+    """A running server stand-in for --url: two routes, no engine."""
+
+    def _reply(self, status, body):
+        raw = json.dumps(body).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(raw)))
+        self.end_headers()
+        self.wfile.write(raw)
+
+    def do_GET(self):
+        cfg = self.server.cfg
+        cfg["health_calls"] = cfg.get("health_calls", 0) + 1
+        if self.path != "/health":
+            return self._reply(404, {})
+        self._reply(cfg.get("health_status", 200),
+                    cfg.get("health", {"ok": True, "model": "fake-2b", "ctx": 4096,
+                                       "runtime": {"head": "exact", "spec": {"enabled": False}}}))
+
+    def do_POST(self):
+        cfg = self.server.cfg
+        cfg["chat_calls"] = cfg.get("chat_calls", 0) + 1
+        cfg["chat_body"] = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+        cfg["authorization"] = self.headers.get("Authorization")
+        if self.path != "/v1/chat/completions":
+            return self._reply(404, {})
+        self._reply(cfg.get("chat_status", 200),
+                    cfg.get("chat", {"choices": [{"message": {"content": "kindi"}, "finish_reason": "stop"}],
+                                     "usage": {"completion_tokens": 1}}))
+
+    def log_message(self, *args):
+        pass
+
+
+@pytest.fixture
+def running_server():
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Server)
+    srv.cfg = {}
+    thread = threading.Thread(target=srv.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield srv
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def _url(srv):
+    return "http://127.0.0.1:%d" % srv.server_address[1]
+
+
+def test_url_mode_proves_a_server_that_is_already_running(running_server, tmp_path):
+    """--url is what the installer calls: no pack load, one health check and one generation."""
+    out = tmp_path / "report.json"
+    lines = []
+    rc = selftest.run_url(_url(running_server), log=lines.append, json_path=str(out))
+    assert rc == 0
+    report = json.loads(out.read_text(encoding="utf-8"))
+    assert report["mode"] == "url" and report["model"] == "fake-2b"
+    assert report["health"]["status"] == 200 and report["runtime"]["head"] == "exact"
+    assert report["generation"]["completion_tokens"] == 1
+    assert running_server.cfg["chat_body"]["stream"] is False
+    assert any("PASS" in line for line in lines)
+    assert report["pack"] is None                    # nothing was loaded here
+
+
+def test_url_mode_authenticates_when_the_server_requires_a_key(running_server, monkeypatch):
+    """--lan installs require a key; docker exec carries KINDI_API_KEY from the container."""
+    monkeypatch.setenv("KINDI_API_KEY", "kindi-test-key")
+    lines = []
+    assert selftest.run_url(_url(running_server), log=lines.append) == 0
+    assert running_server.cfg["authorization"] == "Bearer kindi-test-key"
+
+
+def test_url_mode_reports_a_non_200_health(running_server):
+    running_server.cfg["health_status"] = 503
+    lines = []
+    assert selftest.run_url(_url(running_server), log=lines.append) == 1
+    assert any("/health returned HTTP 503" in line for line in lines)
+    assert running_server.cfg.get("chat_calls", 0) == 0
+
+
+def test_url_mode_reports_a_failed_generation(running_server):
+    running_server.cfg["chat_status"] = 500
+    running_server.cfg["chat"] = {"error": {"message": "decode failed"}}
+    lines = []
+    assert selftest.run_url(_url(running_server), log=lines.append) == 1
+    assert any("generation returned HTTP 500: decode failed" in line for line in lines)
+
+
+def test_url_mode_without_a_server_is_a_clear_failure():
+    lines = []
+    assert selftest.run_url("http://127.0.0.1:9", log=lines.append, timeout=2) == 1
+    assert any("FAIL" in line and "/health" in line for line in lines)

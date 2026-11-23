@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `795d9cf` on `merge/upstream-0.7.0` (the 0.7.0 merge commit is `35e4697`; guarded by
+- **HEAD:** `889a41c` on `merge/upstream-0.7.0` (the 0.7.0 merge commit is `35e4697`; guarded by
   `tests/test_agents_handoff.py`). **2026-11-23: official Kindi v0.7.0 (`8298a0f`) is merged in.** The merge base was
   `dce89df`; the fork was 701 commits ahead and v0.7.0 two ahead (`v0.6.1` + the squashed 0.7.0 commit), so the branch is
   now 0 behind and 702 commits / 931 changed files ahead (+133,113/-1,946), 1,066 tracked files vs 216, no upstream file
@@ -27,11 +27,15 @@ line of evidence (command + result). A task must be resumable from this file alo
   `json_schema`/`grammar` to the fork's decode grammar. Merge defects fixed before the gate: undefined
   `slots`/`_slots`/`bc_all`/`dp_all`, a duplicate `tc_hp_for`, a shadowed `_busy` (every 429 was a 500), the streaming
   path's nonexistent `K.acquire`, `qwen4exp_mtp`'s undefined `hst`, and 43 naked `json.load(open())` sites moved to
-  `jsonio.load_json`. Verification: pytest **1,453 passed / 58 skipped / 0 failed**; quality **207 Ruff / 59 mypy /
+  `jsonio.load_json`. Verification: pytest **1,464 passed / 58 skipped / 0 failed**; quality **207 Ruff / 59 mypy /
   884 Pyright / 245 Pylint** (under the ratchet); config reference, support matrix, project memory, claims and
   `bash -n install.sh` pass. No GPU, pack or Windows run; the vendored unwired `qwen4exp_*`/`qx_*` modules are outside
   Pyright's and Pylint's scope until a GPU run wires them (`pyrightconfig.json`, `VENDORED_UNWIRED`). The Gemma 4
-  pinned-host fix (#44) follows 0.7.0's names and release points with the fork's host budget on top; its tests pin each.
+  pinned-host fix (#44) follows 0.7.0's names and release points with the fork's host budget on top; its tests pin each. The 2026-11-23 installer slice adds `kindi selftest --url`
+  (stdlib HTTP, no pack or engine load, `KINDI_API_KEY` header when the container carries one), replaces fastapi's
+  test client with a direct ASGI call (the images install neither httpx nor requests), and runs the check in each
+  serving container after `/health` with `--no-selftest` to opt out; 10 selftest tests and 6 installer fixture tests
+  cover both paths and a failure. Full CPU suite 1,464 passed / 58 skipped.
 
 ### Python quality ratchet
 
@@ -72,7 +76,7 @@ surface is present from `dce89df`) and records the MoE backend's status (exercis
 (`dce89df`, v0.6.1's parent) both contained, while `v0.6.1` itself is one commit past `dce89df`; vs `v0.6.0` the tree is a strict superset; comparison report in
 `CURRENT-VS-KINDI-0.7.md`.
 
-Dated notes (MTP smoke guard, bench split, audit follow-up, commit-history redaction) moved to
+Dated notes (MTP smoke guard, bench split, audit follow-up, commit-history redaction, Ollama links) moved to
 [docs/development/AGENTS-HISTORY.md](docs/development/AGENTS-HISTORY.md) on 2026-11-23.
 
 ### Engine-liveness roadmap
@@ -136,13 +140,6 @@ Thirteen tests pinning `kindi plan`'s decode-slot arithmetic (the fit subtracts 
 per layer on the 256-expert test pack; the line used to claim one per slot, `kindi/ltfit.py` is now the one implementation both `plan._lt_fit` and
 `lightning._plan` call, and the weighted branch prices the slots against the same room with `dcache=0` - 9 of 128 card experts and 5.8 points of served share on
 the test pack's tight card - in the line and in `slots_cost`).
-
-### Ollama links
-
-`tools/ollama_links.py` links the GGUF models Ollama already downloaded under readable names (`$OLLAMA_MODELS`, else `~/.ollama/models`, `-m` to point
-elsewhere; the manifest's largest model layer, with a blob scan for the `GGUF` magic when there are no manifests), using a symlink when the host allows it and a
-same-volume hard link otherwise into `~/.kindi/models/ollamaLinks` (`-o` to move it) - `tools/ollama_links.ps1` is now a thin wrapper over the same script and
-twelve tests cover the naming, the fallbacks, the environment variable, dry run, idempotence and the failure hints.
 
 ### Coverage gate
 
@@ -235,8 +232,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `795d9cf` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `795d9cf` | this session; 2026-11-23 Kindi 0.7.0 merge |
+| `T:/kindi` | `main` | `889a41c` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `889a41c` | this session; 2026-11-23 Kindi 0.7.0 merge |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
