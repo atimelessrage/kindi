@@ -285,7 +285,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:1100` (+1 more) |
 | `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:1101` |
 | `KINDI_PIPE` | `1` | `kindi/dsv41.py:800` |
-| `KINDI_PREWARM_GRAMMAR` | `1` | `kindi/grammar_prewarm.py:36` |
+| `KINDI_PREWARM_GRAMMAR` | `1` | `kindi/grammar_prewarm.py:41` |
 | `KINDI_PROMPT_CACHE` | `1` | `kindi/cache.py:888` (+1 more) |
 | `KINDI_Q8X2` | `1` | `kindi/chunk.py:345` |
 | `KINDI_QXG_ADAPT` | `0` | `kindi/qwen4exp_gpu.py:441` |
