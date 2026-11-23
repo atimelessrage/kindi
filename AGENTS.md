@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `e19850e` on `merge/upstream-0.7.0` (the 0.7.0 merge commit is `35e4697`; guarded by
+- **HEAD:** `684482d` on `merge/upstream-0.7.0` (the 0.7.0 merge commit is `35e4697`; guarded by
   `tests/test_agents_handoff.py`). **2026-11-23: official Kindi v0.7.0 (`8298a0f`) is merged in.** The merge base was
   `dce89df`; the fork was 701 commits ahead and v0.7.0 two ahead (`v0.6.1` + the squashed 0.7.0 commit), so the branch is
   now 0 behind and 702 commits / 931 changed files ahead (+133,113/-1,946), 1,066 tracked files vs 216, no upstream file
@@ -27,7 +27,7 @@ line of evidence (command + result). A task must be resumable from this file alo
   `json_schema`/`grammar` to the fork's decode grammar. Merge defects fixed before the gate: undefined
   `slots`/`_slots`/`bc_all`/`dp_all`, a duplicate `tc_hp_for`, a shadowed `_busy` (every 429 was a 500), the streaming
   path's nonexistent `K.acquire`, `qwen4exp_mtp`'s undefined `hst`, and 43 naked `json.load(open())` sites moved to
-  `jsonio.load_json`. Verification: pytest **1,450 passed / 58 skipped / 0 failed**; quality **207 Ruff / 59 mypy /
+  `jsonio.load_json`. Verification: pytest **1,453 passed / 58 skipped / 0 failed**; quality **207 Ruff / 59 mypy /
   884 Pyright / 245 Pylint** (under the ratchet); config reference, support matrix, project memory, claims and
   `bash -n install.sh` pass. No GPU, pack or Windows run; the vendored unwired `qwen4exp_*`/`qx_*` modules are outside
   Pyright's and Pylint's scope until a GPU run wires them (`pyrightconfig.json`, `VENDORED_UNWIRED`). The Gemma 4
@@ -235,8 +235,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `e19850e` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `e19850e` | this session; 2026-11-23 Kindi 0.7.0 merge |
+| `T:/kindi` | `main` | `684482d` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `684482d` | this session; 2026-11-23 Kindi 0.7.0 merge |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
