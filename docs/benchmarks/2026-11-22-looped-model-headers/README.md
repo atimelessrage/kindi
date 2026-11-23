@@ -67,6 +67,53 @@ The post-loop blocks 42-47 are stored at the **physical** indices 18-23. Logical
 the second and third passes over 6-17; there are no tensors for them. The bundled DSpark drafter
 is a separate file and is not part of this inventory.
 
+## `kindi loop-info` on the same 32 MiB ranges (2026-11-23)
+
+Both partial files were checked with the repository's own command, once as text and once with
+`--json`. GGUF metadata and the tensor index come before the tensor data, so the range is enough
+for this map check; no tensor byte was read and no weight was downloaded.
+
+| check | SenseNova-Loop-9B | Inkling 2 Mini |
+|---|---|---|
+| revision the range came from | `b489b15c1e35...` | `800c946d7b9c...` (the mirror's `main` on 2026-11-23) |
+| 32 MiB range sha256 | `e9c95bf1a787...` | `229bbecf356c...` |
+| stored blocks present / expected | **33 / 33** | **24 / 24** |
+| missing / unexpected stored blocks | none / none | none / none |
+| exit code | 0 | 0 |
+
+```text
+$ python -m kindi loop-info sensenova.gguf.part
+SenseNova-Loop-9B (sensenova_loop)
+  stored blocks: 33; logical layers: 57; loop: 4-27 x2
+  post-loop stored at 52; tensor coverage: 33/33 stored blocks present
+  plan: pre 0-3; loop pass 1 4-27; loop pass 2 28-51; post 52-56
+  no looped loader or engine is implemented (REQ-0031); this is a map check.
+
+$ python -m kindi loop-info inkling.gguf.part
+Inkling 2 Mini (inkling2)
+  stored blocks: 24; logical layers: 48; loop: 6-17 x3
+  post-loop stored at 18; tensor coverage: 24/24 stored blocks present
+  plan: pre 0-5; loop pass 1 6-17; loop pass 2 18-29; loop pass 3 30-41; post 42-47
+  no looped loader or engine is implemented (REQ-0031); this is a map check.
+```
+
+The plan's `loop pass` ranges are logical layers, not stored blocks: Inkling's second pass over
+logical 18-29 reads stored 6-17, and its post-loop logical 42-47 reads stored 18-23.
+
+**No coverage mismatch on either file.** The map the command prints is the one the header table
+above recorded, and each tensor index carries every stored block the map expects. One provenance
+difference from the 2026-11-22 inventory: the Unsloth mirror's `main` resolved to
+`800c946d7b9c830c86290df49afbbe91db8455f5` for this run (last modified 2026-11-23), while the
+sections above record only the base model's revision. The Q4_K_M file's size is unchanged at
+16,610,543,328 B, and the evidence names the mirror revision actually read; SenseNova's revision
+is unchanged.
+
+The exact text is [sensenova-loop-info-32m.txt](sensenova-loop-info-32m.txt) and
+[inkling-loop-info-32m.txt](inkling-loop-info-32m.txt);
+[loop-info-32m.json](loop-info-32m.json) carries both range hashes, both full JSON reports and the
+coverage fields. This remains a map check only: no loader, engine, pack, catalog entry or support
+claim, and no full-file SHA-256 (only the 32 MiB ranges were read).
+
 ## What this does and does not establish
 
 - It establishes the architecture key, the logical/stored block map, the loop and mHC/MoE fields,

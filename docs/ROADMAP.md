@@ -267,6 +267,13 @@ is still open (checked 2026-11-22), so Q0's reference still needs the vendor
 [REQ-0031](development/requirements/REQ-0031.md); gates in
 [REQ-0031](development/requirements/REQ-0031.md).
 
+**`kindi loop-info` (2026-11-23).** On a fresh 32 MiB range (revision `b489b15c...`, range
+sha256 `e9c95bf1...`) the command reports **33/33 stored blocks present**, no missing and no
+unexpected block tensors, exit 0, with the plan `pre 0-3; loop 4-27 twice; post 52-56`. Evidence: the Q0
+header inventory's benchmark page, linked from [REQ-0031](development/requirements/REQ-0031.md). This is a map
+check only;
+the status stays proposed with no loader, pack or support claim.
+
 ## Inkling 2 Mini (2026-11-22)
 
 **Status: proposed, no backend, no pack, no catalog entry and no support claim.**
@@ -294,6 +301,14 @@ tensors, and the post-loop blocks 42-47 are stored at the **physical** indices 1
 1,048,576; sliding window 1024; SITU activations; final logit softcap 30; vocab 201,024; 734
 tensors in F32/Q8_0/Q5_K/IQ4_XS/MXFP4-class. Full table:
 [REQ-0031](development/requirements/REQ-0031.md).
+
+**`kindi loop-info` (2026-11-23).** On the mirror's 32 MiB range (revision `800c946d...`, range
+sha256 `229bbecf...`) the command reports **24/24 stored blocks present**, no missing and no
+unexpected tensors, exit 0, with the plan `pre 0-5; loop 6-17 three times; post 42-47 stored at
+18-23`. The mirror's `main` moved to that revision on 2026-11-23; the Q4_K_M size is unchanged.
+Evidence: the Q0 header inventory's benchmark page, linked from
+[REQ-0031](development/requirements/REQ-0031.md). Map check only;
+no loader, pack or support claim.
 
 **Reference.** Unlike SenseNova, the GGUF mirror ships `Mainline_Support/` copies and the HF
 launch post lists llama.cpp support, so I0 can pin a mainline build instead of a vendor fork;

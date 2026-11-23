@@ -1,0 +1,5 @@
+Inkling 2 Mini (inkling2)
+  stored blocks: 24; logical layers: 48; loop: 6-17 x3
+  post-loop stored at 18; tensor coverage: 24/24 stored blocks present
+  plan: pre 0-5; loop pass 1 6-17; loop pass 2 18-29; loop pass 3 30-41; post 42-47
+  no looped loader or engine is implemented (REQ-0031); this is a map check.

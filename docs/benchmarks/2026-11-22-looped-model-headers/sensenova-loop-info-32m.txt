@@ -1,0 +1,5 @@
+SenseNova-Loop-9B (sensenova_loop)
+  stored blocks: 33; logical layers: 57; loop: 4-27 x2
+  post-loop stored at 52; tensor coverage: 33/33 stored blocks present
+  plan: pre 0-3; loop pass 1 4-27; loop pass 2 28-51; post 52-56
+  no looped loader or engine is implemented (REQ-0031); this is a map check.

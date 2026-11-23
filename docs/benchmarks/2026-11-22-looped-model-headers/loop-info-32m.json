@@ -1,0 +1,784 @@
+{
+  "schema": 1,
+  "measured": "2026-11-23",
+  "support_claim": false,
+  "weights_downloaded": false,
+  "method": "HTTP range request bytes=0-33554431 per file (33,554,432 bytes each); `kindi loop-info PART.gguf` and `kindi loop-info --json PART.gguf` on the partial file; the tensor index precedes the tensor data, so no tensor bytes were read",
+  "command": [
+    "python -m kindi loop-info PART.gguf",
+    "python -m kindi loop-info --json PART.gguf"
+  ],
+  "tool_exit_code": 0,
+  "coverage_mismatch": false,
+  "models": {
+    "sensenova_loop": {
+      "repo": "sensenova/SenseNova-Loop-9B-GGUF",
+      "base_repo": null,
+      "revision": "b489b15c1e359e6ad429566ab02067bc4b1b12b5",
+      "file": "SenseNova-Loop-9B-Q4_K_M.gguf",
+      "range": "bytes=0-33554431",
+      "range_bytes": 33554432,
+      "range_sha256": "e9c95bf1a787e213add84d618c9c21d86f9d459600882075e5b27e212ceb16da",
+      "exit_code": 0,
+      "coverage": {
+        "present": 33,
+        "expected": 33,
+        "missing": [],
+        "unexpected": []
+      },
+      "text": [
+        "SenseNova-Loop-9B (sensenova_loop)",
+        "  stored blocks: 33; logical layers: 57; loop: 4-27 x2",
+        "  post-loop stored at 52; tensor coverage: 33/33 stored blocks present",
+        "  plan: pre 0-3; loop pass 1 4-27; loop pass 2 28-51; post 52-56",
+        "  no looped loader or engine is implemented (REQ-0031); this is a map check."
+      ],
+      "report": {
+        "arch": "sensenova_loop",
+        "core_end": 28,
+        "core_start": 4,
+        "detail": "two-stream mHC; 3 linear-attention + 1 full-attention layer per four; 512K context",
+        "logical": 57,
+        "missing_blocks": [],
+        "name": "SenseNova-Loop-9B",
+        "passes": 2,
+        "plan": [
+          {
+            "logical": 0,
+            "pass": 0,
+            "phase": "pre",
+            "stored": 0
+          },
+          {
+            "logical": 1,
+            "pass": 0,
+            "phase": "pre",
+            "stored": 1
+          },
+          {
+            "logical": 2,
+            "pass": 0,
+            "phase": "pre",
+            "stored": 2
+          },
+          {
+            "logical": 3,
+            "pass": 0,
+            "phase": "pre",
+            "stored": 3
+          },
+          {
+            "logical": 4,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 4
+          },
+          {
+            "logical": 5,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 5
+          },
+          {
+            "logical": 6,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 6
+          },
+          {
+            "logical": 7,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 7
+          },
+          {
+            "logical": 8,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 8
+          },
+          {
+            "logical": 9,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 9
+          },
+          {
+            "logical": 10,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 10
+          },
+          {
+            "logical": 11,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 11
+          },
+          {
+            "logical": 12,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 12
+          },
+          {
+            "logical": 13,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 13
+          },
+          {
+            "logical": 14,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 14
+          },
+          {
+            "logical": 15,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 15
+          },
+          {
+            "logical": 16,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 16
+          },
+          {
+            "logical": 17,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 17
+          },
+          {
+            "logical": 18,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 18
+          },
+          {
+            "logical": 19,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 19
+          },
+          {
+            "logical": 20,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 20
+          },
+          {
+            "logical": 21,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 21
+          },
+          {
+            "logical": 22,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 22
+          },
+          {
+            "logical": 23,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 23
+          },
+          {
+            "logical": 24,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 24
+          },
+          {
+            "logical": 25,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 25
+          },
+          {
+            "logical": 26,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 26
+          },
+          {
+            "logical": 27,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 27
+          },
+          {
+            "logical": 28,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 4
+          },
+          {
+            "logical": 29,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 5
+          },
+          {
+            "logical": 30,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 6
+          },
+          {
+            "logical": 31,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 7
+          },
+          {
+            "logical": 32,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 8
+          },
+          {
+            "logical": 33,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 9
+          },
+          {
+            "logical": 34,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 10
+          },
+          {
+            "logical": 35,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 11
+          },
+          {
+            "logical": 36,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 12
+          },
+          {
+            "logical": 37,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 13
+          },
+          {
+            "logical": 38,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 14
+          },
+          {
+            "logical": 39,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 15
+          },
+          {
+            "logical": 40,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 16
+          },
+          {
+            "logical": 41,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 17
+          },
+          {
+            "logical": 42,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 18
+          },
+          {
+            "logical": 43,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 19
+          },
+          {
+            "logical": 44,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 20
+          },
+          {
+            "logical": 45,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 21
+          },
+          {
+            "logical": 46,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 22
+          },
+          {
+            "logical": 47,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 23
+          },
+          {
+            "logical": 48,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 24
+          },
+          {
+            "logical": 49,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 25
+          },
+          {
+            "logical": 50,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 26
+          },
+          {
+            "logical": 51,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 27
+          },
+          {
+            "logical": 52,
+            "pass": 0,
+            "phase": "post",
+            "stored": 52
+          },
+          {
+            "logical": 53,
+            "pass": 0,
+            "phase": "post",
+            "stored": 53
+          },
+          {
+            "logical": 54,
+            "pass": 0,
+            "phase": "post",
+            "stored": 54
+          },
+          {
+            "logical": 55,
+            "pass": 0,
+            "phase": "post",
+            "stored": 55
+          },
+          {
+            "logical": 56,
+            "pass": 0,
+            "phase": "post",
+            "stored": 56
+          }
+        ],
+        "post_base": 52,
+        "present_blocks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          52,
+          53,
+          54,
+          55,
+          56
+        ],
+        "stored": 33,
+        "unexpected_blocks": []
+      },
+      "coverage_ok": true
+    },
+    "inkling2": {
+      "repo": "unsloth/Inkling-2-Mini-GGUF",
+      "base_repo": "thinkingmachines/Inkling-2-Mini",
+      "revision": "800c946d7b9c830c86290df49afbbe91db8455f5",
+      "file": "Inkling-2-Mini-UD-Q4_K_M.gguf",
+      "range": "bytes=0-33554431",
+      "range_bytes": 33554432,
+      "range_sha256": "229bbecf356c46121eda0533100d04981d54b6f8879b463704a501037552e713",
+      "exit_code": 0,
+      "coverage": {
+        "present": 24,
+        "expected": 24,
+        "missing": [],
+        "unexpected": []
+      },
+      "text": [
+        "Inkling 2 Mini (inkling2)",
+        "  stored blocks: 24; logical layers: 48; loop: 6-17 x3",
+        "  post-loop stored at 18; tensor coverage: 24/24 stored blocks present",
+        "  plan: pre 0-5; loop pass 1 6-17; loop pass 2 18-29; loop pass 3 30-41; post 42-47",
+        "  no looped loader or engine is implemented (REQ-0031); this is a map check."
+      ],
+      "report": {
+        "arch": "inkling2",
+        "core_end": 18,
+        "core_start": 6,
+        "detail": "128-expert MoE (top-8); hybrid local/global attention; 1M context",
+        "logical": 48,
+        "missing_blocks": [],
+        "name": "Inkling 2 Mini",
+        "passes": 3,
+        "plan": [
+          {
+            "logical": 0,
+            "pass": 0,
+            "phase": "pre",
+            "stored": 0
+          },
+          {
+            "logical": 1,
+            "pass": 0,
+            "phase": "pre",
+            "stored": 1
+          },
+          {
+            "logical": 2,
+            "pass": 0,
+            "phase": "pre",
+            "stored": 2
+          },
+          {
+            "logical": 3,
+            "pass": 0,
+            "phase": "pre",
+            "stored": 3
+          },
+          {
+            "logical": 4,
+            "pass": 0,
+            "phase": "pre",
+            "stored": 4
+          },
+          {
+            "logical": 5,
+            "pass": 0,
+            "phase": "pre",
+            "stored": 5
+          },
+          {
+            "logical": 6,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 6
+          },
+          {
+            "logical": 7,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 7
+          },
+          {
+            "logical": 8,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 8
+          },
+          {
+            "logical": 9,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 9
+          },
+          {
+            "logical": 10,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 10
+          },
+          {
+            "logical": 11,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 11
+          },
+          {
+            "logical": 12,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 12
+          },
+          {
+            "logical": 13,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 13
+          },
+          {
+            "logical": 14,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 14
+          },
+          {
+            "logical": 15,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 15
+          },
+          {
+            "logical": 16,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 16
+          },
+          {
+            "logical": 17,
+            "pass": 1,
+            "phase": "loop",
+            "stored": 17
+          },
+          {
+            "logical": 18,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 6
+          },
+          {
+            "logical": 19,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 7
+          },
+          {
+            "logical": 20,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 8
+          },
+          {
+            "logical": 21,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 9
+          },
+          {
+            "logical": 22,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 10
+          },
+          {
+            "logical": 23,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 11
+          },
+          {
+            "logical": 24,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 12
+          },
+          {
+            "logical": 25,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 13
+          },
+          {
+            "logical": 26,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 14
+          },
+          {
+            "logical": 27,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 15
+          },
+          {
+            "logical": 28,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 16
+          },
+          {
+            "logical": 29,
+            "pass": 2,
+            "phase": "loop",
+            "stored": 17
+          },
+          {
+            "logical": 30,
+            "pass": 3,
+            "phase": "loop",
+            "stored": 6
+          },
+          {
+            "logical": 31,
+            "pass": 3,
+            "phase": "loop",
+            "stored": 7
+          },
+          {
+            "logical": 32,
+            "pass": 3,
+            "phase": "loop",
+            "stored": 8
+          },
+          {
+            "logical": 33,
+            "pass": 3,
+            "phase": "loop",
+            "stored": 9
+          },
+          {
+            "logical": 34,
+            "pass": 3,
+            "phase": "loop",
+            "stored": 10
+          },
+          {
+            "logical": 35,
+            "pass": 3,
+            "phase": "loop",
+            "stored": 11
+          },
+          {
+            "logical": 36,
+            "pass": 3,
+            "phase": "loop",
+            "stored": 12
+          },
+          {
+            "logical": 37,
+            "pass": 3,
+            "phase": "loop",
+            "stored": 13
+          },
+          {
+            "logical": 38,
+            "pass": 3,
+            "phase": "loop",
+            "stored": 14
+          },
+          {
+            "logical": 39,
+            "pass": 3,
+            "phase": "loop",
+            "stored": 15
+          },
+          {
+            "logical": 40,
+            "pass": 3,
+            "phase": "loop",
+            "stored": 16
+          },
+          {
+            "logical": 41,
+            "pass": 3,
+            "phase": "loop",
+            "stored": 17
+          },
+          {
+            "logical": 42,
+            "pass": 0,
+            "phase": "post",
+            "stored": 18
+          },
+          {
+            "logical": 43,
+            "pass": 0,
+            "phase": "post",
+            "stored": 19
+          },
+          {
+            "logical": 44,
+            "pass": 0,
+            "phase": "post",
+            "stored": 20
+          },
+          {
+            "logical": 45,
+            "pass": 0,
+            "phase": "post",
+            "stored": 21
+          },
+          {
+            "logical": 46,
+            "pass": 0,
+            "phase": "post",
+            "stored": 22
+          },
+          {
+            "logical": 47,
+            "pass": 0,
+            "phase": "post",
+            "stored": 23
+          }
+        ],
+        "post_base": 18,
+        "present_blocks": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23
+        ],
+        "stored": 24,
+        "unexpected_blocks": []
+      },
+      "coverage_ok": true
+    }
+  }
+}
