@@ -13,7 +13,8 @@ multi-slot serving stack (`slots.py`, the `*_R` row kernels in `spec.cu`, `--slo
 routing tools (`place.py` as `kindi place`, `route.py` as `kindi route`, `cards.py` as `kindi cards`), the request-field
 validator (`oai.py`, upstream #38), the pack-size gate (`packcheck.py`), DeepSeek V4.1 expert-card calibration
 (`dsv41_xcal.py`), the native Windows launcher and tray monitor (`windows/`), `docs/FLASHNEXT.md`, and the upstream
-0.7.0 test and doc updates. It also carries four of this fork's PRs by content (see the PR status below).
+0.7.0 test and doc updates. It also fixes upstream issue #44 (the Gemma 4 pinned-host leak) the way this fork did, and carries four of this
+fork's PRs by content (see the PR status below).
 
 **Still the fork's own, measured on 0.6.1-era hardware:** the tensor-core plan path (**354.9 vs 180.5 tok/s** on the 2B
 `gen @100`, **118.3 vs 83.8** on the 9B), same-settings decode parity (every median within **2.6%**, **12/12**
@@ -47,6 +48,7 @@ at `60a039b` unless a table says otherwise.
 | question | answer |
 |---|---|
 | **What was merged** | `v0.7.0` (`8298a0f`) into `wip/local-round-2026-11-20` (`fa787b4`), branch `merge/upstream-0.7.0`; merge commit **`35e4697`**. Merge base `dce89df`; 701 fork commits and 2 upstream commits. Upstream's side is 106 files, +24,385/-490. |
+| **Gemma 4 #44 fix** | v0.7.0's `_to_card` (a plain synchronous upload instead of `cupy.asarray`) and `_give_back` (free CuPy's pinned pool after a drop) are now the fork's too, with 0.7.0's two extra release points (a trimmed checkpoint list, and the checkpoints a resume drops). The fork keeps its host-memory budget and telemetry on top, and `tests/test_gemma4_cache.py` pins all six release points; deleting the two new calls fails two tests. |
 | **Conflicts** | 39 files / 69 hunks, all resolved by hand. The fork's implementation wins where it has tests and evidence; upstream's self-contained fixes were ported. |
 | **Ported from 0.7.0** | `packcheck` size + sha256 gate (B16), the B16 `g5_<key>.src` source stamp, `bench --split-at` curve positions (#33), `gpudrv.libcuda()`/`libcuda_name()`, the cgroup parent walk and usage in `hostram.py` (#48), `chunk.py`'s `_cublas`/`_gemm16`/`f16_gemm_ok` GPU-path fixes (#4/#33), `tp.py`'s B15 split fixes, `tc_hp_for(man, card)` with the Turing carve-out (#76), `kindi place`/`kindi route`/`kindi cards`, `oai.check` (#38), the per-card installer detection, and the 0.7.0 docs. |
 | **Present but not wired** | `slots.py` and the multi-slot server path (`--slots`, `KINDI_SLOTS_*`; `spec.py` has the `*_R` kernels and `build_plan(..., slots=...)`, but the fork's `server.py` still serves one engine), the Flash-Next adapter (`qwen4exp_gen.py`/`qwen4exp_gpu.py`, `KINDI_BACKEND` unchanged), the Windows launcher/tray monitor (built separately), and the `kindi place` portfolio as a server placement. Each needs a GPU run this host cannot do. |
