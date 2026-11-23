@@ -13,6 +13,7 @@ from typing import Any
 
 import numpy as np
 
+from .grammar_prewarm import GrammarPrewarm
 from .nanbeige_gen import CALL_OPEN, _lcp, parse_calls
 
 IM_START = "<|im_start|>"
@@ -223,7 +224,7 @@ def pick_candidates(eng, greedy, temperature, top_p, top_k, rng, min_p=0.0, pena
     return Sampler._pick(cand, sc, temperature, top_p, top_k, rng, min_p)
 
 
-class LightningBackend(object):
+class LightningBackend(GrammarPrewarm):
     # The engine is built in __init__ and released by close(); see the server's matching annotation.
     eng: Any
     name = "Lightning"                  # (the log's prefix; the Flash-Next backend reuses this class)
@@ -280,6 +281,11 @@ class LightningBackend(object):
         self.log("Lightning self-check: %s (token by token: %s)" % (
             repr(self.tok.decode(a))[:60], "the same" if c == a else "differs after a near tie"))
 
+    def grammar_token_texts(self):
+        """The vocabulary as text, in id order, for the structured-output token-class index."""
+        return [self.tok.decode_bytes(i).decode("utf-8", "replace")
+                for i in range(len(self.tok.vocab))]
+
     def _pick(self, greedy, temperature, top_p, top_k, rng, min_p=0.0, penalty=None, allowed=None, constrained=False):
         return pick_candidates(self.eng, greedy, temperature, top_p, top_k, rng, min_p, penalty, allowed,
                                constrained=constrained)
@@ -319,10 +325,7 @@ class LightningBackend(object):
         jstate = jgrammar.start() if jgrammar is not None else None
         grammar_texts = None
         if jgrammar is not None:
-            if not hasattr(self, "_grammar_texts"):
-                self._grammar_texts = [self.tok.decode_bytes(i).decode("utf-8", "replace")
-                                       for i in range(len(self.tok.vocab))]
-            grammar_texts = self._grammar_texts
+            grammar_texts = self.grammar_texts()
             thinking = False     # a structured reply is the whole reply: it never enters a thought channel
         else:
             thinking = kw.get("enable_thinking", req.get("enable_thinking", True)) is not False

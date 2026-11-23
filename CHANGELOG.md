@@ -74,11 +74,12 @@ content; the other 29 fork PRs are still open.
   pack, catalog entry or support claim (REQ-0031).
 - **The first structured request no longer pays the vocabulary build** — `kindi serve` starts
   `token_classes.prewarm` in a daemon thread after the engine loads, building the process-shared
-  index, trie, character sets and id sets for the dense and Gemma paths
+  index, trie, character sets and id sets for every served structured-output path: dense, Gemma 4,
+  and (2026-11-23) Lightning and Nanbeige through the shared `kindi/grammar_prewarm.py` mixin
   (`KINDI_PREWARM_GRAMMAR=0` opts out). On the 2B the build is 2,475 ms and the first mask falls
   from 2,350 ms to 20 ms; repeat masks are 2.5 ms. The same change keeps the REQ-0027 gate at
-  15/124 ms/token for `json_schema`/unrolled GBNF at 22 tokens and 3/20 at 200. A4/A5 GPU
-  exactness and the post-change server TTFT remain unmeasured. Evidence:
+  15/124 ms/token for `json_schema`/unrolled GBNF at 22 tokens and 3/20 at 200. A4/A5 GPU exactness remains unmeasured; the CPU server's first structured request measured 0.99 s
+  with the prewarm ready against 3.60 s with it off (2026-11-23), with no GPU server TTFT. Evidence:
   `docs/benchmarks/2026-11-22-i7-8086k-grammar-prewarm/RESULTS.md`.
 - **The dense tandem portfolio is comparable before a model is loaded** — `kindi plan --portfolio`
   prices full GPU, `cpu-first` and `gpu-first` in one dry run with the planner's own byte estimate,

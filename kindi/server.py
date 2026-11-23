@@ -51,6 +51,7 @@ from .api.auth import bearer_matches
 from .cache import Cancelled, Runner
 from .constrained import STRUCTURED_TYPES, is_structured
 from .engine import EOS
+from .grammar_prewarm import GrammarPrewarm
 from .jsonio import load_json
 from .sampling import Sampler
 
@@ -540,7 +541,7 @@ def served_backend(man):
         "contract is not wired into kindi serve." % (family, ", ".join(SERVED_BACKENDS)))
 
 
-class Kindi(object):
+class Kindi(GrammarPrewarm):
     """Engine + tokenizer + cache + sampler, shared by the HTTP layer and `kindi chat`."""
 
     # The engine is one of several backend classes (dense, Lightning, Gemma 4, ...), chosen at runtime; it is
@@ -623,45 +624,24 @@ class Kindi(object):
         if eng is not None:
             getattr(eng, "close", lambda: None)()
 
-    def _grammar_texts_for(self):
-        """The token texts shared by every grammar, built once.
-
-        The prewarm and the first structured request must pass the same list
-        object: the token-class index is keyed by its identity.
-        """
-        lock = getattr(self, "_grammar_texts_lock", None)
-        if lock is None:                     # a test double built without Kindi.__init__
-            lock = self._grammar_texts_lock = threading.Lock()
-        with lock:
-            texts = getattr(self, "_grammar_texts", None)
-            if texts is None:
-                tokens = getattr(self.tok, "tokens", None)
-                n = len(tokens) if tokens is not None else len(self.tok.vocab)
-                texts = [self.tok.decode_bytes(i).decode("utf-8", "replace")
-                         for i in range(n)]
-                self._grammar_texts = texts
-            return texts
+    def grammar_token_texts(self):
+        """The vocabulary as text, in id order (the dense/Gemma tokenizer's API)."""
+        tokens = getattr(self.tok, "tokens", None)
+        n = len(tokens) if tokens is not None else len(self.tok.vocab)
+        return [self.tok.decode_bytes(i).decode("utf-8", "replace") for i in range(n)]
 
     def start_grammar_prewarm(self):
-        """Build the structured-output vocabulary index and trie off the request path."""
+        """Build the index off the request path, on this engine or on its wrapped backend.
+
+        Lightning and Nanbeige own their tokenizer's text list and generation code, so their
+        backend prewarms the same list their requests use; the dense/Gemma paths use this class's.
+        """
+        backend = getattr(self, "nanbeige", None)
+        if backend is not None:
+            return backend.start_grammar_prewarm()
         if self.variant not in ("qwen35", "bonsai27", "gemma4"):
             return None
-        if os.environ.get("KINDI_PREWARM_GRAMMAR", "1") == "0":
-            return None
-        thread = threading.Thread(target=self._prewarm_grammar, name="kindi-grammar-prewarm",
-                                  daemon=True)
-        thread.start()
-        return thread
-
-    def _prewarm_grammar(self):
-        try:
-            from .token_classes import prewarm
-
-            started = time.time()
-            prewarm(self._grammar_texts_for())
-            self.log("structured-output vocabulary ready in %.1fs" % (time.time() - started))
-        except Exception as e:  # noqa: BLE001 - prewarm is an optimization, not a startup gate
-            self.log("structured-output prewarm skipped: %s" % e)
+        return super(Kindi, self).start_grammar_prewarm()
 
     def head_mode(self):
         """exact | fast: the state file (written by `kindi head`) wins over the config."""
@@ -712,7 +692,7 @@ class Kindi(object):
     def _g4_json_token(self,logits,grammar,gstate,temperature,top_p,top_k,rng):
         """the next token inside a structured-output reply: the best grammar-legal one, from the full vocabulary,
         so the finished reply parses against the schema by construction (same allowed-set rule as the dense path)."""
-        allowed=grammar.vocab_allowed(gstate,self._grammar_texts_for())
+        allowed=grammar.vocab_allowed(gstate,self.grammar_texts())
         if grammar.done(gstate):
             allowed=np.concatenate([allowed,np.array(sorted(self.tok.stop_ids),dtype=np.int64)])
         if allowed.size==0:
@@ -985,7 +965,7 @@ class Kindi(object):
         if is_structured(rf):
             grammar = _response_format_grammar(rf, req)
             gstate = grammar.start()
-            self._grammar_texts_for()
+            self.grammar_texts()
         cfg = self.cfg
         messages = req.get("messages") or []
         from . import oai
@@ -1104,7 +1084,7 @@ class Kindi(object):
 
         allowed = None
         if grammar is not None:
-            allowed = grammar.vocab_allowed(gstate, self._grammar_texts)
+            allowed = grammar.vocab_allowed(gstate, self.grammar_texts())
             if grammar.done(gstate):
                 allowed = np.concatenate([allowed, np.array(EOS, dtype=np.int64)])
         tok = self.sample(nxt, temperature, top_p, top_k, rng, min_p, recent(), presence(), allowed=allowed)

@@ -59,8 +59,10 @@ The total is therefore not smaller than the lazy build; the win is that `kindi s
 the server is starting, not inside the first structured request. A request that arrives before the
 thread finishes still waits on the same index lock.
 
-The prewarm covers the dense `qwen35`/`bonsai27` and `gemma4` paths. Lightning and Nanbeige build
-their own token-text lists and are unchanged. The server cold first-token latency is measured on
+Every served structured-output path prewarms: the dense `qwen35`/`bonsai27` and `gemma4` engines
+here, and (since 2026-11-23) Lightning and Nanbeige through the same `GrammarPrewarm` mixin, each
+using its own tokenizer's text API. Lightning and Nanbeige have no pack on this host, so that
+extension is unit-tested with their real tokenizer classes but not measured end to end. The server cold first-token latency is measured on
 the CPU engine below; the earlier 2B/9B server profile's 4.6-4.7 s is the pre-change GPU number,
 and CUDA is still unavailable on this host.
 

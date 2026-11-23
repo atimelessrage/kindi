@@ -11,6 +11,7 @@ import uuid
 
 import numpy as np
 
+from .grammar_prewarm import GrammarPrewarm
 from .lookup import Lookup
 
 THINK_END = "</think>"
@@ -138,7 +139,7 @@ class Sorter(object):
             return out
 
 
-class NanbeigeBackend(object):
+class NanbeigeBackend(GrammarPrewarm):
     def __init__(self, man, cfg, log=print):
         from .gguf import GGUF
         from .nanbeige import Engine, attach_mtp
@@ -184,6 +185,11 @@ class NanbeigeBackend(object):
             raise RuntimeError("Nanbeige self-check failed: the engine gives different tokens for the same prompt")
         self.log("Nanbeige self-check: %s" % repr(self.tok.decode(a))[:60])
 
+    def grammar_token_texts(self):
+        """The vocabulary as text, in id order, for the structured-output token-class index."""
+        return [self.tok.piece(i).decode("utf-8", "replace")
+                for i in range(len(self.tok.tokens))]
+
     def _pick(self, greedy, temperature, top_p, top_k, rng, row=None, allowed=None):
         """sample the next token. The candidates are found on the card: every token whose logit is within 30
         temperatures of the best (each other token has relative probability under e^-30), at most 256 of the best.
@@ -225,10 +231,7 @@ class NanbeigeBackend(object):
         jstate = jgrammar.start() if jgrammar is not None else None
         grammar_texts = None
         if jgrammar is not None:
-            if not hasattr(self, "_grammar_texts"):
-                self._grammar_texts = [self.tok.piece(i).decode("utf-8", "replace")
-                                       for i in range(len(self.tok.tokens))]
-            grammar_texts = self._grammar_texts
+            grammar_texts = self.grammar_texts()
             thinking = False     # a structured reply is the whole reply: it never enters a thought channel
         else:
             thinking = kw.get("enable_thinking", req.get("enable_thinking", True)) is not False
