@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `5750963` on `merge/upstream-0.7.0` (the 0.7.0 merge commit is `35e4697`; guarded by
+- **HEAD:** `6dbfe48` on `merge/upstream-0.7.0` (the 0.7.0 merge commit is `35e4697`; guarded by
   `tests/test_agents_handoff.py`). **2026-11-23: official Kindi v0.7.0 (`8298a0f`) is merged in.** The merge base was
   `dce89df`; the fork was 701 commits ahead and v0.7.0 two ahead (`v0.6.1` + the squashed 0.7.0 commit), so the branch is
   now 0 behind and 702 commits / 931 changed files ahead (+133,113/-1,946), 1,066 tracked files vs 216, no upstream file
@@ -197,7 +197,7 @@ The 27B A/B, fail-closed gate, startup-warning, MTP-server and cold-expert bulle
 
 ### Owner actions
 
-Owner actions pending: Nanbeige 33B GGUF replacement, Gemma 4 E4B pack, DeepSeek V4.1 shards/gate data, PQ2_0/Q2_0 quant downloads, a pinned llama-server,
+Owner actions pending: Nanbeige 33B GGUF replacement, Gemma 4 E4B pack, DeepSeek V4.1 shards/gate data, PQ2_0/Q2_0 quant downloads, a pinned llama-server, the oneAPI Base Toolkit for the planned A770 SYCL smoke,
 other-hardware test rigs, push/installer/CI publications, T4.4/T4.5 + D3/D5 decisions — `docs/MANUAL-HELP-NEEDED.md`.
 
 - **Shared-file owners:** the newest lease row in the table below owns its files until
@@ -235,8 +235,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `5750963` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `5750963` | this session; 2026-11-23 Kindi 0.7.0 merge |
+| `T:/kindi` | `main` | `6dbfe48` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `6dbfe48` | this session; 2026-11-23 Kindi 0.7.0 merge |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 

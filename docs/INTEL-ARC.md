@@ -218,8 +218,9 @@ That is hardware qualification, **not M1 passed**: the gate also asks for the pi
 toolchain, the ReBAR/PCIe record and the llama.cpp baseline, and none of those exist on this host.
 Windows is not the first support target, so this run does not move the support claim either. M2's
 memory and device-kernel halves are now measured (Level Zero copies and runtime-compiled OpenCL);
-`libksycl.so`, a SYCL kernel and Kindi device selection remain open. The next useful step is oneAPI
-on Windows or a Linux host (the plan's target); record every future run in
+`libksycl.so`, a SYCL kernel and Kindi device selection remain open. The next step is the SYCL
+vector-add smoke planned below (oneAPI on Windows; a Linux host is the plan's target); record every
+future run in
 `docs/benchmarks/<date>-<host>-arc-a770/`.
 
 ### M2 memory path (partial, 2026-11-22)
@@ -265,6 +266,87 @@ the device:
 This is the kernel/GEMM half of M2 measured through OpenCL, not SYCL: it proves device compute and
 exactness on the card, but there is no `libksycl.so`, no Kindi backend or engine path, no model and
 no support claim. `kindi intel-cl` is a qualification probe, not a backend entry point.
+
+### M2 next step: SYCL vector-add smoke (planned 2026-11-23, not run)
+
+The OpenCL probe proved exact device compute, but the M2 gate names the SYCL runtime (`libksycl.so`)
+and SYCL device selection, and OpenCL C is not that path. The next step is the same vector-add
+through oneAPI DPC++ on the Level Zero backend, run on this Windows A770 as a host-local precursor;
+M2 still needs the same check on the plan's Linux target before it can pass. Nothing here has run:
+oneAPI is not installed, the files below do not exist yet, and this is not a support claim.
+
+**Toolchain (oneAPI first).** Intel oneAPI Base Toolkit for Windows, pinned to the release that is
+actually installed; record `icx-cl --version` and `sycl-ls --version` rather than writing a version
+that was not observed. It supplies the DPC++ compiler driver (`icx-cl` on Windows), the SYCL runtime
+(`sycl*.dll`), the Level Zero plugin and `sycl-ls.exe`. What the host has today:
+
+| part | state on this host, 2026-11-23 | check |
+|---|---|---|
+| graphics driver + Level Zero device | present, driver 32.0.101.9175 | `python -m kindi intel-info --json` |
+| Level Zero loader and SDK | `ze_loader.dll`; SDK 1.33.1 at `C:/Program Files/LevelZeroSDK/1.33.1` | `python -m kindi intel-smoke --mib 16` |
+| Visual Studio C++ toolset | VS Community 2026 18.9.1, MSVC 14.51 under `T:/VisualStudio/18/Community` | `vcvars64.bat`, then compile a hello-world with `cl` |
+| Windows SDK | not at the default `C:/Program Files (x86)/Windows Kits/10` path; `vcvars64.bat` must find it | the same hello-world build |
+| oneAPI Base Toolkit | **not installed** (`intel-info` reports `oneapi.present: false`; no `sycl-ls`, `icx-cl`, `ocloc`) | `icx-cl --version`; `sycl-ls --verbose` |
+| SPIR-V tools (fallback only) | absent (`llvm-spirv`, `spirv-val`) | `llvm-spirv --version` |
+
+Installation is an owner action (`docs/MANUAL-HELP-NEEDED.md` section 4a), not part of this planning
+change. Check the installed oneAPI release's supported Visual Studio version before choosing the
+compiler: this host has VS 2026, so if that release is validated only against VS 2022, the owner
+decides between the 2022 Build Tools and a newer oneAPI; record the decision instead of working
+around it.
+
+**Planned code.** One C++ file and a thin Python driver, mirroring `intel-cl`'s report surface:
+
+| file | content |
+|---|---|
+| `tools/intel_sycl_vecadd.cpp` | select `level_zero:gpu` with `sycl::ext::oneapi::filter_selector`, assert the backend is `ext_oneapi_level_zero` and the device is the A770, allocate USM, launch the vector-add, compare with an exact host reference, print one JSON report |
+| `kindi/intel_sycl.py` | `run_smoke(n=..., repeats=..., compiler=None, runner=None)`: locate the compiler, build, run under `ONEAPI_DEVICE_SELECTOR=level_zero:gpu`, validate the child report (a child that says pass but names another backend is a fail), `render()`/`dumps()`; builder and runner injectable so CI needs no toolkit or GPU |
+| `kindi/__main__.py` | `kindi intel-sycl [--n N] [--repeats K] [--compiler PATH] [--json]`, exit 0 on pass and 1 on fail (the `intel-smoke`/`intel-cl` convention) |
+| `tests/test_intel_sycl.py` | fake builder/runner: compiler absent, build failure, no `level_zero:gpu` device, child report with mismatches, a child claiming another backend, and pass; no GPU |
+
+**Kernel and inputs.** One `nd_range<1>` vector-add with local size 64 and an `i < n` bounds guard.
+Inputs are integer-valued float32 (`a[i] = (31*i) % 1000`, `b[i] = (17*i) % 1000`), so every sum is
+exactly representable; the host reference is computed independently and compared bit for bit after
+the copy back. Sizes: 1,048,576 elements (five timed repeats), 1 element, and 1,000,003 (not a
+multiple of the local size, so the guard runs).
+
+**Acceptance checks** (all must hold; a failure records `result: fail` and the stage):
+
+| # | check | exact condition |
+|---|---|---|
+| A1 | the runtime sees the card | `sycl-ls --verbose` exits 0 with one `[level_zero:gpu:N]` line naming `Intel(R) Arc(TM) A770 Graphics`; the whole line is recorded |
+| A2 | selection is explicit | `ONEAPI_DEVICE_SELECTOR=level_zero:gpu sycl-ls` lists only the A770 (no `host`, no `opencl` device) |
+| A3 | build | after `vcvars64.bat`, `icx-cl -fsycl -O2 -o intel_sycl_vecadd.exe tools/intel_sycl_vecadd.cpp` exits 0; binary sha256 and build log recorded |
+| A4 | the child asserts its device | backend `ext_oneapi_level_zero`, `is_gpu()` true, name contains `A770`, global memory 16,384 MiB; driver version recorded |
+| A5 | exactness | 0 mismatches and `max_abs_error = 0` for every size and every repeat, over all 1,048,576 elements, not a sample |
+| A6 | bounds guard | 1,000,003 elements pass with 0 mismatches; no out-of-range element is read or written |
+| A7 | no CPU/OpenCL fallback | with `ONEAPI_DEVICE_SELECTOR=opencl:gpu` the child exits 1 naming the missing `level_zero:gpu` device and does not run on OpenCL or the CPU; a child report whose backend is not Level Zero is a failure even when the sums match |
+| A8 | failure is fail | a build, module or launch error gives `result: fail`, exit 1 and the first error string; a failed launch never prints the host reference as the result |
+| A9 | report | `--json` prints `probe: "intel-sycl-smoke"`, `schema: 1`, `support_claim: false`, `scope`, `toolchain`, `device`, `build`, `vector_add` (sizes, repeats, mismatches, max_abs_error, elapsed_ms), `result`, `error` |
+| A10 | host tests | `python -m pytest -q tests/test_intel_sycl.py` passes with no oneAPI, compiler or GPU; the full CPU suite still passes |
+
+**Evidence and scope.** A pass records `sycl-smoke.json`, `sycl-ls.txt`, the compiler version and the
+binary sha256 under `docs/benchmarks/<date>-i7-8086k-arc-a770/`, adds the run section to that page and
+an M2 evidence bullet to REQ-0020. It changes neither `docs/SUPPORT-MATRIX.md` nor the installer and
+adds no support claim: Windows is not the M2 target, this kernel is not Kindi's kernel, and one exact
+vector-add is not a model, engine or GEMM result. Timings are observations, not a throughput claim.
+
+**Stop conditions.** No oneAPI (`sycl-ls` absent) or no `level_zero:gpu` line: record the toolchain
+failure and stop; do not fall back to OpenCL, the CPU or a host device. Build failure: keep the log,
+record the compiler and VS versions, stop. Exactness failure: record the first mismatch index and
+both values, stop. Do not weaken the kernel or the acceptance values to get a pass.
+
+**Fallback if oneAPI cannot be installed (raw Level Zero SPIR-V).** The Level Zero SDK 1.33.1
+headers/libs and the clang 18.1.8 install under
+`C:/Program Files/clang+llvm-18.1.8-x86_64-pc-windows-msvc/bin` are already on the host; the missing
+piece is a SPIR-V producer: `clang -target spir64 -x cl -cl-std=CL2.0 -O0 -emit-llvm -c vecadd.cl -o
+vecadd.bc`, then `llvm-spirv vecadd.bc -o vecadd.spv` (SPIRV-LLVM-Translator matching LLVM 18) and
+`spirv-val --target-env spv1.2 vecadd.spv`; launch through `zeModuleCreate` with
+`ZE_MODULE_FORMAT_IL_SPIRV`, `zeKernelCreate`, group size 64 and `zeCommandListAppendLaunchKernel`
+on the existing USM/copy path in `kindi/intel_l0.py`. It must meet A3-A10 with the module build log
+and SPIR-V hash recorded. It proves a kernel through the loader, not the SYCL runtime or SYCL device
+selection M2 gates, so it is a diagnostic and does not close M2; when oneAPI is installed this path
+is unnecessary.
 
 ### Arrival checklist (M1, run when the card is installed)
 
