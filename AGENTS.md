@@ -27,7 +27,7 @@ line of evidence (command + result). A task must be resumable from this file alo
   `json_schema`/`grammar` to the fork's decode grammar. Merge defects fixed before the gate: undefined
   `slots`/`_slots`/`bc_all`/`dp_all`, a duplicate `tc_hp_for`, a shadowed `_busy` (every 429 was a 500), the streaming
   path's nonexistent `K.acquire`, `qwen4exp_mtp`'s undefined `hst`, and 43 naked `json.load(open())` sites moved to
-  `jsonio.load_json`. Verification: pytest **1,464 passed / 58 skipped / 0 failed**; quality **207 Ruff / 59 mypy /
+  `jsonio.load_json`. Verification: pytest **1,473 passed / 58 skipped / 0 failed**; quality **207 Ruff / 59 mypy /
   884 Pyright / 245 Pylint** (under the ratchet); config reference, support matrix, project memory, claims and
   `bash -n install.sh` pass. No GPU, pack or Windows run; the vendored unwired `qwen4exp_*`/`qx_*` modules are outside
   Pyright's and Pylint's scope until a GPU run wires them (`pyrightconfig.json`, `VENDORED_UNWIRED`). The Gemma 4
@@ -35,7 +35,10 @@ line of evidence (command + result). A task must be resumable from this file alo
   (stdlib HTTP, no pack or engine load, `KINDI_API_KEY` header when the container carries one), replaces fastapi's
   test client with a direct ASGI call (the images install neither httpx nor requests), and runs the check in each
   serving container after `/health` with `--no-selftest` to opt out; 10 selftest tests and 6 installer fixture tests
-  cover both paths and a failure. Full CPU suite 1,464 passed / 58 skipped.
+  cover both paths and a failure. The 2026-11-23 container smoke (`tools/container_smoke.sh`) runs `kindi selftest`
+  one-shot inside the image and again with `--url` in the serving container, so a release image (not just this dev
+  host) proves the pack, tokenizer, engine, `/health` and the chat route; `selftest.py` lost `asyncio.run` (the image
+  is Python 3.6.9) and clears the app key for the in-process run. Unrun here (no GPU or image); full CPU suite 1,473 passed / 58 skipped.
 
 ### Python quality ratchet
 
@@ -232,8 +235,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `889a41c` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `889a41c` | this session; 2026-11-23 Kindi 0.7.0 merge |
+| `T:/kindi` | `main` | `6dcb28b` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `6dcb28b` | this session; 2026-11-23 Kindi 0.7.0 merge |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 

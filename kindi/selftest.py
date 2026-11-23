@@ -116,7 +116,11 @@ def _asgi(app, method, path, payload=b""):
     async def call():
         await app(scope, receive, send)
 
-    asyncio.run(call())
+    loop = asyncio.new_event_loop()                 # asyncio.run is 3.7+; the release image is Python 3.6
+    try:
+        loop.run_until_complete(call())
+    finally:
+        loop.close()
     return sent["status"], sent["body"]
 
 
@@ -179,8 +183,9 @@ def run(cfg, log=print, max_tokens=8, json_path=None):
 
     # The detailed /health view is loopback-only; this app is built for loopback and talks to it in
     # process, so nothing is exposed on the network.
-    run_cfg = dict(cfg, host="127.0.0.1")
-    run_cfg.setdefault("api_key", "")
+    # No port is bound and the app is never exposed, so a keyed container still proves itself here;
+    # leave the key in and the in-process chat would answer 401.
+    run_cfg = dict(cfg, host="127.0.0.1", api_key="")
     try:
         app = create_app(run_cfg, log=log)
     except (Exception, SystemExit) as e:

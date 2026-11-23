@@ -201,7 +201,9 @@ mkdir -p ~/.kindi
 docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.7.0-fork info
 ```
 
-More in [docs/DOCKER.md](docs/DOCKER.md).
+To prove a built image end to end (pack, tokenizer, engine, `/health` and one chat, all inside
+the image), run `bash tools/container_smoke.sh`; [docs/DOCKER.md](docs/DOCKER.md#smoke-test-the-image)
+explains the volume it needs. More in [docs/DOCKER.md](docs/DOCKER.md).
 
 ### Natively
 

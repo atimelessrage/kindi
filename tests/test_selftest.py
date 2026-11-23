@@ -6,6 +6,7 @@ generation fails the command rather than printing a misleading PASS.
 """
 import http.server
 import json
+import pathlib
 import threading
 import time
 
@@ -109,6 +110,32 @@ def test_selftest_proves_health_generation_and_the_effective_runtime(monkeypatch
     assert any("runtime:" in line for line in lines)
     assert any("PASS" in line for line in lines)
     assert K.closed is True
+
+
+def test_the_in_process_client_stays_python36_compatible():
+    """The CUDA image runs Python 3.6.9, where asyncio.run (3.7) does not exist: the container
+    smoke would fail before it proved anything."""
+    src = pathlib.Path(selftest.__file__).read_text(encoding="utf-8")
+    assert "asyncio.run(" not in src
+    assert "new_event_loop" in src
+
+
+def test_a_keyed_container_still_proves_itself_in_process(monkeypatch, tmp_path):
+    """KINDI_API_KEY is set in the image's environment; the in-process app must not demand it."""
+    K = _FakeKindi()
+    monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
+    seen = {}
+    real = server.create_app
+
+    def spy(cfg, log=print):
+        seen.update(cfg)
+        return real(cfg, log)
+
+    monkeypatch.setattr(server, "create_app", spy)
+    cfg = dict(_cfg(_pack(tmp_path)), api_key="container-key", host="0.0.0.0")
+    lines = []
+    assert selftest.run(cfg, log=lines.append) == 0
+    assert seen["api_key"] == "" and seen["host"] == "127.0.0.1"
 
 
 def test_selftest_missing_pack_is_a_clear_failure(tmp_path):

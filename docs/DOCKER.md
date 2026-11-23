@@ -66,6 +66,7 @@ $D convert /data/Ternary-Bonsai-2-2B-PTQ1_0.gguf
 $D verify
 $D fast-head
 $D bench
+$D selftest    # pack, tokenizer, engine and both HTTP routes, in the image
 ```
 
 On AMD graphics, replace `--gpus all` with the AMD devices, and add the group IDs of `video` and `render`:
@@ -79,6 +80,31 @@ $A verify
 ```
 
 `HSA_OVERRIDE_GFX_VERSION=11.0.2` is for the Radeon 780M (gfx1103) only. Other RDNA3 graphics do not need it.
+
+## Smoke test the image
+
+`kindi selftest` is the release image's own end-to-end check: it reads the pack manifest, builds
+the tokenizer and the engine with the image's Python and CuPy, calls `/health` and one chat
+completion. In one command:
+
+```sh
+$D selftest
+```
+
+The tracked script also proves the real serving route. It runs the one-shot check, starts the
+container, waits for `/health`, then runs `kindi selftest --url http://127.0.0.1:8093` inside it:
+
+```sh
+docker volume create kindi-smoke-data
+docker cp ~/.kindi/packs/bonsai-2b/. kindi-smoke-data:/data/pack
+bash tools/container_smoke.sh --image kindi:0.7.0-fork
+```
+
+It needs a GPU unless `--cpu` is given, and the volume must hold a pack at `/data/pack` with write
+access for uid 1000. If it does not, the script prints the one-line `chown -R 1000:1000 /data` fix. `--dry-run` prints every command, `--keep` leaves the server
+running, and `--help` lists the image, volume, port and wait options. The container is removed on
+exit. On AMD, replace the script's `GPU_ARGS` with the `--device` and `--group-add` flags above, or run
+`$A selftest` by hand.
 
 ## The server
 

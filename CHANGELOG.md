@@ -23,6 +23,14 @@ content; the other 29 fork PRs are still open.
 
 ### Added
 
+- **The container smoke runs `kindi selftest`** — `bash tools/container_smoke.sh` proves a release
+  image end to end: `kindi selftest` one-shot (pack, tokenizer, engine, `/health` and the chat route
+  in process) and `kindi selftest --url http://127.0.0.1:8093` in the serving container (the real
+  Uvicorn route, authenticated with the container's key). It replaces the manual `/health` + one-curl
+  step in the release checklist. The selftest's in-process client no longer needs `asyncio.run`
+  (3.7+), because the release image is Python 3.6.9, and it clears the app's key for the in-process
+  run (no port is bound). No image was built or run here: no GPU on this host.
+
 - **The installer proves the server it starts** — after each server answers `/health`, the installer runs
   `kindi selftest --url http://127.0.0.1:8093` inside that container and stops if it fails; `--no-selftest`
   skips the check. `--url` is standard-library only and loads no pack, so it costs one short request and does

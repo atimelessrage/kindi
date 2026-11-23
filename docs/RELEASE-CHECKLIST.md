@@ -72,6 +72,12 @@ output: [container smoke evidence](benchmarks/2026-11-20-i7-8086k-rtx4060ti-cont
 The image label records revision `1627b96312509e6e2bdaad805116f7f6459b88f3-dirty`; the
 `kindi/COMMIT` placeholder still makes `/health` report `commit: null`. No image was published.
 
+**2026-11-23:** the smoke is now one command, `bash tools/container_smoke.sh`, and it runs
+`kindi selftest` twice: one-shot in the image (pack, tokenizer, engine, `/health` and the chat route
+in process) and with `--url` in the serving container (the real Uvicorn route). The 2026-11-20
+results above are the earlier manual `/health` + one-curl recipe and do not include it; no image
+was rebuilt or run for this change on this GPU-less host, so the new smoke is unrun here.
+
 The archive above was rebuilt from `20e2ea0` after the Python 3.6 fix, so it contains the
 repaired `kindi/sessions.py`; the image label still records its earlier dirty build.
 
@@ -141,6 +147,10 @@ docker build -t kindi-rocm7:0.7.0-fork -f docker/Dockerfile.rocm7 \
 
 Before publishing any image tag:
 
+- Run `bash tools/container_smoke.sh --image <tag>` on a real card: `kindi selftest` proves the pack,
+  tokenizer, engine, `/health` and the chat route inside the image, both in a one-shot container and
+  through the serving container's Uvicorn route. `--dry-run` shows the commands; a FAIL stops the
+  release. This replaces the manual `/health` plus one-curl check.
 - Run `kindi verify` on a real card for each backend. The 0.6.0 tags are the last verified images;
   the 0.7.0-fork tags are not verified by this bundle.
 - Push `0.7.0-fork-cuda`, `0.7.0-fork-rocm6` and `0.7.0-fork-rocm7` to
