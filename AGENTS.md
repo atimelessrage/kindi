@@ -197,8 +197,8 @@ The 27B A/B, fail-closed gate, startup-warning, MTP-server and cold-expert bulle
 
 Owner actions pending: Nanbeige 33B GGUF replacement, Gemma 4 E4B pack, DeepSeek V4.1 shards/gate data, PQ2_0/Q2_0 quant downloads, a pinned llama-server, the oneAPI Base Toolkit for the planned A770 SYCL smoke, other-hardware test rigs, push/installer/CI publications, T4.4/T4.5 + D3/D5 decisions — `docs/MANUAL-HELP-NEEDED.md`.
 **A770 (2026-11-24, no claim):** `kindi intel-ternary` splits the packed GEMV over the weight phases (`--parts`, `1`
-= the old shape): 0 mismatches at six shapes, 5.75x-14.14x at layer sizes; M2 partial, still no SYCL/backend.
-
+= the old shape): 0 mismatches at six shapes, 5.75x-14.14x at layer sizes, and `kindi intel-gemm` runs the engine's
+q8 GEMM (`k_q8x_T2` port feeding a `k_mm_g5q` shape) bit-exact at 4.2-36.9 GFLOP/s, so the oneAPI install is the last M2 blocker; M2 partial, still no SYCL/backend. 
 - **Shared-file owners:** the newest lease row in the table below owns its files until
   marked done; `T:/kindi/AGENTS.md` is the main worktree's bridge note, not this file.
 
