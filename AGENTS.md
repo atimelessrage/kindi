@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `e05536b` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `e362a43` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24 (latest): the generic fallback backend landed, and the CPU half of REQ-0030 is measured.**
   REQ-0019 T4.4's recommended option is in the tree: `kindi/backends/llamacpp.py` (registered `llamacpp`) is a
   wildcard that declares no model ids/architectures, so `resolve` picks it only for models nothing specific

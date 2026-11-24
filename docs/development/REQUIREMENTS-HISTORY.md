@@ -28,8 +28,8 @@ the state at that commit.
 | [REQ-0016](requirements/REQ-0016.md) | Chat session history with triage, tags, and raw-markdown export | experimental | `e9b46936da57` | `1c16d556bad9` |
 | [REQ-0017](requirements/REQ-0017.md) | Uneven tensor splits for unequal-capacity GPUs | experimental | `74ee40d79aa7` | `74ee40d79aa7` |
 | [REQ-0018](requirements/REQ-0018.md) | Agent-grade API: structured output, tool-call conformance, concurrency | proposed | `f9eff6db05f0` | `30d4816add28` |
-| [REQ-0019](requirements/REQ-0019.md) | Backend plugin interface (contract, registry, adapters) | experimental | `a40269e2ce91` | `0dbff911102d` |
-| [REQ-0020](requirements/REQ-0020.md) | Intel Arc A770 (Alchemist/DG2) support via a SYCL/oneAPI backend | proposed | `147e3dc61f78` | `9bea16868d44` |
+| [REQ-0019](requirements/REQ-0019.md) | Backend plugin interface (contract, registry, adapters) | experimental | `a40269e2ce91` | `e362a43bc927` |
+| [REQ-0020](requirements/REQ-0020.md) | Intel Arc A770 (Alchemist/DG2) support via a SYCL/oneAPI backend | proposed | `147e3dc61f78` | `e362a43bc927` |
 | [REQ-0021](requirements/REQ-0021.md) | CPU + Intel integrated-graphics tandem (SYCL/Level Zero) | proposed | `ac0c767005ba` | `eec5bc790a66` |
 | [REQ-0022](requirements/REQ-0022.md) | Hardware identification and per-machine autotuning | experimental | `9e6405f223c0` | `82a72bff163d` |
 | [REQ-0023](requirements/REQ-0023.md) | A kernel launch contract checked for every call site | proposed | `3ececca68d4a` | `fb25dd8968de` |
@@ -39,7 +39,7 @@ the state at that commit.
 | [REQ-0027](requirements/REQ-0027.md) | A constrained-decoding mask that does not sweep the vocabulary per state | active | `62ea1a6828f0` | `f7654130192f` |
 | [REQ-0028](requirements/REQ-0028.md) | An Anthropic Messages endpoint for agent harnesses | active | `8c4decde1d0f` | `32075c449184` |
 | [REQ-0029](requirements/REQ-0029.md) | Self-hosted n8n can call a local Kindi server | proposed | `7e675235290d` | `7e675235290d` |
-| [REQ-0030](requirements/REQ-0030.md) | Selectable native accelerators for measured hot Python paths | proposed | `7e675235290d` | `1df80ccd105f` |
+| [REQ-0030](requirements/REQ-0030.md) | Selectable native accelerators for measured hot Python paths | proposed | `7e675235290d` | `e362a43bc927` |
 | [REQ-0031](requirements/REQ-0031.md) | Looped-transformer model family (SenseNova-Loop-9B, Inkling 2 Mini) | active | `7e675235290d` | `7ee95c5e86ff` |
 
 `uncommitted` means the requirement file is not in `HEAD` yet. Commit the requirement
