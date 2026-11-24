@@ -12,8 +12,13 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `bf8954f` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
-  **2026-11-24:** official **Kindi v0.7.1** (`1cb59d2`, one squashed commit on `v0.7.0`, 43 files,
+- **HEAD:** `8032cf4` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+  **2026-11-24 (latest):** REQ-0027's mask got cheaper: self-loop characters now come off the NFA's character edges plus
+  a reverse-epsilon closure (8,228 probes per state gone) and the mask unions use a cached boolean mask (248,320-id sorts
+  gone). 2B medians: 15 -> 10.0 ms/token `json_schema`, 124 -> 57.1 unrolled `json.gbnf` depth 1 (depth 2/3 -> 9.5),
+  record 70 -> 8.4, 200 tokens 3 -> 1.7 and 20 -> 7.5; oracle re-run over 14 real states, 0 mismatches. Evidence:
+  `docs/benchmarks/2026-11-24-i7-8086k-grammar-mask-edges/` (claim `docs/claims/grammar-mask-edges.json`); CPU filter
+  only, A4/A5 open. **2026-11-24:** official **Kindi v0.7.1** (`1cb59d2`, one squashed commit on `v0.7.0`, 43 files,
   +15,649/-114) is merged in as `0.7.1-fork`: the **Inkling 2 Mini** engine (`inkling2_*`, `kindi inkling`,
   the server's `kindi_inkling2` backend), **Flash-Next drafting for sampled requests**
   (`sampling.spec_accept` takes a draft distribution; `spec.spec_accept` delegates), **one CPU thread per
@@ -21,22 +26,20 @@ line of evidence (command + result). A task must be resumable from this file alo
   version identity: the fork keeps `0.7.1-fork` and its own cascade/adapter/`modelids` paths beside
   upstream's inkling additions. **Upstream names `tools/check_warp_masks.py` but the tag does not ship
   it**, so the fork wrote it (14 tests): 404 intrinsics classified, 7 reviewed sub-warp masks in
-  `tools/warp_mask_baseline.json`. It found two real hazards, both fixed: `chunk.cu` `k_q8x_T2` bypassed
-  the file's own `KSHFLX` macro, and `kindi.cu` `wsum_d`/`wsum_f` used bare `__shfl_xor` on every arch.
+  `tools/warp_mask_baseline.json`. It found and fixed two real hazards (`chunk.cu` `k_q8x_T2` bypassed the
+  file's own `KSHFLX` macro; `kindi.cu` `wsum_d`/`wsum_f` used bare `__shfl_xor` on every arch).
   The release's root `test_inkling2_engine.py` moved to `tools/verify_inkling2.py` (a manual check). **Unrun here:** the
   Inkling engine, sampled drafting and core detection (no GPU, pack or Windows host). **2026-11-23:** official Kindi v0.7.0 (`8298a0f`) is also merged in (39 conflicted files, 69 hunks, all
   resolved by hand; the ported fixes, the unwired `slots.py`/Flash-Next modules and the merge defects are
-  recorded in [docs/development/AGENTS-HISTORY.md](docs/development/AGENTS-HISTORY.md) and
-  `CURRENT-VS-KINDI-0.7.md`). No GPU, pack or Windows run; the vendored unwired `qwen4exp_*`/`qx_*` modules are outside
-  Pyright's and Pylint's scope until a GPU run wires them (`pyrightconfig.json`, `VENDORED_UNWIRED`). The Gemma 4
-  pinned-host fix (#44) follows 0.7.0's names and release points with the fork's host budget on top; its tests pin each. The 2026-11-23 installer slice adds `kindi selftest --url`
+  recorded in [docs/development/AGENTS-HISTORY.md](docs/development/AGENTS-HISTORY.md) and `CURRENT-VS-KINDI-0.7.md`).
+  No GPU, pack or Windows run; the vendored unwired `qwen4exp_*`/`qx_*` modules are outside
+  Pyright's and Pylint's scope until a GPU run wires them (`pyrightconfig.json`, `VENDORED_UNWIRED`). The Gemma 4 pinned-host fix (#44) follows 0.7.0's names and release points with the fork's host budget on top; its tests pin each. The 2026-11-23 installer slice adds `kindi selftest --url`
   (stdlib HTTP, no pack or engine load, `KINDI_API_KEY` header when the container carries one), replaces fastapi's
   test client with a direct ASGI call (the images install neither httpx nor requests), and runs the check in each
-  serving container after `/health` with `--no-selftest` to opt out; 10 selftest tests and 6 installer fixture tests
-  cover both paths and a failure. The 2026-11-23 container smoke (`tools/container_smoke.sh`) runs `kindi selftest`
+  serving container after `/health` with `--no-selftest` to opt out; 10 selftest tests and 6 installer fixture tests cover both paths and a failure. The 2026-11-23 container smoke (`tools/container_smoke.sh`) runs `kindi selftest`
   one-shot inside the image and again with `--url` in the serving container, so a release image (not just this dev
   host) proves the pack, tokenizer, engine, `/health` and the chat route; `selftest.py` lost `asyncio.run` (the image
-  is Python 3.6.9) and clears the app key for the in-process run. Unrun here (no GPU or image); full CPU suite 1,485 passed / 58 skipped.
+  is Python 3.6.9). Unrun here (no GPU or image).
 
 ### Python quality ratchet
 
@@ -51,7 +54,7 @@ existing debt is tolerated and `--update --reason "..."` lowers the baseline aft
 
 ### Full CPU gate
 
-The 2026-11-22 prewarm gate at `4bab483` is **1,423 passed, 58 skipped, 0 failed** in 138.50 s (plain CPU suite, no coverage rerun). The 2026-11-20 integration gate at `82a72bf` is **1,412 passed, 28 skipped, 0 failed** in 250.33 s (plain CPU suite, no coverage rerun). The last coverage-measured run remains `539a504`: **1,241 passed, 28 skipped, 0 failed** in 277.17 s at **46.36%** line+branch coverage (23,504 statements and 8,394 branches); its plain suite was 1,241 / 28 / 0 in 227.62 s. The consolidated 2026-11-19 content commits (`f75253b` + `84b6686`) remain **1,357 passed, 28 skipped, 0 failed** in 229.53 s. Every skip is inventoried by node ID and exact reason in `tests/README.md`.
+The 2026-11-24 grammar-mask gate at `8032cf4` is **1,513 passed, 58 skipped, 0 failed** in 180.66 s (plain CPU suite, no coverage rerun); the 2026-11-22 prewarm gate at `4bab483` was 1,423 / 58 / 0 in 138.50 s and the 2026-11-20 integration gate at `82a72bf` 1,412 / 28 / 0 in 250.33 s. The last coverage-measured run remains `539a504`: **1,241 passed, 28 skipped, 0 failed at 46.36%** line+branch (23,504 statements, 8,394 branches; plain 1,241 / 28 / 0 in 227.62 s), and the consolidated 2026-11-19 commits (`f75253b` + `84b6686`) 1,357 / 28 / 0 in 229.53 s. Every skip is inventoried by node ID and reason in `tests/README.md`.
 
 ### Upstream v0.7.0 and comparison
 
@@ -154,17 +157,14 @@ per-module floors are untouched. Its tracked revision, command and counts are in
 
 ### Grammar and claims
 
-The mask itself is now a gated roadmap item, not started: [REQ-0027](docs/development/requirements/REQ-0027.md) takes the 231 and 2,720 ms/token baselines as
-the floor its gate must beat by 10x, with a token-class table or an on-card mask named only as direction and a CPU set-equality test against today's
-`vocab_allowed` as the semantics guard (`docs/ROADMAP.md` "Constrained-decoding cost"). GPU grammar/JSON-schema gate closed on the 2B (§39); recursive GBNF is
-now opt-in (`KINDI_GBNF_MAX_DEPTH`, bounded unroll cross-checked against an independent matcher - see the newest rows in `docs/development/AGENTS-HISTORY.md`)
-and measured as a diagnostic only: on the 2B's 248,320-entry vocabulary the unrolled llama.cpp `json.gbnf` (1,737 states at depth 1) costs 2,720 ms per token
-against 231 ms for `json_schema` (0.42 vs 4.9 tok/s end to end), and 9,483 states cost the same within 3%, because the filter sweeps the vocabulary once per new
-state - and at a 200-token document the average *falls* to 463 ms/token against 57 for the schema (8x) because repeated states are cache hits, while a
-whitespace-permitting constraint lets the greedy 2B spend the whole budget on whitespace (200 tokens, 9 characters) (`docs/API.md`,
-`docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/RESULTS.md`), and the two harnesses behind it are tracked as `tools/grammar_cost.py` and
-`tools/grammar_cost_serve.py` so a clean checkout re-derives the rows instead of trusting the JSON artifact. The numbers those docs quote are no longer prose:
-`python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (37 gates, 265 numbers across `docs/claims/*.json`, six
+[REQ-0027](docs/development/requirements/REQ-0027.md) passed its 10x gate on 2026-11-22 (token-class table + startup prewarm) and again on 2026-11-24 (edge-derived
+safe sets, mask unions); its A4/A5 GPU rows stay open. The CPU set-equality guard against the pre-token-class `vocab_allowed` sweep is what keeps the accepted
+language fixed. GPU grammar/JSON-schema gate closed on the 2B (§39); recursive GBNF is opt-in (`KINDI_GBNF_MAX_DEPTH`, bounded unroll cross-checked against an
+independent matcher - see the newest rows in `docs/development/AGENTS-HISTORY.md`) and measured as a diagnostic only: it once cost 2,720 ms/token against 231 for
+`json_schema` and *fell* to 463 at 200 tokens (cache hits; a whitespace-permitting constraint lets the greedy 2B spend the budget on 9 characters) (`docs/API.md`,
+`docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/RESULTS.md`). The harnesses are tracked as `tools/grammar_cost.py` and
+`tools/grammar_cost_serve.py`; every quoted number is re-derived, not prose:
+`python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (38 gates, 270 numbers across `docs/claims/*.json`, six
 claimed docs and zero citations listed as debt), and refuses a benchmark citation no claim accounts for - schema and procedure in `docs/claims/README.md`.
 
 ### Dated evidence
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `bf8954f` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `bf8954f` | this session; 2026-11-24 v0.7.1 merge, A770 phase-parallel GEMV |
+| `T:/kindi` | `main` | `8032cf4` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `8032cf4` | this session; 2026-11-24 v0.7.1 merge, A770 GEMV, grammar-mask edges |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
