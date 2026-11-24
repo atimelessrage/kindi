@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `32e570e` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `76ff185` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24:** official **Kindi v0.7.1** (`1cb59d2`, one squashed commit on `v0.7.0`, 43 files,
   +15,649/-114) is merged in as `0.7.1-fork`: the **Inkling 2 Mini** engine (`inkling2_*`, `kindi inkling`,
   the server's `kindi_inkling2` backend), **Flash-Next drafting for sampled requests**
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `32e570e` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `32e570e` | this session; 2026-11-24 v0.7.1 merge |
+| `T:/kindi` | `main` | `76ff185` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `76ff185` | this session; 2026-11-24 v0.7.1 merge |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
