@@ -228,10 +228,10 @@ Neu, als reine Funktion (testbar ohne GPU):
 
 ```python
 def fit_slots(free, reserve, ctx, max_slots, state_one, kv_tok, per_pos_shared, min_ctx=1024):
-    """(slots, fit_ctx). Erst Slots reduzieren, dann den Kontext kürzen.
+    """(slots, fit_ctx). Reduce slots first, then shorten the context.
 
-    Slot 0 zahlt wie heute nur über `reserve` (die 96 MiB Reserve deckten den State schon immer);
-    jeder ZUSÄTZLICHE Slot zahlt seinen State und sein K/V pro Position.
+    Slot 0 is charged only through `reserve`, as today (the 96 MiB reserve always covered the state);
+    each ADDITIONAL slot pays its state and its K/V per position.
     """
     budget = max(0, int(free) - int(reserve))
     slots = max(1, int(max_slots))

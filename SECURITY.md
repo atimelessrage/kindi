@@ -7,9 +7,11 @@ history-redaction and push policy is [docs/SECURITY.md](docs/SECURITY.md).
 
 ## Reporting a vulnerability
 
-Please report suspected vulnerabilities privately through GitHub's **Report a vulnerability** form:
+Please report suspected vulnerabilities privately through GitHub's **Report a vulnerability** form on the fork:
 
-<https://github.com/ahtx/kindi/security/advisories/new>
+<https://github.com/atimelessrage/kindi/security/advisories/new>
+
+(Upstream Kindi is at `ahtx/kindi`; this fork's reports go to the fork. If the fork form is unavailable, contact the repository owner privately instead of opening a public issue.)
 
 Do not open a public issue with exploit details, credentials, model files or personal data. Include:
 

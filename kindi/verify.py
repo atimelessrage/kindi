@@ -156,7 +156,7 @@ def run(cfg, log=print):
                                     "no record (a pack from before 0.7.0; kindi convert --force adds it)"))
     cl = os.path.join(pack, "head_clusters.npz")
     said = []
-    eng = make_engine(pack, ctx=1024, clusters=dict(np.load(cl)) if os.path.exists(cl) else None, log=said.append,
+    eng = make_engine(pack, ctx=1024, clusters=dict(np.load(cl, allow_pickle=False)) if os.path.exists(cl) else None, log=said.append,
                        tandem=cfg.get("tandem", "off"), cpu_layers=cfg.get("tandem_cpu_layers"),
                        gpu=cfg.get("tandem_gpu"), kv_cache=cfg.get("kv_cache"))
     # the first line names the mode that will generate, so a PASS is never read as the plain engine's

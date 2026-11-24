@@ -172,7 +172,7 @@ class MTPDraft(object):
         from . import tp as _tp
         self.e, s = eng, eng.cards[0]
         self.s = s
-        z = np.load(path)
+        z = np.load(path, allow_pickle=False)
         m = self.meta = json.loads(bytes(z["meta"]).decode())
         D, NH, NHKV, HD, NFF, W = m["D"], m["NH"], m["NHKV"], m["HD"], m["NFF"], m["W"]
         assert D == s.D and HD == 256 and W <= 64, (D, s.D, HD, W)

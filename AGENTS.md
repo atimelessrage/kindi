@@ -12,8 +12,8 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `3fce22a` on `merge/upstream-0.7.0` (the 0.7.0 merge commit is `35e4697`; guarded by
-  `tests/test_agents_handoff.py`). **2026-11-23: official Kindi v0.7.0 (`8298a0f`) is merged in.** The merge base was
+- **HEAD:** `4fd3f4d` on `merge/upstream-0.7.0` (0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+  **2026-11-24 audit round:** `route.py` auth+caps (`tests/test_route.py`); `np.load(allow_pickle=False)`; fork advisory URL; CHANGELOG/CURRENT-VS refreshed. **2026-11-23: official Kindi v0.7.0 (`8298a0f`) is merged in.** The merge base was
   `dce89df`; the fork was 701 commits ahead and v0.7.0 two ahead (`v0.6.1` + the squashed 0.7.0 commit), so the branch is
   now 0 behind and 702 commits / 931 changed files ahead (+133,113/-1,946), 1,066 tracked files vs 216, no upstream file
   missing. 39 conflicted files (69 hunks) were resolved by hand: the fork keeps the implementations with tests, and
@@ -235,8 +235,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `3fce22a` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `3fce22a` | this session; 2026-11-23 Kindi 0.7.0 merge |
+| `T:/kindi` | `main` | `4fd3f4d` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `4fd3f4d` | this session; 2026-11-24 audit-fix round |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 

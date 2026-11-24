@@ -1,13 +1,14 @@
 # Changelog
 
-## 0.7.0-fork (2026-11-20)
+## 0.7.0-fork (2026-11-23, on official v0.7.0)
 
-This is the fork's release, not official Kindi 0.6.1. At HEAD `60a039b` the fork is **669 commits and
-827 files ahead** of official `v0.6.1` (`+107,320/−1,370`), with no upstream file deleted. The older
-**649**-commit figure in `detailed-fork-changelog.md` was the `3002a40` snapshot; `CURRENT-VS-KINDI-0.7.md`
-recorded 666 at `3fed704`, and the current range is 669. The package, both installers and the Docker tags
-now say `0.7.0-fork`, so the fork cannot be mistaken for an official `0.6.1` patch. The source archive and
+This is the fork's release, not official Kindi 0.6.1. After the 2026-11-23 merge below, the fork is
+**702 commits / 931 changed files ahead** of official `v0.7.0` (`8298a0f`, `+133,113/−1,946`,
+1,066 tracked files vs 216, no upstream file missing). The package, both installers and the Docker tags
+say `0.7.0-fork`, so the fork cannot be mistaken for an official `0.6.1` patch. The source archive and
 installer hashes are recorded in `docs/INSTALL.md`; publication is still a release-owner step.
+(The pre-merge 0.6.1-era snapshot — 669 commits / 827 files at `60a039b` — is kept in
+`detailed-fork-changelog.md`.)
 
 ### Upstream merge (2026-11-23)
 

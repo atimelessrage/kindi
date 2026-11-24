@@ -1281,7 +1281,7 @@ class Engine(object):
     def load_mtp(self, path):
         """load an MTP head file onto the last card"""
         cp = self.cp
-        z = np.load(path)
+        z = np.load(path, allow_pickle=False)
         c, c0 = self.cards[-1], self.cards[0]
         E = self.n_embd
         assert int(z["E"]) == E, "the head is for another model"

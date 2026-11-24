@@ -49,13 +49,15 @@ the AVX2/FMA/F16C tier and runs `test_cpu_build.py`, `test_cpu_threads.py` and `
 test loads the library and checks the ctypes ABI without a model pack. The manual
 self-hosted GPU lane is described in [docs/CI.md](../docs/CI.md); it is not run by hosted CI.
 
-### Skipped-test inventory (final CPU run, 2026-11-19)
+### Skipped-test inventory (final CPU run, 2026-11-19; counts since superseded)
 
 The final full CPU run in this worktree (`3002a40` plus the local changes) was
 `python -m pytest -q -rs`: **1,312 passed, 28 skipped, 0 failed** in 217.78 s
 (`bench-logs/full-suite-head-20261119.txt`). The 28-row inventory was captured from the preceding
 run and its JUnit/`-rs` evidence, `bench-logs/full-suite-final-20261119.{xml,txt}` (228.70 s); the
-final run reports the same 28 skips. This table lists
+final run reports the same 28 skips. The headline suite has since grown (1,485 passed / 58 skipped at
+`4fd3f4d` per `AGENTS.md`); this table is the 2026-11-19 inventory and is re-captured at the next
+full-suite run. This table lists
 every skipped node ID with pytest's exact reason and the environment category; a skip is not a
 pass, so a new or disappearing row must be reviewed instead of hidden by the aggregate count.
 

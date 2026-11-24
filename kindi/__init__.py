@@ -13,7 +13,7 @@ def _commit():
     """the source commit (12 hex digits) or None: kindi/COMMIT, which git archive fills in (export-subst), else git"""
     here = os.path.dirname(os.path.abspath(__file__))
     try:
-        c = open(os.path.join(here, "COMMIT")).read().strip()
+        c = open(os.path.join(here, "COMMIT"), encoding="utf-8").read().strip()
         if c and not c.startswith("$"):
             return c[:12]
     except OSError:

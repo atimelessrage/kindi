@@ -20,9 +20,12 @@ import sys
 import time
 import urllib.request
 
+from .api.auth import bearer_matches
 from .jsonio import load_json
 
 HOP = {"connection", "keep-alive", "proxy-connection", "transfer-encoding", "upgrade", "host", "content-length"}
+MAX_HEAD_BYTES = 65536              # header block cap (asyncio's stream limit by default)
+MAX_BODY_BYTES = 16 * 1024 * 1024   # same 16 MiB request cap as kindi.server (KINDI_MAX_BODY_MB)
 
 
 class Router(object):
@@ -102,13 +105,18 @@ class Router(object):
     async def _reply(self, writer, code, obj):
         body = json.dumps(obj).encode()
         reason = {200: "OK", 400: "Bad Request", 401: "Unauthorized", 404: "Not Found", 411: "Length Required",
+                  413: "Payload Too Large", 431: "Request Header Fields Too Large",
                   502: "Bad Gateway"}.get(code, "Error")
         writer.write(("HTTP/1.1 %d %s\r\nContent-Type: application/json\r\nContent-Length: %d\r\nConnection: close\r\n\r\n"
                       % (code, reason, len(body))).encode() + body)
         await writer.drain()
 
     async def _handle(self, reader, writer):
-        head = await reader.readuntil(b"\r\n\r\n")
+        try:
+            head = await reader.readuntil(b"\r\n\r\n")
+        except asyncio.LimitOverrunError:
+            return await self._reply(writer, 431, {"error": {"message": "the header block is too large",
+                                                              "type": "invalid_request_error"}})
         lines = head.decode("latin-1").split("\r\n")
         method, path, _ = (lines[0].split(" ", 2) + ["", ""])[:3]
         hdr = []
@@ -119,9 +127,19 @@ class Router(object):
         hl = {k.lower(): v for k, v in hdr}
         if hl.get("transfer-encoding", "").lower() == "chunked":
             return await self._reply(writer, 411, {"error": {"message": "send a Content-Length", "type": "invalid_request_error"}})
-        n = int(hl.get("content-length") or 0)
+        try:
+            n = int(hl.get("content-length") or 0)
+        except ValueError:
+            return await self._reply(writer, 400, {"error": {"message": "Content-Length is not a number",
+                                                              "type": "invalid_request_error"}})
+        if n < 0:
+            return await self._reply(writer, 400, {"error": {"message": "Content-Length is negative",
+                                                              "type": "invalid_request_error"}})
+        if n > MAX_BODY_BYTES:
+            return await self._reply(writer, 413, {"error": {"message": "the request body is too large",
+                                                              "type": "invalid_request_error"}})
         body = await reader.readexactly(n) if n else b""
-        if self.key and hl.get("authorization", "") != "Bearer %s" % self.key:
+        if not bearer_matches(hl.get("authorization", ""), self.key):
             return await self._reply(writer, 401, {"error": {"message": "wrong or missing API key", "type": "invalid_request_error"}})
         p = path.split("?", 1)[0]
         if method == "GET" and p in ("/v1/models", "/models"):

@@ -589,7 +589,7 @@ class Engine(object):
         self.fast_assign=None; self.fast_centroids=None; self.fast_special=None
         cluster_path=os.path.join(manifest.get("pack_path",""),"head_clusters.npz")
         if cluster_path and os.path.isfile(cluster_path):
-            z=np.load(cluster_path)
+            z=np.load(cluster_path, allow_pickle=False)
             assign=np.asarray(z["assign"],dtype=np.int32)
             cent=np.asarray(z["centroids"],dtype=np.float32)
             if assign.shape==(self.V,) and cent.ndim==2 and cent.shape[1]==self.D:

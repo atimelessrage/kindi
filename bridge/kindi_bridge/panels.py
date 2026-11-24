@@ -82,7 +82,7 @@ class Inference:
         try:
             from .workbench import refresh_agent_header
             refresh_agent_header(self.store)
-        except Exception:pass
+        except Exception:pass  # best-effort header refresh; telemetry below still runs
         try:
             with urllib.request.urlopen(url,timeout=2) as r:h=json.load(r)
         except Exception:

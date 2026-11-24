@@ -270,7 +270,7 @@ class Openings(object):
                         continue                  # made by another engine configuration
                     if meta["p"] < eng.ctx:
                         self.entries[key] = {"p": meta["p"], "used": meta.get("used", 0),
-                                             "tokens": np.load(os.path.join(d, "tokens.npy"))}
+                                             "tokens": np.load(os.path.join(d, "tokens.npy"), allow_pickle=False)}
                 except Exception:  # noqa: BLE001 - a damaged entry is skipped, not fatal
                     continue
         except OSError as e:
@@ -362,7 +362,7 @@ class Openings(object):
             raise ValueError("saved opening %s was made by another engine" % key)
         if meta.get("p") != p:
             raise ValueError("saved opening %s metadata prefix length does not match its entry" % key)
-        z = np.load(os.path.join(d, "state.npz"))
+        z = np.load(os.path.join(d, "state.npz"), allow_pickle=False)
         expected_keys = set(["M%d" % i for i in range(len(eng.M))]
                             + ["C%d" % i for i in range(len(eng.conv))]
                             + ["K%d" % i for i in range(len(eng.Kc))]
@@ -477,7 +477,7 @@ class Turns(object):
                     if meta["p"] >= eng.ctx or any(b not in self.blocks for b in meta["blocks"]):
                         continue
                     self.entries[key] = {"p": meta["p"], "used": meta.get("used", 0), "blocks": meta["blocks"],
-                                         "tokens": np.load(os.path.join(d, "tokens.npy")), "bytes": _dir_bytes(d)}
+                                         "tokens": np.load(os.path.join(d, "tokens.npy"), allow_pickle=False), "bytes": _dir_bytes(d)}
                 except Exception:  # noqa: BLE001 - a damaged or half-written entry is skipped
                     continue
         except OSError as e:
@@ -571,9 +571,9 @@ class Turns(object):
             e["used"] = time.time()
         d = os.path.join(self.root, "turns", key)
         p = e["p"]
-        parts = [np.load(os.path.join(self.root, "blocks", b + ".npz")) for b in e["blocks"]]
-        tail = np.load(os.path.join(d, "tail.npz")) if p > len(e["blocks"]) * self.B else None
-        z = np.load(os.path.join(d, "state.npz"))
+        parts = [np.load(os.path.join(self.root, "blocks", b + ".npz"), allow_pickle=False) for b in e["blocks"]]
+        tail = np.load(os.path.join(d, "tail.npz"), allow_pickle=False) if p > len(e["blocks"]) * self.B else None
+        z = np.load(os.path.join(d, "state.npz"), allow_pickle=False)
         Ms = [z["M%d" % i] for i in range(len(eng.M))]
         Cs = [z["C%d" % i] for i in range(len(eng.conv))]
         for name, dst in (("K", eng.Kc), ("V", eng.Vc)):

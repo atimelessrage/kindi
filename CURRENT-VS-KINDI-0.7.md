@@ -36,9 +36,14 @@ and no maintainer review has landed. Their union is **122 paths**: **92 of the 9
 and 30 paths that the merge now matches upstream on. **Four are in 0.7.0 by content** - #48 (host RAM capped at the
 container cgroup limit), #49 (a tokenizer pack inconsistency fails loudly), #72 (mode A speculation defaults to k=1) and
 #76 (Hadamard-4096 packs default to exact tensor-core activations) - because upstream squashes a release into one
-commit; they can be closed upstream as included.
+commit; they can be closed upstream as included. **2026-11-24 update:** the other 28 PR branches (#50-#71, #73-#75,
+#77-#79) were rebased onto `v0.7.0` (`8298a0f`) and force-pushed with `--force-with-lease`, so each PR now diffs
+against the official release; local pre-rebase tips are kept at `refs/backup/pr-<name>-pre070`. #47 was left
+untouched: 0.7.0 already carries the equivalent Windows loader (`libcuda_name()`/`libcuda()`), so rebasing it
+would leave only tests against a renamed API. That leaves 33 open PRs, of which 28 are rebased, 4 are in 0.7.0
+by content, and 1 (#47) is superseded.
 
-Report date: **2026-11-23**. Baseline: this fork at **`e19850e`** (the merge commit `35e4697`) against official **Kindi 0.7.0** (tag `v0.7.0`, commit `8298a0f`, released
+Report date: **2026-11-23** (PR-status paragraph updated 2026-11-24). Baseline: this fork at **`e19850e`** (the merge commit `35e4697`) against official **Kindi 0.7.0** (tag `v0.7.0`, commit `8298a0f`, released
 2026-11-23) against this fork's `merge/upstream-0.7.0` branch. The earlier comparison, its 0.6.1 measurements and the
 round-by-round history stay in `detailed-fork-changelog.md`; the speeds and quality figures below are the 0.6.1-era runs
 at `60a039b` unless a table says otherwise.

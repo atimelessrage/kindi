@@ -181,7 +181,7 @@ def _run(cfg, log=print):
     if vram is not None:
         vram.start()
     cl = os.path.join(pack, "head_clusters.npz")
-    eng = make_engine(pack, ctx=cfg["ctx"], clusters=dict(np.load(cl)) if os.path.exists(cl) else None, log=log,
+    eng = make_engine(pack, ctx=cfg["ctx"], clusters=dict(np.load(cl, allow_pickle=False)) if os.path.exists(cl) else None, log=log,
                        tandem=cfg.get("tandem", "off"), cpu_layers=cfg.get("tandem_cpu_layers"),
                        gpu=cfg.get("tandem_gpu"), kv_cache=cfg.get("kv_cache"))
     if vram is not None:

@@ -738,7 +738,7 @@ class Model(object):
         if n <= 0 or not os.path.exists(path):
             return
         if path.endswith(".npy"):
-            ids = np.load(path)[:n].astype(np.int64)
+            ids = np.load(path, allow_pickle=False)[:n].astype(np.int64)
         else:
             with open(path, encoding="utf-8") as f:
                 ids = np.asarray(json.load(f)["ids"][:n], np.int64)

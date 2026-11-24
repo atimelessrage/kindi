@@ -597,7 +597,7 @@ class Kindi(GrammarPrewarm):
             if tandem == "off":
                 cl_path = os.path.join(pack, "head_clusters.npz")
                 if os.path.exists(cl_path):
-                    clusters = dict(np.load(cl_path))
+                    clusters = dict(np.load(cl_path, allow_pickle=False))
             self.eng = make_engine(pack, ctx=cfg["ctx"], clusters=clusters, log=log, tandem=tandem,
                                    cpu_layers=cfg.get("tandem_cpu_layers"),
                                    gpu=cfg.get("tandem_gpu"))
