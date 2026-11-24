@@ -91,7 +91,12 @@ plain CPU suite is the only evidence for the merge.
 - `kindi/api/anthropic.py` holds the whole dialect as pure transforms; `server.py` now has one SSE
   relay shared by both streaming routes instead of two copies. **Not claimed:** compatibility — the
   app-level gate passes (`tests/test_anthropic.py`), but no real Claude Code run has happened yet.
+- `kindi selftest` now also posts its prompt through `/v1/messages` (in process, and with `--url`
+  against a running server), so an installed image proves the Anthropic answer with the real engine
+  and not just that the route is registered; a 200 whose body is not a message fails the check. One
+  extra short generation per selftest.
 
+### Audit fixes (2026-11-24, after the merge)
 
 - **The Windows installer fetched the previous release.** `install.ps1` still pinned `$KindiWinVersion =
   '0.7.0-fork'`, and that literal is the bundle URL and the version Settings > Apps shows, while the package and
@@ -110,6 +115,19 @@ plain CPU suite is the only evidence for the merge.
   rebased onto v0.7.1; #47 joined #48/#49/#72/#76 as included by content), `docs/WINDOWS.md`'s installer-version
   history and `docs/RELEASE-CHECKLIST.md`'s status.
 
+
+### Launch-shape contract: block size (2026-11-24, REQ-0023 A2)
+
+- `tests/test_kernel_arity.py` now holds each graph launch's block tuple against the kernel's
+  `__launch_bounds__` ceiling: 96 kernels declare one, 28 (site, kernel) pairs are measured and 135
+  launches are pinned as dynamic (96 kernels declare no bound; the rest name the kernel or the block
+  through a variable or a runtime width). Both counts are fixed, so a new launch is reviewed once.
+  A block that exceeds the declaration (`k_big asks 1024 > 256`) fails the CPU suite rather than the
+  launch on a card this host does not have; a synthetic mutation proves the check is not vacuous.
+- Only the first `__launch_bounds__` argument is a contract (the second is an occupancy hint), and a
+  name declared more than once must fit the strictest declaration, because the caller cannot say
+  which variant it got. The grid half of A2 stays open: a zero grid launches nothing silently, but
+  grid elements are runtime expressions, so that needs a planner-time assertion on a GPU host.
 
 ### Upstream merge (2026-11-23)
 

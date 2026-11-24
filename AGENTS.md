@@ -12,16 +12,16 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `a702ecc` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
-  **2026-11-24 Anthropic endpoint (REQ-0028):** `POST /v1/messages` translates onto the same `run_generate` path
-  (`kindi/api/anthropic.py`; `x-api-key` or bearer; Anthropic envelope and SSE order; both streaming routes share
-  `_relay`). A1/A2 and A3's app-level gate pass (`tests/test_anthropic.py`); the real Claude Code run is open, so
-  the endpoint is *available*, not *compatible*. **Audit fixes:** `install.ps1` fetched `0.7.0-fork` while the
-  package and `install.sh` said `0.7.1-fork`; all three match now, pinned by `tests/test_version_consistency.py`
-  with each installer's release tag. The `v0.7.1-fork` release is **still unpublished** (only `v0.5.0-installer`
-  exists), so README's one-liners 404 until the owner runs `docs/RELEASE-CHECKLIST.md`. The mask cache is a bounded
-  64 MiB LRU (`StateMaskCache`, `KINDI_MASK_CACHE_MB`) - A5's memory half; A4 and A5's rate half stay open. Suite:
-  1,547 passed / 58 skipped / 0 failed (184.29 s; the run reported 1 failed, the handoff bump this commit carries).
+- **HEAD:** `3c601bb` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+  **2026-11-24:** `POST /v1/messages` answers Anthropic's dialect on the same `run_generate` path
+  (`kindi/api/anthropic.py`; `x-api-key` or bearer; envelope and SSE order; one `_relay` for both streaming
+  routes), and `kindi selftest` drives it in process and with `--url`, so an installed image proves it. REQ-0023's
+  block half landed too: `tests/test_kernel_arity.py` holds each launch's block against its `__launch_bounds__`
+  (28 pairs measured, 135 pinned).
+  while the package and `install.sh` said `0.7.1-fork`; all three match now, pinned by
+  `tests/test_version_consistency.py`. The `v0.7.1-fork` release is **still unpublished** (only `v0.5.0-installer`),
+  so README's one-liners 404 until the owner runs `docs/RELEASE-CHECKLIST.md`. The mask cache is a bounded 64 MiB
+  LRU (`StateMaskCache`, `KINDI_MASK_CACHE_MB`); A4/A5-rate open. Suite: 1,551 passed / 58 skipped / 0 failed (210 s; the run's one failure was this file's line guard, fixed by the commit carrying this line).
   **2026-11-24 (latest):** REQ-0027's mask got cheaper: self-loop characters now come off the NFA's character edges plus
   a reverse-epsilon closure (8,228 probes per state gone) and the mask unions use a cached boolean mask (248,320-id sorts
   gone). 2B medians: 15 -> 10.0 ms/token `json_schema`, 124 -> 57.1 unrolled `json.gbnf` depth 1 (depth 2/3 -> 9.5),
@@ -235,7 +235,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `a101b7d` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `a702ecc` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, audit fixes, Anthropic endpoint |
+| `<worktree>` | `merge/upstream-0.7.0` | `3c601bb` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, audit fixes, Anthropic endpoint, block-size contract |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 

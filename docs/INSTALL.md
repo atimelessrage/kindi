@@ -81,11 +81,12 @@ clients and for pi (one provider for each server). It writes no secrets and asks
 If your user is not in the `docker` group, the script uses `sudo docker`.
 
 Afterwards, `kindi selftest` (or `python -m kindi selftest` from a source tree) loads the selected
-pack, calls `/health`, runs one short chat request through the real HTTP route and prints the
-effective runtime state, pack hash and timings. It exits non-zero on a missing pack, a tokenizer or
-engine failure, a failed health check or an empty generation. The installer runs the same check against each
+pack, calls `/health`, runs one short chat request through the real HTTP route and the same prompt
+once through `/v1/messages` (the Anthropic shape), then prints the effective runtime state, pack hash
+and timings. It exits non-zero on a missing pack, a tokenizer or engine failure, a failed health
+check, an empty generation or a `/v1/messages` answer that is not a message. The installer runs the same check against each
 server it starts: `kindi selftest --url http://127.0.0.1:PORT` in that container, once `/health` answers, and
-`--no-selftest` skips it. `--url` loads no pack, so it costs one short request and does not compete with the
+`--no-selftest` skips it. `--url` loads no pack, so it costs two short requests and does not compete with the
 server for the card.
 
 ## Select a setup

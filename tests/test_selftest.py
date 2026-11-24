@@ -106,6 +106,10 @@ def test_selftest_proves_health_generation_and_the_effective_runtime(monkeypatch
     assert report["generation"]["text"] == "ok"
     assert report["generation"]["completion_tokens"] == 1
     assert report["generation"]["finish"] == "stop"
+    # `/v1/messages` is driven in process too, so a broken translation fails the install check
+    assert report["anthropic"]["text"] == "ok"
+    assert report["anthropic"]["output_tokens"] == 1
+    assert any("/v1/messages" in line for line in lines)
     assert report["seconds"] is not None
     assert any("runtime:" in line for line in lines)
     assert any("PASS" in line for line in lines)
@@ -177,8 +181,13 @@ def test_selftest_is_wired_into_the_cli():
     assert cli._COMMANDS["selftest"] is cli.cmd_selftest
 
 
+ANTHROPIC_REPLY = {"id": "msg_1", "type": "message", "role": "assistant", "model": "fake-2b",
+                   "content": [{"type": "text", "text": "kindi"}], "stop_reason": "end_turn",
+                   "stop_sequence": None, "usage": {"input_tokens": 3, "output_tokens": 1}}
+
+
 class _Server(http.server.BaseHTTPRequestHandler):
-    """A running server stand-in for --url: two routes, no engine."""
+    """A running server stand-in for --url: three routes, no engine."""
 
     def _reply(self, status, body):
         raw = json.dumps(body).encode("utf-8")
@@ -199,9 +208,15 @@ class _Server(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         cfg = self.server.cfg
-        cfg["chat_calls"] = cfg.get("chat_calls", 0) + 1
-        cfg["chat_body"] = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+        body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
         cfg["authorization"] = self.headers.get("Authorization")
+        if self.path == "/v1/messages":
+            cfg["anthropic_calls"] = cfg.get("anthropic_calls", 0) + 1
+            cfg["anthropic_body"] = body
+            return self._reply(cfg.get("anthropic_status", 200),
+                               cfg.get("anthropic", ANTHROPIC_REPLY))
+        cfg["chat_calls"] = cfg.get("chat_calls", 0) + 1
+        cfg["chat_body"] = body
         if self.path != "/v1/chat/completions":
             return self._reply(404, {})
         self._reply(cfg.get("chat_status", 200),
@@ -242,6 +257,13 @@ def test_url_mode_proves_a_server_that_is_already_running(running_server, tmp_pa
     assert running_server.cfg["chat_body"]["stream"] is False
     assert any("PASS" in line for line in lines)
     assert report["pack"] is None                    # nothing was loaded here
+    # the Anthropic dialect is proven against the same server, in its own shape
+    assert running_server.cfg["anthropic_calls"] == 1
+    assert running_server.cfg["anthropic_body"]["messages"][0]["content"] == [
+        {"type": "text", "text": selftest.PROMPT}]
+    assert report["anthropic"]["text"] == "kindi"
+    assert report["anthropic"]["stop_reason"] == "end_turn"
+    assert report["anthropic"]["blocks"] == ["text"]
 
 
 def test_url_mode_authenticates_when_the_server_requires_a_key(running_server, monkeypatch):
@@ -266,6 +288,23 @@ def test_url_mode_reports_a_failed_generation(running_server):
     lines = []
     assert selftest.run_url(_url(running_server), log=lines.append) == 1
     assert any("generation returned HTTP 500: decode failed" in line for line in lines)
+
+
+def test_url_mode_reports_an_anthropic_answer_without_a_message(running_server):
+    """A 200 with the wrong shape must fail: the check is that the dialect answers, not that the route exists."""
+    running_server.cfg["anthropic"] = {"type": "chat.completion", "content": []}
+    lines = []
+    assert selftest.run_url(_url(running_server), log=lines.append) == 1
+    assert any("not a message" in line for line in lines)
+
+
+def test_url_mode_reports_an_anthropic_route_error(running_server):
+    running_server.cfg["anthropic_status"] = 400
+    running_server.cfg["anthropic"] = {"type": "error",
+                                       "error": {"type": "invalid_request_error", "message": "bad block"}}
+    lines = []
+    assert selftest.run_url(_url(running_server), log=lines.append) == 1
+    assert any("/v1/messages returned HTTP 400: bad block" in line for line in lines)
 
 
 def test_url_mode_without_a_server_is_a_clear_failure():

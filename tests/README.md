@@ -34,7 +34,11 @@ CPU ISA preflight, and GPU-driver selection. No CUDA device or model pack is req
 
 `test_kernel_arity.py` reads every `__global__` declaration in `kindi/*.cu` (including
 `__launch_bounds__` forms and the generated `k_*_T` wrappers) and compares each graph launch's
-literal argument tuple with it. Current split: **71 call sites checked across 40 kernels** (`spec.py`
+literal argument tuple with it. Since 2026-11-24 it also holds the launch's **block size** against
+the kernel's `__launch_bounds__` ceiling: 28 (site, kernel) pairs are measured and 135 launches are
+unresolved (96 kernels declare no bound; the rest name the kernel or the block dynamically), with
+both counts pinned. A block larger than the declaration (`k_big asks 1024 > 256`) fails the suite
+instead of failing at launch time on a card this host does not have. Current split: **71 call sites checked across 40 kernels** (`spec.py`
 26, `dspine.py` 4, `mtp.py` 3, `tp.py` 38) and **71 call sites skipped** because their kernel is a
 variable, list element, dict lookup, `getattr` or conditional, or their tuple is assembled at run
 time. The skipped ones are pinned in `UNRESOLVED_SITES` with a reason each - a new dynamic launch
@@ -51,11 +55,12 @@ self-hosted GPU lane is described in [docs/CI.md](../docs/CI.md); it is not run 
 
 ### Skipped-test inventory (2026-11-24 full CPU run)
 
-`python -m pytest -q -rs` after the Anthropic endpoint (REQ-0028) landed: **1,547 passed, 58 skipped,
-0 failed** in 184.29 s (`bench-logs/full-suite-20261124-anthropic-green.log`; that run itself reported
-1 failed, the `tests/test_agents_handoff.py` table check that the handoff bump in the same commit
-fixes, so the two numbers describe the same tree). The 1,520-passed run before the endpoint is
-`bench-logs/full-suite-20261124-auditfix-final.log`; the 1,513-passed run at `ebf871f` is the record
+`python -m pytest -q -rs` with the Anthropic endpoint (REQ-0028), the selftest's Anthropic check and
+the block-size contract (REQ-0023 A2) in: **1,551 passed, 58 skipped, 0 failed** in 210.35 s
+(`bench-logs/full-suite-20261124-blocksize.log`; that run itself reported 1 failed, the AGENTS.md
+line guard tripped at 450 lines, trimmed by the commit that carries this paragraph, so the two
+numbers describe the same tree). The 1,547-passed run before it is
+`bench-logs/full-suite-20261124-anthropic-green.log`; the 1,513-passed run at `ebf871f` is the record
 before the audit fixes. Every skip is one
 of ten groups; pytest groups `-rs` output by location, so the count per group is what to watch. A
 skip is not a pass: a new group, or a changed count, must be reviewed instead of hidden by the total.

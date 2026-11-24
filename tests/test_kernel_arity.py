@@ -501,3 +501,104 @@ def test_every_checked_site_is_detected_when_mutated():
 def check_module_from_source(src, name):
     """check_module over an in-memory copy (the mutation test must not touch the worktree)."""
     return _check_source(src, name)
+
+
+# --- launch shape: the block a call site asks for vs the bound the kernel declares (REQ-0023) ----
+
+#: Call sites whose block or kernel the checker cannot resolve statically, counted rather than listed:
+#: 96 use a kernel that declares no `__launch_bounds__`, 35 name the kernel or the block through a
+#: variable/`getattr`, and 4 combine both. A new launch changes these numbers, so it is reviewed once.
+BLOCK_SITES_UNRESOLVED = 135
+#: (call site, kernel) pairs whose literal block threads were checked against the declaration.
+BLOCK_SITES_CHECKED = 28
+
+
+def _launch_bounds():
+    """name -> {max threads per block} from `__global__ void __launch_bounds__(N[, M]) k_*(`.
+
+    The second argument (minimum blocks per multiprocessor) is an occupancy hint, not a ceiling on
+    the block, so only the first is a contract. A name declared more than once keeps every bound: a
+    launch must fit the strictest declaration, because the caller cannot say which variant it got.
+    """
+    bounds = {}
+    for source in sorted(list((ROOT / "kindi").glob("*.cu")) + list((ROOT / "kindi").glob("*.cuh"))):
+        text = source.read_text(encoding="utf-8", errors="replace")
+        for m in re.finditer(r"__global__\s+void\s+__launch_bounds__\s*\(\s*(\d+)\s*(?:,\s*\d+\s*)?\)\s+"
+                             r"(k_[A-Za-z0-9_]+)\s*\(", text):
+            bounds.setdefault(m.group(2), set()).add(int(m.group(1)))
+    return bounds
+
+
+def _block_threads(node):
+    """Threads per block a literal block tuple asks for, or None when it is not a literal.
+
+    `(256,)`, `(32, 8)` and a conditional between them are static; `(HK,)` or `(32 * nw,)` depend on
+    a runtime width and are counted as unresolved instead of guessed.
+    """
+    if isinstance(node, (ast.Tuple, ast.List)) and node.elts:
+        total = 1
+        for elt in node.elts:
+            if not isinstance(elt, ast.Constant) or not isinstance(elt.value, int):
+                return None
+            total *= elt.value
+        return {total}
+    if isinstance(node, ast.IfExp):
+        body, other = _block_threads(node.body), _block_threads(node.orelse)
+        return None if body is None or other is None else body | other
+    return None
+
+
+def _check_block_sizes(src, path, bounds, tables=None):
+    """(checked, unresolved, violations) over one module source.
+
+    violated: (lineno, kernel, threads, ceiling) for a launch that asks for more threads per block
+    than every declaration of that kernel allows - a launch that fails or silently loses occupancy
+    on hardware, and that nothing on a CPU-only host would otherwise catch.
+    """
+    tables = _kernel_tables(src) if tables is None else tables
+    checked, unresolved, violated = 0, 0, []
+    for call, kernel_expr, _args, _src in _launch_sites(src, path):
+        names = _kernel_names(kernel_expr, tables)
+        named = (names or set()) & set(bounds)
+        blocks = _block_threads(call.args[2]) if named else None
+        if not named or blocks is None:
+            unresolved += 1
+            continue
+        for name in sorted(named):
+            ceiling = min(bounds[name])
+            for threads in sorted(blocks):
+                checked += 1
+                if threads > ceiling:
+                    violated.append((call.lineno, name, threads, ceiling))
+    return checked, unresolved, violated
+
+
+def test_no_launch_asks_for_more_threads_than_its_kernel_declares():
+    bounds = _launch_bounds()
+    assert bounds, "no __launch_bounds__ declaration was found; the CUDA sources moved or were renamed"
+    checked, unresolved, violated = 0, 0, []
+    for path in MODULES:
+        c, u, bad = _check_block_sizes((ROOT / path).read_text(encoding="utf-8"), path, bounds)
+        checked += c
+        unresolved += u
+        violated += ["%s:%d %s asks %d > %d" % (path, line, name, threads, ceiling)
+                     for line, name, threads, ceiling in bad]
+    assert not violated, ("a launch asks for more threads per block than its kernel declares "
+                          "(__launch_bounds__):\n" + "\n".join(violated))
+    assert checked == BLOCK_SITES_CHECKED, (
+        "%d launch(es) now check against __launch_bounds__ (was %d); review the new site(s) and "
+        "update the pinned count" % (checked, BLOCK_SITES_CHECKED))
+    assert unresolved == BLOCK_SITES_UNRESOLVED, (
+        "%d launch(es) cannot be resolved (was %d); a new one needs a look before the count moves"
+        % (unresolved, BLOCK_SITES_UNRESOLVED))
+
+
+def test_a_launch_over_the_declared_bound_is_caught(tmp_path):
+    """Prove the check is not vacuous: 1024 threads against a 256-thread kernel must be reported."""
+    src = ("def f(P):\n"
+           "    P.add(K.k_big, (1,), (1024,), ())\n"
+           "    P.add(K.k_big, (1,), (256,), ())\n"
+           "    P.add(K.k_big, (1,), (HK,), ())\n")
+    checked, unresolved, violated = _check_block_sizes(src, "synthetic", {"k_big": {256}})
+    assert checked == 2 and unresolved == 1
+    assert violated == [(2, "k_big", 1024, 256)], violated

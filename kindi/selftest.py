@@ -3,11 +3,14 @@
 `kindi verify` needs llama.cpp's reference tokens and `kindi serve` needs a second terminal, so a
 fresh install had no single check that the pack, tokenizer, engine and server path all work. This
 loads the configured pack once, asks `/health` for the effective runtime state, runs one short
-greedy completion through `/v1/chat/completions`, and reports the pack hash and timings. It never
-binds a port and never needs a GPU-specific test path.
+greedy completion through `/v1/chat/completions` and the same prompt once through `/v1/messages`
+(Anthropic's shape, REQ-0028), and reports the pack hash and timings. It never binds a port and
+never needs a GPU-specific test path. Two routes rather than one because the Anthropic endpoint is
+translation only: a release image must prove it answers with the real engine, not just that the
+route exists.
 
-`--url` checks a server that is already running instead: no pack is loaded, so it costs one short
-request and is safe next to the serving container (the installer uses it). Both modes speak HTTP
+`--url` checks a server that is already running instead: no pack is loaded, so it costs two short
+requests and is safe next to the serving container (the installer uses it). Both modes speak HTTP
 in process or over loopback with the standard library only; the server package already brings its
 own dependencies, and fastapi's test client would add `httpx`/`requests` to the images.
 """
@@ -87,6 +90,43 @@ def _chat_body(model, max_tokens):
             "temperature": 0, "max_tokens": max_tokens, "stream": False}
 
 
+def _anthropic_body(model, max_tokens):
+    return {"model": model, "max_tokens": max_tokens, "temperature": 0, "stream": False,
+            "messages": [{"role": "user", "content": [{"type": "text", "text": PROMPT}]}]}
+
+
+def _anthropic_answer(result, status, body, seconds, max_tokens, log):
+    """Record the `/v1/messages` answer; returns the failure message, or None when it is a real message.
+
+    A 200 with the wrong shape is a failure: the point of this check is that a release image answers
+    Anthropic's dialect with the engine behind it, not that the route is registered.
+    """
+    body = body if isinstance(body, dict) else {}
+    if status != 200:
+        err = body.get("error")
+        detail = err.get("message") if isinstance(err, dict) else err
+        if status is None:
+            return "the Anthropic route did not answer"
+        return "/v1/messages returned HTTP %d: %s" % (status, detail or body or "no body")
+    blocks = [b for b in (body.get("content") or []) if isinstance(b, dict)]
+    usage = body.get("usage") or {}
+    output_tokens = usage.get("output_tokens")
+    text = "".join(b.get("text") or "" for b in blocks if b.get("type") == "text")
+    answer = {"prompt": PROMPT, "max_tokens": max_tokens, "text": text,
+              "blocks": [b.get("type") for b in blocks], "stop_reason": body.get("stop_reason"),
+              "output_tokens": output_tokens, "seconds": round(seconds, 3)}
+    result["anthropic"] = answer
+    if body.get("type") != "message":
+        return "/v1/messages answered type %r, not a message" % body.get("type")
+    if not blocks:
+        return "/v1/messages returned no content blocks"
+    if not isinstance(output_tokens, int) or output_tokens < 1:
+        return "/v1/messages returned no output tokens"
+    log("selftest: /v1/messages %s in %.0f ms (stop %s, %s output token(s))"
+        % (", ".join(answer["blocks"]), seconds * 1000.0, answer["stop_reason"], output_tokens))
+    return None
+
+
 def _asgi(app, method, path, payload=b""):
     """One in-process ASGI request: the app is already an async callable, so no test client is needed."""
     import asyncio
@@ -161,7 +201,8 @@ def run(cfg, log=print, max_tokens=8, json_path=None):
     started = time.perf_counter()
     result = {"ok": False, "mode": "in-process", "model": cfg.get("model_name"),
               "pack": {"path": cfg.get("pack"), "source_sha256": None, "pack_id": None},
-              "runtime": None, "health": None, "generation": None, "seconds": None, "error": None}
+              "runtime": None, "health": None, "generation": None, "anthropic": None,
+              "seconds": None, "error": None}
     max_tokens = max(1, int(max_tokens))
     pack = cfg.get("pack")
     manifest_path = os.path.join(pack, "kindi_pack.json") if pack else ""
@@ -213,6 +254,17 @@ def run(cfg, log=print, max_tokens=8, json_path=None):
         err = _generation(result, status, gb, time.perf_counter() - t1, max_tokens, log)
         if err:
             return _fail(result, err, log, json_path)
+
+        t2 = time.perf_counter()
+        try:
+            status, ab = _asgi_json(app, "POST", "/v1/messages",
+                                    _anthropic_body(cfg.get("model_name") or hb.get("model") or "model",
+                                                    max_tokens))
+        except Exception as e:                     # noqa: BLE001 - a route exception is a failure, not a crash
+            return _fail(result, "/v1/messages raised %s: %s" % (type(e).__name__, e), log, json_path)
+        err = _anthropic_answer(result, status, ab, time.perf_counter() - t2, max_tokens, log)
+        if err:
+            return _fail(result, err, log, json_path)
         result["ok"] = True
     finally:
         close = getattr(K, "close", None)
@@ -235,7 +287,7 @@ def run_url(url, log=print, max_tokens=8, json_path=None, timeout=600):
     base = (url or "").rstrip("/")
     result = {"ok": False, "mode": "url", "url": base, "model": None,
               "pack": None, "runtime": None, "health": None, "generation": None,
-              "seconds": None, "error": None}
+              "anthropic": None, "seconds": None, "error": None}
     max_tokens = max(1, int(max_tokens))
     if not base:
         return _fail(result, "no server URL", log, json_path)
@@ -249,6 +301,12 @@ def run_url(url, log=print, max_tokens=8, json_path=None, timeout=600):
     status, gb = _url_json(base + "/v1/chat/completions",
                            _chat_body(result["model"] or "model", max_tokens), timeout=timeout)
     err = _generation(result, status, gb, time.perf_counter() - t1, max_tokens, log)
+    if err:
+        return _fail(result, err, log, json_path)
+    t2 = time.perf_counter()
+    status, ab = _url_json(base + "/v1/messages",
+                           _anthropic_body(result["model"] or "model", max_tokens), timeout=timeout)
+    err = _anthropic_answer(result, status, ab, time.perf_counter() - t2, max_tokens, log)
     if err:
         return _fail(result, err, log, json_path)
     result["ok"] = True

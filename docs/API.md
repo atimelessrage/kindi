@@ -183,6 +183,11 @@ the counted prompt in `usage.input_tokens`), then per block
 `tool_use` block with one `input_json_delta`, and the raw `<tool_call>` text is
 never sent as content. An engine failure mid-stream is an `error` event.
 
+`kindi selftest` drives this route as well as the chat route: it posts the same
+prompt through `/v1/messages` in process and, with `--url`, against the running
+server, so an installed image proves the translation answers with the real
+engine (a 200 whose body is not a message fails the check).
+
 What is **not** claimed: compatibility. The app-level gate (a
 Claude-Code-shaped request through `create_app`, the envelope, the SSE order
 and the tool round-trip) passes in `tests/test_anthropic.py`, but REQ-0028 A3
