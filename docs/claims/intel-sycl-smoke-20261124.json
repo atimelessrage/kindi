@@ -1,0 +1,39 @@
+{
+  "gate": "intel-sycl-smoke-20261124",
+  "title": "The Arc A770 runs the SYCL vector-add smoke on Level Zero",
+  "measured": "2026-11-24",
+  "commit": "unreleased",
+  "command": "kindi intel-sycl (oneAPI 2026.2 icpx build of tools/intel_sycl_vecadd.cpp, ONEAPI_DEVICE_SELECTOR=level_zero:gpu)",
+  "notes": "REQ-0020 M2's SYCL half. The smoke is not a Kindi backend and makes no support claim: sycl-smoke.json has support_claim=false and scope names the runtime only. Machine roots in the tracked JSON are replaced with <oneapi-root> / <workdir>.",
+  "evidence": [
+    "docs/benchmarks/2026-11-24-i7-8086k-arc-a770-sycl/sycl-smoke.json",
+    "docs/benchmarks/2026-11-24-i7-8086k-arc-a770-sycl/sycl-smoke.txt",
+    "docs/benchmarks/2026-11-24-i7-8086k-arc-a770-sycl/selector-refusal.txt"
+  ],
+  "numbers": [
+    {
+      "id": "sycl-result",
+      "display": "0 mismatches",
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.7.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-24-i7-8086k-arc-a770-sycl/sycl-smoke.txt",
+        "needle": "result: pass"
+      }
+    },
+    {
+      "id": "sycl-driver",
+      "display": "1.17.39894+6",
+      "quoted_in": [
+        "CURRENT-VS-KINDI-0.7.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-24-i7-8086k-arc-a770-sycl/sycl-smoke.txt",
+        "needle": "1.17.39894+6"
+      }
+    }
+  ]
+}

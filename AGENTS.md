@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `be52214` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `3288ba1` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24:** the llama.cpp proxy backend landed (wildcard; 12 CPU tests, live gate open, no
   arbitrary-GGUF claim) with REQ-0030's native-CPU 2B profile, and `Backend.capabilities` was declared
   instead of `None` (six adapters' mypy `assignment` finding gone, 59 -> 53). Suite: 1,633 / 47 / 0.
@@ -69,8 +69,8 @@ regenerated after it; 1,633 before this round). The 27B-CPU gate at `32075c4` is
 ### Upstream v0.7.0 and comparison
 
 **2026-11-23:** upstream `v0.7.0` (`8298a0f`) is merged into this branch; the current comparison is
-`CURRENT-VS-KINDI-0.7.md` (0 commits behind, 702 ahead, 931 changed files). The PR status rechecked the same day:
-**33 fork PRs (#47-#79) open, 0 merged, 7 drafts**, external #37 open and dirty; #48, #49, #72 and #76 are in v0.7.0 by
+`CURRENT-VS-KINDI-0.7.md` (refreshed 2026-11-24 vs `v0.7.1`: 0 behind, 778 ahead, 1,027 files, 1,159 tracked vs 232;
+PRs and the no-PR gap in §3a). PRs rechecked then: **33 fork PRs (#47-#79) open, 0 merged, 7 drafts**, external #37 open and dirty; #48, #49, #72 and #76 are in v0.7.0 by
 content and can be closed as included. The paragraphs below are the 0.6.1-era record that produced this tree.
 
 Stock moved to upstream `v0.6.1` (`7fececb`, fetched 2026-11-17) and one of its fixes was a bug this fork had: `kindi/mtp.py` never passed `k_rmsfold_qT`'s
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `be52214` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `be52214` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke + Arc GEMM, llama.cpp proxy backend, constrained mask/pick -8.4% structured token, REQ-0030 CPU profile, bench --spec, 27B CPU verify + compiler detection |
+| `T:/kindi` | `main` | `3288ba1` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `3288ba1` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke + Arc GEMM, llama.cpp proxy backend, constrained mask/pick -8.4% structured token, REQ-0030 CPU profile, bench --spec, 27B CPU verify + compiler detection |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
