@@ -36,10 +36,10 @@ the state at that commit.
 | [REQ-0024](requirements/REQ-0024.md) | Speculation state is reported as effective, and the head is verified on load | proposed | `3ececca68d4a` | `b8931576e618` |
 | [REQ-0025](requirements/REQ-0025.md) | `kindi verify` can run under speculation | proposed | `3ececca68d4a` | `0f91b86174ac` |
 | [REQ-0026](requirements/REQ-0026.md) | `kindi bench` can measure a speculation mode | proposed | `3ececca68d4a` | `4e8756fa9761` |
-| [REQ-0027](requirements/REQ-0027.md) | A constrained-decoding mask that does not sweep the vocabulary per state | active | `62ea1a6828f0` | `f7654130192f` |
+| [REQ-0027](requirements/REQ-0027.md) | A constrained-decoding mask that does not sweep the vocabulary per state | active | `62ea1a6828f0` | `3eb4f17b7e62` |
 | [REQ-0028](requirements/REQ-0028.md) | An Anthropic Messages endpoint for agent harnesses | active | `8c4decde1d0f` | `32075c449184` |
 | [REQ-0029](requirements/REQ-0029.md) | Self-hosted n8n can call a local Kindi server | proposed | `7e675235290d` | `7e675235290d` |
-| [REQ-0030](requirements/REQ-0030.md) | Selectable native accelerators for measured hot Python paths | proposed | `7e675235290d` | `e362a43bc927` |
+| [REQ-0030](requirements/REQ-0030.md) | Selectable native accelerators for measured hot Python paths | proposed | `7e675235290d` | `3eb4f17b7e62` |
 | [REQ-0031](requirements/REQ-0031.md) | Looped-transformer model family (SenseNova-Loop-9B, Inkling 2 Mini) | active | `7e675235290d` | `7ee95c5e86ff` |
 
 `uncommitted` means the requirement file is not in `HEAD` yet. Commit the requirement
