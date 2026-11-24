@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `0c2f20e` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `fb3f28a` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24 (latest):** REQ-0028 A4's no-decoding-change gate: `kindi selftest` compares the same greedy prompt through
   `/v1/chat/completions` and `/v1/messages` and fails on a different text or token count (`_dialects_agree`, also `--url`);
   no live pack run (no C compiler, `docs/MANUAL-HELP-NEEDED.md` §3b). The reference also stopped hiding direct reads:
@@ -235,7 +235,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `a101b7d` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `0c2f20e` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc GEMM, bench --spec, config-reference direct reads |
+| `<worktree>` | `merge/upstream-0.7.0` | `fb3f28a` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc GEMM, bench --spec, config-reference direct reads |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
