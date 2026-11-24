@@ -19,6 +19,7 @@ used only when a productive automaton loop accepts every character in the set;
 otherwise the table falls back to the exact per-token advance.  The resulting
 ids are sorted, like the old implementation.
 """
+import array
 import collections
 import os
 import threading
@@ -115,14 +116,15 @@ class StateMaskCache(object):
 class _VocabularyIndex(object):
     """The vocabulary-only part of a token-class table."""
 
-    __slots__ = ("texts", "by_first", "char_masks", "char_bits", "all_mask", "alphabet",
-                 "all_ids", "safe_ids", "safe_masks", "outside_ids", "outside_tries", "root",
-                 "lock")
+    __slots__ = ("texts", "by_first", "char_ids", "bit_chars", "char_bits", "all_mask",
+                 "alphabet", "all_ids", "safe_ids", "safe_masks", "outside_ids",
+                 "outside_tries", "root", "lock")
 
-    def __init__(self, texts, by_first, char_masks, char_bits, alphabet):
+    def __init__(self, texts, by_first, char_ids, bit_chars, char_bits, alphabet):
         self.texts = texts
         self.by_first = by_first
-        self.char_masks = char_masks
+        self.char_ids = char_ids
+        self.bit_chars = bit_chars
         self.char_bits = char_bits
         self.all_mask = (1 << len(char_bits)) - 1
         self.alphabet = alphabet
@@ -136,24 +138,32 @@ class _VocabularyIndex(object):
 
 
 def _build_index(texts):
-    """Build the vocabulary-only indexes for ``texts``."""
+    """Build the vocabulary-only indexes for ``texts``.
+
+    ``char_ids`` maps a character to every token id whose text contains it, which is what makes a
+    safe set's mask a handful of slices instead of a scan over the vocabulary: the per-token
+    character masks this replaces cost a Python loop over 248,320 ints on every new safe set
+    (34.4 ms of a 134 ms schema filter in the 2026-11-24 profile).  The ids are ``array('i')``
+    while they are built (4 bytes an id, no per-id Python object) and become int32 arrays.
+    """
     by_first = collections.defaultdict(list)
-    char_masks = []
+    char_ids: dict = {}
     char_bits = {}
     alphabet = set()
     for token_id, text in enumerate(texts):
         by_first[text[:1]].append(token_id)
-        mask = 0
         for ch in set(text):
-            bit = char_bits.get(ch)
-            if bit is None:
-                bit = 1 << len(char_bits)          # one bit per character in the alphabet
-                char_bits[ch] = bit
+            ids = char_ids.get(ch)
+            if ids is None:
+                ids = char_ids[ch] = array.array("i")
+                char_bits[ch] = 1 << len(char_bits)   # one bit per character in the alphabet
                 alphabet.add(ch)
-            mask |= bit
-        char_masks.append(mask)
+            ids.append(token_id)
     by_first = {k: np.asarray(v, dtype=np.int64) for k, v in by_first.items()}
-    return _VocabularyIndex(texts, by_first, char_masks, char_bits, frozenset(alphabet))
+    bit_chars = [(char_bits[ch], ch) for ch in char_bits]
+    char_ids = {ch: np.frombuffer(ids, dtype=np.int32) for ch, ids in char_ids.items()}
+    return _VocabularyIndex(texts, by_first, char_ids, tuple(bit_chars), char_bits,
+                            frozenset(alphabet))
 
 
 def _index_for(texts):
@@ -223,7 +233,8 @@ class TokenClassTable(object):
         self._prefer_trie = prefer_trie
         self._index = _index_for(texts)
         self._by_first = self._index.by_first
-        self._char_masks = self._index.char_masks
+        self._char_ids = self._index.char_ids
+        self._bit_chars = self._index.bit_chars
         self._char_bits = self._index.char_bits
         self._all_mask = self._index.all_mask
         self._alphabet = self._index.alphabet
@@ -286,26 +297,30 @@ class TokenClassTable(object):
             cached = self._safe_ids.get(chars)
             if cached is not None:
                 return cached
-            safe_bits = 0
-            for ch in chars:
-                safe_bits |= self._char_bits.get(ch, 0)
-            outside = self._all_mask & ~safe_bits
-            if outside:
-                ids = np.fromiter(
-                    (i for i, mask in enumerate(self._char_masks) if not (mask & outside)),
-                    dtype=np.int64)
-            else:
+            ids = np.flatnonzero(self._safe_mask_for(chars))
+            if ids.size == len(self.texts):
                 ids = self._all_ids
             self._safe_ids[chars] = ids
             return ids
 
     def _safe_mask_for(self, chars):
-        """A bool mask of the safe ids, built once per character set (see ``_safe_ids_for``)."""
+        """A bool mask of the ids whose text uses only ``chars``, built once per set.
+
+        Built by clearing the characters that are *not* in the set: each cleared character clears
+        the ids that contain it, so the cost follows the complement, not the vocabulary.
+        """
         with self._index.lock:
             mask = self._index.safe_masks.get(chars)
             if mask is None:
-                mask = np.zeros(len(self.texts), dtype=bool)
-                mask[self._safe_ids_for(chars)] = True
+                safe_bits = 0
+                for ch in chars:
+                    safe_bits |= self._char_bits.get(ch, 0)
+                mask = np.ones(len(self.texts), dtype=bool)
+                outside = self._all_mask & ~safe_bits
+                if outside:
+                    for bit, ch in self._bit_chars:
+                        if outside & bit:
+                            mask[self._char_ids[ch]] = False
                 self._index.safe_masks[chars] = mask
             return mask
 
@@ -313,7 +328,10 @@ class TokenClassTable(object):
         with self._index.lock:
             outside = self._outside_ids.get(chars)
             if outside is None:
-                outside = np.setdiff1d(self._all_ids, self._safe_ids_for(chars))
+                # ``all_ids`` is ``arange``, so the complement of the cached safe mask is the
+                # exact answer; ``np.setdiff1d`` sorted two whole-vocabulary arrays per call, which
+                # the 2026-11-24 profile measured at 112.9 ms of a 249 ms schema filter.
+                outside = np.flatnonzero(~self._safe_mask_for(chars))
                 self._outside_ids[chars] = outside
             return outside
 

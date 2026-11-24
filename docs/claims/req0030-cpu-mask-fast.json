@@ -1,0 +1,81 @@
+{
+  "gate": "req0030-cpu-mask-fast",
+  "title": "Constrained mask and constrained pick: exact refactors, measured on the 2B CPU engine",
+  "measured": "2026-11-24",
+  "commit": "unreleased",
+  "command": "KINDI_DEVICE=cpu python -m kindi --pack ~/.kindi/packs/bonsai-2b serve --host 127.0.0.1 --port 8099, then python docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/measure.py --label <arm> --url http://127.0.0.1:8099/v1",
+  "notes": "Both arms: 3 warm requests per shape, 10 interleaved runs per shape, 8-token replies at temperature 0. Before = 5f44622; after = the change this claim belongs to. Run page: docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/.",
+  "evidence": [
+    "docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/measure.json",
+    "docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/measure.py",
+    "docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/README.md"
+  ],
+  "numbers": [
+    {
+      "id": "structured-before",
+      "display": "26.35 ms/token",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/measure.json",
+        "pointer": "/before/server/structured/ms_per_token",
+        "expect": 26.35
+      }
+    },
+    {
+      "id": "structured-after",
+      "display": "24.13 ms/token",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/measure.json",
+        "pointer": "/after/server/structured/ms_per_token",
+        "expect": 24.13
+      }
+    },
+    {
+      "id": "gap-before",
+      "display": "6.32",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/measure.json",
+        "pointer": "/before/server/gap_ms_per_token",
+        "expect": 6.32
+      }
+    },
+    {
+      "id": "gap-after",
+      "display": "4.34",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/measure.json",
+        "pointer": "/after/server/gap_ms_per_token",
+        "expect": 4.34
+      }
+    },
+    {
+      "id": "filter-before",
+      "display": "245.6 ms",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/measure.json",
+        "pointer": "/before/filter/filter_ms",
+        "expect": 245.6
+      }
+    },
+    {
+      "id": "filter-after",
+      "display": "106.1 ms",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/measure.json",
+        "pointer": "/after/filter/filter_ms",
+        "expect": 106.1
+      }
+    }
+  ]
+}

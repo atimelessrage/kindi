@@ -10,6 +10,30 @@ installer hashes are recorded in `docs/INSTALL.md`; publication is still a relea
 (The pre-merge 0.6.1-era snapshot — 669 commits / 827 files at `60a039b` — is kept in
 `detailed-fork-changelog.md`.)
 
+### Structured replies get 8.4% cheaper on the CPU engine (2026-11-24)
+
+The constrained path was doing work it did not need, in three places, and all three are now exact
+replacements rather than tunings. `TokenClassTable._outside_ids_for` ran
+`np.setdiff1d(arange(vocab), safe_ids)` — two whole-vocabulary `np.unique` sorts per safe character
+set — where the complement of the already-cached safe mask is the same array in one linear scan.
+`_safe_ids_for` scanned 248,320 per-token character masks in a Python generator plus
+`np.fromiter`; the shared index now keeps the ids containing each character, so a safe mask clears
+the ids of the characters that are *not* safe, and the per-token mask objects are gone.
+`Sampler._constrained` built `arange(vocab)`, cast it to int64 and ran `np.isin` over the whole
+vocabulary; on an engine whose logits have no `ylog_map` a boolean mask over `ylog` selects the
+values *and* is the id list. Mapped heads and requests with a frequency/presence penalty still take
+the generic path.
+
+Measured on the 2B CPU engine with the same prompt and reply length for both arms (8 tokens, 10
+interleaved runs per shape, each arm on its own fresh server): the 22-token schema filter fell from
+245.6 ms to 106.1 ms, its slowest miss from 154.6 ms to 14.9 ms, and a structured reply from 26.35
+to 24.13 ms/token (-8.4%) while the unconstrained control stayed flat (20.03 to 19.79). The
+constrained overhead itself went from 6.32 to 4.34 ms/token. `tests/test_sampling.py` pins the new
+pick against the old selection (ids, logits and token, greedy and sampled); the grammar equality
+tests against the pre-token-class sweep are unchanged and passing. Page:
+`docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/`. Not measured: the GPU engines (no CUDA device
+on this host) and the 9B CPU path.
+
 ### The generic fallback: a llama.cpp proxy backend (2026-11-24)
 
 REQ-0019 T4.4's recommended generic fallback is now in the tree: `kindi/backends/llamacpp.py`

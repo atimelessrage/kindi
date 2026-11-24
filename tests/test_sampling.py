@@ -123,3 +123,51 @@ def test_allowed_empty_intersection_is_a_loud_error():
         assert "no allowed token" in str(e)
     else:
         raise AssertionError("an empty allowed set must raise, not silently free-pick")
+
+
+class _CpuEngine(object):
+    """The CPU engine's logit shape: the whole vocabulary in ``ylog``, and no ``ylog_map``."""
+
+    def __init__(self, n):
+        self.ylog = np.round(np.random.default_rng(7).standard_normal(n) * 1e3).astype(np.float32) / 1e3
+        self.ylog_n = n
+        self.ylog_map = None
+
+
+def _old_constrained(allowed):
+    """The generic path ``Sampler._constrained`` used before ``_masked_logits``."""
+    eng = _CpuEngine(97)
+    s = Sampler(eng)
+    cand, z = s._logits()
+    keep = np.isin(cand, np.asarray(allowed, dtype=np.int64))
+    return cand[keep], z[keep]
+
+
+def test_masked_logits_is_the_generic_selection():
+    """The CPU fast path must be the same (ids, logits) pair as arange + np.isin, not a re-pick."""
+    eng = _CpuEngine(97)
+    s = Sampler(eng)
+    for allowed in ([0, 5, 6, 96], list(range(0, 97, 7)), [3], [-4, 2, 200]):
+        cand, z = s._masked_logits(np.asarray(allowed, dtype=np.int64))
+        old_cand, old_z = _old_constrained(allowed)
+        assert cand.tolist() == old_cand.tolist(), allowed
+        assert z.tolist() == old_z.tolist(), allowed
+
+
+def test_constrained_pick_matches_the_generic_path():
+    """Same token from the fast path and the pre-change path, greedy and sampled."""
+    eng = _CpuEngine(97)
+    s = Sampler(eng)
+    for allowed in ([0, 5, 6, 96], list(range(0, 97, 5)), [40, 41]):
+        fast = s._constrained(np.asarray(allowed, dtype=np.int64), 0.0, 1.0, 0, RecordingRng(), 0.0,
+                              None, None)
+        cand, z = _old_constrained(allowed)
+        assert fast == int(cand[int(np.argmax(z))])
+    ids = np.asarray([0, 5, 6, 96], dtype=np.int64)
+    rng_fast, rng_old = RecordingRng(), RecordingRng()
+    fast = s._constrained(ids, 0.7, 1.0, 0, rng_fast, 0.0, None, None)
+    cand, z = _old_constrained([0, 5, 6, 96])
+    band = z >= z.max() - sampling.BAND_T * 0.7
+    old = Sampler._pick(cand[band], z[band], 0.7, 1.0, 0, rng_old, 0.0)
+    assert fast == old
+    assert rng_fast.idx == rng_old.idx

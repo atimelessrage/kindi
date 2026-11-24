@@ -1676,3 +1676,9 @@ Moved verbatim from the handoff's dated bullets because AGENTS.md is capped at 4
   serving container (`--no-selftest` opts out); 16 tests cover both paths and a failure. `tools/container_smoke.sh`
   runs `kindi selftest` in the image and with `--url` in the serving container, so a release image proves the pack,
   tokenizer, engine, `/health` and the chat route; `selftest.py` lost `asyncio.run` (the image is Python 3.6.9). Unrun here (no GPU or image).
+
+### Lease row for the mask/pick round (2026-11-24)
+
+| task | worktree | branch | shared files | state |
+|---|---|---|---|---|
+| constrained mask + pick (2026-11-24) | `<worktree>` | `merge/upstream-0.7.0` | `kindi/token_classes.py`, `kindi/sampling.py`, `tests/test_sampling.py`, `docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/`, `docs/claims/req0030-cpu-mask-fast.json`, `docs/ROADMAP.md`, `docs/development/requirements/REQ-0027.md`, `REQ-0030.md`, `CHANGELOG.md`, `docs/development/KNOWLEDGE.md`, `docs/CONFIGURATION-REFERENCE.md`, `AGENTS.md` | **done.** Three exact refactors on the constrained path: a mask complement instead of two whole-vocabulary `setdiff1d` sorts, a per-character id index instead of a 248,320-element Python scan, and a boolean `ylog` mask instead of `arange`+`np.isin` in the constrained pick. Structured 2B CPU reply 26.35 -> 24.13 ms/token, constrained overhead 6.32 -> 4.34 ms/token, 22-token schema filter 245.6 -> 106.1 ms (same reply length in both arms, unconstrained control flat). `tests/test_sampling.py` pins the new pick against the old selection. No GPU or 9B run. Suite 1,635 / 47 / 0 (250.67 s). |

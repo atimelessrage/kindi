@@ -1,0 +1,112 @@
+{
+  "after": {
+    "filter": {
+      "doc_ok": true,
+      "filter_ms": 106.1,
+      "first_mask_ms": 1970.2,
+      "miss_max_ms": 14.9,
+      "miss_median_ms": 6.1,
+      "misses": 17,
+      "states": 23,
+      "tokens": 22
+    },
+    "label": "after",
+    "pack": "bonsai-2b",
+    "server": {
+      "gap_ms_per_token": 4.34,
+      "max_tokens": 8,
+      "runs": 10,
+      "structured": {
+        "all": [
+          23.64,
+          24.38,
+          25.87,
+          25.4,
+          23.75,
+          23.88,
+          24.6,
+          25.61,
+          23.43,
+          23.11
+        ],
+        "max": 25.87,
+        "min": 23.11,
+        "ms_per_token": 24.13
+      },
+      "unconstrained": {
+        "all": [
+          19.01,
+          19.61,
+          20.01,
+          19.21,
+          20.6,
+          20.09,
+          19.97,
+          19.0,
+          19.38,
+          20.22
+        ],
+        "max": 20.6,
+        "min": 19.0,
+        "ms_per_token": 19.79
+      }
+    }
+  },
+  "before": {
+    "filter": {
+      "doc_ok": true,
+      "filter_ms": 245.6,
+      "first_mask_ms": 2010.2,
+      "miss_max_ms": 154.6,
+      "miss_median_ms": 6.2,
+      "misses": 17,
+      "states": 23,
+      "tokens": 22
+    },
+    "label": "before",
+    "pack": "bonsai-2b",
+    "server": {
+      "gap_ms_per_token": 6.32,
+      "max_tokens": 8,
+      "runs": 10,
+      "structured": {
+        "all": [
+          26.13,
+          26.73,
+          25.98,
+          26.61,
+          27.41,
+          26.57,
+          25.83,
+          28.08,
+          25.99,
+          25.96
+        ],
+        "max": 28.08,
+        "min": 25.83,
+        "ms_per_token": 26.35
+      },
+      "unconstrained": {
+        "all": [
+          20.52,
+          19.28,
+          21.2,
+          19.42,
+          19.54,
+          20.81,
+          19.46,
+          21.71,
+          21.73,
+          19.39
+        ],
+        "max": 21.73,
+        "min": 19.28,
+        "ms_per_token": 20.03
+      }
+    }
+  },
+  "before_commit": "5f44622",
+  "host": "Windows 10, Intel i7-8086K, Python 3.13.6, KINDI_DEVICE=cpu (no CUDA device)",
+  "method": "python measure.py --label <arm> --url http://127.0.0.1:8099/v1; each arm on its own freshly started server, 3 warm requests per shape then 10 interleaved runs per shape, 8-token replies at temperature 0",
+  "pack": "bonsai-2b (248,320 vocab)"
+}

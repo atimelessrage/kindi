@@ -12,20 +12,23 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `d2aeafe` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
-  **2026-11-24 (latest): the generic fallback backend landed, and the CPU half of REQ-0030 is measured.**
-  REQ-0019 T4.4's recommended option is in the tree: `kindi/backends/llamacpp.py` (registered `llamacpp`) is a
-  wildcard that declares no model ids/architectures, so `resolve` picks it only for models nothing specific
-  serves, and forwards generation to a running `llama-server`'s `/completion`
-  (`KINDI_LLAMACPP_BASE_URL`, `KINDI_LLAMACPP_API_KEY`); ChatML by Kindi, one non-streaming request, no
-  constrained decoding, all stated in the module. 12 CPU tests with an injectable opener; **the live
-  `llama-server` gate is open** (no server on this host), so there is still no arbitrary-GGUF claim.
-  REQ-0030 A1's native-CPU half: 2B on the CPU engine keeps the mask as the only native candidate
-  (11.2 ms/token short / 1.1 long), tokenizer 0.034 ms and framing 0.0027 ms/chunk stay removed
-  (`docs/benchmarks/2026-11-24-i7-8086k-cpu-req0030/`, claim `docs/claims/req0030-cpu-profile.json`).
-  Fixed `tools/grammar_cost.py` `walk()` (broke when the mask cache became a bounded `StateMaskCache`), and
-  the root of six adapters' mypy `assignment` finding: `Backend.capabilities` is now declared, not `None`
-  (mypy 59 -> 53, baseline lowered with a reason). Suite: **1,633 passed / 47 skipped / 0 failed (241 s)**.
+- **HEAD:** `5f44622` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+  **2026-11-24:** the llama.cpp proxy backend landed (wildcard; 12 CPU tests, live gate open, no
+  arbitrary-GGUF claim) with REQ-0030's native-CPU 2B profile, and `Backend.capabilities` was declared
+  instead of `None` (six adapters' mypy `assignment` finding gone, 59 -> 53). Suite: 1,633 / 47 / 0.
+  **2026-11-24 (latest): constrained decoding got 8.4% cheaper per structured token, exact.**
+  Three exact refactors, none a tuning: `TokenClassTable._outside_ids_for` no longer runs
+  `np.setdiff1d` (two vocab sorts) but takes the cached safe mask's complement; `_safe_ids_for`
+  no longer scans 248,320 per-token Python masks (the shared index maps each character to the ids
+  containing it, so a safe mask is a few slices); and `Sampler._constrained` masks `ylog` directly
+  instead of `arange(vocab)`+`np.isin` when the engine has no `ylog_map`. Measured with the same
+  prompt and 8-token reply in both arms (10 interleaved runs each, own server per arm):
+  26.35 -> 24.13 ms/token structured, unconstrained control flat 20.03 -> 19.79, so the constrained
+  overhead 6.32 -> 4.34 ms/token; the 22-token filter 245.6 -> 106.1 ms, slowest miss 154.6 -> 14.9
+  (`docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/`, claim
+  `docs/claims/req0030-cpu-mask-fast.json`). `tests/test_sampling.py` pins the new pick against the
+  old selection. What is left of a miss is the trie walk (5.2-5.7 ms/call) - REQ-0030's native
+  question; no GPU/9B run; suite below.
   **2026-11-24:** the 27B verifies on the CPU engine, and the "missing" compiler was installed.**
   `KINDI_DEVICE=cpu kindi verify` on the 27B pack is **4/4 token-exact** (40/40 per prompt) at 3.7 tok/s after a 340 s load;
   packcheck full (10 files, 18.4 s) and a structural audit (851 tensors, byte ranges tiling every file, reference ids in range)
@@ -52,7 +55,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 Audit F9's Python quality ratchet is `tools/check_python_quality.py`: Ruff 0.16.0 (`F`, `E9`, `B`, `I`)
 over the Python tree, mypy 2.4.0 over first-party production
 code, Pyright 1.1.414 (`basic`, all platforms) and Pylint 4.1.3 (`E`, `F`, import-error
-disabled) at Python 3.10 over the same production targets, recorded as **207 Ruff findings / 59 mypy
+disabled) at Python 3.10 over the same production targets, recorded as **207 Ruff findings / 53 mypy
 errors / 863 Pyright errors / 245 Pylint findings** in
 `tools/python_quality_baseline.json`. CI runs it; a new or increased file/rule count fails, while
 existing debt is tolerated and `--update --reason "..."` lowers the baseline after review; it refuses growth and records the reason and delta, so it cannot launder a new finding. Pyright and Pylint skip `VENDORED_UNWIRED` (qwen4exp/qx) and `UPSTREAM_UNVERIFIED` (`kindi/inkling2*`, merged but never run here); `kindi/server.py` stays in scope.
@@ -60,7 +63,8 @@ existing debt is tolerated and `--update --reason "..."` lowers the baseline aft
 
 ### Full CPU gate
 
-The 2026-11-24 27B-CPU gate at `32075c4` is **1,598 passed, 47 skipped, 0 failed** in 226.48 s (the CPU build checks now compile and load every tier here instead of skipping); the 2026-11-24 grammar-mask gate at `ebf871f` is 1,513 passed, 58 skipped, 0 failed in 180.66 s (plain CPU suite, no coverage rerun); the 2026-11-22 prewarm gate at `4bab483` was 1,423 / 58 / 0 in 138.50 s and the 2026-11-20 integration gate at `82a72bf` 1,412 / 28 / 0 in 250.33 s. The last coverage-measured run remains `539a504`: **1,241 passed, 28 skipped, 0 failed at 46.36%** line+branch (23,504 statements, 8,394 branches; plain 1,241 / 28 / 0 in 227.62 s), and the consolidated 2026-11-19 commits (`f75253b` + `84b6686`) 1,357 / 28 / 0 in 229.53 s. Every skip is inventoried by node ID and reason in `tests/README.md`.
+The 2026-11-24 mask/pick gate is **1,635 passed, 47 skipped, 0 failed** in 250.67 s (config reference
+regenerated after it; 1,633 before this round). The 27B-CPU gate at `32075c4` is **1,598 passed, 47 skipped, 0 failed** in 226.48 s (the CPU build checks now compile and load every tier here instead of skipping); the 2026-11-24 grammar-mask gate at `ebf871f` is 1,513 passed, 58 skipped, 0 failed in 180.66 s (plain CPU suite, no coverage rerun); the 2026-11-22 prewarm gate at `4bab483` was 1,423 / 58 / 0 in 138.50 s and the 2026-11-20 integration gate at `82a72bf` 1,412 / 28 / 0 in 250.33 s. The last coverage-measured run remains `539a504`: **1,241 passed, 28 skipped, 0 failed at 46.36%** line+branch (23,504 statements, 8,394 branches; plain 1,241 / 28 / 0 in 227.62 s), and the consolidated 2026-11-19 commits (`f75253b` + `84b6686`) 1,357 / 28 / 0 in 229.53 s. Every skip is inventoried by node ID and reason in `tests/README.md`.
 
 ### Upstream v0.7.0 and comparison
 
@@ -160,7 +164,7 @@ independent matcher - see the newest rows in `docs/development/AGENTS-HISTORY.md
 `json_schema` and *fell* to 463 at 200 tokens (cache hits; a whitespace-permitting constraint lets the greedy 2B spend the budget on 9 characters) (`docs/API.md`,
 `docs/benchmarks/2026-11-17-i7-8086k-rtx4060ti-grammar-cost/RESULTS.md`). The harnesses are tracked as `tools/grammar_cost.py` and
 `tools/grammar_cost_serve.py`; every quoted number is re-derived, not prose:
-`python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (38 gates, 270 numbers across `docs/claims/*.json`, six
+`python tools/check_claims.py` re-derives every one of them from the tracked artifact of its run (40 gates, 279 numbers across `docs/claims/*.json`, six
 claimed docs and zero citations listed as debt), and refuses a benchmark citation no claim accounts for - schema and procedure in `docs/claims/README.md`.
 
 ### Dated evidence
@@ -230,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `d2aeafe` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `d2aeafe` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke on Level Zero, llama.cpp proxy backend, REQ-0030 CPU profile, Arc GEMM, bench --spec, 27B CPU verify + compiler detection |
+| `T:/kindi` | `main` | `5f44622` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `5f44622` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke + Arc GEMM, llama.cpp proxy backend, constrained mask/pick -8.4% structured token, REQ-0030 CPU profile, bench --spec, 27B CPU verify + compiler detection |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 

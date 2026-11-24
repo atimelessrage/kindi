@@ -173,7 +173,14 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   the BPE tokenizer and stream framing were removed, and the native-CPU 2B
   profile (2026-11-24, `docs/benchmarks/2026-11-24-i7-8086k-cpu-req0030/`) keeps the same list
   (mask 11.2 ms/token short; tokenizer 0.034 ms; framing 0.0027 ms/chunk).
-  No native code was added. `kcpu.c` and
+  **Python side of the same path improved first (2026-11-24):** three exact refactors in the
+  constrained decode — a mask complement instead of two whole-vocabulary `setdiff1d` sorts, a
+  per-character id index instead of a 248,320-element Python mask scan, and a boolean mask instead
+  of `arange`+`np.isin` in the constrained pick — took the 22-token schema filter from 245.6 ms to
+  106.1 ms and a structured 2B CPU reply from 26.35 ms/token to 24.13 ms/token (constrained
+  overhead 6.32 to 4.34 ms/token, unconstrained control unchanged; `docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/`).
+  What is left of a mask miss is the trie walk itself, which native code would have to attack; the
+  A2/A3/A6 selector and gates stay open, and no native code was added. `kcpu.c` and
   the CUDA kernels are already native and excluded. A swap is adopted only if it is token/mask/byte-identical and
   improves the measured function by at least 1.25x with at least 5% end-to-end p50, with no >1%
   unconstrained-decode regression; otherwise it stays Python. The external sketch's 15-35%

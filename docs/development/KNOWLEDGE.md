@@ -120,6 +120,25 @@ was verified against is the gitignored host-tools sheet under `bench-logs/`.
   `cache.misses` did not change. `tests/test_grammar_cost.py` pins it with a
   tiny vocabulary and the real cache class.
 
+- **A constrained mask miss is three costs, not one.** `TokenClassTable.allowed` first asks the
+  grammar for safe character sets (`_token_safe_sets`), then either takes the broad-safe slice or
+  walks the token trie (`_trie_allowed`). Until 2026-11-24 the broad path also paid two
+  whole-vocabulary `np.unique` sorts (`_outside_ids_for` via `np.setdiff1d`) and a 248,320-element
+  Python scan (`_safe_ids_for`); both were waste, and both are now linear or slice-based. After the
+  fix the trie walk is the biggest single item (5.2-5.7 ms per call on the 2B), so further Python
+  tuning of the mask has little left — that is where REQ-0030's native question starts.
+- **The server's constrained overhead is mask + pick, and they are comparable.** An instrumented
+  CPU server (2026-11-24) attributed a 24-token structured reply to `allowed` at 8.8 ms/call and
+  `Sampler._logits` at 4.4 ms/call before the refactor; after it, 6.3 and 3.0. `_logits` is only
+  wasteful when `ylog_map` is None: it then builds `arange(vocab)` for ids that are the array
+  positions, which `_masked_logits` avoids. A request with a frequency/presence penalty needs the
+  ids back, so it still takes `_logits`.
+- **Measure the arms at the same reply length.** Comparing a 24-token structured reply with an
+  8-token unconstrained one overstates the constrained overhead (the per-token cost is not linear
+  at the start of a reply). `docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/measure.py` posts
+  both shapes with `max_tokens=8` and interleaves the runs; the unconstrained arm doubles as the
+  host-noise control.
+
 ## Git archaeology
 
 ```sh
