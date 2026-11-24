@@ -98,13 +98,13 @@ variables, and are therefore not listed twice here.
 |---|---|---|
 | `KINDI_ATT_TC` | `0` | `kindi/chunk.py:515` (+1 more) |
 | `KINDI_BACKEND_MODULES` | (empty) | `kindi/backends/__init__.py:56` (+1 more) |
-| `KINDI_BATCH` | `4` | `kindi/spec.py:2059` (+1 more) |
-| `KINDI_BENCH_ATTN` | (unset) | `kindi/dsv41.py:1569` |
+| `KINDI_BATCH` | `4` | `kindi/spec.py:2043` (+1 more) |
+| `KINDI_BENCH_ATTN` | (unset) | `kindi/dsv41.py:1571` |
 | `KINDI_BLOCKING_SYNC` | `1` | `kindi/chunk.py:547` (+9 more) |
 | `KINDI_BUSY_SHARE` | `0.25` | `kindi/cards.py:173` |
 | `KINDI_CACHE_TIMING` | (unset) | `kindi/cache.py:908` (+1 more) |
 | `KINDI_CALIB_DIR` | (unset) | `kindi/calib.py:31` |
-| `KINDI_CARDS` | (unset) | `kindi/spec.py:2083` (+4 more) |
+| `KINDI_CARDS` | (unset) | `kindi/spec.py:2067` (+4 more) |
 | `KINDI_CC` | `clang` or `"clang" if os.name == "nt" else "gcc"` or `"gcc" if os.name != "nt" else "clang"` | `kindi/caps.py:279` (+4 more) |
 | `KINDI_CHUNK` | `256` or `"512" if all(f16_prompt(s.card) for s in eng.cards) else "256"` or `512` or `"256" if major >= 5 else "128"` | `kindi/chunk.py:119` (+4 more) |
 | `KINDI_CHUNK_ATT` | `flash` | `kindi/chunk.py:511` |
@@ -119,11 +119,11 @@ variables, and are therefore not listed twice here.
 | `KINDI_CONFIG` | (unset) | `kindi/config.py:127` (+1 more) |
 | `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:213` (+7 more) |
 | `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:520` (+1 more) |
-| `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:48` |
+| `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:49` |
 | `KINDI_D1` | `1` or `0` | `kindi/spec.py:750` (+1 more) |
 | `KINDI_DATA` | `/data` | `kindi/container.py:243` |
 | `KINDI_DENSE_SPACING` | `256` | `kindi/cache.py:867` |
-| `KINDI_DEVICE` | `gpu` | `kindi/bench.py:36` (+8 more) |
+| `KINDI_DEVICE` | `gpu` | `kindi/bench.py:36` (+9 more) |
 | `KINDI_DOWNLOAD` | `1` | `kindi/container.py:108` |
 | `KINDI_DP4A` | `"1" if rt.is_hip else "0"` | `kindi/tp.py:470` |
 | `KINDI_DRAFT_POLICY` | `0` | `kindi/spec.py:1232` |
@@ -131,39 +131,40 @@ variables, and are therefore not listed twice here.
 | `KINDI_DSPINE_K` | `str(_dsp.BLOCK - 1)` | `kindi/spec.py:1460` |
 | `KINDI_DSPINE_MB` | `1400` | `kindi/dspine.py:54` |
 | `KINDI_DSPINE_NARROW` | (unset) | `kindi/dspine.py:162` |
-| `KINDI_DSV_CKV4` | `0` | `kindi/dsv41.py:838` |
-| `KINDI_DSV_CPUS0` | (unset) | `kindi/dsv41.py:609` |
-| `KINDI_DSV_CPUS1` | (unset) | `kindi/dsv41.py:610` |
+| `KINDI_DSV_CKV4` | `0` | `kindi/dsv41.py:840` |
+| `KINDI_DSV_CPUS0` | (unset) | `kindi/dsv41.py:611` |
+| `KINDI_DSV_CPUS1` | (unset) | `kindi/dsv41.py:612` |
 | `KINDI_DSV_ENCODING` | (unset) | `kindi/dsv41_server.py:409` |
-| `KINDI_DSV_EXPERTS` | `mmap` | `kindi/dsv41.py:146` (+2 more) |
-| `KINDI_DSV_GATE` | `os.path.expanduser("~/.cache/kindi/dsv41-gate")` | `kindi/dsv41.py:1202` |
-| `KINDI_DSV_GPU` | `0` | `kindi/dsv41.py:169` (+4 more) |
-| `KINDI_DSV_GPU2` | `1` | `kindi/dsv41.py:171` |
-| `KINDI_DSV_GPU2_DEVS` | (empty) | `kindi/dsv41.py:90` (+2 more) |
-| `KINDI_DSV_GPU2_LIBS` | (unset) | `kindi/dsv41.py:172` (+2 more) |
-| `KINDI_DSV_GPU_LIB` | (unset) | `kindi/dsv41.py:169` (+1 more) |
-| `KINDI_DSV_PLACE` | `same` | `kindi/dsv41.py:606` |
-| `KINDI_DSV_RELEASE` | `1` | `kindi/dsv41.py:645` |
-| `KINDI_DSV_RING_EVERY` | `1024` | `kindi/dsv41.py:692` |
-| `KINDI_DSV_RING_MAX` | `256` | `kindi/dsv41.py:694` |
-| `KINDI_DSV_SHARE0` | `0.667` | `kindi/dsv41.py:612` |
-| `KINDI_DSV_SNAP_DIR` | `/dev/shm/kindi-dsv41` | `kindi/dsv41.py:764` |
-| `KINDI_DS_LOG` | (unset) | `kindi/dsv41.py:1445` (+1 more) |
-| `KINDI_DS_MS` | (unset) | `kindi/dsv41.py:971` |
-| `KINDI_DS_NGRAM` | (unset) | `kindi/dsv41.py:976` |
-| `KINDI_DS_STATS` | `0` | `kindi/dsv41.py:977` (+1 more) |
-| `KINDI_DS_UNION` | `1` | `kindi/dsv41.py:956` |
+| `KINDI_DSV_EXPERTS` | `mmap` | `kindi/dsv41.py:148` (+2 more) |
+| `KINDI_DSV_GATE` | `os.path.expanduser("~/.cache/kindi/dsv41-gate")` | `kindi/dsv41.py:1204` |
+| `KINDI_DSV_GPU` | `0` | `kindi/dsv41.py:171` (+4 more) |
+| `KINDI_DSV_GPU2` | `1` | `kindi/dsv41.py:173` |
+| `KINDI_DSV_GPU2_DEVS` | (empty) | `kindi/dsv41.py:91` (+2 more) |
+| `KINDI_DSV_GPU2_LIBS` | (unset) | `kindi/dsv41.py:174` (+2 more) |
+| `KINDI_DSV_GPU_LIB` | (unset) | `kindi/dsv41.py:171` (+1 more) |
+| `KINDI_DSV_PLACE` | `same` | `kindi/dsv41.py:608` |
+| `KINDI_DSV_RELEASE` | `1` | `kindi/dsv41.py:647` |
+| `KINDI_DSV_RING_EVERY` | `1024` | `kindi/dsv41.py:694` |
+| `KINDI_DSV_RING_MAX` | `256` | `kindi/dsv41.py:696` |
+| `KINDI_DSV_SHARE0` | `0.667` | `kindi/dsv41.py:614` |
+| `KINDI_DSV_SNAP_DIR` | `/dev/shm/kindi-dsv41` | `kindi/dsv41.py:766` |
+| `KINDI_DS_LOG` | (unset) | `kindi/dsv41.py:1447` (+1 more) |
+| `KINDI_DS_MS` | (unset) | `kindi/dsv41.py:973` |
+| `KINDI_DS_NGRAM` | (unset) | `kindi/dsv41.py:978` |
+| `KINDI_DS_STATS` | `0` | `kindi/dsv41.py:979` (+1 more) |
+| `KINDI_DS_UNION` | `1` | `kindi/dsv41.py:958` |
 | `KINDI_FAST` | `0` or `1` | `kindi/qwen4exp_cli.py:100` (+2 more) |
 | `KINDI_FD` | `0` | `kindi/spec.py:172` (+6 more) |
 | `KINDI_FD_CH` | (empty) or `str(FD_CH)` | `kindi/spec.py:134` (+1 more) |
 | `KINDI_FF` | (empty) or `1` | `kindi/spec.py:180` (+1 more) |
-| `KINDI_FN_CARDS` | `0` | `kindi/qwen4exp_gen.py:58` |
-| `KINDI_FN_CPUS` | `os.environ.get("KINDI_MOE_CPUS0", "0-15")` | `kindi/qwen4exp_gen.py:59` |
-| `KINDI_FN_DRAFT` | `auto` | `kindi/qwen4exp_gen.py:77` |
-| `KINDI_FN_DRAFT_K` | `2` | `kindi/qwen4exp_gen.py:148` (+1 more) |
-| `KINDI_FN_EXPERT_GB` | (unset) | `kindi/qwen4exp_gen.py:62` |
-| `KINDI_FN_HEAD_IDLE` | `0` | `kindi/qwen4exp_gen.py:87` |
-| `KINDI_FN_SELFCHECK` | `1` | `kindi/qwen4exp_gen.py:248` |
+| `KINDI_FN_CARDS` | `0` | `kindi/qwen4exp_gen.py:136` |
+| `KINDI_FN_CPUS` | `os.environ.get("KINDI_MOE_CPUS0")` | `kindi/qwen4exp_gen.py:139` |
+| `KINDI_FN_DRAFT` | `auto` | `kindi/qwen4exp_gen.py:157` |
+| `KINDI_FN_DRAFT_K` | `2` | `kindi/qwen4exp_gen.py:228` (+1 more) |
+| `KINDI_FN_DRAFT_SAMPLED` | `1` | `kindi/qwen4exp_gen.py:429` |
+| `KINDI_FN_EXPERT_GB` | (unset) | `kindi/qwen4exp_gen.py:142` |
+| `KINDI_FN_HEAD_IDLE` | `0` | `kindi/qwen4exp_gen.py:167` |
+| `KINDI_FN_SELFCHECK` | `1` | `kindi/qwen4exp_gen.py:343` |
 | `KINDI_FOLD_SPLIT` | `1` | `kindi/spec.py:671` |
 | `KINDI_G4_CKPT_MAX` | `16` | `kindi/gemma4_cache.py:32` |
 | `KINDI_G4_DP4A` | `"1" if cc=="hip" or int(cc)>=61 else "0"` | `kindi/gemma4.py:89` |
@@ -176,7 +177,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_G4_PAD` | `1` | `kindi/gemma4.py:611` |
 | `KINDI_G4_PARK_MAX` | `4` | `kindi/gemma4_cache.py:33` |
 | `KINDI_G4_PLE_HOST` | `auto` | `kindi/gemma4.py:493` |
-| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:746` |
+| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:754` |
 | `KINDI_G4_PROMPT_CACHE` | `1` | `kindi/gemma4_cache.py:31` |
 | `KINDI_G4_Q5_DP4A` | `1` | `kindi/gemma4.py:85` |
 | `KINDI_G4_RESERVE_MB` | `1024` | `kindi/gemma4.py:555` |
@@ -197,14 +198,20 @@ variables, and are therefore not listed twice here.
 | `KINDI_GEMV_BLOCKS` | (unset) | `kindi/engine.py:220` |
 | `KINDI_HIP_LIB` | `libamdhip64.so` | `kindi/gpudrv.py:28` |
 | `KINDI_HOST_RAM_CHECK` | `1` | `kindi/hostram.py:181` |
+| `KINDI_INKLING2_DCACHE` | `default_dc` | `kindi/inkling2_gpu.py:305` |
+| `KINDI_INKLING2_MODE` | (empty) | `kindi/inkling2.py:266` (+1 more) |
+| `KINDI_INKLING_EFFORT` | (unset) | `kindi/inkling2_gen.py:149` |
+| `KINDI_INKLING_SELFCHECK` | `1` | `kindi/inkling2_gen.py:140` |
 | `KINDI_IO_REPORT` | (unset) | `kindi/autotune.py:40` (+1 more) |
+| `KINDI_K420_MAX_EXPS` | `64` | `kindi/inkling2_gpu.py:252` |
+| `KINDI_K420_SPLIT` | `0.10` | `kindi/inkling2_gpu.py:239` |
 | `KINDI_KEEPALIVE_S` | `10` | `kindi/dsv41_server.py:73` (+1 more) |
 | `KINDI_KEXPF` | (empty) or `0` | `kindi/spec.py:155` (+1 more) |
 | `KINDI_KV` | (empty) or `q8_0` | `kindi/engine.py:80` (+6 more) |
 | `KINDI_KV_EXPERIMENTAL` | `0` | `kindi/kld.py:92` (+5 more) |
 | `KINDI_LEGACY_ENGINE_PATH` | (unset) | `kindi/engine.py:896` |
 | `KINDI_LLVM` | (unset) | `kindi/cpu.py:93` |
-| `KINDI_LOG_RAW` | (unset) | `kindi/lightning_gen.py:396` (+2 more) |
+| `KINDI_LOG_RAW` | (unset) | `kindi/lightning_gen.py:400` (+2 more) |
 | `KINDI_LT_ADDED_TAGS` | `1` | `kindi/lightning_gen.py:241` |
 | `KINDI_LT_CHUNK` | (unset) | `kindi/lightning.py:162` |
 | `KINDI_LT_COLD` | (empty) | `kindi/cold_experts.py:46` |
@@ -226,35 +233,35 @@ variables, and are therefore not listed twice here.
 | `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:588` |
 | `KINDI_MEM_RESERVE_MB` | `96` or `256` or `32` | `kindi/engine.py:331` (+4 more) |
 | `KINDI_MODEL` | (empty) | `kindi/container.py:240` |
-| `KINDI_MOE_COPY` | `0` | `kindi/dsv41.py:627` |
-| `KINDI_MOE_CPUS0` | `0-19` or `0-15` | `kindi/dsv41.py:127` (+3 more) |
-| `KINDI_MOE_CPUS1` | `20-23,32-39` | `kindi/dsv41.py:127` (+2 more) |
-| `KINDI_MOE_DROP_CACHE` | `1` | `kindi/dsv41.py:651` |
-| `KINDI_MOE_IDLE` | `1` | `kindi/dsv41.py:608` |
-| `KINDI_MOE_SHARE0` | `0.667` | `kindi/dsv41.py:611` (+2 more) |
-| `KINDI_MOE_SPIN` | `4000000` | `kindi/qx_cpu.py:239` |
+| `KINDI_MOE_COPY` | `0` | `kindi/dsv41.py:629` |
+| `KINDI_MOE_CPUS0` | (unset) | `kindi/dsv41.py:128` (+3 more) |
+| `KINDI_MOE_CPUS1` | (unset) | `kindi/dsv41.py:129` (+2 more) |
+| `KINDI_MOE_DROP_CACHE` | `1` | `kindi/dsv41.py:653` |
+| `KINDI_MOE_IDLE` | `1` | `kindi/dsv41.py:610` |
+| `KINDI_MOE_SHARE0` | `0.667` | `kindi/dsv41.py:613` (+2 more) |
+| `KINDI_MOE_SPIN` | `4000000` | `kindi/qx_cpu.py:244` |
 | `KINDI_MOE_WEIGHTED` | `1` | `kindi/lightning.py:286` (+2 more) |
-| `KINDI_MTP` | `1` | `kindi/qwen4exp_gen.py:89` (+1 more) |
+| `KINDI_MTP` | `1` | `kindi/qwen4exp_gen.py:169` (+1 more) |
 | `KINDI_MTP_AMIN` | `0` | `kindi/qwen4exp_mtp.py:130` |
 | `KINDI_MTP_AUTO` | `0` | `kindi/qwen4exp_mtp.py:143` |
 | `KINDI_MTP_BACKOFF` | `8` | `kindi/qwen4exp_mtp.py:131` |
-| `KINDI_MTP_CHAIN` | `1` | `kindi/qwen4exp_mtp.py:207` |
+| `KINDI_MTP_CHAIN` | `1` | `kindi/qwen4exp_mtp.py:211` |
 | `KINDI_MTP_COMPACT` | `1` | `kindi/qwen4exp_gpu.py:265` |
 | `KINDI_MTP_FILE` | (unset) | `kindi/qwen4exp_gpu.py:267` |
 | `KINDI_MTP_HEAD_ALLOW_UNREGISTERED` | `0` | `kindi/mtp_heads.py:50` |
-| `KINDI_MTP_HEAD_N` | `0` | `kindi/qwen4exp_gpu.py:316` |
+| `KINDI_MTP_HEAD_N` | `0` | `kindi/qwen4exp_gpu.py:319` |
 | `KINDI_MTP_HYST` | `0.10` | `kindi/qwen4exp_mtp.py:146` |
-| `KINDI_MTP_LM_PROMPT` | `1` | `kindi/qwen4exp_mtp.py:173` |
-| `KINDI_MTP_MIN_HOT_GB` | `0` | `kindi/qwen4exp_gen.py:79` (+2 more) |
+| `KINDI_MTP_LM_PROMPT` | `1` | `kindi/qwen4exp_mtp.py:177` |
+| `KINDI_MTP_MIN_HOT_GB` | `0` | `kindi/qwen4exp_gen.py:159` (+2 more) |
 | `KINDI_MTP_PFIRST` | `0` | `kindi/qwen4exp_mtp.py:129` |
 | `KINDI_MTP_PMIN` | `0.5` | `kindi/qwen4exp_mtp.py:123` |
 | `KINDI_MTP_PROBE` | `64` | `kindi/qwen4exp_mtp.py:144` |
 | `KINDI_MTP_PROBE_LEN` | `4` | `kindi/qwen4exp_mtp.py:145` |
-| `KINDI_MTP_RESERVE_GB` | `0.6` | `kindi/qwen4exp_gpu.py:707` |
-| `KINDI_MTP_USAGE` | (unset) | `kindi/qwen4exp_gpu.py:319` |
-| `KINDI_MTP_USAGE_OUT` | (unset) | `kindi/qwen4exp_gpu.py:324` (+1 more) |
-| `KINDI_MTP_VOCAB` | (unset) | `kindi/qwen4exp_gpu.py:737` |
-| `KINDI_MTP_VOCAB_N` | `32768` | `kindi/qwen4exp_gpu.py:736` |
+| `KINDI_MTP_RESERVE_GB` | `0.6` | `kindi/qwen4exp_gpu.py:710` |
+| `KINDI_MTP_USAGE` | (unset) | `kindi/qwen4exp_gpu.py:322` |
+| `KINDI_MTP_USAGE_OUT` | (unset) | `kindi/qwen4exp_gpu.py:327` (+1 more) |
+| `KINDI_MTP_VOCAB` | (unset) | `kindi/qwen4exp_gpu.py:740` |
+| `KINDI_MTP_VOCAB_N` | `32768` | `kindi/qwen4exp_gpu.py:739` |
 | `KINDI_NB_BPS` | `4` | `kindi/nanbeige.py:711` |
 | `KINDI_NB_CPUF` | `0.55` | `kindi/nanbeige.py:36` |
 | `KINDI_NB_EMBD_HOST` | `"1" if kepler(cp, devices[0]) else "0"` | `kindi/nanbeige.py:304` |
@@ -278,94 +285,94 @@ variables, and are therefore not listed twice here.
 | `KINDI_NB_TSPLIT` | `0` | `kindi/nanbeige.py:1118` |
 | `KINDI_NB_TWARPS` | `24` | `kindi/nanbeige.py:1117` |
 | `KINDI_NB_VOLTA` | (empty) | `kindi/nanbeige.py:330` |
-| `KINDI_NVCC` | `/usr/local/cuda/bin/nvcc` | `kindi/dsv41.py:54` |
-| `KINDI_NVCC2` | `/usr/local/cuda-12.4/bin/nvcc` | `kindi/dsv41.py:95` |
+| `KINDI_NVCC` | `/usr/local/cuda/bin/nvcc` | `kindi/dsv41.py:55` |
+| `KINDI_NVCC2` | `/usr/local/cuda-12.4/bin/nvcc` | `kindi/dsv41.py:96` |
 | `KINDI_NVRTC` | (unset) | `kindi/qx_gpu.py:30` (+1 more) |
 | `KINDI_P100_FP16_PROMPT` | (empty) | `kindi/chunk.py:144` |
 | `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:1100` (+1 more) |
 | `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:1101` |
-| `KINDI_PIPE` | `1` | `kindi/dsv41.py:800` |
+| `KINDI_PIPE` | `1` | `kindi/dsv41.py:802` |
 | `KINDI_PREWARM_GRAMMAR` | `1` | `kindi/grammar_prewarm.py:41` |
 | `KINDI_PROMPT_CACHE` | `1` | `kindi/cache.py:888` (+1 more) |
 | `KINDI_Q8X2` | `1` | `kindi/chunk.py:345` |
-| `KINDI_QXG_ADAPT` | `0` | `kindi/qwen4exp_gpu.py:441` |
+| `KINDI_QXG_ADAPT` | `0` | `kindi/qwen4exp_gpu.py:444` |
 | `KINDI_QXG_ADAPT_DECAY` | `0.9` | `kindi/qwen4exp_cache.py:320` |
 | `KINDI_QXG_ADAPT_RING` | `32` | `kindi/qwen4exp_cache.py:419` |
 | `KINDI_QXG_ADAPT_SWAP` | `64` | `kindi/qwen4exp_cache.py:319` |
 | `KINDI_QXG_ADAPT_WINDOW` | `4` | `kindi/qwen4exp_cache.py:318` |
 | `KINDI_QXG_ARCH` | (unset) | `kindi/qwen4exp_gpu.py:118` |
-| `KINDI_QXG_CAL` | `1` | `kindi/qwen4exp_gpu.py:479` |
-| `KINDI_QXG_CAL_RATIO` | `0.05` | `kindi/qwen4exp_gpu.py:487` |
-| `KINDI_QXG_CHUNK` | (unset) | `kindi/qwen4exp_gpu.py:579` |
-| `KINDI_QXG_COLDSUM` | `0` | `kindi/qwen4exp_gpu.py:1616` |
+| `KINDI_QXG_CAL` | `1` | `kindi/qwen4exp_gpu.py:482` |
+| `KINDI_QXG_CAL_RATIO` | `0.05` | `kindi/qwen4exp_gpu.py:490` |
+| `KINDI_QXG_CHUNK` | (unset) | `kindi/qwen4exp_gpu.py:582` |
+| `KINDI_QXG_COLDSUM` | `0` | `kindi/qwen4exp_gpu.py:1619` |
 | `KINDI_QXG_CUBIN` | `1` | `kindi/qx_gpu.py:119` |
 | `KINDI_QXG_D8MINB` | `3` | `kindi/qx_gpu.py:74` |
-| `KINDI_QXG_D8RW` | `2` | `kindi/qx_gpu.py:439` |
-| `KINDI_QXG_D8T1` | `auto` | `kindi/qx_gpu.py:598` |
-| `KINDI_QXG_D8T2` | `1` | `kindi/qx_gpu.py:438` |
+| `KINDI_QXG_D8RW` | `2` | `kindi/qx_gpu.py:457` |
+| `KINDI_QXG_D8T1` | `auto` | `kindi/qx_gpu.py:616` |
+| `KINDI_QXG_D8T2` | `1` | `kindi/qx_gpu.py:456` |
 | `KINDI_QXG_D8TMINB` | `3` | `kindi/qx_gpu.py:77` |
-| `KINDI_QXG_DENSE1` | `8` | `kindi/qx_gpu.py:607` |
-| `KINDI_QXG_DEQ_REUSE` | `auto` | `kindi/qwen4exp_gpu.py:1427` |
+| `KINDI_QXG_DENSE1` | `8` | `kindi/qx_gpu.py:625` |
+| `KINDI_QXG_DEQ_REUSE` | `auto` | `kindi/qwen4exp_gpu.py:1430` |
 | `KINDI_QXG_DLCM` | `auto` | `kindi/qx_gpu.py:82` (+1 more) |
-| `KINDI_QXG_EMB_GPU` | `1` | `kindi/qwen4exp_gpu.py:1345` |
-| `KINDI_QXG_EMB_STEP` | `1` | `kindi/qwen4exp_gpu.py:2555` |
+| `KINDI_QXG_EMB_GPU` | `1` | `kindi/qwen4exp_gpu.py:1348` |
+| `KINDI_QXG_EMB_STEP` | `1` | `kindi/qwen4exp_gpu.py:2558` |
 | `KINDI_QXG_EXPSEG` | `1` | `kindi/qwen4exp_gpu.py:27` |
-| `KINDI_QXG_EXT` | `auto` | `kindi/qwen4exp_gpu.py:419` |
-| `KINDI_QXG_EXT_GB` | `0` | `kindi/qwen4exp_gpu.py:422` |
-| `KINDI_QXG_EXT_KEEP_GB` | `1.5` | `kindi/qwen4exp_gpu.py:430` |
-| `KINDI_QXG_EXT_MAX_GB` | `4` | `kindi/qwen4exp_gpu.py:429` |
-| `KINDI_QXG_EXT_PROMPT` | `256` | `kindi/qwen4exp_gpu.py:1371` |
+| `KINDI_QXG_EXT` | `auto` | `kindi/qwen4exp_gpu.py:422` |
+| `KINDI_QXG_EXT_GB` | `0` | `kindi/qwen4exp_gpu.py:425` |
+| `KINDI_QXG_EXT_KEEP_GB` | `1.5` | `kindi/qwen4exp_gpu.py:433` |
+| `KINDI_QXG_EXT_MAX_GB` | `4` | `kindi/qwen4exp_gpu.py:432` |
+| `KINDI_QXG_EXT_PROMPT` | `256` | `kindi/qwen4exp_gpu.py:1374` |
 | `KINDI_QXG_FETCH` | `0` | `kindi/qwen4exp_cache.py:121` (+1 more) |
-| `KINDI_QXG_FETCH_N` | `1` | `kindi/qwen4exp_gpu.py:2262` |
-| `KINDI_QXG_FSGL` | `16` | `kindi/qx_gpu.py:314` |
-| `KINDI_QXG_FSLOTS` | `1` | `kindi/qx_gpu.py:313` |
-| `KINDI_QXG_FUSED` | `1` | `kindi/qwen4exp_gpu.py:1613` |
-| `KINDI_QXG_GDN4` | `0` | `kindi/qx_gpu.py:650` |
+| `KINDI_QXG_FETCH_N` | `1` | `kindi/qwen4exp_gpu.py:2265` |
+| `KINDI_QXG_FSGL` | `16` | `kindi/qx_gpu.py:330` |
+| `KINDI_QXG_FSLOTS` | `1` | `kindi/qx_gpu.py:329` |
+| `KINDI_QXG_FUSED` | `1` | `kindi/qwen4exp_gpu.py:1616` |
+| `KINDI_QXG_GDN4` | `0` | `kindi/qx_gpu.py:668` |
 | `KINDI_QXG_GEMM_T` | `32` | `kindi/qwen4exp_gpu.py:44` |
-| `KINDI_QXG_GRAPH` | `1` | `kindi/qwen4exp_gpu.py:1538` |
+| `KINDI_QXG_GRAPH` | `1` | `kindi/qwen4exp_gpu.py:1541` |
 | `KINDI_QXG_HELPER_CPUS` | (unset) | `kindi/qwen4exp_cache.py:438` |
 | `KINDI_QXG_HOTSET` | (empty) | `kindi/qwen4exp_gpu.py:89` |
 | `KINDI_QXG_HOTSET_EVERY` | `512` | `kindi/qwen4exp_cache.py:508` |
 | `KINDI_QXG_I2F` | `1` | `kindi/qx_gpu.py:76` |
-| `KINDI_QXG_IDENSE` | `1` | `kindi/qx_gpu.py:446` |
+| `KINDI_QXG_IDENSE` | `1` | `kindi/qx_gpu.py:464` |
 | `KINDI_QXG_KQ5` | `3` | `kindi/qx_gpu.py:80` |
-| `KINDI_QXG_LAYER_MAJOR` | `auto` | `kindi/qwen4exp_gpu.py:583` |
-| `KINDI_QXG_LMAX` | `8192` | `kindi/qwen4exp_gen.py:92` (+5 more) |
-| `KINDI_QXG_LM_MIN_HOT_GB` | `3` | `kindi/qwen4exp_gpu.py:398` |
-| `KINDI_QXG_LM_TOK` | `4096` | `kindi/qwen4exp_gpu.py:676` |
-| `KINDI_QXG_PASS` | `0` | `kindi/qwen4exp_gen.py:101` (+1 more) |
+| `KINDI_QXG_LAYER_MAJOR` | `auto` | `kindi/qwen4exp_gpu.py:586` |
+| `KINDI_QXG_LMAX` | `8192` | `kindi/qwen4exp_gen.py:172` (+5 more) |
+| `KINDI_QXG_LM_MIN_HOT_GB` | `3` | `kindi/qwen4exp_gpu.py:401` |
+| `KINDI_QXG_LM_TOK` | `4096` | `kindi/qwen4exp_gpu.py:679` |
+| `KINDI_QXG_PASS` | `0` | `kindi/qwen4exp_gen.py:181` (+1 more) |
 | `KINDI_QXG_PFUSE` | `0` | `kindi/qwen4exp_gpu.py:49` |
 | `KINDI_QXG_PGEMM` | `tf32` | `kindi/qwen4exp_gpu.py:40` |
 | `KINDI_QXG_PIN` | `0` | `kindi/qwen4exp_cache.py:342` (+2 more) |
-| `KINDI_QXG_PLE_LOCK` | `auto` | `kindi/qwen4exp_gpu.py:635` |
-| `KINDI_QXG_PROMPT_SUM` | (unset) | `kindi/qwen4exp_gpu.py:1281` |
+| `KINDI_QXG_PLE_LOCK` | `auto` | `kindi/qwen4exp_gpu.py:638` |
+| `KINDI_QXG_PROMPT_SUM` | (unset) | `kindi/qwen4exp_gpu.py:1284` |
 | `KINDI_QXG_Q6T` | `1` | `kindi/qx_gpu.py:79` |
 | `KINDI_QXG_QCHUNK` | `64` | `kindi/qwen4exp_gpu.py:50` |
 | `KINDI_QXG_QSAK` | `1` | `kindi/qx_gpu.py:207` |
-| `KINDI_QXG_RESERVE_GB` | (unset) | `kindi/qwen4exp_gpu.py:371` (+1 more) |
-| `KINDI_QXG_RING` | `32` | `kindi/qwen4exp_gpu.py:1122` |
+| `KINDI_QXG_RESERVE_GB` | (unset) | `kindi/qwen4exp_gpu.py:374` (+1 more) |
+| `KINDI_QXG_RING` | `32` | `kindi/qwen4exp_gpu.py:1125` |
 | `KINDI_QXG_ROUTER2` | `1` | `kindi/qx_gpu.py:78` |
-| `KINDI_QXG_STREAM` | `auto` | `kindi/qwen4exp_gpu.py:575` |
-| `KINDI_QXG_STREAM_MIN` | `64` | `kindi/qwen4exp_gpu.py:1085` |
-| `KINDI_QXG_T2FIX` | `1` | `kindi/qx_gpu.py:440` |
-| `KINDI_QXG_TC` | `auto` | `kindi/qx_gpu.py:573` |
-| `KINDI_QXG_TCX` | `auto` | `kindi/qwen4exp_gpu.py:573` |
-| `KINDI_QXG_TIMELINE` | (unset) | `kindi/qwen4exp_gpu.py:2633` |
-| `KINDI_QXG_USAGE` | (unset) | `kindi/qwen4exp_gpu.py:342` |
-| `KINDI_QXG_WILLNEED` | `auto` | `kindi/qwen4exp_gpu.py:594` |
-| `KINDI_QXG_WIN_FREE` | `1` | `kindi/qwen4exp_gpu.py:1365` |
+| `KINDI_QXG_STREAM` | `auto` | `kindi/qwen4exp_gpu.py:578` |
+| `KINDI_QXG_STREAM_MIN` | `64` | `kindi/qwen4exp_gpu.py:1088` |
+| `KINDI_QXG_T2FIX` | `1` | `kindi/qx_gpu.py:458` |
+| `KINDI_QXG_TC` | `auto` | `kindi/qx_gpu.py:591` |
+| `KINDI_QXG_TCX` | `auto` | `kindi/qwen4exp_gpu.py:576` |
+| `KINDI_QXG_TIMELINE` | (unset) | `kindi/qwen4exp_gpu.py:2636` |
+| `KINDI_QXG_USAGE` | (unset) | `kindi/qwen4exp_gpu.py:345` |
+| `KINDI_QXG_WILLNEED` | `auto` | `kindi/qwen4exp_gpu.py:597` |
+| `KINDI_QXG_WIN_FREE` | `1` | `kindi/qwen4exp_gpu.py:1368` |
 | `KINDI_QXG_XTILE` | `1` | `kindi/qx_gpu.py:266` |
-| `KINDI_QX_COLLAPSE` | `1` | `kindi/qx_cpu.py:204` |
-| `KINDI_QX_CPUS` | `0-15` | `kindi/qx_cpu.py:178` |
-| `KINDI_QX_DN` | `32` | `kindi/qwen4exp_gpu.py:564` (+3 more) |
-| `KINDI_QX_DNCOPY` | `auto` | `kindi/qx_cpu.py:207` |
-| `KINDI_QX_HOSTPIN` | `1` | `kindi/qx_cpu.py:240` |
-| `KINDI_QX_NIB` | `auto` | `kindi/qx_cpu.py:194` |
-| `KINDI_QX_NUMA` | `auto` | `kindi/qx_cpu.py:219` |
+| `KINDI_QX_COLLAPSE` | `1` | `kindi/qx_cpu.py:209` |
+| `KINDI_QX_CPUS` | (unset) | `kindi/qx_cpu.py:183` |
+| `KINDI_QX_DN` | `32` | `kindi/qwen4exp_gpu.py:567` (+3 more) |
+| `KINDI_QX_DNCOPY` | `auto` | `kindi/qx_cpu.py:212` |
+| `KINDI_QX_HOSTPIN` | `1` | `kindi/qx_cpu.py:245` |
+| `KINDI_QX_NIB` | `auto` | `kindi/qx_cpu.py:199` |
+| `KINDI_QX_NUMA` | `auto` | `kindi/qx_cpu.py:224` |
 | `KINDI_QX_NUMA_FAKE` | (unset) | `kindi/qx_cpu.py:125` |
 | `KINDI_QX_ONE` | (unset) | `kindi/qx_cpu.py:90` (+1 more) |
 | `KINDI_QX_VDEC` | (unset) | `kindi/qx_cpu.py:92` (+1 more) |
-| `KINDI_QX_XS_GB` | `0` | `kindi/qx_cpu.py:189` |
+| `KINDI_QX_XS_GB` | `0` | `kindi/qx_cpu.py:194` |
 | `KINDI_RESPONSE_FORMAT` | (empty) | `kindi/oai.py:35` |
 | `KINDI_ROWS_PREFETCH` | `1` | `kindi/qwen4exp_ref.py:30` |
 | `KINDI_SAMPLER_ORDER` | `llama` | `kindi/sampling.py:20` |
@@ -376,8 +383,8 @@ variables, and are therefore not listed twice here.
 | `KINDI_SPEC` | `0` | `kindi/__main__.py:232` (+15 more) |
 | `KINDI_SPEC_B0_K2_MAX` | `1024` | `kindi/spec.py:59` |
 | `KINDI_SPEC_B2_MAX` | `0` | `kindi/spec.py:60` |
-| `KINDI_SPEC_CTX` | (unset) | `kindi/spec.py:2088` |
-| `KINDI_SPEC_DRAFT_HEAD` | (unset) | `kindi/spec.py:2018` (+1 more) |
+| `KINDI_SPEC_CTX` | (unset) | `kindi/spec.py:2072` |
+| `KINDI_SPEC_DRAFT_HEAD` | (unset) | `kindi/spec.py:2002` (+1 more) |
 | `KINDI_SPEC_GUARD` | `1` | `kindi/spec.py:1270` |
 | `KINDI_SPEC_GUARD_BOUND` | `2.5` | `kindi/spec.py:1130` |
 | `KINDI_SPEC_GUARD_BOUND_DEPTH` | `8192` | `kindi/spec.py:1132` |
@@ -386,9 +393,9 @@ variables, and are therefore not listed twice here.
 | `KINDI_SPEC_K` | `"1" if mode == "mtp" else "4"` or `4` | `kindi/calibrate.py:78` (+2 more) |
 | `KINDI_SPEC_KNOWN` | `1` | `kindi/cache.py:1235` |
 | `KINDI_SPEC_MTP_K2_MAX` | `8192` | `kindi/spec.py:58` |
-| `KINDI_SPEC_PACK` | (unset) | `kindi/spec.py:2081` (+2 more) |
+| `KINDI_SPEC_PACK` | (unset) | `kindi/spec.py:2065` (+2 more) |
 | `KINDI_SPEC_SAMPLE` | `1` | `kindi/spec.py:1464` |
-| `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:2088` |
+| `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:2072` |
 | `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:216` |
 | `KINDI_TANDEM_DEBUG_TIMING` | `0` | `kindi/tandem.py:733` |
 | `KINDI_TANDEM_GPU` | `auto` | `kindi/plan.py:187` (+2 more) |
@@ -409,12 +416,13 @@ variables, and are therefore not listed twice here.
 | `KINDI_TC_TUNE` | `0` | `kindi/spec.py:442` (+1 more) |
 | `KINDI_TESTED_CC` | (empty) | `kindi/tc.py:39` |
 | `KINDI_THP` | `0` | `kindi/engine.py:93` |
+| `KINDI_THREADS` | (unset) | `kindi/inkling2.py:339` |
 | `KINDI_TP` | (empty) | `kindi/engine.py:986` (+2 more) |
 | `KINDI_TP_SPLIT` | `equal` or `auto` | `kindi/tp.py:1046` (+1 more) |
 | `KINDI_VERIFY_ON_START` | (unset) | `kindi/container.py:245` |
-| `KINDI_XC_CAL` | `1` | `kindi/dsv41.py:633` |
+| `KINDI_XC_CAL` | `1` | `kindi/dsv41.py:635` |
 | `KINDI_XC_RECAL` | (unset) | `kindi/dsv41_xcal.py:117` |
-| `KINDI_XS_CHUNK` | `str(1 << 20)` | `kindi/qx_cpu.py:267` |
-| `KINDI_XS_DROP` | `0` | `kindi/dsv41.py:639` |
+| `KINDI_XS_CHUNK` | `str(1 << 20)` | `kindi/qx_cpu.py:272` |
+| `KINDI_XS_DROP` | `0` | `kindi/dsv41.py:641` |
 | `KINDI_XS_GB` | (unset) | `kindi/dsv41_server.py:607` |
-| `KINDI_XS_THREADS` | `8` | `kindi/qx_cpu.py:266` |
+| `KINDI_XS_THREADS` | `8` | `kindi/qx_cpu.py:271` |

@@ -36,8 +36,8 @@ registry keep it distinct from upstream.
 |---|---|
 | `dist/kindi-0.7.0-fork.tar.gz` | `cb03cc938cfcda6bf2ff7afa4467153e0bf6ef770e2c704951295c2e114ae61b` |
 | `dist/kindi-0.7.0-fork.tar.gz.sha256` | sidecar containing the archive hash |
-| `install.sh` | `b38de76f9f9beef216d4ac3c832c3c0ce881e08f2db5b11ee04e067e5f28fd40` |
-| `install.ps1` | `0c25abe5f6806ee57070b52b8dd04c1509f4a1cda583fef729b407a9a7ef2888` |
+| `install.sh` | `0035fa923c9db6f05371e180f4a8b14b2b5139d0d08b3a3ba3af07af5898bee4` |
+| `install.ps1` | `3c9e725ed9b1270b957f95451c22e81a29b5d412b44770fd26f37ae412fb43b2` |
 
 The archive is built from the working tree with:
 

@@ -1,6 +1,6 @@
 # Why Kindi
 
-*Current release: Kindi 0.7.0-fork. The K420 table and chart below are the 0.2.0 measurements that established the card; [docs/BENCHMARKS.md](docs/BENCHMARKS.md) has the release tables.*
+*Current release: Kindi 0.7.1-fork. The K420 table and chart below are the 0.2.0 measurements that established the card; [docs/BENCHMARKS.md](docs/BENCHMARKS.md) has the release tables.*
 
 **A modern 2-billion-parameter language model that runs at 22.9 tokens per second on a 1 GB Quadro K420,
 an inexpensive graphics card.**

@@ -1,14 +1,61 @@
 # Changelog
 
-## 0.7.0-fork (2026-11-23, on official v0.7.0)
+## 0.7.1-fork (2026-11-24, on official v0.7.1)
 
-This is the fork's release, not official Kindi 0.6.1. After the 2026-11-23 merge below, the fork is
-**702 commits / 931 changed files ahead** of official `v0.7.0` (`8298a0f`, `+133,113/−1,946`,
-1,066 tracked files vs 216, no upstream file missing). The package, both installers and the Docker tags
-say `0.7.0-fork`, so the fork cannot be mistaken for an official `0.6.1` patch. The source archive and
+This is the fork's release, not official Kindi 0.7.1. After the 2026-11-24 merge below, the fork is
+based on official `v0.7.1` (`1cb59d2`, one squashed commit on `v0.7.0`), 43 upstream files changed
+(+15,649/−114), mostly the new Inkling 2 Mini engine. The package, both installers and the Docker tags
+say `0.7.1-fork`, so the fork cannot be mistaken for an official `0.7.1` patch. The source archive and
 installer hashes are recorded in `docs/INSTALL.md`; publication is still a release-owner step.
 (The pre-merge 0.6.1-era snapshot — 669 commits / 827 files at `60a039b` — is kept in
 `detailed-fork-changelog.md`.)
+
+### Upstream merge (2026-11-24)
+
+0.7.1 keeps everything in 0.7.0 (Qwen3.8-Flash-Next, AMD RDNA2, native Windows, several requests at once and card
+placement) and adds three changes and one model. Flash-Next now drafts for sampled requests. The CPU engines use one
+thread for each physical core. A new check finds the warp-shuffle mistakes that hung kernels on RTX 20, 30 and 40
+cards. Kindi also runs Inkling 2 Mini.
+
+Official v0.7.1 is merged onto the fork's `e4e7eea`; 17 conflicted files were resolved by hand. Three things the
+merge itself had to settle: the release changelog names `tools/check_warp_masks.py` but the tag does not ship it, so
+the fork wrote it (7 reviewed sub-warp masks, wired into CI — it found two real hazards in the merged kernels, a
+`chunk.cu` shuffle and the `kindi.cu` `wsum_d`/`wsum_f` half-warp reduction on pre-Volta cards, both fixed); the
+release's root `test_inkling2_engine.py` moved to `tools/verify_inkling2.py`, since it needs a model pack and is not
+a pytest module; and the merged Inkling modules had to satisfy Ruff and mypy like the rest of the tree (they do,
+after the fixes above), while Pyright and Pylint skip that unrun engine by name (`UPSTREAM_UNVERIFIED`, next to the
+existing qwen4exp/qx scope) — `kindi/server.py`, the file that serves it, stays fully in scope. **Unrun here:** Inkling 2 Mini, Flash-Next sampled
+drafting, the physical-core detection and the three kernel edits need a GPU, a model pack and a Linux host; the
+plain CPU suite is the only evidence for the merge.
+
+### New
+
+- **Inkling 2 Mini** (Thinking Machines Lab), experimental. `kindi convert` accepts the IQ2_M GGUF (about 7.5 GiB),
+  and `kindi serve` runs it with its chat template, streaming, thinking levels, tool calls, the sampling values from
+  the GGUF and prompt reuse. All 3,072 experts fit in VRAM on an 8 GB card. The
+  server answers one request at a time for this model: a second request waits for the first. On a GTX 1080 (8 GB,
+  full VRAM) it reads a 512-token prompt at 120.9 tokens/s and writes at 19.8 tokens/s with a 2,048-token context.
+  On an RTX 3080 10 GB, a context of 32,768 tokens fits.
+- **Drafting for sampled requests in Flash-Next.** A request with temperature above 0, top-k, top-p, min-p or a
+  repeat penalty now drafts with the MTP head. Each draft is kept with the probability that plain sampling gives
+  that token, so the distribution of the output does not change. Greedy requests keep the 0.7.0 stream exactly.
+  `KINDI_FN_DRAFT_SAMPLED=0` turns it off.
+- **One CPU thread for each physical core.** Where Kindi picks CPU threads itself (the dense CPU engines, the
+  Flash-Next expert pool, the DeepSeek expert pools), it takes one logical CPU for each physical core. Environment
+  settings still override it. On a Ryzen 9 7940HS, 8 threads decode at 11.5 tokens/s and 16 threads at 10.0 to 10.8.
+
+### Fixed
+
+- Inkling 2 Mini hung on RTX 20, 30 and 40 cards (compute capability 7.0 and later) because two warp shuffles named
+  lanes that never reach them. Both shuffles now name the lanes that run.
+- `tools/check_warp_masks.py` lists every warp shuffle and barrier under a condition that changes inside a warp and
+  fails on any that is not reviewed. The release checks run it. The expert kernels now stop with a clear error when
+  a model has a shape they cannot handle, in place of a hang.
+- The native Windows package stays at 0.7.0: 0.7.1 has no new Windows build.
+- `install.sh` and `kindi cards` stop with a clear message when the NVIDIA driver and library versions differ, and
+  `install.sh` names the package when `apt-get` cannot install Docker or the NVIDIA container toolkit. It no longer
+  takes an `nvidia` runtime entry in `daemon.json` for an installed toolkit.
+
 
 ### Upstream merge (2026-11-23)
 

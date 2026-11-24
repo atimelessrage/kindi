@@ -103,18 +103,18 @@ commands and interpret the output. Each row states the gate it unlocks.
   `python tools/backup_bundle.py --out <second-medium>/kindi-backups`, then
   copy the bundle and its `.sha256` off this machine. See
   [BACKUP.md](BACKUP.md).
-- **Publish the 0.7.0-fork release bundle** (see `docs/RELEASE-CHECKLIST.md`): the tree
-  now names **0.7.0-fork** in the package, both installers and the Docker tags; the local
+- **Publish the 0.7.1-fork release bundle** (see `docs/RELEASE-CHECKLIST.md`): the tree
+  now names **0.7.1-fork** in the package, both installers and the Docker tags; the local
   source archive and its hash exist in `dist/`. The source URL and checksum in
-  `install.sh` point at the not-yet-created `v0.7.0-fork` release asset, so publication
+  `install.sh` point at the not-yet-created `v0.7.1-fork` release asset, so publication
   and the hosted checksum pair are still owner-only steps. Publishing/tagging needs the
   owner's explicit authorization (the checklist says so).
 - **Retire the stale `v0.5.0-installer` one-liners** (2026-11-16 audit, F9): the docs
-  and both installers now point at `v0.7.0-fork`; the old tag's asset predates this tree.
+  and both installers now point at `v0.7.1-fork`; the old tag's asset predates this tree.
   Do not publish or link it as the current installer.
 - **Publish the Windows and Linux installer pair together** (2026-11-17 real run, see
   [WINDOWS.md](WINDOWS.md#verified-installer-run-2026-11-17)): `install.ps1`
-  (`$KindiWinVersion`) and `install.sh` now both say **0.7.0-fork**, so Settings > Apps
+  (`$KindiWinVersion`) and `install.sh` now both say **0.7.1-fork**, so Settings > Apps
   and the installed tree will agree. The hosted pair is still unverified until the
   release owner uploads these exact assets.
 - **Report the corrupt ahtx upload (§1) to the repo author** (or file/feedback

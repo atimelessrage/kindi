@@ -9,8 +9,6 @@ bad Content-Length, oversized body, oversized header block).
 import asyncio
 import json
 
-import pytest
-
 from kindi import route
 
 

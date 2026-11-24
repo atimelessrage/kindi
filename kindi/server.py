@@ -566,6 +566,9 @@ class Kindi(GrammarPrewarm):
         self.busy = {"active": False, "phase": "", "prompt_tokens": 0, "cached": 0, "read": 0, "generated": 0,
                      "started": 0.0}
         self.nanbeige = None
+        # four unrelated tokenizers fill this slot (SPM, Tok, LightningTokenizer, Inkling2Tokenizer):
+        # the code uses the duck-typed contract, so the union is Any rather than one class's API
+        self.tok: Any
         if family == "kindi_nanbeige":        # llama-arch K/I-quant GGUF (Nanbeige 4.3 33B)
             from .nanbeige_gen import NanbeigeBackend
             self.variant = "nanbeige"
@@ -575,6 +578,11 @@ class Kindi(GrammarPrewarm):
             from .lightning_gen import LightningBackend
             self.variant = "lightning"
             self.nanbeige = LightningBackend(man, cfg, log=log)   # (the same backend interface as Nanbeige's)
+            self.eng, self.tok, self.runner, self.sample = self.nanbeige.eng, self.nanbeige.tok, None, None
+        elif man.get("backend") == "kindi_inkling2":      # Inkling 2 Mini (looped MoE; kindi/inkling2.py)
+            from .inkling2_gen import InklingBackend
+            self.variant = "inkling2"
+            self.nanbeige = InklingBackend(man, cfg, log=log)     # (the same backend interface as Lightning's)
             self.eng, self.tok, self.runner, self.sample = self.nanbeige.eng, self.nanbeige.tok, None, None
         elif self.native:
             from .gemma4 import Engine as NativeEngine
@@ -864,7 +872,16 @@ class Kindi(GrammarPrewarm):
     def check_prompt(self, req):
         """Renders and counts the prompt of a request without the GPU or the lock, and returns its token ids. Raises
         ContextOverflow (the prompt does not fit the context) or ValueError (the prompt is not valid), so that a
-        request gets an HTTP 400 at once: before the first byte of a stream, and before it waits for the engine."""
+        request gets an HTTP 400 at once: before the first byte of a stream, and before it waits for the engine.
+        A backend (Flash-Next, Lightning, Nanbeige, Inkling) keeps per-request state in its generate(), so its check
+        waits for the engine lock: a second request (opencode's title request beside its main one) then waits
+        for the first instead of breaking it."""
+        if self.nanbeige is not None:
+            with self.lock:
+                return self._check_prompt(req)
+        return self._check_prompt(req)
+
+    def _check_prompt(self, req):
         g = self.generate(dict(req, _kindi_check=True))
         try:
             while True:

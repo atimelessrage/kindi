@@ -1,0 +1,51 @@
+{
+  "note": "Reviewed warp intrinsics whose mask is not the full warp. A partial mask names a deliberate sub-warp group; a legacy intrinsic needs a HIP or __CUDA_ARCH__ guard. New or unexplained rows fail tools/check_warp_masks.py. Checked 2026-11-24 when the gate was added: 407 intrinsic sites (288 full mask, 58 compat macro, 44 HIP branch, 8 activemask, 2 legacy-guarded, 7 reviewed here).",
+  "sites": {
+    "inkling2_gpu.cu": [
+      {
+        "line": 171,
+        "intrinsic": "__shfl_xor_sync",
+        "mask": "0x000000FFu",
+        "reason": "d_warp8: only lanes 0-7 enter the branch (tid < 8), so the mask names exactly the lanes that reach the shuffle. This is the 0.7.1 fix for the Inkling hang on sm_70+; a full mask would wait for lanes that never arrive."
+      },
+      {
+        "line": 172,
+        "intrinsic": "__shfl_xor_sync",
+        "mask": "0x000000FFu",
+        "reason": "same d_warp8 reduction (offset 2); lanes 0-7 only."
+      },
+      {
+        "line": 173,
+        "intrinsic": "__shfl_xor_sync",
+        "mask": "0x000000FFu",
+        "reason": "same d_warp8 reduction (offset 1); lanes 0-7 only."
+      },
+      {
+        "line": 1501,
+        "intrinsic": "__shfl_xor_sync",
+        "mask": "0x0000FFFFu",
+        "reason": "d_rel_clip: IK_NREL = 16, so only lanes 0-15 enter the branch and the 16-lane mask matches them exactly."
+      }
+    ],
+    "qx_gpu.cu": [
+      {
+        "line": 236,
+        "intrinsic": "__shfl_sync",
+        "mask": "mask",
+        "reason": "Flash-Next row_dot: mask = __activemask() taken once before the reduction, and each lane reads its own 8-lane group (base = lane & ~7). Correct while all 8 lanes of a group are active, which is the row_dot call contract (one 8-lane group per row); a partial group would read an inactive lane."
+      },
+      {
+        "line": 261,
+        "intrinsic": "__shfl_sync",
+        "mask": "mask",
+        "reason": "row_dot2, first row: same activemask() 8-lane-group reduction as row_dot."
+      },
+      {
+        "line": 264,
+        "intrinsic": "__shfl_sync",
+        "mask": "mask",
+        "reason": "row_dot2, second row: same activemask() 8-lane-group reduction as row_dot."
+      }
+    ]
+  }
+}

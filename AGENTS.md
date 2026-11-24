@@ -12,24 +12,23 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `4fd3f4d` on `merge/upstream-0.7.0` (0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
-  **2026-11-24 audit round:** `route.py` auth+caps (`tests/test_route.py`); `np.load(allow_pickle=False)`; fork advisory URL; CHANGELOG/CURRENT-VS refreshed. **2026-11-23: official Kindi v0.7.0 (`8298a0f`) is merged in.** The merge base was
-  `dce89df`; the fork was 701 commits ahead and v0.7.0 two ahead (`v0.6.1` + the squashed 0.7.0 commit), so the branch is
-  now 0 behind and 702 commits / 931 changed files ahead (+133,113/-1,946), 1,066 tracked files vs 216, no upstream file
-  missing. 39 conflicted files (69 hunks) were resolved by hand: the fork keeps the implementations with tests, and
-  upstream's self-contained fixes were ported (`packcheck` size+sha256 gate and the `g5_*.src` source stamp, bench curve
-  positions #33, `gpudrv.libcuda()`, the cgroup parent walk #48, `chunk.py`'s GPU-path fixes, `tp.py`'s B15 split fixes,
-  `tc_hp_for(man, card)` #76, `kindi place`/`route`/`cards`, `oai.check` #38, installer card detection, 0.7.0 docs).
-  Upstream's `kindi plan` is exposed as **`kindi place`** because the fork already had `kindi plan`. Multi-slot serving
-  (`slots.py`, `--slots`, `KINDI_SLOTS_*`; `spec.py` has the `*_R` plans and `build_plan(..., slots=...)`) and the
-  Flash-Next adapter (`qwen4exp_*`, `qx_*`) are **present but not wired into the fork's server** - both need a GPU run
-  this host cannot do. Structured output still works: `oai.check(..., structured=True)` leaves `json_object`/
-  `json_schema`/`grammar` to the fork's decode grammar. Merge defects fixed before the gate: undefined
-  `slots`/`_slots`/`bc_all`/`dp_all`, a duplicate `tc_hp_for`, a shadowed `_busy` (every 429 was a 500), the streaming
-  path's nonexistent `K.acquire`, `qwen4exp_mtp`'s undefined `hst`, and 43 naked `json.load(open())` sites moved to
-  `jsonio.load_json`. Verification: pytest **1,485 passed / 58 skipped / 0 failed**; quality **207 Ruff / 59 mypy /
-  884 Pyright / 245 Pylint** (under the ratchet); config reference, support matrix, project memory, claims and
-  `bash -n install.sh` pass. The 2026-11-23 startup prewarm also covers Lightning and Nanbeige (`kindi/grammar_prewarm.py`). No GPU, pack or Windows run; the vendored unwired `qwen4exp_*`/`qx_*` modules are outside
+- **HEAD:** `32e570e` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+  **2026-11-24:** official **Kindi v0.7.1** (`1cb59d2`, one squashed commit on `v0.7.0`, 43 files,
+  +15,649/-114) is merged in as `0.7.1-fork`: the **Inkling 2 Mini** engine (`inkling2_*`, `kindi inkling`,
+  the server's `kindi_inkling2` backend), **Flash-Next drafting for sampled requests**
+  (`sampling.spec_accept` takes a draft distribution; `spec.spec_accept` delegates), **one CPU thread per
+  physical core** (`kindi/cores.py`) and the `check_prompt` engine-lock fix. All 17 conflicts were
+  version identity: the fork keeps `0.7.1-fork` and its own cascade/adapter/`modelids` paths beside
+  upstream's inkling additions. **Upstream names `tools/check_warp_masks.py` but the tag does not ship
+  it**, so the fork wrote it (14 tests): 404 intrinsics classified, 7 reviewed sub-warp masks in
+  `tools/warp_mask_baseline.json`, 0 unguarded legacy intrinsics. It found two real hazards, both fixed:
+  `chunk.cu` `k_q8x_T2` bypassed the file's own `KSHFLX` macro, and `kindi.cu` `wsum_d`/`wsum_f` used bare
+  `__shfl_xor` on every arch (now `#if __CUDA_ARCH__ < 700`). The release's root `test_inkling2_engine.py`
+  moved to `tools/verify_inkling2.py` (a manual model check, not a pytest module). **Unrun here:** the
+  Inkling engine, sampled drafting and core detection (no GPU, pack or Windows host). **2026-11-23:** official Kindi v0.7.0 (`8298a0f`) is also merged in (39 conflicted files, 69 hunks, all
+  resolved by hand; the ported fixes, the unwired `slots.py`/Flash-Next modules and the merge defects are
+  recorded in [docs/development/AGENTS-HISTORY.md](docs/development/AGENTS-HISTORY.md) and
+  `CURRENT-VS-KINDI-0.7.md`). No GPU, pack or Windows run; the vendored unwired `qwen4exp_*`/`qx_*` modules are outside
   Pyright's and Pylint's scope until a GPU run wires them (`pyrightconfig.json`, `VENDORED_UNWIRED`). The Gemma 4
   pinned-host fix (#44) follows 0.7.0's names and release points with the fork's host budget on top; its tests pin each. The 2026-11-23 installer slice adds `kindi selftest --url`
   (stdlib HTTP, no pack or engine load, `KINDI_API_KEY` header when the container carries one), replaces fastapi's
@@ -46,10 +45,10 @@ Audit F9's Python quality ratchet is `tools/check_python_quality.py`: Ruff 0.16.
 over the Python tree, mypy 2.4.0 over first-party production
 code, Pyright 1.1.414 (`basic`, all platforms) and Pylint 4.1.3 (`E`, `F`, import-error
 disabled) at Python 3.10 over the same production targets, recorded as **207 Ruff findings / 59 mypy
-errors / 884 Pyright errors / 245 Pylint findings** in
+errors / 863 Pyright errors / 245 Pylint findings** in
 `tools/python_quality_baseline.json`. CI runs it; a new or increased file/rule count fails, while
-existing debt is tolerated and `--update --reason "..."` lowers the baseline after review; it refuses growth and records the reason and delta, so it cannot launder a new finding.
-`tests/test_python_quality.py` + `tests/test_ci_config.py` **14 passed**; no GPU run. Dependency scanning is report-only in CI (`tools/check_dependencies.py`, `requirements-runtime.txt`); the gate waits for a reviewed baseline. The prior test task is below.
+existing debt is tolerated and `--update --reason "..."` lowers the baseline after review; it refuses growth and records the reason and delta, so it cannot launder a new finding. Pyright and Pylint skip `VENDORED_UNWIRED` (qwen4exp/qx) and `UPSTREAM_UNVERIFIED` (`kindi/inkling2*`, merged but never run here); `kindi/server.py` stays in scope.
+`tests/test_python_quality.py` + `tests/test_ci_config.py` **15 passed**; no GPU run. Dependency scanning is report-only in CI (`tools/check_dependencies.py`, `requirements-runtime.txt`); the gate waits for a reviewed baseline. The prior test task is below.
 
 ### Full CPU gate
 
@@ -235,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `4fd3f4d` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `4fd3f4d` | this session; 2026-11-24 audit-fix round |
+| `T:/kindi` | `main` | `32e570e` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `32e570e` | this session; 2026-11-24 v0.7.1 merge |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
@@ -400,6 +399,7 @@ Run from the repository root. The no-GPU gate is cheap and must pass before any 
 | `python tools/project_memory.py --check` | python | the requirement history matches git |
 | `python tools/check_perf_baseline.py` | python | the committed CROSS-MODE rows are within 15% of the perf baseline |
 | `python tools/check_claims.py` | python, git | every number the six claimed docs quote is re-derived from its tracked run, and every benchmark citation has a claim |
+| `python tools/check_warp_masks.py` | python | no new unmasked warp shuffle/barrier in `kindi/*.cu` (7 reviewed sub-warp masks in `tools/warp_mask_baseline.json`) |
 | `python tools/check_secret_history.py` | python, git | no new credential or personal-data row in git history (tracked-file scans cannot see a deleted line) |
 | `python tools/check_secret_baseline.py` | python, `detect-secrets==1.5.0` | `.secrets.baseline` still matches the tracked tree |
 | `git diff --check` | git | no whitespace damage |

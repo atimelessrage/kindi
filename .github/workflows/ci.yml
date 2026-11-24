@@ -40,6 +40,7 @@ jobs:
         run: |
           python tools/check_claims.py
           python scripts/check_ternary_moe.py
+          python tools/check_warp_masks.py
           python tools/project_memory.py --check
           python -m kindi.config_reference --check
           python -m kindi.support_matrix --check

@@ -90,7 +90,9 @@ def test_the_loader_checks_the_registry_before_it_reads_any_weight(tmp_path, mon
     head.write_bytes(b"x" * 128)
     monkeypatch.delenv(mtp_heads.ALLOW, raising=False)
 
-    def weights_read(path):
+    def weights_read(path, allow_pickle=None):
+        # the loader must ask for the no-pickle form explicitly (a tampered head cannot run code)
+        assert allow_pickle is False, "the head loader must pass allow_pickle=False"
         raise AssertionError("np.load ran before the registry check")
 
     monkeypatch.setattr(mtp.np, "load", weights_read)

@@ -189,6 +189,8 @@ def load(explicit=None, overrides=None):
             cfg["model_name"] = m.get("model_id") or claimed
         elif m.get("backend") == "kindi_qwen4exp":
             cfg["model_name"] = m.get("model_id") or "flashnext"
+        elif m.get("backend") == "kindi_inkling2":
+            cfg["model_name"] = m.get("model_id") or "inkling2"
         else:
             # the GGUF's general.name, then its file name: some files name the model only "Hf"
             size = None

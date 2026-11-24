@@ -45,6 +45,12 @@ PYLINT_PY_VERSION = "3.10"          # Ruff/mypy/Pyright target 3.10; Pylint woul
 # a GPU run makes them part of the served surface (AGENTS.md records the decision). Ruff and mypy do
 # cover them; this tuple gates only the two tools whose findings are torch/CUDA false positives.
 VENDORED_UNWIRED = ("kindi/qwen4exp_", "kindi/qx_")
+# 0.7.1's Inkling 2 Mini engine was merged from the official release and is wired into server.py
+# (`kindi_inkling2`), but no pack or GPU on this host can run it, so its own modules have never been
+# executed here. Its Pyright/Pylint findings are upstream's duck-typed idioms (the same reason as
+# VENDORED_UNWIRED); Ruff and mypy still cover them, and the exclusion is one line to delete once a
+# pack run verifies the engine. `kindi/server.py`, the fork's own file, stays fully in scope.
+UPSTREAM_UNVERIFIED = ("kindi/inkling2",)
 
 
 def _dedupe_targets(targets: tuple[str, ...]) -> tuple[str, ...]:
@@ -139,6 +145,27 @@ def _mypy_findings():
     return groups
 
 
+def _repo_relative(path):
+    """`<root>/kindi/inkling2.py` -> `kindi/inkling2.py` so a scope prefix matches an absolute path.
+
+    The checkout directory is itself named `kindi`, so this strips the repository root rather than
+    the last `/kindi/` segment; the latter turned `tools/spec_ab.py` into `kindi/tools/spec_ab.py`.
+    The comparison is case-insensitive because the analyzer reports the drive letter in lower case.
+    """
+    rel = (path or "?").replace("\\", "/")
+    root = str(ROOT).replace("\\", "/").rstrip("/")
+    # the analyzer reports the drive letter in lower case while the checkout path keeps its case
+    if rel.lower().startswith((root + "/").lower()):
+        return rel[len(root) + 1:]
+    return rel
+
+
+def _out_of_scope(path):
+    """True for a file the two torch/CUDA analysers skip (see the tuples above)."""
+    rel = _repo_relative(path)
+    return any(rel.startswith(prefix) for prefix in VENDORED_UNWIRED + UPSTREAM_UNVERIFIED)
+
+
 def _pyright_findings(pyright):
     proc = _run([pyright, "--project", str(PYRIGHT_CONFIG), "--outputjson"], "pyright")
     if proc.returncode not in (0, 1):
@@ -151,7 +178,9 @@ def _pyright_findings(pyright):
     for row in payload.get("generalDiagnostics", []):
         if row.get("severity") != "error":
             continue
-        _add(groups, row.get("file") or "?", row.get("rule") or "no-rule")
+        if _out_of_scope(row.get("file")):
+            continue
+        _add(groups, _repo_relative(row.get("file")), row.get("rule") or "no-rule")
     if proc.returncode == 1 and not groups:
         raise QualityError("pyright failed without a parseable error: %s"
                            % (proc.stderr or proc.stdout).strip())
@@ -172,8 +201,7 @@ def _pylint_findings(pylint):
         raise QualityError("pylint produced invalid JSON: %s" % exc) from exc
     groups = {}
     for row in rows:
-        rel = (row.get("path") or "?").replace("\\", "/")
-        if any(rel.startswith(prefix) for prefix in VENDORED_UNWIRED):
+        if _out_of_scope(row.get("path")):
             continue
         _add(groups, row.get("path") or "?", row.get("message-id") or "no-code")
     if proc.returncode == 2 and not groups:

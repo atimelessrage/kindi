@@ -1067,7 +1067,7 @@ extern "C" __global__ void __launch_bounds__(256) k_q8x_T2(const float* __restri
     if(t < T){
       const float4 v = *(const float4*)(X + (long long)t * ldx + g * 128 + lane * 4);
       float a = fmaxf(fmaxf(fabsf(v.x), fabsf(v.y)), fmaxf(fabsf(v.z), fabsf(v.w)));
-      for(int o = 16; o > 0; o >>= 1) a = fmaxf(a, __shfl_xor(a, o));
+      for(int o = 16; o > 0; o >>= 1) a = fmaxf(a, KSHFLX(a, o));
       const float id = a != 0.0f ? 127.0f / a : 0.0f;
       Q[lane][tt] = ((unsigned int)(__float2int_rn(v.x * id) & 255)) | ((unsigned int)(__float2int_rn(v.y * id) & 255) << 8) |
                     ((unsigned int)(__float2int_rn(v.z * id) & 255) << 16) | ((unsigned int)(__float2int_rn(v.w * id) & 255) << 24);

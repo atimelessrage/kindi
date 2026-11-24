@@ -75,7 +75,8 @@ def test_source_archive_has_a_pinned_release_sha256():
     match = re.search(r'^SOURCE_SHA256="([0-9a-f]{64})"$', text, re.MULTILINE)
     assert match, "install.sh has no pinned 64-hex SOURCE_SHA256"
     assert match.group(1) != "0" * 64, "install.sh still has the build placeholder source hash"
-    assert 'KINDI_VERSION="0.7.0-fork"' in text
+    version = re.search(r'^KINDI_VERSION="([^"]+)"', text, re.MULTILINE).group(1)
+    assert version.endswith("-fork"), "the fork installer must not claim an official version"
     assert ('SOURCE_URL="https://github.com/atimelessrage/kindi/releases/download/'
             'v${KINDI_VERSION}/kindi-${KINDI_VERSION}.tar.gz"') in text
 

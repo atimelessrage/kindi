@@ -1,12 +1,28 @@
-# Current fork vs official Kindi 0.7.0
+# Current fork vs official Kindi 0.7.1
 
 ## TLDR - too long didnt read
 
-**The comparison:** official Kindi **v0.7.0** (tag `v0.7.0`, commit `8298a0f`, released 2026-11-23) against this fork at the
-**0.7.0 merge commit `35e4697`** on `merge/upstream-0.7.0`. The merge base is `dce89df`; the fork was 701 commits ahead and 0.7.0 two commits
-ahead (`v0.6.1` + the squashed "Kindi 0.7.0" commit), so after the merge the fork is **0 commits behind and 702 commits /
-931 changed files ahead** (+133,113/−1,946), with **1,066 tracked files against 216 upstream** and **no upstream file
-missing**.
+**The comparison:** official Kindi **v0.7.1** (tag `v0.7.1`, commit `1cb59d2`, released 2026-11-23) against this fork at
+the **0.7.0 merge commit `35e4697` plus the 2026-11-24 v0.7.1 merge** on `merge/upstream-0.7.0`.
+
+**What 0.7.1 adds (now in the tree):** the **Inkling 2 Mini** engine (`inkling2.py`, `inkling2_gpu.cu`,
+`inkling2_cpu.c`, `inkling2_quant.py`, the `kindi inkling` command and the `kindi_inkling2` server backend; the
+upstream notes measure 120.9 tok/s read and 19.8 tok/s write on a GTX 1080 at 2,048 context), **Flash-Next drafting
+for sampled requests** (`sampling.spec_accept` takes the draft's distribution; `KINDI_FN_DRAFT_SAMPLED=0` opts
+out), **one CPU thread per physical core** (`kindi/cores.py`, used by the dense CPU engines, the Flash-Next expert
+pool and the DeepSeek pools) and the `check_prompt` engine-lock fix for backend models. **None of these was run on
+this host** (no CUDA device, no Inkling pack), so they are present and CPU-reachable-tested only.
+
+**The 0.7.1 changelog names `tools/check_warp_masks.py`, but the tag does not ship it.** The fork wrote it
+(`tools/check_warp_masks.py` + 14 tests + `tools/warp_mask_baseline.json`): 404 intrinsic sites classified, 7
+reviewed sub-warp masks, 0 unguarded legacy intrinsics. Writing it found two real hazards, both fixed: `chunk.cu`
+`k_q8x_T2` bypassed the file's own `KSHFLX` macro and `kindi.cu` `wsum_d`/`wsum_f` used bare `__shfl_xor` on every
+arch.
+
+**Measured 2026-11-24 against `v0.7.1` (`1cb59d2`):** **722 commits / 980 changed files ahead**
+(+136,509/−17,775), **1,133 tracked files against 232 upstream**, no upstream file missing. The v0.7.0 comparison
+that produced this report was 702 commits / 931 files against `8298a0f` at `35e4697`; the numbers below that are
+0.6.1-era runs and are unchanged.
 
 **What 0.7.0 brought in (now in the tree):** the Flash-Next engine (`qwen4exp_*`, `qx_cpu.c`, `qx_gpu.cu`), the
 multi-slot serving stack (`slots.py`, the `*_R` row kernels in `spec.cu`, `--slots`, `KINDI_SLOTS_*`), placement and
@@ -21,10 +37,10 @@ fork's PRs by content (see the PR status below).
 token-exact), the 27B tandem memory split (**7,721 -> 6,091 MiB** peak, 49,152 tokens where unsplit reduces to 30,976),
 the adaptive draft policy (**+15.8%** on the 2B), mode A's **k=1** default (**1.12-1.13x**), sessions, `kindi plan` /
 `kindi caps` / `kindi autotune` / `kindi kld` / `kindi io`, the JSON-schema/GBNF engine and server wiring, the
-process-shared grammar prewarm, and the `0.7.0-fork` release identity. Those numbers were **not** re-benchmarked after
+process-shared grammar prewarm, and the `0.7.1-fork` release identity. Those numbers were **not** re-benchmarked after
 this merge (no CUDA or model packs on this host).
 
-**Caveats:** the `0.7.0-fork` release is still unpublished; no GPU path added by 0.7.0 has been run here, so
+**Caveats:** the `0.7.1-fork` release is still unpublished; no GPU path added by 0.7.0 has been run here, so
 **multi-slot serving and the Flash-Next engine are present but not wired into this fork's server** (the fork's server
 does not call `slots.py` or the Flash-Next adapter); DeepSeek V4.1, DSpine, Nanbeige 4.3, Gemma 4 E4B and the
 Lightning/Nanbeige structured-output paths remain unverified; `/health` still reports `commit: null` from the

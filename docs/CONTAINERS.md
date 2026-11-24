@@ -1,15 +1,15 @@
 # Release-target container images
 
-Kindi's `0.7.0-fork` container images are **release targets in GitHub's registry, not published
+Kindi's `0.7.1-fork` container images are **release targets in GitHub's registry, not published
 images**. This bundle has not pushed them. The tags become live only after `kindi verify` (the
 token-for-token check against llama.cpp) passes on a real card for each backend and the release is
 published. Until then, build locally with [DOCKER.md](DOCKER.md).
 
 | Release-target image | For |
 |---|---|
-| `ghcr.io/atimelessrage/kindi:0.7.0-fork-cuda` (moving `cuda`/`latest` after publication) | NVIDIA cards from Kepler on (CUDA 10.2 in the image), and the CPU engine |
-| `ghcr.io/atimelessrage/kindi:0.7.0-fork-rocm6` (moving `rocm6` after publication) | AMD RDNA3 graphics (ROCm 6.3 in the image) |
-| `ghcr.io/atimelessrage/kindi:0.7.0-fork-rocm7` (moving `rocm7` after publication) | AMD RDNA 3.5 graphics (ROCm 7 in the image) |
+| `ghcr.io/atimelessrage/kindi:0.7.1-fork-cuda` (moving `cuda`/`latest` after publication) | NVIDIA cards from Kepler on (CUDA 10.2 in the image), and the CPU engine |
+| `ghcr.io/atimelessrage/kindi:0.7.1-fork-rocm6` (moving `rocm6` after publication) | AMD RDNA3 graphics (ROCm 6.3 in the image) |
+| `ghcr.io/atimelessrage/kindi:0.7.1-fork-rocm7` (moving `rocm7` after publication) | AMD RDNA 3.5 graphics (ROCm 7 in the image) |
 
 The moving `cuda`, `rocm6`, `rocm7` and `latest` tags move only when the versioned targets above
 are published. The last verified fork images were the 0.6.0 tags: `0.6.0-cuda` on NVIDIA GeForce
@@ -70,7 +70,7 @@ The settings go in the environment or in a `.env` file beside the compose file:
 | Setting | Default | |
 |---|---|---|
 | `KINDI_MODEL` | `bonsai-4b` | a model id, or a GGUF file in the container (see below) |
-| `KINDI_TAG` | `cuda` (`rocm6` in `compose.amd.yaml`) | the image tag, for example `0.7.0-fork-cuda` |
+| `KINDI_TAG` | `cuda` (`rocm6` in `compose.amd.yaml`) | the image tag, for example `0.7.1-fork-cuda` |
 | `KINDI_PORT` | `8093` | the port on the host |
 | `KINDI_BIND` | `127.0.0.1` | `0.0.0.0` serves the network: then set `KINDI_API_KEY` |
 | `KINDI_API_KEY` | empty | clients must then send `Authorization: Bearer <key>` |

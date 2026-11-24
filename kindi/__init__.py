@@ -6,7 +6,7 @@ language modelling.
 import os
 import subprocess
 
-VERSION = "0.7.0-fork"
+VERSION = "0.7.1-fork"
 
 
 def _commit():

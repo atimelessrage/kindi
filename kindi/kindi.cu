@@ -79,12 +79,20 @@ __device__ __forceinline__ float h2f3(unsigned short h){ float f; asm("cvt.f32.f
 #endif
 
 __device__ __forceinline__ double wsum_d(double v){
+#if __CUDA_ARCH__ < 700
   for(int o = 16; o > 0; o >>= 1) v += __shfl_xor(v, o);
+#else
+  for(int o = 16; o > 0; o >>= 1) v += __shfl_xor_sync(0xffffffffu, v, o);
+#endif
   return v;
 }
 
 __device__ __forceinline__ float wsum_f(float v){
+#if __CUDA_ARCH__ < 700
   for(int o = 16; o > 0; o >>= 1) v += __shfl_xor(v, o);
+#else
+  for(int o = 16; o > 0; o >>= 1) v += __shfl_xor_sync(0xffffffffu, v, o);
+#endif
   return v;
 }
 

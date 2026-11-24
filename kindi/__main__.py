@@ -543,6 +543,8 @@ def cmd_info(cfg, a):
             print("backend: Kindi Nanbeige CUDA (llama K/I-quant), exact head")
         elif m.get("backend") == "kindi_dsv41":
             print("backend: Kindi DeepSeek V4.1 (compiled CPU engine)")
+        elif m.get("backend") == "kindi_inkling2":
+            print("backend: Kindi Inkling 2 (looped MoE: CPU, hybrid or full-VRAM CUDA)")
         elif m.get("backend") == "kindi_gemma4":
             print("backend: Kindi Gemma 4 CUDA")
             print("fast head: %s" % ("available" if os.path.exists(os.path.join(cfg["pack"],"head_clusters.npz"))
@@ -697,6 +699,11 @@ def _build_parser():
     s.add_argument("--moe-lane", choices=("copy", "cpu"), default=None,
                    help="the tandem lane the --moe-chunk report plans for (default copy)")
     s.add_argument("--json", default=None, metavar="FILE", help="also record the report in a machine-readable JSON file")
+    s = sub.add_parser("inkling", help="run experimental Inkling 2 Mini text inference")
+    s.add_argument("gguf", help="local Inkling 2 Mini GGUF")
+    s.add_argument("prompt")
+    s.add_argument("--max-tokens", type=int, default=128)
+    s.add_argument("--raw", action="store_true", help="use a raw completion prompt")
     s = sub.add_parser("serve", help="run the OpenAI-compatible server")
     s.add_argument("--host")
     s.add_argument("--port", type=int)
@@ -863,6 +870,11 @@ def main(argv=None):
     if not a.cmd:
         p.print_help()
         return 1
+    if a.cmd == "inkling":
+        from .inkling2_cli import run
+        if a.max_tokens < 1 or (a.ctx is not None and a.ctx < 512):
+            p.error("inkling requires --max-tokens >= 1 and --ctx >= 512")
+        return run(a)
     return _dispatch(_apply_overrides(a), a)
 
 

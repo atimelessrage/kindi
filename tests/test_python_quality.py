@@ -77,6 +77,17 @@ def test_mypy_does_not_receive_a_deduplicated_file_target(monkeypatch):
     assert seen[0].count("tools/moe_expert_lane.py") == 0
 
 
+def test_analyzer_scope_outlives_only_the_unrunnable_gpu_and_upstream_modules():
+    """Pyright and Pylint skip exactly two documented families; the fork's own files stay in scope."""
+    mod = _load()
+    assert mod.VENDORED_UNWIRED == ("kindi/qwen4exp_", "kindi/qx_")
+    assert mod.UPSTREAM_UNVERIFIED == ("kindi/inkling2",)
+    assert mod._out_of_scope("kindi/inkling2.py")
+    assert mod._out_of_scope("kindi/inkling2_gen.py")
+    assert not mod._out_of_scope("kindi/server.py")
+    assert not mod._out_of_scope("tools/check_python_quality.py")
+
+
 def test_pylint_targets_the_other_tools_python_version(monkeypatch):
     mod = _load()
     seen = []
