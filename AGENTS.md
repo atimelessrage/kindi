@@ -12,18 +12,18 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `42d6b2b` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
-  **2026-11-24 (latest):** the reference stopped hiding direct reads: `config_reference.py` dropped every env name
-  matching a config key, hiding `KINDI_MTP_HEAD` (the Bonsai head, `spec.py`/`mtp_heads.py`) beside Nanbeige's `mtp_head`; 331 -> 341 rows.
+- **HEAD:** `e571ff1` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+  **2026-11-24 (latest):** REQ-0028 A4's no-decoding-change gate: `kindi selftest` compares the same greedy prompt through
+  `/v1/chat/completions` and `/v1/messages` and fails on a different text or token count (`_dialects_agree`, also `--url`);
+  no live pack run (no C compiler, `docs/MANUAL-HELP-NEEDED.md` §3b). The reference also stopped hiding direct reads:
+  `config_reference.py` dropped every env name matching a config key, hiding `KINDI_MTP_HEAD`; 331 -> 341 rows.
   **2026-11-24:** `POST /v1/messages` answers Anthropic's dialect on the same `run_generate` path (`kindi/api/anthropic.py`;
-  `x-api-key` or bearer; envelope and SSE order; one `_relay` for both streaming routes), and `kindi selftest` drives it
-  in process and with `--url`, so an installed image proves it. REQ-0023's
-  block half landed too: `tests/test_kernel_arity.py` holds each launch's block against its `__launch_bounds__`
-  (28 pairs measured, 135 pinned).
-  while the package and `install.sh` said `0.7.1-fork`; all three match now, pinned by
+  `x-api-key` or bearer; envelope and SSE order; one `_relay` for both streaming routes), and `kindi selftest` drives it in
+  process and with `--url`. REQ-0023's block half landed too (`tests/test_kernel_arity.py`: 28 block/bound pairs, 135 pinned).
+  The package and `install.sh` said `0.7.1-fork`; all three match now, pinned by
   `tests/test_version_consistency.py`. The `v0.7.1-fork` release is **still unpublished** (only `v0.5.0-installer`),
   so README's one-liners 404 until the owner runs `docs/RELEASE-CHECKLIST.md`. The mask cache is a bounded 64 MiB
-  LRU (`StateMaskCache`, `KINDI_MASK_CACHE_MB`); A4/A5-rate open. Suite: 1,575 passed / 58 skipped / 0 failed (202 s).
+  LRU (`StateMaskCache`, `KINDI_MASK_CACHE_MB`); A4/A5-rate open. Suite: 1,577 passed / 58 skipped / 0 failed (192 s).
   **2026-11-24:** REQ-0027's mask got cheaper: self-loop characters now come off the NFA's character edges plus
   a reverse-epsilon closure (8,228 probes per state gone) and the mask unions use a cached boolean mask (248,320-id sorts
   gone). 2B medians: 15 -> 10.0 ms/token `json_schema`, 124 -> 57.1 unrolled `json.gbnf` depth 1 (depth 2/3 -> 9.5),
@@ -235,7 +235,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `a101b7d` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `42d6b2b` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint, Arc GEMM, bench --spec, config-reference direct reads |
+| `<worktree>` | `merge/upstream-0.7.0` | `e571ff1` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc GEMM, bench --spec, config-reference direct reads |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 

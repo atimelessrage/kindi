@@ -75,6 +75,24 @@ state line — tick it off when done.
 - **When done, tell the agent:** the binary path (or that `llama-server` is
   on PATH), and the version.
 
+## 3b. Install a C compiler for the CPU engine on this Windows host
+
+- **State:** open, waiting on the owner (tooling); found 2026-11-24.
+- **What:** clang (LLVM) or gcc with libomp, on `PATH` as `clang`/`gcc`, or
+  named with `KINDI_CC`.
+- **Why:** `kindi/kcpu.c` is compiled at first use into a content-keyed cache
+  (`~/.cache/kindi/libkcpu-<key>.dll`). This host has neither compiler, so the
+  cache key for the current `kcpu.c` (`9d454e3d97eb8a81`) is not present and
+  every live CPU-engine run fails with `kindi: could not run clang` before the
+  model loads. That blocks the live halves of `kindi selftest` (its REQ-0028 A4
+  dialect-agreement check is code-gated and unit-tested, but no pack run can
+  prove it here), `kindi verify`/`bench` with `KINDI_DEVICE=cpu`, and the 27B
+  CPU check. The cached DLLs from earlier builds do not match the current
+  source, so they cannot be reused. The probes that need no compiler
+  (`intel-cl`, `intel-ternary`, `intel-gemm`) already run on the Arc card.
+- **When done, tell the agent:** `clang --version` (or `gcc --version`) and
+  that `python -m kindi selftest --max-tokens 8` passes or fails, with its output.
+
 ## 4. Tests and runs on other hardware
 
 All of these need machines the owner controls; the agent can only write the

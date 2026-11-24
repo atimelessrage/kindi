@@ -92,6 +92,17 @@ plain CPU suite is the only evidence for the merge.
   shows its loader sites, the knob-liveness test's `UNDOCUMENTED` exemption is gone, and
   `tests/test_config_reference.py` pins the shadowed-key row so the generator cannot hide one again.
 
+### `kindi selftest` compares the two API dialects (2026-11-24, REQ-0028 A4)
+
+- `kindi selftest` already posted the same greedy prompt through `/v1/chat/completions` and
+  `/v1/messages`; it now compares the answers, which is REQ-0028 A4's no-decoding-change gate. A
+  different text or completion-token count between the two dialects fails the run ("the Anthropic
+  route changed decoding"), in process and against a running server (`--url`, which the installer
+  calls), and the JSON records `dialects{same_text, same_tokens, chat_text, anthropic_text}`. Both
+  requests are greedy and greedy repeats are gated separately, so a mismatch is the endpoint rather
+  than sampling noise. No live pack run yet: this host has no C compiler for the CPU engine and no
+  CUDA device (`docs/MANUAL-HELP-NEEDED.md` §3b).
+
 ### `kindi bench --spec` (2026-11-24, REQ-0026)
 
 - `kindi bench` can now benchmark a speculation mode: `kindi bench --spec mtp` (also `ngram`,

@@ -143,8 +143,12 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   `message_delta` → `message_stop`. `kindi/api/anthropic.py` is the whole translation (no FastAPI, no
   engine import, so it unit-tests on a CPU-only host); the route shares `_relay` with the OpenAI
   streaming path. Auth takes `x-api-key` or a bearer token. Evidence: `tests/test_anthropic.py`
-  (A1/A2 plus A3's app-level gate with a stub engine). **Open:** A3's real Claude Code run against
-  `kindi serve`, and A4's no-decoding-change check — the endpoint is *available*, not *compatible*. Proposed by the external knowledge-base scan of
+  (A1/A2 plus A3's app-level gate with a stub engine). A4's no-decoding-change check is **code-gated
+  2026-11-24**: `kindi selftest` compares the same greedy prompt posted through both dialects and fails
+  on a different text or token count (`_dialects_agree`, in-process and `--url`), recording both answers
+  in its JSON; the live pack run is blocked here (no C compiler for the CPU engine, no CUDA device —
+  `docs/MANUAL-HELP-NEEDED.md` §3b). **Open:** A3's real Claude Code run against `kindi serve` and
+  A4's live run — the endpoint is *available*, not *compatible*. Proposed by the external knowledge-base scan of
   2026-11-17 (`docs/development/AI-INVENTORY-SCAN.md`), which is inspiration only.
 - **n8n workflow integration ([REQ-0029](development/requirements/REQ-0029.md), proposed):** a
   self-hosted n8n workflow should use `kindi serve` as an OpenAI-compatible provider without a

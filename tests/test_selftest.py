@@ -113,7 +113,40 @@ def test_selftest_proves_health_generation_and_the_effective_runtime(monkeypatch
     assert report["seconds"] is not None
     assert any("runtime:" in line for line in lines)
     assert any("PASS" in line for line in lines)
+    # REQ-0028 A4: the same greedy request through both dialects must decode the same text
+    assert report["dialects"] == {"same_text": True, "same_tokens": True,
+                                  "chat_text": "ok", "anthropic_text": "ok"}
+    assert any("dialects agree" in line for line in lines)
     assert K.closed is True
+
+
+def test_selftest_fails_when_the_dialects_decode_different_text(monkeypatch, tmp_path):
+    """A4's gate: translation only. The engine returns the same text for the same request; if the
+    Anthropic route produced something else, something reached decoding and the check must fail."""
+    class _Drifting(_FakeKindi):
+        def generate(self, req, cancel=None):
+            self.calls = getattr(self, "calls", 0) + 1
+            second = self.calls > 1
+            text = "kindi" if second else "ok"
+            yield "text", text
+            yield "done", {"content": text, "tool_calls": [], "reasoning": "", "finish": "stop",
+                           "logprobs": None,
+                           "usage": {"prompt_tokens": 3, "completion_tokens": 1, "total_tokens": 4,
+                                     "prompt_tokens_details": {"cached_tokens": 0}},
+                           "timing": {"prompt_s": 0.0, "gen_s": 0.0, "gen_tok_s": 0.0}}
+
+    K = _Drifting()
+    monkeypatch.setattr(server, "_make_engine", lambda cfg, log: K)
+    out = tmp_path / "selftest.json"
+    lines = []
+    rc = selftest.run(_cfg(_pack(tmp_path)), log=lines.append, json_path=str(out))
+    assert rc == 1
+    report = json.loads(out.read_text(encoding="utf-8"))
+    assert report["ok"] is False and "changed decoding" in report["error"]
+    assert report["dialects"]["same_text"] is False
+    assert report["dialects"]["chat_text"] == "ok"
+    assert report["dialects"]["anthropic_text"] == "kindi"
+    assert not any("PASS" in line for line in lines)
 
 
 def test_the_in_process_client_stays_python36_compatible():
@@ -264,6 +297,16 @@ def test_url_mode_proves_a_server_that_is_already_running(running_server, tmp_pa
     assert report["anthropic"]["text"] == "kindi"
     assert report["anthropic"]["stop_reason"] == "end_turn"
     assert report["anthropic"]["blocks"] == ["text"]
+    assert report["dialects"]["same_text"] is True               # both routes answered "kindi"
+
+
+def test_url_mode_fails_when_the_dialects_disagree(running_server):
+    """The installer's check must see a served server that answers the two dialects differently."""
+    running_server.cfg["anthropic"] = dict(ANTHROPIC_REPLY,
+                                          content=[{"type": "text", "text": "something else"}])
+    lines = []
+    assert selftest.run_url(_url(running_server), log=lines.append) == 1
+    assert any("changed decoding" in line for line in lines)
 
 
 def test_url_mode_authenticates_when_the_server_requires_a_key(running_server, monkeypatch):

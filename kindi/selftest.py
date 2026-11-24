@@ -4,10 +4,11 @@
 fresh install had no single check that the pack, tokenizer, engine and server path all work. This
 loads the configured pack once, asks `/health` for the effective runtime state, runs one short
 greedy completion through `/v1/chat/completions` and the same prompt once through `/v1/messages`
-(Anthropic's shape, REQ-0028), and reports the pack hash and timings. It never binds a port and
-never needs a GPU-specific test path. Two routes rather than one because the Anthropic endpoint is
-translation only: a release image must prove it answers with the real engine, not just that the
-route exists.
+(Anthropic's shape, REQ-0028), compares the two answers (same greedy request, so the same tokens:
+REQ-0028 A4's no-decoding-change gate), and reports the pack hash and timings. It never binds a port
+and never needs a GPU-specific test path. Two routes rather than one because the Anthropic endpoint
+is translation only: a release image must prove it answers with the real engine, not just that the
+route exists, and that it decodes what the OpenAI route decodes.
 
 `--url` checks a server that is already running instead: no pack is loaded, so it costs two short
 requests and is safe next to the serving container (the installer uses it). Both modes speak HTTP
@@ -124,6 +125,33 @@ def _anthropic_answer(result, status, body, seconds, max_tokens, log):
         return "/v1/messages returned no output tokens"
     log("selftest: /v1/messages %s in %.0f ms (stop %s, %s output token(s))"
         % (", ".join(answer["blocks"]), seconds * 1000.0, answer["stop_reason"], output_tokens))
+    return None
+
+
+def _dialects_agree(result, log):
+    """The two dialects must decode the same text (REQ-0028 A4: the endpoint is translation only).
+
+    Both requests are greedy (temperature 0) with the same prompt and ``max_tokens``, so the same
+    engine must produce the same tokens: anything else means the Anthropic route changed decoding,
+    which the requirement forbids. Greedy repeats are gated elsewhere (ten identical completions per
+    server), so a mismatch here is the endpoint, not sampling noise.
+    """
+    gen = result.get("generation") or {}
+    ant = result.get("anthropic") or {}
+    chat_text, ant_text = gen.get("text") or "", ant.get("text") or ""
+    chat_tok, ant_tok = gen.get("completion_tokens"), ant.get("output_tokens")
+    same_text = chat_text == ant_text
+    same_tokens = (chat_tok == ant_tok) if isinstance(chat_tok, int) and isinstance(ant_tok, int) else None
+    result["dialects"] = {"same_text": same_text, "same_tokens": same_tokens,
+                          "chat_text": chat_text, "anthropic_text": ant_text}
+    if not same_text:
+        return ("the two dialects decoded different text for the same greedy request "
+                "(chat %r, /v1/messages %r), so the Anthropic route changed decoding"
+                % (chat_text[:120], ant_text[:120]))
+    if same_tokens is False:
+        return ("the two dialects report %r and %r completion tokens for the same text"
+                % (chat_tok, ant_tok))
+    log("selftest: dialects agree (%d token(s), %d chars)" % (chat_tok or 0, len(chat_text)))
     return None
 
 
@@ -265,6 +293,9 @@ def run(cfg, log=print, max_tokens=8, json_path=None):
         err = _anthropic_answer(result, status, ab, time.perf_counter() - t2, max_tokens, log)
         if err:
             return _fail(result, err, log, json_path)
+        err = _dialects_agree(result, log)
+        if err:
+            return _fail(result, err, log, json_path)
         result["ok"] = True
     finally:
         close = getattr(K, "close", None)
@@ -307,6 +338,9 @@ def run_url(url, log=print, max_tokens=8, json_path=None, timeout=600):
     status, ab = _url_json(base + "/v1/messages",
                            _anthropic_body(result["model"] or "model", max_tokens), timeout=timeout)
     err = _anthropic_answer(result, status, ab, time.perf_counter() - t2, max_tokens, log)
+    if err:
+        return _fail(result, err, log, json_path)
+    err = _dialects_agree(result, log)
     if err:
         return _fail(result, err, log, json_path)
     result["ok"] = True
