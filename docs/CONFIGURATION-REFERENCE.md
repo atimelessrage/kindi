@@ -193,8 +193,8 @@ variables, and are therefore not listed twice here.
 | `KINDI_G5_PINS` | (empty) | `kindi/tp.py:154` |
 | `KINDI_G5_TUNE` | `1` | `kindi/tp.py:180` |
 | `KINDI_G5_TUNELOG` | (unset) | `kindi/tp.py:295` |
-| `KINDI_GBNF_MAX_DEPTH` | `str(DEFAULT_MAX_DEPTH)` | `kindi/gbnf.py:61` |
-| `KINDI_GBNF_MAX_STATES` | `str(DEFAULT_MAX_STATES)` | `kindi/gbnf.py:51` |
+| `KINDI_GBNF_MAX_DEPTH` | `str(DEFAULT_MAX_DEPTH)` | `kindi/gbnf.py:63` |
+| `KINDI_GBNF_MAX_STATES` | `str(DEFAULT_MAX_STATES)` | `kindi/gbnf.py:53` |
 | `KINDI_GEMV_BLOCKS` | (unset) | `kindi/engine.py:220` |
 | `KINDI_HIP_LIB` | `libamdhip64.so` | `kindi/gpudrv.py:28` |
 | `KINDI_HOST_RAM_CHECK` | `1` | `kindi/hostram.py:181` |
@@ -231,6 +231,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_LT_SM75` | (unset) | `kindi/lightning.py:150` |
 | `KINDI_LT_TC` | `1` | `kindi/lightning.py:145` |
 | `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:588` |
+| `KINDI_MASK_CACHE_MB` | `64` | `kindi/token_classes.py:50` |
 | `KINDI_MEM_RESERVE_MB` | `96` or `256` or `32` | `kindi/engine.py:331` (+4 more) |
 | `KINDI_MODEL` | (empty) | `kindi/container.py:240` |
 | `KINDI_MOE_COPY` | `0` | `kindi/dsv41.py:629` |

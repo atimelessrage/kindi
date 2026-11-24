@@ -250,6 +250,66 @@ def test_a_shared_index_does_not_change_either_language():
         _same_mask(grammar, texts, [state])
 
 
+def test_state_mask_cache_holds_its_byte_budget_and_evicts_the_least_recent():
+    """REQ-0027 A5: a long constrained generation must not grow the mask cache without bound."""
+    cache = token_classes.StateMaskCache(budget=200)
+    cache.put("a", np.zeros(10, dtype=np.int64))      # 80 bytes
+    cache.put("b", np.zeros(10, dtype=np.int64))      # 160 total
+    assert cache.get("a") is not None               # 'a' is now the most recent
+    cache.put("c", np.zeros(10, dtype=np.int64))      # evicts 'b', not 'a'
+    assert cache.nbytes == 160 and len(cache) == 2
+    assert cache.get("b") is None and cache.get("a") is not None
+    assert cache.evictions == 1
+    assert cache.hits == 2 and cache.misses == 1
+
+
+def test_state_mask_cache_skips_a_mask_larger_than_the_whole_budget():
+    cache = token_classes.StateMaskCache(budget=64)
+    big = np.zeros(100, dtype=np.int64)               # 800 bytes: nothing else could fit either
+    cache.put("state", big)
+    assert len(cache) == 0 and cache.nbytes == 0
+    assert cache.get("state") is None
+
+
+def test_state_mask_cache_can_be_disabled_and_cleared():
+    cache = token_classes.StateMaskCache(budget=0)
+    cache.put("state", np.zeros(4, dtype=np.int64))
+    assert len(cache) == 0
+    cache = token_classes.StateMaskCache(budget=1024)
+    cache.put("state", np.zeros(4, dtype=np.int64))
+    cache.clear()
+    assert cache.nbytes == 0 and cache.get("state") is None
+
+
+def test_mask_cache_budget_comes_from_the_environment(monkeypatch):
+    monkeypatch.setenv("KINDI_MASK_CACHE_MB", "8")
+    assert token_classes.mask_cache_bytes() == 8 * 1024 * 1024
+    assert token_classes.StateMaskCache().budget == 8 * 1024 * 1024
+    for bad in ("", "many", "-1", "nan"):
+        monkeypatch.setenv("KINDI_MASK_CACHE_MB", bad)
+        assert token_classes.mask_cache_bytes() == 64 * 1024 * 1024
+
+
+def test_a_long_generation_keeps_the_grammar_mask_cache_bounded():
+    """The grammar's own cache is the bounded one, and eviction never changes a mask."""
+    texts = list(TEXTS)
+    grammar = grammar_from_schema({"type": "object", "properties": {"s": {"type": "string"}},
+                                   "required": ["s"]})
+    grammar._vocab_cache = token_classes.StateMaskCache(budget=1)
+    state = grammar.start()
+    # A JSON string body keeps every character in a new state, so this walks many
+    # distinct masks, which is exactly what an unbounded per-state cache would hold.
+    for ch in '{"s": "' + "abcdefghij":
+        state = grammar._step(state, ch)
+        assert state is not None
+        ids = grammar.vocab_allowed(state, texts)
+        assert ids.tolist() == grammar._vocab_allowed_scan(state, texts).tolist()
+    # Every mask is bigger than the 1-byte budget, so nothing is retained at all.
+    assert len(grammar._vocab_cache) == 0
+    assert grammar._vocab_cache.nbytes == 0
+    assert grammar._vocab_cache.misses > 0 and grammar._vocab_cache.hits == 0
+
+
 def test_gbnf_instances_share_the_same_index_and_language():
     texts = list(TEXTS)
     first = Grammar.from_string(LOOP_GBNF)

@@ -12,7 +12,15 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `ebf871f` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `a101b7d` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+  **2026-11-24 audit fixes:** `install.ps1` still pinned `0.7.0-fork` (its bundle URL and Programs & Features entry)
+  while the package and `install.sh` said `0.7.1-fork`; all three now match and `tests/test_version_consistency.py`
+  pins them plus each installer's release tag. The `v0.7.1-fork` release is **still unpublished** (the fork's
+  releases page has only `v0.5.0-installer`), so README's one-liners 404 until the owner runs
+  `docs/RELEASE-CHECKLIST.md`. The per-state mask cache is now a bounded 64 MiB LRU
+  (`kindi/token_classes.py::StateMaskCache`, `KINDI_MASK_CACHE_MB`) - A5's host-memory half, tested; A4 and A5's
+  rate half stay open. Full CPU suite: 1,520 passed / 58 skipped / 0 failed in 185.81 s
+  (`bench-logs/full-suite-20261124-auditfix-final.log`).
   **2026-11-24 (latest):** REQ-0027's mask got cheaper: self-loop characters now come off the NFA's character edges plus
   a reverse-epsilon closure (8,228 probes per state gone) and the mask unions use a cached boolean mask (248,320-id sorts
   gone). 2B medians: 15 -> 10.0 ms/token `json_schema`, 124 -> 57.1 unrolled `json.gbnf` depth 1 (depth 2/3 -> 9.5),
@@ -33,13 +41,14 @@ line of evidence (command + result). A task must be resumable from this file alo
   resolved by hand; the ported fixes, the unwired `slots.py`/Flash-Next modules and the merge defects are
   recorded in [docs/development/AGENTS-HISTORY.md](docs/development/AGENTS-HISTORY.md) and `CURRENT-VS-KINDI-0.7.md`).
   No GPU, pack or Windows run; the vendored unwired `qwen4exp_*`/`qx_*` modules are outside
-  Pyright's and Pylint's scope until a GPU run wires them (`pyrightconfig.json`, `VENDORED_UNWIRED`). The Gemma 4 pinned-host fix (#44) follows 0.7.0's names and release points with the fork's host budget on top; its tests pin each. The 2026-11-23 installer slice adds `kindi selftest --url`
-  (stdlib HTTP, no pack or engine load, `KINDI_API_KEY` header when the container carries one), replaces fastapi's
-  test client with a direct ASGI call (the images install neither httpx nor requests), and runs the check in each
-  serving container after `/health` with `--no-selftest` to opt out; 10 selftest tests and 6 installer fixture tests cover both paths and a failure. The 2026-11-23 container smoke (`tools/container_smoke.sh`) runs `kindi selftest`
-  one-shot inside the image and again with `--url` in the serving container, so a release image (not just this dev
-  host) proves the pack, tokenizer, engine, `/health` and the chat route; `selftest.py` lost `asyncio.run` (the image
-  is Python 3.6.9). Unrun here (no GPU or image).
+  Pyright's and Pylint's scope until a GPU run wires them (`pyrightconfig.json`, `VENDORED_UNWIRED`). The Gemma 4
+  pinned-host fix (#44) follows 0.7.0's names and release points with the fork's host budget on top; its tests pin
+  each. The 2026-11-23 installer slice adds `kindi selftest --url` (stdlib HTTP, `KINDI_API_KEY` when the container
+  carries one), replaces fastapi's test client with a direct ASGI call, and runs the check after `/health` in each
+  serving container (`--no-selftest` opts out); 16 tests cover both paths and a failure. `tools/container_smoke.sh`
+  runs `kindi selftest` in the image and with `--url` in the serving container, so a release image proves the pack,
+  tokenizer, engine, `/health` and the chat route; `selftest.py` lost `asyncio.run` (the image is Python 3.6.9).
+  Unrun here (no GPU or image).
 
 ### Python quality ratchet
 
@@ -115,21 +124,11 @@ the Strata/KTransformers/BigMoeOnEdge triage is in `docs/EXTERNAL-ENGINES.md`.
 
 ### Suite and recent additions
 
-The coverage-measured full suite at `539a504` is **1,241 passed, 28 skipped, 0 failed** in 277.17 s at **46.36%** (23,504 statements and 8,394 branches; the plain run is 1,241 / 28 / 0 in 227.62 s), including two new kernel-arity resolver checks (only tables rooted at `self` are
-followed; every branch of a conditional kernel must accept the call's argument count) and the two CLI comma-value checks (unknown
-`--split-at`/`--tandem-cpu-layers` tokens are rejected at parse time with the valid forms; the full suite re-ran after the generated reference was refreshed),
-and the newest twenty-six being seven saved-I/O-report checks (save/reload, missing and unusable fallback, and the plan/autotune wiring) plus the Lightning
-plan's command-reproduction test, four autotune host-cache candidate checks (env pair, rate size, host cap, default run budget and missing inputs) plus the
-cold-expert flag, host/disk split and pinned/disk byte accounting, exact-byte/coalescing/prefetch accounting, Q2_0 split, ordering, warm-slot skip and
-short-read checks in `tests/test_plan.py`/`tests/test_autotune.py`/`tests/test_cold_experts.py`, before them the six rate-normalization, rate-slot
-prediction/cap, plan-rate report and autotune candidate checks in `tests/test_io_probe.py`/`test_lt_fit_equivalence.py`/`test_plan.py`/`test_autotune.py`, then
-the `kindi io` invalid-`--skip` rejection, then the three effective-mode metrics states in `tests/test_server.py` (loaded, refused and drafter fallback), before
-them the eight speculation cells in `tests/test_verify_matrix.py` (the `tc-<spec>` env, skip reasons, requested/effective/draft parsing, refusal ordering and
-dry run), then `kindi io`'s RAM/disk/PCIe probes (PCIe reports unavailable when CuPy/CUDA is absent; the disk probe labels a buffered fallback instead of
-passing it off as the device's), before them the seventeen MTP head registry/effective-speculation and `verify --spec` checks, then the eight MTP head and
-effective-state tests, and before those the kernel-arity checks, and the previous seven covering `tools/check_secret_history.py` (a key deleted from the tree is
-still found in a diff, the count gate flags a new row, the baseline carries no matched text, the last 20 commits add no history hit, and a message-only leak is
-caught in both a subject and a body with no file carrying the path).
+The coverage-measured full suite at `539a504` is **1,241 passed, 28 skipped, 0 failed** in 277.17 s at
+**46.36%** (23,504 statements, 8,394 branches; the plain run is 1,241 / 28 / 0 in 227.62 s). The per-round
+list of new tests (kernel-arity resolvers, CLI comma values, saved I/O reports, autotune/cold-expert checks,
+effective-mode metrics, speculation cells, I/O probes, MTP registry, secret-history guards) moved verbatim to
+[docs/development/AGENTS-HISTORY.md](docs/development/AGENTS-HISTORY.md) on 2026-11-24.
 
 ### Secret guards
 
@@ -234,8 +233,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `ebf871f` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `ebf871f` | this session; 2026-11-24 v0.7.1 merge, A770 GEMV, grammar-mask edges |
+| `T:/kindi` | `main` | `a101b7d` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `a101b7d` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, audit fixes |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 

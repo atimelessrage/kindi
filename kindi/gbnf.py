@@ -36,6 +36,8 @@ a dead end that would leave the allowed set empty.
 import collections
 import os
 
+from .token_classes import StateMaskCache as _StateMaskCache
+
 # A grammar is compiled into one state per literal character, so an unbounded repetition or a
 # megabyte literal is a memory request from whoever sent the request. Both limits are refusals
 # (ValueError -> an enveloped 400), not silent truncation.
@@ -524,7 +526,7 @@ class Grammar(object):
                 % (e.rule, nfa.max_depth))
         self._productive = self._productive_states()
         self._closures = {}
-        self._vocab_cache = {}
+        self._vocab_cache = _StateMaskCache()
         self._mask_table = None
         self._mask_texts = None
         self._self_loop_chars = {}
@@ -724,7 +726,7 @@ class Grammar(object):
         if cached is not None:
             return cached
         ids = self._vocab_table(texts).allowed(state)
-        self._vocab_cache[state] = ids
+        self._vocab_cache.put(state, ids)
         return ids
 
 

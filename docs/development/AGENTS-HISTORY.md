@@ -6,6 +6,40 @@ the resume protocol and the local audit follow-up. It is kept verbatim (only thi
 it is the reasoning behind the current rules; the live handoff is `AGENTS.md` and the durable record
 starts at `docs/development/README.md`.
 
+## Audit fixes (2026-11-24, after the grammar-mask round)
+
+A fresh read-only audit of code, design, docs and harness produced nine findings; four were real and
+three were fixed in code or docs here, two were already correct in the tree and one is an owner step.
+
+- **Installer version skew (fixed).** `install.ps1:45` pinned `$KindiWinVersion = '0.7.0-fork'` while
+  `kindi/__init__.py` and `install.sh` said `0.7.1-fork`; that literal is the bundle download URL and
+  the Programs & Features version, so the documented Windows one-liner fetched the previous release.
+  Both version literals, `install.ps1`'s `$ScriptUrl` default and `install.sh`'s header one-liners now
+  name `0.7.1-fork`, and `tests/test_version_consistency.py` gained two checks: the Windows literal equals
+  `VERSION`, and every literal `releases/download|tag/v.../` in either installer matches it (a URL
+  built from the version variable is allowed).
+- **Unbounded mask cache (fixed).** `Grammar.vocab_allowed` / `JsonGrammar.vocab_allowed` stored every
+  state's allowed ids for the life of a request (a broad 2B state is 248,320 int64 = ~2 MB; the
+  200-token walk touched ~43 states, ~86 MB). `kindi/token_classes.py::StateMaskCache` is a byte-budget
+  LRU (`KINDI_MASK_CACHE_MB`, default 64, `0` disables); it evicts least-recently-used masks and never
+  stores a single mask larger than the budget. Five tests cover the budget, LRU order, the oversize
+  case, the env override and grammar-level eviction parity with `_vocab_allowed_scan`.
+- **Doc drift (fixed).** `docs/ROADMAP.md`'s status date (2026-11-22 -> 2026-11-24);
+  `tests/README.md`'s skip inventory (the 2026-11-19 1,312/28 table was the only inventory while the
+  suite had 58 skips - a 2026-11-24 grouped inventory now leads, with the old per-node table kept and
+  labelled); `CURRENT-VS-KINDI-0.7.md` (31 of 33 branches rebased onto v0.7.1, #47 joined
+  #48/#49/#72/#76 as included by content); `docs/WINDOWS.md`'s installer-version history;
+  `docs/RELEASE-CHECKLIST.md` gained a status section.
+- **Release is unpublished (owner step, not fixable here).** The fork's releases page carries only
+  `v0.5.0-installer`; `v0.7.0-fork` and `v0.7.1-fork` both 404, so every install one-liner in README
+  and both installers is dead until the release owner publishes. README now says so; the exact steps
+  and the `SOURCE_SHA256` refresh rule are in `docs/RELEASE-CHECKLIST.md`.
+- **Already correct, no change:** `kindi/route.py` authenticates with `hmac.compare_digest`
+  (`kindi/api/auth.py::bearer_matches`) and caps headers/body (64 KiB / 16 MiB, 411/413/431), and the
+  secret guards are already three (entropy, pattern, history) - the prior audit's findings there were
+  stale. The two `tests/test_tandem.py` placement tests the audit expected to fail without a CUDA
+  device pass on this host (51/51), so no skip guard was added.
+
 ### Current leases (checked 2026-11-12)
 
 | task | worktree | branch | shared files | state |
@@ -1576,3 +1610,21 @@ outside Pyright/Pylint scope until wired. Gates: 1,453 passed / 58 skipped; qual
 elsewhere; the manifest's largest model layer, with a blob scan for the `GGUF` magic when there are no manifests), using a symlink when the host allows it and a
 same-volume hard link otherwise into `~/.kindi/models/ollamaLinks` (`-o` to move it) - `tools/ollama_links.ps1` is now a thin wrapper over the same script and
 twelve tests cover the naming, the fallbacks, the environment variable, dry run, idempotence and the failure hints.
+
+## Suite and recent additions moved from AGENTS.md (2026-11-24)
+
+The coverage-measured full suite at `539a504` is **1,241 passed, 28 skipped, 0 failed** in 277.17 s at **46.36%** (23,504 statements and 8,394 branches; the plain run is 1,241 / 28 / 0 in 227.62 s), including two new kernel-arity resolver checks (only tables rooted at `self` are
+followed; every branch of a conditional kernel must accept the call's argument count) and the two CLI comma-value checks (unknown
+`--split-at`/`--tandem-cpu-layers` tokens are rejected at parse time with the valid forms; the full suite re-ran after the generated reference was refreshed),
+and the newest twenty-six being seven saved-I/O-report checks (save/reload, missing and unusable fallback, and the plan/autotune wiring) plus the Lightning
+plan's command-reproduction test, four autotune host-cache candidate checks (env pair, rate size, host cap, default run budget and missing inputs) plus the
+cold-expert flag, host/disk split and pinned/disk byte accounting, exact-byte/coalescing/prefetch accounting, Q2_0 split, ordering, warm-slot skip and
+short-read checks in `tests/test_plan.py`/`tests/test_autotune.py`/`tests/test_cold_experts.py`, before them the six rate-normalization, rate-slot
+prediction/cap, plan-rate report and autotune candidate checks in `tests/test_io_probe.py`/`test_lt_fit_equivalence.py`/`test_plan.py`/`test_autotune.py`, then
+the `kindi io` invalid-`--skip` rejection, then the three effective-mode metrics states in `tests/test_server.py` (loaded, refused and drafter fallback), before
+them the eight speculation cells in `tests/test_verify_matrix.py` (the `tc-<spec>` env, skip reasons, requested/effective/draft parsing, refusal ordering and
+dry run), then `kindi io`'s RAM/disk/PCIe probes (PCIe reports unavailable when CuPy/CUDA is absent; the disk probe labels a buffered fallback instead of
+passing it off as the device's), before them the seventeen MTP head registry/effective-speculation and `verify --spec` checks, then the eight MTP head and
+effective-state tests, and before those the kernel-arity checks, and the previous seven covering `tools/check_secret_history.py` (a key deleted from the tree is
+still found in a diff, the count gate flags a new row, the baseline carries no matched text, the last 20 commits add no history hit, and a message-only leak is
+caught in both a subject and a body with no file carrying the path).

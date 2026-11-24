@@ -1,4 +1,24 @@
-# Release checklist: Kindi 0.7.0-fork
+# Release checklist: Kindi 0.7.1-fork
+
+## Status (2026-11-24)
+
+This page was written for the `0.7.0-fork` bundle and most of its hashes still name it. The version
+surfaces moved to `0.7.1-fork` when the 0.7.1 merge landed (`kindi/__init__.py`, `install.sh`,
+`install.ps1`, README, `WHY.md`, `SECURITY.md`), and `tests/test_version_consistency.py` now pins
+them together. **Nothing has been published for either `-fork` version:** the fork's releases page
+carries only `v0.5.0-installer`, so every `releases/download/v0.7.1-fork/...` URL in README,
+`docs/INSTALL.md` and both installers returns 404 until this checklist is executed. To publish:
+
+1. Build the archive from the current tree and refresh the installer pin in the same step:
+   `python scripts/build_release_archive.py`, then set `install.sh:SOURCE_SHA256` to the new hash
+   (a pin left behind is refused by the installer's sha256 check, so it cannot pass silently).
+2. Rebuild the installers' own hashes in the table below and add `install.ps1`'s, since its
+   `$KindiWinVersion` and `$ScriptUrl` now name `0.7.1-fork`.
+3. Upload `kindi-0.7.1-fork.tar.gz`, its `.sha256`, `install.sh` and `install.ps1` to a
+   `v0.7.1-fork` release, then re-run `python -m pytest tests/test_version_consistency.py
+   tests/test_installer_source.py -q` and the README one-liners.
+
+The body below is kept as the 0.7.0 record (identity decision, exclusions, container smoke).
 
 This is the checklist for the fork's `0.7.0-fork` release. It is a **fork release**, not official
 Kindi `0.6.1`. The `-fork` suffix, the `atimelessrage/kindi` release URLs and the fork container
@@ -94,7 +114,8 @@ git diff --check
 Expected:
 
 - `test_version_consistency.py` passes; every image tag in README/CARDS/DOCKER/AMD/INSTALL and the
-  three Dockerfiles equals `0.7.0-fork`.
+  three Dockerfiles equals `kindi/__init__.py`'s `VERSION`, and both installers' version literal and
+  release URL agree with it.
 - `test_installer_source.py` passes; the source block still downloads to `.part`, checks sha256,
   and only then extracts.
 - `bash -n install.sh` and `compileall` exit 0.

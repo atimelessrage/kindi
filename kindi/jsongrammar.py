@@ -35,6 +35,8 @@ property would be rejected (the model emits canonical JSON).
 import json
 import re
 
+from .token_classes import StateMaskCache as _StateMaskCache
+
 _WS = " \t\n\r"
 _NUM = re.compile(r"-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?\Z")
 _INT = re.compile(r"-?(0|[1-9][0-9]*)\Z")
@@ -136,7 +138,7 @@ class JsonGrammar(object):
 
     def __init__(self, node):
         self.root = node
-        self._vocab_cache = {}
+        self._vocab_cache = _StateMaskCache()
         self._mask_table = None
         self._mask_texts = None
 
@@ -197,7 +199,7 @@ class JsonGrammar(object):
         if cached is not None:
             return cached
         ids = self._vocab_table(texts).allowed(state)
-        self._vocab_cache[state] = ids
+        self._vocab_cache.put(state, ids)
         return ids
 
     # --- completion ---------------------------------------------------------

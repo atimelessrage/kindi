@@ -75,6 +75,25 @@ plain CPU suite is the only evidence for the merge.
   `install.sh` names the package when `apt-get` cannot install Docker or the NVIDIA container toolkit. It no longer
   takes an `nvidia` runtime entry in `daemon.json` for an installed toolkit.
 
+### Audit fixes (2026-11-24, after the merge)
+
+- **The Windows installer fetched the previous release.** `install.ps1` still pinned `$KindiWinVersion =
+  '0.7.0-fork'`, and that literal is the bundle URL and the version Settings > Apps shows, while the package and
+  `install.sh` said `0.7.1-fork`. Both installers and both release URLs now name `0.7.1-fork`, and
+  `tests/test_version_consistency.py` pins the three literals and each installer's release tag so a release cannot
+  ship the skew again. The `v0.7.1-fork` release itself is still unpublished (the fork's releases page carries only
+  `v0.5.0-installer`), so the one-liners 404 until the release owner uploads it; README says so and
+  `docs/RELEASE-CHECKLIST.md` lists the exact steps.
+- **The constrained-decoding mask cache is now bounded.** `vocab_allowed` cached every automaton state's allowed-id
+  array for the life of a request, and a broad state on the 2B vocabulary is 248,320 int64 ids (~2 MB), so a long
+  grammar walk grew with the generation (~86 MB at 200 tokens). `kindi/token_classes.py::StateMaskCache` is a 64 MiB
+  LRU by default (`KINDI_MASK_CACHE_MB`, `0` disables caching) that evicts the least recently used mask and never
+  stores one mask bigger than the whole budget; both `Grammar` and `JsonGrammar` use it, and the tests prove
+  eviction leaves every mask equal to the pre-token-class sweep.
+- Document drift corrected: `docs/ROADMAP.md`'s status date, `CURRENT-VS-KINDI-0.7.md`'s PR status (31 of 33 branches
+  rebased onto v0.7.1; #47 joined #48/#49/#72/#76 as included by content), `docs/WINDOWS.md`'s installer-version
+  history and `docs/RELEASE-CHECKLIST.md`'s status.
+
 
 ### Upstream merge (2026-11-23)
 

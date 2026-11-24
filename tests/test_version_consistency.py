@@ -21,6 +21,29 @@ def test_package_and_installer_versions_match():
     assert package == installer
 
 
+def test_the_windows_installer_uses_the_package_version():
+    """The 2026-11-24 audit found install.ps1 still pinning 0.7.0-fork.
+
+    That literal is the version the script turns into the bundle download URL and
+    the Programs & Features entry, so stale meant every Windows one-liner fetched
+    the previous release.
+    """
+    package = _version(r'^VERSION = "([^"]+)"', "kindi/__init__.py")
+    windows = _version(r"^\$KindiWinVersion = '([^']+)'", "install.ps1")
+    assert package == windows
+
+
+def test_each_installer_points_at_its_own_release_tag():
+    """A release URL may be derived from the version, never a second literal."""
+    package = _version(r'^VERSION = "([^"]+)"', "kindi/__init__.py")
+    for relative in ("install.sh", "install.ps1"):
+        tags = re.findall(r"releases/(?:download|tag)/v([^/'\"]+)/", _read(relative))
+        assert tags, "%s names no release URL" % relative
+        literal = {tag for tag in tags if not tag.startswith(("$", "{"))}
+        assert literal <= {package}, "%s points at release(s) %s, expected %s" % (
+            relative, sorted(literal - {package}), package)
+
+
 def test_current_docs_and_images_use_the_package_version():
     version = _version(r'^VERSION = "([^"]+)"', "kindi/__init__.py")
     tag = re.compile(r"\bkindi(?:-rocm7?)?:([0-9][0-9A-Za-z_.-]*)")

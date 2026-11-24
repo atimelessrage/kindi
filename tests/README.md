@@ -49,17 +49,38 @@ the AVX2/FMA/F16C tier and runs `test_cpu_build.py`, `test_cpu_threads.py` and `
 test loads the library and checks the ctypes ABI without a model pack. The manual
 self-hosted GPU lane is described in [docs/CI.md](../docs/CI.md); it is not run by hosted CI.
 
-### Skipped-test inventory (final CPU run, 2026-11-19; counts since superseded)
+### Skipped-test inventory (2026-11-24 full CPU run)
 
-The final full CPU run in this worktree (`3002a40` plus the local changes) was
-`python -m pytest -q -rs`: **1,312 passed, 28 skipped, 0 failed** in 217.78 s
-(`bench-logs/full-suite-head-20261119.txt`). The 28-row inventory was captured from the preceding
-run and its JUnit/`-rs` evidence, `bench-logs/full-suite-final-20261119.{xml,txt}` (228.70 s); the
-final run reports the same 28 skips. The headline suite has since grown (1,485 passed / 58 skipped at
-`4fd3f4d` per `AGENTS.md`); this table is the 2026-11-19 inventory and is re-captured at the next
-full-suite run. This table lists
-every skipped node ID with pytest's exact reason and the environment category; a skip is not a
-pass, so a new or disappearing row must be reviewed instead of hidden by the aggregate count.
+`python -m pytest -q -rs` at `a101b7d` plus this round's changes: **1,520 passed, 58 skipped, 0
+failed** in 185.81 s (`bench-logs/full-suite-20261124-auditfix-final.log`); the 1,513-passed run at
+`ebf871f` is the previous record. Every skip is one
+of ten groups; pytest groups `-rs` output by location, so the count per group is what to watch. A
+skip is not a pass: a new group, or a changed count, must be reviewed instead of hidden by the total.
+
+| # | file | count | category and exact reason |
+|---:|---|---:|---|
+| 1 | `tests/test_gemma4_fp8_mma.py` | 14 | CUDA/cuBLAS absent: `cudaErrorNoDevice: no CUDA-capable device is detected`, and `Failure finding "known cublasLt DLL"` |
+| 2 | `tests/test_gemma4_fp8.py` | 11 | CUDA absent: `CUDA is unavailable: cudaErrorNoDevice: no CUDA-capable device is detected` |
+| 3 | `tests/test_tc_turing_reference.py` | 10 | `needs a CUDA device for the Turing PTX kernels` |
+| 4 | `tests/test_cpu_build.py` | 9 | `neither gcc nor clang is installed` (6), `clang is not installed; set KINDI_CC to ...` (3) |
+| 5 | `tests/backends/test_contract.py` | 5 | `<Backend> needs a model pack to tokenize; its text primitives are verified through the kindi verify/bench gate, not this harness` |
+| 6 | `tests/test_cpu_avx_fallback.py` | 2 | `set KINDI_CPU_AVX_PACKS` / `set KINDI_CPU_NO_FMA_PACKS to one or more Bonsai pack directories` |
+| 7 | `tests/test_cpu_layers.py` | 2 | `no gcc/clang to build the ISA tier libraries`, `set KINDI_CPU_PACK to a Bonsai pack ...` |
+| 8 | `tests/test_cpu_smoke.py` | 2 | `set KINDI_CPU_SMOKE=1 with a prebuilt kcpu library` |
+| 9 | `tests/test_server_cpu.py` | 2 | `no cached CPU library and no gcc/clang to build it` |
+| 10 | `tests/test_calib.py` | 1 | `chmod does not make a dir read-only on Windows` |
+
+58 skips: 35 need a CUDA device, 12 need a C compiler, 10 need a model pack or an explicit opt-in
+(`KINDI_CPU_SMOKE`, `KINDI_CC`), and 1 is a Windows filesystem difference. None is evidence that the corresponding GPU, model-pack or
+optional-dependency path passed.
+
+#### Per-node baseline (2026-11-19, superseded)
+
+The 28-row table below is the 2026-11-19 run (`3002a40` plus the local changes: **1,312 passed, 28
+skipped, 0 failed** in 217.78 s, `bench-logs/full-suite-head-20261119.txt`, with the JUnit/`-rs`
+evidence `bench-logs/full-suite-final-20261119.{xml,txt}`). It is kept because the suite roughly
+doubled its skip count since (28 -> 58) and the node IDs show which rows are new; regenerate it with
+`python -m pytest -q --junitxml=bench-logs/full-suite.xml` when a per-node list is needed.
 
 | # | test | category | exact skip reason |
 |---:|---|---|---|

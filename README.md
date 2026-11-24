@@ -71,6 +71,10 @@ Windows 10 and 11 (PowerShell; the installer sets up WSL2):
 irm https://github.com/atimelessrage/kindi/releases/download/v0.7.1-fork/install.ps1 | iex
 ```
 
+Both one-liners fetch the `v0.7.1-fork` release artifacts. That release is not published yet (the fork's releases page
+still carries only `v0.5.0-installer`), so until the release owner uploads it those two URLs return 404; a checkout
+runs the same installers directly (`bash install.sh --dry-run`).
+
 The installer finds your cards and shows the setups that they support, the recommended setup first. It downloads
 the model, checks its sha256, runs `kindi verify` and starts the server on `127.0.0.1:8093`, then proves each server with
 `kindi selftest --url` (`--no-selftest` skips it). After an install, `kindi selftest` proves the selected pack,

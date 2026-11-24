@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Kindi installer: one command from a bare Linux machine to a verified, running Kindi server.
 #
-#   curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.7.0-fork/install.sh | bash             # install (or upgrade / repair)
-#   curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.7.0-fork/install.sh | bash -s -- --dry-run
+#   curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.7.1-fork/install.sh | bash             # install (or upgrade / repair)
+#   curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.7.1-fork/install.sh | bash -s -- --dry-run
 #   bash install.sh --uninstall [--purge]
 #
 # What it does, in order (every step prints what it is about to do and why):
@@ -26,7 +26,8 @@ KINDI_VERSION="0.7.1-fork"
 IMAGE_TAG="${KINDI_IMAGE_TAG:-$KINDI_VERSION}"
 SOURCE_URL="https://github.com/atimelessrage/kindi/releases/download/v${KINDI_VERSION}/kindi-${KINDI_VERSION}.tar.gz"
 # sha256 of the fork's source archive at SOURCE_URL; a custom URL can be pinned with KINDI_SOURCE_SHA256. The archive is
-# rebuilt after every merge, so this pin is refreshed by the release owner when the 0.7.0-fork bundle is published.
+# rebuilt after every merge, so the release owner refreshes this pin in the same publication that uploads the archive;
+# a pin left behind is refused with the sha256 mismatch message above, never silently accepted.
 SOURCE_SHA256="cb03cc938cfcda6bf2ff7afa4467153e0bf6ef770e2c704951295c2e114ae61b"
 HF="https://huggingface.co/prism-ml"
 # model: GGUF file, sha256 (= the Hugging Face file hash), size in bytes

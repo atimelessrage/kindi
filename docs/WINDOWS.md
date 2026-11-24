@@ -161,9 +161,11 @@ Two things this run showed and did not hide:
 - **The Windows and Linux installers used to report different versions.** At the time of this
   run the published `install.sh` said **0.6.1**, while `install.ps1` (`$KindiWinVersion`) and
   this tree's `install.sh` said **0.6.0**, so Settings > Apps showed 0.6.0 for a distribution
-  that held 0.6.1. The 0.7.0-fork release bundle now sets both installers, the package and the
-  image tags to **0.7.0-fork**; publishing that pair together remains the release-owner step
-  tracked in [MANUAL-HELP-NEEDED.md](MANUAL-HELP-NEEDED.md).
+  that held 0.6.1. Both installers, the package and the image tags now name **0.7.1-fork**, and
+  `tests/test_version_consistency.py` pins the three literals together so they cannot drift again.
+  Publishing the bundle remains the release-owner step tracked in
+  [MANUAL-HELP-NEEDED.md](MANUAL-HELP-NEEDED.md) and [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md);
+  until it is done the release URLs 404.
 - **The in-WSL disk check is not a host-space check.** Inside the distribution `install.sh`
   reported **954.5 GB free** for its own home directory, because it sees the virtual disk's capacity,
   while the host `S:` actually had 22 GB free. The Windows layer is the one that knows: it prints

@@ -59,6 +59,15 @@ untouched: 0.7.0 already carries the equivalent Windows loader (`libcuda_name()`
 would leave only tests against a renamed API. That leaves 33 open PRs, of which 28 are rebased, 4 are in 0.7.0
 by content, and 1 (#47) is superseded.
 
+**Current status (2026-11-24, v0.7.1 merged):** **33 fork PRs (#47-#79) are open and 0 are merged**; 7 are drafts
+(#67-#71, #74, #76), and external #37 is open and dirty. After the official v0.7.1 (`1cb59d2`) merge, **31 of the 33
+branches were rebased onto it** and force-pushed to `myfork` with `--force-with-lease`; #37 was left untouched.
+**#47 (Windows CUDA-driver detection) and #48 (host RAM at the cgroup limit) are now in 0.7.1 by content** - 0.7.1's
+`kindi/hostram.py` carries `_cgroup_dirs`/`_cgroup_limit`/`_cgroup_usage` - so both can be closed as included, which
+leaves 31 rebased, 2 included and no superseded branch. A merge rehearsal on `1cb59d2` found a 14-PR conflict-free
+foundation (#49, #50, #59, #60, #73, #57, #55, #72, #54, #61, #65, #66, #75, #51; #67 and #68 follow); the rest
+conflict in `kindi/__main__.py`, `kindi/server.py`, `kindi/backends/__init__.py` or the token-class/engine files.
+
 Report date: **2026-11-23** (PR-status paragraph updated 2026-11-24). Baseline: this fork at **`e19850e`** (the merge commit `35e4697`) against official **Kindi 0.7.0** (tag `v0.7.0`, commit `8298a0f`, released
 2026-11-23) against this fork's `merge/upstream-0.7.0` branch. The earlier comparison, its 0.6.1 measurements and the
 round-by-round history stay in `detailed-fork-changelog.md`; the speeds and quality figures below are the 0.6.1-era runs
@@ -228,6 +237,10 @@ The preview chips are computed at render time from the committed baseline and it
 > **92 are in the 931-path 0.7.0 delta** and 30 are now identical to upstream after the merge. **#48, #49, #72 and #76
 > are in v0.7.0 by content** (upstream squashes a release into one commit) and can be closed upstream as included.
 > The per-PR table and the 0.6.1 coverage arithmetic below are unchanged from the 2026-11-22 measurement.
+>
+> **Superseded by the 2026-11-24 state:** all 31 non-#37 branches were rebased onto v0.7.1 (`1cb59d2`), and **#47**
+> joined the included-by-content list (0.7.1 ships the host-RAM cgroup cap and its own Windows loader), so the open
+> set is 33 PRs of which 31 rebased and 2 closeable as included. See the current-status paragraph above.
 
 Thirty-four pull requests are open against `ahtx/kindi`: **#37** and **#47-#79**. **33 target
 `v0.6.1` (`7fececb`)**; #37 is an external fork (`JohnUzoka/kindi`) based on `dce89df`

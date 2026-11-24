@@ -1,6 +1,6 @@
 # Roadmap
 
-Status: **living document, updated 2026-11-22.** The generated capability tables are in
+Status: **living document, updated 2026-11-24.** The generated capability tables are in
 [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md); this page is the single index of what was tried and
 rejected, why it was rejected, and what evidence would reopen it. The detailed documents stay as
 appendices and are linked from their rows.

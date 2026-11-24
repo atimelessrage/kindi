@@ -20,6 +20,7 @@ otherwise the table falls back to the exact per-token advance.  The resulting
 ids are sorted, like the old implementation.
 """
 import collections
+import os
 import threading
 
 import numpy as np
@@ -36,6 +37,79 @@ _INDEX_CACHE_LIMIT = 2
 _FIRST_CHAR_LIMIT = 150000
 _INDEX_CACHE: "collections.OrderedDict[int, tuple[object, _VocabularyIndex]]" = collections.OrderedDict()
 _INDEX_LOCK = threading.Lock()
+
+# A broad mask on the 2B vocabulary is 248,320 int64 ids (~1.99 MB), so an
+# unbounded per-state dict would grow with the length of a constrained
+# generation (REQ-0027 A5).  The mask cache is therefore an LRU with a byte
+# budget: the recurring states of a long generation stay, the churn is evicted.
+_MASK_CACHE_MB = 64
+
+
+def mask_cache_bytes():
+    """The per-grammar mask-cache budget in bytes (``KINDI_MASK_CACHE_MB``, 64 by default)."""
+    raw = os.environ.get("KINDI_MASK_CACHE_MB", "64")
+    try:
+        megabytes = float(raw)
+    except ValueError:
+        megabytes = float(_MASK_CACHE_MB)
+    if not megabytes >= 0:
+        megabytes = _MASK_CACHE_MB
+    return int(megabytes * 1024 * 1024)
+
+
+class StateMaskCache(object):
+    """A bounded LRU cache from an automaton state to its allowed token ids.
+
+    ``budget <= 0`` disables caching (every caller recomputes the mask); a mask
+    larger than the whole budget is returned but not stored, so a single huge
+    vocabulary cannot pin memory by itself.
+    """
+
+    __slots__ = ("budget", "_items", "_bytes", "hits", "misses", "evictions")
+
+    def __init__(self, budget=None):
+        self.budget = mask_cache_bytes() if budget is None else int(budget)
+        self._items = collections.OrderedDict()
+        self._bytes = 0
+        self.hits = 0
+        self.misses = 0
+        self.evictions = 0
+
+    def get(self, state):
+        ids = self._items.get(state)
+        if ids is None:
+            self.misses += 1
+            return None
+        self._items.move_to_end(state)
+        self.hits += 1
+        return ids
+
+    def put(self, state, ids):
+        previous = self._items.pop(state, None)
+        if previous is not None:
+            self._bytes -= int(previous.nbytes)
+        size = int(ids.nbytes)
+        if self.budget <= 0 or size > self.budget:
+            return
+        while self._items and self._bytes + size > self.budget:
+            _, evicted = self._items.popitem(last=False)
+            self._bytes -= int(evicted.nbytes)
+            self.evictions += 1
+        self._items[state] = ids
+        self._bytes += size
+
+    def clear(self):
+        self._items.clear()
+        self._bytes = 0
+        self.hits = self.misses = self.evictions = 0
+
+    @property
+    def nbytes(self):
+        """The bytes of ids currently held (never above ``budget``)."""
+        return self._bytes
+
+    def __len__(self):
+        return len(self._items)
 
 
 class _VocabularyIndex(object):
