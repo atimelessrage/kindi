@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `8032cf4` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `ebf871f` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24 (latest):** REQ-0027's mask got cheaper: self-loop characters now come off the NFA's character edges plus
   a reverse-epsilon closure (8,228 probes per state gone) and the mask unions use a cached boolean mask (248,320-id sorts
   gone). 2B medians: 15 -> 10.0 ms/token `json_schema`, 124 -> 57.1 unrolled `json.gbnf` depth 1 (depth 2/3 -> 9.5),
@@ -54,7 +54,7 @@ existing debt is tolerated and `--update --reason "..."` lowers the baseline aft
 
 ### Full CPU gate
 
-The 2026-11-24 grammar-mask gate at `8032cf4` is **1,513 passed, 58 skipped, 0 failed** in 180.66 s (plain CPU suite, no coverage rerun); the 2026-11-22 prewarm gate at `4bab483` was 1,423 / 58 / 0 in 138.50 s and the 2026-11-20 integration gate at `82a72bf` 1,412 / 28 / 0 in 250.33 s. The last coverage-measured run remains `539a504`: **1,241 passed, 28 skipped, 0 failed at 46.36%** line+branch (23,504 statements, 8,394 branches; plain 1,241 / 28 / 0 in 227.62 s), and the consolidated 2026-11-19 commits (`f75253b` + `84b6686`) 1,357 / 28 / 0 in 229.53 s. Every skip is inventoried by node ID and reason in `tests/README.md`.
+The 2026-11-24 grammar-mask gate at `ebf871f` is **1,513 passed, 58 skipped, 0 failed** in 180.66 s (plain CPU suite, no coverage rerun); the 2026-11-22 prewarm gate at `4bab483` was 1,423 / 58 / 0 in 138.50 s and the 2026-11-20 integration gate at `82a72bf` 1,412 / 28 / 0 in 250.33 s. The last coverage-measured run remains `539a504`: **1,241 passed, 28 skipped, 0 failed at 46.36%** line+branch (23,504 statements, 8,394 branches; plain 1,241 / 28 / 0 in 227.62 s), and the consolidated 2026-11-19 commits (`f75253b` + `84b6686`) 1,357 / 28 / 0 in 229.53 s. Every skip is inventoried by node ID and reason in `tests/README.md`.
 
 ### Upstream v0.7.0 and comparison
 
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `8032cf4` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `8032cf4` | this session; 2026-11-24 v0.7.1 merge, A770 GEMV, grammar-mask edges |
+| `T:/kindi` | `main` | `ebf871f` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `ebf871f` | this session; 2026-11-24 v0.7.1 merge, A770 GEMV, grammar-mask edges |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 

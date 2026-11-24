@@ -61,6 +61,7 @@ def main():
                     help="call token_classes.prewarm first (a server does this at startup)")
     args = ap.parse_args()
 
+    args.pack = os.path.expanduser(args.pack)
     tok, texts = harness.vocab_texts(args.pack)
     started = time.perf_counter()
     if args.prewarm:
