@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `7f61bcd` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `be52214` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24:** the llama.cpp proxy backend landed (wildcard; 12 CPU tests, live gate open, no
   arbitrary-GGUF claim) with REQ-0030's native-CPU 2B profile, and `Backend.capabilities` was declared
   instead of `None` (six adapters' mypy `assignment` finding gone, 59 -> 53). Suite: 1,633 / 47 / 0.
@@ -63,7 +63,7 @@ existing debt is tolerated and `--update --reason "..."` lowers the baseline aft
 
 ### Full CPU gate
 
-The 2026-11-24 mask/pick gate is **1,635 passed, 47 skipped, 0 failed** in 250.67 s (config reference
+The 2026-11-24 mask/pick gate is **1,635 passed, 47 skipped, 0 failed** in 238.23 s (config reference
 regenerated after it; 1,633 before this round). The 27B-CPU gate at `32075c4` is **1,598 passed, 47 skipped, 0 failed** in 226.48 s (the CPU build checks now compile and load every tier here instead of skipping); the 2026-11-24 grammar-mask gate at `ebf871f` is 1,513 passed, 58 skipped, 0 failed in 180.66 s (plain CPU suite, no coverage rerun); the 2026-11-22 prewarm gate at `4bab483` was 1,423 / 58 / 0 in 138.50 s and the 2026-11-20 integration gate at `82a72bf` 1,412 / 28 / 0 in 250.33 s. The last coverage-measured run remains `539a504`: **1,241 passed, 28 skipped, 0 failed at 46.36%** line+branch (23,504 statements, 8,394 branches; plain 1,241 / 28 / 0 in 227.62 s), and the consolidated 2026-11-19 commits (`f75253b` + `84b6686`) 1,357 / 28 / 0 in 229.53 s. Every skip is inventoried by node ID and reason in `tests/README.md`.
 
 ### Upstream v0.7.0 and comparison
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `7f61bcd` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `7f61bcd` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke + Arc GEMM, llama.cpp proxy backend, constrained mask/pick -8.4% structured token, REQ-0030 CPU profile, bench --spec, 27B CPU verify + compiler detection |
+| `T:/kindi` | `main` | `be52214` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `be52214` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke + Arc GEMM, llama.cpp proxy backend, constrained mask/pick -8.4% structured token, REQ-0030 CPU profile, bench --spec, 27B CPU verify + compiler detection |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
