@@ -131,9 +131,10 @@ from this shell at all (`nvidia-smi` reports insufficient permissions, CuPy
 raises `cudaErrorNoDevice`), so even a single-card CUDA rerun cannot happen
 here. The installed Arc A770 is visible through Level Zero/OpenCL and its probes
 run, but it is not a CUDA second card and has no Kindi backend yet. When a rig
-appears: `bench-logs/test_k8v4_cache.py` with `KINDI_CARDS=2`, then
-`bench-logs/test_k8v4_dist_cache.py` unchanged (the second then needs no stubbed
-device).
+appears, the two-card cache runs use the local scratch scripts under `bench-logs/`
+(`test_k8v4_cache.py` with `KINDI_CARDS=2`, then `test_k8v4_dist_cache.py`, which
+then needs no stubbed device); the tracked `tests/test_k8v4.py` already pins the
+quarantine and the CPU-side selection, so only the card run is missing.
 
 ## 5. Publications and packages only the release owner can do
 
