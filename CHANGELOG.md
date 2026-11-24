@@ -84,6 +84,13 @@ plain CPU suite is the only evidence for the merge.
   a stale row, or a knob with no reader left in `kindi/`. This is the general form of the mode-A bug
   (a documented knob that reached nothing while every gate stayed green). It found one real gap:
   `KINDI_MTP_HEAD` is read by the loader but absent from the generated configuration reference.
+- The gate now covers four families, not just speculation: `KINDI_GBNF_MAX_DEPTH` (a recursive
+  grammar compiles only when opted in), `KINDI_GBNF_MAX_STATES` (a 90-character literal fits a
+  20,000-state default and not an 8-state limit), `KINDI_MASK_CACHE_MB` (the cache budget in
+  bytes) and `KINDI_RESPONSE_FORMAT=ignore` (a `json_object` request is refused by default and
+  accepted when ignored) are proven live too; `KINDI_SAMPLER_ORDER` is parked because it is a
+  module constant read at import, so a request cannot set it. 10 live / 16 parked, and deleting
+  one env read fails the gate, so it is not vacuous.
 - That gap is closed: `kindi/config_reference.py` dropped every environment name that matched a
   config key, so `KINDI_MTP_HEAD` — the Bonsai MTP head path read directly in `kindi/spec.py` and
   `kindi/mtp_heads.py` — was hidden behind the unrelated Nanbeige `mtp_head` key. The generator now

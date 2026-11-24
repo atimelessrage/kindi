@@ -84,6 +84,40 @@ def _probe_mtp_head(eng, monkeypatch):
     return mtp_heads.report(spec="mtp")
 
 
+def _probe_gbnf_depth(eng, monkeypatch):
+    """A recursive grammar compiles or is refused, decided inside `gbnf.Grammar`."""
+    from kindi import gbnf
+    try:
+        gbnf.Grammar.from_string('root ::= "(" root ")" | "x"')
+    except ValueError as e:
+        return "refused" if "recursive" in str(e) else "refused-other"
+    return "compiled"
+
+
+def _probe_gbnf_states(eng, monkeypatch):
+    """A 90-character literal needs one state per character, so a tiny limit refuses it."""
+    from kindi import gbnf
+    try:
+        gbnf.Grammar.from_string('root ::= "' + "a" * 90 + '"')
+    except ValueError:
+        return "refused"
+    return "compiled"
+
+
+def _probe_mask_cache(eng, monkeypatch):
+    from kindi import token_classes
+    return token_classes.mask_cache_bytes()
+
+
+def _probe_response_format(eng, monkeypatch):
+    from kindi import oai
+    try:
+        oai.check_response_format({"response_format": {"type": "json_object"}})
+    except oai.RequestError:
+        return "refused"
+    return "accepted"
+
+
 # knob -> (default, trial, probe, what the trial must produce)
 LIVE = {
     "KINDI_SPEC": ("0", "mtp", _probe_spec, "mtp"),
@@ -94,6 +128,11 @@ LIVE = {
     # the exact wording is the loader's; the gate only needs the decision to change, which the
     # second assertion in the test enforces (documented head vs a refused path)
     "KINDI_MTP_HEAD": (None, "/nonexistent/head.npz", _probe_mtp_head, "REFUSED"),
+    # the decode-path families that a CPU-only host can actually decide (2026-11-24)
+    "KINDI_GBNF_MAX_DEPTH": (None, "2", _probe_gbnf_depth, "compiled"),
+    "KINDI_GBNF_MAX_STATES": (None, "8", _probe_gbnf_states, "refused"),
+    "KINDI_MASK_CACHE_MB": (None, "1", _probe_mask_cache, 1024 * 1024),
+    "KINDI_RESPONSE_FORMAT": (None, "ignore", _probe_response_format, "accepted"),
 }
 
 # knob -> why its effect cannot be observed on this host (the row is still checked for (1) and (2))
@@ -119,10 +158,13 @@ PARKED = {
     "KINDI_SPEC_GUARD_BOUND": "enables the guard's bounded probe; needs a stepping engine",
     "KINDI_SPEC_GUARD_BOUND_DEPTH": "the bounded probe's depth; same run as GUARD_BOUND",
     "KINDI_SPEC_KNOWN": "the prompt-cache key's speculation tag, read in cache.py on a warm hit",
+    "KINDI_SAMPLER_ORDER": "a module constant read at import of kindi/sampling.py, so only a new "
+                          "process can change it (documented, but a request cannot set it)",
 }
 
-PREFIXES = ("KINDI_SPEC", "KINDI_DSPINE")
-EXTRA = ("KINDI_MTP_HEAD", "KINDI_MTP_HEAD_ALLOW_UNREGISTERED")
+PREFIXES = ("KINDI_SPEC", "KINDI_DSPINE", "KINDI_GBNF_")
+EXTRA = ("KINDI_MTP_HEAD", "KINDI_MTP_HEAD_ALLOW_UNREGISTERED", "KINDI_MASK_CACHE_MB",
+         "KINDI_RESPONSE_FORMAT", "KINDI_SAMPLER_ORDER")
 
 
 def _in_scope(knob):
