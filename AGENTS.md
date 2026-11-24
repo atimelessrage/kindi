@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `76ff185` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `bf8954f` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24:** official **Kindi v0.7.1** (`1cb59d2`, one squashed commit on `v0.7.0`, 43 files,
   +15,649/-114) is merged in as `0.7.1-fork`: the **Inkling 2 Mini** engine (`inkling2_*`, `kindi inkling`,
   the server's `kindi_inkling2` backend), **Flash-Next drafting for sampled requests**
@@ -21,10 +21,9 @@ line of evidence (command + result). A task must be resumable from this file alo
   version identity: the fork keeps `0.7.1-fork` and its own cascade/adapter/`modelids` paths beside
   upstream's inkling additions. **Upstream names `tools/check_warp_masks.py` but the tag does not ship
   it**, so the fork wrote it (14 tests): 404 intrinsics classified, 7 reviewed sub-warp masks in
-  `tools/warp_mask_baseline.json`, 0 unguarded legacy intrinsics. It found two real hazards, both fixed:
-  `chunk.cu` `k_q8x_T2` bypassed the file's own `KSHFLX` macro, and `kindi.cu` `wsum_d`/`wsum_f` used bare
-  `__shfl_xor` on every arch (now `#if __CUDA_ARCH__ < 700`). The release's root `test_inkling2_engine.py`
-  moved to `tools/verify_inkling2.py` (a manual model check, not a pytest module). **Unrun here:** the
+  `tools/warp_mask_baseline.json`. It found two real hazards, both fixed: `chunk.cu` `k_q8x_T2` bypassed
+  the file's own `KSHFLX` macro, and `kindi.cu` `wsum_d`/`wsum_f` used bare `__shfl_xor` on every arch.
+  The release's root `test_inkling2_engine.py` moved to `tools/verify_inkling2.py` (a manual check). **Unrun here:** the
   Inkling engine, sampled drafting and core detection (no GPU, pack or Windows host). **2026-11-23:** official Kindi v0.7.0 (`8298a0f`) is also merged in (39 conflicted files, 69 hunks, all
   resolved by hand; the ported fixes, the unwired `slots.py`/Flash-Next modules and the merge defects are
   recorded in [docs/development/AGENTS-HISTORY.md](docs/development/AGENTS-HISTORY.md) and
@@ -196,8 +195,9 @@ The 27B A/B, fail-closed gate, startup-warning, MTP-server and cold-expert bulle
 
 ### Owner actions
 
-Owner actions pending: Nanbeige 33B GGUF replacement, Gemma 4 E4B pack, DeepSeek V4.1 shards/gate data, PQ2_0/Q2_0 quant downloads, a pinned llama-server, the oneAPI Base Toolkit for the planned A770 SYCL smoke,
-other-hardware test rigs, push/installer/CI publications, T4.4/T4.5 + D3/D5 decisions — `docs/MANUAL-HELP-NEEDED.md`.
+Owner actions pending: Nanbeige 33B GGUF replacement, Gemma 4 E4B pack, DeepSeek V4.1 shards/gate data, PQ2_0/Q2_0 quant downloads, a pinned llama-server, the oneAPI Base Toolkit for the planned A770 SYCL smoke, other-hardware test rigs, push/installer/CI publications, T4.4/T4.5 + D3/D5 decisions — `docs/MANUAL-HELP-NEEDED.md`.
+**A770 (2026-11-24, no claim):** `kindi intel-ternary` splits the packed GEMV over the weight phases (`--parts`, `1`
+= the old shape): 0 mismatches at six shapes, 5.75x-14.14x at layer sizes; M2 partial, still no SYCL/backend.
 
 - **Shared-file owners:** the newest lease row in the table below owns its files until
   marked done; `T:/kindi/AGENTS.md` is the main worktree's bridge note, not this file.
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `76ff185` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `76ff185` | this session; 2026-11-24 v0.7.1 merge |
+| `T:/kindi` | `main` | `bf8954f` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `bf8954f` | this session; 2026-11-24 v0.7.1 merge, A770 phase-parallel GEMV |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
