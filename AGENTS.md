@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `7f5f494` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `d2aeafe` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24 (latest): the generic fallback backend landed, and the CPU half of REQ-0030 is measured.**
   REQ-0019 T4.4's recommended option is in the tree: `kindi/backends/llamacpp.py` (registered `llamacpp`) is a
   wildcard that declares no model ids/architectures, so `resolve` picks it only for models nothing specific
@@ -230,8 +230,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `7f5f494` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `e8e88b7` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke on Level Zero, llama.cpp proxy backend, REQ-0030 CPU profile, Arc GEMM, bench --spec, 27B CPU verify + compiler detection |
+| `T:/kindi` | `main` | `d2aeafe` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `d2aeafe` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke on Level Zero, llama.cpp proxy backend, REQ-0030 CPU profile, Arc GEMM, bench --spec, 27B CPU verify + compiler detection |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
