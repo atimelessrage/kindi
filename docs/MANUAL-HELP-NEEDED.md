@@ -75,23 +75,23 @@ state line — tick it off when done.
 - **When done, tell the agent:** the binary path (or that `llama-server` is
   on PATH), and the version.
 
-## 3b. Install a C compiler for the CPU engine on this Windows host
+## 3b. Put the installed C compiler on `PATH` for the CPU engine (Windows host)
 
-- **State:** open, waiting on the owner (tooling); found 2026-11-24.
-- **What:** clang (LLVM) or gcc with libomp, on `PATH` as `clang`/`gcc`, or
-  named with `KINDI_CC`.
-- **Why:** `kindi/kcpu.c` is compiled at first use into a content-keyed cache
-  (`~/.cache/kindi/libkcpu-<key>.dll`). This host has neither compiler, so the
-  cache key for the current `kcpu.c` (`9d454e3d97eb8a81`) is not present and
-  every live CPU-engine run fails with `kindi: could not run clang` before the
-  model loads. That blocks the live halves of `kindi selftest` (its REQ-0028 A4
-  dialect-agreement check is code-gated and unit-tested, but no pack run can
-  prove it here), `kindi verify`/`bench` with `KINDI_DEVICE=cpu`, and the 27B
-  CPU check. The cached DLLs from earlier builds do not match the current
-  source, so they cannot be reused. The probes that need no compiler
-  (`intel-cl`, `intel-ternary`, `intel-gemm`) already run on the Arc card.
-- **When done, tell the agent:** `clang --version` (or `gcc --version`) and
-  that `python -m kindi selftest --max-tokens 8` passes or fails, with its output.
+- **State:** resolved in code on 2026-11-24; the owner action is now optional tidying.
+- **What:** clang+LLVM 18.1.8 (with libomp) is installed under Program Files, but `clang` is not on
+  `PATH`. Either add its `bin` to `PATH`, or set `KINDI_CC` to the `clang.exe` and `KINDI_LLVM` to
+  the install root; the engine now also finds a standard LLVM install on its own.
+- **Why this was open:** `kindi/kcpu.c` is compiled at first use into a content-keyed cache
+  (`~/.cache/kindi/libkcpu-<key>.dll`). The engine only looked for the literal name `clang`, so
+  every live CPU-engine run failed with `kindi: could not run clang` and the CPU path looked
+  unavailable although the compiler was installed. `kindi/cpu.py:_find_cc` now resolves `KINDI_CC`,
+  then `PATH`, then `Program Files/clang+llvm-*` or `LLVM*` (newest first), and `kindi caps` uses the
+  same resolver.
+- **Measured after the fix on this host:** a library builds from the current `kcpu.c` in 6.3 s;
+  `KINDI_DEVICE=cpu kindi verify` is 4/4 token-exact on the 2B (24.6-29.6 tok/s) and on the 27B
+  (3.7 tok/s, 340 s load); `kindi info` reports `AVX=yes, AVX2=yes, FMA3=yes, F16C=yes`.
+- **Still unrun here:** the live half of REQ-0028 A4 (`kindi selftest` on the 27B pack takes the same
+  7-minute load before its two dialect requests) and native-hardware CPU rows on other machines.
 
 ## 4. Tests and runs on other hardware
 

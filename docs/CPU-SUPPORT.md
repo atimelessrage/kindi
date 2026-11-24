@@ -25,14 +25,17 @@ A CPU is supported when all of these hold:
 4. The CPU is listed in `docs/CARDS.md` with its thread count and measured result.
 5. It works without an illegal-instruction crash, and without an undocumented manual override.
 
-The current CPU engine covers the **2B, 4B and 9B**. The 27B, Nemotron and Nanbeige are GPU targets;
-they are not part of this CPU goal.
+The current CPU engine covers the **2B, 4B and 9B**, and since 2026-11-24 it also runs the **27B**:
+`KINDI_DEVICE=cpu` loads the 27B pack and `kindi verify` is **4/4 token-exact** on the i7-8086K
+(3.7 tok/s over the run, 340 s load, 31.9 GiB host RAM). That is an exactness row, not a recommendation: the 27B
+is a GPU model and this path is the fallback of a machine without one. Nemotron and Nanbeige are
+separate backends and are not part of this CPU goal.
 
 ## Current backend reality
 
 | gate | current behaviour | consequence |
 |---|---|---|
-| `kindi/cpu.py` build | Linux: `gcc -O3 <tier flags> -fopenmp -fno-math-errno -shared -fPIC`; Windows: `clang -O3 <tier flags> -fopenmp -fno-math-errno -ffp-contract=off -shared` plus `libomp` (`KINDI_CC`, `KINDI_LLVM`) | One library per ISA tier, built on demand and cached by OS/architecture/compiler/tier. A shared cache can serve AVX2 and AVX-only hosts without mixing binaries. |
+| `kindi/cpu.py` build | Linux: `gcc -O3 <tier flags> -fopenmp -fno-math-errno -shared -fPIC`; Windows: `clang -O3 <tier flags> -fopenmp -fno-math-errno -ffp-contract=off -shared` plus `libomp` (`KINDI_CC`, `KINDI_LLVM`; a bare `clang` that is not on `PATH` is resolved to a standard LLVM install under Program Files, 2026-11-24) | One library per ISA tier, built on demand and cached by OS/architecture/compiler/tier. A shared cache can serve AVX2 and AVX-only hosts without mixing binaries. |
 | runtime dispatch | `kindi/cpu.py` selects the best tier from `/proc/cpuinfo` (Linux) or the build compiler's `-march=native` macros (Windows), builds it with explicit flags and loads it. `KINDI_CPU_ISA` pins a tier. `kcpu.c:kc_isa_name()` reports the compiled tier and the loader rejects a mismatch. | The i5-2500K path is selected at runtime, not by a special build; forcing an unsupported tier is an actionable error instead of an illegal instruction. |
 | `kindi/kcpu.c` ISA | Requires AVX. The AVX2 path (`_mm256_srlv_epi32`, `_mm256_permutevar8x32_ps`) is used whenever the compiler enables AVX2. F16C (`_cvtsh_ss` / `_cvtss_sh`) is used when available, with a software fp16 fallback. FMA (`_mm256_fmadd_ps`) is optional: without it the AVX2 kernel uses separate multiply/add. An AVX-only build uses the scalar AVX table lookup. A compile-time `#error` names a missing AVX baseline. | AVX2/FMA/F16C hosts get the full fast path; AVX2/F16C hosts without FMA keep the AVX2 table/permute path; an AVX-only CPU such as Sandy Bridge gets the scalar fallback. |
 | documented requirement | `docs/CARDS.md` and the README say x86-64 with AVX; AVX2/F16C is the fast path, FMA is optional, and AVX-only is the fallback | This matches the source: AVX is required; `kindi/cpu.py` selects the AVX2/FMA/F16C, AVX2/F16C, AVX2 or AVX-only tier at startup from the host flags, and each tier is built with explicit `-m` flags. |
@@ -112,6 +115,30 @@ ten raw logs in `bench-logs/cpu-isa-4b-9b/logs/`. The 4B manifest SHA-256 is
 about 4.9x slower than the fastest 4B AVX2 run and 5.5x slower than the fastest 9B run. Forced-tier
 runs on this AVX2 host are compatibility evidence, not native Sandy Bridge or no-FMA support.
 
+### The 27B on the CPU (2026-11-24)
+
+The 27B is a 64-layer gated-attention/GDN model, and `kcpu.c` already implements both block shapes
+(`qn[2*HD]` carries the per-head query gate), so the pack loads on the CPU engine unchanged:
+
+```sh
+KINDI_DEVICE=cpu python3 -m kindi --pack <packs>/bonsai-27b verify
+```
+
+| measurement | result |
+|---|---|
+| pack integrity before the engine | 10 files, size + fast hash + sha256 (18.4 s) |
+| tensor map | 851 tensors, byte ranges tile `bcodes.bin`/`dpm.bin`/`f32.bin` exactly |
+| load | 340 s (fresh build) / 417.5 s (cached build), `avx2-fma-f16c`, 6 threads, ctx 1,024 |
+| `kindi verify` (4 prompts x 40 greedy tokens) | **4/4 PASS, 40/40 tokens each**, both libraries |
+| throughput over the run | **3.7 tok/s** (library built from the current `kcpu.c` in this session), 2.0 tok/s (the cached 2026-11-20 build) |
+| exit code | 0 |
+
+That is exactness against llama.cpp's q8_0-K/V reference for the same GGUF, on the CPU engine's own
+16-bit K/V. It is not a speed recommendation (3.7 tok/s against 34.8 tok/s for the same 27B on the
+RTX 4060 Ti) and it does not make the 27B a CPU target: the row exists so a host without a card can
+still prove a 27B pack is intact and its engine decodes faithfully. The 64-layer pack needs about
+13 GiB of host memory for the pair codes and scales on top of the 6.8 GiB on disk.
+
 ## Target matrix
 
 | CPU | Microarchitecture | Cores / threads | Relevant ISA | Current state | Target |
@@ -119,7 +146,7 @@ runs on this AVX2 host are compatibility evidence, not native Sandy Bridge or no
 | Intel Core i5-2500K | Sandy Bridge | 4 / 4 | AVX; **no AVX2, FMA or F16C** | **AVX-only tier selected at runtime**: forced `KINDI_CPU_ISA=avx-only` passes 2B 4/4 token-exact at 8.9 tok/s, 4B 4/4 at 3.9 and 9B 4/4 at 2.0 on the i7-8086K; native i5-2500K hardware not available | 2B and 4B; 9B only if measured and useful; 27B no |
 | Intel Xeon W-2133 | Skylake-W | 6 / 12 | AVX-512, AVX2, FMA, F16C | Expected to build and run, but **unverified** | 2B, 4B and 9B |
 | Intel Core i9-13900K | Raptor Lake (8 P + 16 E) | 24 / 32 | AVX2, FMA, F16C; no AVX-512 | Expected to build and run, but **unverified** | 2B, 4B and 9B; tune P/E thread count |
-| Intel Core i7-8086K | Coffee Lake | 6 / 12 | AVX2, FMA, F16C | **Engine and server verified**: native Windows (2B/4B/9B 4/4 at 33.7/16.7/9.1 tok/s, 6 threads auto-detected; 24K generation 8.2/3.1/2.6 tok/s, read 45.1/19.2/9.9), WSL2 history, and native CPU server chat requests on the 2B/4B/9B (32.9/19.2/11.5 tok/s, 1,024 context, non-stream and stream, 0 errors) | 2B, 4B and 9B; use 6 threads |
+| Intel Core i7-8086K | Coffee Lake | 6 / 12 | AVX2, FMA, F16C | **Engine and server verified**: native Windows (2B/4B/9B 4/4 at 33.7/16.7/9.1 tok/s, 6 threads auto-detected; 24K generation 8.2/3.1/2.6 tok/s, read 45.1/19.2/9.9), WSL2 history, native CPU server chat requests on the 2B/4B/9B (32.9/19.2/11.5 tok/s, 1,024 context, non-stream and stream, 0 errors), and the **27B 4/4 token-exact at 3.7 tok/s** (2026-11-24) | 2B, 4B, 9B and the 27B (exact, slow); use 6 threads |
 
 Notes:
 

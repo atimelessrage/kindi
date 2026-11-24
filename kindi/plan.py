@@ -115,6 +115,27 @@ def _io_rates_for(path, mib=64, log=None):
     return io_probe.load_or_probe(path, mib=mib, log=log, label="kindi plan")
 
 
+def _model_line(man, layers):
+    """Which model the report planned for: the adapter's registry id, its family and layer count.
+
+    A dense Bonsai manifest has no `backend` field, and the 27B GGUF names itself only "Hf", so
+    printing `manifest["model"]` and `manifest["backend"]` rendered "Hf (None, 64 layers)" for the
+    one pack this report most needs to identify (2026-11-24). The adapters are the single place that
+    resolves which family a pack belongs to (`kindi/modelids.py`), so ask them instead.
+    """
+    from .modelids import adapter_model_id
+
+    man = man or {}
+    try:
+        claimed = adapter_model_id(man)
+    except SystemExit:                       # a manifest two adapters claim: name what it says
+        claimed = None
+    name = claimed or man.get("model_id") or man.get("model") or "unnamed pack"
+    family = man.get("backend") or ("dense ternary" if claimed else None)
+    return "%s (%s, %d layers)" % (name, family, int(layers)) if family else \
+        "%s (%d layers)" % (name, int(layers))
+
+
 def _moe_free_bytes(assume_vram_gib):
     if assume_vram_gib is not None:
         return int(float(assume_vram_gib) * 2 ** 30)
@@ -142,8 +163,7 @@ def describe(pack, ctx, spec, mode="cpu-first", gpu_kind=None,
     out = {"pack": pack, "model": man.get("model"), "backend": man.get("backend"),
            "ctx": int(ctx), "mode": mode, "lines": lines}
 
-    lines.append(("model", "%s (%s, %d layers)" % (man.get("model"), man.get("backend"),
-                                                   int(dims.get("layers", 0)))))
+    lines.append(("model", _model_line(man, dims.get("layers", 0))))
     lines.append(("context", "%d tokens requested; the loader clamps to device memory"
                   % int(ctx)))
 

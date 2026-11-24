@@ -10,6 +10,35 @@ installer hashes are recorded in `docs/INSTALL.md`; publication is still a relea
 (The pre-merge 0.6.1-era snapshot — 669 commits / 827 files at `60a039b` — is kept in
 `detailed-fork-changelog.md`.)
 
+### The 27B on the CPU, and a compiler that was there (2026-11-24)
+
+The 27B pack (6.8 GB, 64 layers) now has a measured CPU row without any CUDA device: `kindi verify`
+with `KINDI_DEVICE=cpu` is **4/4 token-exact** (40/40 tokens per prompt), 3.7 tok/s over the run
+after a 340 s load with a library built from the current `kcpu.c`; the older cached library gave the
+same 4/4 at 2.0 tok/s. `kcpu.c` already implemented the block the 27B needs (gated attention, `qn[2*HD]`), so nothing in
+the engine changed to make this work; what was missing was the toolchain and the record.
+
+- `kindi/cpu.py` resolves the CPU build compiler through `_find_cc`: `KINDI_CC`, then the name on
+  `PATH`, then a standard Windows LLVM install (`Program Files`/`clang+llvm-*` or `LLVM*`, newest
+  first). This host had clang+LLVM 18.1.8 installed with `clang` not on `PATH`, so the engine said
+  "could not run clang", `kindi info` reported every AVX feature as `unknown`, and the CPU engine
+  looked unavailable although everything was installed. The cache key now names the compiler that
+  will run, so two installs never share one library.
+- `kindi caps` asks the same resolver, so the toolchain line names the compiler instead of claiming
+  the CPU engine cannot be built here.
+- `kindi plan` names the pack it planned for: the header printed `Hf (None, 64 layers)` for the 27B,
+  whose GGUF names itself `Hf` and whose manifest has no `backend`; it now resolves the registry id
+  through the adapters (`bonsai2-27b (dense ternary, 64 layers)`).
+- `kindi models` no longer calls the 2B/4B/9B "too large" on a host with no card: the human listing
+  names the CPU engine for the models it runs, and `GPU only` for the rest (`fits()` is unchanged).
+- `docs/SUPPORT-MATRIX.md` gains the 27B CPU verify row; `docs/CPU-SUPPORT.md` records the run and
+  keeps the scope statement (an exactness row, not a speed recommendation).
+- The `tests/test_cpu_build.py` build-and-load checks now resolve the compiler the way the engine
+  does, so they compile and load real libraries on this host instead of skipping.
+- With the CPU engine buildable again, REQ-0028 A4's live half is measured: `kindi selftest` on the
+  2B pack passed with `dialects agree (2 token(s), 5 chars)`, i.e. `/v1/chat/completions` and
+  `/v1/messages` decoded the same greedy tokens through the real engine.
+
 ### Upstream merge (2026-11-24)
 
 0.7.1 keeps everything in 0.7.0 (Qwen3.8-Flash-Next, AMD RDNA2, native Windows, several requests at once and card

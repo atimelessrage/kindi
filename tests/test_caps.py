@@ -189,6 +189,11 @@ def test_toolchain_reports_the_resolved_compiler(monkeypatch):
 
 
 def test_a_missing_toolchain_is_a_named_blocker_not_a_silence(monkeypatch):
+    from kindi import cpu
+
+    # the unit under test is the render, so pin the resolver: on a host with an LLVM install off
+    # PATH `_find_cc` answers with that path (which is the fix, tested separately)
+    monkeypatch.setattr(cpu, "_find_cc", lambda name=None: "clang")
     monkeypatch.setattr(caps.shutil, "which", lambda name: None)
     monkeypatch.setattr(caps, "cpu_extras", lambda: {"l2_kb": None, "l3_kb": None,
                                                      "avx512": None, "amx": None})
@@ -206,3 +211,22 @@ def test_render_says_unknown_rather_than_guessing_a_capability(monkeypatch):
                                                      "avx512": None, "amx": None})
     text = "\n".join(caps.render(caps.probe()))
     assert "hardware features: unknown" in text
+
+
+def test_toolchain_reports_an_llvm_install_that_is_not_on_path(monkeypatch, tmp_path):
+    """`kindi caps` said "cannot be built here" on a host with clang+LLVM 18.1.8 installed.
+
+    The engine can now resolve a bare `clang` to a standard LLVM install (kindi/cpu.py:_find_cc),
+    so the capability report has to ask the same resolver instead of `shutil.which` alone.
+    """
+    from kindi import cpu
+
+    exe = tmp_path / "clang.exe"
+    exe.write_text("")
+    monkeypatch.setattr(cpu, "_find_cc", lambda name=None: str(exe))
+    tc = caps.toolchain()
+    assert tc["ok"] is True and tc["path"] == str(exe)
+    monkeypatch.setattr(caps, "cpu_extras", lambda: {"l2_kb": None, "l3_kb": None,
+                                                    "avx512": None, "amx": None})
+    text = "\n".join(caps.render({"gpus": [], "gpu_source": "none", "cpu": caps.cpu_report()}))
+    assert str(exe) in text and "cannot be built here" not in text

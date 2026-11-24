@@ -49,6 +49,29 @@ def test_describe_reports_every_choice_with_a_reason(tmp_path):
     assert rep["command"].endswith("bench --tandem cpu-first --tandem-cpu-layers auto")
 
 
+def test_the_model_line_names_the_pack_the_adapter_resolves(tmp_path):
+    """A dense Bonsai manifest has no `backend`, and the 27B GGUF names itself only "Hf".
+
+    The header rendered "Hf (None, 64 layers)" for the one pack a plan report most needs to
+    identify (2026-11-24): the 27B plan run on a GPU-less host read as an unnamed model.
+    """
+    pack = make_pack(tmp_path, layers=64)
+    man = json.loads((pack / "kindi_pack.json").read_text())
+    man.pop("backend")
+    man.update({"model": "Hf", "source_file": "Ternary-Bonsai-2-27B-PTQ1_0.gguf"})
+    (pack / "kindi_pack.json").write_text(json.dumps(man))
+    rep = _plan.describe(str(pack), 24576, "auto", assume_vram_gib=8, assume_ram_gib=32)
+    line = dict(rep["lines"])["model"]
+    assert line == "bonsai2-27b (dense ternary, 64 layers)"
+    assert "None" not in line
+
+
+def test_the_model_line_keeps_a_declared_backend(tmp_path):
+    pack = make_pack(tmp_path)
+    rep = _plan.describe(str(pack), 100, "auto", assume_vram_gib=1, assume_ram_gib=4)
+    assert dict(rep["lines"])["model"] == "fake (kindi, 4 layers)"
+
+
 def test_describe_needs_no_card_when_assumed(tmp_path):
     pack = make_pack(tmp_path)
     rep = _plan.describe(str(pack), 512, "gdn:1", assume_vram_gib=8, assume_ram_gib=4,

@@ -13,10 +13,17 @@ SRC = Path(__file__).resolve().parents[1] / "kindi" / "kcpu.c"
 
 
 def _cc():
-    """A compiler for the preprocessor checks, preferring KINDI_CC."""
+    """A compiler for the preprocessor checks, resolved the way the engine resolves it.
+
+    `kindi.cpu._find_cc` also finds an LLVM install that is not on PATH (2026-11-24), so these
+    checks stop skipping on a host that has clang installed but not exported.
+    """
     for candidate in (os.environ.get("KINDI_CC"), "gcc", "clang"):
-        if candidate and shutil.which(candidate):
-            return shutil.which(candidate)
+        if not candidate:
+            continue
+        found = cpu._find_cc(candidate)
+        if os.path.isabs(found) or shutil.which(found):
+            return found
     pytest.skip("neither gcc nor clang is installed")
 
 
@@ -61,6 +68,7 @@ def test_windows_build_uses_clang_libomp_and_no_posix_flags(monkeypatch, tmp_pat
     (llvm / "lib").mkdir(parents=True)
     monkeypatch.setenv("KINDI_CC", "clang")
     monkeypatch.setenv("KINDI_LLVM", str(llvm))
+    monkeypatch.setattr(cpu, "_find_cc", lambda name=None: "clang")   # pin the name; detection has its own tests
     src, dll = str(tmp_path / "kcpu.c"), str(tmp_path / "libkcpu.dll")
     cmd = cpu._build_cmd(src, dll, win=True, native_fma=False)
     assert cmd[0] == "clang" and cmd[1] == "-O3"
@@ -78,6 +86,7 @@ def test_windows_build_keeps_static_crt_when_fma_is_available(monkeypatch, tmp_p
     (llvm / "lib").mkdir(parents=True)
     monkeypatch.setenv("KINDI_CC", "clang")
     monkeypatch.setenv("KINDI_LLVM", str(llvm))
+    monkeypatch.setattr(cpu, "_find_cc", lambda name=None: "clang")   # pin the name; detection has its own tests
     src, dll = str(tmp_path / "kcpu.c"), str(tmp_path / "libkcpu.dll")
     cmd = cpu._build_cmd(src, dll, win=True, native_fma=True)
     assert "-Xlinker" not in cmd
@@ -121,8 +130,8 @@ def test_avx_only_library_builds_and_loads(monkeypatch, tmp_path):
     this also checks the loader and the Python ctypes ABI without a pack.
     """
     if os.name == "nt":
-        cc = shutil.which(os.environ.get("KINDI_CC") or "clang")
-        if not cc:
+        cc = cpu._find_cc()
+        if not os.path.isabs(cc) and not shutil.which(cc):
             pytest.skip("clang is not installed; set KINDI_CC to build the AVX-only fallback")
         monkeypatch.setenv("KINDI_CC", cc)
     else:
@@ -151,8 +160,8 @@ def test_avx2_f16c_without_fma_preprocesses():
 def test_avx2_f16c_no_fma_library_builds_and_loads(monkeypatch, tmp_path):
     """The AVX2/F16C/no-FMA branch must compile and load, not just preprocess."""
     if os.name == "nt":
-        cc = shutil.which(os.environ.get("KINDI_CC") or "clang")
-        if not cc:
+        cc = cpu._find_cc()
+        if not os.path.isabs(cc) and not shutil.which(cc):
             pytest.skip("clang is not installed; set KINDI_CC to build the no-FMA AVX2 fallback")
         monkeypatch.setenv("KINDI_CC", cc)
     else:
@@ -176,8 +185,8 @@ def test_full_isa_library_builds_and_loads(monkeypatch, tmp_path):
     if cpu.cpu_tier() not in ("avx2-fma-f16c", "unknown"):
         pytest.skip("this host does not expose AVX2/FMA/F16C")
     if os.name == "nt":
-        cc = shutil.which(os.environ.get("KINDI_CC") or "clang")
-        if not cc:
+        cc = cpu._find_cc()
+        if not os.path.isabs(cc) and not shutil.which(cc):
             pytest.skip("clang is not installed; set KINDI_CC to build the native path")
         monkeypatch.setenv("KINDI_CC", cc)
     elif not shutil.which("gcc"):
@@ -217,3 +226,58 @@ def test_other_avx2_variants_preprocess(flags):
     proc = subprocess.run([cc, "-fopenmp", *flags, "-E", str(SRC)],
                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     assert proc.returncode == 0, proc.stderr.decode("utf-8", "replace")
+
+
+def test_find_cc_uses_kindi_cc_verbatim(monkeypatch, tmp_path):
+    exe = tmp_path / "clang.exe"
+    exe.write_text("")
+    monkeypatch.setenv("KINDI_CC", str(exe))
+    assert cpu._find_cc() == str(exe)
+
+
+def test_find_cc_keeps_a_bare_name_it_cannot_find(monkeypatch):
+    """A missing compiler must still name the command the build would have run."""
+    monkeypatch.delenv("KINDI_CC", raising=False)
+    monkeypatch.setattr(cpu.shutil, "which", lambda name: None)
+    monkeypatch.setattr(cpu, "_windows_clang", lambda: None)
+    assert cpu._find_cc("clang") == "clang"
+    assert cpu._build_cmd("kcpu.c", "libkcpu.dll", win=True, native_fma=True)[0] == "clang"
+
+
+def test_windows_clang_finds_an_llvm_install_off_path(monkeypatch, tmp_path):
+    """2026-11-24: a full clang+LLVM 18.1.8 under Program Files, with `clang` not on PATH.
+
+    The engine reported "could not run clang" and the CPU path looked unavailable.
+    """
+    for var in ("ProgramW6432", "ProgramFiles(x86)"):
+        monkeypatch.delenv(var, raising=False)
+    root = tmp_path / "Program Files"
+    exe = root / "clang+llvm-18.1.8-x86_64-pc-windows-msvc" / "bin" / "clang.exe"
+    exe.parent.mkdir(parents=True)
+    exe.write_text("")
+    monkeypatch.setenv("ProgramFiles", str(root))
+    assert cpu._windows_clang() == str(exe)
+
+
+def test_windows_clang_prefers_the_newest_install(monkeypatch, tmp_path):
+    for var in ("ProgramW6432", "ProgramFiles(x86)"):
+        monkeypatch.delenv(var, raising=False)
+    root = tmp_path / "Program Files"
+    older = root / "clang+llvm-17.0.6" / "bin" / "clang.exe"
+    newer = root / "clang+llvm-18.1.8" / "bin" / "clang.exe"
+    for exe in (older, newer):
+        exe.parent.mkdir(parents=True)
+        exe.write_text("")
+    monkeypatch.setenv("ProgramFiles", str(root))
+    assert cpu._windows_clang() == str(newer)
+    assert cpu._windows_clang() != str(older)
+
+
+def test_find_cc_reports_the_install_as_the_cache_key(monkeypatch, tmp_path):
+    """The cache key must name the compiler that will run, so two installs never share a library."""
+    exe = tmp_path / "clang.exe"
+    exe.write_text("")
+    monkeypatch.setenv("KINDI_CC", str(exe))
+    first = cpu._so_path(str(tmp_path), "avx2-fma-f16c")
+    monkeypatch.setenv("KINDI_CC", "clang")
+    assert cpu._so_path(str(tmp_path), "avx2-fma-f16c") != first

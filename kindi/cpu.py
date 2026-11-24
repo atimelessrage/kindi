@@ -5,7 +5,8 @@ kindi.engine.Engine: reset(), feed(tok, pos), step(tok, pos) -> greedy token, ge
 self.ylog[:self.ylog_n]. Loads a Kindi pack (kindi convert) and repacks the ternary weights into pair codes
 ("perm8": per 8-row block and 128-column group, 64 words of 32 bits; one vpermps gives 8 rows x 2 columns).
 kcpu.c is built on first use into KINDI_CPU_CACHE (default ~/.cache/kindi): gcc on Linux, and on Windows
-clang with the MSVC headers and libomp that its driver finds (KINDI_CC, KINDI_LLVM override). Five ISA tiers
+clang with the MSVC headers and libomp that its driver finds (KINDI_CC, KINDI_LLVM override; a bare name
+that is not on PATH is looked up in the standard LLVM install directories, see _find_cc). Five ISA tiers
 are defined (AVX2/FMA/F16C, AVX2/F16C without FMA, AVX2/FMA without F16C, AVX2, AVX-only); the host's flags
 select one, it is built with explicit -m flags, and the loaded library reports its tier in kc_isa_name().
 KINDI_CPU_ISA=auto|avx2-fma-f16c|avx2-f16c-no-fma|avx2-fma|avx2|avx-only overrides the selection.
@@ -100,6 +101,45 @@ def _llvm_root(cc):
     return root if os.path.isdir(os.path.join(root, "lib")) else None
 
 
+def _find_cc(cc=None):
+    """The compiler to build with: KINDI_CC, the name on PATH, or a Windows LLVM install.
+
+    On 2026-11-24 this host had a complete clang+LLVM 18.1.8 under Program Files while `clang` was
+    not on PATH, so the engine reported "could not run clang" and the CPU path looked unavailable
+    although every piece was installed. A bare compiler name that is not on PATH is looked up in
+    the standard LLVM install locations; an explicit path in KINDI_CC is always used as given, and a
+    name that is nowhere stays that name, so the existing build-failure message still names it.
+    """
+    name = cc or os.environ.get("KINDI_CC") or ("clang" if os.name == "nt" else "gcc")
+    if os.path.sep in name or (os.altsep and os.altsep in name):
+        return name
+    if shutil.which(name):
+        return name
+    if os.name == "nt" and name == "clang":
+        found = _windows_clang()
+        if found:
+            return found
+    return name
+
+
+def _windows_clang():
+    """clang.exe from an LLVM install under Program Files, or None.
+
+    The distribution's archive unpacks as "LLVM" or "clang+llvm-<version>"; the official installer
+    uses "LLVM". Highest version first, so two installs pick the newer one deterministically.
+    """
+    import glob
+
+    roots = [os.environ.get(k) for k in ("ProgramW6432", "ProgramFiles", "ProgramFiles(x86)")]
+    patterns = []
+    for root in roots:
+        if root:
+            patterns += [os.path.join(root, "clang+llvm-*", "bin", "clang.exe"),
+                         os.path.join(root, "LLVM*", "bin", "clang.exe")]
+    found = sorted(p for pattern in patterns for p in glob.glob(pattern) if os.path.isfile(p))
+    return found[-1] if found else None
+
+
 def _compiler_flags(cc=None):
     """The ISA flags the compiler enables for this host, or None when it cannot be probed.
 
@@ -107,7 +147,7 @@ def _compiler_flags(cc=None):
     -march=native defines. The same probe answers the CRT question: the static libcmt expf
     contains FMA instructions even with -mno-fma.
     """
-    cc = cc or os.environ.get("KINDI_CC", "clang" if os.name == "nt" else "gcc")
+    cc = _find_cc(cc)
     try:
         result = subprocess.run([cc, "-march=native", "-dM", "-E", "-x", "c", "-"],
                                 input=b"", stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
@@ -144,7 +184,7 @@ def _build_cmd(src, so, win=None, native_fma=None, isa=None):
     if not win:
         return ["gcc", "-O3"] + march + ["-fopenmp", "-fno-math-errno", "-shared", "-fPIC",
                                           "-o", so, src, "-lm"]
-    cc = os.environ.get("KINDI_CC", "clang")
+    cc = _find_cc()
     cmd = [cc, "-O3"] + march + ["-fopenmp", "-fno-math-errno", "-ffp-contract=off",
                                   "-shared", "-o", so, src]
     root = _llvm_root(cc)
@@ -190,7 +230,7 @@ def _cache_key(isa=None):
     identity: a `-march=native` binary must never be handed to a different machine.
     """
     parts = [os.name, platform.machine(),
-             os.environ.get("KINDI_CC", "gcc" if os.name != "nt" else "clang"),
+             _find_cc(),                       # the compiler actually used, not just the name asked for
              "isa=" + (isa or "native")]
     if isa is None:
         native_fma = True
@@ -226,7 +266,7 @@ def _lib():
         check_features()
         _build(src, so, isa)
     if os.name == "nt":
-        root = _llvm_root(os.environ.get("KINDI_CC", "clang"))
+        root = _llvm_root(_find_cc())
         if root and os.path.isdir(os.path.join(root, "bin")):
             os.add_dll_directory(os.path.join(root, "bin"))      # libomp.dll the built DLL links against
     lib = ctypes.CDLL(so)

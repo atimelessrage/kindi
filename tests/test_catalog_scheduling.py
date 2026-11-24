@@ -47,6 +47,26 @@ def test_fits_no_cards_is_too_large():
         assert catalog.fits(m, []) == ""
 
 
+def test_without_a_card_the_listing_names_the_cpu_engine():
+    """`fits` stays the card-only answer; the human listing must not call a CPU-runnable model too large.
+
+    On a GPU-less host the listing printed "too large" for every model, including the 2B, 4B and 9B
+    that the CPU engine runs on that same machine (2026-11-24).
+    """
+    for mid in ("bonsai-2b", "bonsai-4b", "bonsai-9b"):
+        assert catalog._no_card_label(catalog.MODELS[mid]) == "CPU engine"
+    for mid in ("bonsai-27b", "nemotron-e4b", "nanbeige-33b", "lightning-30b"):
+        assert catalog._no_card_label(catalog.MODELS[mid]) == "GPU only"
+    assert catalog.fits(catalog.MODELS["bonsai-2b"], []) == ""      # unchanged
+
+
+def test_the_listing_uses_the_cpu_label_only_without_a_card(capsys):
+    lines = []
+    catalog.list_models({"pack": os.path.join(os.sep, "x", "packs", "bonsai-2b")}, log=lines.append)
+    text = "\n".join(lines)
+    assert "CPU engine" in text and "too large" not in text
+
+
 def test_model_dir_is_next_to_the_pack():
     pack = os.path.join(os.sep, "x", "packs", "bonsai-2b")   # the layout `kindi use` writes
     assert catalog.model_dir({"pack": pack}) == os.path.join(os.sep, "x", "models")

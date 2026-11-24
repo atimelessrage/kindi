@@ -276,9 +276,14 @@ def toolchain():
     A CPU feature nobody can compile is not an available feature: the tandem split and the CPU
     engine both need this build, so the report says whether it can happen here.
     """
+    from . import cpu as cpu_backend
+
     name = os.environ.get("KINDI_CC") or ("clang" if os.name == "nt" else "gcc")
-    path = shutil.which(name)
-    return {"name": name, "path": path, "ok": bool(path)}
+    # cpu._find_cc also finds an LLVM install that is not on PATH (Windows, 2026-11-24): this
+    # report said "cannot be built here" on a host that had clang+LLVM 18.1.8 installed.
+    resolved = cpu_backend._find_cc(name)
+    found = resolved if os.path.isabs(resolved) else shutil.which(resolved)
+    return {"name": name, "path": found, "ok": bool(found)}
 
 
 def cpu_report():
@@ -394,8 +399,9 @@ def render(report):
     if tc.get("path"):
         lines.append("     CPU engine toolchain: %s" % tc["path"])
     elif tc:
-        lines.append("     CPU engine toolchain: %s not found on PATH (set KINDI_CC, and KINDI_LLVM on "
-                     "Windows) - the CPU engine and the tandem split cannot be built here" % tc.get("name"))
+        lines.append("     CPU engine toolchain: %s not found on PATH or in a standard LLVM install "
+                     "(set KINDI_CC, and KINDI_LLVM on Windows) - the CPU engine and the tandem "
+                     "split cannot be built here" % tc.get("name"))
     if cpu.get("features_known") is False:
         lines.append("     note: this OS exposes no CPU flags to Python; the build compiler probe "
                      "(kindi/cpu.py, KINDI_CC) is the authority, and KINDI_CPU_ISA can name the tier")

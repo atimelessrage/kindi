@@ -146,9 +146,10 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   (A1/A2 plus A3's app-level gate with a stub engine). A4's no-decoding-change check is **code-gated
   2026-11-24**: `kindi selftest` compares the same greedy prompt posted through both dialects and fails
   on a different text or token count (`_dialects_agree`, in-process and `--url`), recording both answers
-  in its JSON; the live pack run is blocked here (no C compiler for the CPU engine, no CUDA device —
-  `docs/MANUAL-HELP-NEEDED.md` §3b). **Open:** A3's real Claude Code run against `kindi serve` and
-  A4's live run — the endpoint is *available*, not *compatible*. Proposed by the external knowledge-base scan of
+  in its JSON; the live half ran the same day on the CPU engine — `KINDI_DEVICE=cpu kindi selftest`
+  on the 2B pack ended `dialects agree (2 token(s), 5 chars)`, exit 0 (the compiler that looked missing
+  was installed but off `PATH`; `docs/MANUAL-HELP-NEEDED.md` §3b). **Open:** A3's real Claude Code run
+  against `kindi serve` — the endpoint is *available*, not *compatible*. Proposed by the external knowledge-base scan of
   2026-11-17 (`docs/development/AI-INVENTORY-SCAN.md`), which is inspiration only.
 - **n8n workflow integration ([REQ-0029](development/requirements/REQ-0029.md), proposed):** a
   self-hosted n8n workflow should use `kindi serve` as an OpenAI-compatible provider without a
@@ -216,8 +217,9 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
     of scratch the host does not have. Every single-card K8/V4 check (`kindi verify` / `kindi kld`
     `tp-k8v4` on the CUDA plan engine; [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md) records 2B 2/4, 4B 4/4,
     9B/27B n/a) needs a CUDA device or the not-yet-existing Intel backend: this host has neither
-    (`cudaErrorNoDevice`, no SYCL, CPU engine does not support the 27B), so `kindi verify` on the
-    27B pack fails before any kernel runs. The two-card half still needs a second identical card
+    (`cudaErrorNoDevice`, no SYCL), so `kindi verify` on the 27B pack as a K8/V4 cell cannot run -
+    the CPU engine does decode the pack (4/4 token-exact on 2026-11-24, [CPU-SUPPORT.md](CPU-SUPPORT.md))
+    but it has no K8/V4 cache path, so it is an exactness row and not a substitute for this cell. The two-card half still needs a second identical card
     plus REQ-0020 M3-M6 first (single-card 2B exact, then 27B exact, then the layer split), and
     27B K8/V4 itself has no kernel path (`k8v4` refuses other head sizes; the plain engine rejects
     it), so even a two-card run would have no K8/V4 row to measure. Reopen when M2's SYCL smoke

@@ -16,13 +16,13 @@ HF = "https://huggingface.co"
 MODELS = {
     "bonsai-2b": dict(file="Ternary-Bonsai-2-2B-PTQ1_0.gguf", repo="prism-ml/Ternary-Bonsai-2-2B-gguf",
                       sha="36061ad406df8a4903a6db005be350c50fabfaf717f9ef0acf4b76adcd9929fa", size=429183456,
-                      one=900, two=0, what="Ternary-Bonsai-2 2B (ternary weights)"),
+                      one=900, two=0, what="Ternary-Bonsai-2 2B (ternary weights)", cpu=True),
     "bonsai-4b": dict(file="Ternary-Bonsai-2-4B-PTQ1_0.gguf", repo="prism-ml/Ternary-Bonsai-2-4B-gguf",
                       sha="56711263ec9a9ffeaa74a3a0e58dece8127cf9268404746c721113ca76994d60", size=949549920,
-                      one=1900, two=0, what="Ternary-Bonsai-2 4B (ternary weights)"),
+                      one=1900, two=0, what="Ternary-Bonsai-2 4B (ternary weights)", cpu=True),
     "bonsai-9b": dict(file="Ternary-Bonsai-2-9B-PTQ1_0.gguf", repo="prism-ml/Ternary-Bonsai-2-9B-gguf",
                       sha="3561df7ac7d26a71ffa991ac2db740b10841c3a350aa2676ccd3ff5d428b4e8b", size=1997486976,
-                      one=3800, two=0, what="Ternary-Bonsai-2 9B (ternary weights)"),
+                      one=3800, two=0, what="Ternary-Bonsai-2 9B (ternary weights)", cpu=True),
     "bonsai-27b": dict(file="Ternary-Bonsai-2-27B-PTQ1_0.gguf", repo="prism-ml/Ternary-Bonsai-2-27B-gguf",
                        sha="53107f530aa52eb00912263ab1ee29bd199261c87cd7b4ad4ca1318c1fe33ee3", size=5946648928,
                        one=7600, two=3800, what="Ternary-Bonsai-2 27B (ternary weights)"),
@@ -96,6 +96,19 @@ def _download_state(path, m):
     return "present (size ok, unchecked)"
 
 
+def _no_card_label(m):
+    """What this machine can do with a model when no card fits it (the human listing only).
+
+    With no card at all the listing called every model "too large", including the 2B/4B/9B that the
+    CPU engine runs on this same host (2026-11-24, on a GPU-less Windows machine): "too large" reads
+    as "this machine cannot run it", which was wrong for three of the seven. `fits()` stays the
+    card-only answer (tests and Kindi Monitor read it), so the CPU lane is a display label naming
+    the engine that would run the model, not a fit claim - the pack still has to fit host RAM, which
+    this listing does not measure.
+    """
+    return "CPU engine" if m.get("cpu") else "GPU only"
+
+
 def list_models(cfg, log=print, as_json=False):
     cards = _cards()
     if as_json:                      # for programs (Kindi Monitor's model selector): stdout only, no log lines
@@ -108,7 +121,8 @@ def list_models(cfg, log=print, as_json=False):
     d = model_dir(cfg)
     for mid, m in MODELS.items():
         state = _download_state(os.path.join(d, m["file"]), m)
-        log("  %-13s %-52s %5.1f GB  %-10s %s" % (mid, m["what"], m["size"] / 1e9, fits(m, cards) or "too large", state))
+        where = fits(m, cards) or _no_card_label(m)
+        log("  %-13s %-52s %5.1f GB  %-10s %s" % (mid, m["what"], m["size"] / 1e9, where, state))
     log("kindi use ID  downloads a model, builds its pack and selects it")
 
 

@@ -73,7 +73,7 @@ STATUS = {
     "bonsai-2b": ["4/4", "4/4, 33.7 tok/s", "4/4, identical pack", "2/4, gated"],
     "bonsai-4b": ["4/4", "4/4, 16.7 tok/s", "not tested", "4/4, gated"],
     "bonsai-9b": ["4/4", "4/4, 9.1 tok/s", "not tested", "n/a"],
-    "bonsai-27b": ["3 exact + tie, 4060 Ti tc", "not supported", "not converted", "n/a"],
+    "bonsai-27b": ["3 exact + tie, 4060 Ti tc", "4/4, 3.7 tok/s", "not converted", "n/a"],
     "nemotron-e4b": ["separate backend", "n/a", "n/a", "n/a"],
     "nanbeige-33b": ["separate backend", "n/a", "n/a", "n/a"],
     "lightning-30b": ["separate backend", "n/a", "n/a", "n/a"],
@@ -89,8 +89,9 @@ REF = {
     "bonsai-4b": "plain engine, exact head, q8_0 K/V (GPU and CPU verify both 4/4)",
     "bonsai-9b": "plain engine, exact head, q8_0 K/V (GPU verify 4/4; the tensor-core plans need"
                  " KINDI_TC_HP=1 for the 9B's HB 4096)",
-    "bonsai-27b": "tensor-core plan engine, exact head (3 exact + tie on the 4060 Ti); the plain"
-                  " engine has no recorded verify row",
+    "bonsai-27b": "tensor-core plan engine, exact head (3 exact + tie on the 4060 Ti); the CPU"
+                  " engine, exact head (4/4 on the i7-8086K, 2026-11-24); the plain GPU engine has"
+                  " no recorded verify row",
     "nemotron-e4b": "separate backend; no `kindi verify` reference configuration recorded",
     "nanbeige-33b": "separate backend; no `kindi verify` reference configuration recorded",
     "lightning-30b": "separate backend; no `kindi verify` reference configuration recorded",
