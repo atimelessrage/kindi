@@ -57,8 +57,9 @@ self-hosted GPU lane is described in [docs/CI.md](../docs/CI.md); it is not run 
 
 `python -m pytest -q -rs` with the Anthropic endpoint (REQ-0028), the block-size contract
 (REQ-0023 A2), the Intel q8 GEMM probe with its staged/pinned additions, and `kindi bench --spec`
-(REQ-0026) in: **1,569 passed, 58 skipped, 0 failed** in 184.01 s
-(`bench-logs/full-suite-20261124-bench-spec-final.log`). The 1,563-passed run before it is
+(REQ-0026) in: **1,574 passed, 58 skipped, 0 failed** in 194.95 s
+(`bench-logs/full-suite-20261124-knob-liveness.log`; the run before it, 1,569, is
+`bench-logs/full-suite-20261124-bench-spec-final.log`). The 1,563-passed run before it is
 `bench-logs/full-suite-20261124-arc-tiled-final.log`; the 1,560-passed run is
 `bench-logs/full-suite-20261124-intel-gemm.log`. Every skip is one
 of ten groups; pytest groups `-rs` output by location, so the count per group is what to watch. A
