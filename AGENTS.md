@@ -12,24 +12,24 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `fb3f28a` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
-  **2026-11-24 (latest):** REQ-0028 A4's no-decoding-change gate: `kindi selftest` compares the same greedy prompt through
-  `/v1/chat/completions` and `/v1/messages` and fails on a different text or token count (`_dialects_agree`, also `--url`);
-  no live pack run (no C compiler, `docs/MANUAL-HELP-NEEDED.md` §3b). The reference also stopped hiding direct reads:
-  `config_reference.py` dropped every env name matching a config key, hiding `KINDI_MTP_HEAD`; 331 -> 341 rows.
+- **HEAD:** `32075c4` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+  **2026-11-24 (latest): the 27B verifies on the CPU engine, and the "missing" compiler was installed.**
+  `KINDI_DEVICE=cpu kindi verify` on the 27B pack is **4/4 token-exact** (40/40 per prompt) at 3.7 tok/s after a 340 s load;
+  packcheck full (10 files, 18.4 s) and a structural audit (851 tensors, byte ranges tiling every file, reference ids in
+  range) passed first, and `kindi plan` ran on it (8 GiB assumed: 2 GDN CPU layers, 7,601 MiB, fits). The blocker was
+  detection, not hardware: clang+LLVM 18.1.8 sits under Program Files while `clang` is not on PATH, so `_find_cc` resolves
+  `KINDI_CC`, then PATH, then a standard LLVM install (newest first); the cache key names the compiler that will run and
+  `kindi caps` asks the same resolver. That unblocked REQ-0028 A4's live half (`kindi selftest`, 2B CPU: `dialects agree`
+  exit 0) and the `test_cpu_build.py` compile-and-load checks; `kindi plan` names the resolved pack and `kindi models` drops
+  "too large" for the 2B/4B/9B without a card. GPU rows (tc/plain verify, K8/V4, bench, tandem) still need a card.
   **2026-11-24:** `POST /v1/messages` answers Anthropic's dialect on the same `run_generate` path (`kindi/api/anthropic.py`;
   `x-api-key` or bearer; envelope and SSE order; one `_relay` for both streaming routes), and `kindi selftest` drives it in
   process and with `--url`. REQ-0023's block half landed too (`tests/test_kernel_arity.py`: 28 block/bound pairs, 135 pinned).
   The package and `install.sh` said `0.7.1-fork`; all three match now, pinned by
   `tests/test_version_consistency.py`. The `v0.7.1-fork` release is **still unpublished** (only `v0.5.0-installer`),
   so README's one-liners 404 until the owner runs `docs/RELEASE-CHECKLIST.md`. The mask cache is a bounded 64 MiB
-  LRU (`StateMaskCache`, `KINDI_MASK_CACHE_MB`); A4/A5-rate open. Suite: 1,577 passed / 58 skipped / 0 failed (195 s).
-  **2026-11-24:** REQ-0027's mask got cheaper: self-loop characters now come off the NFA's character edges plus
-  a reverse-epsilon closure (8,228 probes per state gone) and the mask unions use a cached boolean mask (248,320-id sorts
-  gone). 2B medians: 15 -> 10.0 ms/token `json_schema`, 124 -> 57.1 unrolled `json.gbnf` depth 1 (depth 2/3 -> 9.5),
-  record 70 -> 8.4, 200 tokens 3 -> 1.7 and 20 -> 7.5; oracle re-run over 14 real states, 0 mismatches. Evidence:
-  `docs/benchmarks/2026-11-24-i7-8086k-grammar-mask-edges/` (claim `docs/claims/grammar-mask-edges.json`); CPU filter
-  only, A4/A5 open. **2026-11-24:** official **Kindi v0.7.1** (`1cb59d2`, one squashed commit on `v0.7.0`, 43 files,
+  LRU (`StateMaskCache`, `KINDI_MASK_CACHE_MB`); A4/A5-rate open. Suite: 1,598 passed / 47 skipped / 0 failed (226 s).
+  **2026-11-24:** official **Kindi v0.7.1** (`1cb59d2`, one squashed commit on `v0.7.0`, 43 files,
   +15,649/-114) is merged in as `0.7.1-fork`: the **Inkling 2 Mini** engine (`inkling2_*`, `kindi inkling`,
   the server's `kindi_inkling2` backend), **Flash-Next drafting for sampled requests**
   (`sampling.spec_accept` takes a draft distribution; `spec.spec_accept` delegates), **one CPU thread per
@@ -64,7 +64,7 @@ existing debt is tolerated and `--update --reason "..."` lowers the baseline aft
 
 ### Full CPU gate
 
-The 2026-11-24 grammar-mask gate at `ebf871f` is **1,513 passed, 58 skipped, 0 failed** in 180.66 s (plain CPU suite, no coverage rerun); the 2026-11-22 prewarm gate at `4bab483` was 1,423 / 58 / 0 in 138.50 s and the 2026-11-20 integration gate at `82a72bf` 1,412 / 28 / 0 in 250.33 s. The last coverage-measured run remains `539a504`: **1,241 passed, 28 skipped, 0 failed at 46.36%** line+branch (23,504 statements, 8,394 branches; plain 1,241 / 28 / 0 in 227.62 s), and the consolidated 2026-11-19 commits (`f75253b` + `84b6686`) 1,357 / 28 / 0 in 229.53 s. Every skip is inventoried by node ID and reason in `tests/README.md`.
+The 2026-11-24 27B-CPU gate at `32075c4` is **1,598 passed, 47 skipped, 0 failed** in 226.48 s (the CPU build checks now compile and load every tier here instead of skipping); the 2026-11-24 grammar-mask gate at `ebf871f` is 1,513 passed, 58 skipped, 0 failed in 180.66 s (plain CPU suite, no coverage rerun); the 2026-11-22 prewarm gate at `4bab483` was 1,423 / 58 / 0 in 138.50 s and the 2026-11-20 integration gate at `82a72bf` 1,412 / 28 / 0 in 250.33 s. The last coverage-measured run remains `539a504`: **1,241 passed, 28 skipped, 0 failed at 46.36%** line+branch (23,504 statements, 8,394 branches; plain 1,241 / 28 / 0 in 227.62 s), and the consolidated 2026-11-19 commits (`f75253b` + `84b6686`) 1,357 / 28 / 0 in 229.53 s. Every skip is inventoried by node ID and reason in `tests/README.md`.
 
 ### Upstream v0.7.0 and comparison
 
@@ -235,7 +235,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `a101b7d` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `fb3f28a` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc GEMM, bench --spec, config-reference direct reads |
+| `<worktree>` | `merge/upstream-0.7.0` | `32075c4` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc GEMM, bench --spec, config-reference direct reads, 27B CPU verify + compiler detection |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 

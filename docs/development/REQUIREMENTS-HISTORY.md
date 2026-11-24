@@ -13,7 +13,7 @@ the state at that commit.
 | [REQ-0001](requirements/REQ-0001.md) | Greedy output matches llama.cpp | active | `f25509f9ba89` | `f25509f9ba89` |
 | [REQ-0002](requirements/REQ-0002.md) | Bonsai packs convert losslessly | active | `f25509f9ba89` | `f25509f9ba89` |
 | [REQ-0003](requirements/REQ-0003.md) | Tensor-core plans are exact or explicitly refused | active | `f25509f9ba89` | `f25509f9ba89` |
-| [REQ-0004](requirements/REQ-0004.md) | CPU inference is exact and ISA-safe | active | `f25509f9ba89` | `f25509f9ba89` |
+| [REQ-0004](requirements/REQ-0004.md) | CPU inference is exact and ISA-safe | active | `f25509f9ba89` | `32075c449184` |
 | [REQ-0005](requirements/REQ-0005.md) | The serving boundary is predictable and bounded | active | `f25509f9ba89` | `70a6f764c899` |
 | [REQ-0006](requirements/REQ-0006.md) | Prefix caches are exact and invalidate safely | active | `f25509f9ba89` | `70a6f764c899` |
 | [REQ-0007](requirements/REQ-0007.md) | Sampling settings are explicit and reproducible | active | `f25509f9ba89` | `f25509f9ba89` |
@@ -37,7 +37,7 @@ the state at that commit.
 | [REQ-0025](requirements/REQ-0025.md) | `kindi verify` can run under speculation | proposed | `3ececca68d4a` | `0f91b86174ac` |
 | [REQ-0026](requirements/REQ-0026.md) | `kindi bench` can measure a speculation mode | proposed | `3ececca68d4a` | `4e8756fa9761` |
 | [REQ-0027](requirements/REQ-0027.md) | A constrained-decoding mask that does not sweep the vocabulary per state | active | `62ea1a6828f0` | `f7654130192f` |
-| [REQ-0028](requirements/REQ-0028.md) | An Anthropic Messages endpoint for agent harnesses | active | `8c4decde1d0f` | `0c2f20e5be12` |
+| [REQ-0028](requirements/REQ-0028.md) | An Anthropic Messages endpoint for agent harnesses | active | `8c4decde1d0f` | `32075c449184` |
 | [REQ-0029](requirements/REQ-0029.md) | Self-hosted n8n can call a local Kindi server | proposed | `7e675235290d` | `7e675235290d` |
 | [REQ-0030](requirements/REQ-0030.md) | Selectable native accelerators for measured hot Python paths | proposed | `7e675235290d` | `1df80ccd105f` |
 | [REQ-0031](requirements/REQ-0031.md) | Looped-transformer model family (SenseNova-Loop-9B, Inkling 2 Mini) | active | `7e675235290d` | `7ee95c5e86ff` |

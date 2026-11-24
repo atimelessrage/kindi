@@ -1628,3 +1628,19 @@ passing it off as the device's), before them the seventeen MTP head registry/eff
 effective-state tests, and before those the kernel-arity checks, and the previous seven covering `tools/check_secret_history.py` (a key deleted from the tree is
 still found in a diff, the count gate flags a new row, the baseline carries no matched text, the last 20 commits add no history hit, and a message-only leak is
 caught in both a subject and a body with no file carrying the path).
+
+## Handoff notes moved from AGENTS.md (2026-11-24, 27B CPU round)
+
+Verbatim, from the live handoff, to keep it under its 450-line guard.
+
+**2026-11-24:** REQ-0028 A4's no-decoding-change code gate: `kindi selftest` compares the same greedy prompt through
+`/v1/chat/completions` and `/v1/messages` and fails on a different text or token count (`_dialects_agree`, also `--url`).
+The reference also stopped hiding direct reads:
+`config_reference.py` dropped every env name matching a config key, hiding `KINDI_MTP_HEAD`; 331 -> 341 rows.
+
+**2026-11-24:** REQ-0027's mask got cheaper: self-loop characters now come off the NFA's character edges plus
+a reverse-epsilon closure (8,228 probes per state gone) and the mask unions use a cached boolean mask (248,320-id sorts
+gone). 2B medians: 15 -> 10.0 ms/token `json_schema`, 124 -> 57.1 unrolled `json.gbnf` depth 1 (depth 2/3 -> 9.5),
+record 70 -> 8.4, 200 tokens 3 -> 1.7 and 20 -> 7.5; oracle re-run over 14 real states, 0 mismatches. Evidence:
+`docs/benchmarks/2026-11-24-i7-8086k-grammar-mask-edges/` (claim `docs/claims/grammar-mask-edges.json`); CPU filter
+only, A4/A5 open.
