@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `5c0b63d` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `7aa4578` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24 (latest): the 27B verifies on the CPU engine, and the "missing" compiler was installed.**
   `KINDI_DEVICE=cpu kindi verify` on the 27B pack is **4/4 token-exact** (40/40 per prompt) at 3.7 tok/s after a 340 s load;
   packcheck full (10 files, 18.4 s) and a structural audit (851 tensors, byte ranges tiling every file, reference ids in range)
@@ -198,7 +198,7 @@ The 27B A/B, fail-closed gate, startup-warning, MTP-server and cold-expert bulle
 Owner actions pending: Nanbeige 33B GGUF replacement, Gemma 4 E4B pack, DeepSeek V4.1 shards/gate data, PQ2_0/Q2_0 quant downloads, a pinned llama-server, the oneAPI Base Toolkit for the planned A770 SYCL smoke, other-hardware test rigs, push/installer/CI publications, T4.4/T4.5 + D3/D5 decisions — `docs/MANUAL-HELP-NEEDED.md`.
 **A770 (2026-11-24, no claim):** `kindi intel-ternary` splits the packed GEMV over the weight phases (0 mismatches
 at six shapes, 5.75x-14.14x) and `kindi intel-gemm` runs the engine's q8 GEMM bit-exact; pinning its work-group to `(256,1)` bought 1.71x (555->323 ms at 512x512x4096, and it was wrong across tiles before), `--staging local` another 1.02-1.05x, and all three OpenCL probes now take `--device-name Arc` because the driver's device order is not stable
-(the iGPU has come back first). The oneAPI install is the last M2 blocker; no SYCL/backend, no support claim.
+(the iGPU has come back first). oneAPI 2026.2 is installed and `sycl-ls` sees the Arc **through OpenCL only (no Level Zero)**, so the SYCL smoke and L0 detection are next; the gemm staging pair re-checked at 1.05x/1.06x/0.97x (paired, three runs per arm); no SYCL/backend, no support claim.
 - **Shared-file owners:** the newest lease row in the table below owns its files until
   marked done; `T:/kindi/AGENTS.md` is the main worktree's bridge note, not this file.
 
@@ -235,7 +235,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `a101b7d` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `5c0b63d` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc GEMM, bench --spec, config-reference direct reads, 27B CPU verify + compiler detection |
+| `<worktree>` | `merge/upstream-0.7.0` | `7aa4578` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc GEMM, bench --spec, config-reference direct reads, 27B CPU verify + compiler detection |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
