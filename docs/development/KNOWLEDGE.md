@@ -30,15 +30,26 @@ guide. Keep commands copy-pasteable and avoid local machine paths and credential
 
 - The exact head and `kindi verify` are the exactness reference; benchmark throughput does
   not replace correctness.
-- The 9B tensor-core plan is refused because its Hadamard block is 4096. The plain engine
-  is the fallback.
+- The 9B's Hadamard block is 4096. A **single card** folds it in 512-point chunks with the
+  high-precision activations (`kindi/tp.py`, `KINDI_TC_HP=1` selected automatically; measured
+  4/4 exact on the 4060 Ti, 2026-11-18). A **two-card tensor-parallel split** still refuses
+  anything but Hadamard 1024 (`tp.py::build_plans`), so 4096 stays single-card (or plain-engine)
+  only. The older "the 9B plan is refused" note was the pre-`KINDI_TC_HP` behaviour.
 - The 4B tensor-core path uses the standard decode attention because split flash-decode
   diverges on its 2560-wide plan. This is a conditional pass, not a claim about split
   decode on that geometry.
 - The 27B plain engine refuses grouped head dimensions it does not support. A refusal is a
   known boundary, not a benchmark failure.
-- `k8v4` is experimental, opt-in and quarantined; it is not token-exact. See the
-  requirement and decision records before touching it.
+- `k8v4` is experimental, opt-in and quarantined; it is not token-exact (2B verify 2/4 against
+  the fp16 reference). See the requirement and decision records before touching it. It keys on
+  the head size, not the model name (`spec.py::kv_plan`; the value kernels cover head_dim 256),
+  and the plain engine refuses it outright (`KINDI_KV=k8v4` needs the plan engine).
+- The 27B GGUF published as `Ternary-Bonsai-2-27B-PTQ1_0.gguf` carries `general.name = "Hf"` and
+  `general.basename = "folded"`, so `kindi info`/`kindi plan` print **Hf** as the model name - it is
+  faithful metadata, not a conversion defect. `verify` still finds its reference, because
+  `reference_for` reads the size from `source_file` (`-27B-` -> `reference-27b.json`). The pack is
+  64 layers, width 5120, head_dim 256, Hadamard block **1024** (the tensor-core-friendly case),
+  ~7,242 MB, and a full convert takes ~6 minutes on an i7-8086K.
 - CPU support requires AVX and chooses one of five explicit ISA tiers (AVX2/FMA/F16C,
   AVX2/F16C, AVX2/FMA, AVX2, AVX-only). Forced-tier exactness on an AVX2 host is not a
   native Sandy Bridge/no-FMA hardware claim.
