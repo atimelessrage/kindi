@@ -16,6 +16,13 @@ The layout is the one ``kindi convert`` writes (``convert.phase_bytes``):
 The probe's inputs are small integers and its scales are powers of two, so the dot products are
 exactly representable and the device result must match the host bit for bit; a mismatch is a
 failure, never a tolerance.
+
+The GEMV is split over the 128-weight phases (``--parts``) because one work-item per row leaves most
+of the card idle: the packed layout is ``[slot][row]``, so the only coalesced access has consecutive
+work-items on consecutive rows, and extra parallelism therefore has to come from the phase axis.  Each
+part writes one exact partial sum per row and a second kernel adds the parts.  A part's value and the
+reduction are both sums of exactly representable numbers, so the split cannot change the result and
+the reference check still runs at every size.
 """
 import ctypes
 import hashlib
@@ -38,7 +45,6 @@ from .intel_cl import (
     _enumerate,
     _finish,
     _hex,
-    _launch,
     _open,
     _read_back,
     _set_arg,
@@ -48,7 +54,8 @@ PROBE = "intel-ternary-gemv"
 DEFAULT_ROWS = 64
 DEFAULT_COLS = 1024
 MIN_ROWS = 1
-MAX_ROWS = 1024
+MAX_ROWS = 4096                 # a 4096x8192 layer is 8 MiB packed; the probe is not a benchmark
+MAX_PARTS = 64                  # 1 is the 2026-11-23 one-work-item-per-row shape
 MIN_COLS = 128
 MAX_COLS = 8192
 DEFAULT_REPEATS = 5
@@ -57,18 +64,21 @@ PHASE = 128
 SCALES = (1.0, 0.5, 2.0, 1.5)          # fp16-exact powers of two / halves: every product is exact
 SEED = 7
 SOURCE = """
-__kernel void ternary_gemv(__global const uchar *codes,
-                           __global const float *scales,
-                           __global const float *x,
-                           __global float *y,
-                           uint rows, uint cols) {
+/* Phase `ph` belongs to part `ph % parts`; work-items are laid out row-fastest, so a work-group
+   covers consecutive rows of one phase and its byte loads land in one contiguous slab region. */
+__kernel void ternary_gemv_part(__global const uchar *codes,
+                                __global const float *scales,
+                                __global const float *x,
+                                __global float *partial,
+                                uint rows, uint cols, uint parts) {
     uint row = get_global_id(0);
-    if (row >= rows) {
+    uint part = get_global_id(1);
+    uint phases = cols >> 7;
+    if (row >= rows || part >= parts) {
         return;
     }
-    uint phases = cols >> 7;
     float total = 0.0f;
-    for (uint ph = 0; ph < phases; ++ph) {
+    for (uint ph = part; ph < phases; ph += parts) {
         int dot = 0;
         uint base = ((ph << 5) * rows) + row;        /* slot (ph*32 + s), stored [slot][row] */
         uint col = ph << 7;
@@ -82,6 +92,20 @@ __kernel void ternary_gemv(__global const uchar *codes,
         }
         total += (float)dot * scales[(ph * rows) + row];
     }
+    partial[part * rows + row] = total;
+}
+
+__kernel void ternary_gemv_reduce(__global const float *partial,
+                                  __global float *y,
+                                  uint rows, uint parts) {
+    uint row = get_global_id(0);
+    if (row >= rows) {
+        return;
+    }
+    float total = 0.0f;
+    for (uint part = 0; part < parts; ++part) {
+        total += partial[part * rows + row];
+    }
     y[row] = total;
 }
 """
@@ -93,7 +117,31 @@ def _fail(report, message):
     return report
 
 
-def _base_report(loader, rows, cols, repeats, seed):
+def default_parts(cols):
+    """One part per 128-weight phase, capped: measured fastest on the A770 at every shape tried."""
+    return max(1, min(MAX_PARTS, int(cols) // PHASE))
+
+
+def _launch_2d(lib, queue, kernel, dim0, dim1, report, key):
+    """Enqueue a 2-D NDRange with no local size; dim0 (the row axis) stays the fastest-varying one."""
+    global_size = (ctypes.c_size_t * 2)(dim0, dim1)
+    code = int(lib.clEnqueueNDRangeKernel(queue, kernel, 2, None, global_size, None,
+                                          0, None, None))
+    report["returncodes"][key] = _hex(code)
+    if code != CL_SUCCESS:
+        raise ValueError("%s returned %s" % (key, _hex(code)))
+
+
+def _launch_1d(lib, queue, kernel, total, report, key):
+    global_size = (ctypes.c_size_t * 1)(total)
+    code = int(lib.clEnqueueNDRangeKernel(queue, kernel, 1, None, global_size, None,
+                                          0, None, None))
+    report["returncodes"][key] = _hex(code)
+    if code != CL_SUCCESS:
+        raise ValueError("%s returned %s" % (key, _hex(code)))
+
+
+def _base_report(loader, rows, cols, repeats, seed, parts=None):
     return {
         "probe": PROBE,
         "schema": 1,
@@ -113,11 +161,19 @@ def _base_report(loader, rows, cols, repeats, seed):
             "scales": "fp16 per 128 weights, [column/128][row]; widened to float32 on the host",
             "weight": "trit - 1, scaled by the 128-weight group's scale",
         },
+        "kernel": {
+            "names": ["ternary_gemv_part", "ternary_gemv_reduce"],
+            "split": "phase ph -> part ph % parts; one work-item per (row, part), row axis fastest",
+            "reduce": "sums the parts per row; the 1-part shape is the earlier single-kernel GEMV",
+            "exactness": "each part and the reduction sum exactly representable values, so the split "
+                         "cannot change the result; the host reference is still compared bit for bit",
+        },
         "shape": {"rows": rows, "cols": cols, "phases": cols // 128 if isinstance(cols, int) else None,
+                  "parts": parts, "parts_source": None, "partial_bytes": None,
                   "packed_bytes": None, "scale_bytes": None},
         "pack": {"seed": seed, "bcodes_sha256": None, "dpm_sha256": None},
         "build": {"ok": False, "source_bytes": len(SOURCE.encode("utf-8")), "log": None},
-        "gemv": {"rows": rows, "cols": cols, "repeats": repeats, "warmup_ms": None,
+        "gemv": {"rows": rows, "cols": cols, "repeats": repeats, "parts": parts, "warmup_ms": None,
                  "mismatches": None, "max_abs_error": None, "first_mismatch": None,
                  "elapsed_ms": None, "gflops": None},
         "returncodes": {},
@@ -159,6 +215,31 @@ def reference(bcodes, dpm, x, rows, cols):
     return out
 
 
+def partials(bcodes, dpm, x, rows, cols, parts):
+    """The host model of what the device computes: one float32 partial per (part, row).
+
+    Phase ``ph`` belongs to part ``ph % parts``, exactly as in ``ternary_gemv_part``; each phase is
+    accumulated in int32 and scaled once, which is also what the kernel does.  The probe sums these
+    on the host before it launches anything, so a shape where the split is not exact fails with a
+    reason instead of surfacing as a device mismatch.
+    """
+    phases = cols // PHASE
+    codes = np.asarray(bcodes, dtype=np.uint8).reshape(phases, 32, rows)
+    scales = np.asarray(dpm, dtype=np.float16).astype(np.float32)
+    xv = np.asarray(x, dtype=np.int32).reshape(phases, PHASE)
+    out = np.zeros((parts, rows), dtype=np.float32)
+    for ph in range(phases):
+        b = codes[ph].astype(np.int32)                           # (32, rows)
+        digits = xv[ph].reshape(32, 4)
+        dot = ((b % 3 - 1) * digits[:, 0][:, None]
+               + (b // 3 % 3 - 1) * digits[:, 1][:, None]
+               + (b // 9 % 3 - 1) * digits[:, 2][:, None]
+               + (b // 27 % 3 - 1) * digits[:, 3][:, None]).sum(axis=0)
+        part = ph % parts
+        out[part] = (out[part] + dot.astype(np.float32) * scales[ph]).astype(np.float32)
+    return out
+
+
 def _buffer(lib, context, flags, data, report, key):
     array = np.ascontiguousarray(data)
     pointer = (ctypes.c_void_p(int(array.ctypes.data))
@@ -173,10 +254,10 @@ def _buffer(lib, context, flags, data, report, key):
 
 
 def run_probe(rows=DEFAULT_ROWS, cols=DEFAULT_COLS, repeats=DEFAULT_REPEATS, loader=None,
-              opener=None, device=0, seed=SEED):
+              opener=None, device=0, seed=SEED, parts=None):
     """Launch the packed ternary GEMV on the selected Intel GPU; it never runs on the CPU."""
     loader = loader or DEFAULT_LOADER
-    report = _base_report(loader, rows, cols, repeats, seed)
+    report = _base_report(loader, rows, cols, repeats, seed, parts)
     if not isinstance(rows, int) or not MIN_ROWS <= rows <= MAX_ROWS:
         return _fail(report, "--rows must be an integer in [%d, %d]" % (MIN_ROWS, MAX_ROWS))
     if not isinstance(cols, int) or not MIN_COLS <= cols <= MAX_COLS or cols % PHASE:
@@ -184,11 +265,26 @@ def run_probe(rows=DEFAULT_ROWS, cols=DEFAULT_COLS, repeats=DEFAULT_REPEATS, loa
                      % (PHASE, MIN_COLS, MAX_COLS))
     if not isinstance(repeats, int) or not 1 <= repeats <= MAX_REPEATS:
         return _fail(report, "--repeats must be an integer in [1, %d]" % MAX_REPEATS)
+    if parts is None:
+        parts = default_parts(cols)
+        source = "phases (cols/128), capped at %d" % MAX_PARTS
+    elif isinstance(parts, int) and 1 <= parts <= MAX_PARTS:
+        source = "--parts"
+    else:
+        return _fail(report, "--parts must be an integer in [1, %d]" % MAX_PARTS)
+    report["shape"]["parts"] = parts
+    report["shape"]["parts_source"] = source
+    report["gemv"]["parts"] = parts
     if not isinstance(device, int) or device < 0:
         return _fail(report, "--device must be a non-negative integer")
 
     _trits, bcodes, dpm, x = matrix(rows, cols, seed)
     expected = reference(bcodes, dpm, x, rows, cols)
+    split = partials(bcodes, dpm, x, rows, cols, parts).sum(axis=0, dtype=np.float32)
+    if not np.array_equal(split, expected):
+        return _fail(report, "the %d-part split is not exact for %d rows x %d cols on the host; "
+                            "refusing to launch a kernel whose result would depend on summation order"
+                     % (parts, rows, cols))
     scales = np.ascontiguousarray(dpm.astype(np.float32))
     report["shape"]["packed_bytes"] = int(bcodes.nbytes)
     report["shape"]["scale_bytes"] = int(dpm.nbytes)
@@ -208,6 +304,7 @@ def run_probe(rows=DEFAULT_ROWS, cols=DEFAULT_COLS, repeats=DEFAULT_REPEATS, loa
     queue = None
     program = None
     kernel = None
+    reduce_kernel = None
     buffers = []
     try:
         devices, error = _enumerate(lib, report)
@@ -264,10 +361,16 @@ def run_probe(rows=DEFAULT_ROWS, cols=DEFAULT_COLS, repeats=DEFAULT_REPEATS, loa
         report["build"]["ok"] = True
 
         error_code = ctypes.c_int(0)
-        kernel = lib.clCreateKernel(program, b"ternary_gemv", ctypes.byref(error_code))
+        kernel = lib.clCreateKernel(program, b"ternary_gemv_part", ctypes.byref(error_code))
         report["returncodes"]["clCreateKernel"] = _hex(error_code.value)
         if not kernel or error_code.value != CL_SUCCESS:
-            return _fail(report, "clCreateKernel returned %s" % _hex(error_code.value))
+            return _fail(report, "clCreateKernel(ternary_gemv_part) returned %s" % _hex(error_code.value))
+        error_code = ctypes.c_int(0)
+        reduce_kernel = lib.clCreateKernel(program, b"ternary_gemv_reduce", ctypes.byref(error_code))
+        report["returncodes"]["clCreateKernelReduce"] = _hex(error_code.value)
+        if not reduce_kernel or error_code.value != CL_SUCCESS:
+            return _fail(report, "clCreateKernel(ternary_gemv_reduce) returned %s"
+                         % _hex(error_code.value))
 
         buffers.append(_buffer(lib, context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, bcodes,
                                report, "clCreateBufferCodes"))
@@ -277,19 +380,31 @@ def run_probe(rows=DEFAULT_ROWS, cols=DEFAULT_COLS, repeats=DEFAULT_REPEATS, loa
                                report, "clCreateBufferX"))
         buffers.append(_buffer(lib, context, CL_MEM_WRITE_ONLY,
                                np.zeros(rows, dtype=np.float32), report, "clCreateBufferY"))
-        for index, handle in enumerate(buffers):
+        partial_buffer = np.zeros(rows * parts, dtype=np.float32)
+        report["shape"]["partial_bytes"] = int(partial_buffer.nbytes)
+        buffers.append(_buffer(lib, context, CL_MEM_WRITE_ONLY, partial_buffer, report,
+                               "clCreateBufferPartial"))
+        for index, handle in enumerate(buffers[:3]):        # codes, scales, x
             _set_arg(lib, kernel, index, ctypes.c_void_p(int(handle)))
+        _set_arg(lib, kernel, 3, ctypes.c_void_p(int(buffers[4])))    # partial
         _set_arg(lib, kernel, 4, ctypes.c_uint32(rows))
         _set_arg(lib, kernel, 5, ctypes.c_uint32(cols))
+        _set_arg(lib, kernel, 6, ctypes.c_uint32(parts))
+        _set_arg(lib, reduce_kernel, 0, ctypes.c_void_p(int(buffers[4])))
+        _set_arg(lib, reduce_kernel, 1, ctypes.c_void_p(int(buffers[3])))
+        _set_arg(lib, reduce_kernel, 2, ctypes.c_uint32(rows))
+        _set_arg(lib, reduce_kernel, 3, ctypes.c_uint32(parts))
 
         started = time.perf_counter()
-        _launch(lib, queue, kernel, rows, report, "clEnqueueNDRangeKernelWarmup")
+        _launch_2d(lib, queue, kernel, rows, parts, report, "clEnqueueNDRangeKernelWarmup")
+        _launch_1d(lib, queue, reduce_kernel, rows, report, "clEnqueueNDRangeReduceWarmup")
         _finish(lib, queue, report, "clFinishWarmup")
         report["gemv"]["warmup_ms"] = round((time.perf_counter() - started) * 1000.0, 3)
 
         started = time.perf_counter()
         for _ in range(repeats):
-            _launch(lib, queue, kernel, rows, report, "clEnqueueNDRangeKernel")
+            _launch_2d(lib, queue, kernel, rows, parts, report, "clEnqueueNDRangeKernel")
+            _launch_1d(lib, queue, reduce_kernel, rows, report, "clEnqueueNDRangeReduce")
         _finish(lib, queue, report, "clFinish")
         seconds = time.perf_counter() - started
         report["gemv"]["elapsed_ms"] = round(seconds * 1000.0, 3)
@@ -315,6 +430,9 @@ def run_probe(rows=DEFAULT_ROWS, cols=DEFAULT_COLS, repeats=DEFAULT_REPEATS, loa
     except (AttributeError, TypeError, ValueError, OSError) as exc:
         return _fail(report, "OpenCL packed-ternary path failed: %s" % exc)
     finally:
+        if reduce_kernel:
+            report["returncodes"]["clReleaseKernelReduce"] = _hex(
+                lib.clReleaseKernel(reduce_kernel))
         if kernel:
             report["returncodes"]["clReleaseKernel"] = _hex(lib.clReleaseKernel(kernel))
         if program:
@@ -344,8 +462,8 @@ def render(report):
             device["opencl_c_version"]))
     if report["build"]["ok"]:
         lines.append("  build: ok (%d source bytes)" % report["build"]["source_bytes"])
-    lines.append("  shape: %d rows x %d cols (%d phases, %s packed bytes, %s scale bytes)" % (
-        shape["rows"], shape["cols"], shape["phases"], shape["packed_bytes"],
+    lines.append("  shape: %d rows x %d cols (%d phases in %d part(s), %s packed bytes, %s scale bytes)" % (
+        shape["rows"], shape["cols"], shape["phases"], shape["parts"], shape["packed_bytes"],
         shape["scale_bytes"]))
     if gemv["mismatches"] is not None:
         lines.append("  gemv: mismatches: %s; warmup %.3f ms; %d launches %.3f ms; %s GFLOP/s" % (

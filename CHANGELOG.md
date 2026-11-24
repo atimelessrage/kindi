@@ -43,6 +43,12 @@ plain CPU suite is the only evidence for the merge.
 - **One CPU thread for each physical core.** Where Kindi picks CPU threads itself (the dense CPU engines, the
   Flash-Next expert pool, the DeepSeek expert pools), it takes one logical CPU for each physical core. Environment
   settings still override it. On a Ryzen 9 7940HS, 8 threads decode at 11.5 tokens/s and 16 threads at 10.0 to 10.8.
+- **Faster Intel Arc A770 probe: the packed ternary GEMV runs parallel over the 128-weight phases.**
+  `kindi intel-ternary` used one work-item per row, which used a fraction of the card; the phases are now split
+  over work-items (`--parts`, default one per phase) and a second kernel adds them. Still bit-exact against the
+  host reference, and 5.75x to 14.14x faster at layer-sized matrices on the A770 (512x4096 8.88 -> 1.11 ms,
+  4096x4096 9.06 -> 1.58 ms, three-run medians). The probe now refuses a shape whose split is not exact rather
+  than reporting a device mismatch. Arc is still unsupported: no backend, model or engine path, and M2 stays partial.
 
 ### Fixed
 

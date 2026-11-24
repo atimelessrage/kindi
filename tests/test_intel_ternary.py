@@ -35,6 +35,48 @@ def test_the_reference_matches_an_independent_float64_dot():
     assert np.array_equal(got.astype(np.float64), want)
 
 
+def test_the_parts_cover_every_phase_exactly_once():
+    """Phase ph belongs to part ph % parts: the sum of the partials is the whole GEMV."""
+    for rows, cols in ((16, 512), (5, 1024), (3, 4096)):
+        _trits, bcodes, dpm, x = intel_ternary.matrix(rows, cols, seed=7)
+        want = intel_ternary.reference(bcodes, dpm, x, rows, cols)
+        for parts in (1, 2, 8, 32, 64):
+            got = intel_ternary.partials(bcodes, dpm, x, rows, cols, parts)
+            assert got.shape == (parts, rows)
+            assert np.array_equal(got.sum(axis=0, dtype=np.float32), want), (rows, cols, parts)
+
+
+def test_a_part_only_touches_its_own_phases():
+    """A phase the part does not own contributes nothing to it."""
+    _trits, bcodes, dpm, x = intel_ternary.matrix(8, 512, seed=7)
+    full = intel_ternary.partials(bcodes, dpm, x, 8, 512, 2)
+    zeroed = np.array(x, dtype=np.float32)
+    for phase in range(1, 512 // 128, 2):      # blank every phase part 1 owns
+        zeroed[phase * 128:(phase + 1) * 128] = 0.0
+    part0 = intel_ternary.partials(bcodes, dpm, zeroed, 8, 512, 2)
+    assert np.array_equal(part0[0], full[0])
+    assert np.array_equal(part0[1], np.zeros(8, dtype=np.float32))
+
+
+def test_the_default_split_is_one_part_per_phase_capped():
+    assert intel_ternary.default_parts(128) == 1
+    assert intel_ternary.default_parts(1024) == 8
+    assert intel_ternary.default_parts(4096) == 32
+    assert intel_ternary.default_parts(8192) == 64
+    assert intel_ternary.default_parts(65536) == intel_ternary.MAX_PARTS
+
+
+def test_the_probe_reports_the_split_it_used():
+    report = intel_ternary.run_probe(rows=8, cols=1024, loader="missing-opencl-loader-probe.dll")
+    assert report["shape"]["parts"] == 8
+    assert "phases" in report["shape"]["parts_source"]
+    explicit = intel_ternary.run_probe(rows=8, cols=1024, parts=3,
+                                       loader="missing-opencl-loader-probe.dll")
+    assert explicit["shape"]["parts"] == 3
+    assert explicit["shape"]["parts_source"] == "--parts"
+    assert report["kernel"]["names"] == ["ternary_gemv_part", "ternary_gemv_reduce"]
+
+
 def test_the_probe_is_flagged_as_a_probe():
     report = intel_ternary.run_probe(loader="missing-opencl-loader-probe.dll")
     assert report["result"] == "fail"
@@ -50,3 +92,5 @@ def test_the_shape_is_validated_before_any_device_work():
     assert "--rows" in intel_ternary.run_probe(rows=0)["error"]
     assert "--repeats" in intel_ternary.run_probe(repeats=0)["error"]
     assert "--device" in intel_ternary.run_probe(device=-1)["error"]
+    assert "--parts" in intel_ternary.run_probe(parts=0)["error"]
+    assert "--parts" in intel_ternary.run_probe(parts=intel_ternary.MAX_PARTS + 1)["error"]

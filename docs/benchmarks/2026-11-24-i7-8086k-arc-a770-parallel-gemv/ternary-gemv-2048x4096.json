@@ -1,0 +1,123 @@
+{
+ "backend": "opencl packed-ternary gemv probe; no sycl, model, engine or backend",
+ "build": {
+  "log": null,
+  "ok": true,
+  "source_bytes": 1767
+ },
+ "device": {
+  "compute_units": 512,
+  "device_version": "OpenCL 3.0 NEO ",
+  "driver_version": "32.0.101.9175",
+  "global_mem_mib": 15932,
+  "max_clock_mhz": 2400,
+  "max_work_group_size": 1024,
+  "name": "Intel(R) Arc(TM) A770 Graphics",
+  "opencl_c_version": "OpenCL C 1.2 ",
+  "vendor": "Intel(R) Corporation"
+ },
+ "device_count": 2,
+ "device_index": 0,
+ "error": null,
+ "gemv": {
+  "cols": 4096,
+  "elapsed_ms": 1.152,
+  "first_mismatch": null,
+  "gflops": 291.145,
+  "max_abs_error": 0.0,
+  "mismatches": 0,
+  "parts": 32,
+  "repeats": 20,
+  "rows": 2048,
+  "warmup_ms": 4.303
+ },
+ "kernel": {
+  "exactness": "each part and the reduction sum exactly representable values, so the split cannot change the result; the host reference is still compared bit for bit",
+  "names": [
+   "ternary_gemv_part",
+   "ternary_gemv_reduce"
+  ],
+  "reduce": "sums the parts per row; the 1-part shape is the earlier single-kernel GEMV",
+  "split": "phase ph -> part ph % parts; one work-item per (row, part), row axis fastest"
+ },
+ "layout": {
+  "scales": "fp16 per 128 weights, [column/128][row]; widened to float32 on the host",
+  "weight": "trit - 1, scaled by the 128-weight group's scale",
+  "weights": "4 trits per byte, byte = t0 + 3*t1 + 9*t2 + 27*t3; [column/4][row]"
+ },
+ "loader": {
+  "available": true,
+  "error": null,
+  "name": "OpenCL.dll"
+ },
+ "pack": {
+  "bcodes_sha256": "03dcf75128b18a7d36fe68e9a92f57e07ccf335c200e38ae239c1ff7abed6bb3",
+  "dpm_sha256": "f2e007bbfa348f33b9bc94505edd28d0968a5a29e047bd7da39473791f3f173c",
+  "seed": 7
+ },
+ "platform": "Intel(R) OpenCL Graphics (discrete)",
+ "platforms": [
+  {
+   "gpu_devices": 1,
+   "index": 0,
+   "name": "Intel(R) OpenCL Graphics (discrete)",
+   "vendor": "Intel(R) Corporation",
+   "version": "OpenCL 3.0 "
+  },
+  {
+   "gpu_devices": 1,
+   "index": 1,
+   "name": "Intel(R) OpenCL HD Graphics",
+   "vendor": "Intel(R) Corporation",
+   "version": "OpenCL 3.0 "
+  }
+ ],
+ "probe": "intel-ternary-gemv",
+ "read_only": false,
+ "result": "pass",
+ "returncodes": {
+  "clBuildProgram": "0x00000000",
+  "clCreateBufferCodes": "0x00000000",
+  "clCreateBufferPartial": "0x00000000",
+  "clCreateBufferScales": "0x00000000",
+  "clCreateBufferX": "0x00000000",
+  "clCreateBufferY": "0x00000000",
+  "clCreateCommandQueue": "0x00000000",
+  "clCreateContext": "0x00000000",
+  "clCreateKernel": "0x00000000",
+  "clCreateKernelReduce": "0x00000000",
+  "clCreateProgramWithSource": "0x00000000",
+  "clEnqueueNDRangeKernel": "0x00000000",
+  "clEnqueueNDRangeKernelWarmup": "0x00000000",
+  "clEnqueueNDRangeReduce": "0x00000000",
+  "clEnqueueNDRangeReduceWarmup": "0x00000000",
+  "clEnqueueReadBuffer": "0x00000000",
+  "clFinish": "0x00000000",
+  "clFinishWarmup": "0x00000000",
+  "clGetPlatformIDs": "0x00000000",
+  "clGetPlatformIDsHandles": "0x00000000",
+  "clReleaseCommandQueue": "0x00000000",
+  "clReleaseContext": "0x00000000",
+  "clReleaseKernel": "0x00000000",
+  "clReleaseKernelReduce": "0x00000000",
+  "clReleaseMemObject0": "0x00000000",
+  "clReleaseMemObject1": "0x00000000",
+  "clReleaseMemObject2": "0x00000000",
+  "clReleaseMemObject3": "0x00000000",
+  "clReleaseMemObject4": "0x00000000",
+  "clReleaseProgram": "0x00000000"
+ },
+ "schema": 1,
+ "scope": "packed ternary GEMV (4 trits/byte, one fp16 scale per 128 weights), checked against an exact host reference",
+ "shape": {
+  "cols": 4096,
+  "packed_bytes": 2097152,
+  "partial_bytes": 262144,
+  "parts": 32,
+  "parts_source": "phases (cols/128), capped at 64",
+  "phases": 32,
+  "rows": 2048,
+  "scale_bytes": 131072
+ },
+ "support_claim": false
+}

@@ -1,6 +1,6 @@
 # Intel Arc A770 support: goal and implementation plan
 
-Status: **planning and architecture audit, 2026-11-10; updated 2026-11-22.** There is no Intel backend
+Status: **planning and architecture audit, 2026-11-10; updated 2026-11-24.** There is no Intel backend
 in Kindi yet, and no Intel support claim. The A770 16 GB is now **installed in the Windows test rig**,
 and M1 hardware qualification has been measured there: the card is visible at 16 GiB, its display
 driver registers a Level Zero driver, and the loader enumerates one driver and one device
@@ -8,7 +8,8 @@ driver registers a Level Zero driver, and the loader enumerates one driver and o
 without oneAPI: `kindi intel-smoke` round-trips 16 MiB through Level Zero device/shared USM, and
 `kindi intel-cl` compiles and runs exact vector-add and GEMM kernels with the driver's OpenCL C
 compiler, and `kindi intel-ternary` runs a packed ternary GEMV over the pack's 4-trit/byte layout
-with a bit-exact host check. There is still no SYCL backend, Kindi engine path or model run. The plan's first support
+with a bit-exact host check, now split over the 128-weight phases (5.75x-14.14x the one-work-item
+shape at layer-sized matrices, [run](benchmarks/2026-11-24-i7-8086k-arc-a770-parallel-gemv/README.md)). There is still no SYCL backend, Kindi engine path or model run. The plan's first support
 target remains Linux; the Windows run qualifies the hardware, the memory path and the device kernel
 path, not Kindi support (tracked as [REQ-0020](development/requirements/REQ-0020.md)).
 
@@ -197,7 +198,7 @@ arithmetic path: no `KINDI_TC`, `KINDI_SPEC`, `KINDI_FD`, fast head or `k8v4` in
 |---|---|---|
 | **M0** Architecture audit | this page; 22-kernel inventory; backend boundary and scope | this page names every affected path and the unsupported options |
 | **M1** Hardware qualification | one A770 16 GB on Linux; oneAPI/SYCL/Level Zero; `sycl-ls`; ReBAR and PCIe state | device is visible with 16 GB; ReBAR state recorded; CPU and llama.cpp SYCL baselines run |
-| **M2** Backend smoke test | memory path and runtime-compiled OpenCL vector-add/GEMM (partial); still needs `libksycl.so` and Kindi device selection | the smoke binary runs on the A770 with no CPU fallback |
+| **M2** Backend smoke test | memory path, runtime-compiled OpenCL vector-add/GEMM and the phase-parallel pack-layout ternary GEMV (partial); still needs `libksycl.so` and Kindi device selection | the smoke binary runs on the A770 with no CPU fallback |
 | **M3** Single-card 2B exact | plain engine, exact head, `kindi verify` | 4/4 Bonsai prompts token-exact; no fast/spec/TC |
 | **M4** Server and cache | `kindi serve`, non-stream/stream, prompt cache, health/metrics | same outputs as M3; cache save/restore works |
 | **M5** 4B/9B/27B | model matrix and context fit | exact verify for each advertised model; 8K/24K stability measured |
@@ -290,7 +291,41 @@ launches:
 Reports: `docs/benchmarks/2026-11-23-i7-8086k-arc-a770/`. This is the on-disk pack layout, not the
 engine's load-time 5-trit lane repack (`kindi/layout.py`); the activation is not quantized and one
 work-item per row is not a throughput design, so the rates are observations, not a claim. It adds no
-backend, model, SYCL path or support row: M2 stays partial.
+backend, model, SYCL path or support row: M2 stays partial. (The 2026-11-24 kernel below keeps this
+layout and splits the phase axis instead of running one work-item per row.)
+
+### M2 packed ternary GEMV: phase-parallel kernel (2026-11-24)
+
+One work-item per row left most of the card idle (512 work-items on 512 EUs), so the probe now splits
+the 128-weight phase axis: work-item `(row, part)` handles the phases whose `ph % parts == part` and
+writes one partial per row, and a second kernel `ternary_gemv_reduce` adds the parts. `--parts`
+defaults to one part per phase (capped at 64) because that measured fastest at every shape tried;
+`--parts 1` is the 2026-11-23 one-work-item shape. Rows stay the fastest-varying axis, so the loads
+that were coalesced before still are.
+
+The split cannot change the result: a part sums at most 64 exactly representable products and the
+reduction at most 64 such floats, all integer-valued below 2^24. The probe also checks that on the
+host before it launches — `kindi.intel_ternary.partials` computes the same decomposition and the run
+refuses a shape where summing the parts differs from the reference — and the device result is still
+compared bit for bit.
+
+Measured on the same Windows A770 (driver 32.0.101.9175), 20 launches, three runs per shape, median
+run quoted ([page](benchmarks/2026-11-24-i7-8086k-arc-a770-parallel-gemv/README.md)):
+
+| rows x cols | parts | mismatches | 20 launches | GFLOP/s | `--parts 1` | speedup |
+|---|---|---|---|---|---|---|
+| 64 x 1024 | 8 | 0 | 1.054 ms | 2.49 | 2.825 ms | 2.68x |
+| 128 x 4096 | 32 | 0 | 1.081 ms | 19.40 | 8.870 ms | 8.21x |
+| 512 x 4096 | 32 | 0 | 1.111 ms | 75.54 | 8.880 ms | 7.99x |
+| 1024 x 8192 | 64 | 0 | 1.224 ms | 274.12 | 17.306 ms | 14.14x |
+| 2048 x 4096 | 32 | 0 | 1.152 ms | 291.15 | 9.001 ms | 7.81x |
+| 4096 x 4096 | 32 | 0 | 1.577 ms | 425.60 | 9.064 ms | 5.75x |
+
+This is still the on-disk pack layout with an unquantized activation, not the engine's 5-trit lane
+repack or its Q8 GEMV, and a launch costs about 1 ms of fixed overhead at these sizes. No backend,
+model, engine or support claim is added; M2 stays partial. What it does establish is that the layout
+decodes exactly at a useful rate with the parallelism spread over phases, which is the shape the
+backend's kernel order needs.
 
 ### M2 next step: SYCL vector-add smoke (planned 2026-11-23, not run)
 

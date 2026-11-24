@@ -464,7 +464,7 @@ def cmd_intel_ternary(cfg, a):
     from . import intel_ternary
 
     report = intel_ternary.run_probe(a.rows, cols=a.cols, repeats=a.repeats, loader=a.loader,
-                                     device=a.device)
+                                     device=a.device, parts=a.parts)
     if a.json:
         print(intel_ternary.dumps(report))
     else:
@@ -741,8 +741,11 @@ def _build_parser():
     s.add_argument("--loader", default=None, help="Level Zero loader name/path (default: the host loader)")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("intel-ternary", help="packed ternary GEMV probe on an Intel GPU (no backend)")
-    s.add_argument("--rows", type=int, default=64, help="matrix rows (default 64, 1-1024)")
+    s.add_argument("--rows", type=int, default=64, help="matrix rows (default 64, 1-4096)")
     s.add_argument("--cols", type=int, default=1024, help="matrix columns, a multiple of 128 (default 1024)")
+    s.add_argument("--parts", type=int, default=None,
+                   help="phase groups run in parallel, one work-item per (row, part) "
+                        "(default: one per 128-weight phase, capped at 64)")
     s.add_argument("--repeats", type=int, default=5, help="timed launches (default 5, max 50)")
     s.add_argument("--device", type=int, default=0, help="Intel OpenCL GPU index (default 0)")
     s.add_argument("--loader", default=None, help="OpenCL loader name/path (default: the host loader)")
