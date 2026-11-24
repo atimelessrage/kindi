@@ -75,6 +75,16 @@ plain CPU suite is the only evidence for the merge.
   `install.sh` names the package when `apt-get` cannot install Docker or the NVIDIA container toolkit. It no longer
   takes an `nvidia` runtime entry in `daemon.json` for an installed toolkit.
 
+### A liveness gate for the documented speculation knobs (2026-11-24, REQ-0018)
+
+- `tests/test_knob_liveness.py` classifies every documented `KINDI_SPEC*`/`KINDI_DSPINE*`/
+  `KINDI_MTP_HEAD*` knob: six are proven live (setting the knob changes what the code decides —
+  the mode, k, whether sampling drafts, whether the block drafter is wanted, the head's verdict),
+  fifteen are parked with a reason, and the test fails on a documented speculation knob with no row,
+  a stale row, or a knob with no reader left in `kindi/`. This is the general form of the mode-A bug
+  (a documented knob that reached nothing while every gate stayed green). It found one real gap:
+  `KINDI_MTP_HEAD` is read by the loader but absent from the generated configuration reference.
+
 ### `kindi bench --spec` (2026-11-24, REQ-0026)
 
 - `kindi bench` can now benchmark a speculation mode: `kindi bench --spec mtp` (also `ngram`,
