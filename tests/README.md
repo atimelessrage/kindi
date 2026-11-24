@@ -51,9 +51,12 @@ self-hosted GPU lane is described in [docs/CI.md](../docs/CI.md); it is not run 
 
 ### Skipped-test inventory (2026-11-24 full CPU run)
 
-`python -m pytest -q -rs` at `a101b7d` plus this round's changes: **1,520 passed, 58 skipped, 0
-failed** in 185.81 s (`bench-logs/full-suite-20261124-auditfix-final.log`); the 1,513-passed run at
-`ebf871f` is the previous record. Every skip is one
+`python -m pytest -q -rs` after the Anthropic endpoint (REQ-0028) landed: **1,547 passed, 58 skipped,
+0 failed** in 184.29 s (`bench-logs/full-suite-20261124-anthropic-green.log`; that run itself reported
+1 failed, the `tests/test_agents_handoff.py` table check that the handoff bump in the same commit
+fixes, so the two numbers describe the same tree). The 1,520-passed run before the endpoint is
+`bench-logs/full-suite-20261124-auditfix-final.log`; the 1,513-passed run at `ebf871f` is the record
+before the audit fixes. Every skip is one
 of ten groups; pytest groups `-rs` output by location, so the count per group is what to watch. A
 skip is not a pass: a new group, or a changed count, must be reviewed instead of hidden by the total.
 
