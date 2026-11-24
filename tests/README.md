@@ -56,12 +56,11 @@ self-hosted GPU lane is described in [docs/CI.md](../docs/CI.md); it is not run 
 ### Skipped-test inventory (2026-11-24 full CPU run)
 
 `python -m pytest -q -rs` with the Anthropic endpoint (REQ-0028), the selftest's Anthropic check,
-the block-size contract (REQ-0023 A2) and the Intel q8 GEMM probe in: **1,560 passed, 58 skipped,
-0 failed** in 201.34 s (`bench-logs/full-suite-20261124-intel-gemm.log`; that run itself reported
-1 failed, the `CONFIGURATION-REFERENCE.md` staleness from the `__main__.py` line shift, regenerated
-by the commit that carries this paragraph, so the two numbers describe the same tree). The
-1,551-passed run before it is `bench-logs/full-suite-20261124-blocksize.log`; the 1,547-passed run
-is `bench-logs/full-suite-20261124-anthropic-green.log`. Every skip is one
+the block-size contract (REQ-0023 A2), the Intel q8 GEMM probe and its staged/pinned additions in:
+**1,563 passed, 58 skipped, 0 failed** in 195.17 s
+(`bench-logs/full-suite-20261124-arc-tiled-final.log`). The 1,560-passed run before it is
+`bench-logs/full-suite-20261124-intel-gemm.log`; the 1,551-passed run is
+`bench-logs/full-suite-20261124-blocksize.log`. Every skip is one
 of ten groups; pytest groups `-rs` output by location, so the count per group is what to watch. A
 skip is not a pass: a new group, or a changed count, must be reviewed instead of hidden by the total.
 

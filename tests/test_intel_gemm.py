@@ -91,12 +91,52 @@ def test_the_shape_is_validated_before_any_device_work():
     assert "--cols" in intel_gemm.run_probe(cols=100)["error"]
     assert "--repeats" in intel_gemm.run_probe(repeats=0)["error"]
     assert "--device" in intel_gemm.run_probe(device=-1)["error"]
+    assert "--staging" in intel_gemm.run_probe(staging="tensor")["error"]
+
+
+def test_both_stagings_are_offered_and_reported():
+    """The un-tiled shape stays reachable: it is the page's first measured baseline."""
+    assert intel_gemm.STAGINGS == ("local", "global")
+    global_report = intel_gemm.run_probe(staging="global",
+                                         loader="missing-opencl-loader-probe.dll")
+    local_report = intel_gemm.run_probe(loader="missing-opencl-loader-probe.dll")
+    assert global_report["shape"]["staging"] == "global"
+    assert global_report["shape"]["local_bytes"] == 0
+    assert local_report["shape"]["staging"] == "local"
+    assert local_report["shape"]["local_bytes"] == intel_gemm.LOCAL_BYTES
+    assert 0 < intel_gemm.LOCAL_BYTES <= 64 * 1024        # fits the measured card's 64 KiB
+
+
+def test_a_non_arc_device_is_named_in_the_warning():
+    """Device order is driver-defined; a run that lands on the iGPU must say so, not pass silently."""
+    source = intel_gemm.SOURCE
+    assert "device_name" in intel_gemm.run_probe.__code__.co_varnames
+    rendered = intel_gemm.render(
+        dict(intel_gemm._base_report("OpenCL.dll", 128, 128, 512, 5, "local"),
+             warnings=["the selected device is Intel(R) UHD Graphics 630, not an Arc; "
+                       "pass --device-name Arc"], result="pass", error=None))
+    assert any("warning:" in line and "--device-name Arc" in line for line in rendered)
+    assert "gemm_tile_local" in source             # the staged kernel exists to be selected
 
 
 def test_the_kernel_stages_the_tile_it_claims():
     source = intel_gemm.SOURCE
     assert "__kernel void q8x" in source and "__kernel void gemm_tile" in source
+    assert "__kernel void gemm_tile_local" in source
     assert "rint" in source                       # the CUDA quantizer rounds half to even
     assert "127.0f" in source                     # the threshold pair
     assert "decode_byte" in source                # the pack's 4-trit layout, not a requantization
     assert "dp4a_manual" in source                # OpenCL C 1.2 has no dot-product instruction
+    assert "barrier(CLK_LOCAL_MEM_FENCE)" in source
+
+
+def test_the_two_staged_kernels_accumulate_identically():
+    """Staging must not change the arithmetic: both kernels keep the same group order and scale."""
+    source = intel_gemm.SOURCE
+    global_body = source.split("__kernel void gemm_tile(")[1].split("__kernel void gemm_tile_local(")[0]
+    local_body = source.split("__kernel void gemm_tile_local(")[1]
+    for body in (global_body, local_body):
+        assert "is[i][j] = dp4a_manual(a[i], b[j], is[i][j])" in body   # same int32 dot
+        assert "(float)is[i][j] * (xx * dj)" in body                    # same scale, same order
+        assert "barrier" in body or body is global_body
+    assert local_body.count("barrier(CLK_LOCAL_MEM_FENCE)") == 3

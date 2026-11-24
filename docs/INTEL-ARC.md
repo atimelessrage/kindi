@@ -358,11 +358,32 @@ measured against. Exactness is by construction (activations bounded by 127 with 
 maximum forced to 127, so the quantizer passes through at xs = 1.0; fp16-exact scales), and the
 host reference is checked against an independent float64 dot before the device is launched.
 
-No backend, model, engine or support claim is added; M2 stays partial. The kernel is ready to be
-re-run against a local-memory-staged variant and a 5-trit-lane unpack as follow-ups, which are
-named measurements, not claims.
+No backend, model, engine or support claim is added; M2 stays partial. The local-memory-staged
+variant and the 5-trit-lane unpack were named as follow-ups; the first is measured below, the second
+is still open.
 
 ([page](benchmarks/2026-11-24-i7-8086k-arc-a770-ternary-gemm/README.md))
+
+### M2 next: pinned work-group (+1.71x) and local staging (+1.02-1.05x) (2026-11-24)
+
+Two changes followed, and the larger one was not the tiles. First, the GEMM now always launches one
+256-wide work-group per 128-token x 128-row tile (`(256,1)` local size). The first page left the
+work-group shape to the runtime, which cost **1.71x** at 512 x 512 x 4096 (555.1 -> 323.4 ms, three
+runs per arm, bit-identical output) and - worse - let a work-group span two tiles once the tiles
+were staged in local memory, which made the result wrong at more than one tile. Pinning is therefore
+a correctness fix first. Second, `--staging local` (the default) stages each group's activation
+words and decoded weight words in local memory as `k_mm_g5q` does; it is exact and a further
+1.02-1.05x over the pinned global load (67.77 vs 66.17 GFLOP/s at the large shape), small because
+the bottleneck is the byte-wise dot and the 4-trit decode, not global traffic.
+
+OpenCL's device order is **not stable on this host**: the driver has returned the integrated UHD 630
+first and the Arc A770 second, and the reverse on other runs, so `--device 0` can silently benchmark
+the iGPU. All three OpenCL probes now take `--device-name SUBSTR` and put a warning in the report
+(and the printed output) when the selected device is not an Arc; every number below was measured
+with `--device-name Arc` and records `Intel(R) Arc(TM) A770 Graphics`.
+
+([page](benchmarks/2026-11-24-i7-8086k-arc-a770-gemm-tiled/README.md)) No backend, model, engine or
+support claim: M2 stays partial.
 
 ### M2 next step: SYCL vector-add smoke (planned 2026-11-23, not run)
 

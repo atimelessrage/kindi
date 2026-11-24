@@ -9,14 +9,20 @@ observation with the same bit-exact discipline:
 * ``q8x`` ports ``k_q8x_T2`` (``kindi/chunk.cu``: one 256-thread group per 128-column group and
   64-token band; one threshold pair per token, ``rint`` with round-half-even, four int8 per
   word). Its output feeds the GEMM directly, so a mismatch anywhere in the chain fails the run.
+  The activations are held in registers between the maximum and the packing pass, so the kernel
+  pays three work-group barriers per band instead of one pair per token.
 * ``gemm_tile`` mirrors ``k_mm_g5q``'s arithmetic: the block covers 128 tokens x 128 rows with 256
   work-items (8 x 8 outputs each); per 128-column group the dot products accumulate in int32 and
   are scaled once (``f * (xs * dj)``) before an fp32 add, in group order, with the group's scale
   read per row. Two deliberate differences, both load-time choices rather than arithmetic: the
   weight bytes are the pack's on-disk 4-trit layout ``intel-ternary`` uploads (the engine
-  repacks to 5-trit lanes at load; the decode here is the 4-trit one), and there is no local-memory
-  staging - every load comes from global memory, so this is the un-tiled shape to measure before
-  tiled variants, not the fast one.
+  repacks to 5-trit lanes at load; the decode here is the 4-trit one), and there is no tensor-core
+  or subgroup path.
+* ``gemm_tile_local`` is the same arithmetic with the group's activation words and decoded weight
+  words staged in local memory (as the CUDA kernels stage their A/B tiles), so each staged word is
+  read from global memory once per block instead of once per consumer. Staging cannot change the
+  result: the dot still accumulates the same int32 products in the same ``k4`` order and the group
+  is scaled once, which is why both variants are held to the same bit-exact reference.
 
 The inputs are constructed so every float operation is exact (activations are small integers with a
 per-group maximum of exactly 127, so the quantizer is a pass-through at xs = 1.0; scales are
@@ -44,17 +50,19 @@ from .intel_cl import (
     DEFAULT_LOADER,
     _bind,
     _build_log,
-    _device_report,
     _enumerate,
     _finish,
     _hex,
     _open,
     _read_back,
+    _scalar,
     _set_arg,
+    pick_device,
 )
-from .intel_ternary import _buffer, _launch_2d
+from .intel_ternary import _buffer
 
 PROBE = "intel-ternary-gemm"
+STAGINGS = ("local", "global")
 DEFAULT_ROWS = 128
 DEFAULT_TOKENS = 128
 DEFAULT_COLS = 512
@@ -71,8 +79,8 @@ SCALES = (1.0, 0.5, 2.0, 1.5)          # fp16-exact: every scaled product below 
 SEED = 7
 SOURCE = """
 /* The CUDA kernels stage tiles in shared memory and use dp4a; OpenCL C 1.2 has neither a shuffle
-   nor a dot-product instruction, so the dot below is byte by byte (exactly dp4a's integers) and
-   every load is a global load. tq(d) maps a digit 0/1/2 to the int8 trit -1/0/1 as a byte. */
+   nor a dot-product instruction, so the dot below is byte by byte (exactly dp4a's integers).
+   tq(d) maps a digit 0/1/2 to the int8 trit -1/0/1 as a byte. */
 static inline uint tq(uint d) { return (d + 255u) & 255u; }
 
 /* Decodes one packed byte to four int8 trits in a word, in the engine's digit order
@@ -95,56 +103,55 @@ static inline int dp4a_manual(uint a, uint b, int acc) {
                + sgn(a >> 16) * sgn(b >> 16) + sgn(a >> 24) * sgn(b >> 24);
 }
 
-/* k_q8x_T2 without shuffles: one 256-wide group per (128-column group, 64-token band). */
+/* k_q8x_T2 without shuffles: one 256-wide group per (128-column group, 64-token band). The eight
+   float4 activations stay in registers between the maximum pass and the packing pass, so the band
+   costs two barriers rather than one pair per token; lane 0 of each warp reduces its eight tokens'
+   maxima from local memory and publishes the threshold. */
 __kernel void q8x(__global const float *x, int ldx,
                   __global uint *xq, __global float *xs, int ldt, int t_max) {
     __local uint q[32][65];
-    __local float red[8][32];
+    __local float mx[8][8][32];
     __local float amaxv[64];
     const int g = get_global_id(1) % (ldx >> 7);
     const int t0 = (get_global_id(1) / (ldx >> 7)) * 64;
     const int lane = get_global_id(0) & 31;
     const int w = get_global_id(0) >> 5;
+    float4 v[8];
     for (int i = 0; i < 8; ++i) {
-        int tt = w * 8 + i;
-        int t = t0 + tt;
-        float a = 0.0f;
-        if (t < t_max) {
-            float4 v = ((__global float4 *)(x + (long long)t * ldx + g * 128 + lane * 4))[0];
-            a = fmax(fabs(v.x), fmax(fabs(v.y), fmax(fabs(v.z), fabs(v.w))));
-        }
-        red[w][lane] = a;
-        barrier(CLK_LOCAL_MEM_FENCE);
-        if (lane == 0) {
-            float m = 0.0f;
-            for (int l = 0; l < 32; ++l) m = fmax(m, red[w][l]);
-            amaxv[tt] = m;
-            if (t < t_max) xs[g * ldt + t] = m / 127.0f;
-        }
-        barrier(CLK_LOCAL_MEM_FENCE);
-        if (t < t_max) {
-            float m = amaxv[tt];
-            float id = m != 0.0f ? 127.0f / m : 0.0f;
-            float q0 = 0.0f, q1 = 0.0f, q2 = 0.0f, q3 = 0.0f;
-            if (t < t_max) {
-                float4 v = ((__global float4 *)(x + (long long)t * ldx + g * 128 + lane * 4))[0];
-                q0 = v.x; q1 = v.y; q2 = v.z; q3 = v.w;
-            }
-            q[lane][tt] = ((uint)((int)rint(q0 * id) & 255))
-                        | ((uint)((int)rint(q1 * id) & 255) << 8)
-                        | ((uint)((int)rint(q2 * id) & 255) << 16)
-                        | ((uint)((int)rint(q3 * id) & 255) << 24);
-        }
-        barrier(CLK_LOCAL_MEM_FENCE);
+        int t = t0 + w * 8 + i;
+        v[i] = (float4)(0.0f, 0.0f, 0.0f, 0.0f);
+        if (t < t_max)
+            v[i] = ((__global float4 *)(x + (long long)t * ldx + g * 128 + lane * 4))[0];
+        mx[w][i][lane] = fmax(fabs(v[i].x), fmax(fabs(v[i].y), fmax(fabs(v[i].z), fabs(v[i].w))));
     }
+    barrier(CLK_LOCAL_MEM_FENCE);
+    if (lane == 0) {
+        for (int i = 0; i < 8; ++i) {
+            int tt = w * 8 + i;
+            float m = 0.0f;
+            for (int l = 0; l < 32; ++l) m = fmax(m, mx[w][i][l]);
+            amaxv[tt] = m;
+            if (t0 + tt < t_max) xs[g * ldt + t0 + tt] = m / 127.0f;
+        }
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+    for (int i = 0; i < 8; ++i) {
+        float m = amaxv[w * 8 + i];
+        float id = m != 0.0f ? 127.0f / m : 0.0f;
+        q[lane][w * 8 + i] = ((uint)((int)rint(v[i].x * id) & 255))
+                           | ((uint)((int)rint(v[i].y * id) & 255) << 8)
+                           | ((uint)((int)rint(v[i].z * id) & 255) << 16)
+                           | ((uint)((int)rint(v[i].w * id) & 255) << 24);
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
     for (int i = get_global_id(0); i < 32 * 64; i += 256) {
         int k4 = i >> 6, tt = i & 63, t = t0 + tt;
         if (t < t_max) xq[((long long)g * 32 + k4) * ldt + t] = q[k4][tt];
     }
 }
 
-/* One 256-wide group computes one 128-token x 128-row tile, mirroring mm_core's 8 x 8 register
-   tile; the encoding of a row's byte is the pack's 4 trits per byte. */
+/* One group computes one 128-token x 128-row tile with global loads only (the first measured
+   shape); the encoding of a row's byte is the pack's 4 trits per byte. */
 __kernel void gemm_tile(__global const uchar *codes, __global const float *scales,
                         __global const uint *xq, __global const float *xs,
                         __global float *y, int rows, int tokens, int ng) {
@@ -178,8 +185,75 @@ __kernel void gemm_tile(__global const uchar *codes, __global const float *scale
             float xx = xs[g * tokens + t0 + (i < 4 ? tx * 4 + i : 64 + tx * 4 + i - 4)];
             for (int j = 0; j < 8; ++j) {
                 float dj = scales[g * rows + r0 + (j < 4 ? ty * 4 + j : 64 + ty * 4 + j - 4)];
-                float f = (float)is[i][j];
-                acc[i][j] += f * (xx * dj);
+                acc[i][j] += (float)is[i][j] * (xx * dj);
+            }
+        }
+    }
+    for (int i = 0; i < 8; ++i) {
+        int tok = t0 + (i < 4 ? tx * 4 + i : 64 + tx * 4 + i - 4);
+        for (int j = 0; j < 8; ++j) {
+            int row = r0 + (j < 4 ? ty * 4 + j : 64 + ty * 4 + j - 4);
+            y[(long long)tok * rows + row] = acc[i][j];
+        }
+    }
+}
+
+/* The same arithmetic with the group's tiles staged in local memory, as k_mm_g5q stages its A and
+   B tiles: each activation word and each decoded weight word is read from global memory once per
+   block and then served to all 8 consumers. Padded rows keep the 16-lane groups off one bank. */
+__kernel void gemm_tile_local(__global const uchar *codes, __global const float *scales,
+                              __global const uint *xq, __global const float *xs,
+                              __global float *y, int rows, int tokens, int ng) {
+    __local uint A[32][132];
+    __local int B[32][132];
+    __local float XSL[128];
+    __local float DSL[128];
+    const int gid = get_global_id(0);
+    const int tile = get_global_id(1);
+    const int nrt = rows >> 7;
+    const int r0 = (tile % nrt) * 128;
+    const int t0 = (tile / nrt) * 128;
+    const int tx = gid & 15, ty = gid >> 4;
+    float acc[8][8];
+    for (int i = 0; i < 8; ++i)
+        for (int j = 0; j < 8; ++j) acc[i][j] = 0.0f;
+    for (int g = 0; g < ng; ++g) {
+        barrier(CLK_LOCAL_MEM_FENCE);
+        for (int i = gid; i < 32 * 128; i += 256) {
+            int k4 = i >> 7, tt = i & 127;
+            A[k4][tt] = xq[((long long)g * 32 + k4) * tokens + t0 + tt];
+        }
+        for (int i = gid; i < 32 * 128; i += 256) {
+            int k4 = i >> 7, rr = i & 127;
+            B[k4][rr] = (int)decode_byte((uint)codes[((long long)g * 32 + k4) * rows + r0 + rr]);
+        }
+        if (gid < 128) {
+            XSL[gid] = xs[g * tokens + t0 + gid];
+            DSL[gid] = scales[g * rows + r0 + gid];
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+        int is[8][8];
+        for (int i = 0; i < 8; ++i)
+            for (int j = 0; j < 8; ++j) is[i][j] = 0;
+        for (int k4 = 0; k4 < 32; ++k4) {
+            uint a[8], b[8];
+            for (int i = 0; i < 4; ++i) {
+                a[i] = A[k4][tx * 4 + i];
+                a[4 + i] = A[k4][64 + tx * 4 + i];
+            }
+            for (int j = 0; j < 4; ++j) {
+                b[j] = (uint)B[k4][ty * 4 + j];
+                b[4 + j] = (uint)B[k4][64 + ty * 4 + j];
+            }
+            for (int i = 0; i < 8; ++i)
+                for (int j = 0; j < 8; ++j) is[i][j] = dp4a_manual(a[i], b[j], is[i][j]);
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+        for (int i = 0; i < 8; ++i) {
+            float xx = XSL[i < 4 ? tx * 4 + i : 64 + tx * 4 + i - 4];
+            for (int j = 0; j < 8; ++j) {
+                float dj = DSL[j < 4 ? ty * 4 + j : 64 + ty * 4 + j - 4];
+                acc[i][j] += (float)is[i][j] * (xx * dj);
             }
         }
     }
@@ -193,6 +267,9 @@ __kernel void gemm_tile(__global const uchar *codes, __global const float *scale
 }
 """
 
+CL_DEVICE_LOCAL_MEM_SIZE = 0x1023
+LOCAL_BYTES = (32 * 132 * 4) * 2 + 128 * 4 * 2      # A + B + XSL + DSL, the staged group
+
 
 def _fail(report, message):
     report["error"] = message
@@ -200,7 +277,7 @@ def _fail(report, message):
     return report
 
 
-def _base_report(loader, rows, tokens, cols, repeats):
+def _base_report(loader, rows, tokens, cols, repeats, staging):
     return {
         "probe": PROBE,
         "schema": 1,
@@ -217,22 +294,26 @@ def _base_report(loader, rows, tokens, cols, repeats):
         "device": None,
         "layout": {
             "quantizer": "k_q8x_T2: one 256-wide group per 128-column group and 64-token band; "
-                         "one threshold pair per token; rint, round half even; four int8 per word",
+                         "one threshold pair per token; rint, round half even; four int8 per word; "
+                         "activations held in registers between the maximum and packing passes",
             "weights": "4 trits per byte, byte = t0 + 3*t1 + 9*t2 + 27*t3; [column/4][row]; "
                        "the pack's on-disk layout, not the engine's load-time 5-trit lane repack",
             "arithmetic": "int32 dot per 128-column group, one float (xs * scale) per row, "
-                          "fp32 accumulate in group order; no local-memory staging",
+                          "fp32 accumulate in group order",
         },
         "shape": {"rows": rows, "tokens": tokens, "cols": cols,
                   "groups": cols // GROUP if isinstance(cols, int) else None,
                   "tile": {"rows": 128, "tokens": 128, "work_items": 256},
+                  "staging": staging,
+                  "local_bytes": LOCAL_BYTES if staging == "local" else 0,
                   "x_bytes": None, "codes_bytes": None, "scale_bytes": None},
         "pack": {"seed": SEED, "bcodes_sha256": None, "dpm_sha256": None, "x_sha256": None},
         "build": {"ok": False, "source_bytes": len(SOURCE.encode("utf-8")), "log": None},
         "quantizer": {"xq_mismatches": None, "xs_mismatches": None},
         "gemm": {"rows": rows, "tokens": tokens, "cols": cols, "repeats": repeats,
-                 "mismatches": None, "max_abs_error": None, "first_mismatch": None,
-                 "elapsed_ms": None, "gflops": None},
+                 "staging": staging, "mismatches": None, "max_abs_error": None,
+                 "first_mismatch": None, "elapsed_ms": None, "gflops": None},
+        "warnings": [],
         "returncodes": {},
         "error": None,
         "result": "fail",
@@ -327,6 +408,18 @@ def reference_f64(trits_signed, xq_signed, xs, scales_f32):
     return acc
 
 
+def _launch_gemm(lib, queue, kernel, tiles, report, key):
+    """One 256-wide work-group per tile: a work-group must not span two tiles, because the local
+    staging and its barriers are per group (the runtime would otherwise be free to choose that)."""
+    global_size = (ctypes.c_size_t * 2)(256, tiles)
+    local_size = (ctypes.c_size_t * 2)(256, 1)
+    code = int(lib.clEnqueueNDRangeKernel(queue, kernel, 2, None, global_size, local_size,
+                                          0, None, None))
+    report["returncodes"][key] = _hex(code)
+    if code != CL_SUCCESS:
+        raise ValueError("%s returned %s" % (key, _hex(code)))
+
+
 def _launch_q8x(lib, queue, kernel, ng, bands, report, key):
     global_size = (ctypes.c_size_t * 2)(256, ng * bands)
     local_size = (ctypes.c_size_t * 2)(256, 1)
@@ -338,10 +431,11 @@ def _launch_q8x(lib, queue, kernel, ng, bands, report, key):
 
 
 def run_probe(rows=DEFAULT_ROWS, tokens=DEFAULT_TOKENS, cols=DEFAULT_COLS,
-              repeats=DEFAULT_REPEATS, loader=None, opener=None, device=0, seed=SEED):
+              repeats=DEFAULT_REPEATS, loader=None, opener=None, device=0, seed=SEED,
+              staging="local", device_name=None):
     """Launch the GEMM probe shapes on the selected Intel GPU; it never runs on the CPU."""
     loader = loader or DEFAULT_LOADER
-    report = _base_report(loader, rows, tokens, cols, repeats)
+    report = _base_report(loader, rows, tokens, cols, repeats, staging)
     if not isinstance(rows, int) or not MIN_ROWS <= rows <= MAX_ROWS or rows % 128:
         return _fail(report, "--rows must be a multiple of 128 in [%d, %d]" % (MIN_ROWS, MAX_ROWS))
     if not isinstance(tokens, int) or not MIN_TOKENS <= tokens <= MAX_TOKENS or tokens % 128:
@@ -354,6 +448,9 @@ def run_probe(rows=DEFAULT_ROWS, tokens=DEFAULT_TOKENS, cols=DEFAULT_COLS,
         return _fail(report, "--repeats must be an integer in [1, %d]" % MAX_REPEATS)
     if not isinstance(device, int) or device < 0:
         return _fail(report, "--device must be a non-negative integer")
+    if staging not in STAGINGS:
+        return _fail(report, "--staging must be one of %s" % ", ".join(STAGINGS))
+    kernel_name = b"gemm_tile_local" if staging == "local" else b"gemm_tile"
 
     digits, codes, scales_f16 = matrix(rows, cols, seed)
     x = activations(tokens, cols, seed)
@@ -392,18 +489,24 @@ def run_probe(rows=DEFAULT_ROWS, tokens=DEFAULT_TOKENS, cols=DEFAULT_COLS,
         if devices is None:
             return _fail(report, error or "OpenCL device enumeration failed")
         report["device_count"] = len(devices)
-        if not devices:
-            return _fail(report, "no Intel OpenCL GPU device is visible")
-        if device >= len(devices):
-            return _fail(report, "--device %d is outside the %d visible Intel GPU(s)"
-                         % (device, len(devices)))
-        platform, device_handle, platform_entry = devices[device]
-        report["device_index"] = device
+        index, info, error = pick_device(lib, devices, device, device_name)
+        if error or index is None or info is None:
+            return _fail(report, ("--device-name: " if device_name else "--device: ")
+                         + (error or "the selected device could not be read"))
+        platform, device_handle, platform_entry = devices[index]
+        report["device_index"] = index
         report["platform"] = platform_entry["name"]
-        info = _device_report(lib, device_handle)
-        if info is None:
-            return _fail(report, "could not read the selected device's properties")
+        local_kb = _scalar(lib, device_handle, CL_DEVICE_LOCAL_MEM_SIZE, ctypes.c_uint64)
+        info["local_mem_kb"] = None if local_kb is None else local_kb // 1024
         report["device"] = info
+        if "arc" not in (info.get("name") or "").lower():
+            report["warnings"].append(
+                "the selected device is %r, not an Arc: the driver's device order is not stable "
+                "(the integrated GPU has come back first), so pass --device-name Arc for a run "
+                "whose numbers may be reported as Arc" % (info.get("name"),))
+        if staging == "local" and local_kb is not None and LOCAL_BYTES > local_kb:
+            return _fail(report, "local staging needs %d KiB but the device offers %d KiB; "
+                                 "use --staging global" % (LOCAL_BYTES // 1024, local_kb // 1024))
 
         properties = (ctypes.c_void_p * 3)(CL_CONTEXT_PLATFORM, platform, None)
         handles = (ctypes.c_void_p * 1)(device_handle)
@@ -441,7 +544,7 @@ def run_probe(rows=DEFAULT_ROWS, tokens=DEFAULT_TOKENS, cols=DEFAULT_COLS,
                 _hex(code), "" if not first else ": " + first[0][:200]))
         report["build"]["ok"] = True
 
-        for name in (b"q8x", b"gemm_tile"):
+        for name in (b"q8x", kernel_name):
             error_code = ctypes.c_int(0)
             kernel = lib.clCreateKernel(program, name, ctypes.byref(error_code))
             report["returncodes"]["clCreateKernel%s" % name.decode().title()] = _hex(
@@ -504,9 +607,9 @@ def run_probe(rows=DEFAULT_ROWS, tokens=DEFAULT_TOKENS, cols=DEFAULT_COLS,
         report["quantizer"]["xs_mismatches"] = 0
 
         started = time.perf_counter()
+        tiles = (rows // 128) * (tokens // 128)
         for _ in range(repeats):
-            _launch_2d(lib, queue, kernels[1], 256, (rows // 128) * (tokens // 128), report,
-                       "clEnqueueNDRangeKernelGemm")
+            _launch_gemm(lib, queue, kernels[1], tiles, report, "clEnqueueNDRangeKernelGemm")
         _finish(lib, queue, report, "clFinishGemm")
         seconds = time.perf_counter() - started
         report["gemm"]["elapsed_ms"] = round(seconds * 1000.0, 3)
@@ -557,14 +660,15 @@ def render(report):
              "  loader: %s%s" % (loader["name"], "" if loader["available"] else " (unavailable)")]
     if report["device"]:
         device = report["device"]
-        lines.append("  device: %s; %s CU(s), %s MiB, OpenCL C %s" % (
+        lines.append("  device: %s; %s CU(s), %s MiB, %s KiB local, OpenCL C %s" % (
             device["name"], device["compute_units"], device["global_mem_mib"],
-            device["opencl_c_version"]))
+            device.get("local_mem_kb"), device["opencl_c_version"]))
     if report["build"]["ok"]:
         lines.append("  build: ok (%d source bytes)" % report["build"]["source_bytes"])
     shape = report["shape"]
-    lines.append("  shape: %d rows x %d tokens x %d cols (%d groups)" % (
-        shape["rows"], shape["tokens"], shape["cols"], shape["groups"]))
+    lines.append("  shape: %d rows x %d tokens x %d cols (%d groups); staging: %s%s" % (
+        shape["rows"], shape["tokens"], shape["cols"], shape["groups"], shape["staging"],
+        "" if not shape["local_bytes"] else " (%d KiB local)" % (shape["local_bytes"] // 1024)))
     if report["quantizer"]["xq_mismatches"] is not None:
         lines.append("  q8x: xq mismatches: %s; xs mismatches: %s; %.3f ms" % (
             report["quantizer"]["xq_mismatches"], report["quantizer"]["xs_mismatches"],
@@ -573,6 +677,8 @@ def render(report):
     if gemm["mismatches"] is not None:
         lines.append("  gemm: mismatches: %s; %d launches %.3f ms; %s GFLOP/s" % (
             gemm["mismatches"], gemm["repeats"], gemm["elapsed_ms"], gemm["gflops"]))
+    for warning in report.get("warnings") or []:
+        lines.append("  warning: %s" % warning)
     lines.append("  result: %s%s" % (
         report["result"], "" if not report["error"] else " (%s)" % report["error"]))
     return lines

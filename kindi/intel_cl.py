@@ -99,6 +99,7 @@ def _base_report(loader, n, dim, repeats):
         "vector_add": {"n": n, "mismatches": None, "max_abs_error": None, "elapsed_ms": None},
         "gemm": {"dim": dim, "repeats": repeats, "mismatches": None, "max_abs_error": None,
                  "elapsed_ms": None, "gflops": None},
+        "warnings": [],
         "returncodes": {},
         "error": None,
         "result": "fail",
@@ -276,6 +277,38 @@ def _device_report(lib, device):
     }
 
 
+def device_names(lib, devices):
+    """[(index, CL_DEVICE_NAME)] for every enumerated Intel GPU, in the driver's order.
+
+    The order is not stable: on the measured Windows host the integrated UHD 630 and the discrete
+    Arc A770 have come back in both orders across runs, so a benchmark that selects by index alone
+    can silently measure the wrong card. Probes that publish numbers should select by name.
+    """
+    out = []
+    for index, (_platform, handle, _entry) in enumerate(devices):
+        info = _device_report(lib, handle) or {}
+        out.append((index, info.get("name")))
+    return out
+
+
+def pick_device(lib, devices, index=0, name=None):
+    """(index, info, error): a device chosen by name (case-insensitive substring) or by index."""
+    if not devices:
+        return None, None, "no Intel OpenCL GPU device is visible"
+    named = [(i, _device_report(lib, handle) or {})
+             for i, (_platform, handle, _entry) in enumerate(devices)]
+    if name:
+        want = name.strip().lower()
+        hits = [item for item in named if want in (item[1].get("name") or "").lower()]
+        if not hits:
+            return None, None, "no Intel GPU matches %r (visible: %s)" % (
+                name, ", ".join(info.get("name") or "?" for _i, info in named))
+        return hits[0][0], hits[0][1], None
+    if not isinstance(index, int) or index < 0 or index >= len(named):
+        return None, None, "device %s is outside the %d visible Intel GPU(s)" % (index, len(named))
+    return index, named[index][1], None
+
+
 def _build_log(lib, program, device):
     raw, code = _query_program(lib, program, device, CL_PROGRAM_BUILD_LOG)
     if code != CL_SUCCESS or not raw:
@@ -390,7 +423,7 @@ def _compare(packed, reference):
 
 
 def run_smoke(n=DEFAULT_N, dim=DEFAULT_DIM, repeats=DEFAULT_REPEATS, loader=None,
-              opener=None, device=0):
+              opener=None, device=0, device_name=None):
     """Compile and run the two kernels on the selected Intel GPU; never on the CPU."""
     loader = loader or DEFAULT_LOADER
     report = _base_report(loader, n, dim, repeats)
@@ -422,18 +455,19 @@ def run_smoke(n=DEFAULT_N, dim=DEFAULT_DIM, repeats=DEFAULT_REPEATS, loader=None
         if devices is None:
             return _fail(report, error or "OpenCL device enumeration failed")
         report["device_count"] = len(devices)
-        if not devices:
-            return _fail(report, "no Intel OpenCL GPU device is visible")
-        if device >= len(devices):
-            return _fail(report, "--device %d is outside the %d visible Intel GPU(s)"
-                         % (device, len(devices)))
-        platform, device_handle, platform_entry = devices[device]
-        report["device_index"] = device
+        index, info, error = pick_device(lib, devices, device, device_name)
+        if error or index is None or info is None:
+            return _fail(report, ("--device-name: " if device_name else "--device: ")
+                         + (error or "the selected device could not be read"))
+        platform, device_handle, platform_entry = devices[index]
+        report["device_index"] = index
         report["platform"] = platform_entry["name"]
-        info = _device_report(lib, device_handle)
-        if info is None:
-            return _fail(report, "could not read the selected device's properties")
         report["device"] = info
+        if "arc" not in (info.get("name") or "").lower():
+            report["warnings"].append(
+                "the selected device is %r, not an Arc: the driver's device order is not stable, "
+                "so pass --device-name Arc for a run whose numbers may be reported as Arc"
+                % (info.get("name"),))
 
         properties = (ctypes.c_void_p * 3)(CL_CONTEXT_PLATFORM, platform, None)
         handles = (ctypes.c_void_p * 1)(device_handle)

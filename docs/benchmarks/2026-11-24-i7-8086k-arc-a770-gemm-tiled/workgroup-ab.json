@@ -1,0 +1,50 @@
+{
+  "device": "Intel(R) Arc(TM) A770 Graphics",
+  "pinned_work_group": [
+    256,
+    1
+  ],
+  "repeats": 10,
+  "runs": {
+    "pinned": [
+      {
+        "elapsed_ms": 322.958,
+        "gflops": 66.494,
+        "mismatches": 0
+      },
+      {
+        "elapsed_ms": 324.201,
+        "gflops": 66.239,
+        "mismatches": 0
+      },
+      {
+        "elapsed_ms": 323.917,
+        "gflops": 66.297,
+        "mismatches": 0
+      }
+    ],
+    "runtime": [
+      {
+        "elapsed_ms": 555.061,
+        "gflops": 38.689,
+        "mismatches": 0
+      },
+      {
+        "elapsed_ms": 555.002,
+        "gflops": 38.693,
+        "mismatches": 0
+      },
+      {
+        "elapsed_ms": 555.114,
+        "gflops": 38.685,
+        "mismatches": 0
+      }
+    ]
+  },
+  "shape": {
+    "cols": 4096,
+    "rows": 512,
+    "tokens": 512
+  },
+  "staging": "global"
+}

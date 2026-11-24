@@ -41,13 +41,13 @@ from .intel_cl import (
     DEFAULT_LOADER,
     _bind,
     _build_log,
-    _device_report,
     _enumerate,
     _finish,
     _hex,
     _open,
     _read_back,
     _set_arg,
+    pick_device,
 )
 
 PROBE = "intel-ternary-gemv"
@@ -176,6 +176,7 @@ def _base_report(loader, rows, cols, repeats, seed, parts=None):
         "gemv": {"rows": rows, "cols": cols, "repeats": repeats, "parts": parts, "warmup_ms": None,
                  "mismatches": None, "max_abs_error": None, "first_mismatch": None,
                  "elapsed_ms": None, "gflops": None},
+        "warnings": [],
         "returncodes": {},
         "error": None,
         "result": "fail",
@@ -254,7 +255,7 @@ def _buffer(lib, context, flags, data, report, key):
 
 
 def run_probe(rows=DEFAULT_ROWS, cols=DEFAULT_COLS, repeats=DEFAULT_REPEATS, loader=None,
-              opener=None, device=0, seed=SEED, parts=None):
+              opener=None, device=0, seed=SEED, parts=None, device_name=None):
     """Launch the packed ternary GEMV on the selected Intel GPU; it never runs on the CPU."""
     loader = loader or DEFAULT_LOADER
     report = _base_report(loader, rows, cols, repeats, seed, parts)
@@ -311,18 +312,19 @@ def run_probe(rows=DEFAULT_ROWS, cols=DEFAULT_COLS, repeats=DEFAULT_REPEATS, loa
         if devices is None:
             return _fail(report, error or "OpenCL device enumeration failed")
         report["device_count"] = len(devices)
-        if not devices:
-            return _fail(report, "no Intel OpenCL GPU device is visible")
-        if device >= len(devices):
-            return _fail(report, "--device %d is outside the %d visible Intel GPU(s)"
-                         % (device, len(devices)))
-        platform, device_handle, platform_entry = devices[device]
-        report["device_index"] = device
+        index, info, error = pick_device(lib, devices, device, device_name)
+        if error or index is None or info is None:
+            return _fail(report, ("--device-name: " if device_name else "--device: ")
+                         + (error or "the selected device could not be read"))
+        platform, device_handle, platform_entry = devices[index]
+        report["device_index"] = index
         report["platform"] = platform_entry["name"]
-        info = _device_report(lib, device_handle)
-        if info is None:
-            return _fail(report, "could not read the selected device's properties")
         report["device"] = info
+        if "arc" not in (info.get("name") or "").lower():
+            report["warnings"].append(
+                "the selected device is %r, not an Arc: the driver's device order is not stable, "
+                "so pass --device-name Arc for a run whose numbers may be reported as Arc"
+                % (info.get("name"),))
 
         properties = (ctypes.c_void_p * 3)(CL_CONTEXT_PLATFORM, platform, None)
         handles = (ctypes.c_void_p * 1)(device_handle)
@@ -469,6 +471,8 @@ def render(report):
         lines.append("  gemv: mismatches: %s; warmup %.3f ms; %d launches %.3f ms; %s GFLOP/s" % (
             gemv["mismatches"], gemv["warmup_ms"], gemv["repeats"], gemv["elapsed_ms"],
             gemv["gflops"]))
+    for warning in report.get("warnings") or []:
+        lines.append("  warning: %s" % warning)
     lines.append("  result: %s%s" % (
         report["result"], "" if not report["error"] else " (%s)" % report["error"]))
     return lines

@@ -1,0 +1,130 @@
+{
+  "backend": "opencl ternary gemm in the q8 shape; no sycl, model, engine or backend",
+  "build": {
+    "log": null,
+    "ok": true,
+    "source_bytes": 8286
+  },
+  "device": {
+    "compute_units": 512,
+    "device_version": "OpenCL 3.0 NEO ",
+    "driver_version": "32.0.101.9175",
+    "global_mem_mib": 15932,
+    "local_mem_kb": 64,
+    "max_clock_mhz": 2400,
+    "max_work_group_size": 1024,
+    "name": "Intel(R) Arc(TM) A770 Graphics",
+    "opencl_c_version": "OpenCL C 1.2 ",
+    "vendor": "Intel(R) Corporation"
+  },
+  "device_count": 2,
+  "device_index": 1,
+  "error": null,
+  "gemm": {
+    "cols": 2048,
+    "elapsed_ms": 147.465,
+    "first_mismatch": null,
+    "gflops": 18.203,
+    "max_abs_error": 0.0,
+    "mismatches": 0,
+    "q8x_elapsed_ms": 3.325,
+    "repeats": 10,
+    "rows": 256,
+    "staging": "local",
+    "tokens": 256
+  },
+  "layout": {
+    "arithmetic": "int32 dot per 128-column group, one float (xs * scale) per row, fp32 accumulate in group order",
+    "quantizer": "k_q8x_T2: one 256-wide group per 128-column group and 64-token band; one threshold pair per token; rint, round half even; four int8 per word; activations held in registers between the maximum and packing passes",
+    "weights": "4 trits per byte, byte = t0 + 3*t1 + 9*t2 + 27*t3; [column/4][row]; the pack's on-disk layout, not the engine's load-time 5-trit lane repack"
+  },
+  "loader": {
+    "available": true,
+    "error": null,
+    "name": "OpenCL.dll"
+  },
+  "pack": {
+    "bcodes_sha256": "3b1f385c6353ca45e4bb808a8725e8714191c760761c17201c31f0c1b69ebb28",
+    "dpm_sha256": "5b7e35a7ea54678f4a71a803412e0a853f7040d4386e825a4030b271fbf397ea",
+    "seed": 7,
+    "x_sha256": "fb3729d3bef6fa2e4f6a1924476f54210443d61d8fbd5fdff71471337649164b"
+  },
+  "platform": "Intel(R) OpenCL Graphics (discrete)",
+  "platforms": [
+    {
+      "gpu_devices": 1,
+      "index": 0,
+      "name": "Intel(R) OpenCL HD Graphics",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.0 "
+    },
+    {
+      "gpu_devices": 1,
+      "index": 1,
+      "name": "Intel(R) OpenCL Graphics (discrete)",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.0 "
+    }
+  ],
+  "probe": "intel-ternary-gemm",
+  "quantizer": {
+    "xq_mismatches": 0,
+    "xs_mismatches": 0
+  },
+  "read_only": false,
+  "result": "pass",
+  "returncodes": {
+    "clBuildProgram": "0x00000000",
+    "clCreateBufferCodes": "0x00000000",
+    "clCreateBufferScales": "0x00000000",
+    "clCreateBufferX": "0x00000000",
+    "clCreateBufferXq": "0x00000000",
+    "clCreateBufferXs": "0x00000000",
+    "clCreateBufferY": "0x00000000",
+    "clCreateCommandQueue": "0x00000000",
+    "clCreateContext": "0x00000000",
+    "clCreateKernelGemm_Tile_Local": "0x00000000",
+    "clCreateKernelQ8X": "0x00000000",
+    "clCreateProgramWithSource": "0x00000000",
+    "clEnqueueNDRangeKernelGemm": "0x00000000",
+    "clEnqueueNDRangeKernelQ8x": "0x00000000",
+    "clEnqueueReadBufferXq": "0x00000000",
+    "clEnqueueReadBufferXs": "0x00000000",
+    "clEnqueueReadBufferY": "0x00000000",
+    "clFinishGemm": "0x00000000",
+    "clFinishQ8x": "0x00000000",
+    "clGetPlatformIDs": "0x00000000",
+    "clGetPlatformIDsHandles": "0x00000000",
+    "clReleaseCommandQueue": "0x00000000",
+    "clReleaseContext": "0x00000000",
+    "clReleaseKernel0": "0x00000000",
+    "clReleaseKernel1": "0x00000000",
+    "clReleaseMemObject0": "0x00000000",
+    "clReleaseMemObject1": "0x00000000",
+    "clReleaseMemObject2": "0x00000000",
+    "clReleaseMemObject3": "0x00000000",
+    "clReleaseMemObject4": "0x00000000",
+    "clReleaseMemObject5": "0x00000000",
+    "clReleaseProgram": "0x00000000"
+  },
+  "schema": 1,
+  "scope": "k_q8x_T2-style quantization feeding an int32-dot ternary gemm over the pack's 4-trit layout, checked against an exact host reference",
+  "shape": {
+    "codes_bytes": 131072,
+    "cols": 2048,
+    "groups": 16,
+    "local_bytes": 34816,
+    "rows": 256,
+    "scale_bytes": 16384,
+    "staging": "local",
+    "tile": {
+      "rows": 128,
+      "tokens": 128,
+      "work_items": 256
+    },
+    "tokens": 256,
+    "x_bytes": 2097152
+  },
+  "support_claim": false,
+  "warnings": []
+}

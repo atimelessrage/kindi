@@ -450,7 +450,7 @@ def cmd_intel_cl(cfg, a):
     from . import intel_cl
 
     report = intel_cl.run_smoke(a.n, dim=a.dim, repeats=a.repeats, loader=a.loader,
-                                device=a.device)
+                                device=a.device, device_name=a.device_name)
     if a.json:
         print(intel_cl.dumps(report))
     else:
@@ -464,7 +464,7 @@ def cmd_intel_ternary(cfg, a):
     from . import intel_ternary
 
     report = intel_ternary.run_probe(a.rows, cols=a.cols, repeats=a.repeats, loader=a.loader,
-                                     device=a.device, parts=a.parts)
+                                     device=a.device, parts=a.parts, device_name=a.device_name)
     if a.json:
         print(intel_ternary.dumps(report))
     else:
@@ -478,7 +478,8 @@ def cmd_intel_gemm(cfg, a):
     from . import intel_gemm
 
     report = intel_gemm.run_probe(rows=a.rows, tokens=a.tokens, cols=a.cols, repeats=a.repeats,
-                                  loader=a.loader, device=a.device)
+                                  loader=a.loader, device=a.device, staging=a.staging,
+                                  device_name=a.device_name)
     if a.json:
         print(intel_gemm.dumps(report))
     else:
@@ -759,8 +760,14 @@ def _build_parser():
     s.add_argument("--tokens", type=int, default=128,
                    help="prompt tokens in the tile, a multiple of 128 (default 128)")
     s.add_argument("--cols", type=int, default=512, help="matrix columns, a multiple of 128 (default 512)")
+    s.add_argument("--staging", choices=("local", "global"), default="local",
+                   help="stage each group's tiles in local memory (default) or read them "
+                        "from global memory at every use (the first measured shape)")
     s.add_argument("--repeats", type=int, default=5, help="timed GEMM launches (default 5, max 50)")
     s.add_argument("--device", type=int, default=0, help="Intel OpenCL GPU index (default 0)")
+    s.add_argument("--device-name", default=None, metavar="SUBSTR",
+                   help="pick the GPU whose name contains SUBSTR (e.g. Arc) instead of --device; "
+                        "the driver's device order is not stable")
     s.add_argument("--loader", default=None, help="OpenCL loader name/path (default: the host loader)")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("intel-ternary", help="packed ternary GEMV probe on an Intel GPU (no backend)")
@@ -771,6 +778,9 @@ def _build_parser():
                         "(default: one per 128-weight phase, capped at 64)")
     s.add_argument("--repeats", type=int, default=5, help="timed launches (default 5, max 50)")
     s.add_argument("--device", type=int, default=0, help="Intel OpenCL GPU index (default 0)")
+    s.add_argument("--device-name", default=None, metavar="SUBSTR",
+                   help="pick the GPU whose name contains SUBSTR (e.g. Arc) instead of --device; "
+                        "the driver's device order is not stable")
     s.add_argument("--loader", default=None, help="OpenCL loader name/path (default: the host loader)")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("intel-cl", help="compile and run OpenCL vector-add/GEMM on an Intel GPU (no model)")
@@ -778,6 +788,9 @@ def _build_parser():
     s.add_argument("--dim", type=int, default=128, help="square GEMM dimension (default 128, 8-512)")
     s.add_argument("--repeats", type=int, default=5, help="timed GEMM launches (default 5, max 50)")
     s.add_argument("--device", type=int, default=0, help="Intel OpenCL GPU index (default 0)")
+    s.add_argument("--device-name", default=None, metavar="SUBSTR",
+                   help="pick the GPU whose name contains SUBSTR (e.g. Arc) instead of --device; "
+                        "the driver's device order is not stable")
     s.add_argument("--loader", default=None, help="OpenCL loader name/path (default: the host loader)")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("loop-info", help="inspect a looped-transformer GGUF map (no tensor data loaded)")

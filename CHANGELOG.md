@@ -116,6 +116,27 @@ plain CPU suite is the only evidence for the merge.
   history and `docs/RELEASE-CHECKLIST.md`'s status.
 
 
+### Intel Arc A770: pinned work-group (+1.71x) and staged tiles (2026-11-24, REQ-0020 M2)
+
+- The q8 GEMM probe now launches one 256-wide work-group per 128-token x 128-row tile instead of
+  letting the runtime choose the shape. Same session, same kernel, 512 x 512 x 4096: 555.1 -> 323.4 ms
+  (38.69 -> 66.3 GFLOP/s, **1.71x**) with bit-identical output. It is a correctness fix as well: with
+  tiles staged in local memory an unpinned launch let one work-group span two tiles, whose staging
+  and barriers then mixed, giving wrong results at more than one tile (0 mismatches at one tile).
+- `--staging local` (the default) stages each group's activation words and decoded weight words in
+  local memory as the CUDA kernels do: exact, and 1.02-1.05x over the pinned global load
+  (67.77 vs 66.17 GFLOP/s at 512 x 512 x 4096). Small because the byte-wise dot and the per-word
+  4-trit decode dominate, not global traffic.
+- **Device selection is pinned by name, not index.** The driver has returned the integrated UHD 630
+  first and the Arc A770 second, and the reverse on other runs, so a bare `--device 0` could publish
+  iGPU numbers as Arc. `intel-cl`, `intel-ternary` and `intel-gemm` take `--device-name SUBSTR` and
+  record a warning in the report and printed output when the device is not an Arc.
+- `kindi intel-gemm` also holds the quantizer's activations in registers between the maximum and
+  packing passes (three barriers per band instead of one pair per token); that change measured inside
+  the noise of a single launch, so no speedup is claimed for it. No backend, engine path or support
+  claim: M2 stays partial. Evidence in
+  `docs/benchmarks/2026-11-24-i7-8086k-arc-a770-gemm-tiled/`.
+
 ### Intel Arc A770: the engine's q8 GEMM runs on the card (2026-11-24, REQ-0020 M2)
 
 - `kindi intel-gemm` runs the arithmetic the engine's prompt path does, on the A770 in this rig,
