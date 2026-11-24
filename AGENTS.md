@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `9bea168` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `67e1468` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24 (latest): the 27B verifies on the CPU engine, and the "missing" compiler was installed.**
   `KINDI_DEVICE=cpu kindi verify` on the 27B pack is **4/4 token-exact** (40/40 per prompt) at 3.7 tok/s after a 340 s load;
   packcheck full (10 files, 18.4 s) and a structural audit (851 tensors, byte ranges tiling every file, reference ids in range)
@@ -235,7 +235,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `a101b7d` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `7aa4578` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc GEMM, bench --spec, config-reference direct reads, 27B CPU verify + compiler detection |
+| `<worktree>` | `merge/upstream-0.7.0` | `67e1468` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke on Level Zero, Arc GEMM, bench --spec, 27B CPU verify + compiler detection |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
