@@ -186,7 +186,10 @@ never sent as content. An engine failure mid-stream is an `error` event.
 `kindi selftest` drives this route as well as the chat route: it posts the same
 prompt through `/v1/messages` in process and, with `--url`, against the running
 server, so an installed image proves the translation answers with the real
-engine (a 200 whose body is not a message fails the check).
+engine (a 200 whose body is not a message fails the check). Both requests are
+greedy with the same prompt, and the two answers must match: a different text or
+completion-token count fails the run as a decoding change (REQ-0028 A4), and the
+JSON report records `dialects` with both texts.
 
 What is **not** claimed: compatibility. The app-level gate (a
 Claude-Code-shaped request through `create_app`, the envelope, the SSE order
