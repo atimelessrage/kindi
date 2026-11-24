@@ -473,6 +473,20 @@ def cmd_intel_ternary(cfg, a):
     return 0 if report["result"] == "pass" else 1
 
 
+def cmd_intel_gemm(cfg, a):
+    """Ternary GEMM in the engine's q8 shape on an Intel GPU; no backend or support claim."""
+    from . import intel_gemm
+
+    report = intel_gemm.run_probe(rows=a.rows, tokens=a.tokens, cols=a.cols, repeats=a.repeats,
+                                  loader=a.loader, device=a.device)
+    if a.json:
+        print(intel_gemm.dumps(report))
+    else:
+        for line in intel_gemm.render(report):
+            print(line)
+    return 0 if report["result"] == "pass" else 1
+
+
 def cmd_loop_info(cfg, a):
     """Inspect a looped-transformer GGUF map without loading any tensor data (REQ-0031)."""
     from . import looped
@@ -740,6 +754,15 @@ def _build_parser():
     s.add_argument("--device", type=int, default=0, help="Level Zero device index (default 0)")
     s.add_argument("--loader", default=None, help="Level Zero loader name/path (default: the host loader)")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
+    s = sub.add_parser("intel-gemm", help="ternary GEMM in the engine's q8 shape on an Intel GPU (no backend)")
+    s.add_argument("--rows", type=int, default=128, help="matrix rows, a multiple of 128 (default 128)")
+    s.add_argument("--tokens", type=int, default=128,
+                   help="prompt tokens in the tile, a multiple of 128 (default 128)")
+    s.add_argument("--cols", type=int, default=512, help="matrix columns, a multiple of 128 (default 512)")
+    s.add_argument("--repeats", type=int, default=5, help="timed GEMM launches (default 5, max 50)")
+    s.add_argument("--device", type=int, default=0, help="Intel OpenCL GPU index (default 0)")
+    s.add_argument("--loader", default=None, help="OpenCL loader name/path (default: the host loader)")
+    s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("intel-ternary", help="packed ternary GEMV probe on an Intel GPU (no backend)")
     s.add_argument("--rows", type=int, default=64, help="matrix rows (default 64, 1-4096)")
     s.add_argument("--cols", type=int, default=1024, help="matrix columns, a multiple of 128 (default 1024)")
@@ -840,6 +863,7 @@ _COMMANDS = {
     "intel-info": cmd_intel_info,
     "intel-smoke": cmd_intel_smoke,
     "intel-cl": cmd_intel_cl,
+    "intel-gemm": cmd_intel_gemm,
     "intel-ternary": cmd_intel_ternary,
     "loop-info": cmd_loop_info,
     "io": cmd_io,

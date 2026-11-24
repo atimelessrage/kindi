@@ -116,6 +116,23 @@ plain CPU suite is the only evidence for the merge.
   history and `docs/RELEASE-CHECKLIST.md`'s status.
 
 
+### Intel Arc A770: the engine's q8 GEMM runs on the card (2026-11-24, REQ-0020 M2)
+
+- `kindi intel-gemm` runs the arithmetic the engine's prompt path does, on the A770 in this rig,
+  and holds it to the same bit-exact discipline as the earlier probes: `q8x` ports `k_q8x_T2` (one
+  256-wide group per 128-column group and 64-token band, one threshold pair per token, `rint`
+  round-half-even) and feeds `gemm_tile`, which mirrors `k_mm_g5q` (128 tokens x 128 rows per
+  256-work-item block, int32 dots per group, one `f * (xs * dj)` per group, fp32 accumulate in
+  group order). The weight bytes are the pack's on-disk 4-trit layout, there is no local-memory
+  staging, and the int32 dot is byte by byte because OpenCL C 1.2 has no dot-product instruction.
+  The quantizer is bit-exact with the host model at every shape and the GEMM has 0 mismatches at
+  4.2-36.9 GFLOP/s (128x128x512 through 512x512x4096); the host reference is checked against an
+  independent float64 dot before the device is launched. The local-memory-staged variant and the
+  engine's 5-trit lane unpack are named follow-ups, not measurements.
+- No backend, engine path or support claim: Windows/OpenCL is precursor work, M2 stays partial, and
+  the exactness construction (amax forced to 127) proves the pipeline but not the general
+  threshold path. Recorded under `docs/benchmarks/2026-11-24-i7-8086k-arc-a770-ternary-gemm/`.
+
 ### Launch-shape contract: block size (2026-11-24, REQ-0023 A2)
 
 - `tests/test_kernel_arity.py` now holds each graph launch's block tuple against the kernel's

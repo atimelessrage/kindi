@@ -9,7 +9,10 @@ without oneAPI: `kindi intel-smoke` round-trips 16 MiB through Level Zero device
 `kindi intel-cl` compiles and runs exact vector-add and GEMM kernels with the driver's OpenCL C
 compiler, and `kindi intel-ternary` runs a packed ternary GEMV over the pack's 4-trit/byte layout
 with a bit-exact host check, now split over the 128-weight phases (5.75x-14.14x the one-work-item
-shape at layer-sized matrices, [run](benchmarks/2026-11-24-i7-8086k-arc-a770-parallel-gemv/README.md)). There is still no SYCL backend, Kindi engine path or model run. The plan's first support
+shape at layer-sized matrices, [run](benchmarks/2026-11-24-i7-8086k-arc-a770-parallel-gemv/README.md)),
+and `kindi intel-gemm` runs the engine's q8 arithmetic (`k_q8x_T2` port feeding a `k_mm_g5q`-shaped
+GEMM) bit-exact at 4.2-36.9 GFLOP/s ([run](benchmarks/2026-11-24-i7-8086k-arc-a770-ternary-gemm/README.md)).
+There is still no SYCL backend, Kindi engine path or model run. The plan's first support
 target remains Linux; the Windows run qualifies the hardware, the memory path and the device kernel
 path, not Kindi support (tracked as [REQ-0020](development/requirements/REQ-0020.md)).
 
@@ -326,6 +329,40 @@ repack or its Q8 GEMV, and a launch costs about 1 ms of fixed overhead at these 
 model, engine or support claim is added; M2 stays partial. What it does establish is that the layout
 decodes exactly at a useful rate with the parallelism spread over phases, which is the shape the
 backend's kernel order needs.
+
+### M2 ternary GEMM in the engine's q8 shape (2026-11-24)
+
+`kindi intel-gemm` runs the arithmetic the engine's prompt path does, at the CUDA kernels' tile,
+bit-exact. `q8x` ports `k_q8x_T2` (one 256-wide group per 128-column group and 64-token band, one
+threshold pair per token, `rint` round-half-even, four int8 per word) and its XQ/XS output feeds
+`gemm_tile` directly; `gemm_tile` mirrors `k_mm_g5q`: 128 tokens x 128 rows per 256-work-item
+block, int32 dots per 128-column group, one `f * (xs * dj)` per group, fp32 accumulate in group
+order. The weight bytes are still the pack's on-disk 4-trit layout (the engine repacks to 5-trit
+lanes at load), there is no local-memory staging, and OpenCL C 1.2 has no dot-product instruction,
+so the int32 dot is computed byte by byte - exactly the integers `dp4a` computes.
+
+Measured on the same Windows A770, 10 launches per shape:
+
+| rows x tokens x cols | mismatches | 10 launches | GFLOP/s |
+|---|---|---|---|
+| 128 x 128 x 512 | 0 | 40.204 ms | 4.173 |
+| 256 x 128 x 1024 | 0 | 85.832 ms | 7.819 |
+| 256 x 256 x 2048 | 0 | 283.782 ms | 9.459 |
+| 512 x 512 x 4096 | 0 | 581.610 ms | 36.923 |
+
+The quantizer is bit-exact with the host model at every shape (XQ 0, XS 0), so the GEMM input is
+the proven one. The rate rises with tile count because a launch is ~4 ms of fixed overhead at
+these sizes (the 128-token quantizer alone took 3.766 ms); the 36.9 GFLOP/s at the large shape is
+the un-tiled, global-load, byte-dot shape - the baseline a local-memory-staged variant gets
+measured against. Exactness is by construction (activations bounded by 127 with every group's
+maximum forced to 127, so the quantizer passes through at xs = 1.0; fp16-exact scales), and the
+host reference is checked against an independent float64 dot before the device is launched.
+
+No backend, model, engine or support claim is added; M2 stays partial. The kernel is ready to be
+re-run against a local-memory-staged variant and a 5-trit-lane unpack as follow-ups, which are
+named measurements, not claims.
+
+([page](benchmarks/2026-11-24-i7-8086k-arc-a770-ternary-gemm/README.md))
 
 ### M2 next step: SYCL vector-add smoke (planned 2026-11-23, not run)
 
