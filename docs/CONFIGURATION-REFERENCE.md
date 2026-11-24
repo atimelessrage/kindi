@@ -87,15 +87,19 @@ Each key can also be set from the environment as `KINDI_<KEY>` (for example `KIN
 
 ## Environment-only variables
 
-These have no config key. The default is the code's own fallback (empty: unset); the last column
+These are read directly; most have no config key. The default is the code's own fallback (empty: unset); the last column
 is where it is read, which is where the full description lives.
 
 Every config key above is also settable as `KINDI_<KEY>` (upper-cased, `-` as `_`), so a key
-like `max_body_mb` is read as `KINDI_MAX_BODY_MB`; those names are the same setting, not extra
-variables, and are therefore not listed twice here.
+like `max_body_mb` is read as `KINDI_MAX_BODY_MB`. A name that is also read directly (not
+through the config file) is listed here as well, because the direct read can be a different
+setting: `KINDI_MTP_HEAD` is the Nanbeige config key `mtp_head` *and* the Bonsai MTP head
+path read by `kindi/spec.py` and `kindi/mtp_heads.py`, and only the env table shows the
+direct sites.
 
 | variable | default | read in |
 |---|---|---|
+| `KINDI_API_KEY` | (unset) | `kindi/dsv41_server.py:1548` (+2 more) |
 | `KINDI_ATT_TC` | `0` | `kindi/chunk.py:515` (+1 more) |
 | `KINDI_BACKEND_MODULES` | (empty) | `kindi/backends/__init__.py:56` (+1 more) |
 | `KINDI_BATCH` | `4` | `kindi/spec.py:2043` (+1 more) |
@@ -208,6 +212,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_KEEPALIVE_S` | `10` | `kindi/dsv41_server.py:73` (+1 more) |
 | `KINDI_KEXPF` | (empty) or `0` | `kindi/spec.py:155` (+1 more) |
 | `KINDI_KV` | (empty) or `q8_0` | `kindi/engine.py:80` (+6 more) |
+| `KINDI_KV_CACHE` | (unset) | `kindi/nanbeige.py:274` (+1 more) |
 | `KINDI_KV_EXPERIMENTAL` | `0` | `kindi/kld.py:92` (+5 more) |
 | `KINDI_LEGACY_ENGINE_PATH` | (unset) | `kindi/engine.py:896` |
 | `KINDI_LLVM` | (unset) | `kindi/cpu.py:93` |
@@ -232,6 +237,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_LT_TC` | `1` | `kindi/lightning.py:145` |
 | `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:588` |
 | `KINDI_MASK_CACHE_MB` | `64` | `kindi/token_classes.py:50` |
+| `KINDI_MAX_BODY_MB` | `16` | `kindi/dsv41_server.py:78` (+1 more) |
 | `KINDI_MEM_RESERVE_MB` | `96` or `256` or `32` | `kindi/engine.py:331` (+4 more) |
 | `KINDI_MODEL` | (empty) | `kindi/container.py:240` |
 | `KINDI_MOE_COPY` | `0` | `kindi/dsv41.py:629` |
@@ -249,6 +255,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_MTP_CHAIN` | `1` | `kindi/qwen4exp_mtp.py:211` |
 | `KINDI_MTP_COMPACT` | `1` | `kindi/qwen4exp_gpu.py:265` |
 | `KINDI_MTP_FILE` | (unset) | `kindi/qwen4exp_gpu.py:267` |
+| `KINDI_MTP_HEAD` | (unset) | `kindi/mtp_heads.py:77` (+2 more) |
 | `KINDI_MTP_HEAD_ALLOW_UNREGISTERED` | `0` | `kindi/mtp_heads.py:50` |
 | `KINDI_MTP_HEAD_N` | `0` | `kindi/qwen4exp_gpu.py:319` |
 | `KINDI_MTP_HYST` | `0.10` | `kindi/qwen4exp_mtp.py:146` |
@@ -290,12 +297,14 @@ variables, and are therefore not listed twice here.
 | `KINDI_NVCC2` | `/usr/local/cuda-12.4/bin/nvcc` | `kindi/dsv41.py:96` |
 | `KINDI_NVRTC` | (unset) | `kindi/qx_gpu.py:30` (+1 more) |
 | `KINDI_P100_FP16_PROMPT` | (empty) | `kindi/chunk.py:144` |
+| `KINDI_PACK` | (unset) | `kindi/catalog.py:205` (+1 more) |
 | `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:1100` (+1 more) |
 | `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:1101` |
 | `KINDI_PIPE` | `1` | `kindi/dsv41.py:802` |
 | `KINDI_PREWARM_GRAMMAR` | `1` | `kindi/grammar_prewarm.py:41` |
 | `KINDI_PROMPT_CACHE` | `1` | `kindi/cache.py:888` (+1 more) |
 | `KINDI_Q8X2` | `1` | `kindi/chunk.py:345` |
+| `KINDI_QUEUE_MAX` | `8` | `kindi/server.py:156` |
 | `KINDI_QXG_ADAPT` | `0` | `kindi/qwen4exp_gpu.py:444` |
 | `KINDI_QXG_ADAPT_DECAY` | `0.9` | `kindi/qwen4exp_cache.py:320` |
 | `KINDI_QXG_ADAPT_RING` | `32` | `kindi/qwen4exp_cache.py:419` |
@@ -377,6 +386,7 @@ variables, and are therefore not listed twice here.
 | `KINDI_RESPONSE_FORMAT` | (empty) | `kindi/oai.py:35` |
 | `KINDI_ROWS_PREFETCH` | `1` | `kindi/qwen4exp_ref.py:30` |
 | `KINDI_SAMPLER_ORDER` | `llama` | `kindi/sampling.py:20` |
+| `KINDI_SLOTS` | `1` | `kindi/__main__.py:319` (+2 more) |
 | `KINDI_SLOTS_DEBUG` | (unset) | `kindi/slots.py:175` |
 | `KINDI_SLOTS_ROWS` | `1` | `kindi/spec.py:656` |
 | `KINDI_SLOTS_WAIT_MS` | `2` | `kindi/slots.py:170` |
@@ -398,10 +408,13 @@ variables, and are therefore not listed twice here.
 | `KINDI_SPEC_SAMPLE` | `1` | `kindi/spec.py:1464` |
 | `KINDI_SPEC_WINDOW` | `8192` | `kindi/spec.py:2072` |
 | `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:216` |
+| `KINDI_STATE_DIR` | `~/.kindi/state` | `kindi/dsv41_xcal.py:107` |
 | `KINDI_TANDEM_DEBUG_TIMING` | `0` | `kindi/tandem.py:733` |
 | `KINDI_TANDEM_GPU` | `auto` | `kindi/plan.py:187` (+2 more) |
 | `KINDI_TANDEM_HEAD_SPLIT` | (empty) | `kindi/tandem.py:677` |
 | `KINDI_TANDEM_RATIO` | (unset) | `kindi/tandem.py:355` |
+| `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/__main__.py:197` (+3 more) |
+| `KINDI_TANDEM_VRAM_MB` | `0` | `kindi/__main__.py:196` (+1 more) |
 | `KINDI_TC` | `0` | `kindi/engine.py:825` (+5 more) |
 | `KINDI_TC_B2` | (empty) | `kindi/tc.py:51` |
 | `KINDI_TC_DP4A` | `0` | `kindi/tc.py:74` |

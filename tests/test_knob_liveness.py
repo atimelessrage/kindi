@@ -97,12 +97,10 @@ LIVE = {
 }
 
 # knob -> why its effect cannot be observed on this host (the row is still checked for (1) and (2))
-# live knobs the generated reference does not list: a real gap, pinned so it stays visible. The
-# generator derives its table from a fixed set of read sites; these are read elsewhere.
-UNDOCUMENTED = {
-    "KINDI_MTP_HEAD": "read by mtp_heads.check/report and spec's head lookup, documented by hand in "
-                      "docs/MTP.md; `kindi.config_reference` does not list it",
-}
+# (No UNDOCUMENTED table: `KINDI_MTP_HEAD` was once read by the loader but missing from the
+# generated reference. `kindi/config_reference` now lists every direct literal read, including
+# names that coincide with a config key, so the Bonsai MTP path is documented beside the
+# Nanbeige `mtp_head` config key.)
 
 PARKED = {
     "KINDI_SPEC_PACK": "builds a second TPEngine for the drafter; needs a card and a 2B pack",
@@ -134,8 +132,7 @@ def _in_scope(knob):
 def test_every_live_knob_is_documented_and_read():
     docs = _documented()
     for knob in LIVE:
-        if knob not in UNDOCUMENTED:
-            assert knob in docs, "%s is in the liveness table but not documented" % knob
+        assert knob in docs, "%s is in the liveness table but not documented" % knob
         assert _readers(knob), "%s has no reader in kindi/ (renamed, moved into prose, or dead)" % knob
 
 
@@ -173,7 +170,7 @@ def test_setting_a_live_knob_changes_what_the_code_decides(monkeypatch):
 def test_every_documented_speculation_knob_is_classified():
     """Part 4: the coverage half. A new documented speculation knob must be live or parked here."""
     documented = {k for k in _documented() if _in_scope(k)}
-    classified = (set(LIVE) | set(PARKED) | set(UNDOCUMENTED))
+    classified = (set(LIVE) | set(PARKED))
     missing = sorted(documented - classified)
     assert not missing, ("documented speculation knobs with no liveness row: %s - add a probe "
                          "or a PARKED reason" % ", ".join(missing))
@@ -182,5 +179,5 @@ def test_every_documented_speculation_knob_is_classified():
 def test_the_table_does_not_list_knobs_the_reference_dropped():
     """A row for a knob nobody documents any more is dead weight, and usually a stale rename."""
     documented = _documented()
-    stale = sorted(((set(LIVE) | set(PARKED) | set(UNDOCUMENTED)) - documented) - set(UNDOCUMENTED))
+    stale = sorted((set(LIVE) | set(PARKED)) - documented)
     assert not stale, "liveness rows for knobs the reference no longer documents: %s" % ", ".join(stale)

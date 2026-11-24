@@ -6,8 +6,8 @@ A new key or switch therefore cannot be missing from the reference - `python -m
 kindi.config_reference --check` (and `tests/test_config_reference.py`) fails until the file is
 regenerated with `python -m kindi.config_reference`.
 
-A config key also has an environment form, `KINDI_<KEY>`; those are covered by the config table and
-are not repeated in the environment table.
+A config key also has an environment form, `KINDI_<KEY>`; it is covered by the config table,
+and additionally listed in the environment table when code reads the name directly (see below).
 """
 import ast
 import glob
@@ -49,12 +49,15 @@ Each key can also be set from the environment as `KINDI_<KEY>` (for example `KIN
 ENV_HEADER = """\
 ## Environment-only variables
 
-These have no config key. The default is the code's own fallback (empty: unset); the last column
+These are read directly; most have no config key. The default is the code's own fallback (empty: unset); the last column
 is where it is read, which is where the full description lives.
 
 Every config key above is also settable as `KINDI_<KEY>` (upper-cased, `-` as `_`), so a key
-like `max_body_mb` is read as `KINDI_MAX_BODY_MB`; those names are the same setting, not extra
-variables, and are therefore not listed twice here.
+like `max_body_mb` is read as `KINDI_MAX_BODY_MB`. A name that is also read directly (not
+through the config file) is listed here as well, because the direct read can be a different
+setting: `KINDI_MTP_HEAD` is the Nanbeige config key `mtp_head` *and* the Bonsai MTP head
+path read by `kindi/spec.py` and `kindi/mtp_heads.py`, and only the env table shows the
+direct sites.
 """
 
 
@@ -204,8 +207,10 @@ def render(env_paths=None):
         default = "`%s`" % _cell(k["default"]) if k["default"] else "(empty)"
         lines.append("| `%s` | %s | %s | %s |" % (k["key"], k["type"], default, _cell(k["description"])))
     lines += [""] + ENV_HEADER.splitlines() + ["", "| variable | default | read in |", "|---|---|---|"]
-    skip = {"KINDI_" + k["key"].upper() for k in keys}
-    for name in sorted(set(envs) - skip):
+    # No skip: a config key's env form is *also* listed when it has a direct literal read
+    # (e.g. `KINDI_MTP_HEAD` in spec.py). Hiding it would make the Bonsai MTP path
+    # undocumented while the Nanbeige config key `mtp_head` is documented.
+    for name in sorted(envs):
         lines.append("| `%s` | %s | %s |" % (name, _default_cell(envs[name]["defaults"]),
                                              _site_cell(envs[name]["sites"])))
     return "\n".join(lines) + "\n"

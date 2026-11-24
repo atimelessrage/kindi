@@ -84,6 +84,13 @@ plain CPU suite is the only evidence for the merge.
   a stale row, or a knob with no reader left in `kindi/`. This is the general form of the mode-A bug
   (a documented knob that reached nothing while every gate stayed green). It found one real gap:
   `KINDI_MTP_HEAD` is read by the loader but absent from the generated configuration reference.
+- That gap is closed: `kindi/config_reference.py` dropped every environment name that matched a
+  config key, so `KINDI_MTP_HEAD` — the Bonsai MTP head path read directly in `kindi/spec.py` and
+  `kindi/mtp_heads.py` — was hidden behind the unrelated Nanbeige `mtp_head` key. The generator now
+  lists every direct literal read, so the environment table grows 331 -> 341 rows (ten names, and
+  the direct read of a shared name is not the same setting as the config key). `KINDI_MTP_HEAD` now
+  shows its loader sites, the knob-liveness test's `UNDOCUMENTED` exemption is gone, and
+  `tests/test_config_reference.py` pins the shadowed-key row so the generator cannot hide one again.
 
 ### `kindi bench --spec` (2026-11-24, REQ-0026)
 

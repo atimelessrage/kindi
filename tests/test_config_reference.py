@@ -91,3 +91,16 @@ def test_the_scan_covers_subpackages():
     sites = [s for s, _ in found["KINDI_BACKEND_MODULES"]["sites"]]
     assert "backends/registry.py" in sites
     assert "| `KINDI_BACKEND_MODULES` |" in reference_text()
+
+
+def test_a_config_key_read_directly_is_listed_with_its_direct_sites():
+    """`KINDI_MTP_HEAD` is the config key `mtp_head` *and* a direct read: `spec.py` loads that
+    file as the Bonsai MTP head. The generator used to drop every name that matched a config
+    key, so the Bonsai path was documented by hand in `docs/MTP.md` and missing from the
+    generated reference (found by the knob-liveness gate, 2026-11-24)."""
+    text = reference_text()
+    assert "| `KINDI_MTP_HEAD` |" in text, "a direct read that shadows a config key is missing"
+    row = next(line for line in text.splitlines() if line.startswith("| `KINDI_MTP_HEAD` |"))
+    assert "kindi/mtp_heads.py:" in row and "more" in row, row
+    # the Nanbeige config key is still described in the config table
+    assert "| `mtp_head` | string | (empty) |" in text

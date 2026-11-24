@@ -12,17 +12,19 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `54bd08e` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
-  **2026-11-24:** `POST /v1/messages` answers Anthropic's dialect on the same `run_generate` path
-  (`kindi/api/anthropic.py`; `x-api-key` or bearer; envelope and SSE order; one `_relay` for both streaming
-  routes), and `kindi selftest` drives it in process and with `--url`, so an installed image proves it. REQ-0023's
+- **HEAD:** `42d6b2b` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+  **2026-11-24 (latest):** the reference stopped hiding direct reads: `config_reference.py` dropped every env name
+  matching a config key, hiding `KINDI_MTP_HEAD` (the Bonsai head, `spec.py`/`mtp_heads.py`) beside Nanbeige's `mtp_head`; 331 -> 341 rows.
+  **2026-11-24:** `POST /v1/messages` answers Anthropic's dialect on the same `run_generate` path (`kindi/api/anthropic.py`;
+  `x-api-key` or bearer; envelope and SSE order; one `_relay` for both streaming routes), and `kindi selftest` drives it
+  in process and with `--url`, so an installed image proves it. REQ-0023's
   block half landed too: `tests/test_kernel_arity.py` holds each launch's block against its `__launch_bounds__`
   (28 pairs measured, 135 pinned).
   while the package and `install.sh` said `0.7.1-fork`; all three match now, pinned by
   `tests/test_version_consistency.py`. The `v0.7.1-fork` release is **still unpublished** (only `v0.5.0-installer`),
   so README's one-liners 404 until the owner runs `docs/RELEASE-CHECKLIST.md`. The mask cache is a bounded 64 MiB
-  LRU (`StateMaskCache`, `KINDI_MASK_CACHE_MB`); A4/A5-rate open. Suite: 1,574 passed / 58 skipped / 0 failed (195 s).
-  **2026-11-24 (latest):** REQ-0027's mask got cheaper: self-loop characters now come off the NFA's character edges plus
+  LRU (`StateMaskCache`, `KINDI_MASK_CACHE_MB`); A4/A5-rate open. Suite: 1,575 passed / 58 skipped / 0 failed (202 s).
+  **2026-11-24:** REQ-0027's mask got cheaper: self-loop characters now come off the NFA's character edges plus
   a reverse-epsilon closure (8,228 probes per state gone) and the mask unions use a cached boolean mask (248,320-id sorts
   gone). 2B medians: 15 -> 10.0 ms/token `json_schema`, 124 -> 57.1 unrolled `json.gbnf` depth 1 (depth 2/3 -> 9.5),
   record 70 -> 8.4, 200 tokens 3 -> 1.7 and 20 -> 7.5; oracle re-run over 14 real states, 0 mismatches. Evidence:
@@ -38,18 +40,16 @@ line of evidence (command + result). A task must be resumable from this file alo
   `tools/warp_mask_baseline.json`. It found and fixed two real hazards (`chunk.cu` `k_q8x_T2` bypassed the
   file's own `KSHFLX` macro; `kindi.cu` `wsum_d`/`wsum_f` used bare `__shfl_xor` on every arch).
   The release's root `test_inkling2_engine.py` moved to `tools/verify_inkling2.py` (a manual check). **Unrun here:** the
-  Inkling engine, sampled drafting and core detection (no GPU, pack or Windows host). **2026-11-23:** official Kindi v0.7.0 (`8298a0f`) is also merged in (39 conflicted files, 69 hunks, all
-  resolved by hand; the ported fixes, the unwired `slots.py`/Flash-Next modules and the merge defects are
-  recorded in [docs/development/AGENTS-HISTORY.md](docs/development/AGENTS-HISTORY.md) and `CURRENT-VS-KINDI-0.7.md`).
-  No GPU, pack or Windows run; the vendored unwired `qwen4exp_*`/`qx_*` modules are outside
+  Inkling engine, sampled drafting and core detection (no GPU, pack or Windows host). **2026-11-23:** v0.7.0 (`8298a0f`) is also merged in (39 conflicted files, 69 hunks, all
+  resolved by hand; the ported fixes, the unwired `slots.py`/Flash-Next modules and the merge defects are in
+  [docs/development/AGENTS-HISTORY.md](docs/development/AGENTS-HISTORY.md) and `CURRENT-VS-KINDI-0.7.md`). No GPU, pack or Windows run; the vendored unwired `qwen4exp_*`/`qx_*` modules are outside
   Pyright's and Pylint's scope until a GPU run wires them (`pyrightconfig.json`, `VENDORED_UNWIRED`). The Gemma 4
   pinned-host fix (#44) follows 0.7.0's names and release points with the fork's host budget on top; its tests pin
   each. The 2026-11-23 installer slice adds `kindi selftest --url` (stdlib HTTP, `KINDI_API_KEY` when the container
   carries one), replaces fastapi's test client with a direct ASGI call, and runs the check after `/health` in each
   serving container (`--no-selftest` opts out); 16 tests cover both paths and a failure. `tools/container_smoke.sh`
   runs `kindi selftest` in the image and with `--url` in the serving container, so a release image proves the pack,
-  tokenizer, engine, `/health` and the chat route; `selftest.py` lost `asyncio.run` (the image is Python 3.6.9).
-  Unrun here (no GPU or image).
+  tokenizer, engine, `/health` and the chat route; `selftest.py` lost `asyncio.run` (the image is Python 3.6.9). Unrun here (no GPU or image).
 
 ### Python quality ratchet
 
@@ -235,7 +235,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `a101b7d` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `54bd08e` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint, Arc GEMM, bench --spec |
+| `<worktree>` | `merge/upstream-0.7.0` | `42d6b2b` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint, Arc GEMM, bench --spec, config-reference direct reads |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
