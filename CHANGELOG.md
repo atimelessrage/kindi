@@ -10,6 +10,25 @@ installer hashes are recorded in `docs/INSTALL.md`; publication is still a relea
 (The pre-merge 0.6.1-era snapshot — 669 commits / 827 files at `60a039b` — is kept in
 `detailed-fork-changelog.md`.)
 
+### Arc staging re-checked, and the host's compilers recorded (2026-11-24)
+
+The Arc A770's `kindi intel-gemm` already had the locally staged variant beside the global-load
+shape, and its page claimed a consistent 1.02-1.05x. A paired re-check (arms alternated per run,
+three runs per arm, ten launches per run) says something narrower and truer: **1.05x at 128 x 128 x
+512, 1.06x at 256 x 256 x 2048, and 0.97x at 512 x 512 x 4096**, with the host reference bit-exact
+in all 18 runs. The staged group reserves 34 KiB of the device's 64 KiB local memory, so occupancy
+is the plausible cost, but the probe measures no counters and the note says so instead of guessing.
+Both tables now sit on the same page (`docs/benchmarks/2026-11-24-i7-8086k-arc-a770-gemm-tiled/`),
+and the large-shape 1.02x is marked as that session's number rather than a property of the shape.
+
+The Intel oneAPI toolkit installed on this host is now recorded: `sycl-ls` enumerates the Arc A770
+through OpenCL and finds **no Level Zero device**, so the SYCL runtime half of REQ-0020 M2 is in
+place and L0 detection is the gap. `docs/development/KNOWLEDGE.md` gained the path-free how-to for
+clang (CPU build and `--analyze`), Cppcheck and the oneAPI driver, with the exact machine paths in
+the gitignored host-tools sheet; `clang --analyze` on `kindi/kcpu.c` reports two warnings, both
+reviewed (one false positive at the attention rotation, one cosmetic dead store left alone so the
+engine's source hash and its 4/4 CPU evidence stay valid).
+
 ### The 27B on the CPU, and a compiler that was there (2026-11-24)
 
 The 27B pack (6.8 GB, 64 layers) now has a measured CPU row without any CUDA device: `kindi verify`

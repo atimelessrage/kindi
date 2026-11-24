@@ -27,7 +27,7 @@ unpinned launch let a work-group span two tiles, so its staging and barriers mix
 result was wrong (0 mismatches at one tile, mismatches at 2+ tiles). The probe now always launches
 `(256, 1)`; that is why every shape below, including 512 rows x 512 tokens, is exact.
 
-## 2. Local staging: a small, consistent win
+## 2. Local staging: a small win at the smaller shapes
 
 `gemm_tile_local` stages the group's activation words and decoded weight words in local memory (as
 `k_mm_g5q` stages its A/B tiles), so each word is read from global memory once per block. Arithmetic
@@ -53,6 +53,10 @@ bottleneck is the byte-wise dot and the per-word 4-trit decode, not global traff
 variant removes the re-reads (8 consumers per staged word) but not the arithmetic. That is the
 honest reason `dp4a`-style packing, not more staging, is the next lever.
 
+**The 512 x 512 x 4096 cell did not reproduce** in a paired re-check later the same day: staging was
+0.97x there (§4). The 1.02x quoted above is what that session measured, not a property of the shape;
+read the two sections together, and treat only the re-check as a paired comparison.
+
 ## 3. Device selection is not stable, so the probe selects by name
 
 On this host the driver has returned the **integrated UHD 630 first** and the Arc A770 second, and
@@ -62,6 +66,41 @@ now take `--device-name SUBSTR` and record a warning in the report and in the pr
 the selected device's name does not contain `Arc`. Every run on this page was
 `--device-name Arc`; each report's `device.name` reads `Intel(R) Arc(TM) A770 Graphics` with 512
 compute units and 15,932 MiB.
+
+## 4. Paired re-check: the win holds at two shapes, not the third
+
+Re-run after the Intel oneAPI toolkit was installed on this host (the OpenCL ICD set changed, so the
+absolute milliseconds are not comparable with §2; the reported driver is the same
+`32.0.101.9175` and so is the source). Arms alternate per run — global, local, global, local — so a
+clock or thermal drift hits both alike; three runs per arm, ten launches per run, medians quoted,
+[staging-recheck.json](staging-recheck.json):
+
+| rows x tokens x cols | staging | 10 launches (3 runs) | median | GFLOP/s | speedup | mismatches |
+|---|---|---|---|---|---|---|
+| 128 x 128 x 512 | global | 39.7 / 39.8 / 39.9 ms | 39.8 ms | 4.21 | - | 0 |
+| 128 x 128 x 512 | local | 37.9 / 37.7 / 37.8 ms | 37.8 ms | 4.44 | **1.05x** | 0 |
+| 256 x 256 x 2048 | global | 156.3 / 157.0 / 153.9 ms | 156.3 ms | 17.17 | - | 0 |
+| 256 x 256 x 2048 | local | 148.9 / 147.4 / 147.5 ms | 147.5 ms | 18.20 | **1.06x** | 0 |
+| 512 x 512 x 4096 | global | 323.5 / 336.6 / 343.1 ms | 336.6 ms | 63.80 | - | 0 |
+| 512 x 512 x 4096 | local | 345.4 / 345.6 / 345.5 ms | 345.5 ms | 62.16 | **0.97x** | 0 |
+
+Both variants stayed bit-exact against the same host reference in all 18 runs, which is the point of
+keeping the gate: a staging change that changed a single bit would be a correctness bug, not a
+speedup. The staged arm is also the *steadier* one at the large shape (345.4-345.6 ms against
+323.5-343.1 ms), so the global arm's spread is not hiding a staged regression.
+
+What this supports and what it does not:
+
+- **Supported:** staging is worth about 5-6% while the staged tile is small (128x128 and 256x256
+  tiles), and it costs about 3% at 512 x 512 x 4096 on this card.
+- **Not supported:** "local staging is a consistent win", and any single-arm number from one session.
+  The first session's 1.02x at the largest shape is the measured fact of that session; the paired
+  re-check is what the gain should be quoted from.
+- **Not attributed:** why the sign flips. The staged group reserves
+  34 KiB of the device's 64 KiB local memory (`LOCAL_BYTES`) where the global variant reserves
+  almost none, so occupancy and the extra copy plus barriers are the suspects, but the probe does
+  not query occupancy or counters, and no claim is made. The next lever is unchanged either way:
+  the byte-wise dot and the 4-trit decode, i.e. `dp4a`-shaped packing.
 
 ## Scope and limits
 

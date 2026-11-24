@@ -57,6 +57,39 @@ guide. Keep commands copy-pasteable and avoid local machine paths and credential
   and `gpu-first` placements, with 27B also gated after generic GQA support; the
   Nanbeige host-layer path and MoE/Gemma tandem remain separate.
 
+## Compilers and static analysis on a Windows host
+
+Exact install locations are machine data, so they are not written here (see the note
+at the top of this file); the local record with the paths and the versions this host
+was verified against is the gitignored host-tools sheet under `bench-logs/`.
+
+- **clang builds the CPU engine.** `kindi/cpu.py:_find_cc` resolves `KINDI_CC`, then
+  `PATH`, then a standard LLVM install, so a clang under `Program Files` is used without
+  any setup; `kindi caps` prints the compiler it found. The build needs `-mavx2 -mfma
+  -mf16c` (the source refuses to compile without AVX).
+- **`clang --analyze` is the cheap bug finder for `kindi/kcpu.c`.** Run it with the same
+  ISA flags, or the file's own `#error` and `__m256` errors hide the real findings. It
+  currently reports two warnings and both are understood: an "assigned value is garbage"
+  at the attention rotation that is a false positive (`rms_rows(..., 1, HD)` writes exactly
+  `HD` elements; the analyzer does not follow the store through the callee's loop-bound
+  parameter), and one dead store of `R` that is left in place on purpose so the engine's
+  source hash, and therefore its 4/4 CPU verify evidence, stays valid. Re-run it after any
+  change to the C engine and treat a third finding with the same care.
+- **Cppcheck 2.22.0 covers the C engine too**, in C mode:
+  `--enable=warning,performance,portability --std=c11 --language=c
+  --suppress=missingIncludeSystem`. It is clean on `kindi/kcpu.c` today. It cannot see the
+  OpenCL kernels, which live in Python string literals (`kindi/intel_gemm.py`, `intel_ternary.py`,
+  `intel_cl.py`); those are checked by running the probes against the host reference instead.
+- **Intel oneAPI (SYCL/DPC++) is the REQ-0020 M2 toolchain.** `sycl-ls` enumerates the
+  backends; on this host it lists the Arc A770 and the UHD 630 through **OpenCL only** and no
+  Level Zero device, so the SYCL runtime path is installed while Level Zero detection is the
+  remaining gap. `icx-cl` drives MSVC and needs its environment (`vcvars64.bat` or a Developer
+  PowerShell); `icpx`/`dpcpp` do not. No SYCL code is in the tree yet: the probes stay OpenCL
+  and no backend or support claim exists.
+- **A CUDA toolkit installer for the NVIDIA route is kept on the host but not installed**, and
+  no CUDA device is visible (see `docs/MANUAL-HELP-NEEDED.md` §4), so nothing NVIDIA-side can
+  be measured from here.
+
 ## Git archaeology
 
 ```sh

@@ -1,0 +1,86 @@
+{
+  "cells": {
+    "128x128x512": {
+      "device": [
+        "Intel(R) Arc(TM) A770 Graphics"
+      ],
+      "driver": [
+        "32.0.101.9175"
+      ],
+      "gflops_global": 4.21,
+      "gflops_local": 4.44,
+      "global_median_ms": 39.809,
+      "global_ms": [
+        39.741,
+        39.809,
+        39.932
+      ],
+      "local_median_ms": 37.757,
+      "local_ms": [
+        37.884,
+        37.722,
+        37.757
+      ],
+      "mismatches": [
+        0
+      ],
+      "speedup": 1.054
+    },
+    "256x256x2048": {
+      "device": [
+        "Intel(R) Arc(TM) A770 Graphics"
+      ],
+      "driver": [
+        "32.0.101.9175"
+      ],
+      "gflops_global": 17.17,
+      "gflops_local": 18.2,
+      "global_median_ms": 156.327,
+      "global_ms": [
+        156.327,
+        156.974,
+        153.908
+      ],
+      "local_median_ms": 147.47,
+      "local_ms": [
+        148.881,
+        147.45,
+        147.47
+      ],
+      "mismatches": [
+        0
+      ],
+      "speedup": 1.06
+    },
+    "512x512x4096": {
+      "device": [
+        "Intel(R) Arc(TM) A770 Graphics"
+      ],
+      "driver": [
+        "32.0.101.9175"
+      ],
+      "gflops_global": 63.8,
+      "gflops_local": 62.16,
+      "global_median_ms": 336.617,
+      "global_ms": [
+        323.501,
+        336.617,
+        343.124
+      ],
+      "local_median_ms": 345.46,
+      "local_ms": [
+        345.409,
+        345.632,
+        345.46
+      ],
+      "mismatches": [
+        0
+      ],
+      "speedup": 0.974
+    }
+  },
+  "command": "python -m kindi intel-gemm --rows R --tokens T --cols K --staging {local,global} --repeats 10 --device-name Arc --json",
+  "order": "arms alternated per shape",
+  "repeats": 10,
+  "runs_per_arm": 3
+}

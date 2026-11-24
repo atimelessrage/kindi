@@ -374,7 +374,11 @@ were staged in local memory, which made the result wrong at more than one tile. 
 a correctness fix first. Second, `--staging local` (the default) stages each group's activation
 words and decoded weight words in local memory as `k_mm_g5q` does; it is exact and a further
 1.02-1.05x over the pinned global load (67.77 vs 66.17 GFLOP/s at the large shape), small because
-the bottleneck is the byte-wise dot and the 4-trit decode, not global traffic.
+the bottleneck is the byte-wise dot and the 4-trit decode, not global traffic. **A paired re-check
+later the same day (arms alternated, three runs each) holds 1.05x and 1.06x at the two smaller
+shapes but measures 0.97x at 512 x 512 x 4096**, so staging is a small win, not a consistent one:
+the 1.02x above is that session's number, not a property of the shape. Either way the bottleneck is
+the byte-wise dot and the 4-trit decode, so `dp4a`-shaped packing, not more staging, is the lever.
 
 OpenCL's device order is **not stable on this host**: the driver has returned the integrated UHD 630
 first and the Arc A770 second, and the reverse on other runs, so `--device 0` can silently benchmark
