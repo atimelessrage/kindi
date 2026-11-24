@@ -149,9 +149,9 @@ def walk(g, tok, texts, doc, label):
     per-token list is the honest cost of that token; the quarter breakdown shows whether the price
     grows with the document, which one average cannot.
     """
+    # hit detection via the cache's own miss counter: the cache is a StateMaskCache
+    # (bounded LRU), not a dict, so `state in cache` no longer works
     cache = getattr(g, "_vocab_cache", None)
-    if cache is None:
-        g._vocab_cache = cache = {}
     ids = tok.encode(doc)
     t0 = time.perf_counter()
     g.vocab_allowed(g.start(), texts)
@@ -163,10 +163,11 @@ def walk(g, tok, texts, doc, label):
         if state is None:
             ok = False
             break
-        hit = state in cache
+        before = cache.misses if cache is not None else 0
         t1 = time.perf_counter()
         g.vocab_allowed(state, texts)
         dt = (time.perf_counter() - t1) * 1e3
+        hit = cache is None or cache.misses == before
         costs.append(0.0 if hit else dt)
         if not hit:
             per_miss.append(dt)

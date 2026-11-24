@@ -1644,3 +1644,35 @@ gone). 2B medians: 15 -> 10.0 ms/token `json_schema`, 124 -> 57.1 unrolled `json
 record 70 -> 8.4, 200 tokens 3 -> 1.7 and 20 -> 7.5; oracle re-run over 14 real states, 0 mismatches. Evidence:
 `docs/benchmarks/2026-11-24-i7-8086k-grammar-mask-edges/` (claim `docs/claims/grammar-mask-edges.json`); CPU filter
 only, A4/A5 open.
+
+### Lease row moved out of the live table (2026-11-24)
+
+| task | worktree | branch | shared files | state |
+|---|---|---|---|---|
+| roadmap wins (2026-11-24) | `<worktree>` | `merge/upstream-0.7.0` | `kindi/backends/llamacpp.py`, `kindi/backends/__init__.py`, `kindi/backends/base.py`, `tests/backends/test_llamacpp.py`, `tests/test_grammar_cost.py`, `docs/BACKENDS.md`, `docs/ROADMAP.md`, `docs/development/requirements/REQ-0019.md`, `REQ-0030.md`, `CHANGELOG.md`, `docs/CONFIGURATION.md`, `docs/CONFIGURATION-REFERENCE.md`, `docs/claims/req0030-cpu-profile.json`, `tools/grammar_cost.py`, `tools/python_quality_baseline.json` | **done.** REQ-0019 T4.4: the llama.cpp proxy backend (wildcard, 12 CPU tests) — live `llama-server` gate open. REQ-0030 A1 native-CPU profile (2B CPU engine): mask stays the only candidate (11.2 ms/token short, 1.1 long), tokenizer and framing removed; `docs/benchmarks/2026-11-24-i7-8086k-cpu-req0030/` + claim. Fixed `tools/grammar_cost.py` `walk()` against the bounded `StateMaskCache` (6 tests). Root fix: `Backend.capabilities` is declared instead of initialized to `None` (six adapters' mypy `assignment` findings gone, 59 -> 53, baseline lowered with a reason). Full suite 1,633 passed / 47 skipped / 0 failed. |
+
+### The v0.7.1 and v0.7.0 merges, as AGENTS.md recorded them (moved 2026-11-24)
+
+Moved verbatim from the handoff's dated bullets because AGENTS.md is capped at 450 lines.
+
+  **2026-11-24:** official **Kindi v0.7.1** (`1cb59d2`, one squashed commit on `v0.7.0`, 43 files,
+  +15,649/-114) is merged in as `0.7.1-fork`: the **Inkling 2 Mini** engine (`inkling2_*`, `kindi inkling`,
+  the server's `kindi_inkling2` backend), **Flash-Next drafting for sampled requests**
+  (`sampling.spec_accept` takes a draft distribution; `spec.spec_accept` delegates), **one CPU thread per
+  physical core** (`kindi/cores.py`) and the `check_prompt` engine-lock fix. All 17 conflicts were
+  version identity: the fork keeps `0.7.1-fork` and its own cascade/adapter/`modelids` paths beside
+  upstream's inkling additions. **Upstream names `tools/check_warp_masks.py` but the tag does not ship
+  it**, so the fork wrote it (14 tests): 404 intrinsics classified, 7 reviewed sub-warp masks in
+  `tools/warp_mask_baseline.json`. It found and fixed two real hazards (`chunk.cu` `k_q8x_T2` bypassed the
+  file's own `KSHFLX` macro; `kindi.cu` `wsum_d`/`wsum_f` used bare `__shfl_xor` on every arch).
+  The release's root `test_inkling2_engine.py` moved to `tools/verify_inkling2.py` (a manual check). **Unrun here:** the
+  Inkling engine, sampled drafting and core detection (no GPU, pack or Windows host). **2026-11-23:** v0.7.0 (`8298a0f`) is also merged in (39 conflicted files, 69 hunks, all
+  resolved by hand; the ported fixes, the unwired `slots.py`/Flash-Next modules and the merge defects are in
+  [AGENTS-HISTORY.md](AGENTS-HISTORY.md) and `CURRENT-VS-KINDI-0.7.md`). No GPU, pack or Windows run; the vendored unwired `qwen4exp_*`/`qx_*` modules are outside
+  Pyright's and Pylint's scope until a GPU run wires them (`pyrightconfig.json`, `VENDORED_UNWIRED`). The Gemma 4
+  pinned-host fix (#44) follows 0.7.0's names and release points with the fork's host budget on top; its tests pin
+  each. The 2026-11-23 installer slice adds `kindi selftest --url` (stdlib HTTP, `KINDI_API_KEY` when the container
+  carries one), replaces fastapi's test client with a direct ASGI call, and runs the check after `/health` in each
+  serving container (`--no-selftest` opts out); 16 tests cover both paths and a failure. `tools/container_smoke.sh`
+  runs `kindi selftest` in the image and with `--url` in the serving container, so a release image proves the pack,
+  tokenizer, engine, `/health` and the chat route; `selftest.py` lost `asyncio.run` (the image is Python 3.6.9). Unrun here (no GPU or image).

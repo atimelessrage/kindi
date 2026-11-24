@@ -91,6 +91,13 @@ def test_resolve_by_architecture_via_metadata(monkeypatch):
 
 
 def test_resolve_unknown_names_what_is_registered():
+    # an unknown model id now resolves to the llama.cpp proxy wildcard (REQ-0019 T4.4);
+    # the refusal text only fires when no wildcard is registered
+    from kindi.backends.llamacpp import LlamaCppBackend
+
+    backend = registry.resolve("no-such-model")
+    assert isinstance(backend, LlamaCppBackend)
+    registry.unregister_backend("llamacpp")
     with pytest.raises(registry.BackendNotFound) as excinfo:
         registry.resolve("no-such-model")
     message = str(excinfo.value)
@@ -101,8 +108,12 @@ def test_resolve_unknown_names_what_is_registered():
 
 def test_resolve_respects_device_filter():
     registry.register_backend(ToyBackend)
-    with pytest.raises(registry.BackendNotFound):
-        registry.resolve("toy-1b", device="cuda")
+    # the toy is cpu-only and is excluded by a cuda request; the proxy wildcard has no
+    # device filter of its own, so it is what serves instead (device choice is the
+    # upstream server's business)
+    backend = registry.resolve("toy-1b", device="cuda")
+    assert backend.capabilities.name == "llamacpp"
+    assert isinstance(registry.resolve("toy-1b", device="cpu"), ToyBackend)
 
 
 def test_external_module_loading_registers_on_import(tmp_path, monkeypatch):

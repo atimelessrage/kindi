@@ -1,0 +1,123 @@
+{
+  "decode_2000_ms": 1.27,
+  "framing_ms_per_chunk": 0.0027,
+  "host": "i7-8086K CPU engine (KINDI_DEVICE=cpu)",
+  "mask": {
+    "long": {
+      "allowed_at_start": 426,
+      "first_mask_ms": 2.2,
+      "max_miss_ms": 12.4,
+      "mean_ms_per_token": 1.1,
+      "median_miss_ms": 4.8,
+      "misses": 43,
+      "ok": true
+    },
+    "short": {
+      "allowed_at_start": 426,
+      "first_mask_ms": 1988.1,
+      "max_miss_ms": 157.3,
+      "mean_ms_per_token": 11.2,
+      "median_miss_ms": 6.0,
+      "misses": 17,
+      "ok": true
+    }
+  },
+  "pack": "bonsai-2b",
+  "server": {
+    "structured_first": {
+      "content_chunks": 24,
+      "content_s": 0.735,
+      "ttft_s": 0.175,
+      "usage": {
+        "completion_tokens": 24,
+        "prompt_tokens": 35,
+        "prompt_tokens_details": {
+          "cached_tokens": 28
+        },
+        "total_tokens": 59
+      },
+      "wall_s": 0.91
+    },
+    "structured_warm_median": {
+      "content_s": 0.729,
+      "ttft_s": 0.147,
+      "wall_s": 0.878
+    },
+    "unconstrained_warm_median": {
+      "content_s": 0.154,
+      "ttft_s": 0.14,
+      "wall_s": 0.321
+    },
+    "unconstrained_warm_runs": [
+      {
+        "content_chunks": 8,
+        "content_s": 0.154,
+        "ttft_s": 0.141,
+        "usage": {
+          "completion_tokens": 8,
+          "prompt_tokens": 35,
+          "prompt_tokens_details": {
+            "cached_tokens": 28
+          },
+          "total_tokens": 43
+        },
+        "wall_s": 0.321
+      },
+      {
+        "content_chunks": 8,
+        "content_s": 0.158,
+        "ttft_s": 0.14,
+        "usage": {
+          "completion_tokens": 8,
+          "prompt_tokens": 35,
+          "prompt_tokens_details": {
+            "cached_tokens": 28
+          },
+          "total_tokens": 43
+        },
+        "wall_s": 0.321
+      },
+      {
+        "content_chunks": 8,
+        "content_s": 0.154,
+        "ttft_s": 0.13,
+        "usage": {
+          "completion_tokens": 8,
+          "prompt_tokens": 35,
+          "prompt_tokens_details": {
+            "cached_tokens": 28
+          },
+          "total_tokens": 43
+        },
+        "wall_s": 0.306
+      }
+    ]
+  },
+  "tokenizer": {
+    "api": {
+      "cold_ms": null,
+      "tokens": 28,
+      "warm_min_ms": 0.03290000313427299,
+      "warm_ms": 0.033700001949910074
+    },
+    "repo-13k": {
+      "cold_ms": null,
+      "tokens": 3001,
+      "warm_min_ms": 4.139700002269819,
+      "warm_ms": 4.152599998633377
+    },
+    "repo-2k": {
+      "cold_ms": null,
+      "tokens": 451,
+      "warm_min_ms": 0.6180999989737757,
+      "warm_ms": 0.6203999946592376
+    },
+    "repo-6k": {
+      "cold_ms": null,
+      "tokens": 1351,
+      "warm_min_ms": 1.86089999624528,
+      "warm_ms": 1.8715999976848252
+    }
+  },
+  "vocab": 248320
+}

@@ -132,7 +132,9 @@ class Backend(object, metaclass=abc.ABCMeta):
     generation only.
     """
 
-    capabilities = None
+    # Declared, not initialized: every concrete backend assigns its own capabilities,
+    # and one that does not gets a default from registry._capabilities_for (getattr).
+    capabilities: "BackendCapabilities"
 
     @abc.abstractmethod
     def load(self, config):

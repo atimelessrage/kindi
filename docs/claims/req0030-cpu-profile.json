@@ -1,0 +1,49 @@
+{
+  "gate": "req0030-cpu-profile",
+  "title": "REQ-0030 A1 native CPU path: tokenizer, constrained mask and framing on the 2B",
+  "measured": "2026-11-24",
+  "commit": "unreleased",
+  "command": "KINDI_DEVICE=cpu python -m kindi --pack ~/.kindi/packs/bonsai-2b serve --host 127.0.0.1 --port 8099 (background) then KINDI_DEVICE=cpu python profile.py",
+  "notes": "The candidate-list numbers quoted in docs/ROADMAP.md's REQ-0030 bullet. Run page: docs/benchmarks/2026-11-24-i7-8086k-cpu-req0030/. CPU engine, 2B pack, i7-8086K.",
+  "evidence": [
+    "docs/benchmarks/2026-11-24-i7-8086k-cpu-req0030/profile.json",
+    "docs/benchmarks/2026-11-24-i7-8086k-cpu-req0030/README.md",
+    "docs/benchmarks/2026-11-24-i7-8086k-cpu-req0030/profile.py"
+  ],
+  "numbers": [
+    {
+      "id": "mask-short-mean",
+      "display": "11.2 ms/token",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-i7-8086k-cpu-req0030/profile.json",
+        "pointer": "/mask/short/mean_ms_per_token",
+        "expect": 11.2
+      }
+    },
+    {
+      "id": "tokenizer-api-warm",
+      "display": "0.034 ms",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "tolerance": 0.02,
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-i7-8086k-cpu-req0030/profile.json",
+        "pointer": "/tokenizer/api/warm_ms",
+        "expect": 0.0337
+      }
+    },
+    {
+      "id": "framing-per-chunk",
+      "display": "0.0027 ms/chunk",
+      "quoted_in": ["docs/ROADMAP.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-i7-8086k-cpu-req0030/profile.json",
+        "pointer": "/framing_ms_per_chunk",
+        "expect": 0.0027
+      }
+    }
+  ]
+}

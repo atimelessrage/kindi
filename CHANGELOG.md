@@ -10,6 +10,29 @@ installer hashes are recorded in `docs/INSTALL.md`; publication is still a relea
 (The pre-merge 0.6.1-era snapshot — 669 commits / 827 files at `60a039b` — is kept in
 `detailed-fork-changelog.md`.)
 
+### The generic fallback: a llama.cpp proxy backend (2026-11-24)
+
+REQ-0019 T4.4's recommended generic fallback is now in the tree: `kindi/backends/llamacpp.py`
+(registered `llamacpp`) declares no model ids and no architectures, so the registry resolves it
+only for models nothing more specific serves (an arbitrary GGUF), and forwards generation to a
+running `llama-server`'s `/completion` endpoint through the backend contract. Configuration is
+`base_url`/`api_key`/`model` from the load config or `KINDI_LLAMACPP_BASE_URL` /
+`KINDI_LLAMACPP_API_KEY` (default `http://127.0.0.1:8080`); `load()` probes `/health` and records
+reachability in `info()` without failing, and `generate()` raises `BackendUnavailable` naming the
+server and the `llama-server -m <model.gguf>` remedy when it is missing. Limits are stated, not
+hidden: the prompt is ChatML-rendered by Kindi (llama.cpp's own template is bypassed), generation
+is one non-streaming request, and constrained decoding is unsupported (`supports_json_grammar` and
+`supports_token_filter` are False; a `token_filter` raises instead of being ignored). CPU-tested
+with an injectable opener (`tests/backends/test_llamacpp.py`, 12 tests); `kindi backends` lists it
+as a wildcard. There is still no arbitrary-GGUF claim: no `llama-server` runs on this host, so the
+live proxy gate is open and `verify_prompts()` stays empty.
+
+Also in this round: REQ-0030's native-CPU profile is measured (2B, CPU engine — the mask stays the
+only qualifying native candidate at 11.2 ms/token short / 1.1 ms/token long; tokenizer 0.034 ms
+and framing 0.0027 ms/chunk stay removed), and `tools/grammar_cost.py`'s `walk()` no longer
+crashes on the bounded `StateMaskCache` (hit detection reads the miss counter). Pages:
+`docs/BACKENDS.md`, `docs/benchmarks/2026-11-24-i7-8086k-cpu-req0030/`.
+
 ### The Arc A770 runs a SYCL vector-add through Level Zero (2026-11-24)
 
 REQ-0020 M2 names the SYCL runtime and SYCL device selection, and every probe so far used OpenCL C.

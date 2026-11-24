@@ -12,8 +12,21 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `67e1468` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
-  **2026-11-24 (latest): the 27B verifies on the CPU engine, and the "missing" compiler was installed.**
+- **HEAD:** `e05536b` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+  **2026-11-24 (latest): the generic fallback backend landed, and the CPU half of REQ-0030 is measured.**
+  REQ-0019 T4.4's recommended option is in the tree: `kindi/backends/llamacpp.py` (registered `llamacpp`) is a
+  wildcard that declares no model ids/architectures, so `resolve` picks it only for models nothing specific
+  serves, and forwards generation to a running `llama-server`'s `/completion`
+  (`KINDI_LLAMACPP_BASE_URL`, `KINDI_LLAMACPP_API_KEY`); ChatML by Kindi, one non-streaming request, no
+  constrained decoding, all stated in the module. 12 CPU tests with an injectable opener; **the live
+  `llama-server` gate is open** (no server on this host), so there is still no arbitrary-GGUF claim.
+  REQ-0030 A1's native-CPU half: 2B on the CPU engine keeps the mask as the only native candidate
+  (11.2 ms/token short / 1.1 long), tokenizer 0.034 ms and framing 0.0027 ms/chunk stay removed
+  (`docs/benchmarks/2026-11-24-i7-8086k-cpu-req0030/`, claim `docs/claims/req0030-cpu-profile.json`).
+  Fixed `tools/grammar_cost.py` `walk()` (broke when the mask cache became a bounded `StateMaskCache`), and
+  the root of six adapters' mypy `assignment` finding: `Backend.capabilities` is now declared, not `None`
+  (mypy 59 -> 53, baseline lowered with a reason). Suite: **1,633 passed / 47 skipped / 0 failed (241 s)**.
+  **2026-11-24:** the 27B verifies on the CPU engine, and the "missing" compiler was installed.**
   `KINDI_DEVICE=cpu kindi verify` on the 27B pack is **4/4 token-exact** (40/40 per prompt) at 3.7 tok/s after a 340 s load;
   packcheck full (10 files, 18.4 s) and a structural audit (851 tensors, byte ranges tiling every file, reference ids in range)
   passed first, and `kindi plan` ran on it (8 GiB assumed: no split, 7,266 MiB at ctx 8192; the default max context plans 2 GDN CPU layers). Because
@@ -29,27 +42,10 @@ line of evidence (command + result). A task must be resumable from this file alo
   `tests/test_version_consistency.py`. The `v0.7.1-fork` release is **still unpublished** (only `v0.5.0-installer`),
   so README's one-liners 404 until the owner runs `docs/RELEASE-CHECKLIST.md`. The mask cache is a bounded 64 MiB
   LRU (`StateMaskCache`, `KINDI_MASK_CACHE_MB`); A4/A5-rate open. Suite: 1,598 passed / 47 skipped / 0 failed (226 s).
-  **2026-11-24:** official **Kindi v0.7.1** (`1cb59d2`, one squashed commit on `v0.7.0`, 43 files,
-  +15,649/-114) is merged in as `0.7.1-fork`: the **Inkling 2 Mini** engine (`inkling2_*`, `kindi inkling`,
-  the server's `kindi_inkling2` backend), **Flash-Next drafting for sampled requests**
-  (`sampling.spec_accept` takes a draft distribution; `spec.spec_accept` delegates), **one CPU thread per
-  physical core** (`kindi/cores.py`) and the `check_prompt` engine-lock fix. All 17 conflicts were
-  version identity: the fork keeps `0.7.1-fork` and its own cascade/adapter/`modelids` paths beside
-  upstream's inkling additions. **Upstream names `tools/check_warp_masks.py` but the tag does not ship
-  it**, so the fork wrote it (14 tests): 404 intrinsics classified, 7 reviewed sub-warp masks in
-  `tools/warp_mask_baseline.json`. It found and fixed two real hazards (`chunk.cu` `k_q8x_T2` bypassed the
-  file's own `KSHFLX` macro; `kindi.cu` `wsum_d`/`wsum_f` used bare `__shfl_xor` on every arch).
-  The release's root `test_inkling2_engine.py` moved to `tools/verify_inkling2.py` (a manual check). **Unrun here:** the
-  Inkling engine, sampled drafting and core detection (no GPU, pack or Windows host). **2026-11-23:** v0.7.0 (`8298a0f`) is also merged in (39 conflicted files, 69 hunks, all
-  resolved by hand; the ported fixes, the unwired `slots.py`/Flash-Next modules and the merge defects are in
-  [docs/development/AGENTS-HISTORY.md](docs/development/AGENTS-HISTORY.md) and `CURRENT-VS-KINDI-0.7.md`). No GPU, pack or Windows run; the vendored unwired `qwen4exp_*`/`qx_*` modules are outside
-  Pyright's and Pylint's scope until a GPU run wires them (`pyrightconfig.json`, `VENDORED_UNWIRED`). The Gemma 4
-  pinned-host fix (#44) follows 0.7.0's names and release points with the fork's host budget on top; its tests pin
-  each. The 2026-11-23 installer slice adds `kindi selftest --url` (stdlib HTTP, `KINDI_API_KEY` when the container
-  carries one), replaces fastapi's test client with a direct ASGI call, and runs the check after `/health` in each
-  serving container (`--no-selftest` opts out); 16 tests cover both paths and a failure. `tools/container_smoke.sh`
-  runs `kindi selftest` in the image and with `--url` in the serving container, so a release image proves the pack,
-  tokenizer, engine, `/health` and the chat route; `selftest.py` lost `asyncio.run` (the image is Python 3.6.9). Unrun here (no GPU or image).
+  The v0.7.1 (`1cb59d2`) and v0.7.0 (`8298a0f`) merge details (Inkling 2 Mini, Flash-Next drafting,
+  one CPU thread per physical core, the fork's own `tools/check_warp_masks.py`, the 2026-11-23 installer
+  slice, and what stayed unrun) moved to
+  [docs/development/AGENTS-HISTORY.md](docs/development/AGENTS-HISTORY.md), "The v0.7.1 and v0.7.0 merges".
 
 ### Python quality ratchet
 

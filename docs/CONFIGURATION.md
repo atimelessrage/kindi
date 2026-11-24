@@ -154,3 +154,5 @@ and the rest).
 | `KINDI_BLOCKING_SYNC` | `1` | the host thread sleeps while it waits for the card, and does not use a CPU core. `0` = it waits in a loop (the driver default) |
 | `KINDI_PREWARM_GRAMMAR` | `1` | `kindi serve` builds the served structured-output vocabulary index and trie (dense, Gemma 4, Lightning, Nanbeige) in a background thread after the engine loads, so the first `json_schema` or `grammar` request does not pay the cold build. `0` = lazy build on the first constrained request |
 | `KINDI_MASK_CACHE_MB` | `64` | the byte budget (MiB) of a grammar's per-state allowed-id cache. A broad mask on the 2B vocabulary is 248,320 int64 ids (~2 MB), so the cache is a bounded LRU: the recurring states of a long constrained generation stay and the churn is evicted. `0` = no caching (every token recomputes its mask) |
+| `KINDI_LLAMACPP_BASE_URL` | `http://127.0.0.1:8080` | the llama.cpp proxy backend (the generic fallback for models no specific adapter serves): the `llama-server` base URL it forwards `/completion` requests to |
+| `KINDI_LLAMACPP_API_KEY` | (unset) | the bearer token sent to that `llama-server` (`--api-key`), when it has one |

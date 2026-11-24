@@ -72,10 +72,13 @@ anything it holds is folded in here, and a stray one is now visible to
   against) can be regenerated on demand.
 - **Why:** several pending gates need fresh references: the bartowski Nanbeige
   quant (§1b), the Gemma 26B G0 reference, the Cascade 2 pinned reference,
-  the Dory D1 goldens. Today `~/llama.cpp` has source and a build tree but
-  no `llama-server` on PATH. A pinned binary (or a short build command +
-  version pin committed to `docs/development/KNOWLEDGE.md`) unblocks all of
-  them; right now each of those gates is stuck on "no reference".
+  the Dory D1 goldens, and now the REQ-0019 T4.4 llama.cpp proxy's live gate
+  (the backend landed 2026-11-24 and is CPU-tested with a fake opener; its
+  only unrun check is a real `llama-server` behind it, which would also prove
+  the proxy's `/completion` request shape on a live server). Today `~/llama.cpp`
+  has source and a build tree but no `llama-server` on PATH. A pinned binary (or a
+  short build command + version pin committed to `docs/development/KNOWLEDGE.md`)
+  unblocks all of them; right now each of those gates is stuck on "no reference".
 - **When done, tell the agent:** the binary path (or that `llama-server` is
   on PATH), and the version.
 

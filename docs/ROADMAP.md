@@ -98,9 +98,13 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   and DeepSeek V4.1 adapters are ported 2026-11-16 and CPU-tested with both
   GPU gates blocked (neither model is on this host; a DeepSeek V4.1 pack is
   hand-written, there is no converter), so all five families now have an
-  adapter; there is still no arbitrary-GGUF claim; the generic fallback
-  stays decision-gated (llama.cpp proxy recommended, native generic
-  backend design-only). The OpenAI error envelope and the conformance suite
+  adapter; there is still no arbitrary-GGUF claim. The generic fallback's
+  recommended option **landed 2026-11-24** (REQ-0019 T4.4): the llama.cpp
+  proxy backend (`kindi/backends/llamacpp.py`, registered `llamacpp`, a
+  wildcard for models nothing specific serves) forwards to a running
+  `llama-server`'s `/completion` and is CPU-tested with an injectable opener;
+  its live gate (a real `llama-server`) is open, so the claim stays closed.
+  The native generic backend (T4.5) stays design-only. The OpenAI error envelope and the conformance suite
   (`kindi/api/errors.py`, `tests/api/`) also landed as the T5.1 foundation for
   REQ-0018; the per-family tool-call parsers, scheduler, metrics T5.5 and
   structured output (T5.4) landed for the dense and Gemma 4 paths (the
@@ -166,7 +170,10 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   existing compiler/cache path and checked with cppcheck; Rust uses the same C ABI as a `cdylib`
   and is checked with cargo fmt/clippy/test. Start with a profile, not a rewrite: the 2026-11-22
   2B/9B profile in REQ-0030 leaves the constrained-decoding mask as the only qualifying candidate;
-  the BPE tokenizer and stream framing were removed, and no native code was added. `kcpu.c` and
+  the BPE tokenizer and stream framing were removed, and the native-CPU 2B
+  profile (2026-11-24, `docs/benchmarks/2026-11-24-i7-8086k-cpu-req0030/`) keeps the same list
+  (mask 11.2 ms/token short; tokenizer 0.034 ms; framing 0.0027 ms/chunk).
+  No native code was added. `kcpu.c` and
   the CUDA kernels are already native and excluded. A swap is adopted only if it is token/mask/byte-identical and
   improves the measured function by at least 1.25x with at least 5% end-to-end p50, with no >1%
   unconstrained-decode regression; otherwise it stays Python. The external sketch's 15-35%
@@ -207,7 +214,10 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   is installed in the Windows test rig**; M1 hardware qualification is partly measured there, and
   the M2 memory and device-kernel halves now pass (`kindi intel-smoke`: device USM + shared USM
   round trip; `kindi intel-cl`: runtime-compiled OpenCL vector-add/GEMM with zero mismatches),
-  while the SYCL `libksycl.so` path, Kindi device selection and a model run remain open. The card
+  and the SYCL runtime smoke now passes on Level Zero (`kindi intel-sycl`:
+  0 mismatches at 1,048,576/1/1,000,003 elements, backend
+  `ext_oneapi_level_zero`), while `libksycl.so`, Kindi device selection and a
+  model run remain open — M2 still needs the Linux target. The card
   is registered in the support matrix as `not measured` and is not offered by the installer. This
   is not a support claim.
   - **27B pack + K8/V4 on the A770 (2026-11-24, blocked):** the pack already exists as a copy in the

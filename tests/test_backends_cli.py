@@ -64,7 +64,7 @@ def test_backends_lists_registered_fake_backend(capsys):
 def test_backends_json_is_machine_readable(capsys):
     assert cli.cmd_backends({}, _args(json_output=True)) == 0
     rows = json.loads(capsys.readouterr().out)
-    assert [row["name"] for row in rows] == ["fake", "bonsai", "nanbeige", "lightning", "gemma4", "dsv41"]
+    assert [row["name"] for row in rows] == ["fake", "bonsai", "nanbeige", "lightning", "gemma4", "dsv41", "llamacpp"]
     assert rows[0]["devices"] == ["cpu"]
     assert rows[0]["factory"] == "FakeBackend"
     assert "bonsai2-2b" in rows[1]["model_ids"]
@@ -79,6 +79,11 @@ def test_backends_json_is_machine_readable(capsys):
     assert rows[5]["model_ids"] == ["deepseek-v41-flash"]
     assert rows[5]["architectures"] == ["deepseek41"]
     assert rows[5]["devices"] == ["cpu"]
+    # the llama.cpp proxy is the wildcard generic fallback (REQ-0019 T4.4): no model
+    # ids and no architectures, so it matches only what nothing specific serves
+    assert rows[6]["model_ids"] == []
+    assert rows[6]["architectures"] == []
+    assert rows[6]["factory"] == "LlamaCppBackend"
 
 
 def test_backends_loads_configured_external_modules(monkeypatch, capsys):

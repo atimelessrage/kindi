@@ -101,7 +101,7 @@ direct sites.
 |---|---|---|
 | `KINDI_API_KEY` | (unset) | `kindi/dsv41_server.py:1548` (+2 more) |
 | `KINDI_ATT_TC` | `0` | `kindi/chunk.py:515` (+1 more) |
-| `KINDI_BACKEND_MODULES` | (empty) | `kindi/backends/__init__.py:56` (+1 more) |
+| `KINDI_BACKEND_MODULES` | (empty) | `kindi/backends/__init__.py:58` (+1 more) |
 | `KINDI_BATCH` | `4` | `kindi/spec.py:2043` (+1 more) |
 | `KINDI_BENCH_ATTN` | (unset) | `kindi/dsv41.py:1571` |
 | `KINDI_BLOCKING_SYNC` | `1` | `kindi/chunk.py:547` (+9 more) |
@@ -215,6 +215,8 @@ direct sites.
 | `KINDI_KV_CACHE` | (unset) | `kindi/nanbeige.py:274` (+1 more) |
 | `KINDI_KV_EXPERIMENTAL` | `0` | `kindi/kld.py:92` (+5 more) |
 | `KINDI_LEGACY_ENGINE_PATH` | (unset) | `kindi/engine.py:896` |
+| `KINDI_LLAMACPP_API_KEY` | (unset) | `kindi/backends/llamacpp.py:120` |
+| `KINDI_LLAMACPP_BASE_URL` | (unset) | `kindi/backends/llamacpp.py:117` |
 | `KINDI_LLVM` | (unset) | `kindi/cpu.py:94` |
 | `KINDI_LOG_RAW` | (unset) | `kindi/lightning_gen.py:400` (+2 more) |
 | `KINDI_LT_ADDED_TAGS` | `1` | `kindi/lightning_gen.py:241` |

@@ -96,6 +96,30 @@ was verified against is the gitignored host-tools sheet under `bench-logs/`.
   no CUDA device is visible (see `docs/MANUAL-HELP-NEEDED.md` §4), so nothing NVIDIA-side can
   be measured from here.
 
+- **The generic fallback backend is a llama.cpp proxy (REQ-0019 T4.4).**
+  `kindi/backends/llamacpp.py` (registered `llamacpp`) is the registry wildcard:
+  it declares no model ids or architectures, so it is chosen only for models
+  nothing more specific serves. It forwards generation to a running
+  `llama-server`'s `/completion`; point it with `KINDI_LLAMACPP_BASE_URL`
+  (default `http://127.0.0.1:8080`) and `KINDI_LLAMACPP_API_KEY`. Reachability
+  is probed at `load()` and recorded in `info()`; the missing-server error is
+  raised by `generate()` with the `llama-server -m <model.gguf>` remedy. It
+  renders ChatML itself (llama.cpp's own chat template is bypassed), makes one
+  non-streaming request, and cannot do constrained decoding (a `token_filter`
+  raises). `tests/backends/test_llamacpp.py` covers it with an injectable
+  opener; a live server is the one unrun gate.
+- **`Backend.capabilities` is declared, not `None`.** The base contract carries
+  `capabilities: "BackendCapabilities"` as an annotation only, so a subclass
+  assigns its own object without a mypy override error and
+  `registry._capabilities_for` still gives an unannotated backend a default
+  (it uses `getattr`). Initializing it to `None` was what produced the same
+  `assignment` finding in six adapters.
+- **`tools/grammar_cost.py` reads the mask cache's miss counter.** The grammar
+  caches moved from dicts to the bounded `StateMaskCache` LRU, so `state in
+  cache` no longer works; `walk()` marks a step as a hit when
+  `cache.misses` did not change. `tests/test_grammar_cost.py` pins it with a
+  tiny vocabulary and the real cache class.
+
 ## Git archaeology
 
 ```sh

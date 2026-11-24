@@ -10,10 +10,11 @@ Lightning, Gemma 4 and DeepSeek V4.1 adapters (`kindi/backends/bonsai.py`,
 is converter/validator only.
 The authoring checklist and `kindi backends` listing (T4.3) and the generic
 fallback (T4.4) are tracked in [REQ-0019](development/requirements/REQ-0019.md).
-Today the registry resolves the fake backend, those five adapters and
-externally registered backends, and `resolve` says so when asked for
-anything else. There is no generic-GGUF claim yet: an arbitrary GGUF cannot
-be served today.
+Today the registry resolves the fake backend, those five adapters, the
+llama.cpp proxy wildcard and externally registered backends. There is no
+generic-GGUF claim yet: the proxy forwards to a running `llama-server`, and
+its live gate has not run, so an arbitrary GGUF cannot be claimed as served
+today.
 
 ## Serving boundary
 
@@ -90,6 +91,26 @@ the Python 3.6 CUDA image. No CuPy import happens at module import time.
   Importing the module registers the backend. Python entry points are
   deferred because `importlib.metadata` does not exist on Python 3.6.
 
+## llama.cpp proxy backend (T4.4)
+
+`kindi/backends/llamacpp.py` (registered `llamacpp`) is the generic fallback:
+a wildcard that declares no model ids and no architectures, so `resolve` picks
+it only for models nothing more specific serves. It forwards generation to a
+running `llama-server` (`llama-server -m model.gguf`) over `POST /completion`
+and replays the reply through the contract. `base_url`/`api_key`/`model`
+come from the load config or `KINDI_LLAMACPP_BASE_URL` /
+`KINDI_LLAMACPP_API_KEY` (default `http://127.0.0.1:8080`); `load()` probes
+`/health` and records reachability in `info()` without failing, and
+`generate()` raises `BackendUnavailable` naming the server and the remedy
+when it is missing. Documented limits (module docstring): the prompt is
+ChatML-rendered by Kindi (llama.cpp's own template is bypassed), generation
+is one non-streaming request, and constrained decoding is unsupported —
+`supports_json_grammar`/`supports_token_filter` are False and a
+`token_filter` raises, so a structured-output request must be rejected at
+the API layer on this backend. CPU-tested with an injectable opener
+(`tests/backends/test_llamacpp.py`); the live gate — a real `llama-server`
+behind the contract — is open, and `verify_prompts()` is empty until it runs.
+
 ## FakeBackend
 
 `kindi/backends/fake.py` is a deterministic backend for tests: byte-level
@@ -162,8 +183,8 @@ ids or GGUF architectures it serves instead of relying on an engine path.
   `encoding` pointing at the model release's `encoding.py` (the chat
   template). Cascade 2 stays converter/validator only.
 - T4.3: `kindi backends` listing and this authoring guide. Done 2026-11-15.
-- T4.4: generic fallback as a llama.cpp proxy backend. Needs the maintainer
-  decision on positioning (REQ-0019). Not done.
+- T4.4: generic fallback as a llama.cpp proxy backend. Done 2026-11-24
+  (the recommended option); CPU-tested, live `llama-server` gate open.
 - T4.5: native generic backend. Design document only. Not done.
 
 Tracked in [REQ-0019](development/requirements/REQ-0019.md) (experimental).

@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """Backend plugin interface (T4.1).
 
-Importing this package registers the fake backend and the T4.2 bonsai,
-nanbeige, lightning, gemma4 and dsv41 adapters (``kindi.backends.*``).
-``resolve`` serves the fake backend, the adapter backends and any
+Importing this package registers the fake backend, the T4.2 bonsai,
+nanbeige, lightning, gemma4 and dsv41 adapters, and the T4.4 llama.cpp
+proxy wildcard (``kindi.backends.*``). ``resolve`` serves those and any
 externally registered backend, and says so when asked for anything else.
 """
 import os
@@ -26,6 +26,7 @@ from .nanbeige import NanbeigeBackend
 from .lightning import LightningBackend
 from .gemma4 import Gemma4Backend
 from .dsv41 import DeepseekV41Backend
+from .llamacpp import LlamaCppBackend
 
 __all__ = [
     "Backend",
@@ -35,6 +36,7 @@ __all__ = [
     "LightningBackend",
     "Gemma4Backend",
     "DeepseekV41Backend",
+    "LlamaCppBackend",
     "BackendNotFound",
     "BackendUnavailable",
     "CancelToken",
