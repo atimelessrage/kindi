@@ -205,6 +205,19 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   while the SYCL `libksycl.so` path, Kindi device selection and a model run remain open. The card
   is registered in the support matrix as `not measured` and is not offered by the installer. This
   is not a support claim.
+  - **27B pack + K8/V4 on the A770 (2026-11-24, blocked):** the pack already exists as a copy at
+    `T:/kindi-models/packs/bonsai-27b` and its `kindi_pack.json` source sha256 matches the GGUF at
+    `T:/kindi-models/Ternary-Bonsai-2-27B-PTQ1_0.gguf` (verified the same day; the GGUF was not
+    moved or deleted), so no re-convert is needed and none is run - a fresh convert needs ~6.8 GiB
+    of scratch the host does not have. Every single-card K8/V4 check (`kindi verify` / `kindi kld`
+    `tp-k8v4` on the CUDA plan engine; [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md) records 2B 2/4, 4B 4/4,
+    9B/27B n/a) needs a CUDA device or the not-yet-existing Intel backend: this host has neither
+    (`cudaErrorNoDevice`, no SYCL, CPU engine does not support the 27B), so `kindi verify` on the
+    27B pack fails before any kernel runs. The two-card half still needs a second identical card
+    plus REQ-0020 M3-M6 first (single-card 2B exact, then 27B exact, then the layer split), and
+    27B K8/V4 itself has no kernel path (`k8v4` refuses other head sizes; the plain engine rejects
+    it), so even a two-card run would have no K8/V4 row to measure. Reopen when M2's SYCL smoke
+    passes on Linux.
 - **CPU + Intel integrated graphics ([REQ-0021](development/requirements/REQ-0021.md), proposed):**
   investigation in [INTEL-IGPU-TANDEM.md](INTEL-IGPU-TANDEM.md). The iGPU route is a retarget
   of the REQ-0020 SYCL backend (Xe-LP/Xe2-LPG, shared system memory, no PCIe boundary — the
