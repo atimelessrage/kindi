@@ -29,7 +29,7 @@ the state at that commit.
 | [REQ-0017](requirements/REQ-0017.md) | Uneven tensor splits for unequal-capacity GPUs | experimental | `74ee40d79aa7` | `74ee40d79aa7` |
 | [REQ-0018](requirements/REQ-0018.md) | Agent-grade API: structured output, tool-call conformance, concurrency | proposed | `f9eff6db05f0` | `30d4816add28` |
 | [REQ-0019](requirements/REQ-0019.md) | Backend plugin interface (contract, registry, adapters) | experimental | `a40269e2ce91` | `0dbff911102d` |
-| [REQ-0020](requirements/REQ-0020.md) | Intel Arc A770 (Alchemist/DG2) support via a SYCL/oneAPI backend | proposed | `147e3dc61f78` | `903431e7c020` |
+| [REQ-0020](requirements/REQ-0020.md) | Intel Arc A770 (Alchemist/DG2) support via a SYCL/oneAPI backend | proposed | `147e3dc61f78` | `97904986b424` |
 | [REQ-0021](requirements/REQ-0021.md) | CPU + Intel integrated-graphics tandem (SYCL/Level Zero) | proposed | `ac0c767005ba` | `eec5bc790a66` |
 | [REQ-0022](requirements/REQ-0022.md) | Hardware identification and per-machine autotuning | experimental | `9e6405f223c0` | `82a72bff163d` |
 | [REQ-0023](requirements/REQ-0023.md) | A kernel launch contract checked for every call site | proposed | `3ececca68d4a` | `fb25dd8968de` |
