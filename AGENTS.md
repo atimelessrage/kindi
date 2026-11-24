@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `ae7e819` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `4e8756f` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24:** `POST /v1/messages` answers Anthropic's dialect on the same `run_generate` path
   (`kindi/api/anthropic.py`; `x-api-key` or bearer; envelope and SSE order; one `_relay` for both streaming
   routes), and `kindi selftest` drives it in process and with `--url`, so an installed image proves it. REQ-0023's
@@ -235,7 +235,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `a101b7d` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `ae7e819` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint, Arc GEMM, bench --spec |
+| `<worktree>` | `merge/upstream-0.7.0` | `4e8756f` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint, Arc GEMM, bench --spec |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
