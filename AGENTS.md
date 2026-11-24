@@ -12,16 +12,16 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `32075c4` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `174c68e` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24 (latest): the 27B verifies on the CPU engine, and the "missing" compiler was installed.**
   `KINDI_DEVICE=cpu kindi verify` on the 27B pack is **4/4 token-exact** (40/40 per prompt) at 3.7 tok/s after a 340 s load;
-  packcheck full (10 files, 18.4 s) and a structural audit (851 tensors, byte ranges tiling every file, reference ids in
-  range) passed first, and `kindi plan` ran on it (8 GiB assumed: 2 GDN CPU layers, 7,601 MiB, fits). The blocker was
-  detection, not hardware: clang+LLVM 18.1.8 sits under Program Files while `clang` is not on PATH, so `_find_cc` resolves
-  `KINDI_CC`, then PATH, then a standard LLVM install (newest first); the cache key names the compiler that will run and
-  `kindi caps` asks the same resolver. That unblocked REQ-0028 A4's live half (`kindi selftest`, 2B CPU: `dialects agree`
-  exit 0) and the `test_cpu_build.py` compile-and-load checks; `kindi plan` names the resolved pack and `kindi models` drops
-  "too large" for the 2B/4B/9B without a card. GPU rows (tc/plain verify, K8/V4, bench, tandem) still need a card.
+  packcheck full (10 files, 18.4 s) and a structural audit (851 tensors, byte ranges tiling every file, reference ids in range)
+  passed first, and `kindi plan` ran on it (8 GiB assumed: 2 GDN CPU layers, 7,601 MiB, fits). The blocker was detection, not hardware:
+  clang+LLVM 18.1.8 sits under Program Files while `clang` is not on PATH, so `_find_cc` resolves `KINDI_CC`, then
+  PATH, then a standard LLVM install (newest first); the cache key names the compiler that will run, and `kindi caps` asks the same
+  resolver. That unblocked REQ-0028 A4's live half (`kindi selftest`, 2B CPU: `dialects agree`, exit 0) and the
+  `test_cpu_build.py` compile-and-load checks; `kindi plan` names the resolved pack and `kindi models` drops "too large" for
+  the 2B/4B/9B without a card. GPU rows (tc/plain verify, K8/V4, bench, tandem) still need a card; `MANUAL-HELP-NEEDED.md` §3c holds the one open repo gate (4 unbaselined rows on `pr/07-intel-probe`).
   **2026-11-24:** `POST /v1/messages` answers Anthropic's dialect on the same `run_generate` path (`kindi/api/anthropic.py`;
   `x-api-key` or bearer; envelope and SSE order; one `_relay` for both streaming routes), and `kindi selftest` drives it in
   process and with `--url`. REQ-0023's block half landed too (`tests/test_kernel_arity.py`: 28 block/bound pairs, 135 pinned).
@@ -235,7 +235,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `a101b7d` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `32075c4` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc GEMM, bench --spec, config-reference direct reads, 27B CPU verify + compiler detection |
+| `<worktree>` | `merge/upstream-0.7.0` | `174c68e` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc GEMM, bench --spec, config-reference direct reads, 27B CPU verify + compiler detection |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
