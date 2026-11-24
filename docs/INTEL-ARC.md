@@ -389,13 +389,28 @@ with `--device-name Arc` and records `Intel(R) Arc(TM) A770 Graphics`.
 ([page](benchmarks/2026-11-24-i7-8086k-arc-a770-gemm-tiled/README.md)) No backend, model, engine or
 support claim: M2 stays partial.
 
-### M2 next step: SYCL vector-add smoke (planned 2026-11-23, not run)
+### M2 step: SYCL vector-add smoke (ran 2026-11-24 on Windows; M2 still needs the Linux target)
 
 The OpenCL probe proved exact device compute, but the M2 gate names the SYCL runtime (`libksycl.so`)
-and SYCL device selection, and OpenCL C is not that path. The next step is the same vector-add
-through oneAPI DPC++ on the Level Zero backend, run on this Windows A770 as a host-local precursor;
-M2 still needs the same check on the plan's Linux target before it can pass. Nothing here has run:
-oneAPI is not installed, the files below do not exist yet, and this is not a support claim.
+and SYCL device selection, and OpenCL C is not that path. The smoke is now implemented and has run
+on this Windows A770 through oneAPI DPC++ on the **Level Zero** backend: `kindi intel-sycl` builds
+`tools/intel_sycl_vecadd.cpp` with the installed `icpx`, runs it with
+`ONEAPI_DEVICE_SELECTOR=level_zero:gpu`, and validates the child's report. Result: `pass`,
+0 mismatches and `max_abs_error = 0` at 1,048,576, 1 and 1,000,003 elements, backend
+`ext_oneapi_level_zero`, device `Intel(R) Arc(TM) A770 Graphics`, driver `1.17.39894+6`, all ten
+acceptance checks below met ([page](benchmarks/2026-11-24-i7-8086k-arc-a770-sycl/README.md)).
+
+Two findings from the run are in the code. The Level Zero adapter is only loaded from the oneAPI
+`bin` directories, so a `sycl-ls` run without them on `PATH` lists OpenCL devices and no Level Zero
+device at all - which is what made the earlier session record "no L0" on a host that has one;
+`kindi/intel.py` now locates the install and prepends those directories. And the current `sycl-ls`
+prints `[backend:kind][backend:index]`, not the older `[backend:kind:index]`; the parser dropped
+every line of the new shape, so `intel-info` reported no Level Zero device while `sycl-ls` listed
+the Arc. Both layouts parse now.
+
+This is a host-local precursor, not M2: the plan's Linux target still needs the same smoke, and one
+exact vector-add is not a model, engine or Kindi kernel. No support claim, and
+`docs/SUPPORT-MATRIX.md` and the installer are unchanged.
 
 **Toolchain (oneAPI first).** Intel oneAPI Base Toolkit for Windows, pinned to the release that is
 actually installed; record `icx-cl --version` and `sycl-ls --version` rather than writing a version
@@ -408,7 +423,7 @@ that was not observed. It supplies the DPC++ compiler driver (`icx-cl` on Window
 | Level Zero loader and SDK | `ze_loader.dll`; SDK 1.33.1 under `%ProgramFiles%/LevelZeroSDK/1.33.1` | `python -m kindi intel-smoke --mib 16` |
 | Visual Studio C++ toolset | VS Community 2026 18.9.1, MSVC 14.51 (record its install path) | `vcvars64.bat`, then compile a hello-world with `cl` |
 | Windows SDK | not at the default `%ProgramFiles(x86)%/Windows Kits/10` path; `vcvars64.bat` must find it | the same hello-world build |
-| oneAPI Base Toolkit | **not installed** (`intel-info` reports `oneapi.present: false`; no `sycl-ls`, `icx-cl`, `ocloc`) | `icx-cl --version`; `sycl-ls --verbose` |
+| oneAPI Base Toolkit | **installed 2026-11-24**: 2026.2 (`icpx`, `icx-cl`, `dpcpp`, `sycl-ls`); `intel-info` finds it through `KINDI_ONEAPI_ROOT` or the default root | `icx-cl --version`; `sycl-ls --verbose` |
 | SPIR-V tools (fallback only) | absent (`llvm-spirv`, `spirv-val`) | `llvm-spirv --version` |
 
 Installation is an owner action (`docs/MANUAL-HELP-NEEDED.md` section 4a), not part of this planning
@@ -417,13 +432,13 @@ compiler: this host has VS 2026, so if that release is validated only against VS
 decides between the 2022 Build Tools and a newer oneAPI; record the decision instead of working
 around it.
 
-**Planned code.** One C++ file and a thin Python driver, mirroring `intel-cl`'s report surface:
+**Code.** One C++ file and a thin Python driver, mirroring `intel-cl`'s report surface:
 
 | file | content |
 |---|---|
-| `tools/intel_sycl_vecadd.cpp` | select `level_zero:gpu` with `sycl::ext::oneapi::filter_selector`, assert the backend is `ext_oneapi_level_zero` and the device is the A770, allocate USM, launch the vector-add, compare with an exact host reference, print one JSON report |
-| `kindi/intel_sycl.py` | `run_smoke(n=..., repeats=..., compiler=None, runner=None)`: locate the compiler, build, run under `ONEAPI_DEVICE_SELECTOR=level_zero:gpu`, validate the child report (a child that says pass but names another backend is a fail), `render()`/`dumps()`; builder and runner injectable so CI needs no toolkit or GPU |
-| `kindi/__main__.py` | `kindi intel-sycl [--n N] [--repeats K] [--compiler PATH] [--json]`, exit 0 on pass and 1 on fail (the `intel-smoke`/`intel-cl` convention) |
+| `tools/intel_sycl_vecadd.cpp` | enumerate the GPUs, keep only devices whose backend is `ext_oneapi_level_zero`, and refuse (exit 1, naming what the runtime offered) when there is none; assert the device name contains `A770`, allocate USM, launch the vector-add, compare with an exact host reference, print one JSON report with `--compiler-version` and `--selector` echoed |
+| `kindi/intel_sycl.py` | `smoke(n=..., repeats=..., compiler=None, builder=None, runner=None)`: locate the toolchain, build with `icpx -fsycl -O2` after `vcvars64.bat`, run under `ONEAPI_DEVICE_SELECTOR=level_zero:gpu`, validate the child report (a child that says pass but names another backend is a failure), `render()`/`dumps()`; builder and runner injectable so the tests need no toolkit or GPU |
+| `kindi/__main__.py` | `kindi intel-sycl [--n N] [--repeats K] [--compiler PATH] [--selector S] [--json]`, exit 0 on pass and 1 on fail (the `intel-smoke`/`intel-cl` convention) |
 | `tests/test_intel_sycl.py` | fake builder/runner: compiler absent, build failure, no `level_zero:gpu` device, child report with mismatches, a child claiming another backend, and pass; no GPU |
 
 **Kernel and inputs.** One `nd_range<1>` vector-add with local size 64 and an `i < n` bounds guard.
@@ -438,8 +453,8 @@ multiple of the local size, so the guard runs).
 |---|---|---|
 | A1 | the runtime sees the card | `sycl-ls --verbose` exits 0 with one `[level_zero:gpu:N]` line naming `Intel(R) Arc(TM) A770 Graphics`; the whole line is recorded |
 | A2 | selection is explicit | `ONEAPI_DEVICE_SELECTOR=level_zero:gpu sycl-ls` lists only the A770 (no `host`, no `opencl` device) |
-| A3 | build | after `vcvars64.bat`, `icx-cl -fsycl -O2 -o intel_sycl_vecadd.exe tools/intel_sycl_vecadd.cpp` exits 0; binary sha256 and build log recorded |
-| A4 | the child asserts its device | backend `ext_oneapi_level_zero`, `is_gpu()` true, name contains `A770`, global memory 16,384 MiB; driver version recorded |
+| A3 | build | after `vcvars64.bat`, `icpx -fsycl -O2 -o intel_sycl_vecadd.exe tools/intel_sycl_vecadd.cpp` exits 0; binary sha256 and build log recorded |
+| A4 | the child asserts its device | backend `ext_oneapi_level_zero`, `is_gpu()` true, name contains `A770`, at least 15,000 MiB of global memory (SYCL reports 15,932 MiB of the card's 16,384); driver version recorded |
 | A5 | exactness | 0 mismatches and `max_abs_error = 0` for every size and every repeat, over all 1,048,576 elements, not a sample |
 | A6 | bounds guard | 1,000,003 elements pass with 0 mismatches; no out-of-range element is read or written |
 | A7 | no CPU/OpenCL fallback | with `ONEAPI_DEVICE_SELECTOR=opencl:gpu` the child exits 1 naming the missing `level_zero:gpu` device and does not run on OpenCL or the CPU; a child report whose backend is not Level Zero is a failure even when the sums match |
@@ -447,14 +462,21 @@ multiple of the local size, so the guard runs).
 | A9 | report | `--json` prints `probe: "intel-sycl-smoke"`, `schema: 1`, `support_claim: false`, `scope`, `toolchain`, `device`, `build`, `vector_add` (sizes, repeats, mismatches, max_abs_error, elapsed_ms), `result`, `error` |
 | A10 | host tests | `python -m pytest -q tests/test_intel_sycl.py` passes with no oneAPI, compiler or GPU; the full CPU suite still passes |
 
-**Evidence and scope.** A pass records `sycl-smoke.json`, `sycl-ls.txt`, the compiler version and the
-binary sha256 under `docs/benchmarks/<date>-i7-8086k-arc-a770/`, adds the run section to that page and
-an M2 evidence bullet to REQ-0020. It changes neither `docs/SUPPORT-MATRIX.md` nor the installer and
-adds no support claim: Windows is not the M2 target, this kernel is not Kindi's kernel, and one exact
-vector-add is not a model, engine or GEMM result. Timings are observations, not a throughput claim.
+**Evidence and scope.** The pass is recorded in
+[`benchmarks/2026-11-24-i7-8086k-arc-a770-sycl/`](benchmarks/2026-11-24-i7-8086k-arc-a770-sycl/README.md)
+as `sycl-smoke.json` and a text copy, with the `sycl-ls` listing, the selector-restricted listing and
+the OpenCL-selector refusal, plus an M2 evidence bullet in REQ-0020. It changes neither
+`docs/SUPPORT-MATRIX.md` nor the installer and adds no support claim: Windows is not the M2 target,
+this kernel is not Kindi's kernel, and one exact vector-add is not a model, engine or GEMM result.
+Timings are observations, not a throughput claim. The Linux target still has to run the same smoke
+before M2 passes.
 
-**Stop conditions.** No oneAPI (`sycl-ls` absent) or no `level_zero:gpu` line: record the toolchain
-failure and stop; do not fall back to OpenCL, the CPU or a host device. Build failure: keep the log,
+The OpenCL fallback below stays on record as a diagnostic and is no longer needed on this host.
+
+**Stop conditions** (what a failing host must do). No oneAPI (`sycl-ls` absent) or no
+`level_zero:gpu` line: record the toolchain failure and stop; do not fall back to OpenCL, the CPU or
+a host device. On this host the Level Zero line needs the oneAPI `bin` directories on `PATH`, so
+check that before recording "no device". Build failure: keep the log,
 record the compiler and VS versions, stop. Exactness failure: record the first mismatch index and
 both values, stop. Do not weaken the kernel or the acceptance values to get a pass.
 

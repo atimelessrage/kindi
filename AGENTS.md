@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `7aa4578` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `77823e2` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24 (latest): the 27B verifies on the CPU engine, and the "missing" compiler was installed.**
   `KINDI_DEVICE=cpu kindi verify` on the 27B pack is **4/4 token-exact** (40/40 per prompt) at 3.7 tok/s after a 340 s load;
   packcheck full (10 files, 18.4 s) and a structural audit (851 tensors, byte ranges tiling every file, reference ids in range)
@@ -195,10 +195,10 @@ The 27B A/B, fail-closed gate, startup-warning, MTP-server and cold-expert bulle
 
 ### Owner actions
 
-Owner actions pending: Nanbeige 33B GGUF replacement, Gemma 4 E4B pack, DeepSeek V4.1 shards/gate data, PQ2_0/Q2_0 quant downloads, a pinned llama-server, the oneAPI Base Toolkit for the planned A770 SYCL smoke, other-hardware test rigs, push/installer/CI publications, T4.4/T4.5 + D3/D5 decisions — `docs/MANUAL-HELP-NEEDED.md`.
+Owner actions pending: Nanbeige 33B GGUF replacement, Gemma 4 E4B pack, DeepSeek V4.1 shards/gate data, PQ2_0/Q2_0 quant downloads, a pinned llama-server, a Linux A770 host for the M2 target, other-hardware test rigs, push/installer/CI publications, T4.4/T4.5 + D3/D5 decisions — `docs/MANUAL-HELP-NEEDED.md`.
 **A770 (2026-11-24, no claim):** `kindi intel-ternary` splits the packed GEMV over the weight phases (0 mismatches
 at six shapes, 5.75x-14.14x) and `kindi intel-gemm` runs the engine's q8 GEMM bit-exact; pinning its work-group to `(256,1)` bought 1.71x (555->323 ms at 512x512x4096, and it was wrong across tiles before), `--staging local` another 1.02-1.05x, and all three OpenCL probes now take `--device-name Arc` because the driver's device order is not stable
-(the iGPU has come back first). oneAPI 2026.2 is installed and `sycl-ls` sees the Arc **through OpenCL only (no Level Zero)**, so the SYCL smoke and L0 detection are next; the gemm staging pair re-checked at 1.05x/1.06x/0.97x (paired, three runs per arm); no SYCL/backend, no support claim.
+(the iGPU has come back first). **`kindi intel-sycl` now passes on Level Zero**: oneAPI 2026.2 `icpx`, backend `ext_oneapi_level_zero`, driver `1.17.39894+6`, 0 mismatches at 1,048,576/1/1,000,003 elements, and `--selector opencl:gpu` exits 1 instead of falling back (`docs/benchmarks/2026-11-24-i7-8086k-arc-a770-sycl/`). The earlier "no L0" was PATH: the adapter loads only from oneAPI's `bin` dirs, `intel-info` finds the install via `KINDI_ONEAPI_ROOT`, and the `sycl-ls` parser now accepts both bracket layouts. M2 still needs the Linux target; no SYCL backend or support claim.
 - **Shared-file owners:** the newest lease row in the table below owns its files until
   marked done; `T:/kindi/AGENTS.md` is the main worktree's bridge note, not this file.
 

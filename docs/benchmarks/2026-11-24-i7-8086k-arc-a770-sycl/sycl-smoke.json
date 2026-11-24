@@ -1,0 +1,84 @@
+{
+  "build": {
+    "binary": "<workdir>/intel_sycl_vecadd.exe",
+    "command": "icpx -fsycl -O2 -o <binary> tools/intel_sycl_vecadd.cpp",
+    "error": null,
+    "log": "",
+    "ok": true,
+    "sha256": "83b3b81ea1a7e16149852a52b299e33f1346dcfd6a7e3cd037f6da26b7d96656",
+    "source_sha256": "eff03a5f4c946634819b410312f97a8cd65fb3f41c939a5b888121ec8fbf3802"
+  },
+  "child_error": "",
+  "child_result": "pass",
+  "child_stage": "done",
+  "device": {
+    "backend": "ext_oneapi_level_zero",
+    "driver": "1.17.39894+6",
+    "global_mem_mib": 15932,
+    "is_gpu": true,
+    "local_mem_kb": 64,
+    "name": "Intel(R) Arc(TM) A770 Graphics",
+    "vendor": "Intel(R) Corporation"
+  },
+  "error": null,
+  "probe": "intel-sycl-smoke",
+  "problems": [],
+  "redacted": [
+    "machine roots replaced with <oneapi-root> / <workdir> for the tracked copy"
+  ],
+  "result": "pass",
+  "schema": 1,
+  "scope": "SYCL runtime and device selection on this host; not a model, engine or Kindi kernel",
+  "stage": "done",
+  "support_claim": false,
+  "toolchain": {
+    "bin_dirs": [
+      "<oneapi-root>/...",
+      "<oneapi-root>/...",
+      "<oneapi-root>/..."
+    ],
+    "compiler": "<oneapi-root>/bin/icpx.exe",
+    "device_selector": "level_zero:gpu",
+    "oneapi_root": "<oneapi-root>",
+    "searched": [
+      "<machine roots redacted>"
+    ],
+    "sycl_ls": "<oneapi-root>/bin/sycl-ls.exe",
+    "vcvars": "<vs-root>/vcvars64.bat"
+  },
+  "vector_add": {
+    "expected_sizes": [
+      1048576,
+      1,
+      1000003
+    ],
+    "local_size": 64,
+    "repeats": 5,
+    "sizes": [
+      {
+        "elapsed_ms": 14.38,
+        "error": "",
+        "max_abs_error": 0.0,
+        "mismatches": 0,
+        "n": 1048576,
+        "repeats": 5
+      },
+      {
+        "elapsed_ms": 1.18,
+        "error": "",
+        "max_abs_error": 0.0,
+        "mismatches": 0,
+        "n": 1,
+        "repeats": 5
+      },
+      {
+        "elapsed_ms": 4.53,
+        "error": "",
+        "max_abs_error": 0.0,
+        "mismatches": 0,
+        "n": 1000003,
+        "repeats": 5
+      }
+    ]
+  }
+}

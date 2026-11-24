@@ -122,7 +122,7 @@ direct sites.
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:592` |
 | `KINDI_CONFIG` | (unset) | `kindi/config.py:127` (+1 more) |
 | `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:253` (+7 more) |
-| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:538` (+1 more) |
+| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:552` (+1 more) |
 | `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:49` |
 | `KINDI_D1` | `1` or `0` | `kindi/spec.py:750` (+1 more) |
 | `KINDI_DATA` | `/data` | `kindi/container.py:243` |
@@ -296,6 +296,7 @@ direct sites.
 | `KINDI_NVCC` | `/usr/local/cuda/bin/nvcc` | `kindi/dsv41.py:55` |
 | `KINDI_NVCC2` | `/usr/local/cuda-12.4/bin/nvcc` | `kindi/dsv41.py:96` |
 | `KINDI_NVRTC` | (unset) | `kindi/qx_gpu.py:30` (+1 more) |
+| `KINDI_ONEAPI_ROOT` | (unset) | `kindi/intel.py:688` |
 | `KINDI_P100_FP16_PROMPT` | (empty) | `kindi/chunk.py:144` |
 | `KINDI_PACK` | (unset) | `kindi/catalog.py:219` (+1 more) |
 | `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:1100` (+1 more) |

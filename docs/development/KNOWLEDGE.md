@@ -81,11 +81,17 @@ was verified against is the gitignored host-tools sheet under `bench-logs/`.
   OpenCL kernels, which live in Python string literals (`kindi/intel_gemm.py`, `intel_ternary.py`,
   `intel_cl.py`); those are checked by running the probes against the host reference instead.
 - **Intel oneAPI (SYCL/DPC++) is the REQ-0020 M2 toolchain.** `sycl-ls` enumerates the
-  backends; on this host it lists the Arc A770 and the UHD 630 through **OpenCL only** and no
-  Level Zero device, so the SYCL runtime path is installed while Level Zero detection is the
-  remaining gap. `icx-cl` drives MSVC and needs its environment (`vcvars64.bat` or a Developer
-  PowerShell); `icpx`/`dpcpp` do not. No SYCL code is in the tree yet: the probes stay OpenCL
-  and no backend or support claim exists.
+  backends. It finds the Arc A770 **through Level Zero** only when the oneAPI `bin` directories
+  are on `PATH`: the Unified Runtime adapter is loaded from there, so running the installed
+  `sycl-ls.exe` by absolute path with a bare `PATH` lists OpenCL devices and no Level Zero
+  device. `kindi/intel.py` therefore locates the install (`KINDI_ONEAPI_ROOT`, then
+  `ONEAPI_ROOT`, then the default root) and runs the installed `sycl-ls` with those directories
+  prepended; `KINDI_ONEAPI_ROOT=<root> python -m kindi intel-info` then prints the L0 device.
+  Current `sycl-ls` prints `[backend:kind][backend:index]` per device while older builds printed
+  `[backend:kind:index]`; the parser accepts both. `icx-cl` drives MSVC and needs its environment
+  (`vcvars64.bat` or a Developer PowerShell); `icpx`/`dpcpp` do not, and `icpx -fsycl` builds the
+  smoke after `vcvars64.bat`. `python -m kindi intel-sycl` runs the exact vector-add smoke on
+  Level Zero; the engine still has no SYCL backend, so no backend or support claim exists.
 - **A CUDA toolkit installer for the NVIDIA route is kept on the host but not installed**, and
   no CUDA device is visible (see `docs/MANUAL-HELP-NEEDED.md` §4), so nothing NVIDIA-side can
   be measured from here.

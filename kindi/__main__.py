@@ -476,6 +476,20 @@ def cmd_intel_ternary(cfg, a):
     return 0 if report["result"] == "pass" else 1
 
 
+def cmd_intel_sycl(cfg, a):
+    """SYCL vector-add smoke on an Intel GPU; no backend or support claim."""
+    from . import intel_sycl
+
+    report = intel_sycl.smoke(root=a.oneapi_root, compiler=a.compiler, vcvars=a.vcvars,
+                              selector=a.selector, device_name=a.device_name)
+    if a.json:
+        print(intel_sycl.dumps(report))
+    else:
+        for line in intel_sycl.render(report):
+            print(line)
+    return 0 if report["result"] == "pass" else 1
+
+
 def cmd_intel_gemm(cfg, a):
     """Ternary GEMM in the engine's q8 shape on an Intel GPU; no backend or support claim."""
     from . import intel_gemm
@@ -762,6 +776,17 @@ def _build_parser():
     s.add_argument("--device", type=int, default=0, help="Level Zero device index (default 0)")
     s.add_argument("--loader", default=None, help="Level Zero loader name/path (default: the host loader)")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
+    s = sub.add_parser("intel-sycl", help="SYCL vector-add smoke on an Intel GPU (no backend)")
+    s.add_argument("--compiler", default=None, help="oneAPI DPC++ compiler (default: discovered)")
+    s.add_argument("--oneapi-root", default=None,
+                   help="oneAPI install root (default: KINDI_ONEAPI_ROOT, then ONEAPI_ROOT, then the "
+                        "standard install location)")
+    s.add_argument("--vcvars", default=None, help="vcvars64.bat (default: found with vswhere)")
+    s.add_argument("--selector", default="level_zero:gpu",
+                   help="ONEAPI_DEVICE_SELECTOR for the child (default level_zero:gpu)")
+    s.add_argument("--device-name", default="A770",
+                   help="the device name the child must report (default A770)")
+    s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("intel-gemm", help="ternary GEMM in the engine's q8 shape on an Intel GPU (no backend)")
     s.add_argument("--rows", type=int, default=128, help="matrix rows, a multiple of 128 (default 128)")
     s.add_argument("--tokens", type=int, default=128,
@@ -884,6 +909,7 @@ _COMMANDS = {
     "intel-smoke": cmd_intel_smoke,
     "intel-cl": cmd_intel_cl,
     "intel-gemm": cmd_intel_gemm,
+    "intel-sycl": cmd_intel_sycl,
     "intel-ternary": cmd_intel_ternary,
     "loop-info": cmd_loop_info,
     "io": cmd_io,

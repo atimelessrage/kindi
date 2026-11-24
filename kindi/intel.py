@@ -87,8 +87,11 @@ CPU_FEATURES = (
 )
 
 _BDF = re.compile(r"(?:[0-9a-fA-F]{4}:)?[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-7]")
+# two printed shapes exist: the older `[level_zero:gpu:0] desc` and the current
+# `[level_zero:gpu][level_zero:0] desc` (backend and index in separate brackets).
 _SYCL_DEVICE = re.compile(
-    r"^\s*\[(?P<backend>[^:\]]+):(?P<kind>[^:\]]+):(?P<index>\d+)\]\s*(?P<desc>.+?)\s*$")
+    r"^\s*\[(?P<backend>[^:\]]+):(?P<kind>[^:\]]+)"
+    r"(?:\]\[[^:\]]+:(?P<index2>\d+)\]|:(?P<index>\d+)\])\s*(?P<desc>.+?)\s*$")
 _OPENVINO_CODE = ("import json, openvino as ov; print(json.dumps({"
                   "'version': getattr(ov, '__version__', None), "
                   "'devices': list(ov.Core().available_devices)}))")
@@ -316,11 +319,16 @@ def _merge_cpu(cpu, fallback):
     return merged
 
 
-def _run(command, runner=None):
-    """Run a read-only probe command and keep its output/error for the report."""
+def _run(command, runner=None, env=None):
+    """Run a read-only probe command and keep its output/error for the report.
+
+    ``env`` is only for commands that need a toolchain on `PATH` (see `oneapi_toolchain`);
+    an injected runner keeps its one-argument shape.
+    """
     try:
         if runner is None:
-            proc = subprocess.run(command, capture_output=True, text=True, timeout=20)
+            kwargs = {} if env is None else {"env": env}
+            proc = subprocess.run(command, capture_output=True, text=True, timeout=20, **kwargs)
         else:
             proc = runner(command)
     except FileNotFoundError as exc:
@@ -424,10 +432,11 @@ def parse_sycl_ls(text):
         match = _SYCL_DEVICE.match(line)
         if not match:
             continue
+        index = match.group("index2") if match.group("index2") is not None else match.group("index")
         devices.append({
             "backend": match.group("backend").strip().lower(),
             "kind": match.group("kind").strip().lower(),
-            "index": int(match.group("index")),
+            "index": int(index),
             "description": match.group("desc").strip(),
         })
     return devices
@@ -667,11 +676,49 @@ def _oneapi_default_root():
     return _ONEAPI_ROOT
 
 
-def _oneapi_probe(oneapi_root=None):
-    """oneAPI installation presence; never imports a oneAPI package."""
-    root = oneapi_root or os.environ.get("ONEAPI_ROOT") or _oneapi_default_root()
-    return {"root": root, "present": os.path.isdir(root),
-            "source": "ONEAPI_ROOT" if os.environ.get("ONEAPI_ROOT") and not oneapi_root else "default"}
+def oneapi_toolchain(oneapi_root=None):
+    """The oneAPI install that can actually compile and enumerate, never just a directory.
+
+    A leftover install directory (an empty `oneAPI/Installer`, say) used to count as
+    "present" and then the report could not explain why `sycl-ls` was missing. A root
+    now counts only when a compiler or `sycl-ls` exists under it, and the result carries
+    the paths so the caller can run `sycl-ls` with the oneAPI `bin` directories on `PATH`
+    (the Level Zero Unified Runtime adapter is loaded from there).
+    """
+    explicit = os.environ.get("KINDI_ONEAPI_ROOT")
+    candidates = []
+    if oneapi_root:
+        candidates.append((oneapi_root, "argument"))
+    if explicit:
+        candidates.append((explicit, "KINDI_ONEAPI_ROOT"))
+    if os.environ.get("ONEAPI_ROOT"):
+        candidates.append((os.environ["ONEAPI_ROOT"], "ONEAPI_ROOT"))
+    candidates.append((_oneapi_default_root(), "default"))
+    suffix = ".exe" if os.name == "nt" else ""
+    for root, source in candidates:
+        manifests = sorted(glob.glob(os.path.join(root, "compiler", "*", "bin")))
+        preferred = os.path.join(root, "compiler", "latest", "bin")
+        dirs = ([preferred] if os.path.isdir(preferred) else []) + manifests
+        compiler = sycl_ls = ""
+        for name in ("icpx", "dpcpp", "icx-cl", "icx"):
+            for directory in dirs:
+                path = os.path.join(directory, name + suffix)
+                if not compiler and os.path.isfile(path):
+                    compiler = path
+        for directory in dirs:
+            path = os.path.join(directory, "sycl-ls" + suffix)
+            if not sycl_ls and os.path.isfile(path):
+                sycl_ls = path
+        bins = [d for d in dirs if os.path.isdir(d)]
+        versioned = [p for p in glob.glob(os.path.join(root, "*")) if re.match(r".*[\\/]\d{4}\.\d", p)]
+        bins += [os.path.join(v, "bin") for v in sorted(versioned) if os.path.isdir(os.path.join(v, "bin"))]
+        # `compiler/latest` is usually a junction to the versioned directory: one entry each.
+        bins = list(dict.fromkeys(bins))
+        if compiler or sycl_ls:
+            return {"root": root, "present": True, "source": source, "compiler": compiler,
+                    "sycl_ls": sycl_ls, "bin_dirs": bins}
+    return {"root": candidates[-1][0], "present": False, "source": "not found",
+            "compiler": "", "sycl_ls": "", "bin_dirs": []}
 
 
 def _openvino_probe(runner=None):
@@ -724,7 +771,20 @@ def probe(drm_root=_SYS_DRM, dri_root=_DEV_DRI, accel_root=_SYS_ACCEL,
     pci_devices = parse_lspci(lspci_result["stdout"])
     devices = _merge_lspci(devices, pci_devices)
 
-    sycl_result = _run(["sycl-ls", "--verbose"], runner)
+    # `sycl-ls` on PATH is the normal case; when it is not, the oneAPI install is used
+    # with its own `bin` directories on PATH, because the Level Zero Unified Runtime
+    # adapter is only loaded from there (without it the card looks absent).
+    toolchain = oneapi_toolchain(oneapi_root)
+    sycl_command = ["sycl-ls", "--verbose"]
+    sycl_env = None
+    if toolchain["sycl_ls"]:
+        sycl_command = [toolchain["sycl_ls"], "--verbose"]
+        sycl_env = dict(os.environ)
+        sycl_env["PATH"] = os.pathsep.join(
+            toolchain["bin_dirs"] + [os.environ.get("PATH", "")]).strip(os.pathsep)
+    sycl_result = _run(sycl_command, runner, env=sycl_env)
+    # Evidence keeps the command by name: a report must not carry a machine root.
+    sycl_result["command"] = ["sycl-ls", "--verbose"]
     sycl_devices = parse_sycl_ls(sycl_result["stdout"])
     level_zero = [device for device in sycl_devices
                   if "level_zero" in device["backend"]]
@@ -761,7 +821,7 @@ def probe(drm_root=_SYS_DRM, dri_root=_DEV_DRI, accel_root=_SYS_ACCEL,
         "cpu": cpu,
         "devices": devices,
         "npu": _npu_probe(accel_root),
-        "oneapi": _oneapi_probe(oneapi_root),
+        "oneapi": toolchain,
         "level_zero": {"source": "sycl-ls", "available": sycl_result["available"],
                        "error": sycl_result["error"], "devices": level_zero},
         "openvino": _openvino_probe(runner),

@@ -1,0 +1,11 @@
+SYCL vector-add smoke (oneAPI DPC++, Level Zero; no backend or support claim)
+  compiler: <oneapi-root>\compiler\latest\bin\icpx
+  oneAPI root: <oneapi-root>
+  MSVC environment: vcvars64.bat
+  build: ok (sha256 21a71fd0ae0979da)
+  device: Intel(R) Arc(TM) A770 Graphics; backend ext_oneapi_level_zero; driver 1.17.39894+6; 15932 MiB, 64 KiB local
+  n=1048576  mismatches 0  max_abs_error 0.0  5 launches 14.77 ms
+  n=1        mismatches 0  max_abs_error 0.0  5 launches 1.55 ms
+  n=1000003  mismatches 0  max_abs_error 0.0  5 launches 4.52 ms
+  selector: level_zero:gpu
+  result: pass

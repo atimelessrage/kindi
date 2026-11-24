@@ -213,7 +213,10 @@ def test_probe_collects_cpu_devices_npu_and_tool_versions(tmp_path):
     assert report["npu"]["available"] is True
     assert report["npu"]["present"] is True
     assert report["npu"]["devices"][0]["driver"] == "intel_vpu"
-    assert report["oneapi"] == {"root": str(oneapi), "present": True, "source": "default"}
+    # An empty directory is not an installation: a leftover `oneAPI/Installer` used to
+    # count as present and left the report unable to explain the missing toolchain.
+    assert report["oneapi"]["present"] is False
+    assert report["oneapi"]["source"] == "not found"
     assert report["level_zero"]["devices"] == [{
         "backend": "level_zero", "kind": "gpu", "index": 0,
         "description": "Intel(R) Arc(TM) A770 Graphics 16GB"}]
@@ -430,3 +433,66 @@ def test_intel_info_cli_prints_json(monkeypatch, capsys):
     monkeypatch.setattr(intel, "probe", lambda: report)
     assert cli.main(["intel-info", "--json"]) == 0
     assert json.loads(capsys.readouterr().out) == report
+
+
+def test_oneapi_root_counts_only_when_a_toolchain_is_there(tmp_path, monkeypatch):
+    """An empty directory is not an installation; a root with a compiler/sycl-ls is."""
+    monkeypatch.delenv("KINDI_ONEAPI_ROOT", raising=False)
+    leftover = tmp_path / "leftover"
+    leftover.mkdir()
+    assert intel.oneapi_toolchain(str(leftover))["present"] is False
+    root = tmp_path / "oneAPI"
+    bin_dir = root / "compiler" / "latest" / "bin"
+    bin_dir.mkdir(parents=True)
+    suffix = ".exe" if os.name == "nt" else ""
+    (bin_dir / ("icpx" + suffix)).write_text("")
+    (bin_dir / ("sycl-ls" + suffix)).write_text("")
+    tc = intel.oneapi_toolchain(str(root))
+    assert tc["present"] is True and tc["source"] == "argument"
+    assert tc["compiler"].endswith("icpx" + suffix)
+    assert str(bin_dir) in tc["bin_dirs"]
+
+
+def test_probe_uses_the_toolchain_sycl_ls_and_records_it_by_name(tmp_path, monkeypatch):
+    """Without sycl-ls on PATH, the oneAPI copy is used with its bin dirs, and the report
+    records the command by name (evidence must not carry a machine root)."""
+    monkeypatch.delenv("KINDI_ONEAPI_ROOT", raising=False)
+    root = tmp_path / "oneAPI"
+    bin_dir = root / "compiler" / "latest" / "bin"
+    bin_dir.mkdir(parents=True)
+    suffix = ".exe" if os.name == "nt" else ""
+    sycl = bin_dir / ("sycl-ls" + suffix)
+    sycl.write_text("")
+    (bin_dir / ("icpx" + suffix)).write_text("")
+    seen = []
+
+    def runner(command):
+        seen.append(list(command))
+        if "sycl-ls" in os.path.basename(command[0]):
+            return _command("[level_zero:gpu:0] Intel(R) Arc(TM) A770 Graphics 16GB\n")
+        return _command("")
+
+    report = intel.probe(drm_root=str(tmp_path / "no-drm"), dri_root=str(tmp_path / "no-dri"),
+                         accel_root=str(tmp_path / "no-accel"),
+                         cpuinfo_path=str(tmp_path / "no-cpuinfo"),
+                         oneapi_root=str(root), runner=runner, windows=False)
+    assert report["oneapi"]["present"] is True
+    sycl_calls = [command for command in seen if "sycl-ls" in os.path.basename(command[0])]
+    assert sycl_calls and sycl_calls[0][0] == str(sycl)
+    assert report["commands"]["sycl-ls"]["command"] == ["sycl-ls", "--verbose"]
+    assert report["level_zero"]["devices"][0]["description"].startswith("Intel(R) Arc")
+
+
+def test_parse_sycl_ls_accepts_both_bracket_layouts():
+    """Current sycl-ls prints `[backend:kind][backend:index]`, older builds `[backend:kind:index]`.
+
+    The current layout is what the installed oneAPI 2026.2 prints, and the old parser dropped
+    it, so `intel-info` reported no Level Zero device on a host where `sycl-ls` listed one.
+    """
+    text = ("[level_zero:gpu][level_zero:0] Intel(R) oneAPI Unified Runtime over Level-Zero, "
+            "Intel(R) Arc(TM) A770 Graphics 12.55.8 [1.17.39894+6]\n"
+            "[opencl:gpu:1] Intel(R) OpenCL HD Graphics\n")
+    devices = intel.parse_sycl_ls(text)
+    assert [(d["backend"], d["kind"], d["index"]) for d in devices] == [
+        ("level_zero", "gpu", 0), ("opencl", "gpu", 1)]
+    assert "A770" in devices[0]["description"]

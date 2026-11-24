@@ -1,0 +1,9 @@
+SYCL vector-add smoke (oneAPI DPC++, Level Zero; no backend or support claim)
+  compiler: <oneapi-root>\compiler\latest\bin\icpx.exe
+  oneAPI root: <oneapi-root>
+  MSVC environment: vcvars64.bat
+  build: ok (sha256 2bad466f664b7fd5)
+  device: not reached
+  selector: opencl:gpu
+  result: fail
+  error (validate): backend is None, not Level Zero; device None does not name A770; the child did not select a GPU; size 1048576 is missing; size 1 is missing; size 1000003 is missing; the child's result is 'fail'; the child's error is 'no level_zero:gpu device (runtime offered: Intel(R) Arc(TM) A770 Graphics (opencl); Intel(R) UHD Graphics 630 (opencl))'

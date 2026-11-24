@@ -10,6 +10,31 @@ installer hashes are recorded in `docs/INSTALL.md`; publication is still a relea
 (The pre-merge 0.6.1-era snapshot — 669 commits / 827 files at `60a039b` — is kept in
 `detailed-fork-changelog.md`.)
 
+### The Arc A770 runs a SYCL vector-add through Level Zero (2026-11-24)
+
+REQ-0020 M2 names the SYCL runtime and SYCL device selection, and every probe so far used OpenCL C.
+`kindi intel-sycl` now builds `tools/intel_sycl_vecadd.cpp` with the installed oneAPI 2026.2 `icpx`,
+runs it under `ONEAPI_DEVICE_SELECTOR=level_zero:gpu`, and validates the child's report: **`result:
+pass`**, backend `ext_oneapi_level_zero`, device `Intel(R) Arc(TM) A770 Graphics`, driver
+`1.17.39894+6`, 0 mismatches and `max_abs_error = 0` at 1,048,576, 1 and 1,000,003 elements (the last
+not a multiple of the local size 64, so the bounds guard runs). The child keeps only a Level Zero
+GPU and refuses anything else, and with `--selector opencl:gpu` the run exits 1 naming the missing
+`level_zero:gpu` device, so a silent OpenCL or CPU fallback cannot pass as an M2 signal. Page:
+`docs/benchmarks/2026-11-24-i7-8086k-arc-a770-sycl/`.
+
+Getting there fixed two host-facing gaps. The Level Zero adapter is loaded from the oneAPI `bin`
+directories, so `sycl-ls` run without them on `PATH` lists the Arc through OpenCL and no Level Zero
+device at all - which is why the earlier entry below recorded "no L0" on a host that has one.
+`kindi/intel.py` now locates the oneAPI install (`KINDI_ONEAPI_ROOT`, then `ONEAPI_ROOT`, then the
+default root), runs the installed `sycl-ls` with those directories on `PATH`, counts a root as
+present only when it holds a compiler or `sycl-ls` (a leftover `oneAPI/Installer` directory used to
+count), and the `intel-info` report keeps the command by name rather than a machine path. And the
+current `sycl-ls` prints `[backend:kind][backend:index]`, not `[backend:kind:index]`; the parser
+accepted only the old layout and silently dropped every device line, so `intel-info` said "none"
+while `sycl-ls` listed the Arc. Both layouts parse now, with a test pinning each. M2 is still not
+passed: Windows is not the Linux target, this kernel is not Kindi's, and there is no backend,
+engine, installer or support-matrix change.
+
 ### Arc staging re-checked, and the host's compilers recorded (2026-11-24)
 
 The Arc A770's `kindi intel-gemm` already had the locally staged variant beside the global-load
@@ -21,9 +46,10 @@ is the plausible cost, but the probe measures no counters and the note says so i
 Both tables now sit on the same page (`docs/benchmarks/2026-11-24-i7-8086k-arc-a770-gemm-tiled/`),
 and the large-shape 1.02x is marked as that session's number rather than a property of the shape.
 
-The Intel oneAPI toolkit installed on this host is now recorded: `sycl-ls` enumerates the Arc A770
-through OpenCL and finds **no Level Zero device**, so the SYCL runtime half of REQ-0020 M2 is in
-place and L0 detection is the gap. `docs/development/KNOWLEDGE.md` gained the path-free how-to for
+The Intel oneAPI toolkit installed on this host is now recorded: at the time `sycl-ls` enumerated
+the Arc A770 through OpenCL and found no Level Zero device, which the entry above later traced to
+the adapter only loading from oneAPI's own `bin` directories (with them on `PATH` the card is listed
+through Level Zero and the SYCL smoke passes), so the SYCL runtime half of REQ-0020 M2 is in place. `docs/development/KNOWLEDGE.md` gained the path-free how-to for
 clang (CPU build and `--analyze`), Cppcheck and the oneAPI driver, with the exact machine paths in
 the gitignored host-tools sheet; `clang --analyze` on `kindi/kcpu.c` reports two warnings, both
 reviewed (one false positive at the attention rotation, one cosmetic dead store left alone so the
