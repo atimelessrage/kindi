@@ -90,8 +90,21 @@ state line — tick it off when done.
 - **Measured after the fix on this host:** a library builds from the current `kcpu.c` in 6.3 s;
   `KINDI_DEVICE=cpu kindi verify` is 4/4 token-exact on the 2B (24.6-29.6 tok/s) and on the 27B
   (3.7 tok/s, 340 s load); `kindi info` reports `AVX=yes, AVX2=yes, FMA3=yes, F16C=yes`.
-- **Still unrun here:** the live half of REQ-0028 A4 (`kindi selftest` on the 27B pack takes the same
-  7-minute load before its two dialect requests) and native-hardware CPU rows on other machines.
+- **Ran after the fix:** the live half of REQ-0028 A4 on the 2B pack (`kindi selftest`: `dialects agree`,
+  exit 0, 23.5 s).
+- **Still unrun here:** `kindi selftest` on the 27B pack (its two dialect requests pay the same 7-minute
+  load) and native-hardware CPU rows on other machines.
+
+## 3c. Decide four unbaselined history rows on `pr/07-intel-probe`
+
+- **State:** open; a maintainer decision, not a code change.
+- **What:** `python tools/check_secret_history.py` (its default range is `--all`, so it covers every ref) fails on
+  `tests/test_intel.py: local drive path +8 (baseline 4)`. The eight rows come from three 2026-11-22 commits on
+  `pr/07-intel-probe` (`b8d8b70`, `e7270c8`, `658a885`) that no other ref contains; this branch adds none
+  (`--range 0d3c474..HEAD` is clean).
+- **Why it is open:** either review those rows and re-record them with `--update-baseline` (endorsing them as
+  examples, the way earlier rows were), or rewrite that branch before it is pushed or merged.
+- **When done, tell the agent:** which of the two, and the baseline count afterwards.
 
 ## 4. Tests and runs on other hardware
 
