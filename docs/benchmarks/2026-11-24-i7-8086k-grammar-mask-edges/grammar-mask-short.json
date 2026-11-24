@@ -1,0 +1,76 @@
+{
+ "date": "2026-11-24",
+ "pack": "~/.kindi/packs/bonsai-2b",
+ "vocab_entries": 248320,
+ "runs": 3,
+ "aggregate": "median of three fresh processes per document",
+ "short": {
+  "gbnf_json_d1": {
+   "tokens": 22,
+   "misses": 18,
+   "filter_ms": 1255.3,
+   "ms_per_token": 57.1,
+   "states": 1737,
+   "quarters_ms_per_token": null,
+   "runs_ms_per_token": [
+    57.6,
+    57.1,
+    56.3
+   ]
+  },
+  "gbnf_json_d2": {
+   "tokens": 22,
+   "misses": 18,
+   "filter_ms": 209.1,
+   "ms_per_token": 9.5,
+   "states": 3195,
+   "quarters_ms_per_token": null,
+   "runs_ms_per_token": [
+    9.7,
+    9.5,
+    9.5
+   ]
+  },
+  "gbnf_json_d3": {
+   "tokens": 22,
+   "misses": 18,
+   "filter_ms": 212.4,
+   "ms_per_token": 9.7,
+   "states": 9483,
+   "quarters_ms_per_token": null,
+   "runs_ms_per_token": [
+    9.8,
+    9.7,
+    9.6
+   ]
+  },
+  "gbnf_record": {
+   "tokens": 22,
+   "misses": 19,
+   "filter_ms": 183.8,
+   "ms_per_token": 8.4,
+   "states": 2293,
+   "quarters_ms_per_token": null,
+   "runs_ms_per_token": [
+    8.4,
+    8.3,
+    8.4
+   ]
+  },
+  "json_schema": {
+   "tokens": 22,
+   "misses": 17,
+   "filter_ms": 220.8,
+   "ms_per_token": 10.0,
+   "states": 0,
+   "quarters_ms_per_token": null,
+   "runs_ms_per_token": [
+    10.0,
+    10.0,
+    10.0
+   ]
+  }
+ },
+ "long": {},
+ "doc": "short"
+}

@@ -128,6 +128,28 @@ def test_gbnf_table_matches_on_every_small_reachable_state():
     _same_mask(grammar, TEXTS, _reachable(grammar, alphabet))
 
 
+def test_the_self_loop_set_is_read_off_the_edges_not_probed():
+    """The 2026-11-24 edge computation must equal the probing definition it replaced.
+
+    ``_self_loop_chars_for`` derives ``{c | step({q}, c) is not None and q in step({q}, c)}`` from
+    the NFA's character edges and reverse epsilon closure; the probe cost a full closure per
+    alphabet character (8,228 of them on the 2B vocabulary) and dominated every mask miss. A state
+    reached only through epsilon edges is where a naive edge read differs, so walk one.
+    """
+    grammar = Grammar.from_string(LOOP_GBNF)
+    alphabet = sorted(set('"abc \\\n\x01'))
+    states = _reachable(grammar, alphabet)
+    checked = 0
+    for state in states:
+        for q in state:
+            want = frozenset(c for c in alphabet
+                             if (lambda nxt: nxt is not None and q in nxt)(
+                                 grammar._step(frozenset([q]), c)))
+            assert grammar._self_loop_chars_for(q, alphabet) == want, (q, alphabet)
+            checked += 1
+    assert checked > len(states)          # the document reached multi-state closures
+
+
 def test_a_bounded_loop_is_not_treated_as_a_universal_loop():
     grammar = Grammar.from_string(r'root ::= "\"" [a-z]{1,3} "\""')
     state = grammar._step(grammar.start(), '"')

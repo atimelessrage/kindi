@@ -528,6 +528,19 @@ class Grammar(object):
         self._mask_table = None
         self._mask_texts = None
         self._self_loop_chars = {}
+        # Reverse epsilon adjacency, built once: a state q's self-loop proof needs every
+        # state that can epsilon-reach q (see _self_loop_chars_for).
+        self._eps_reverse = collections.defaultdict(list)
+        # Character edges flattened per state (no epsilon edges): _step runs per trie node, so it
+        # must not re-scan epsilon edges or re-dispatch on the label kind for every state member.
+        self._char_edges = {}
+        for src, edges in nfa.edges.items():
+            for label, target in edges:
+                if label[0] == "eps":
+                    self._eps_reverse[target].append(src)
+                else:
+                    self._char_edges.setdefault(src, []).append((label, target))
+        self._flat_edges = {}   # automaton state -> its flattened character edges (built on demand)
 
     @property
     def states(self):
@@ -597,10 +610,34 @@ class Grammar(object):
         return state
 
     def _step(self, state, ch):
+        # The label check is inlined (``_accepts`` + a per-edge generator is the hot path: this runs
+        # once per trie node per mask miss). The semantics are ``_accepts`` exactly: "ch" equality,
+        # "any" always, "range" the code point in one of the ranges, negated when label[2].
+        flat = self._flat_edges.get(state)
+        if flat is None:
+            flat = []
+            for s in state:
+                flat.extend(self._char_edges.get(s, ()))
+            flat = tuple(flat)
+            self._flat_edges[state] = flat
         out = set()
-        for s in state:
-            for label, target in self._nfa.edges[s]:
-                if label[0] != "eps" and _accepts(label, ch):
+        cp = None
+        for label, target in flat:
+            kind = label[0]
+            if kind == "ch":
+                if ch == label[1]:
+                    out.add(target)
+            elif kind == "any":
+                out.add(target)
+            else:  # "range"
+                if cp is None:
+                    cp = ord(ch)
+                hit = False
+                for lo, hi in label[1]:
+                    if lo <= cp <= hi:
+                        hit = True
+                        break
+                if hit != label[2]:
                     out.add(target)
         if not out:
             return None
@@ -608,6 +645,40 @@ class Grammar(object):
         if not (closed & self._productive):
             return None                                # dead end: the language cannot finish
         return closed
+
+    def _self_loop_chars_for(self, q, alphabet):
+        """The characters from which ``q`` loops back to itself in one step, computed from the edges.
+
+        This is exactly the set the probing definition computes — ``{c | step({q}, c) is not
+        None and q in step({q}, c)}`` — without probing: ``step({q}, c)``'s epsilon closure
+        contains ``q`` exactly when one of ``q``'s own character edges lands on a state that can
+        epsilon-reach ``q``, and a productive ``q`` then makes the step's productivity check pass.
+        Probing every alphabet character (8,228 on the 2B vocabulary) through a full closure per
+        state dominated the mask cost; the edge computation is the same proof read off the NFA.
+        """
+        # Every state that can epsilon-reach q, q included (reverse epsilon BFS).
+        reach_q = set([q])
+        stack = [q]
+        while stack:
+            current = stack.pop()
+            for prev in self._eps_reverse.get(current, ()):
+                if prev not in reach_q:
+                    reach_q.add(prev)
+                    stack.append(prev)
+        chars = set()
+        for label, target in self._nfa.edges[q]:
+            if label[0] == "eps" or target not in reach_q:
+                continue
+            if label[0] == "ch":
+                if label[1] in alphabet:
+                    chars.add(label[1])
+            elif label[0] == "any":
+                chars.update(alphabet)
+            elif label[0] == "range":
+                for c in alphabet:
+                    if _accepts(label, c):
+                        chars.add(c)
+        return frozenset(chars)
 
     def _token_safe_sets(self, state, alphabet):
         """Characters a productive self-loop in ``state`` accepts without end.
@@ -622,13 +693,7 @@ class Grammar(object):
                 continue
             chars = self._self_loop_chars.get(q)
             if chars is None:
-                closed = frozenset([q])
-                chars = set()
-                for c in alphabet:
-                    nxt = self._step(closed, c)
-                    if nxt is not None and q in nxt:
-                        chars.add(c)
-                chars = frozenset(chars)
+                chars = self._self_loop_chars_for(q, alphabet)
                 self._self_loop_chars[q] = chars
             if chars:
                 out.append(chars)

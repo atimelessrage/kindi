@@ -1,0 +1,85 @@
+{
+  "gate": "grammar-mask-edges",
+  "title": "Edge-derived safe-set proofs and mask unions: REQ-0027 rows after the 2026-11-24 change",
+  "measured": "2026-11-24",
+  "commit": "working tree (uncommitted at measurement)",
+  "command": "for i in 1 2 3; do python tools/grammar_mask_record.py --pack ~/.kindi/packs/bonsai-2b --doc short --out bench-logs/ms-short-$i.json; python tools/grammar_mask_record.py --pack ~/.kindi/packs/bonsai-2b --doc long --out bench-logs/ms-long-$i.json; done; then the medians of the three runs are written to the two artifacts",
+  "notes": "REQ-0027 A2, re-passed. Same pack, documents and harness as the 2026-11-22 run; three-run medians. The change removes an 8,228-character probe per NFA state and a whole-vocabulary sort per mask miss. The pre-token-class sweep was compared state by state on the real 2B vocabulary with 0 mismatches (14 states across the json.gbnf, json_schema and record walks). A4/A5 remain unmeasured.",
+  "evidence": [
+    "docs/benchmarks/2026-11-24-i7-8086k-grammar-mask-edges/grammar-mask-short.json",
+    "docs/benchmarks/2026-11-24-i7-8086k-grammar-mask-edges/grammar-mask-long.json",
+    "docs/benchmarks/2026-11-24-i7-8086k-grammar-mask-edges/grammar-mask-9b.json",
+    "docs/benchmarks/2026-11-24-i7-8086k-grammar-mask-edges/RESULTS.md"
+  ],
+  "numbers": [
+    {
+      "id": "json-schema-short",
+      "display": "10.0 ms",
+      "quoted_in": [
+        "docs/ROADMAP.md",
+        "docs/development/requirements/REQ-0027.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-i7-8086k-grammar-mask-edges/grammar-mask-short.json",
+        "pointer": "/short/json_schema/ms_per_token",
+        "expect": 10.0
+      }
+    },
+    {
+      "id": "gbnf-short-d1",
+      "display": "57.1 ms",
+      "quoted_in": [
+        "docs/ROADMAP.md",
+        "docs/development/requirements/REQ-0027.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-i7-8086k-grammar-mask-edges/grammar-mask-short.json",
+        "pointer": "/short/gbnf_json_d1/ms_per_token",
+        "expect": 57.1
+      }
+    },
+    {
+      "id": "gbnf-short-d2",
+      "display": "9.5 ms",
+      "quoted_in": [
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-i7-8086k-grammar-mask-edges/grammar-mask-short.json",
+        "pointer": "/short/gbnf_json_d2/ms_per_token",
+        "expect": 9.5
+      }
+    },
+    {
+      "id": "json-schema-long",
+      "display": "1.7 ms",
+      "quoted_in": [
+        "docs/ROADMAP.md",
+        "docs/development/requirements/REQ-0027.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-i7-8086k-grammar-mask-edges/grammar-mask-long.json",
+        "pointer": "/long/json_schema/ms_per_token",
+        "expect": 1.7
+      }
+    },
+    {
+      "id": "gbnf-long",
+      "display": "7.5 ms",
+      "quoted_in": [
+        "docs/ROADMAP.md",
+        "docs/development/requirements/REQ-0027.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-i7-8086k-grammar-mask-edges/grammar-mask-long.json",
+        "pointer": "/long/gbnf_ordered_record/ms_per_token",
+        "expect": 7.5
+      }
+    }
+  ]
+}

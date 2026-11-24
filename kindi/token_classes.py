@@ -42,7 +42,8 @@ class _VocabularyIndex(object):
     """The vocabulary-only part of a token-class table."""
 
     __slots__ = ("texts", "by_first", "char_masks", "char_bits", "all_mask", "alphabet",
-                 "all_ids", "safe_ids", "outside_ids", "outside_tries", "root", "lock")
+                 "all_ids", "safe_ids", "safe_masks", "outside_ids", "outside_tries", "root",
+                 "lock")
 
     def __init__(self, texts, by_first, char_masks, char_bits, alphabet):
         self.texts = texts
@@ -53,6 +54,7 @@ class _VocabularyIndex(object):
         self.alphabet = alphabet
         self.all_ids = np.arange(len(texts), dtype=np.int64)
         self.safe_ids = {}
+        self.safe_masks = {}
         self.outside_ids = {}
         self.outside_tries = {}
         self.root: _Node | None = None
@@ -94,6 +96,24 @@ def _index_for(texts):
         while len(_INDEX_CACHE) > _INDEX_CACHE_LIMIT:
             _INDEX_CACHE.popitem(last=False)
         return index
+
+
+def _sorted_ids(pieces, size):
+    """The union of id arrays as a sorted int64 array, via a boolean mask.
+
+    ``np.unique(np.concatenate(pieces))`` sorts up to a whole-vocabulary array of int64s on every
+    mask miss, which the 2026-11-24 profile showed as the largest single cost of the schema path.
+    A byte mask over the vocabulary plus ``flatnonzero`` is linear with a small constant and still
+    returns ascending ids, which is what the old implementation returned.
+    """
+    if not pieces:
+        return np.empty(0, dtype=np.int64)
+    if len(pieces) == 1 and isinstance(pieces[0], np.ndarray):
+        return np.sort(pieces[0])
+    mask = np.zeros(size, dtype=bool)
+    for piece in pieces:
+        mask[np.asarray(piece, dtype=np.int64)] = True
+    return np.flatnonzero(mask)
 
 
 class _Node(object):
@@ -158,7 +178,13 @@ class TokenClassTable(object):
                 outside = self._outside_ids_for(chosen)
                 if outside.size:
                     kept = self._subset_allowed(state, outside, chosen)
-                    ids = np.union1d(ids, kept)
+                    if kept.size:
+                        # Both arrays are sorted and “safe” and “outside” are disjoint, so a mask
+                        # union is exact; np.union1d sorted a 245K-element array per miss (the
+                        # largest single cost of the schema path in the 2026-11-24 profile).
+                        mask = self._safe_mask_for(chosen).copy()
+                        mask[kept] = True
+                        return np.flatnonzero(mask)
                 return ids
             # A narrow safe set (for example the whitespace before a JSON
             # value) should not pay for the whole trie when the first-character
@@ -198,6 +224,16 @@ class TokenClassTable(object):
                 ids = self._all_ids
             self._safe_ids[chars] = ids
             return ids
+
+    def _safe_mask_for(self, chars):
+        """A bool mask of the safe ids, built once per character set (see ``_safe_ids_for``)."""
+        with self._index.lock:
+            mask = self._index.safe_masks.get(chars)
+            if mask is None:
+                mask = np.zeros(len(self.texts), dtype=bool)
+                mask[self._safe_ids_for(chars)] = True
+                self._index.safe_masks[chars] = mask
+            return mask
 
     def _outside_ids_for(self, chars):
         with self._index.lock:
@@ -258,9 +294,7 @@ class TokenClassTable(object):
                 next_state = self._step(node_state, ch)
                 if next_state is not None:
                     stack.append((child, next_state))
-        if not out:
-            return np.empty(0, dtype=np.int64)
-        return np.asarray(sorted(out), dtype=np.int64)
+        return _sorted_ids([np.asarray(out, dtype=np.int64)], len(self.texts))
 
     def _build_trie(self):
         return _trie_for(self._index)
@@ -323,9 +357,7 @@ class TokenClassTable(object):
                 next_state = self._step(node_state, ch)
                 if next_state is not None:
                     stack.append((child, next_state))
-        if not pieces:
-            return np.empty(0, dtype=np.int64)
-        return np.unique(np.concatenate(pieces))
+        return _sorted_ids(pieces, len(self.texts))
 
 
 def _trie_for(index):
