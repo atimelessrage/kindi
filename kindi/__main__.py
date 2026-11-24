@@ -236,6 +236,9 @@ def cmd_verify(cfg, a):
 
 
 def cmd_bench(cfg, a):
+    spec = getattr(a, "spec", None)
+    if spec:
+        os.environ["KINDI_SPEC"] = spec          # the mode's own variables (KINDI_MTP_HEAD, KINDI_SPEC_PACK) stay as set
     _setup_gpu_env(cfg)
     from .bench import run
     return run(cfg, log=log)
@@ -688,6 +691,10 @@ def _build_parser():
                         "'none' or 'off' turns it off)")
     s.add_argument("--split-generated", type=int, default=None, metavar="TOKENS",
                    help="tokens generated in each --split-at request (default: 128)")
+    s.add_argument("--spec", default=None, choices=("ngram", "mtp", "draft2b", "both", "dspine", "auto", "0"),
+                   help="benchmark under this speculation mode (same as KINDI_SPEC; the mode's own variables, "
+                        "KINDI_MTP_HEAD or KINDI_SPEC_PACK, are read as usual); the generation curve runs "
+                        "under spec_begin/spec_end and the JSON carries the effective mode and acceptance")
     s = sub.add_parser("kld", help="teacher-forced KLD quality gate for lossy K/V caches against fp16")
     s.add_argument("--json", default=None, metavar="FILE", help="also record the numbers in a machine-readable JSON file")
     s = sub.add_parser("calibrate", help="measure the per-machine tuning once and persist it")

@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `ad3d8db` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `ae7e819` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24:** `POST /v1/messages` answers Anthropic's dialect on the same `run_generate` path
   (`kindi/api/anthropic.py`; `x-api-key` or bearer; envelope and SSE order; one `_relay` for both streaming
   routes), and `kindi selftest` drives it in process and with `--url`, so an installed image proves it. REQ-0023's
@@ -21,7 +21,7 @@ line of evidence (command + result). A task must be resumable from this file alo
   while the package and `install.sh` said `0.7.1-fork`; all three match now, pinned by
   `tests/test_version_consistency.py`. The `v0.7.1-fork` release is **still unpublished** (only `v0.5.0-installer`),
   so README's one-liners 404 until the owner runs `docs/RELEASE-CHECKLIST.md`. The mask cache is a bounded 64 MiB
-  LRU (`StateMaskCache`, `KINDI_MASK_CACHE_MB`); A4/A5-rate open. Suite: 1,563 passed / 58 skipped / 0 failed (195 s).
+  LRU (`StateMaskCache`, `KINDI_MASK_CACHE_MB`); A4/A5-rate open. Suite: 1,569 passed / 58 skipped / 0 failed (184 s).
   **2026-11-24 (latest):** REQ-0027's mask got cheaper: self-loop characters now come off the NFA's character edges plus
   a reverse-epsilon closure (8,228 probes per state gone) and the mask unions use a cached boolean mask (248,320-id sorts
   gone). 2B medians: 15 -> 10.0 ms/token `json_schema`, 124 -> 57.1 unrolled `json.gbnf` depth 1 (depth 2/3 -> 9.5),
@@ -235,7 +235,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `a101b7d` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `ad3d8db` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint, Arc GEMM work-group/staging |
+| `<worktree>` | `merge/upstream-0.7.0` | `ae7e819` | this session; 2026-11-24 v0.7.1 merge, grammar-mask edges, Anthropic endpoint, Arc GEMM, bench --spec |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 

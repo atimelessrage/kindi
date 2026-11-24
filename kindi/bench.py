@@ -186,6 +186,25 @@ def _run(cfg, log=print):
                        gpu=cfg.get("tandem_gpu"), kv_cache=cfg.get("kv_cache"))
     if vram is not None:
         vram.mark("loaded")
+    # the speculation mode is named before any timing (REQ-0026 A1/A2, same resolver as verify's
+    # spec_state and /health): a requested mode whose drafter did not attach is a refusal with exit
+    # 2 and no JSON row, never a plain-engine measurement with a spec label.
+    from .verify import spec_state
+    spec_info_requested = os.environ.get("KINDI_SPEC", "0") or "0"
+    spec_mode, spec_line, refusal = spec_state(eng, spec_info_requested)
+    log(spec_line)
+    if refusal:
+        log("FAIL: %s" % refusal)
+        if vram is not None:
+            vram.stop()
+        return 2
+    from . import spec as _sp
+    _st = _sp.effective_state(eng, spec_info_requested) if spec_mode is not None else None
+    _head = (_st or {}).get("head") or {}
+    spec_info = {"requested": spec_info_requested, "mode": spec_mode,
+                 "head": _head.get("file") if _head.get("state") == "loaded" else None,
+                 "head_sha256": (_head.get("sha256") or "")[:12] if _head.get("state") == "loaded" else None,
+                 "drafted": None, "accepted": None, "acceptance_ratio": None, "k": None}
     # eng.ctx is the *actual* context (the loader reduces it to fit); the requested one is
     # recorded separately so a reduced run is never mistaken for the requested context.
     result = {"pack": pack, "model": man.get("model"), "ctx": eng.ctx,
@@ -196,6 +215,7 @@ def _run(cfg, log=print):
               "vram_budget_mib": cfg.get("tandem_vram_mb") or None,
               "vram_reserve_mib": cfg.get("tandem_reserve_mb"),
               "device": "gpu" if cp is not None else "cpu", "read_tok_s": None, "gen_tok_s": {},
+              "spec": spec_info,
               "runtime": runtime_view.describe(cfg, eng)}
     if hasattr(eng, "cpu_range"):
         result["cpu_range"] = list(eng.cpu_range)
@@ -223,6 +243,12 @@ def _run(cfg, log=print):
     ms = timed(lambda i: eng.feed(1000 + i, 10 + i), 20)
     result["read_tok_s"] = round(1000 / ms, 1)
     log("prompt reading:       %5.1f tokens/s" % (1000 / ms))
+    # the generation curve is the spec row: under a mode it runs inside spec_begin/spec_end like a
+    # server request, so drafted/accepted are counted. Prompt reading and the split below stay plain.
+    if spec_mode is not None:
+        begin = getattr(eng, "spec_begin", None)
+        if begin is not None:
+            begin(True)                          # greedy, exactly the server's request path
     modes = [("exact", 0)] + ([("fast", cfg["fast_clusters"])] if eng.hsl is not None else [])
     pos, skip = curve_positions(eng.ctx)
     log("generation curve: positions %s (context %d)" % (", ".join(str(p) for p in pos), eng.ctx))
@@ -236,6 +262,19 @@ def _run(cfg, log=print):
             result["gen_tok_s"]["%s:%d" % (name, p)] = round(1000 / ms, 1)
             log("generation (%s head) at position %5d: %5.1f tokens/s" % (name, p, 1000 / ms))
     eng.shortlist = 0
+    if spec_mode is not None:
+        end = getattr(eng, "spec_end", None)
+        stats = (end() if end is not None else None) or {}
+        drafted = int(stats.get("drafted", 0))
+        accepted = int(stats.get("accepted", 0))
+        ratio = round(accepted / drafted, 4) if drafted else None
+        spec_k = int(getattr(eng, "spec_k", 0) or 0)
+        spec_info["drafted"] = drafted
+        spec_info["accepted"] = accepted
+        spec_info["acceptance_ratio"] = ratio
+        spec_info["k"] = spec_k
+        log("speculation %s: %d/%d drafts accepted (%.1f%%, k=%d)"
+            % (spec_mode, accepted, drafted, (ratio or 0.0) * 100.0, spec_k))
     generated = int(cfg.get("split_generated", SPLIT_GENERATED) or 0)
     splits = {}
     for prompt in requested_splits:

@@ -75,6 +75,16 @@ plain CPU suite is the only evidence for the merge.
   `install.sh` names the package when `apt-get` cannot install Docker or the NVIDIA container toolkit. It no longer
   takes an `nvidia` runtime entry in `daemon.json` for an installed toolkit.
 
+### `kindi bench --spec` (2026-11-24, REQ-0026)
+
+- `kindi bench` can now benchmark a speculation mode: `kindi bench --spec mtp` (also `ngram`,
+  `draft2b`, `both`, `dspine`) prints the effective mode first — the same line `/health` and
+  `kindi verify` print — and the generation curve runs inside `spec_begin`/`spec_end` exactly as a
+  server request, so the JSON carries the mode, the loaded head, drafted/accepted counts, the
+  acceptance ratio and the k used. A mode whose drafter did not attach is a named refusal (exit 2,
+  no JSON row), never a plain-engine number with a spec label. The first registered measurement
+  (2B mode A, off vs on) still needs a CUDA card.
+
 ### Anthropic Messages endpoint (2026-11-24, REQ-0028)
 
 - `POST /v1/messages` answers the same engine path in Anthropic's dialect, so Claude Code and the
