@@ -40,7 +40,6 @@ optimizing-mixed-gpu-rig.json
 *_ReviewAudit_*.txt
 *_ProblemsOnly_*.txt
 ConsultProposals*.txt
-manual_help_needed.txt
 # key material
 *.pem
 *.key

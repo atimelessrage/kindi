@@ -5,6 +5,10 @@ file, hardware only the owner has, installations/publishing only the release
 owner can do, and optional tooling that unblocks agent work. Each entry has a
 state line — tick it off when done.
 
+This is the **only** manual-help tracker. A local scratch copy is not kept:
+anything it holds is folded in here, and a stray one is now visible to
+`git status` instead of being ignored.
+
 ## Automated tasks (no owner action)
 
 - ~~The Lightning T4.2 GPU gate is **the agent's**, not the owner's: do not
@@ -120,12 +124,25 @@ commands and interpret the output. Each row states the gate it unlocks.
 | 4e | **i5-2500K (AVX-only) / Xeon W-2133 / i9-13900K** | The AVX-only CPU fallback and the other CPU rows of the matrix | Native CPU engine + CPU server chat re-run; timing numbers. |
 | 4f | **A machine that cannot run full-GPU but can split (any 2-card pair)** | The mixed-card P2 phase and truly-larger-than-VRAM tandem rows | Two-card verify/bench on an unequal pair (e.g. 6 GB + 8 GB) for `KINDI_TP_SPLIT=auto`. |
 
+**Owner's standing note (2026-11-24):** the rows above are parked on purpose, not
+waiting on an action today — the current focus is the Arc A770 path (4a), and
+another card or a different machine may follow later. No CUDA device is visible
+from this shell at all (`nvidia-smi` reports insufficient permissions, CuPy
+raises `cudaErrorNoDevice`), so even a single-card CUDA rerun cannot happen
+here. The installed Arc A770 is visible through Level Zero/OpenCL and its probes
+run, but it is not a CUDA second card and has no Kindi backend yet. When a rig
+appears: `bench-logs/test_k8v4_cache.py` with `KINDI_CARDS=2`, then
+`bench-logs/test_k8v4_dist_cache.py` unchanged (the second then needs no stubbed
+device).
+
 ## 5. Publications and packages only the release owner can do
 
 - **Push the tree:** `git push origin` is 403 from this environment (house
-  rule is also never-push). The fork (`myfork/main`) is behind; the owner
-  must push. This is the single easiest owner action with the biggest
-  unblock value (CI, installer refresh, ever). Read
+  rule is also never-push). Write access to `ahtx/kindi` is **not** needed and
+  should not be chased: this is a fork (`myfork` = `atimelessrage/kindi`), so
+  contributions go upstream as pull requests. The fork (`myfork/main`) is
+  behind; the owner must push. This is the single easiest owner action with the
+  biggest unblock value (CI, installer refresh, ever). Read
   [SECURITY.md](SECURITY.md) first: the remotes still hold pre-redaction
   objects, so a plain fast-forward can republish what the 2026-11-17 rewrite
   removed.
@@ -183,3 +200,21 @@ commands and interpret the output. Each row states the gate it unlocks.
 - **Nanbeige corrupt-file deletion** (2026-11-16): the 13.1 GB corrupt GGUF
   and `<kindi-model-root>/kindi-nb` were removed at the owner's request; the adapter port and
   the gate are recorded so the download (§1) resumes cleanly.
+- **27B pack for the K8/V4 long-context gate** (2026-11-24): built as a **copy**
+  (the source GGUF was not touched and its sha256 `53107f53…33ee3` re-checked
+  after conversion). The pack is 7,242 MB, built in 357 s by
+  `python -m kindi convert <gguf> --out <pack>`: 64 layers, width 5120,
+  head_dim 256, Hadamard block 1024 (the tensor-core-friendly case). The
+  planner accepts it — no split at ctx 8192 (7,266 MiB against a 7,680 MiB
+  budget with 8 GiB assumed); at the default maximum context it plans 2 CPU
+  layers. Keep the pack on the external model volume: the system drive holds
+  the 2B/4B/9B packs and has under 6 GB free. What is left is GPU exactness
+  (`kindi verify`, K8/V4), which is parked with §4 because it needs a CUDA
+  device; the CPU engine is measured separately in `docs/CPU-SUPPORT.md`.
+- **No history rewrite** (decided 2026-11-17, recorded in
+  [SECURITY.md](SECURITY.md)): the reviewed 160-row / ~3,318-hit baseline is
+  kept rather than rewritten again, so no approval or force-push is
+  outstanding.
+- **The `# api_key` line in `kindi.conf.example`** is the placeholder
+  `choose-a-long-random-string`, not a credential — nothing to rotate or
+  scrub.
