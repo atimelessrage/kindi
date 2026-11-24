@@ -75,7 +75,23 @@ plain CPU suite is the only evidence for the merge.
   `install.sh` names the package when `apt-get` cannot install Docker or the NVIDIA container toolkit. It no longer
   takes an `nvidia` runtime entry in `daemon.json` for an installed toolkit.
 
-### Audit fixes (2026-11-24, after the merge)
+### Anthropic Messages endpoint (2026-11-24, REQ-0028)
+
+- `POST /v1/messages` answers the same engine path in Anthropic's dialect, so Claude Code and the
+  harnesses that expect that shape need no proxy. Content blocks map both ways (`text`, `tool_use` →
+  `tool_calls`, `tool_result` → a `tool` message), `system` may be a string or text blocks, `tools`
+  and `tool_choice` map field for field, and `stop_sequences` becomes `stop`. The answer is the
+  Anthropic envelope (`message`, `content` blocks, `stop_reason`, `usage`); `stream: true` emits
+  `message_start` → `content_block_start` → `content_block_delta`(s) → `content_block_stop` →
+  `message_delta` → `message_stop`, with a parsed call as a `tool_use` block rather than leaked
+  `<tool_call>` text.
+- Auth accepts `x-api-key` (what Claude Code sends) beside the existing bearer token, errors use the
+  Anthropic envelope (400/401/413/429/500, never a 500 for a bad field), and an `image` or `document`
+  block is refused by name because this backend has no vision path.
+- `kindi/api/anthropic.py` holds the whole dialect as pure transforms; `server.py` now has one SSE
+  relay shared by both streaming routes instead of two copies. **Not claimed:** compatibility — the
+  app-level gate passes (`tests/test_anthropic.py`), but no real Claude Code run has happened yet.
+
 
 - **The Windows installer fetched the previous release.** `install.ps1` still pinned `$KindiWinVersion =
   '0.7.0-fork'`, and that literal is the bundle URL and the version Settings > Apps shows, while the package and

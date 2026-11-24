@@ -60,6 +60,11 @@ Besides `/v1`, Kindi serves what an agent host needs to observe and to connect a
   `dspine`), alongside `passes`, `drafted`, `accepted` and `acceptance`.
 - `POST /v1/completions` and `/v1/embeddings` are not implemented and return 404; use
   `POST /v1/chat/completions` for text generation.
+- `POST /v1/messages` speaks Anthropic's shape over the same engine, so a harness that expects it (Claude Code)
+  needs no proxy. Point it at the base URL `http://127.0.0.1:8093` with any model name and send the key as
+  `x-api-key` when `api_key` is set; the field mapping, the envelope and the SSE order are in
+  [API.md](API.md#anthropic-messages-req-0028). It is *available*, not yet *compatible*: no real Claude Code run
+  has been recorded.
 - Image input is rejected with HTTP 400 when the selected pack has no vision weights. The current packs are
   text-only; remove `image_url`/`input_image` parts and Ollama `images`, or use a text-only prompt.
 

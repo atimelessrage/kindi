@@ -4,6 +4,8 @@
   GET  /v1/models              the model and its real context (context_length, max_model_len, meta.n_ctx)
   POST /v1/chat/completions    messages (+ tools) -> answer; stream=true for SSE; tool calls as OpenAI tool_calls;
                                dry_run=true -> the exact prompt_tokens, no generation
+  POST /v1/messages            the same engine path in Anthropic's shape (REQ-0028): content blocks, tool_use,
+                               stop_reason/usage, and the Anthropic SSE event order; x-api-key or Bearer
   POST /v1/tokenize            {"content": text} or {"messages": [...], "tools": [...]} -> count, tokens
   POST /v1/detokenize          {"tokens": [...]} -> text
   POST /api/chat               the same, in Ollama's NDJSON form (stream defaults to true)
@@ -46,6 +48,7 @@ import numpy as np
 
 from . import COMMIT, __version__, chat
 from . import runtime as runtime_view
+from .api import anthropic
 from .api import errors as api_errors
 from .api.auth import bearer_matches
 from .cache import Cancelled, Runner
@@ -1533,6 +1536,39 @@ def create_app(cfg, log=print):
     def _auth(request):
         return bearer_matches(request.headers.get("authorization", ""), cfg["api_key"])
 
+    async def _relay(produce, prio, progress_note, cancel):
+        """Relay an SSE producer running on a scheduler thread to the client.
+
+        Shared by the OpenAI and Anthropic streaming routes: a keepalive comment every KEEPALIVE_S while
+        nothing else goes out (waiting in the queue, reading a long prompt), and a disconnect cancels the
+        engine at its next token.
+        """
+        loop = asyncio.get_event_loop()
+        q = asyncio.Queue()
+        END = object()
+
+        def pump():
+            try:
+                for item in produce():
+                    loop.call_soon_threadsafe(q.put_nowait, item)
+            finally:
+                loop.call_soon_threadsafe(q.put_nowait, END)
+        fut = asyncio.wrap_future(SCHED.submit(pump, prio))
+        try:
+            while True:
+                try:
+                    item = await asyncio.wait_for(q.get(), timeout=KEEPALIVE_S)
+                except asyncio.TimeoutError:
+                    yield ": kindi progress " + json.dumps(progress_note()) + "\n\n"
+                    continue
+                if item is END:
+                    break
+                yield item
+        finally:
+            cancel.set()
+            await asyncio.wait([fut], timeout=30)
+            gate.release()
+
     def _rate_limited(request):
         """A 429 response when this source address exhausted its generation budget, else None."""
         wait = limiter.retry_after(request.client.host if request.client else "-")
@@ -2195,38 +2231,10 @@ def create_app(cfg, log=print):
                     yield "data: [DONE]\n\n"
                     if not cancel.is_set():
                         V.after_turn(locked=True)     # the client has its answer; the next request waits for this
-            async def relay():
-                # the generator runs in a worker thread; if the client disconnects, Starlette cancels this
-                # coroutine, the finally sets `cancel`, and the engine stops at its next token
-                loop = asyncio.get_event_loop()
-                q = asyncio.Queue()
-                END = object()
-
-                def pump():
-                    try:
-                        for item in sse():
-                            loop.call_soon_threadsafe(q.put_nowait, item)
-                    finally:
-                        loop.call_soon_threadsafe(q.put_nowait, END)
-                fut = asyncio.wrap_future(SCHED.submit(pump, prio))
-                try:
-                    while True:
-                        # an SSE comment every KEEPALIVE_S while nothing else is sent (waiting in the queue, reading
-                        # a long prompt): it keeps the stream alive and says how far the read is. SSE clients
-                        # ignore comment lines.
-                        try:
-                            item = await asyncio.wait_for(q.get(), timeout=KEEPALIVE_S)
-                        except asyncio.TimeoutError:
-                            yield ": kindi progress " + json.dumps(progress_note()) + "\n\n"
-                            continue
-                        if item is END:
-                            break
-                        yield item
-                finally:
-                    cancel.set()
-                    await asyncio.wait([fut], timeout=30)
-                    gate.release()
-            return StreamingResponse(relay(), media_type="text/event-stream")
+            # the generator runs in a worker thread; on a client disconnect the relay's finally sets
+            # `cancel` and the engine stops at its next token
+            return StreamingResponse(_relay(sse, prio, progress_note, cancel),
+                                     media_type="text/event-stream")
 
         try:
             gate.enter()
@@ -2311,6 +2319,127 @@ def create_app(cfg, log=print):
         # the save of the turn's end state runs on the engine thread after this answer is sent, before the next request
         SCHED.submit(K.after_turn, PRIO_TURN)
         return answer(info)
+
+    # --- Anthropic Messages (REQ-0028): the same engine path, Anthropic's dialect -------------------
+
+    def _anthropic_auth(request):
+        """Claude Code sends `x-api-key`; other Anthropic clients send a bearer token. Accept both."""
+        if not cfg["api_key"]:
+            return True
+        key = request.headers.get("x-api-key")
+        if key is not None:
+            return bearer_matches("Bearer " + key, cfg["api_key"])
+        return _auth(request)
+
+    def _anthropic_error(code, msg, typ="invalid_request_error", headers=None):
+        _access(_CURRENT.get(), code, error=msg)
+        body = anthropic.error_payload(msg, typ)
+        return JSONResponse(body, status_code=code, headers=headers)
+
+    @app.post("/v1/messages")
+    async def messages(request: Request):
+        if not _anthropic_auth(request):
+            return _anthropic_error(401, "invalid x-api-key", "authentication_error")
+        limited = _rate_limited(request)
+        if limited is not None:
+            return limited
+        try:
+            body = await _read_json_body(request)
+        except RequestTooLarge as e:
+            return _anthropic_error(413, str(e), "request_too_large")
+        except RequestError as e:
+            return _anthropic_error(400, str(e))
+        try:
+            req = anthropic.to_chat(body)
+        except ValueError as e:
+            return _anthropic_error(400, str(e))
+        try:
+            _validate_request(req, image_error)       # the OpenAI checks; a bad field is a 400 either way
+        except RequestError as e:
+            return _anthropic_error(400, str(e))
+        if req.get("tools") and not getattr(K, "supports_tools", True):
+            return _anthropic_error(400, "tools are not supported by the %s backend" % getattr(K, "variant", ""))
+        msg_id = "msg_" + uuid.uuid4().hex[:24]
+        # Anthropic's message_start carries the input token count, so count before generating; a count that
+        # fails (a stub engine, a prompt the engine cannot tokenize) reports 0 there and the real usage later.
+        input_tokens = 0
+        try:
+            ids = await asyncio.get_event_loop().run_in_executor(None, K.check_prompt, req)
+            input_tokens = len(ids or [])
+        except OverflowError as e:
+            return _anthropic_error(400, str(e))
+        except Exception:  # noqa: BLE001 - the answer itself reports a real failure
+            input_tokens = 0
+        cancel = threading.Event()
+        meta = _CURRENT.get() or {}
+        meta["stream"] = bool(req.get("stream"))
+        prio = priority_of(req, request.headers)
+        mine = {"started": False}
+
+        def progress_note():
+            if not mine["started"]:
+                return {"phase": "queued"}
+            return K.progress() or {"phase": "finishing"}
+
+        if req.get("stream"):
+            try:
+                gate.enter()
+            except QueueFull as e:
+                return _anthropic_error(429, str(e), "overloaded_error", {"Retry-After": "1"})
+
+            def sse():
+                with K.lock:
+                    mine["started"] = True
+                    try:
+                        for item in anthropic.stream(_logged(run_generate(K, req, cancel, prio), meta, True),
+                                                     model_id, msg_id, input_tokens):
+                            yield item
+                    except OverflowError as e:
+                        yield anthropic.error_event(str(e))
+                    except ValueError as e:
+                        yield anthropic.error_event(str(e))
+                    except Exception as e:  # noqa: BLE001 - engine failure becomes an SSE error event
+                        yield anthropic.error_event("kindi: %s" % e)
+                        _after_engine_error(K, e)
+                    if not cancel.is_set():
+                        K.after_turn(locked=True)
+            return StreamingResponse(_relay(sse, prio, progress_note, cancel),
+                                     media_type="text/event-stream")
+
+        try:
+            gate.enter()
+        except QueueFull as e:
+            return _anthropic_error(429, str(e), "overloaded_error", {"Retry-After": "1"})
+
+        def run():
+            with K.lock:
+                mine["started"] = True
+                info = None
+                for kind, val in _logged(run_generate(K, req, cancel, prio), meta, False):
+                    if kind == "done":
+                        info = val
+                return info
+
+        try:
+            fut = asyncio.wrap_future(SCHED.submit(run, prio))
+            while not fut.done():
+                done, _ = await asyncio.wait([fut], timeout=1.0)
+                if not done and await request.is_disconnected():
+                    cancel.set()
+            info = fut.result()
+            if info is None:
+                return _anthropic_error(400, "request cancelled")
+        except OverflowError as e:
+            return _anthropic_error(400, str(e))
+        except ValueError as e:
+            return _anthropic_error(400, str(e))
+        except Exception as e:  # noqa: BLE001
+            _after_engine_error(K, e)
+            return _anthropic_error(500, "kindi: %s" % e, "api_error")
+        finally:
+            gate.release()
+        SCHED.submit(K.after_turn, PRIO_TURN)
+        return anthropic.message(info, model_id, msg_id)
 
     return app
 

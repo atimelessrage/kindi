@@ -13,14 +13,15 @@ line of evidence (command + result). A task must be resumable from this file alo
 ### Handoff
 
 - **HEAD:** `a101b7d` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; guarded by `tests/test_agents_handoff.py`).
-  **2026-11-24 audit fixes:** `install.ps1` still pinned `0.7.0-fork` (its bundle URL and Programs & Features entry)
-  while the package and `install.sh` said `0.7.1-fork`; all three now match and `tests/test_version_consistency.py`
-  pins them plus each installer's release tag. The `v0.7.1-fork` release is **still unpublished** (the fork's
-  releases page has only `v0.5.0-installer`), so README's one-liners 404 until the owner runs
-  `docs/RELEASE-CHECKLIST.md`. The per-state mask cache is now a bounded 64 MiB LRU
-  (`kindi/token_classes.py::StateMaskCache`, `KINDI_MASK_CACHE_MB`) - A5's host-memory half, tested; A4 and A5's
-  rate half stay open. Full CPU suite: 1,520 passed / 58 skipped / 0 failed in 185.81 s
-  (`bench-logs/full-suite-20261124-auditfix-final.log`).
+  **2026-11-24 Anthropic endpoint (REQ-0028):** `POST /v1/messages` translates onto the same `run_generate` path
+  (`kindi/api/anthropic.py`; `x-api-key` or bearer; Anthropic envelope and SSE order; both streaming routes share
+  `_relay`). A1/A2 and A3's app-level gate pass in `tests/test_anthropic.py`; the real Claude Code run is open, so it
+  is *available*, not *compatible*. **2026-11-24 audit fixes:** `install.ps1` fetched `0.7.0-fork` while the package
+  and `install.sh` said `0.7.1-fork`; all three now match, pinned by `tests/test_version_consistency.py` with each
+  installer's release tag. The `v0.7.1-fork` release is **still unpublished** (only `v0.5.0-installer` exists), so
+  README's one-liners 404 until the owner runs `docs/RELEASE-CHECKLIST.md`. The mask cache is a bounded 64 MiB LRU
+  (`StateMaskCache`, `KINDI_MASK_CACHE_MB`) - A5's memory half; A4 and A5's rate half stay open. Suite: 1,520
+  passed / 58 skipped / 0 failed (185.81 s, `bench-logs/full-suite-20261124-auditfix-final.log`).
   **2026-11-24 (latest):** REQ-0027's mask got cheaper: self-loop characters now come off the NFA's character edges plus
   a reverse-epsilon closure (8,228 probes per state gone) and the mask unions use a cached boolean mask (248,320-id sorts
   gone). 2B medians: 15 -> 10.0 ms/token `json_schema`, 124 -> 57.1 unrolled `json.gbnf` depth 1 (depth 2/3 -> 9.5),

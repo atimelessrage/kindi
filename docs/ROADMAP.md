@@ -136,12 +136,15 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   drop-in-for-agent-frameworks claim until the conformance suite and a schema-constrained
   reply both pass. The goal is a backend an agent framework can rely on, not just a fast
   chat endpoint.
-- **An Anthropic Messages endpoint ([REQ-0028](development/requirements/REQ-0028.md), proposed):**
-  `kindi serve` speaks OpenAI shapes only, while Claude Code and several harnesses in the ranking
-  expect `POST /v1/messages` (content blocks, `tool_use`/`tool_result`, the SSE event order). A
-  translation adapter over the existing chat path would let those harnesses point at Kindi without a
-  proxy; it changes no decoding, so the gate is an app-level test with a Claude-Code-shaped request
-  plus one real harness run, not a benchmark. Proposed by the external knowledge-base scan of
+- **An Anthropic Messages endpoint ([REQ-0028](development/requirements/REQ-0028.md), landed
+  2026-11-24):** `POST /v1/messages` now answers the same engine path in Anthropic's dialect — content
+  blocks (`text`, `tool_use`, `tool_result`), `system`, `tools`/`tool_choice`, `stop_sequences`, and
+  the SSE order `message_start` → `content_block_start` → deltas → `content_block_stop` →
+  `message_delta` → `message_stop`. `kindi/api/anthropic.py` is the whole translation (no FastAPI, no
+  engine import, so it unit-tests on a CPU-only host); the route shares `_relay` with the OpenAI
+  streaming path. Auth takes `x-api-key` or a bearer token. Evidence: `tests/test_anthropic.py`
+  (A1/A2 plus A3's app-level gate with a stub engine). **Open:** A3's real Claude Code run against
+  `kindi serve`, and A4's no-decoding-change check — the endpoint is *available*, not *compatible*. Proposed by the external knowledge-base scan of
   2026-11-17 (`docs/development/AI-INVENTORY-SCAN.md`), which is inspiration only.
 - **n8n workflow integration ([REQ-0029](development/requirements/REQ-0029.md), proposed):** a
   self-hosted n8n workflow should use `kindi serve` as an OpenAI-compatible provider without a

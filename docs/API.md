@@ -1,6 +1,7 @@
 # API
 
-The OpenAI-compatible HTTP API. This page is the field-by-field contract
+The OpenAI-compatible HTTP API, plus the Anthropic Messages dialect
+(`POST /v1/messages`, REQ-0028) over the same engine path. This page is the field-by-field contract
 (agent frameworks depend on it), the error envelope, and the conformance
 suite that pins the wire shape. It records what the server does **today**;
 proposed changes are marked as such and are not implemented until the
@@ -135,6 +136,58 @@ structured types above, and purely cosmetic fields keep being ignored. The gramm
 must be present, `additionalProperties` behaves like OpenAI strict mode
 (only schema properties), `integer` is canonical decimal, and `enum`/`const`
 accept primitives only.
+
+## Anthropic Messages (REQ-0028)
+
+`POST /v1/messages` answers the same engine path in Anthropic's dialect, so a
+harness that speaks `/v1/messages` (Claude Code and the harnesses in the
+ranking) needs no proxy. It is a translation, not a second engine: decoding,
+structured output, speculation and the prompt cache are the ones
+`/v1/chat/completions` already uses.
+
+Authentication takes either header: `x-api-key: <key>` (what Claude Code
+sends) or `Authorization: Bearer <key>`. Errors use the Anthropic envelope
+`{"type": "error", "error": {"type": "...", "message": "..."}}`, with
+`invalid_request_error` (400), `authentication_error` (401),
+`request_too_large` (413), `overloaded_error` (429, `Retry-After: 1`) and
+`api_error` (500); a bad field is never a 500.
+
+| Anthropic field | becomes |
+|---|---|
+| `system` (string or text blocks) | a `system` message (blocks concatenated) |
+| `messages[].content` (string) | the same text |
+| `messages[].content[]` `text` blocks | one text part (concatenated) |
+| `messages[].content[]` `tool_use` (assistant) | `tool_calls`, `input` re-serialised as `arguments` |
+| `messages[].content[]` `tool_result` (user) | a `tool` message with `tool_call_id = tool_use_id`; it precedes the turn's text |
+| `messages[].content[]` `image` / `document` | refused: 400 naming `messages`, this backend has no vision path |
+| `thinking` / `redacted_thinking` blocks | dropped (a previous turn's reasoning is not fed back) |
+| `tools[] {name, description, input_schema}` | `tools[] {type: function, function: {...}}`; a missing schema is `{"type": "object", "properties": {}}` |
+| `tool_choice` `auto` / `any` / `none` / `{type: tool, name}` | `auto` / `required` / `none` / a named function |
+| `max_tokens`, `temperature`, `top_p`, `top_k` | the same request fields |
+| `stop_sequences[]` | `stop` |
+| `stream` | `stream` |
+
+A non-streaming answer is `{"id": "msg_...", "type": "message", "role":
+"assistant", "model": <served model>, "content": [...], "stop_reason":
+..., "stop_sequence": null, "usage": {"input_tokens", "output_tokens"}}`.
+`content` holds `text` blocks and, for each parsed call, `tool_use` blocks with
+the arguments parsed into `input` (unparsable arguments are kept as
+`{"_raw": "..."}` rather than dropped). `stop_reason` is `end_turn`,
+`max_tokens` or `tool_use`.
+
+With `stream: true` the event order is Anthropic's: `message_start` (carrying
+the counted prompt in `usage.input_tokens`), then per block
+`content_block_start` / `content_block_delta`(s) / `content_block_stop`, then
+`message_delta` (with `stop_reason` and `usage.output_tokens`), then
+`message_stop`. Text deltas are `text_delta`; a parsed tool call is a
+`tool_use` block with one `input_json_delta`, and the raw `<tool_call>` text is
+never sent as content. An engine failure mid-stream is an `error` event.
+
+What is **not** claimed: compatibility. The app-level gate (a
+Claude-Code-shaped request through `create_app`, the envelope, the SSE order
+and the tool round-trip) passes in `tests/test_anthropic.py`, but REQ-0028 A3
+also wants one real Claude Code run against `kindi serve`, which has not
+happened, so the endpoint is *available*, not *compatible*.
 
 ## Sessions (REQ-0016)
 
