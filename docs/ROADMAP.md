@@ -179,8 +179,16 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   of `arange`+`np.isin` in the constrained pick — took the 22-token schema filter from 245.6 ms to
   106.1 ms and a structured 2B CPU reply from 26.35 ms/token to 24.13 ms/token (constrained
   overhead 6.32 to 4.34 ms/token, unconstrained control unchanged; `docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/`).
-  What is left of a mask miss is the trie walk itself, which native code would have to attack; the
-  A2/A3/A6 selector and gates stay open, and no native code was added. `kcpu.c` and
+  **The walk itself, profiled and cut (2026-11-25):** the remaining cost is not trie structure but the
+  automaton transition count — 8,303 steps per schema mask miss, 8,219 of them one per distinct
+  token-start character, 91% rejected. A per-character-class edge memo (exact, filled from the
+  second state of a class, 16-class LRU) takes the median miss from 4.02 ms to 2.70 ms (1.486x),
+  steps to 309 and a warm 22-token document's mask work from 109.1 ms to 89.2 ms; served, structured
+  replies 24.42 -> 23.50 ms/token (3.8%) with the constrained gap 4.57 -> 4.08 (10.7%)
+  (`docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/`). A6's mask half passes and its 5%
+  end-to-end half does not, so the A2/A3/A6 selector and gates stay open and no native code was
+  added; what a native transition function would have to own is the `okey`/`int` grammar state
+  itself, which is a grammar port rather than a mask port. `kcpu.c` and
   the CUDA kernels are already native and excluded. A swap is adopted only if it is token/mask/byte-identical and
   improves the measured function by at least 1.25x with at least 5% end-to-end p50, with no >1%
   unconstrained-decode regression; otherwise it stays Python. The external sketch's 15-35%

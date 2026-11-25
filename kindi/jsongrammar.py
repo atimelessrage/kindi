@@ -174,11 +174,48 @@ class JsonGrammar(object):
             return [safe] if safe else []
         return []
 
+    # Modes whose one-character acceptance reads nothing but the mode: inside a JSON string the same
+    # characters print and the same two end it whatever the buffer holds, trailing whitespace and the
+    # colon slot are fixed, and an array's tail can always take `,` and `]`.
+    _MODE_CLASSES = frozenset(("trail", "str", "akey", "sx", "su", "ocolon", "atail",
+                              "objka", "objkb"))
+
+    def _char_class(self, state):
+        """A key holding exactly what one-character acceptance reads, or None for exact stepping.
+
+        The token-class walk shares a `character -> next state` memo between states of one class, so
+        a key may only group states that agree on every character.  Where the buffer, the schema stack
+        or the remaining property index decides acceptance, that part is in the key; the walk is only
+        skipping questions whose answer cannot differ.
+        """
+        mode, stk, buf, aux = state
+        if mode in self._MODE_CLASSES:
+            return mode
+        if mode == "val":
+            return ("val", id(self.root))          # only the root schema decides
+        if mode in ("aval", "oval"):
+            if not stk:
+                return (mode, None)
+            top = stk[-1]
+            node = top[1]
+            if mode == "oval":
+                target = node[1][top[2]][1] if node[0] == "object" else ("any",)
+            else:
+                target = node[1] if node[0] == "array" else ("any",)
+            return (mode, target)
+        # Deliberately absent: `okey`, `otail`, `objk`, `objkf`, `num`/`int` and `kw`.  Their key
+        # would have to include the key buffer, the digit buffer or the schema stack, and a walk then
+        # creates a new one of those per accepted character - a class cache that churns instead of
+        # repeating.  They keep the exact per-edge path (measured on 2026-11-25: memoizing them cost
+        # about 6% of a first-pass document walk and saved nothing on the next pass).
+        return None
+
     def _vocab_table(self, texts):
         if self._mask_texts is not texts:
             from .token_classes import TokenClassTable
 
-            self._mask_table = TokenClassTable(texts, self._step, self._token_safe_sets)
+            self._mask_table = TokenClassTable(texts, self._step, self._token_safe_sets,
+                                               char_class=self._char_class)
             self._mask_texts = texts
             self._vocab_cache.clear()
         table = self._mask_table

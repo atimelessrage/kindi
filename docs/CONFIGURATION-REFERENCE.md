@@ -238,7 +238,7 @@ direct sites.
 | `KINDI_LT_SM75` | (unset) | `kindi/lightning.py:150` |
 | `KINDI_LT_TC` | `1` | `kindi/lightning.py:145` |
 | `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:608` |
-| `KINDI_MASK_CACHE_MB` | `64` | `kindi/token_classes.py:51` |
+| `KINDI_MASK_CACHE_MB` | `64` | `kindi/token_classes.py:60` |
 | `KINDI_MAX_BODY_MB` | `16` | `kindi/dsv41_server.py:78` (+1 more) |
 | `KINDI_MEM_RESERVE_MB` | `96` or `256` or `32` | `kindi/engine.py:331` (+4 more) |
 | `KINDI_MODEL` | (empty) | `kindi/container.py:240` |

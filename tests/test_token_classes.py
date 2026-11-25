@@ -322,3 +322,100 @@ def test_gbnf_instances_share_the_same_index_and_language():
     assert state is not None
     states.append(state)
     _same_mask(second, texts, states)
+
+
+def _doc_states(grammar, texts, text):
+    state, out = grammar.start(), [grammar.start()]
+    for ch in text:
+        state = grammar._step(state, ch)
+        if state is None:
+            break
+        out.append(state)
+    return out
+
+
+def test_the_edge_memo_never_changes_a_mask():
+    """The class memo only skips questions whose answer cannot differ; every mask must match.
+
+    The oracle here is the same token-class table built without `char_class`, so a walk that shared
+    an edge wrongly shows up as a different id set rather than only in a benchmark.
+    """
+    texts = list(TEXTS)
+    grammar = grammar_from_schema({
+        "type": "object",
+        "properties": {"name": {"type": "string"}, "tags": {"type": "array", "items": {"type": "string"}},
+                       "n": {"type": "integer"}},
+        "required": ["name", "tags", "n"],
+    })
+    memo_table = grammar._vocab_table(texts)
+    exact_table = token_classes.TokenClassTable(texts, grammar._step, grammar._token_safe_sets)
+    states = _doc_states(grammar, texts, '{"name": "a", "tags": ["x", "y"], "n": 42}')
+    states += _doc_states(grammar, texts, '{"name": "a\u0041", "tags": [], "n": -3}')
+    states.append(grammar.start())
+    seen = set()
+    for state in states:
+        if state in seen:
+            continue
+        seen.add(state)
+        assert memo_table.allowed(state).tolist() == exact_table.allowed(state).tolist(), state
+
+
+def test_a_character_class_only_groups_states_that_agree_on_every_character():
+    """The memo's soundness condition, checked on the states a document reaches.
+
+    Two states of one class must accept exactly the same characters; if a grammar change makes a
+    class key too coarse, this fails before any mask does.
+    """
+    texts = list(TEXTS)
+    alphabet = sorted(set("".join(TEXTS)))
+    grammar = grammar_from_schema({
+        "type": "object",
+        "properties": {"name": {"type": "string"}, "n": {"type": "integer"}, "b": {"type": "boolean"}},
+        "required": ["name", "n", "b"],
+    })
+    states = _doc_states(grammar, texts, '{"name": "a", "n": 42, "b": true}')
+    states += _doc_states(grammar, texts, '{"name": "a')
+    groups = {}
+    for state in states:
+        key = grammar._char_class(state)
+        if key is None:
+            continue
+        vector = tuple(grammar._step(state, ch) is not None for ch in alphabet)
+        groups.setdefault(key, set()).add(vector)
+    assert groups, "the document reached no classed state"
+    for key, vectors in groups.items():
+        assert len(vectors) == 1, (key, vectors)
+
+
+def test_the_edge_memo_starts_at_the_second_state_of_a_class():
+    """A first structured request pays no memo build; the repeat is what creates it."""
+    texts = list(TEXTS)
+    grammar = grammar_from_schema({"type": "string"})
+    table = grammar._vocab_table(texts)
+    # A closed string lands in `trail`, which takes the trie walk (its safe set is four characters).
+    state = grammar.start()
+    for ch in '"abc"':
+        state = grammar._step(state, ch)
+    assert grammar._char_class(state) == "trail"
+    table.allowed(state)
+    assert grammar._char_class(state) in table._index.accept_pending
+    assert grammar._char_class(state) not in table._index.accept_maps
+    table.allowed(state)
+    assert grammar._char_class(state) in table._index.accept_maps
+
+
+def test_the_edge_memos_are_bounded():
+    texts = list(TEXTS)
+    grammar = grammar_from_schema({"type": "array", "items": {"type": "string"}})
+    table = grammar._vocab_table(texts)
+    for i in range(token_classes._ACCEPT_MAP_LIMIT + 6):
+        state = grammar.start()
+        for ch in '[-' + str(i) + ',"x':
+            state = grammar._step(state, ch)
+            if state is None:
+                break
+        if state is not None:
+            table.allowed(state)
+            table.allowed(state)               # second sight creates the memo
+    assert len(table._index.accept_maps) <= token_classes._ACCEPT_MAP_LIMIT
+    assert len(table._index.accept_pending) <= token_classes._ACCEPT_PENDING_LIMIT

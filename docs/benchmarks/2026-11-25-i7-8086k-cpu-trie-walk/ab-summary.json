@@ -1,0 +1,32 @@
+{
+  "runs_per_arm": 3,
+  "runs": {
+    "old0": {"structured": 23.48, "unconstrained": 19.14, "gap": 4.34},
+    "old1": {"structured": 24.42, "unconstrained": 19.73, "gap": 4.69},
+    "old2": {"structured": 25.12, "unconstrained": 20.55, "gap": 4.57},
+    "new0": {"structured": 23.5, "unconstrained": 19.42, "gap": 4.08},
+    "new1": {"structured": 29.15, "unconstrained": 23.46, "gap": 5.69},
+    "new2": {"structured": 23.09, "unconstrained": 19.12, "gap": 3.97}
+  },
+  "arms": {
+    "old": {
+      "structured_median": 24.42,
+      "unconstrained_median": 19.73,
+      "gap_median": 4.57,
+      "structured_all": [23.48, 24.42, 25.12],
+      "gap_all": [4.34, 4.69, 4.57]
+    },
+    "new": {
+      "structured_median": 23.5,
+      "unconstrained_median": 19.42,
+      "gap_median": 4.08,
+      "structured_all": [23.5, 29.15, 23.09],
+      "gap_all": [4.08, 5.69, 3.97]
+    }
+  },
+  "structured_change_percent": -3.8,
+  "gap_change_percent": -10.7,
+  "unconstrained_change_percent": -1.6,
+  "structured_gain_percent": 3.8,
+  "gap_gain_percent": 10.7
+}

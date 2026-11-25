@@ -1,0 +1,190 @@
+{
+  "runs": 3,
+  "rounds_per_run": 5,
+  "grammars": {
+    "json_schema": {
+      "median_ms_exact": [
+        4.018,
+        4.072,
+        4.014
+      ],
+      "median_ms_class": [
+        2.704,
+        2.713,
+        2.684
+      ],
+      "steps_exact": [
+        8303,
+        8303,
+        8303
+      ],
+      "steps_class": [
+        309,
+        309,
+        309
+      ],
+      "pass_totals_exact": [
+        [
+          109.1,
+          108.7,
+          118.6,
+          108.7,
+          119.8
+        ],
+        [
+          109.2,
+          109.4,
+          109.4,
+          108.7,
+          108.5
+        ],
+        [
+          108.6,
+          108.7,
+          107.5,
+          108.1,
+          108.2
+        ]
+      ],
+      "pass_totals_class": [
+        [
+          124.8,
+          92.0,
+          89.4,
+          88.9,
+          88.9
+        ],
+        [
+          124.9,
+          92.7,
+          89.8,
+          89.1,
+          89.1
+        ],
+        [
+          124.0,
+          91.7,
+          88.5,
+          88.9,
+          88.3
+        ]
+      ],
+      "median_of_runs_ms_exact": 4.018,
+      "median_of_runs_ms_class": 2.704,
+      "speedup_median_of_runs": 1.486,
+      "warm_document_ms_exact": [
+        113.7,
+        109.1,
+        108.2
+      ],
+      "warm_document_ms_class": [
+        89.2,
+        89.4,
+        88.7
+      ],
+      "first_pass_ms_exact": [
+        109.1,
+        109.2,
+        108.6
+      ],
+      "first_pass_ms_class": [
+        124.8,
+        124.9,
+        124.0
+      ],
+      "warm_document_speedup": 1.223
+    },
+    "gbnf_record": {
+      "median_ms_exact": [
+        4.915,
+        4.9,
+        4.833
+      ],
+      "median_ms_class": [
+        4.938,
+        4.924,
+        4.889
+      ],
+      "steps_exact": [
+        8424,
+        8424,
+        8424
+      ],
+      "steps_class": [
+        8424,
+        8424,
+        8424
+      ],
+      "pass_totals_exact": [
+        [
+          159.0,
+          160.5,
+          159.6,
+          159.6,
+          159.3
+        ],
+        [
+          163.2,
+          164.3,
+          160.0,
+          160.3,
+          159.8
+        ],
+        [
+          157.6,
+          157.2,
+          159.3,
+          157.7,
+          158.0
+        ]
+      ],
+      "pass_totals_class": [
+        [
+          221.1,
+          160.2,
+          161.2,
+          159.9,
+          160.0
+        ],
+        [
+          222.7,
+          164.2,
+          161.3,
+          161.1,
+          160.7
+        ],
+        [
+          218.4,
+          158.9,
+          165.4,
+          159.6,
+          158.9
+        ]
+      ],
+      "median_of_runs_ms_exact": 4.9,
+      "median_of_runs_ms_class": 4.924,
+      "speedup_median_of_runs": 0.995,
+      "warm_document_ms_exact": [
+        159.6,
+        160.2,
+        157.8
+      ],
+      "warm_document_ms_class": [
+        160.1,
+        161.2,
+        159.2
+      ],
+      "first_pass_ms_exact": [
+        159.0,
+        163.2,
+        157.6
+      ],
+      "first_pass_ms_class": [
+        221.1,
+        222.7,
+        218.4
+      ],
+      "warm_document_speedup": 0.997
+    }
+  }
+}

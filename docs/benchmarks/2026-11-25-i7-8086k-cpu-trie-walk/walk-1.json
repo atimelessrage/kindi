@@ -1,0 +1,247 @@
+{
+  "pack": "bonsai-2b",
+  "vocab": 248320,
+  "doc_tokens": 22,
+  "rounds": 5,
+  "host": {
+    "cpu": 12,
+    "python": "3.13.6"
+  },
+  "grammars": {
+    "json_schema": {
+      "misses": 23,
+      "median_ms": {
+        "class": 2.704,
+        "exact": 4.018
+      },
+      "total_ms": {
+        "class": 89.1,
+        "exact": 108.5
+      },
+      "pass_totals_ms": {
+        "class": [
+          124.8,
+          92.0,
+          89.4,
+          88.9,
+          88.9
+        ],
+        "exact": [
+          109.1,
+          108.7,
+          118.6,
+          108.7,
+          119.8
+        ]
+      },
+      "first_pass_speedup": 0.874,
+      "warm_pass_speedup": 1.275,
+      "speedup_total": 1.218,
+      "speedup_median_miss": 1.486,
+      "max_ms": {
+        "class": 11.984,
+        "exact": 11.932
+      },
+      "steps_per_miss_median": 309,
+      "steps_per_miss_median_exact": 8303,
+      "edge_states_per_miss_median": 2,
+      "edge_states_per_miss_median_exact": 4,
+      "modes": [
+        "aval",
+        "int",
+        "objkb",
+        "okey",
+        "oval",
+        "str",
+        "trail",
+        "val"
+      ],
+      "per_state_ms": {
+        "class": [
+          0.869,
+          6.078,
+          6.364,
+          1.903,
+          2.952,
+          2.704,
+          1.304,
+          6.06,
+          6.259,
+          1.009,
+          2.911,
+          2.716,
+          2.193,
+          2.616,
+          2.691,
+          1.338,
+          6.011,
+          6.332,
+          1.047,
+          0.886,
+          11.951,
+          11.984,
+          0.918
+        ],
+        "exact": [
+          2.158,
+          6.018,
+          6.283,
+          4.907,
+          2.905,
+          2.871,
+          2.932,
+          6.006,
+          6.296,
+          3.574,
+          3.042,
+          2.844,
+          4.519,
+          2.895,
+          2.893,
+          2.932,
+          5.945,
+          6.317,
+          4.119,
+          4.018,
+          11.932,
+          11.861,
+          1.233
+        ]
+      },
+      "profile_tottime_class_arm": {
+        "jsongrammar.py:438(_key_char)": {
+          "tottime_s": 0.063,
+          "calls": 49755
+        },
+        "jsongrammar.py:275(_step)": {
+          "tottime_s": 0.051,
+          "calls": 89822
+        },
+        "token_classes.py:502(_trie_allowed)": {
+          "tottime_s": 0.041,
+          "calls": 17
+        },
+        "jsongrammar.py:168(<genexpr>)": {
+          "tottime_s": 0.014,
+          "calls": 49170
+        },
+        "jsongrammar.py:244(_after_value)": {
+          "tottime_s": 0.008,
+          "calls": 16414
+        }
+      }
+    },
+    "gbnf_record": {
+      "misses": 23,
+      "median_ms": {
+        "class": 4.938,
+        "exact": 4.915
+      },
+      "total_ms": {
+        "class": 160.4,
+        "exact": 159.5
+      },
+      "pass_totals_ms": {
+        "class": [
+          221.1,
+          160.2,
+          161.2,
+          159.9,
+          160.0
+        ],
+        "exact": [
+          159.0,
+          160.5,
+          159.6,
+          159.6,
+          159.3
+        ]
+      },
+      "first_pass_speedup": 0.719,
+      "warm_pass_speedup": 0.997,
+      "speedup_total": 0.994,
+      "speedup_median_miss": 0.995,
+      "max_ms": {
+        "class": 21.656,
+        "exact": 21.389
+      },
+      "steps_per_miss_median": 8424,
+      "steps_per_miss_median_exact": 8424,
+      "edge_states_per_miss_median": 11,
+      "edge_states_per_miss_median_exact": 11,
+      "modes": [
+        "gbnf"
+      ],
+      "per_state_ms": {
+        "class": [
+          1.995,
+          4.938,
+          2.048,
+          13.309,
+          1.465,
+          1.464,
+          5.937,
+          4.93,
+          2.033,
+          13.395,
+          2.356,
+          2.202,
+          12.706,
+          2.16,
+          2.202,
+          6.037,
+          4.947,
+          2.473,
+          13.338,
+          13.346,
+          21.656,
+          20.264,
+          5.248
+        ],
+        "exact": [
+          2.014,
+          4.902,
+          2.063,
+          13.235,
+          1.492,
+          1.498,
+          5.799,
+          4.925,
+          2.097,
+          13.282,
+          2.266,
+          2.232,
+          12.548,
+          2.211,
+          2.19,
+          5.806,
+          4.915,
+          2.488,
+          13.387,
+          13.284,
+          21.389,
+          20.312,
+          5.156
+        ]
+      },
+      "profile_tottime_class_arm": {
+        "gbnf.py:614(_step)": {
+          "tottime_s": 0.202,
+          "calls": 169173
+        },
+        "token_classes.py:502(_trie_allowed)": {
+          "tottime_s": 0.051,
+          "calls": 17
+        },
+        "token_classes.py:434(_subset_allowed)": {
+          "tottime_s": 0.006,
+          "calls": 6
+        },
+        "gbnf.py:566(_closure)": {
+          "tottime_s": 0.002,
+          "calls": 7384
+        }
+      }
+    }
+  }
+}

@@ -124,9 +124,17 @@ was verified against is the gitignored host-tools sheet under `bench-logs/`.
   grammar for safe character sets (`_token_safe_sets`), then either takes the broad-safe slice or
   walks the token trie (`_trie_allowed`). Until 2026-11-24 the broad path also paid two
   whole-vocabulary `np.unique` sorts (`_outside_ids_for` via `np.setdiff1d`) and a 248,320-element
-  Python scan (`_safe_ids_for`); both were waste, and both are now linear or slice-based. After the
-  fix the trie walk is the biggest single item (5.2-5.7 ms per call on the 2B), so further Python
-  tuning of the mask has little left — that is where REQ-0030's native question starts.
+  Python scan (`_safe_ids_for`); both were waste, and both are now linear or slice-based.
+- **Inside the trie walk the cost is the automaton, not the trie.** Profiled 2026-11-25: a schema
+  mask miss makes ~8,300 `jsongrammar._step` calls, ~8,200 of them one per distinct token-start
+  character (91% rejected), with only two distinct states per miss and 761 nodes for the
+  end-of-document `trail` state; the id sort and `_chars_under` are rounding error. So the cost
+  model is "one Python transition per distinct first character", and the useful lever is to stop
+  asking transitions whose answer cannot differ — a per-character-class edge memo did exactly that
+  (8,303 -> 309 steps, median miss 4.02 -> 2.70 ms, exact). Memoizing classes whose key carries the
+  key/digit buffer was *slower*: they churn a class per accepted character. What remains is those
+  `okey`/`int` states, i.e. the grammar's own state, which is where a native transition function
+  would have to start (a grammar port, not a mask port).
 - **The server's constrained overhead is mask + pick, and they are comparable.** An instrumented
   CPU server (2026-11-24) attributed a 24-token structured reply to `allowed` at 8.8 ms/call and
   `Sampler._logits` at 4.4 ms/call before the refactor; after it, 6.3 and 3.0. `_logits` is only

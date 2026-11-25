@@ -44,6 +44,15 @@ _INDEX_LOCK = threading.Lock()
 # generation (REQ-0027 A5).  The mask cache is therefore an LRU with a byte
 # budget: the recurring states of a long generation stay, the churn is evicted.
 _MASK_CACHE_MB = 64
+# Bound on the per-class transition memos (REQ-0027 A5 again): each holds up to one entry per
+# distinct character in the vocabulary, so an unbounded set of classes would add tens of MB over a
+# long generation.  The least recently walked class is dropped when the bound is reached; its edges
+# are simply stepped again.
+_ACCEPT_MAP_LIMIT = 16
+# Classes seen once and not yet memoized.  Bounded so a generation that visits many one-off classes
+# cannot grow it without limit; a key evicted from here is simply treated as new again.
+_ACCEPT_PENDING_LIMIT = 64
+_MISSING = object()          # a memo miss, distinct from a stored None (a rejected character)
 
 
 def mask_cache_bytes():
@@ -118,7 +127,7 @@ class _VocabularyIndex(object):
 
     __slots__ = ("texts", "by_first", "char_ids", "bit_chars", "char_bits", "all_mask",
                  "alphabet", "all_ids", "safe_ids", "safe_masks", "outside_ids",
-                 "outside_tries", "root", "lock")
+                 "outside_tries", "accept_maps", "accept_pending", "root", "lock")
 
     def __init__(self, texts, by_first, char_ids, bit_chars, char_bits, alphabet):
         self.texts = texts
@@ -133,6 +142,12 @@ class _VocabularyIndex(object):
         self.safe_masks = {}
         self.outside_ids = {}
         self.outside_tries = {}
+        # per character class: character -> next state (or None), filled lazily by the walk (see
+        # TokenClassTable._edge_memo).  A class is a key whose states accept the same characters, so
+        # one state's edges answer the next state's questions.  An LRU: a long generation makes new
+        # classes, the ones still in use stay.
+        self.accept_maps = collections.OrderedDict()
+        self.accept_pending = set()
         self.root: _Node | None = None
         self.lock = threading.RLock()
 
@@ -224,10 +239,14 @@ class TokenClassTable(object):
     use; the server and the backends already build it once and keep it.
     """
 
-    def __init__(self, texts, step, safe_sets, prefer_trie=True):
+    def __init__(self, texts, step, safe_sets, prefer_trie=True, char_class=None):
         self.texts = texts
         self._step = step
         self._safe_sets = safe_sets
+        # ``char_class(state)`` returns a hashable key whose states accept exactly the same set of
+        # single characters, or None when the state has to be stepped itself.  A walk then asks the
+        # class map once per node instead of stepping every child edge (see _accepts).
+        self._char_class = char_class
         # The trie is the default for both grammars.  The exact first-character
         # path remains available for a caller that explicitly turns the trie off.
         self._prefer_trie = prefer_trie
@@ -284,6 +303,46 @@ class TokenClassTable(object):
             if ids is not None:
                 return ids
         return self._trie_allowed(state, safe)
+
+    def _edge_memo(self, state):
+        """The `character -> next state` memo shared by every state of ``state``'s class.
+
+        The trie walk called the automaton once per child edge, and the root alone has one edge per
+        distinct token-start character (8,219 on the 2B vocabulary): the 2026-11-25 profile measured
+        10,732 steps in a 4.5 ms schema miss, 8,219 of them that root fan-out, 91% of them rejected.
+        Two states of one class make the same decisions, so the second state's walk reads the first
+        one's edges from here instead of asking the automaton again.
+
+        Soundness rests on ``char_class``: it must return a key only when every state of that class
+        answers every character identically.  The default (no ``char_class``) is exact stepping, and
+        a grammar that returns None there keeps it.
+        """
+        if self._char_class is None:
+            return None
+        key = self._char_class(state)
+        if key is None:
+            return None
+        maps = self._index.accept_maps
+        memo = maps.get(key)
+        if memo is not None:
+            maps.move_to_end(key)
+            return memo
+        # A class is memoized from its *second* state: one state pays exactly what it paid before
+        # (stepping every edge, no dict insert per character), and the memo only appears where a
+        # repeat has already been seen - a first structured request pays no build for classes it
+        # never revisits.
+        pending = self._index.accept_pending
+        if key not in pending:
+            if len(pending) < _ACCEPT_PENDING_LIMIT:
+                pending.add(key)
+            return None
+        with self._index.lock:
+            memo = maps.get(key)
+            if memo is None:
+                if len(maps) >= _ACCEPT_MAP_LIMIT:
+                    maps.popitem(last=False)
+                memo = maps[key] = {}
+        return memo
 
     def _advance(self, state, text):
         for ch in text:
@@ -374,6 +433,7 @@ class TokenClassTable(object):
 
     def _subset_allowed(self, state, ids, key):
         root = self._subset_trie(ids, key)
+        step = self._step
         out = []
         stack = [(root, state)]
         while stack:
@@ -382,8 +442,16 @@ class TokenClassTable(object):
                 continue
             if node.ids:
                 out.extend(node.ids)
+            if not node.children:
+                continue
+            memo = self._edge_memo(node_state)
             for ch, child in node.children.items():
-                next_state = self._step(node_state, ch)
+                if memo is None:
+                    next_state = step(node_state, ch)
+                else:
+                    next_state = memo.get(ch, _MISSING)
+                    if next_state is _MISSING:
+                        next_state = memo[ch] = step(node_state, ch)
                 if next_state is not None:
                     stack.append((child, next_state))
         return _sorted_ids([np.asarray(out, dtype=np.int64)], len(self.texts))
@@ -434,21 +502,34 @@ class TokenClassTable(object):
     def _trie_allowed(self, state, safe):
         """Walk the character trie, pruning subtrees covered by ``safe``."""
         root = self._build_trie()
+        step = self._step
         pieces = []
         stack = [(root, state)]
         while stack:
             node, node_state = stack.pop()
             if node_state is None:
                 continue
-            if any(self._chars_under(node) <= chars for chars in safe):
+            if safe and any(self._chars_under(node) <= chars for chars in safe):
                 pieces.append(self._ids_under(node))
                 continue
             if node.ids:
                 pieces.append(np.asarray(node.ids, dtype=np.int64))
-            for ch, child in node.children.items():
-                next_state = self._step(node_state, ch)
-                if next_state is not None:
-                    stack.append((child, next_state))
+            children = node.children
+            if not children:
+                continue
+            memo = self._edge_memo(node_state)
+            if memo is None:
+                for ch, child in children.items():
+                    next_state = step(node_state, ch)
+                    if next_state is not None:
+                        stack.append((child, next_state))
+            else:
+                for ch, child in children.items():
+                    next_state = memo.get(ch, _MISSING)
+                    if next_state is _MISSING:
+                        next_state = memo[ch] = step(node_state, ch)
+                    if next_state is not None:
+                        stack.append((child, next_state))
         return _sorted_ids(pieces, len(self.texts))
 
 

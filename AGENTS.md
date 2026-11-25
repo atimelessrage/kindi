@@ -12,23 +12,23 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `2d168c5` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; 2026-11-25: the Bonsai 2.5 27B pack runs on the CPU engine - SHA-256 matched, 7,242 MB in 370 s, packcheck full, 339.9 s load, 3.08-4.02 tok/s greedy, ids identical across two processes - and `kindi verify` now keys its reference by release, so the pack gets "no llama.cpp reference" + exit 2 instead of Bonsai 2's tokens; `chat._tojson` makes the prompt match the published template 26 of 26 (26 cases); GPU cells still `not run`, no exactness claimed; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `ed6bd7d` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; 2026-11-25: the Bonsai 2.5 27B pack runs on the CPU engine - SHA-256 matched, 7,242 MB in 370 s, packcheck full, 339.9 s load, 3.08-4.02 tok/s greedy, ids identical across two processes - and `kindi verify` now keys its reference by release, so the pack gets "no llama.cpp reference" + exit 2 instead of Bonsai 2's tokens; `chat._tojson` makes the prompt match the published template 26 of 26 (26 cases); GPU cells still `not run`, no exactness claimed; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24:** the llama.cpp proxy backend landed (wildcard; 12 CPU tests, live gate open, no
   arbitrary-GGUF claim) with REQ-0030's native-CPU 2B profile, and `Backend.capabilities` was declared
   instead of `None` (six adapters' mypy `assignment` finding gone, 59 -> 53). Suite: 1,633 / 47 / 0.
-  **2026-11-24 (latest): constrained decoding got 8.4% cheaper per structured token, exact.**
-  Three exact refactors, none a tuning: `TokenClassTable._outside_ids_for` no longer runs
-  `np.setdiff1d` (two vocab sorts) but takes the cached safe mask's complement; `_safe_ids_for`
-  no longer scans 248,320 per-token Python masks (the shared index maps each character to the ids
-  containing it, so a safe mask is a few slices); and `Sampler._constrained` masks `ylog` directly
-  instead of `arange(vocab)`+`np.isin` when the engine has no `ylog_map`. Measured with the same
-  prompt and 8-token reply in both arms (10 interleaved runs each, own server per arm):
-  26.35 -> 24.13 ms/token structured, unconstrained control flat 20.03 -> 19.79, so the constrained
-  overhead 6.32 -> 4.34 ms/token; the 22-token filter 245.6 -> 106.1 ms, slowest miss 154.6 -> 14.9
-  (`docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/`, claim
-  `docs/claims/req0030-cpu-mask-fast.json`). `tests/test_sampling.py` pins the new pick against the
-  old selection. What is left of a miss is the trie walk (5.2-5.7 ms/call) - REQ-0030's native
-  question; no GPU/9B run; suite below.
+  **2026-11-25 (latest): the constrained mask's trie walk, profiled and cut exactly.** The walk's
+  cost is the automaton, not the trie: a schema miss makes 8,303 `jsongrammar._step` calls, 8,219 of
+  them one per distinct token-start character and 91% rejected. `TokenClassTable` memoizes
+  `character -> next state` per character class (`_char_class`, from a class's second state;
+  `okey`/`objk`/`otail`/`num`/`int`/`kw` excluded - their key carries a buffer), a 16-class LRU plus
+  64 seen-once keys, so A5's bound holds. Median miss 4.02 -> 2.70 ms (1.486x), steps 8,303 -> 309,
+  a warm 22-token document 109.1 -> 89.2 ms; served 24.42 -> 23.50 ms/token (3.8%), constrained gap
+  4.57 -> 4.08 (10.7%). Masks identical (oracle: the table without `char_class`;
+  `tests/test_token_classes.py` pins parity, the second-state rule and the bounds). REQ-0030 A6 stays
+  open: the mask half clears 1.25x, the 5% end-to-end half does not, so no native variant was
+  started - native code would have to own the `okey`/`int` grammar state, a grammar port. Run page
+  `docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/`, claim `req0030-trie-walk-20261125.json`;
+  (2026-11-24's mask/pick -8.4% stands on `req0030-cpu-mask-fast.json`; no GPU run; suite below.)
   **2026-11-24:** the 27B verifies on the CPU engine, and the "missing" compiler was installed.**
   `KINDI_DEVICE=cpu kindi verify` on the 27B pack is **4/4 token-exact** (40/40 per prompt) at 3.7 tok/s after a 340 s load;
   packcheck full (10 files, 18.4 s) and a structural audit (851 tensors, byte ranges tiling every file, reference ids in range)
@@ -63,7 +63,7 @@ existing debt is tolerated and `--update --reason "..."` lowers the baseline aft
 
 ### Full CPU gate
 
-The 2026-11-25 Bonsai 2.5 gate is **1,640 passed, 47 skipped, 0 failed** in 242.39 s (the 2026-11-24
+The 2026-11-25 trie-walk gate is **1,644 passed, 47 skipped, 0 failed** in 247.32 s; the 2026-11-25 Bonsai 2.5 gate is 1,640 / 47 / 0 in 242.39 s (the 2026-11-24
 mask/pick gate was 1,635 / 47 / 0 in 238.23 s; 1,633 before that). The 27B-CPU gate at `32075c4` is **1,598 passed, 47 skipped, 0 failed** in 226.48 s (the CPU build checks now compile and load every tier here instead of skipping); the 2026-11-24 grammar-mask gate at `ebf871f` is 1,513 passed, 58 skipped, 0 failed in 180.66 s (plain CPU suite, no coverage rerun); the 2026-11-22 prewarm gate at `4bab483` was 1,423 / 58 / 0 in 138.50 s and the 2026-11-20 integration gate at `82a72bf` 1,412 / 28 / 0 in 250.33 s. The last coverage-measured run remains `539a504`: **1,241 passed, 28 skipped, 0 failed at 46.36%** line+branch (23,504 statements, 8,394 branches; plain 1,241 / 28 / 0 in 227.62 s), and the consolidated 2026-11-19 commits (`f75253b` + `84b6686`) 1,357 / 28 / 0 in 229.53 s. Every skip is inventoried by node ID and reason in `tests/README.md`.
 
 ### Upstream v0.7.0 and comparison
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `2d168c5` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `2d168c5` | this session; 2026-11-25 Bonsai 2.5 27B CPU run + template parity, before that the v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke + Arc GEMM, llama.cpp proxy backend, constrained mask/pick -8.4% structured token, REQ-0030 CPU profile, bench --spec, 27B CPU verify + compiler detection |
+| `T:/kindi` | `main` | `ed6bd7d` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `ed6bd7d` | this session; 2026-11-25 mask trie walk +1.486x, before that Bonsai 2.5 27B CPU run + template parity, the v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke + Arc GEMM, llama.cpp proxy backend, constrained mask/pick -8.4% structured token, REQ-0030 CPU profile, bench --spec, 27B CPU verify + compiler detection |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
