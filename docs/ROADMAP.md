@@ -971,6 +971,36 @@ statement on this pack | proposed; the card argues against it |
 The sampling harness gap behind both rows: `tools/bonsai_sampling_bench.py` records ids and
 fingerprints, not thinking length, so the measurement they need does not exist yet.
 
+## Vision projector as a host-RAM tier (2026-11-25)
+
+The multimodal families in this file (SenseNova-Loop, Qwen 3.6-35B, Bonsai 2.5 27B) all ship the
+vision tower as a separate `mmproj-*.gguf` of roughly 600-930 MB that only an image request touches.
+On a card the language model already fills, that is VRAM taken from the K/V cache for weights that
+are idle on every text request - llama.cpp's `--no-mmproj-offload` answers the same problem.
+
+**Tier landed 2026-11-25.** `kindi/mmproj.py` reads a projector's GGUF, prices every tensor against
+the ggml type table (fails closed on a type it cannot price), resolves a placement from
+`--place`/`KINDI_MMPROJ_PLACE`/the `mmproj_place` key (default `ram`; `auto` resolves to `ram`), and
+for `ram` reads the weights into one host arena and reports resident bytes, load time and the RSS
+delta. `vram` allocates nothing in the probe and only accounts the bytes against the card. `/health`
+reports `projector.declared` and `projector.place`. Eight tests in `tests/test_mmproj.py` pin the
+inventory, the policy precedence, the arena, and the fail-closed cases. **No encoder exists**: the
+server still refuses image parts with a 400, so this is the placement decision and its accounting,
+not vision.
+
+**Gate ladder for vision itself** (nothing here is started):
+
+| step | work | gate |
+|---|---|---|
+| V0 | pin a real `mmproj-*.gguf` for the 2.5 27B (SHA-256, size) and record its inventory with `kindi mmproj --json` | the file's tensors all price; the recorded `clip.*` metadata names the projector type and image size |
+| V1 | image preprocessing (resize, normalize, patch split) and the patch embedding | a fixed image produces the same patch tensor as the reference implementation, element for element |
+| V2 | the vision transformer blocks (attention, 2D RoPE, MLP, merger) on the CPU engine first | a fixed image produces the same merged embedding as the reference within fp16 tolerance |
+| V3 | splice the merged tokens into the prompt and refuse mismatched counts | one image request answers; a text request is unchanged and token-exact |
+| V4 | placement parity: the projector resident in host RAM (the default) and on the card | identical tokens in both placements; `/health` reports the same residency numbers |
+
+Steps V1 and V2 need a reference (llama.cpp's own `mmproj` path, pinned by commit) - that is the
+manual-help item, not a Kindi measurement.
+
 ## Standing rules
 
 - Every experiment gets a numeric gate before implementation, and the gate is written down before

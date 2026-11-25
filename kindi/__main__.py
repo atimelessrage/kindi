@@ -479,6 +479,23 @@ def cmd_intel_cl(cfg, a):
     return 0 if report["result"] == "pass" else 1
 
 
+def cmd_mmproj(cfg, a):
+    """Vision projector (mmproj) tier: inventory and placement; no encoder, no image path."""
+    from . import mmproj
+    place, source = mmproj.resolve_place(a.place, cfg)
+    if place is None:
+        print("kindi: %s" % source, file=sys.stderr)
+        return 2
+    report = mmproj.load(a.path, place=place, max_mb=a.max_mb)
+    report["place_source"] = source
+    if a.json:
+        print(mmproj.dumps(report))
+    else:
+        for line in mmproj.render(report):
+            print(line)
+    return 0 if report["result"] == "pass" else 1
+
+
 def cmd_intel_ternary(cfg, a):
     """Packed ternary GEMV probe on an Intel GPU; no backend, model or support claim."""
     from . import intel_ternary
@@ -835,6 +852,16 @@ def _build_parser():
                         "the driver's device order is not stable")
     s.add_argument("--loader", default=None, help="OpenCL loader name/path (default: the host loader)")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
+    s = sub.add_parser("mmproj", help="vision projector (mmproj-*.gguf) tier: inventory and its "
+                                      "placement as a host-RAM expert; no encoder")
+    s.add_argument("path", help="the projector GGUF, e.g. Ternary-Bonsai-2.5-27B-mmproj-f16.gguf")
+    s.add_argument("--place", default=None,
+                   help="ram (default): hold the weights in host RAM and keep the card for the "
+                        "language model and its K/V cache; vram: account them for the card; "
+                        "auto: ram, because the projector is off the decode path")
+    s.add_argument("--max-mb", type=int, default=0,
+                   help="refuse a projector larger than this many MiB (0: no limit)")
+    s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("intel-ternary", help="packed ternary GEMV probe on an Intel GPU (no backend)")
     s.add_argument("--rows", type=int, default=64, help="matrix rows (default 64, 1-4096)")
     s.add_argument("--cols", type=int, default=1024, help="matrix columns, a multiple of 128 (default 1024)")
@@ -959,6 +986,7 @@ _COMMANDS = {
     "intel-cl": cmd_intel_cl,
     "intel-gemm": cmd_intel_gemm,
     "intel-sycl": cmd_intel_sycl,
+    "mmproj": cmd_mmproj,
     "intel-ternary": cmd_intel_ternary,
     "intel-pack": cmd_intel_pack,
     "loop-info": cmd_loop_info,

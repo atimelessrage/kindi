@@ -28,6 +28,7 @@ DEFAULTS = {
     "slots": "1",                       # requests written at the same time (decode slots, plan engine with KINDI_TC=1)
     "lora": "",                         # LoRA adapter: a PEFT folder / file, or the hash of one converted into the pack
     "head": "exact",                    # exact | fast (shortlist head, ~15% faster, approximate)
+    "mmproj_place": "ram",              # vision projector (mmproj-*.gguf): ram (host RAM, off the card) | vram | auto (ram)
     "fast_clusters": "256",             # clusters scored by the fast head
     "tandem_vram_mb": "0",              # tandem GPU ceiling in MiB (0: no ceiling)
     "tandem_reserve_mb": "512",         # free card memory the tandem planner leaves for the display/driver

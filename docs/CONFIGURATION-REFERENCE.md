@@ -49,6 +49,7 @@ Each key can also be set from the environment as `KINDI_<KEY>` (for example `KIN
 | `slots` | int | `1` | requests written at the same time (decode slots, plan engine with KINDI_TC=1) |
 | `lora` | string | (empty) | LoRA adapter: a PEFT folder / file, or the hash of one converted into the pack |
 | `head` | string | `exact` | exact \| fast (shortlist head, ~15% faster, approximate) |
+| `mmproj_place` | string | `ram` | vision projector (mmproj-*.gguf): ram (host RAM, off the card) \| vram \| auto (ram) |
 | `fast_clusters` | int | `256` | clusters scored by the fast head |
 | `tandem_vram_mb` | int | `0` | tandem GPU ceiling in MiB (0: no ceiling) |
 | `tandem_reserve_mb` | int | `512` | free card memory the tandem planner leaves for the display/driver |
@@ -70,7 +71,7 @@ Each key can also be set from the environment as `KINDI_<KEY>` (for example `KIN
 | `lookup` | int | `5` | Nanbeige: prompt-lookup drafting, up to this many tokens per check (0: off) |
 | `mtp_head` | string | (empty) | Nanbeige: an MTP head file, a second draft source (empty: none) |
 | `kv_cache` | string | `auto` | Nanbeige: the K/V cache, auto, f16 or q8_0 (auto: f16 when it fits, else q8_0) |
-| `reasoning_effort` | string | (empty) | 27B template: xhigh \| high \| medium \| low (empty: the template default, xhigh; low and high render the xhigh instruction) |
+| `reasoning_effort` | string | (empty) | 27B template: xhigh \| medium \| low (empty: the template default, xhigh) |
 
 ### generation defaults (a request's own values win)
 
@@ -121,9 +122,9 @@ direct sites.
 | `KINDI_CKPT_PINNED` | `"1" if _WDDM else "0"` | `kindi/cache.py:48` |
 | `KINDI_CKPT_STREAM` | (empty) | `kindi/cache.py:69` |
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:592` |
-| `KINDI_CONFIG` | (unset) | `kindi/config.py:128` (+1 more) |
-| `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:253` (+7 more) |
-| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:584` (+1 more) |
+| `KINDI_CONFIG` | (unset) | `kindi/config.py:129` (+1 more) |
+| `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:254` (+7 more) |
+| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:601` (+1 more) |
 | `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:49` |
 | `KINDI_D1` | `1` or `0` | `kindi/spec.py:750` (+1 more) |
 | `KINDI_DATA` | `/data` | `kindi/container.py:243` |
@@ -182,7 +183,7 @@ direct sites.
 | `KINDI_G4_PAD` | `1` | `kindi/gemma4.py:611` |
 | `KINDI_G4_PARK_MAX` | `4` | `kindi/gemma4_cache.py:33` |
 | `KINDI_G4_PLE_HOST` | `auto` | `kindi/gemma4.py:493` |
-| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:762` |
+| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:773` |
 | `KINDI_G4_PROMPT_CACHE` | `1` | `kindi/gemma4_cache.py:31` |
 | `KINDI_G4_Q5_DP4A` | `1` | `kindi/gemma4.py:85` |
 | `KINDI_G4_RESERVE_MB` | `1024` | `kindi/gemma4.py:555` |
@@ -218,7 +219,7 @@ direct sites.
 | `KINDI_LEGACY_ENGINE_PATH` | (unset) | `kindi/engine.py:1025` |
 | `KINDI_LLAMACPP_API_KEY` | (unset) | `kindi/backends/llamacpp.py:120` |
 | `KINDI_LLAMACPP_BASE_URL` | (unset) | `kindi/backends/llamacpp.py:117` |
-| `KINDI_LLVM` | (unset) | `kindi/cpu.py:94` |
+| `KINDI_LLVM` | (unset) | `kindi/cpu.py:95` |
 | `KINDI_LOG_RAW` | (unset) | `kindi/lightning_gen.py:400` (+2 more) |
 | `KINDI_LORA_BLOCKS` | `0` | `kindi/engine.py:471` |
 | `KINDI_LORA_KERNEL` | `"1" if nmp == 1 else "2"` | `kindi/engine.py:470` |

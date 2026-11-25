@@ -1806,6 +1806,10 @@ def create_app(cfg, log=print):
                      "runtime": rt,
                      "queue": {"waiting": gate.waiting, "max": gate.max_queue, "rejected": gate.rejected,
                                "scheduler": dict(SCHED.counts(), yields=getattr(K, "yields", 0))},
+                     "projector": {"declared": _pack_has_vision(getattr(K, "pack", None)),
+                                   "place": cfg.get("mmproj_place", "ram"),
+                                   "detail": "mmproj weights; no Kindi build implements the encoder, "
+                                             "so image input is refused"},
                      "rate_limit_per_min": limiter.per_minute, "rate_limited": limiter.rejected,
                      "gpu_free_mib": round(free / 1048576.0), "gpu_total_mib": round(total / 1048576.0)})
         return body

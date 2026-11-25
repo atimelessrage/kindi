@@ -1,5 +1,15 @@
 # Changelog
 
+## The vision projector as a host-RAM tier (2026-11-25)
+
+- **`kindi mmproj PATH` prices a projector (`mmproj-*.gguf`) and places it off the card.**
+  `--place ram` (the default, also `KINDI_MMPROJ_PLACE=ram` / `mmproj_place = ram`) reads its tensors
+  into one host arena and reports the resident bytes, the load time and the RSS delta; `vram` only
+  accounts the bytes against the card; `auto` resolves to `ram`, because the projector is off the
+  decode path. `/health` gains a `projector` block naming the policy and whether the selected pack
+  declares vision weights. The encoder is not implemented in any build, so image requests are still
+  refused with a 400: the key decides where the weights would live, not that vision runs.
+
 ## Round-5 audits: an honest fail report, an honest timing key, and one effort vocabulary (2026-11-25)
 
 - **`kindi intel-pack` answers a pack that has the metadata but not `bcodes.bin`/`dpm.bin` with its fail
