@@ -1690,3 +1690,18 @@ Moved verbatim from the handoff's dated bullets because AGENTS.md is capped at 4
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
 | trie walk of the constrained mask (2026-11-25) | `<worktree>` | `merge/upstream-0.7.0` | `kindi/token_classes.py`, `kindi/jsongrammar.py`, `tests/test_token_classes.py`, `docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/`, `docs/claims/req0030-trie-walk-20261125.json`, `docs/ROADMAP.md`, `docs/development/requirements/REQ-0030.md`, `CHANGELOG.md`, `docs/development/KNOWLEDGE.md`, `docs/CONFIGURATION-REFERENCE.md`, `AGENTS.md` | **done.** Profiled the walk before touching it: 8,303 `jsongrammar._step` calls per schema mask miss (8,219 root fan-out, 91% rejected, two distinct states), so the cost is the automaton, not the trie. Added a per-character-class `character -> next state` memo (`kindi/token_classes.py`, keys from `jsongrammar._char_class`, filled from a class's second state, 16-class LRU + 64 seen-once keys): median miss 4.02 -> 2.70 ms (1.486x), steps 8,303 -> 309, warm 22-token document mask work 109.1 -> 89.2 ms; served 24.42 -> 23.50 ms/token (3.8%), constrained gap 4.57 -> 4.08 (10.7%), unconstrained control -1.6%. Masks bit-identical (oracle: the same table without `char_class`); `tests/test_token_classes.py` +4 tests (parity, class agreement, second-state rule, bounds). GBNF unchanged (0.995x, no provable class). REQ-0030 A6 stays open: mask half 1.486x > 1.25x, end-to-end 3.8% < 5%, so no native variant was started. No GPU or 9B run. |
+
+### Server grammar tests ported from pr/15 (2026-11-25)
+
+`tests/test_server_grammar.py` came back into main from `pr/15-grammar-server` (13 cases, none
+skipped). Main already carried the `response_format` path, so 9 of the 13 passed unchanged and the
+four that drive the real `Kindi.generate` loop failed on `KeyError: 'gen_seconds'`: the stub `stats`
+dict predated the accumulate-into-semantics the server adopted later. The stubs (`_FakeKindi`,
+`_constrained_kindi`, the Gemma case) now carry `gen_seconds` and `last_tok_s`, the docstring says
+what the file covers instead of pointing at a follow-up PR, and the file takes main's SPDX header
+and ruff-clean import order. Coverage: request-boundary acceptance and 400s that never reach the
+engine, tools-vs-structured exclusion, the recursive-grammar opt-in, the capability gate, stream
+validation before SSE, forbidden bytes skipped through the HTTP route, json_schema compiled once,
+the sampler's allowed set, thinking-channel isolation and the Gemma path. Focused run: 180 passed
+(`test_server_grammar` + `test_server` + `test_gbnf` + `test_gbnf_recursion` + `test_sampling` +
+`test_python_quality`); quality ratchet at baseline.
