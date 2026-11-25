@@ -15,7 +15,9 @@
   template, asks `kindi.profiles` for the values (so the benchmark cannot drift from the server),
   samples with `kindi.sampling.Sampler` and records settings, ids, text and timings for instruct and
   for thinking at `xhigh`, `medium` and `low`. Its 2026-11-25 run on the CPU engine covers both the
-  plain and the `-mtp` Bonsai 2.5 27B packs; no GPU run (the Arc A770 has no backend).
+  plain and the `-mtp` Bonsai 2.5 27B packs; that host was busy with other work, so the run is a
+  check that the settings apply and the engine answers, not a performance comparison - no rate from
+  it is quoted. No GPU run (the Arc A770 has no backend).
 
 ## Bonsai 2.5 27B `-mtp` files (2026-11-25)
 

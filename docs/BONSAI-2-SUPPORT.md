@@ -298,7 +298,9 @@ profile and Kindi's template handle all three:
 - **Repeatable benchmark:** `tools/bonsai_sampling_bench.py` runs both rows on a pack (and thinking
   at `xhigh`, `medium` and `low`), on the CPU engine or a card, and writes the ids, text, settings and
   timings to JSON. The 2026-11-25 CPU run on both 2.5 27B packs is
-  [the sampling benchmark page](benchmarks/2026-11-25-i7-8086k-bonsai25-27b-sampling/README.md).
+  [the sampling benchmark page](benchmarks/2026-11-25-i7-8086k-bonsai25-27b-sampling/README.md); that
+  computer was busy with other work while it ran, so the page is a settings-and-engine check and its
+  timings are not a performance measurement.
 
 **Implemented (2026-11-10).** `presence_penalty` is a request field (OpenAI semantics, -2..2) and a
 config key; `kindi/profiles.py` carries the publisher profile above, and `sampling_profile = publisher`

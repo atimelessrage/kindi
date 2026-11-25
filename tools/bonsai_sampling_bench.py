@@ -16,6 +16,10 @@ template, and samples with ``kindi.sampling.Sampler`` on the engine that is load
 CPU engine (no CUDA needed) and on a card; it records what each run used, so the JSON is the
 evidence and no number has to be retyped.
 
+The decode rate it prints is a fact of that run, not a performance measurement: a busy host makes it
+unfit for comparison with another run, mode, pack or machine. Use the ids, the settings and the text
+as the check that the profile applies and the engine answers, and take any rate on an idle host.
+
     KINDI_DEVICE=cpu python tools/bonsai_sampling_bench.py --pack PACK --out run.json --tokens 32
 
 The pack may be the plain `-mtp`-less Bonsai 2.5 27B or the `-mtp` file's pack; the tool reads the
@@ -137,7 +141,7 @@ def main():
 
     efforts = tuple(e for e in args.efforts.split(",") if e)
     rows = []
-    for i, (mode, effort) in enumerate(combos(efforts)):
+    for mode, effort in combos(efforts):
         thinking = mode == "thinking"
         p = settings(profile_id, thinking)
         for pi, prompt in enumerate(PROMPTS):
