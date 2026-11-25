@@ -23,8 +23,9 @@
   drafts; the external 2B pack drafter accepts 30.6% on the same two prompts, and neither can beat
   plain decode until the CPU verifies T rows in one pass (road map CP1). The head's remaining error
   is not any of these switches - its drafts are shaped like the model's output but off by a token or
-  two - so CP1 is built against the 2B. Numbers are untracked `bench-logs/` runs, documented in
-  `docs/MTP.md`.
+  two - so CP1 is built against the 2B. The bench comparison is tracked at
+  `docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/` (claim `mtp-cpu-20261125`); the variant-ladder
+  probe runs are still untracked `bench-logs/` measurements, documented in `docs/MTP.md`.
 - **Embedding rows are cached per token.** `Head._embed` used to open the 6 GB GGUF on every draft
   row; it now reads each distinct token once (`_embed_read`), which is what made a four-draft round
   six file reads instead of four.

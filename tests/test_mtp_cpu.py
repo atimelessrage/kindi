@@ -1,7 +1,8 @@
 """The CPU MTP head's arithmetic and its draft scoring, without a 6.8 GB pack.
 
-The head's real weights and acceptance numbers live in an untracked `bench-logs/` run made with
-`tools/mtp_cpu_bench.py` (no evidence page, no speed claim); these tests pin the pieces that can go
+The head's real weights and acceptance numbers live in the tracked evidence page
+`docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/` (claim `mtp-cpu-20261125`, made with
+`tools/mtp_cpu_bench.py`; no speed claim); these tests pin the pieces that can go
 silently wrong: the Q4_0 layout and the C GEMV built on it, the
 folded-input transform, the Hadamard block transform, and the scoring loop's bookkeeping.
 """

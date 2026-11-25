@@ -1,0 +1,348 @@
+{
+ "date": "2026-11-25",
+ "host": "i7-8086K (6 threads), CPU engine (avx2-fma-f16c), ctx 2048",
+ "tool": "tools/mtp_cpu_bench.py",
+ "note": "Drafts are scored against the model's own greedy tokens, never substituted; exact=true means the scored run equals plain greedy decode token for token. Machine-local paths stripped; model and pack names kept.",
+ "runs": [
+  {
+   "run": "mtp-cpu-20261125.json",
+   "model": "Ternary-Bonsai-2.5-27B",
+   "pack": "bonsai25-27b (converted from Ternary-Bonsai-2.5-27B-PTQ1_0.gguf)",
+   "drafter": {
+    "kind": "mtp-head",
+    "file": "Ternary-Bonsai-2.5-27B-PTQ1_0-mtp.gguf",
+    "block": 64,
+    "bytes": 238983168,
+    "dims": {
+     "D": 5120,
+     "NFF": 17408,
+     "NH": 24,
+     "NHKV": 4,
+     "HD": 256,
+     "RD": 64,
+     "base": 10000000.0,
+     "block": 64
+    }
+   },
+   "tokens": 16,
+   "k": 4,
+   "window": 64,
+   "ctx": 2048,
+   "threads": 6,
+   "load_s": 371.4,
+   "accepted": 7,
+   "offered": 108,
+   "rate": 0.06481481481481481,
+   "depth": [
+    3,
+    1,
+    2
+   ],
+   "runs": [
+    {
+     "prompt": "In one sentence: what is a ternary weight?",
+     "ids": [
+      623,
+      799,
+      11316,
+      25,
+      1092,
+      369,
+      264,
+      69184,
+      640,
+      4528,
+      30
+     ],
+     "plain_ids": [
+      271,
+      248068,
+      198,
+      760,
+      1156,
+      369,
+      9859,
+      883,
+      264,
+      328,
+      4024,
+      640,
+      4528,
+      1,
+      303,
+      799
+     ],
+     "scored_ids": [
+      271,
+      248068,
+      198,
+      760,
+      1156,
+      369,
+      9859,
+      883,
+      264,
+      328,
+      4024,
+      640,
+      4528,
+      1,
+      303,
+      799
+     ],
+     "exact": true,
+     "plain_s": 9.463,
+     "scored_s": 14.355,
+     "plain_tok_s": 1.691,
+     "scored_tok_s": 1.115,
+     "drafts": {
+      "steps": 15,
+      "offered": 54,
+      "matched": 1,
+      "depth": [
+       1,
+       0,
+       0
+      ],
+      "rate": 0.018518518518518517
+     }
+    },
+    {
+     "prompt": "2 + 2 = ? Answer with the number only.",
+     "ids": [
+      17,
+      478,
+      220,
+      17,
+      283,
+      907,
+      21134,
+      440,
+      279,
+      1324,
+      1132,
+      13
+     ],
+     "plain_ids": [
+      248046,
+      198,
+      248046,
+      198,
+      248045,
+      248046,
+      198,
+      248046,
+      198,
+      248045,
+      248046,
+      198,
+      248045,
+      248046,
+      198,
+      248045
+     ],
+     "scored_ids": [
+      248046,
+      198,
+      248046,
+      198,
+      248045,
+      248046,
+      198,
+      248046,
+      198,
+      248045,
+      248046,
+      198,
+      248045,
+      248046,
+      198,
+      248045
+     ],
+     "exact": true,
+     "plain_s": 10.605,
+     "scored_s": 15.763,
+     "plain_tok_s": 1.509,
+     "scored_tok_s": 1.015,
+     "drafts": {
+      "steps": 15,
+      "offered": 54,
+      "matched": 6,
+      "depth": [
+       2,
+       1,
+       2
+      ],
+      "rate": 0.1111111111111111
+     }
+    }
+   ]
+  },
+  {
+   "run": "mtp-cpu-2b-drafter-20261125.json",
+   "model": "Ternary-Bonsai-2.5-27B",
+   "pack": "bonsai25-27b (converted from Ternary-Bonsai-2.5-27B-PTQ1_0.gguf)",
+   "drafter": {
+    "kind": "pack",
+    "model": "bonsai-2b (Ternary-Bonsai-2-2B pack)"
+   },
+   "tokens": 16,
+   "k": 4,
+   "window": null,
+   "ctx": 2048,
+   "threads": 6,
+   "load_s": 355.0,
+   "accepted": 33,
+   "offered": 108,
+   "rate": 0.3055555555555556,
+   "depth": [
+    15,
+    8,
+    7,
+    3
+   ],
+   "runs": [
+    {
+     "prompt": "In one sentence: what is a ternary weight?",
+     "ids": [
+      623,
+      799,
+      11316,
+      25,
+      1092,
+      369,
+      264,
+      69184,
+      640,
+      4528,
+      30
+     ],
+     "plain_ids": [
+      271,
+      248068,
+      198,
+      760,
+      1156,
+      369,
+      9859,
+      883,
+      264,
+      328,
+      4024,
+      640,
+      4528,
+      1,
+      303,
+      799
+     ],
+     "scored_ids": [
+      271,
+      248068,
+      198,
+      760,
+      1156,
+      369,
+      9859,
+      883,
+      264,
+      328,
+      4024,
+      640,
+      4528,
+      1,
+      303,
+      799
+     ],
+     "exact": true,
+     "plain_s": 7.886,
+     "scored_s": 15.832,
+     "plain_tok_s": 2.029,
+     "scored_tok_s": 1.011,
+     "drafts": {
+      "steps": 15,
+      "offered": 54,
+      "matched": 23,
+      "depth": [
+       9,
+       6,
+       5,
+       3
+      ],
+      "rate": 0.42592592592592593
+     }
+    },
+    {
+     "prompt": "2 + 2 = ? Answer with the number only.",
+     "ids": [
+      17,
+      478,
+      220,
+      17,
+      283,
+      907,
+      21134,
+      440,
+      279,
+      1324,
+      1132,
+      13
+     ],
+     "plain_ids": [
+      248046,
+      198,
+      248046,
+      198,
+      248045,
+      248046,
+      198,
+      248046,
+      198,
+      248045,
+      248046,
+      198,
+      248045,
+      248046,
+      198,
+      248045
+     ],
+     "scored_ids": [
+      248046,
+      198,
+      248046,
+      198,
+      248045,
+      248046,
+      198,
+      248046,
+      198,
+      248045,
+      248046,
+      198,
+      248045,
+      248046,
+      198,
+      248045
+     ],
+     "exact": true,
+     "plain_s": 7.564,
+     "scored_s": 13.844,
+     "plain_tok_s": 2.115,
+     "scored_tok_s": 1.156,
+     "drafts": {
+      "steps": 15,
+      "offered": 54,
+      "matched": 10,
+      "depth": [
+       6,
+       2,
+       2,
+       0
+      ],
+      "rate": 0.18518518518518517
+     }
+    }
+   ]
+  }
+ ],
+ "verdict": "The external 2B pack is the better draft source (30.6% vs 6.5%) and neither route is a speedup before CP1's batched T-row verify."
+}

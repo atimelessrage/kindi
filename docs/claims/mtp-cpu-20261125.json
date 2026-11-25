@@ -1,0 +1,80 @@
+{
+  "gate": "mtp-cpu-20261125",
+  "title": "27B CPU MTP: integrated blk.64 head vs 2B pack drafter acceptance",
+  "measured": "2026-11-25",
+  "commit": "67b0a61",
+  "command": "python tools/mtp_cpu_bench.py --pack PACK --gguf <the -mtp GGUF> --tokens 16 --k 4; python tools/mtp_cpu_bench.py --pack PACK --drafter-pack <2B pack> --tokens 16 --k 4",
+  "notes": "The CPU engine verifies one row per forward pass, so drafts are scored, never substituted, and the drafted run is slower; this gate measures acceptance only. results.json is the sanitized copy of the two bench-logs runs (machine paths stripped); exact=true on all four rows means the scored tokens equal plain greedy decode.",
+  "evidence": [
+    "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json",
+    "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md"
+  ],
+  "numbers": [
+    {
+      "id": "head-accepted",
+      "display": "7/108",
+      "quoted_in": ["docs/MTP.md", "docs/ROADMAP.md"],
+      "check": {
+        "kind": "ratio",
+        "a": {"file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/0/accepted"},
+        "b": {"file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/0/offered"},
+        "expect": 0.0648
+      }
+    },
+    {
+      "id": "head-rate",
+      "display": "6.5%",
+      "quoted_in": ["docs/MTP.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json",
+        "pointer": "/runs/0/rate",
+        "expect": 0.0648
+      }
+    },
+    {
+      "id": "drafter-accepted",
+      "display": "33/108",
+      "quoted_in": ["docs/MTP.md", "docs/ROADMAP.md"],
+      "check": {
+        "kind": "ratio",
+        "a": {"file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/1/accepted"},
+        "b": {"file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/1/offered"},
+        "expect": 0.3056
+      }
+    },
+    {
+      "id": "drafter-rate",
+      "display": "30.6%",
+      "quoted_in": ["docs/MTP.md", "docs/ROADMAP.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json",
+        "pointer": "/runs/1/rate",
+        "expect": 0.3056
+      }
+    },
+    {
+      "id": "drafter-prompt-1",
+      "display": "23/54",
+      "quoted_in": ["docs/MTP.md"],
+      "check": {
+        "kind": "ratio",
+        "a": {"file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/1/runs/0/drafts/matched"},
+        "b": {"file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/1/runs/0/drafts/offered"},
+        "expect": 0.4259
+      }
+    },
+    {
+      "id": "drafter-prompt-2",
+      "display": "10/54",
+      "quoted_in": ["docs/MTP.md"],
+      "check": {
+        "kind": "ratio",
+        "a": {"file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/1/runs/1/drafts/matched"},
+        "b": {"file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/1/runs/1/drafts/offered"},
+        "expect": 0.1852
+      }
+    }
+  ]
+}

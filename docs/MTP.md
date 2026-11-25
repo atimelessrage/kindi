@@ -33,8 +33,9 @@ acceptance measurement, and the tokens are asserted identical to plain greedy de
 carries the missing piece (a batched T-row verify in `kcpu.c`: one weight pass for T rows, per-row
 attention and GDN scan, T-row head) with the gate it has to clear. Until then, use the head for
 acceptance studies; `tools/mtp_cpu_bench.py --pack PACK --gguf <the -mtp file>` is the tool. The
-2026-11-25 run is still an untracked bench log, not an evidence page: it records the head's cost and its
-acceptance, and the acceptance is not yet good enough to wire the head as a win (road map CP1).
+2026-11-25 run is a tracked evidence page ([docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp](benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md),
+claim `mtp-cpu-20261125`): it records the head's cost and its acceptance, and the acceptance is not
+yet good enough to wire the head as a win (road map CP1).
 
 - Download: https://huggingface.co/ahtx/kindi-mtp-heads (the installer downloads it and checks its sha256).
 - Base model: Ternary-Bonsai-2-2B by Prism ML (Apache-2.0).
@@ -85,7 +86,7 @@ this head appears in notes written about Kindi. It is **not in this tree and not
 1.12x in this file is the **2B** `draft2b` result on the 4060 Ti at 512 tokens, with 69% acceptance
 (the tables above); what the 2.5 head measured on this host so far is worse: **9 accepted of 108
 drafted (8.3%), up to 15/108 (13.9%) once the hidden is output-normed and the window seeded**, from
-`tools/mtp_cpu_probe.py` on the real 27B, untracked `bench-logs/` runs.
+`tools/mtp_cpu_probe.py` on the real 27B (the probe runs themselves stay untracked `bench-logs/` measurements).
 Do not repeat a CPU acceptance or speedup figure for this head without a tracked page behind it.
 
 ### Which drafter, on the 27B CPU (2026-11-25)
@@ -106,9 +107,9 @@ slower than plain decode**: every round replays the known prefix through the 2B 
 and the 27B verifies one row per pass, so no draft removes work. Neither route is a speedup until
 CP1's batched T-row verify exists; what the measurement settles is which drafter CP1 should be built
 against - the 2B pack, not the head. Per prompt the 2B accepted 23/54 (43%) on the first and 10/54
-(19%) on the second. Both numbers come from untracked `bench-logs/` runs (`mtp-cpu-20261125.json`,
-`mtp-cpu-2b-drafter-20261125.json`), and both asserted their tokens equal to plain greedy decode, so
-acceptance is measured against the real model and nothing else.
+(19%) on the second. Both numbers come from the tracked [2026-11-25 evidence page](benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md)
+(claim `mtp-cpu-20261125`, sanitized from the two `bench-logs/` runs), and both asserted their tokens
+equal to plain greedy decode, so acceptance is measured against the real model and nothing else.
 
 #### The head's acceptance ladder (2026-11-25, one load per batch)
 
