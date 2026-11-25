@@ -1,5 +1,19 @@
 # Changelog
 
+## Bonsai 2.5 27B `-mtp` files (2026-11-25)
+
+- **The `-mtp` GGUF converts to the base model's pack.** Prism ships the 2.5 27B draft head as a
+  65th block (`blk.64`: one decoder layer plus its `nextn.*` tensors, stored Q4_0) after the
+  64-block language model, so `kindi convert` refused the file: the block count did not match the
+  27B profile, and the head's Q4_0 tensors failed the format gate. The converter now recognises
+  the shape (a profile one block past a known model whose extra block carries `nextn.eh_proj`),
+  converts the language model, and records the head's block and tensor names in `kindi_pack.json`
+  (`mtp_head`). The catalog gains `bonsai-2.5-27b-mtp` with the file's pinned size and SHA-256.
+  The head is not used to draft: Kindi's drafter is the 2B's registered head on the tensor-core
+  path, and the 27B head is not wired to it. Verified on the CPU engine only - full conversion,
+  then a greedy load-and-generate run of that pack; no GPU run (no CUDA device here, the Arc A770
+  is probe-only).
+
 ## 0.7.2-fork (2026-11-25)
 
 Official Kindi 0.7.2 (`22af8d4`, released 2026-11-24) is merged by content on top of the fork's

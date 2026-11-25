@@ -213,3 +213,27 @@ Use this shape:
   fold, the readers, conversion and the plumbing. The port also fixes an upstream reader defect:
   an `.npz` adapter's `lora_alpha` scalar matched the `lora_` tensor filter and aborted the
   conversion (`tests/test_lora.py::test_read_adapter_reads_npz_pairs_and_refuses_half_a_pair`).
+
+## DEC-0012: a Bonsai `-mtp` file converts as its base model; its head is recorded, not drafted
+
+- Status: accepted
+- Date: 2026-11-25
+- Requirements: none (Bonsai 2.5 27B `-mtp` intake; docs/BONSAI-2-SUPPORT.md section 1a)
+- Context: Prism ML publishes the 2.5 27B draft head inside the model GGUF as a 65th block
+  (`blk.64`): one decoder layer plus `nextn.{eh_proj,enorm,hnorm,shared_head_norm}`, stored as
+  Q4_0 while the language model is PTQ1_0. Kindi's `kindi convert` keyed the model profile on
+  `qwen35.block_count`, so it refused the file on both the shape and the tensor-type gate. Kindi's
+  own drafter (`kindi/mtp.py:MTPDraft`) is written for the registered 2B head: a separate `.npz`
+  with int8 rows, head dimension 256, on the tensor-core plan engine, and it reuses the main
+  model's output head. The 27B head is one 256-wide attention block in the same file and has never
+  been converted, wired or measured; this host has no CUDA device to test a GPU path.
+- Decision: treat a file whose block count is one past a known profile, and whose extra block
+  carries `nextn.eh_proj`, as that profile plus a head. Convert the language-model blocks,
+  exclude the head block from the tensor-type gate, and record the block index and tensor names
+  in `kindi_pack.json` under `mtp_head`. Do not extract, quantize or load the head for drafting,
+  and do not imply a speedup: `KINDI_SPEC=mtp` still only drafts with the 2B `.npz` head.
+- Consequences: the `-mtp` file is a supported model (catalog id `bonsai-2.5-27b-mtp`, the same
+  pack as the base file) and switching between Bonsai 2, 2.5 and the 2.5 `-mtp` file is a
+  `kindi use`/`--pack` choice. Drafting with a 27B head remains open work: it needs a head
+  extractor, an engine path that accepts head dimension 128 and a GPU run to verify exactness
+  and speed. The catalog entry therefore carries the base fit estimate, not a speculative one.

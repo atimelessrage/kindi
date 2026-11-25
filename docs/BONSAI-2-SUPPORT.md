@@ -100,7 +100,8 @@ What Kindi now does with it:
 
 - `kindi use bonsai-2.5-27b` downloads `Ternary-Bonsai-2.5-27B-PTQ1_0.gguf` (5993834848 bytes, SHA-256
   pinned in `kindi/catalog.py`) from `prism-ml/Ternary-Bonsai-2.5-27B-GGUF`, builds a pack and selects
-  it. The catalog's fit estimate is the 27B's: one 7600 MiB card, or two at 3800 MiB.
+  it. The catalog's fit estimate is the 27B's: one 7600 MiB card, or two at 3800 MiB. The `-mtp` file
+  has its own id, `bonsai-2.5-27b-mtp`, and the same fit estimate (see the next bullet).
 - The registry id is `bonsai2.5-27b`. A 2.5 pack resolves through the Bonsai adapter's
   `model_id_for_manifest` (from `general.name`, or from `source_file` for a file that names itself
   `Hf`), and the release is part of the id so the two releases cannot share a sampling profile.
@@ -132,7 +133,13 @@ What was run (2026-11-25, i7-8086K, CPU engine; evidence in
   two processes produced the same ids, and a repeated generation in one process is identical too, so
   CPU decode is reproducible.
 - `kindi verify` on the pack prints `no llama.cpp reference for this model in this version of Kindi`
-  and exits 2. That is the new, deliberate behaviour: `verify.reference_for` keys the reference file by
+  and exits 2.
+- The `-mtp` file was run the same way, from its own conversion: the pack manifest names the same
+  64-layer model with the head's block and tensor names under `mtp_head`, and the CPU engine loaded
+  and generated from it with the same kinds of replies as the base file (the first answer on topic,
+  the arithmetic prompt answering the number) and identical ids on an in-process repeat. This is a
+  load-and-generate check, not a second process run and not a drafting result: nothing drafted.
+ That is the new, deliberate behaviour: `verify.reference_for` keys the reference file by
   release as well as by size, so a 2.5 pack is no longer scored against Bonsai 2's tokens
   (`reference-27b.json`) and reported as a port failure.
 
@@ -144,8 +151,15 @@ What is **not** verified and must not be claimed:
 - No GPU run of any kind: the Arc A770 toolchain is still probe-only (`kindi intel-sycl`) and this host
   has no CUDA device, so the GPU cells stay `not run`. Sampling beyond greedy, tool calling, long
   context (>2048 tokens) and a 2-vs-2.5 quality comparison are all unmeasured.
-- The `-mtp` files (a draft head in the same GGUF) are neither converted nor wired to Kindi's
-  speculation paths. The catalog names the base `PTQ1_0` file only.
+- The `-mtp` files are converted, but their head is not used to draft. Prism ships the head as a
+  65th block (`blk.64`): one decoder layer plus its `nextn.*` tensors, after the 64-block language
+  model. `kindi convert` recognises that shape (a profile one block past a known model whose extra
+  block carries `nextn.eh_proj`), builds the base model's pack, and records the block and its tensor
+  names in `kindi_pack.json` under `mtp_head`, so the pack is the same model the base file produces.
+  `KINDI_SPEC=mtp` still drafts only with the 2B's registered `.npz` head: Kindi's `MTPDraft` is
+  written for that head's geometry on the tensor-core plan engine, and the 27B's embedded head is not
+  wired to it. The catalog therefore lists the file (so `kindi use`/`kindi models` handle it) without
+  implying a speedup.
 - The `mmproj` vision artifacts are unsupported as before (section 4.1): the 2.5 ships the same separate
   BF16/Q8_0 mmproj files, and an image request against a text pack is answered with 400.
 - The 2.5 `PQ2_0` and `Q2_0` files use the same container types the converter handles, but none was
@@ -408,7 +422,9 @@ Performance:
    run on the CPU engine, and `kindi verify` refuses it for lack of a llama.cpp reference instead of
    scoring it against Bonsai 2. What is still missing is a **GPU** run on a card (the Arc toolchain is
    probe-only) and a reference configuration to make `kindi verify` meaningful. The header and CPU
-   checks do not substitute for that, and the `-mtp` variant is a separate decision.
+   checks do not substitute for that. The `-mtp` file is no longer a separate intake problem:
+   it converts as its base model with the head recorded (DEC-0012), but drafting with that head
+   remains open work and needs a GPU run.
 
 The project should describe the current text path as **text-only PTQ1_0** until the vision milestone
 passes. The family is vision-language; the engine is not there yet.

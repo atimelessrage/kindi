@@ -78,6 +78,9 @@ STATUS = {
     # PTQ1_0 pack was built and loaded on the CPU engine (2026-11-25) but has no llama.cpp reference,
     # so `kindi verify` reports that and exits 2 instead of scoring it against Bonsai 2's tokens.
     "bonsai-2.5-27b": ["not run", "load+generate, no reference", "not converted", "n/a"],
+    # The -mtp file is the same language model plus a 65th head block: the converter drops the block,
+    # records it in the manifest and builds the identical pack, so its CPU cell matches the base one.
+    "bonsai-2.5-27b-mtp": ["not run", "load+generate, no reference", "not converted", "n/a"],
     "nemotron-e4b": ["separate backend", "n/a", "n/a", "n/a"],
     "nanbeige-33b": ["separate backend", "n/a", "n/a", "n/a"],
     "lightning-30b": ["separate backend", "n/a", "n/a", "n/a"],
@@ -99,6 +102,10 @@ REF = {
     "bonsai-2.5-27b": "the CPU engine loads the converted PTQ1_0 pack and decodes deterministically"
                     " (2026-11-25); no `kindi verify` reference configuration exists for this release, so"
                     " `kindi verify` says so and exits 2 rather than compare it with Bonsai 2's tokens",
+    "bonsai-2.5-27b-mtp": "the `-mtp` file is the same 64-layer model plus its draft head as a 65th"
+                        " block; the converter builds the base pack and records the head in the manifest,"
+                        " and Kindi does not draft with it (docs/MTP.md); no `kindi verify` reference"
+                        " configuration exists for this release",
     "nemotron-e4b": "separate backend; no `kindi verify` reference configuration recorded",
     "nanbeige-33b": "separate backend; no `kindi verify` reference configuration recorded",
     "lightning-30b": "separate backend; no `kindi verify` reference configuration recorded",

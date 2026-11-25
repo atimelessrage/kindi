@@ -10,6 +10,11 @@ The output is exactly the same as without MTP. MTP changes only the speed.
 
 Kindi has one head: `kindi-mtp-2b-v1.npz` (61 MB), for Ternary-Bonsai-2-2B. It is our own work.
 
+The Bonsai 2.5 27B `-mtp` GGUF carries its own draft head as a 65th block. `kindi convert` accepts
+that file and builds the 64-layer base model's pack, recording the head block in `kindi_pack.json`,
+but Kindi does not draft with that head: `MTPDraft` is written for the registered 2B head's geometry
+on the tensor-core plan engine, and a 27B head has not been converted, wired or measured here.
+
 - Download: https://huggingface.co/ahtx/kindi-mtp-heads (the installer downloads it and checks its sha256).
 - Base model: Ternary-Bonsai-2-2B by Prism ML (Apache-2.0).
 - The head contains weights derived from Qwen3.5-2B by the Qwen team at Alibaba Cloud (Apache-2.0).

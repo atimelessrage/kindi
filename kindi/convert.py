@@ -36,6 +36,28 @@ PROFILES = {
     # Bonsai 2 and Bonsai 2.5 27B share this geometry (verified from the 2.5 GGUF header, 2026-11-24)
     (64, 5120, 17408, 24, 4, 16): "Ternary-Bonsai-2-27B / 2.5-27B",
 }
+
+def mtp_head_block(profile, names):
+    """The extra block of a Ternary-Bonsai ``-mtp`` GGUF, or None.
+
+    Prism ML ships the 2.5 27B draft head in the same file: a 65th block (``blk.64``) holding one
+    decoder layer plus ``nextn.{eh_proj,enorm,hnorm,shared_head_norm}``. Everything before it is the
+    64-layer language model, so the pack is built from those blocks and the head is recorded in the
+    manifest instead of being converted into a model layer.
+    """
+    if not profile or profile[0] is None:
+        return None
+    n = int(profile[0]) - 1
+    if (n,) + tuple(profile[1:]) not in PROFILES:
+        return None
+    names = set(names)
+    if "blk.%d.nextn.eh_proj.weight" % n not in names:
+        return None
+    if any(x.startswith("blk.%d." % (n + 1)) for x in names):
+        return None
+    return n
+
+
 PACK_FORMAT = 1
 
 
@@ -163,9 +185,19 @@ def convert(gguf_path, out_dir, log=print):
     profile = (g.kv.get("qwen35.block_count"), g.kv.get("qwen35.embedding_length"),
                g.kv.get("qwen35.feed_forward_length"), g.kv.get("qwen35.attention.head_count"),
                g.kv.get("qwen35.attention.head_count_kv"), g.kv.get("qwen35.ssm.group_count"))
+    mtp_block = None
     if profile not in PROFILES:
-        raise SystemExit("kindi convert: unsupported Ternary-Bonsai-2/2.5 dimensions %r" % (profile,))
-    types = {t[2] for t in g.tensors}
+        mtp_block = mtp_head_block(profile, [t[0] for t in g.tensors])
+        if mtp_block is None:
+            raise SystemExit("kindi convert: unsupported Ternary-Bonsai-2/2.5 dimensions %r" % (profile,))
+        # the file is the same language model plus one head block: convert the model, not the head
+        profile = (mtp_block,) + tuple(profile[1:])
+        log("MTP head: blk.%d is the draft head, not a model layer; converting the %d-layer language model"
+            % (mtp_block, profile[0]))
+    # the draft head carries its own types (the 2.5 -mtp file stores blk.64 as Q4_0); it is not converted,
+    # so it must not decide whether the language model's formats are supported
+    types = {t[2] for t in g.tensors
+             if mtp_block is None or not t[0].startswith("blk.%d." % mtp_block)}
     if not types <= {PTQ1_0, PQ2_0, Q2_0, F32, BF16, FP8_E4M3, FP8_E5M2}:
         raise SystemExit("kindi convert: needs a PTQ1_0, PQ2_0 or Q2_0 GGUF (found tensor types %s)" % sorted(types))
     hd = {k.split("prism.hadamard.")[-1]: v for k, v in g.kv.items() if k.startswith("prism.hadamard.")}
@@ -197,7 +229,13 @@ def convert(gguf_path, out_dir, log=print):
     src = stack.enter_context(open(gguf_path, "rb"))
     bc_off = dpm_off = f32_off = 0
     n_t = 0
+    head_names = []
+    n_total = sum(1 for t in g.tensors
+                  if mtp_block is None or not t[0].startswith("blk.%d." % mtp_block))
     for name, ne, ty, toff in g.tensors:
+        if mtp_block is not None and name.startswith("blk.%d." % mtp_block):
+            head_names.append(name)               # the draft head: recorded below, never a model layer
+            continue
         ne0 = ne[0]
         rows = 1
         for x in ne[1:]:
@@ -248,7 +286,7 @@ def convert(gguf_path, out_dir, log=print):
         index["tensors"][name] = rec
         n_t += 1
         if n_t % 40 == 0:
-            log("  %d / %d tensors" % (n_t, len(g.tensors)))
+            log("  %d / %d tensors" % (n_t, n_total))
     stack.close()
     with open(os.path.join(out_dir, "index.json"), "w") as f:
         json.dump(index, f)
@@ -274,6 +312,12 @@ def convert(gguf_path, out_dir, log=print):
                 "head": "output.weight" if any(t[0] == "output.weight" for t in g.tensors) else "token_embd.weight",
                 # the chat template: the 27B's differs from the 2B/4B/9B one (chat.template_variant)
                 "chat_template": g.kv.get("tokenizer.chat_template", "")}
+    if mtp_block is not None:
+        manifest["mtp_head"] = {
+            "block": mtp_block, "tensors": head_names,
+            "note": "the file's MTP draft head, left out of the pack: Kindi runs the base language model "
+                    "and does not draft with the 27B head (docs/MTP.md)"}
+
     # B16: each pack file's size, fast hash and sha256, checked before the pack is used (kindi.packcheck)
     from .packcheck import record
     manifest["files"] = record(out_dir, log)

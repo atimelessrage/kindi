@@ -19,7 +19,7 @@ PTQ1_0 one - is `bench-logs/convert_pq2_q2.py`.
 import numpy as np
 import pytest
 
-from kindi.convert import PQ2_0, PTQ1_0, Q2_0, phase_bytes, q2_groups, trits_from_slots
+from kindi.convert import PQ2_0, PTQ1_0, Q2_0, mtp_head_block, phase_bytes, q2_groups, trits_from_slots
 
 
 def encode_slots(trits, group, d=None):
@@ -100,3 +100,32 @@ def test_phase_bytes_packs_four_trits_per_byte():
     assert b.shape == (1, 2)                      # one byte per four trits, rows kept
     assert b[0, 0] == 0 + 3 * 1 + 9 * 2 + 27 * 1
     assert b[0, 1] == 2 + 3 * 0 + 9 * 1 + 27 * 0
+
+MTP_27B = (65, 5120, 17408, 24, 4, 16)
+MTP_NAMES = [
+    "blk.%d.%s" % (64, n) for n in (
+        "attn_norm.weight", "attn_q.weight", "attn_k.weight", "attn_v.weight", "attn_output.weight",
+        "attn_q_norm.weight", "attn_k_norm.weight", "post_attention_norm.weight", "ffn_gate.weight",
+        "ffn_up.weight", "ffn_down.weight", "nextn.eh_proj.weight", "nextn.enorm.weight",
+        "nextn.hnorm.weight", "nextn.shared_head_norm.weight")
+]
+
+def test_a_bonsai_mtp_file_is_its_base_model_plus_one_head_block():
+    # the published 2.5 27B -mtp file: block_count 65, one extra block holding the draft head
+    assert mtp_head_block(MTP_27B, MTP_NAMES) == 64
+    assert mtp_head_block(MTP_27B, MTP_NAMES + ["output.weight", "token_embd.weight"]) == 64
+
+def test_a_plain_64_block_file_has_no_mtp_block():
+    plain = (64, 5120, 17408, 24, 4, 16)
+    assert mtp_head_block(plain, ["blk.63.attn_q.weight"]) is None
+
+def test_a_65th_block_without_the_nextn_tensors_is_not_an_mtp_head():
+    names = [n for n in MTP_NAMES if ".nextn." not in n]
+    assert mtp_head_block(MTP_27B, names) is None
+
+def test_an_unknown_base_geometry_is_not_an_mtp_head():
+    assert mtp_head_block((41, 5120, 17408, 24, 4, 16), MTP_NAMES) is None
+
+def test_a_stray_block_after_the_head_is_not_accepted():
+    assert mtp_head_block(MTP_27B, MTP_NAMES + ["blk.65.attn_q.weight"]) is None
+    assert mtp_head_block(None, MTP_NAMES) is None
