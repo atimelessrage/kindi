@@ -325,7 +325,7 @@ def cpu_report():
 
 def probe():
     """The whole report: cards (with their fact table) and the CPU."""
-    for finder, source in ((_from_smi, "nvidia-smi"), (_from_nvml, "pynvml"), (_from_cupy, "cupy")):
+    for finder, source in ((_from_smi, "nvidia-smi"), (_from_nvml, "pynvml"), (_from_cupy, "cupy")):  # noqa: B007 - the else branch names the source
         rows = finder()
         if rows:
             break

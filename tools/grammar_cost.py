@@ -33,9 +33,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from kindi.gbnf import Grammar                                         # noqa: E402
-from kindi.jsongrammar import grammar_from_schema                      # noqa: E402
-from kindi.tokenizer import Tok                                        # noqa: E402
+from kindi.gbnf import Grammar  # noqa: E402
+from kindi.jsongrammar import grammar_from_schema  # noqa: E402
+from kindi.tokenizer import Tok  # noqa: E402
 
 # llama.cpp's own grammars/json.gbnf (value -> object | array | string | number | literal, with
 # object/array recursing into value) -- the canonical recursive JSON grammar.

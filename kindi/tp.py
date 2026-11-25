@@ -221,7 +221,7 @@ def g5_tuned(s, name, R, NG, rowpar):
                 for _ in range(3):
                     run()
                 ev0.record()
-                for W5 in Wt:
+                for W5 in Wt:  # noqa: B007 - run() reads W5 through its closure
                     run()
                 ev1.record()
                 ev1.synchronize()
@@ -269,7 +269,7 @@ def g5_tuned(s, name, R, NG, rowpar):
                     for _ in range(3):
                         run_ab()
                     ev0.record()
-                    for W5 in Wt:
+                    for W5 in Wt:  # noqa: B007 - run() reads W5 through its closure
                         run()
                     ev1.record()
                     ev1.synchronize()

@@ -28,7 +28,6 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 POSITIONS = (100, 2000, 8000, 16000, 24000)
 CONTEXT_RE = re.compile(r"with a (\d+)-token context")

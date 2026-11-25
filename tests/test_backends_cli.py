@@ -59,6 +59,8 @@ def test_backends_lists_registered_fake_backend(capsys):
     assert "devices=cpu" in out
     assert "architectures=fake" in out
     assert "model_ids=fake,kindi-fake" in out
+    # the limits column names what a backend cannot do, before a request finds out
+    assert "limits=" in out
 
 
 def test_backends_json_is_machine_readable(capsys):

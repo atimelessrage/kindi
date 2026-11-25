@@ -393,6 +393,22 @@ def cmd_use(cfg, a):
     return use(cfg, a.model, gguf=a.gguf, log=log)
 
 
+def _backend_limits(row):
+    """What a backend does not do, so a proxy's gaps are visible before a request is sent."""
+    missing = []
+    if not row.get("supports_json_grammar"):
+        missing.append("no-grammar")
+    if str(row.get("cache_kind") or "none") == "none":
+        missing.append("no-cache")
+    if not row.get("supports_speculation"):
+        missing.append("no-spec")
+    if not row.get("supports_thinking"):
+        missing.append("no-thinking")
+    if not row.get("supports_tools"):
+        missing.append("no-tools")
+    return ",".join(missing) or "-"
+
+
 def cmd_backends(cfg, a):
     """List the backend plugin registry (host-only; no pack or GPU touched)."""
     from .backends import list_backends, load_configured_backends
@@ -405,11 +421,12 @@ def cmd_backends(cfg, a):
         log("no backend plugins registered")
         return 0
     for row in rows:
-        log("%-16s devices=%-10s architectures=%-20s model_ids=%s" % (
+        log("%-16s devices=%-10s architectures=%-20s model_ids=%-24s limits=%s" % (
             row.get("name", ""),
             ",".join(row.get("devices") or []) or "-",
             ",".join(row.get("architectures") or []) or "-",
-            ",".join(row.get("model_ids") or []) or "-"))
+            ",".join(row.get("model_ids") or []) or "-",
+            _backend_limits(row)))
     return 0
 
 
@@ -785,9 +802,9 @@ def _build_parser():
     sub.add_parser("info", help="show configuration, pack and GPU")
     s = sub.add_parser("caps", help="what each card and this CPU can do, and which Kindi paths that enables")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
-    s = sub.add_parser("intel-info", help="read-only Intel M1 probe: CPU, display, NPU, Level Zero and OpenVINO")
+    s = sub.add_parser("intel-info", help="read-only Intel M1 probe: CPU, display, NPU, Level Zero and OpenVINO (a probe: no backend)")
     s.add_argument("--json", action="store_true", help="print the whole probe as JSON")
-    s = sub.add_parser("intel-smoke", help="Level Zero device-memory round trip on an Intel GPU (no kernel)")
+    s = sub.add_parser("intel-smoke", help="Level Zero device-memory round trip on an Intel GPU (no kernel, no backend)")
     s.add_argument("--mib", type=int, default=1, help="device USM allocation in MiB (default 1, max 256)")
     s.add_argument("--device", type=int, default=0, help="Level Zero device index (default 0)")
     s.add_argument("--loader", default=None, help="Level Zero loader name/path (default: the host loader)")
@@ -846,7 +863,7 @@ def _build_parser():
                    help="pick the GPU whose name contains SUBSTR (e.g. Arc) instead of --device")
     s.add_argument("--loader", default=None, help="OpenCL loader name/path (default: the host loader)")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
-    s = sub.add_parser("intel-cl", help="compile and run OpenCL vector-add/GEMM on an Intel GPU (no model)")
+    s = sub.add_parser("intel-cl", help="compile and run OpenCL vector-add/GEMM on an Intel GPU (no model, no backend)")
     s.add_argument("--n", type=int, default=1048576, help="vector-add elements (default 1048576, max 16777216)")
     s.add_argument("--dim", type=int, default=128, help="square GEMM dimension (default 128, 8-512)")
     s.add_argument("--repeats", type=int, default=5, help="timed GEMM launches (default 5, max 50)")

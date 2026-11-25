@@ -74,6 +74,11 @@ def test_the_forward_slash_machine_root_rule_is_not_vacuous():
     assert forward_roots("the T:/kindi worktree") == ()
     assert forward_roots("pack at T:/kindi-packs/bonsai") == ("T:/kindi-packs/",)
     assert forward_roots("pack at d://Models/pack/") == ("d://Models/",)
+    # a directory with a space is the same machine-local layout (2026-11-25 audit)
+    spaced = "D:" + "/my " + "packs/bonsai/"
+    assert forward_roots("pack at " + spaced) == ("D:" + "/my " + "packs/",)
+    # a Windows system install root is evidence, not a home directory: allow-listed
+    assert forward_roots("tool at C:/Program " + "Files/LLVM/bin/clang.exe") == ()
 
 
 def test_no_forward_slash_machine_roots_in_current_facing_files():

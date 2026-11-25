@@ -64,7 +64,6 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:        # tools/ runs with tools/ as sys.path[0]; `kindi` must import
     sys.path.insert(0, str(ROOT))
@@ -514,7 +513,7 @@ def run_bench_row(model: str, mode: str, pack: Path, out_dir: Path, cards: int,
                               encoding="utf-8", errors="replace", timeout=timeout, check=False)
         exit_code = proc.returncode
         output = proc.stdout + proc.stderr
-    except subprocess.TimeoutExpired as exc:
+    except subprocess.TimeoutExpired:
         exit_code = 124
         output = "TIMEOUT after %.1f s\n" % timeout
     except OSError as exc:
@@ -672,7 +671,7 @@ def environment(packs: list[Path]) -> dict:
         "packs": _packs_used(packs),
     }
     try:
-        import cupy                                    # noqa: PLC0415 - optional, GPU host only
+        import cupy  # noqa: PLC0415 - optional, GPU host only
         record["cupy"] = getattr(cupy, "__version__", None)
         record["cuda_runtime"] = int(cupy.cuda.runtime.runtimeGetVersion())
     except Exception:                                  # noqa: BLE001 - a missing CuPy is a normal CPU run

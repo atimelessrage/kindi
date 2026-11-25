@@ -255,7 +255,7 @@ def convert(g, gguf_path, out_dir, version, pack_format, sha256, log=print):
 
 
 def _tensor_bytes(g, path, name, max_bytes=None):
-    for n, ne, ty, off in g.tensors:
+    for n, ne, ty, off in g.tensors:  # noqa: B007 - read after the loop (it stops on the match)
         if n == name:
             break
     else:
@@ -281,7 +281,7 @@ def _dequant_gate(g, path, log=print):
             wanted.append((name, ne, ty, block, size))
         if len(wanted) >= len(SUPPORTED_TYPES):
             break
-    for name, ne, ty, block, size in wanted:
+    for name, _ne, ty, block, size in wanted:
         raw = _tensor_bytes(g, path, name, max_bytes=block * size * 8)
         got = dequantize(raw, ty)
         if not np.isfinite(got).all() or not np.any(got):

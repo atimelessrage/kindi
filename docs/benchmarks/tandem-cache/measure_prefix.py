@@ -38,8 +38,18 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 DEFAULT_PACK = Path(os.path.expanduser("~/.kindi/packs/bonsai-2b"))
-DEFAULT_CLANG = Path("C:/Program Files/clang+llvm-18.1.8-x86_64-pc-windows-msvc/bin/clang.exe")
-DEFAULT_LLVM = Path("C:/Program Files/clang+llvm-18.1.8-x86_64-pc-windows-msvc")
+def toolchain(clang, llvm):
+    """The clang/LLVM the CPU engine compiles with: the flags first, then KINDI_CC/KINDI_LLVM.
+
+    The run that produced these results named its own toolchain (`--clang`/`--llvm`, which the
+    result file records); no machine's install path is baked into the script.
+    """
+    clang = clang or os.environ.get("KINDI_CC")
+    llvm = llvm or os.environ.get("KINDI_LLVM")
+    if not clang or not llvm:
+        raise SystemExit("pass --clang and --llvm (or set KINDI_CC and KINDI_LLVM) to name the CPU engine's toolchain")
+    return Path(clang).expanduser(), Path(llvm).expanduser()
+
 
 
 def configure_environment(clang: Path, llvm: Path) -> None:
@@ -399,8 +409,10 @@ def run_placement(mode: str, pack: Path, ctx: int, cpu_layers: int, reps: int,
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--pack", type=Path, default=DEFAULT_PACK)
-    ap.add_argument("--clang", type=Path, default=DEFAULT_CLANG)
-    ap.add_argument("--llvm", type=Path, default=DEFAULT_LLVM)
+    ap.add_argument("--clang", type=Path, default=None,
+                    help="the clang the CPU engine compiles with (default: KINDI_CC)")
+    ap.add_argument("--llvm", type=Path, default=None,
+                    help="the LLVM install root (default: KINDI_LLVM)")
     ap.add_argument("--ctx", type=int, default=512)
     ap.add_argument("--cpu-layers", type=int, default=6)
     ap.add_argument("--reps", type=int, default=5)
@@ -415,6 +427,7 @@ def main() -> int:
     ap.add_argument("--out", type=Path, default=Path(__file__).with_name("prefix-results.json"))
     a = ap.parse_args()
 
+    a.clang, a.llvm = toolchain(a.clang, a.llvm)
     configure_environment(a.clang, a.llvm)
     result = {
         "started_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),

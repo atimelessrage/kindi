@@ -101,7 +101,9 @@ What Kindi now does with it:
 - `kindi use bonsai-2.5-27b` downloads `Ternary-Bonsai-2.5-27B-PTQ1_0.gguf` (5993834848 bytes, SHA-256
   pinned in `kindi/catalog.py`) from `prism-ml/Ternary-Bonsai-2.5-27B-GGUF`, builds a pack and selects
   it. The catalog's fit estimate is the 27B's: one 7600 MiB card, or two at 3800 MiB. The `-mtp` file
-  has its own id, `bonsai-2.5-27b-mtp`, and the same fit estimate (see the next bullet).
+  has its own id, `bonsai-2.5-27b-mtp`, and the same fit estimate (see the next bullet). **Download the
+  base file unless you are keeping the head for future drafting:** today both files build the same
+  64-layer pack and read the same weight stream, so the larger file buys no speed and does not draft.
 - The registry id is `bonsai2.5-27b`. A 2.5 pack resolves through the Bonsai adapter's
   `model_id_for_manifest` (from `general.name`, or from `source_file` for a file that names itself
   `Hf`), and the release is part of the id so the two releases cannot share a sampling profile.

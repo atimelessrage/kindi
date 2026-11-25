@@ -85,17 +85,17 @@ def scan(rev_range="--all", repo=ROOT):
     """
     args = ["log", "-p", "-U0", "--no-color", "--format=%s" % (RECORD + "%H" + FIELD + "%s")]
     args += rev_range.split() if isinstance(rev_range, str) else list(rev_range)
-    commit, a_path, b_path = "", "", ""
+    commit, b_path = "", ""
     for hit in messages(rev_range, repo):
         yield hit
     for line in _git(args, repo).splitlines():
         if line.startswith(RECORD):
             commit, _, _subject = line[1:].partition(FIELD)
-            a_path = b_path = ""
+            b_path = ""
             continue
         match = DIFF.match(line)
         if match:
-            a_path, b_path = match.group(1), match.group(2)
+            b_path = match.group(2)          # the new path; the old one is not needed
             continue
         if not line or line[0] != "+" or line.startswith("+++"):
             continue

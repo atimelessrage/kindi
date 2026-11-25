@@ -216,7 +216,7 @@
         "reportOptionalOperand": 1
       },
       "kindi/backends/bonsai.py": {
-        "reportArgumentType": 11,
+        "reportArgumentType": 1,
         "reportOptionalMemberAccess": 9
       },
       "kindi/backends/dsv41.py": {
@@ -235,9 +235,6 @@
         "reportArgumentType": 12,
         "reportAttributeAccessIssue": 1,
         "reportOptionalMemberAccess": 10
-      },
-      "kindi/bench.py": {
-        "reportAttributeAccessIssue": 9
       },
       "kindi/caps.py": {
         "reportArgumentType": 11
@@ -398,9 +395,6 @@
         "reportGeneralTypeIssues": 2,
         "reportOptionalSubscript": 6
       },
-      "kindi/verify.py": {
-        "reportAttributeAccessIssue": 6
-      },
       "tools/cascade_reference.py": {
         "reportOptionalMemberAccess": 1
       },
@@ -430,7 +424,6 @@
         "reportOptionalMemberAccess": 1
       },
       "tools/mtp_context_bench.py": {
-        "reportAttributeAccessIssue": 6,
         "reportOptionalMemberAccess": 1
       },
       "tools/mtp_smoke.py": {
@@ -441,7 +434,6 @@
         "reportReturnType": 1
       },
       "tools/spec_ab.py": {
-        "reportAttributeAccessIssue": 3,
         "reportOptionalMemberAccess": 1
       },
       "tools/verify_blackwell_fp8.py": {
@@ -457,19 +449,19 @@
         "reportOptionalMemberAccess": 1
       }
     },
-    "total": 863,
+    "total": 829,
     "version": "1.1.414"
   },
   "review": {
     "deltas": {
-      "mypy": -6,
-      "pylint": -10,
-      "pyright": -128,
-      "ruff": -107
+      "mypy": 0,
+      "pylint": 0,
+      "pyright": -34,
+      "ruff": -18
     },
-    "head": "e05536bff6106a0af7a96895be631da8da803cc3",
-    "previous_head": "60a039b107b078338d5e865d98d1f231089457de",
-    "reason": "Backend.capabilities is now declared (annotation-only) on the contract instead of initialized to None, so the six adapters' identical mypy 'assignment' findings are gone (59 -> 53); no new findings"
+    "head": "22898e4ad98e33eb42622f6422628a4592952de8",
+    "previous_head": "e05536bff6106a0af7a96895be631da8da803cc3",
+    "reason": "round-4 audit: unused imports/names and import order fixed in tools/, one dead local dropped; behaviour unchanged"
   },
   "ruff": {
     "findings": {
@@ -551,12 +543,6 @@
         "B023": 1,
         "B904": 1
       },
-      "kindi/caps.py": {
-        "B007": 1
-      },
-      "kindi/cascade.py": {
-        "B007": 4
-      },
       "kindi/cold_experts.py": {
         "B904": 1
       },
@@ -590,9 +576,6 @@
       "kindi/gemma4_chat.py": {
         "B904": 1
       },
-      "kindi/lightning.py": {
-        "B007": 1
-      },
       "kindi/lightning_chat.py": {
         "B904": 1
       },
@@ -608,9 +591,6 @@
       "kindi/server.py": {
         "B904": 2
       },
-      "kindi/sessions.py": {
-        "B007": 1
-      },
       "kindi/spec.py": {
         "B023": 1
       },
@@ -625,7 +605,6 @@
       },
       "kindi/tp.py": {
         "B002": 2,
-        "B007": 2,
         "B023": 15
       },
       "tests/api/test_error_envelope.py": {
@@ -769,40 +748,20 @@
       "tools/check_claims.py": {
         "B904": 5
       },
-      "tools/check_coverage.py": {
-        "F401": 1
-      },
-      "tools/check_long_context.py": {
-        "I001": 1
-      },
-      "tools/check_perf_baseline.py": {
-        "F401": 1
-      },
-      "tools/check_secret_history.py": {
-        "F841": 1
-      },
-      "tools/grammar_cost.py": {
-        "I001": 1
-      },
       "tools/mtp_smoke.py": {
         "B904": 5
       },
       "tools/spec_ab.py": {
         "B905": 2
       },
-      "tools/verify_blackwell_fp8.py": {
-        "F401": 1
-      },
       "tools/verify_matrix.py": {
-        "B904": 2,
-        "F841": 1,
-        "I001": 2
+        "B904": 2
       },
       "tools/verify_p106.py": {
         "B905": 1
       }
     },
-    "total": 207,
+    "total": 189,
     "version": "0.16.0"
   },
   "schema": 2,

@@ -78,7 +78,7 @@ class SessionStore(object):
     def append_messages(self, rec_or_id, messages):
         """Append new turns to a stored session and save once (`kindi chat --resume` reuses the id)."""
         rec = self._coerce(rec_or_id)
-        for role, content in (messages or []):
+        for role, _content in (messages or []):
             if role not in ("system", "user", "assistant", "tool"):
                 raise ValueError("unknown role %r" % role)
         for role, content in (messages or []):

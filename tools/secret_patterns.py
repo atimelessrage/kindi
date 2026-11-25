@@ -57,19 +57,25 @@ SYSTEM_ROOT = re.compile(r"(?i)^[A-Z]:[\\/]+(?:windows|program files(?: \(x86\))
 
 # Forward-slash drive roots (a drive letter, then `/` and at least one directory) are the same
 # machine-local layout as the backslash form above, which the 2026-11-18 audit found was missed.
+# The directory characters include a space and parentheses: an installer directory whose name has
+# a space is the same layout as a home directory, and the 2026-11-25 audit found the narrow class
+# skipped it (three benchmark scripts carried one).
+# A root under a Windows system directory is allow-listed by `forward_roots` (SYSTEM_ROOT) on the
+# same reasoning as the backslash rule: an install path is evidence, a home directory is personal.
 # The rule is separate from
 # PATTERNS on purpose: PATTERNS also drives the history gate, whose reviewed baseline predates
 # these paths and must not grow for a current-tree cleanup. The repository's own checkout
 # (`T:/kindi/`) stays allowed; a neighbouring directory whose name merely starts with the same
 # letters does not.
-FORWARD_DRIVE_ROOT = re.compile(r"(?i)\b[A-Z]:/+[A-Za-z0-9_.$~-]+/")
+FORWARD_DRIVE_ROOT = re.compile(r"(?i)\b[A-Z]:/+[A-Za-z0-9_.$~ ()+-]+/")
 REPO_DRIVE_ROOT = re.compile(r"(?i)^t:/kindi/")
 
 
 def forward_roots(line):
     """Forward-slash drive roots outside the repository's own `T:/kindi/` (a tuple)."""
     roots = (match.group(0) for match in FORWARD_DRIVE_ROOT.finditer(line))
-    return tuple(root for root in roots if not REPO_DRIVE_ROOT.match(root))
+    return tuple(root for root in roots if not REPO_DRIVE_ROOT.match(root)
+                 and not SYSTEM_ROOT.match(root))
 
 
 # Assignments with a long literal value, excluding the common placeholders and hashes.

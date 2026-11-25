@@ -1,5 +1,22 @@
 # Changelog
 
+## Round-4 audit: a wider path rule, portable benchmark scripts, visible backend limits (2026-11-25)
+
+- **The secret scan now catches a forward-slash drive root whose directory name has a space**
+  (and still allows a Windows system root, as the backslash rule does), so an installer path is
+  caught like a home directory. The three `docs/benchmarks/tandem-cache/` scripts no longer carry
+  one: they take `--clang`/`--llvm` or `KINDI_CC`/`KINDI_LLVM` and refuse to run without either.
+- **`kindi backends` prints a `limits=` column** (`no-grammar`, `no-cache`, `no-spec`,
+  `no-thinking`, `no-tools`) from each registration's capabilities, so the llama.cpp proxy's gaps
+  are visible before a request; three Intel help strings now say "no backend" like the others.
+- **`docs/BONSAI-2-SUPPORT.md` says which 2.5 file to download:** the base file, because the `-mtp`
+  file builds the same pack today and does not draft.
+- Ruff debt 207 -> 189 (unused imports/names, import order in `tools/`, one dead local), baseline
+  lowered with a reason; three `# noqa: B007` carry the reason the loop variable is live (read after
+  the loop or through a closure) instead of a rename that would have changed behaviour.
+- Every round-4 finding is triaged in `docs/development/AUDIT-TRIAGE-2026-11-25.md`, including the
+  one that was stale (the cold reader's close is wired and tested).
+
 ## Intel Arc A770: a real pack's shapes on the card (2026-11-25)
 
 - **`kindi intel-pack --pack DIR`** reads a converted pack's `bcodes.bin`/`dpm.bin` exactly as the

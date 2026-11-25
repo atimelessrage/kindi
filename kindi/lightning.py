@@ -551,7 +551,7 @@ class Engine(object):
             cold = [(i, e) for i, e in enumerate(w.hoff) if e in w.hcold]
             self._join_prefetch()             # a decode lookahead may still be filling the queue
             spans = [self._cold_span(w, e) for _, e in cold]
-            for (i, e), raw in zip(cold, self.cold_reader.read_many(spans, coalesce=1), strict=False):
+            for (i, _e), raw in zip(cold, self.cold_reader.read_many(spans, coalesce=1), strict=False):
                 codes, scales = split_q2(raw, w.rows, w.cols // 64)
                 host[base + i * w.cw:base + (i + 1) * w.cw] = codes
                 host[base + nh * w.cw + i * w.sw:base + nh * w.cw + (i + 1) * w.sw] = scales

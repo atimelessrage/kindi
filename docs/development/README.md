@@ -15,6 +15,7 @@ It complements the user-facing documentation in `docs/` and the handoff notes in
 | [`KNOWLEDGE.md`](KNOWLEDGE.md) | Operational facts, commands and support caveats. |
 | [`AI-INVENTORY-SCAN.md`](AI-INVENTORY-SCAN.md) | What was read from the external local-AI knowledge base, and what was adopted, parked or rejected. |
 | [`AUDIT-TRIAGE-2026-11-18.md`](AUDIT-TRIAGE-2026-11-18.md) | Status of every finding in the MiniMax-M3.1-Flash round-2 review, with the evidence or the open gate for each. |
+| [`AUDIT-TRIAGE-2026-11-25.md`](AUDIT-TRIAGE-2026-11-25.md) | The same for the round-4 review: what was fixed (path rule, toolchain flags, backend limits), what was already closed, and the open gates. |
 | [`../../.agents/skills/project-memory/SKILL.md`](../../.agents/skills/project-memory/SKILL.md) | The project-local workflow skill. |
 | [`../../.agents/skills/ai-inventory/SKILL.md`](../../.agents/skills/ai-inventory/SKILL.md) | Read the external knowledge base as inspiration only, and verify any idea before calling it a win. |
 

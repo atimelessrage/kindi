@@ -27,8 +27,18 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 DEFAULT_PACK = Path.home() / ".kindi" / "packs" / "bonsai-2b"
 DEFAULT_CPU_CACHE = HERE / "cpu-cache"
-DEFAULT_CLANG = Path("C:/Program Files/clang+llvm-18.1.8-x86_64-pc-windows-msvc/bin/clang.exe")
-DEFAULT_LLVM = Path("C:/Program Files/clang+llvm-18.1.8-x86_64-pc-windows-msvc")
+def toolchain(clang, llvm):
+    """The clang/LLVM the CPU engine compiles with: the flags first, then KINDI_CC/KINDI_LLVM.
+
+    The run that produced these results named its own toolchain (`--clang`/`--llvm`, which the
+    result file records); no machine's install path is baked into the script.
+    """
+    clang = clang or os.environ.get("KINDI_CC")
+    llvm = llvm or os.environ.get("KINDI_LLVM")
+    if not clang or not llvm:
+        raise SystemExit("pass --clang and --llvm (or set KINDI_CC and KINDI_LLVM) to name the CPU engine's toolchain")
+    return Path(clang).expanduser(), Path(llvm).expanduser()
+
 
 SYSTEM = ("The archive contains carefully indexed notes about weather, rivers, tools, "
           "and quiet places. " * 20).strip()
@@ -364,8 +374,10 @@ def main() -> int:
     ap.add_argument("--run-dir", type=Path, default=HERE / "server-runs")
     ap.add_argument("--out", type=Path, default=HERE / "server-results.json")
     ap.add_argument("--cpu-cache", type=Path, default=DEFAULT_CPU_CACHE)
-    ap.add_argument("--clang", type=Path, default=DEFAULT_CLANG)
-    ap.add_argument("--llvm", type=Path, default=DEFAULT_LLVM)
+    ap.add_argument("--clang", type=Path, default=None,
+                    help="the clang the CPU engine compiles with (default: KINDI_CC)")
+    ap.add_argument("--llvm", type=Path, default=None,
+                    help="the LLVM install root (default: KINDI_LLVM)")
     ap.add_argument("--cpu-layers", type=int, default=6)
     ap.add_argument("--ctx", type=int, default=512)
     ap.add_argument("--tokens", type=int, default=8)
@@ -374,8 +386,7 @@ def main() -> int:
     args = ap.parse_args()
     args.pack = args.pack.expanduser()
     args.cpu_cache = args.cpu_cache.expanduser()
-    args.clang = args.clang.expanduser()
-    args.llvm = args.llvm.expanduser()
+    args.clang, args.llvm = toolchain(args.clang, args.llvm)
 
     prompts = prompt_token_info(args.pack)
     print("prompt tokens:", [(p["tokens"], p["opening_end"]) for p in prompts["prompts"]],
