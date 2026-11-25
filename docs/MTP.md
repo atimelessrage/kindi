@@ -11,9 +11,30 @@ The output is exactly the same as without MTP. MTP changes only the speed.
 Kindi has one head: `kindi-mtp-2b-v1.npz` (61 MB), for Ternary-Bonsai-2-2B. It is our own work.
 
 The Bonsai 2.5 27B `-mtp` GGUF carries its own draft head as a 65th block. `kindi convert` accepts
-that file and builds the 64-layer base model's pack, recording the head block in `kindi_pack.json`,
-but Kindi does not draft with that head: `MTPDraft` is written for the registered 2B head's geometry
-on the tensor-core plan engine, and a 27B head has not been converted, wired or measured here.
+that file and builds the 64-layer base model's pack, recording the head block in `kindi_pack.json`.
+
+### The 2.5 27B head on the CPU engine (2026-11-25)
+
+`kindi/mtp_cpu.py` runs that head on the CPU engine. The block is one Qwen3.5 decoder layer plus the
+four `nextn` tensors (`enorm`, `hnorm`, `eh_proj`, `shared_head_norm`), stored Q4_0 in the `-mtp`
+file; the head predicts with the main model's own `output.weight`, so it needs no second vocabulary
+and no second head. Its row for position `q` reads the main model's residual at `q` and the token at
+`q + 1` and predicts the token at `q + 2`, the same convention as `kindi/mtp.py`. The eight Q4_0
+matrices run through `kc_q4gemv` in `kindi/kcpu.c`; the norms, RoPE and the gated attention over the
+head's own 64-position window are NumPy at 5,120/24 heads, and the argmax is the pack's folded
+output head through `Engine.gemv_rows` (the input is folded with the pack's own signs and Hadamard
+block, which is what makes the pack's folded matrix and the head's float32 output agree).
+
+**On the CPU this drafts and scores, it does not yet accelerate.** `kindi/cpu.py` decodes one row per
+forward pass, so confirming a draft costs exactly the pass plain decoding would have run; there is
+nothing for a speculative loop to skip. `kindi.mtp_cpu.score_drafts` therefore decodes exactly
+`Engine.generate` and compares the head's drafts with the model's own tokens: that is the
+acceptance measurement, and the tokens are asserted identical to plain greedy decoding. The road map
+carries the missing piece (a batched T-row verify in `kcpu.c`: one weight pass for T rows, per-row
+attention and GDN scan, T-row head) with the gate it has to clear. Until then, use the head for
+acceptance studies; `tools/mtp_cpu_bench.py --pack PACK --gguf <the -mtp file>` is the tool. The
+2026-11-25 run is still an untracked bench log, not an evidence page: it records the head's cost and its
+acceptance, and the acceptance is not yet good enough to wire the head as a win (road map CP1).
 
 - Download: https://huggingface.co/ahtx/kindi-mtp-heads (the installer downloads it and checks its sha256).
 - Base model: Ternary-Bonsai-2-2B by Prism ML (Apache-2.0).

@@ -39,6 +39,7 @@ DEFAULT_DIMS = {"layers": 24, "width": 2048, "ffn": 6144, "heads": 8, "kv_heads"
                 "rope_base": 1e7, "full_attention_interval": 4}
 HERE = os.path.dirname(os.path.abspath(__file__))
 F32 = np.float32
+_LIB: dict[str, Any] = {}                    # built library path -> loaded DLL, one load per path
 PF = ctypes.POINTER(ctypes.c_float)
 PU8 = ctypes.POINTER(ctypes.c_uint8)
 PU16 = ctypes.POINTER(ctypes.c_uint16)
@@ -265,6 +266,8 @@ def _lib():
     if not os.path.exists(so) or os.path.getmtime(so) < os.path.getmtime(src):
         check_features()
         _build(src, so, isa)
+    if _LIB.get(so) is not None:
+        return _LIB[so]
     if os.name == "nt":
         root = _llvm_root(_find_cc())
         if root and os.path.isdir(os.path.join(root, "bin")):
@@ -287,9 +290,12 @@ def _lib():
     lib.kc_layer_ffn_input.restype = ctypes.c_int
     lib.kc_gemv.argtypes = [ctypes.POINTER(Model), ctypes.POINTER(Mat), PF, PF]
     lib.kc_gemv.restype = ctypes.c_int
+    lib.kc_q4gemv.argtypes = [PU8, PF, PF, ctypes.c_int, ctypes.c_int]
+    lib.kc_q4gemv.restype = ctypes.c_int
     lib.kc_head.argtypes = [ctypes.POINTER(Model)]
     lib.kc_head.restype = ctypes.c_int
     assert lib.kc_sizeof_model() == ctypes.sizeof(Model) and lib.kc_sizeof_layer() == ctypes.sizeof(Layer)
+    _LIB[so] = lib
     return lib
 
 
@@ -570,6 +576,25 @@ def paircodes(codes, R, C, chunk=4096):
     return out
 
 
+def q4_gemv(W, x, R, C):
+    """y = W x for a Q4_0 matrix outside a Model (R rows of C values, 18 bytes per 32 values).
+
+    The 2.5 -mtp draft head is stored Q4_0 and is not part of the pack, so it cannot use the pack's
+    pair-code Mat: this is the same memory-bound row loop in C instead of a per-token dequantise in Python.
+    """
+    W = np.ascontiguousarray(W, dtype=np.uint8)
+    x = np.ascontiguousarray(x, dtype=F32)
+    R, C = int(R), int(C)
+    if W.size != R * (C // 32) * 18 or C % 32:
+        raise ValueError("kindi: Q4_0 matrix is %d bytes, expected %d for %dx%d" % (W.size, R * (C // 32) * 18, R, C))
+    if x.shape != (C,):
+        raise ValueError("kindi: Q4_0 input has shape %r, expected (%d,)" % (x.shape, C))
+    y = np.empty(R, dtype=F32)
+    if _lib().kc_q4gemv(_p(W, PU8), _p(x), _p(y), R, C):
+        raise ValueError("kindi: the CPU Q4_0 GEMV rejected a %dx%d matrix" % (R, C))
+    return y
+
+
 def _p(a, t: Any = PF) -> Any:
     return a.ctypes.data_as(t)
 
@@ -578,6 +603,7 @@ class Engine(object):
     def __init__(self, pack, ctx=4096, clusters=None, log=print, threads=None, layers=None, embed=True, head=True,
                  head_rows=None):
         t0 = time.time()
+        self.pack = pack
         self.threads = _configure_threads(threads)
         self.lib = _lib()
         self.isa = getattr(self.lib, "kindi_isa", "native")

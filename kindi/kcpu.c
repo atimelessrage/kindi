@@ -557,6 +557,32 @@ KC_API int kc_gemv(Model* m, const Mat* A, const float* x, float* y){
   return 0;
 }
 
+/* Q4_0 GEMV for a matrix that is not part of the Model (the Bonsai 2.5 -mtp draft head, stored Q4_0):
+   blocks of 32 values, 18 bytes each (one fp16 scale then 16 packed nibbles; element j < 16 is the low
+   nibble of qs[j] and element j + 16 its high nibble).  y[r] = sum_c W[r][c] x[c], C a multiple of 32.
+   Rows are independent, so the loop is the parallel region; the caller owns the buffers. */
+KC_API int kc_q4gemv(const uint8_t* W, const float* x, float* y, int R, int C){
+  if(!W || !x || !y || R <= 0 || C <= 0 || C % 32) return -1;
+  const int nb = C / 32;
+  #pragma omp parallel for schedule(static)
+  for(int r = 0; r < R; ++r){
+    const uint8_t* p = W + (size_t)r * nb * 18;
+    float acc = 0.f;
+    for(int b = 0; b < nb; ++b, p += 18){
+      const float d = h2f(*(const uint16_t*)p);
+      const uint8_t* qs = p + 2;
+      float s = 0.f;
+      for(int j = 0; j < 16; ++j){
+        s += (float)((int)(qs[j] & 15u) - 8) * x[b * 32 + j];
+        s += (float)((int)(qs[j] >> 4) - 8) * x[b * 32 + 16 + j];
+      }
+      acc += d * s;
+    }
+    y[r] = acc;
+  }
+  return 0;
+}
+
 KC_API int kc_head(Model* m){
   int best = -1;
   t_last = omp_get_wtime(); t_cur = 0;

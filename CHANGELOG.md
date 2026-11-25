@@ -36,6 +36,24 @@
   research. Both round-5 reports are triaged in
   [docs/development/AUDIT-TRIAGE-2026-11-25-round5.md](docs/development/AUDIT-TRIAGE-2026-11-25-round5.md).
 
+## The Bonsai 2.5 27B MTP head runs on the CPU engine (2026-11-25)
+
+- **`kindi/mtp_cpu.py` loads the `-mtp` GGUF's 65th block and drafts with it.** The block is one
+  Qwen3.5 decoder layer (gated attention, q/k norms, a 17,408-wide FFN) plus `nextn.{enorm,hnorm,
+  eh_proj,shared_head_norm}`, stored Q4_0; the head predicts with the main model's own folded
+  `output.weight`, so there is no second vocabulary and no second head. `kindi/kcpu.c` gained
+  `kc_q4gemv` for the eight Q4_0 matrices (`cpu.q4_gemv`), and norms, RoPE and the head's own
+  64-position gated attention run in NumPy at 5,120 wide / 24 heads.
+- **`kindi.mtp_cpu.score_drafts` decodes exactly `Engine.generate` and scores the head's drafts
+  against those tokens**, which is the CPU acceptance measurement: `kindi/cpu.py` verifies one row
+  per forward pass, so a draft cannot skip work yet. `tools/mtp_cpu_bench.py` writes the run
+  (ids, per-depth match counts, head cost per row) to JSON; the 2026-11-25 run is still an untracked
+  bench log, with no evidence page and no speed claim.
+- **Road map:** the CPU rows CP1 (batched T-row verify in `kcpu.c`) and CP2 (the 2B pack as the CPU
+  drafter) carry the gate that would turn the head's acceptance into throughput; I8's Arc row now
+  records that the head drafts on the CPU instead. `docs/MTP.md` no longer says the 27B head is
+  unwired.
+
 ## Round-4 audit: a wider path rule, portable benchmark scripts, visible backend limits (2026-11-25)
 
 - **The secret scan now catches a forward-slash drive root whose directory name has a space**

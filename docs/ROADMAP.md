@@ -935,7 +935,8 @@ driver's OpenCL C 1.2 profile exposes any of it at all (it may need ESIMD/SYCL i
 | I5 | fp16/bf16 vector path for norms, RoPE, attention | The current probe only covers ternary matmuls; a real token also pays attention, GDN state and norms, none of which has an Arc kernel | Implement one layer's non-ternary ops in SYCL, compare against the CPU engine's intermediate values on the 2B before any 27B work | proposed; no kernel exists |
 | I6 | Split-K / multi-queue over Xe-cores | One queue may not saturate 560 GB/s at 5,120-wide rows; independent phase ranges on two queues are the cheap experiment | 17,408 x 5,120: two queues versus one, **>=1.1x** GB/s with identical ids | proposed; driver-level queue behaviour on this driver is unmeasured |
 | I7 | Bit-plane popcount versus DP4A versus DPAS | A 1.58-bit format invites popcount tricks, but the Intel vector engine's popcount rate and the extra masking may lose to integer dots | Same shape, three kernels, bit-exact, rank by effective GB/s; keep the best and record the others as no-go | proposed; often slower than expected, which is why it is gated |
-| I8 | 27B MTP head drafting on Arc | The `-mtp` file's head is recorded but unused anywhere; on Arc a 65th-block drafter would need its own kernel and accept/reject loop | Only after a working 27B decode path: token-exact at k=1 and **>=1.15x** tokens/s at 4K context, else no-go | proposed; blocked on I1-I5 and on a 27B backend |
+| I8 | 27B MTP head drafting on Arc | The `-mtp` file's head is recorded but unused anywhere; on Arc a 65th-block drafter would need its own kernel and accept/reject loop | Only after a working 27B decode path: token-exact at k=1 and **>=1.15x** tokens/s at 4K context, else no-go | proposed; blocked on I1-I5 and on a 27B backend. Since 2026-11-25 the head drafts on the **CPU** engine instead (`kindi/mtp_cpu.py`; acceptance in an
+untracked `bench-logs/` run, no page and no speed claim), which is not an Arc path: Arc still needs I1-I5 |
 
 The OpenCL probe's numbers are a projection, not a model run: they exclude attention, norms, the GDN
 state update and the f32 output-head work, so a real backend will be slower than the projection. A
@@ -970,6 +971,20 @@ statement on this pack | proposed; the card argues against it |
 
 The sampling harness gap behind both rows: `tools/bonsai_sampling_bench.py` records ids and
 fingerprints, not thinking length, so the measurement they need does not exist yet.
+
+## MTP drafting on the CPU (2026-11-25)
+
+The Bonsai 2.5 27B `-mtp` head now runs on the CPU engine (`kindi/mtp_cpu.py`): it loads blk.64 from
+the `-mtp` GGUF, drafts k tokens with the main model's own output head, and
+`kindi.mtp_cpu.score_drafts` scores those drafts against exactly the model's greedy tokens. What it
+cannot do yet is make the CPU faster: `kindi/cpu.py` decodes one row per forward pass, so confirming a
+draft costs the pass plain decoding would have run, and a speculative loop has nothing to skip. Both
+rows below are **gate only** - the head and its acceptance are measured, neither row is.
+
+| # | item | why it might pay | first gate | status |
+|---|---|---|---|---|
+| CP1 | batched T-row verify in `kcpu.c` | verification is one pass per token today, so k drafts cost k passes and the head's work is pure overhead; one weight pass over T rows (pair-code GEMV with T accumulators, per-row attention and GDN scan, a T-row head) turns the same 6.75 GB of traffic into up to T tokens, which is where the head's acceptance finally pays | 2.5 27B pack, ctx 2048, greedy, k=4: 4/4 prompts token-exact against plain CPU decode **and >=1.25x** tokens/s on the same host, with the acceptance rate recorded; a miss is a no-go | proposed; the drafter and its acceptance measurement exist (2026-11-25) |
+| CP2 | the 2B pack as the CPU drafter (mode B0's `KINDI_SPEC=draft2b` pack) | mode B0 already drafts with the 2B for the 27B on the card; on the CPU it needs no Q4_0 head and no new kernel, only the same batched verify, and one 2B draft costs a thirteenth of a 27B pass | the CP1 gate, with the 2B pack as the drafter and its acceptance rate recorded against the 27B's own tokens | proposed; blocked on CP1 - a single-row verify makes it slower for the same reason |
 
 ## Vision projector as a host-RAM tier (2026-11-25)
 
@@ -1006,7 +1021,7 @@ refuses image parts with a 400, so this is the placement decision and its accoun
 | V3 | splice the merged tokens into the prompt and refuse mismatched counts | one image request answers; a text request is unchanged and token-exact |
 | V4 | placement parity: the projector resident in host RAM (the default) and on the card | identical tokens in both placements; `/health` reports the same residency numbers |
 
-Steps V1 and V2 need a reference (llama.cpp's own `mmproj` path, pinned by commit) - that is the
+Steps V1 and V2 need a reference (llama.cpp's own `mmproj` path, pinned by commit) — that is the
 manual-help item, not a Kindi measurement.
 
 ## Standing rules
