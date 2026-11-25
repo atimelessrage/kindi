@@ -37,14 +37,14 @@ param(
   [switch]$NoDesktopShortcut,
   [switch]$NoReboot,          # after WSL is turned on, do not restart: you restart, the install continues then
   [string]$AppName = 'Kindi', # the name of the shortcuts, the Settings entry and the data folder (tests use another)
-  [string]$ScriptUrl = 'https://github.com/atimelessrage/kindi/releases/download/v0.7.1-fork/install.ps1',
+  [string]$ScriptUrl = 'https://github.com/atimelessrage/kindi/releases/download/v0.7.2-fork/install.ps1',
   [switch]$Resume,            # internal: the run after the restart
   [switch]$ElevatedEnableWsl  # internal: the administrator step that turns on WSL
 )
 
 # Must equal kindi/__init__.py:VERSION and install.sh:KINDI_VERSION; tests/test_version_consistency.py
 # pins all three together so a release cannot ship a Windows installer that fetches the old bundle.
-$KindiWinVersion = '0.7.1-fork'
+$KindiWinVersion = '0.7.2-fork'
 $RootfsBase = 'https://cloud-images.ubuntu.com/wsl/releases/24.04/current'
 $RootfsFile = 'ubuntu-noble-wsl-amd64-wsl.rootfs.tar.gz'
 $MinBuild = 19041      # Windows 10 2004: WSL2

@@ -21,6 +21,7 @@ import time
 import urllib.request
 
 from .api.auth import bearer_matches
+from .api.errors import error_body
 from .jsonio import load_json
 
 HOP = {"connection", "keep-alive", "proxy-connection", "transfer-encoding", "upgrade", "host", "content-length"}
@@ -93,7 +94,7 @@ class Router(object):
         except Exception as e:  # noqa: BLE001 - one bad request never stops the router
             self.log("error: %r" % e)
             try:
-                await self._reply(writer, 502, {"error": {"message": "kindi route: %s" % e, "type": "server_error"}})
+                await self._reply(writer, 502, error_body("kindi route: %s" % e, "server_error"))
             except Exception:  # noqa: BLE001
                 pass
         finally:
@@ -115,8 +116,7 @@ class Router(object):
         try:
             head = await reader.readuntil(b"\r\n\r\n")
         except asyncio.LimitOverrunError:
-            return await self._reply(writer, 431, {"error": {"message": "the header block is too large",
-                                                              "type": "invalid_request_error"}})
+            return await self._reply(writer, 431, error_body("the header block is too large"))
         lines = head.decode("latin-1").split("\r\n")
         method, path, _ = (lines[0].split(" ", 2) + ["", ""])[:3]
         hdr = []
@@ -126,21 +126,18 @@ class Router(object):
                 hdr.append((k.strip(), v.strip()))
         hl = {k.lower(): v for k, v in hdr}
         if hl.get("transfer-encoding", "").lower() == "chunked":
-            return await self._reply(writer, 411, {"error": {"message": "send a Content-Length", "type": "invalid_request_error"}})
+            return await self._reply(writer, 411, error_body("send a Content-Length"))
         try:
             n = int(hl.get("content-length") or 0)
         except ValueError:
-            return await self._reply(writer, 400, {"error": {"message": "Content-Length is not a number",
-                                                              "type": "invalid_request_error"}})
+            return await self._reply(writer, 400, error_body("Content-Length is not a number"))
         if n < 0:
-            return await self._reply(writer, 400, {"error": {"message": "Content-Length is negative",
-                                                              "type": "invalid_request_error"}})
+            return await self._reply(writer, 400, error_body("Content-Length is negative"))
         if n > MAX_BODY_BYTES:
-            return await self._reply(writer, 413, {"error": {"message": "the request body is too large",
-                                                              "type": "invalid_request_error"}})
+            return await self._reply(writer, 413, error_body("the request body is too large"))
         body = await reader.readexactly(n) if n else b""
         if not bearer_matches(hl.get("authorization", ""), self.key):
-            return await self._reply(writer, 401, {"error": {"message": "wrong or missing API key", "type": "invalid_request_error"}})
+            return await self._reply(writer, 401, error_body("wrong or missing API key", "authentication_error"))
         p = path.split("?", 1)[0]
         if method == "GET" and p in ("/v1/models", "/models"):
             return await self._reply(writer, 200, await asyncio.get_event_loop().run_in_executor(None, self.models))
@@ -159,14 +156,14 @@ class Router(object):
             try:
                 model = json.loads(body.decode("utf-8")).get("model")
             except (ValueError, AttributeError):
-                return await self._reply(writer, 400, {"error": {"message": "the body is not JSON", "type": "invalid_request_error"}})
+                return await self._reply(writer, 400, error_body("the body is not JSON"))
         name = await asyncio.get_event_loop().run_in_executor(None, self.pick, model)
         if name is None:
             avail = [m["id"] for m in (await asyncio.get_event_loop().run_in_executor(None, self.models))["data"]]
-            return await self._reply(writer, 404, {"error": {
-                "message": "no server for model %r; the models here: %s" % (model, ", ".join(avail)) if model else
+            return await self._reply(writer, 404, error_body(
+                "no server for model %r; the models here: %s" % (model, ", ".join(avail)) if model else
                 "several servers: say which one with \"model\" (%s)" % ", ".join(avail),
-                "type": "invalid_request_error", "code": "model_not_found"}})
+                code="model_not_found", param="model"))
         base = self.backends[name][0]
         hostport = base.split("//", 1)[1].rstrip("/")
         host, _, port = hostport.partition(":")

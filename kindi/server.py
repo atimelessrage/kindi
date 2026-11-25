@@ -566,6 +566,9 @@ class Kindi(GrammarPrewarm):
         family = served_backend(man)
         self.pack_id = (man.get("source_sha256") or "pack")[:12]
         self.native = family == "kindi_gemma4"
+        if cfg.get("lora") and family not in (None, ""):
+            raise SystemExit("kindi: LoRA adapters apply to dense Ternary-Bonsai packs; the %r backend "
+                             "does not load one" % family)
         self.busy = {"active": False, "phase": "", "prompt_tokens": 0, "cached": 0, "read": 0, "generated": 0,
                      "started": 0.0}
         self.nanbeige = None
@@ -609,9 +612,11 @@ class Kindi(GrammarPrewarm):
                 cl_path = os.path.join(pack, "head_clusters.npz")
                 if os.path.exists(cl_path):
                     clusters = dict(np.load(cl_path, allow_pickle=False))
+            from . import lora as _lora
             self.eng = make_engine(pack, ctx=cfg["ctx"], clusters=clusters, log=log, tandem=tandem,
                                    cpu_layers=cfg.get("tandem_cpu_layers"),
-                                   gpu=cfg.get("tandem_gpu"))
+                                   gpu=cfg.get("tandem_gpu"),
+                                   lora=_lora.resolve(cfg.get("lora", ""), pack, log=log))
             self.tok = Tok(self.eng.vocab, os.path.join(pack, "merges.txt"))
             if tandem != "off":
                 from .tandem import TandemRunner
@@ -1529,8 +1534,8 @@ def create_app(cfg, log=print):
         """a ValueError of a request as HTTP 400; an oai.RequestError also names the field (#38)"""
         p = getattr(e, "param", None)
         if p:
-            return JSONResponse({"error": {"message": str(e), "type": "invalid_request_error", "param": p,
-                                           "code": "unsupported_" + p}}, status_code=400)
+            code = "unsupported_" + p if p in ("tool_choice", "response_format") else None
+            return JSONResponse(api_errors.error_body(str(e), code=code, param=p), status_code=400)
         return _err(400, str(e))
 
     def _auth(request):
@@ -1781,7 +1786,8 @@ def create_app(cfg, log=print):
                     "prompt_tokens": b["prompt_tokens"], "reused": b["cached"],
                     "prompt_read": "%d/%d" % (b["read"], b["prompt_tokens"] - b["cached"]), "generated": b["generated"]}
         rt = runtime_view.describe(cfg, K.eng, K)
-        body.update({"head": rt["head"], "uptime_s": round(time.time() - K.t0), "busy": busy, "stats": K.stats,
+        body.update({"head": rt["head"], "lora": getattr(K.eng, "lora_hash", None),
+                     "uptime_s": round(time.time() - K.t0), "busy": busy, "stats": K.stats,
                      "drafting": rt["spec"],
                      "runtime": rt,
                      "queue": {"waiting": gate.waiting, "max": gate.max_queue, "rejected": gate.rejected,
@@ -2221,12 +2227,12 @@ def create_app(cfg, log=print):
                                 inc = (req.get("stream_options") or {}).get("include_usage")
                                 yield chunk({}, info["finish"], info["usage"] if inc else None)
                     except OverflowError as e:
-                        yield "data: " + json.dumps({"error": {"message": str(e), "type": "invalid_request_error",
-                                                               "code": "context_length_exceeded"}}) + "\n\n"
+                        yield "data: " + json.dumps(api_errors.error_body(str(e), code="context_length_exceeded",
+                                                                         param="messages")) + "\n\n"
                     except ValueError as e:
-                        yield "data: " + json.dumps({"error": {"message": str(e), "type": "invalid_request_error"}}) + "\n\n"
+                        yield "data: " + json.dumps(api_errors.error_body(str(e))) + "\n\n"
                     except Exception as e:  # noqa: BLE001 - engine failure becomes an SSE error event, by design
-                        yield "data: " + json.dumps({"error": {"message": "kindi: %s" % e, "type": "server_error"}}) + "\n\n"
+                        yield "data: " + json.dumps(api_errors.error_body("kindi: %s" % e, "server_error")) + "\n\n"
                         _after_engine_error(V, e)
                     yield "data: [DONE]\n\n"
                     if not cancel.is_set():
@@ -2268,13 +2274,11 @@ def create_app(cfg, log=print):
         def failed(e):
             """(status, body) of a request that raised"""
             if isinstance(e, OverflowError):
-                return 400, {"error": {"message": str(e), "type": "invalid_request_error", "param": "messages",
-                                       "code": "context_length_exceeded"}}
+                return 400, api_errors.error_body(str(e), code="context_length_exceeded", param="messages")
             if isinstance(e, ValueError):
-                return 400, {"error": {"message": str(e), "type": "invalid_request_error",
-                                       "code": "invalid_request_error"}}
+                return 400, api_errors.error_body(str(e))
             _after_engine_error(K, e)
-            return 500, {"error": {"message": "kindi: %s" % e, "type": "server_error", "code": "server_error"}}
+            return 500, api_errors.error_body("kindi: %s" % e, "server_error")
 
         # kindi_keepalive (or the header X-Kindi-Keepalive: 1): a non-streaming client behind a proxy with an idle
         # timeout gets a space every KEEPALIVE_S until the JSON answer. JSON allows whitespace before the value, but
@@ -2291,8 +2295,8 @@ def create_app(cfg, log=print):
                         yield " "
                     try:
                         info = fut.result()
-                        out = answer(info) if info is not None else {"error": {"message": "request cancelled",
-                                                                               "type": "cancelled"}}
+                        out = answer(info) if info is not None else api_errors.error_body("request cancelled",
+                                                                                        "cancelled")
                     except Exception as e:  # noqa: BLE001
                         out = failed(e)[1]
                     yield json.dumps(out, ensure_ascii=False)

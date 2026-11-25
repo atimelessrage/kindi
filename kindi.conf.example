@@ -25,6 +25,9 @@ log_json = 0
 
 # --- engine
 ctx = 24576
+# LoRA adapter: a PEFT folder (or the hash of one converted into the pack). Dense GPU engine only:
+# the plan engine needs KINDI_TP=0, and the CPU and tandem engines refuse it.
+lora =
 head = exact
 fast_clusters = 256
 # CPU+GPU tandem: cap the GPU side at this many MiB (0: no ceiling) and leave this much free for the

@@ -17,14 +17,14 @@ Download the script, compare its sha256 with the value below, read it, and then 
 the path the project supports: the checksum covers the file you actually execute.
 
 ```bash
-curl -fsSLO https://github.com/atimelessrage/kindi/releases/download/v0.7.1-fork/install.sh
+curl -fsSLO https://github.com/atimelessrage/kindi/releases/download/v0.7.2-fork/install.sh
 echo "b38de76f9f9beef216d4ac3c832c3c0ce881e08f2db5b11ee04e067e5f28fd40  install.sh" | sha256sum -c -
 bash install.sh --dry-run     # show every step and command first
 bash install.sh
 ```
 
 `curl ... | bash` is convenient but verifies nothing; if you use that form, it runs the hosted file
-without the checksum block. The fork release tag is `v0.7.1-fork`; the older `v0.5.0-installer`
+without the checksum block. The fork release tag is `v0.7.2-fork`; the older `v0.5.0-installer`
 tag predates this tree and is not the current installer.
 
 On Windows 10 or 11, use the PowerShell installer. It sets up WSL2 and then runs this installer
@@ -32,21 +32,21 @@ inside it (see [WINDOWS.md](WINDOWS.md)). Download it and compare the hash below
 copy before running rather than piping it straight into `iex`:
 
 ```powershell
-Invoke-WebRequest https://github.com/atimelessrage/kindi/releases/download/v0.7.1-fork/install.ps1 -OutFile install.ps1
+Invoke-WebRequest https://github.com/atimelessrage/kindi/releases/download/v0.7.2-fork/install.ps1 -OutFile install.ps1
 Get-FileHash install.ps1      # compare with the table below
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-For Docker Compose, Podman, servers and automated installs, [CONTAINERS.md](CONTAINERS.md) lists the `0.7.1-fork`
+For Docker Compose, Podman, servers and automated installs, [CONTAINERS.md](CONTAINERS.md) lists the `0.7.2-fork`
 registry tags as **unpublished release targets**: they become live only after `kindi verify` passes on a real card for
 each backend and the release is published. Until then, the installer builds the same images on your computer, or
 [DOCKER.md](DOCKER.md) shows how to build them locally.
 
 | File | sha256 |
 |---|---|
-| `install.sh` (Kindi 0.7.1-fork) | `0035fa923c9db6f05371e180f4a8b14b2b5139d0d08b3a3ba3af07af5898bee4` |
-| `install.ps1` (Kindi 0.7.1-fork) | `3c9e725ed9b1270b957f95451c22e81a29b5d412b44770fd26f37ae412fb43b2` |
-| `kindi-0.7.1-fork.tar.gz` (source archive) | built at packaging time (`scripts/build_release_archive.py`); the hash is published with the release |
+| `install.sh` (Kindi 0.7.2-fork) | `0035fa923c9db6f05371e180f4a8b14b2b5139d0d08b3a3ba3af07af5898bee4` |
+| `install.ps1` (Kindi 0.7.2-fork) | `3c9e725ed9b1270b957f95451c22e81a29b5d412b44770fd26f37ae412fb43b2` |
+| `kindi-0.7.2-fork.tar.gz` (source archive) | built at packaging time (`scripts/build_release_archive.py`); the hash is published with the release |
 
 **What those values hash.** They are the exact release assets: the two installers and the source
 archive. The archive is built from the release tree and excludes the installers, the two
@@ -69,7 +69,7 @@ is not used by this fork release.
 | 1. Check the machine | Linux x86-64, AVX for the CPU engine, RAM, free disk, each NVIDIA GPU with its compute capability, and each AMD RDNA2, RDNA3 or RDNA 3.5 GPU. Without AVX, GPU setups remain available but CPU setups are not offered. | no |
 | 2. Docker and GPU access | Finds Docker, and the NVIDIA Container Toolkit or the AMD devices `/dev/kfd` and `/dev/dri`. If something is missing, it asks before it installs it (apt). Without the toolkit, it gives the container the NVIDIA devices and the driver libraries directly. | only to install |
 | 3. Select the setup | Shows each setup for this computer, the recommended one first, and asks which one (below). | no |
-| 4. Build the image | Builds `kindi:0.7.1-fork` (CUDA 10.2), `kindi-rocm:0.7.1-fork` (ROCm 6.3, RDNA2/RDNA3) or `kindi-rocm7:0.7.1-fork` (ROCm 7, RDNA 3.5) from the release source, and checks that the Kindi modules load. A re-run with the same source does not build again. | no |
+| 4. Build the image | Builds `kindi:0.7.2-fork` (CUDA 10.2), `kindi-rocm:0.7.2-fork` (ROCm 6.3, RDNA2/RDNA3) or `kindi-rocm7:0.7.2-fork` (ROCm 7, RDNA 3.5) from the release source, and checks that the Kindi modules load. A re-run with the same source does not build again. | no |
 | 5. Download the models | Downloads each GGUF from Hugging Face. The sha256 must match the value in the script (table below). | no |
 | 6. Convert and verify | `kindi convert`, then `kindi verify` one time for each model on each kind of card. | no |
 | 7. Start the servers | One Docker container for each server, with `--restart unless-stopped`, on `127.0.0.1`. It waits until each `/health` answers, then runs `kindi selftest --url` inside that container (`--no-selftest` skips the check). | no |
@@ -268,7 +268,7 @@ curl http://<address>:8093/v1/chat/completions -H 'Content-Type: application/jso
 | `--name N` | The name of the first container (default `kindi`; later ones are `N-2`, `N-3`, ...). |
 | `--threads N` | The CPU engine: the number of threads. |
 | `--memory M` | The container memory limit, for example `8g`. |
-| `--source S` | The Kindi source: a folder, or a `.tar.gz` path or URL (default: the 0.7.1-fork release). |
+| `--source S` | The Kindi source: a folder, or a `.tar.gz` path or URL (default: the 0.7.2-fork release). |
 | `--with-bridge` | Also installs Kindi Bridge, the terminal workspace for agents on Kindi (see below). |
 | `--no-bridge` | Does not ask about Kindi Bridge. |
 | `--bridge-source D` | Installs Kindi Bridge from folder D (default: `bridge/` in the Kindi source). |

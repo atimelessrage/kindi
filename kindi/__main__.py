@@ -673,6 +673,7 @@ def _build_parser():
     p.add_argument("--pack")
     p.add_argument("--state-dir", dest="state_dir")
     p.add_argument("--ctx", type=int)
+    p.add_argument("--lora", help="LoRA adapter: a PEFT folder, or the hash of one converted into the pack")
     p.add_argument("--version", action="version", version="kindi " + __version__)
     sub = p.add_subparsers(dest="cmd")
     s = sub.add_parser("convert", help="build the weight pack from the GGUF")
@@ -868,7 +869,8 @@ def _build_parser():
 
 def _apply_overrides(a):
     """Merge the global CLI options into the config; command-only values stay on `a`."""
-    ov = {k: getattr(a, k, None) for k in ("pack", "state_dir", "ctx", "host", "port", "api_key", "head")}
+    ov = {k: getattr(a, k, None) for k in ("pack", "state_dir", "ctx", "host", "port", "api_key", "head",
+                                       "lora")}
     cfg = C.load(a.config, ov)
     if getattr(a, "tandem", None) is not None:
         cfg["tandem"] = a.tandem

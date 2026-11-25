@@ -123,6 +123,7 @@ class BonsaiBackend(Backend):
             tandem=config.get("tandem") or "off",
             cpu_layers=config.get("cpu_layers"),
             gpu=config.get("gpu"),
+            lora=config.get("lora"),
         )
         self.tok = Tok(self.engine.vocab, os.path.join(pack, "merges.txt"))
         self.variant = template_variant(self.man)

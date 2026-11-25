@@ -1,19 +1,20 @@
-<p align="center"><img src="assets/kindi-banner.svg?v=0.7.1-fork" alt="Kindi 0.7.1-fork: language models on low-cost GPUs, from a 1 GB Quadro K420 to the RTX 50 series, the CMP 170HX and Radeon graphics. Ternary Bonsai 2B to 27B, AH-Nanbeige4.3-33B, Nemotron 3.5 Lightning 30B-A3B and DeepSeek-V4.1-Flash." width="100%"></p>
+<p align="center"><img src="assets/kindi-banner.svg?v=0.7.2-fork" alt="Kindi 0.7.2-fork: language models on low-cost GPUs, from a 1 GB Quadro K420 to the RTX 50 series, the CMP 170HX and Radeon graphics. Ternary Bonsai 2B to 27B, AH-Nanbeige4.3-33B, Nemotron 3.5 Lightning 30B-A3B and DeepSeek-V4.1-Flash." width="100%"></p>
 
-# Kindi 0.7.1-fork
+# Kindi 0.7.2-fork
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Commercial licenses available](https://img.shields.io/badge/commercial%20licenses-available-green.svg)](COMMERCIAL-LICENSE.md)
-[![Fork release v0.7.1-fork](https://img.shields.io/badge/release-v0.7.1--fork-lightgrey.svg)](https://github.com/atimelessrage/kindi/releases/tag/v0.7.1-fork)
+[![Fork release v0.7.2-fork](https://img.shields.io/badge/release-v0.7.2--fork-lightgrey.svg)](https://github.com/atimelessrage/kindi/releases/tag/v0.7.2-fork)
 
 Kindi is a custom inference engine for language models on low-cost GPUs. It runs Prism ML's ternary
 Bonsai models (2B, 4B, 9B and 27B), AH-Nanbeige4.3-33B, Nemotron 3.5 Lightning 30B-A3B, DeepSeek-V4.1-Flash and Qwen3.8-Flash-Next.
 Kindi supports NVIDIA cards from the 1 GB Quadro K420 (Kepler) to the RTX 50 series and the CMP 170HX. It also
 supports AMD Radeon 780M, 840M and 8060S graphics, and x86-64 CPUs. The OpenAI-compatible server has a prompt
 cache, tool calls, a thinking mode and speculative decoding. With the exact head, the greedy output is the same as
-the output of llama.cpp for the same model file, token for token. Version 0.7.1-fork is this fork's release, now based
-on official Kindi 0.7.1 (`1cb59d2`): it carries every 0.7.1 feature (Inkling 2 Mini, Flash-Next sampled drafting,
-physical-core CPU threads) plus the fork's own plan/tensor-core/tandem/session work, and it is not an official release.
+the output of llama.cpp for the same model file, token for token. Version 0.7.2-fork is this fork's release, now based
+on official Kindi 0.7.2 (`22af8d4`): it carries every 0.7.2 feature (LoRA adapters for the ternary Bonsai models, one
+OpenAI error body on every endpoint), every 0.7.1 feature (Inkling 2 Mini, Flash-Next sampled drafting, physical-core
+CPU threads) plus the fork's own plan/tensor-core/tandem/session work, and it is not an official release.
 
 ### Measured speed
 
@@ -62,16 +63,16 @@ The measured cards and the per-card settings: [docs/CARDS.md](docs/CARDS.md).
 Linux x86-64:
 
 ```bash
-curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.7.1-fork/install.sh | bash
+curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.7.2-fork/install.sh | bash
 ```
 
 Windows 10 and 11 (PowerShell; the installer sets up WSL2):
 
 ```powershell
-irm https://github.com/atimelessrage/kindi/releases/download/v0.7.1-fork/install.ps1 | iex
+irm https://github.com/atimelessrage/kindi/releases/download/v0.7.2-fork/install.ps1 | iex
 ```
 
-Both one-liners fetch the `v0.7.1-fork` release artifacts. That release is not published yet (the fork's releases page
+Both one-liners fetch the `v0.7.2-fork` release artifacts. That release is not published yet (the fork's releases page
 still carries only `v0.5.0-installer`), so until the release owner uploads it those two URLs return 404; a checkout
 runs the same installers directly (`bash install.sh --dry-run`).
 
@@ -164,9 +165,9 @@ context to the free card memory. On the K420 1 GB, Kindi uses about 870 MB of it
 
 ### Containers: release-target images
 
-The fork's `0.7.1-fork` container tags are **release targets, not published images**:
-`ghcr.io/atimelessrage/kindi` with tags `0.7.1-fork-cuda` (NVIDIA and the CPU engine),
-`0.7.1-fork-rocm6` (AMD RDNA3) and `0.7.1-fork-rocm7` (AMD RDNA 3.5). They become live only
+The fork's `0.7.2-fork` container tags are **release targets, not published images**:
+`ghcr.io/atimelessrage/kindi` with tags `0.7.2-fork-cuda` (NVIDIA and the CPU engine),
+`0.7.2-fork-rocm6` (AMD RDNA3) and `0.7.2-fork-rocm7` (AMD RDNA 3.5). They become live only
 after `kindi verify` passes on a real card for each backend and the release is published; this
 bundle has not pushed them. The moving `cuda`, `latest`, `rocm6` and `rocm7` tags move only at
 publication. Until then, build locally below.
@@ -189,22 +190,22 @@ exactly that.
 
 ```sh
 git clone https://github.com/atimelessrage/kindi.git && cd kindi
-docker build -t kindi:0.7.1-fork -f docker/Dockerfile .   # downloads the CUDA 10.2 toolkit (~2.5 GB), ~15 minutes
+docker build -t kindi:0.7.2-fork -f docker/Dockerfile .   # downloads the CUDA 10.2 toolkit (~2.5 GB), ~15 minutes
 ```
 
-For AMD RDNA3 graphics, build `docker/Dockerfile.rocm` instead (`kindi-rocm:0.7.1-fork`, about 6 GB to download). For
-RDNA 3.5 graphics, build `docker/Dockerfile.rocm7` (`kindi-rocm7:0.7.1-fork`, about 9 GB to download). See
+For AMD RDNA3 graphics, build `docker/Dockerfile.rocm` instead (`kindi-rocm:0.7.2-fork`, about 6 GB to download). For
+RDNA 3.5 graphics, build `docker/Dockerfile.rocm7` (`kindi-rocm7:0.7.2-fork`, about 9 GB to download). See
 [docs/AMD.md](docs/AMD.md).
 
-You can also use the release archive. Download `kindi-0.7.1-fork.tar.gz` from the
-[v0.7.1-fork release](https://github.com/atimelessrage/kindi/releases/tag/v0.7.1-fork), then run
-`tar xzf kindi-0.7.1-fork.tar.gz && cd kindi-0.7.1-fork` and build the image with the same `docker build` command.
+You can also use the release archive. Download `kindi-0.7.2-fork.tar.gz` from the
+[v0.7.2-fork release](https://github.com/atimelessrage/kindi/releases/tag/v0.7.2-fork), then run
+`tar xzf kindi-0.7.2-fork.tar.gz && cd kindi-0.7.2-fork` and build the image with the same `docker build` command.
 
 Check that Docker sees the GPU (create `~/.kindi` first, so it belongs to you and not to root):
 
 ```sh
 mkdir -p ~/.kindi
-docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.7.1-fork info
+docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.7.2-fork info
 ```
 
 To prove a built image end to end (pack, tokenizer, engine, `/health` and one chat, all inside
@@ -243,7 +244,7 @@ Convert it once into Kindi's weight pack (about a minute; exact - the same weigh
 
 ```sh
 # Docker
-docker run --rm -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.7.1-fork convert /data/Ternary-Bonsai-2-2B-PTQ1_0.gguf
+docker run --rm -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.7.2-fork convert /data/Ternary-Bonsai-2-2B-PTQ1_0.gguf
 # native
 python3 -m kindi convert ~/.kindi/Ternary-Bonsai-2-2B-PTQ1_0.gguf          # writes ~/.kindi/pack
 ```
@@ -251,7 +252,7 @@ python3 -m kindi convert ~/.kindi/Ternary-Bonsai-2-2B-PTQ1_0.gguf          # wri
 Check the engine against llama.cpp's reference output:
 
 ```sh
-docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.7.1-fork verify
+docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.7.2-fork verify
 ```
 
 ```
@@ -270,14 +271,14 @@ measures the generation speed (see [Performance](#performance)).
 Optional - build the cluster file for the fast output head (about 2 minutes):
 
 ```sh
-docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.7.1-fork fast-head
+docker run --rm --gpus all -u $(id -u):$(id -g) -v ~/.kindi:/data kindi:0.7.2-fork fast-head
 ```
 
 ## Run the server
 
 ```sh
 docker run -d --name kindi --restart unless-stopped --gpus all -u $(id -u):$(id -g) \
-    -p 127.0.0.1:8093:8093 -v ~/.kindi:/data kindi:0.7.1-fork
+    -p 127.0.0.1:8093:8093 -v ~/.kindi:/data kindi:0.7.2-fork
 # native:  python3 -m kindi serve
 ```
 
@@ -346,6 +347,26 @@ The output layer scores all 248,320 vocabulary entries for every generated token
 
 To change the head while the server runs, with no restart, use `kindi head fast` / `kindi head exact` (Docker:
 `docker exec kindi python3 -m kindi head fast`). `/health` shows the current mode in its detailed view (send `Authorization: Bearer <api_key>` when a key is configured).
+
+## LoRA adapters
+
+A PEFT adapter can be applied to the dense Bonsai models on the plain single-card GPU engine:
+
+```sh
+kindi --lora ./my-adapter serve          # a folder with adapter_config.json + adapter_model.safetensors
+kindi --lora 0123456789abcdef serve      # or the hash of an adapter already converted into the pack
+KINDI_LORA=./my-adapter kindi verify
+```
+
+The tensor names may be Hugging Face Qwen3.5 names or GGUF names. Kindi folds the adapter into the
+activation rotation once, at conversion, so nothing extra rotates per token, and stores it in
+`PACK/lora/<hash>/`; the prompt cache is keyed by it. `ssm_alpha` and `ssm_beta` adapters are merged
+into the fp32 weights (no cost per token). The embeddings and the output head are not adapted, so the
+fast head stays valid.
+
+Range: the plain single-card GPU engine (`KINDI_TP=0`). The plan engine, the tandem engine and the
+CPU engine refuse an adapter with a message instead of silently ignoring it. See
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md) (`lora`) and `kindi/lora.py`.
 
 ## The prompt cache
 

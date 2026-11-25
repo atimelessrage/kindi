@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Kindi installer: one command from a bare Linux machine to a verified, running Kindi server.
 #
-#   curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.7.1-fork/install.sh | bash             # install (or upgrade / repair)
-#   curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.7.1-fork/install.sh | bash -s -- --dry-run
+#   curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.7.2-fork/install.sh | bash             # install (or upgrade / repair)
+#   curl -fsSL https://github.com/atimelessrage/kindi/releases/download/v0.7.2-fork/install.sh | bash -s -- --dry-run
 #   bash install.sh --uninstall [--purge]
 #
 # What it does, in order (every step prints what it is about to do and why):
@@ -20,7 +20,7 @@
 # password or a key. Copyright (c) 2026 Amir Husain. SPDX-License-Identifier: AGPL-3.0-only.
 set -euo pipefail
 
-KINDI_VERSION="0.7.1-fork"
+KINDI_VERSION="0.7.2-fork"
 # the image tag (kindi:TAG); KINDI_IMAGE_TAG sets another one, so a test install never replaces an image that other
 # containers on the machine use
 IMAGE_TAG="${KINDI_IMAGE_TAG:-$KINDI_VERSION}"

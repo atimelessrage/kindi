@@ -190,3 +190,26 @@ Use this shape:
   it is unit-tested on a CPU-only host and stays Python 3.6-safe. The audit's engine/spec findings
   (broad `except` in `_is_turing`, the HB-4096 refusal after the repack) were left for the
   in-flight engine round that owns those uncommitted files.
+
+## DEC-0011: LoRA adapters are a dense-GPU-only path in this port
+
+- Status: accepted
+- Date: 2026-11-25
+- Requirements: none (official Kindi 0.7.2 intake: LoRA adapters)
+- Context: official 0.7.2 adds PEFT LoRA adapters to the dense engine (`kindi/lora.py`, `k_lora`/
+  `k_lora2` in `kindi.cu`, the chunked prompt path, the cache fingerprint, `--lora`/`KINDI_LORA`).
+  This fork's default engine for the 2B/4B/9B is the plan engine (`kindi.tp.TPEngine`, `KINDI_TP`
+  unset), whose per-token GEMV path and mixed layout do not expose the `gemv` hook the adapter
+  rides on; the tandem engine and the CPU engine have their own GEMV paths too. Upstream's own
+  port refuses the plan engine as well (it defaults to the plain engine, this fork does not).
+- Decision: port the feature where it is coherent - the plain single-card GPU engine - and make
+  every other engine refuse an adapter with an actionable message (`KINDI_TP=0` for the plan
+  engine, the tandem and CPU refusals) instead of silently ignoring it. The converted adapter
+  (`PACK/lora/<hash>/`) and the fingerprint entry are engine-independent, so a later plan-engine
+  implementation does not have to reconvert anything.
+- Consequences: on a one-card default run (`KINDI_TP` unset) `--lora` stops with the message;
+  documenting that is part of the feature. The kernels are compiled but unrun on this host (no
+  CUDA device), so no speed or exactness claim is made here; the device-free tests cover the
+  fold, the readers, conversion and the plumbing. The port also fixes an upstream reader defect:
+  an `.npz` adapter's `lora_alpha` scalar matched the `lora_` tensor filter and aborted the
+  conversion (`tests/test_lora.py::test_read_adapter_reads_npz_pairs_and_refuses_half_a_pair`).

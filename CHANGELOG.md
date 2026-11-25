@@ -1,5 +1,42 @@
 # Changelog
 
+## 0.7.2-fork (2026-11-25)
+
+Official Kindi 0.7.2 (`22af8d4`, released 2026-11-24) is merged by content on top of the fork's
+`v0.7.1` merge (`1cb59d2`). Its `load_json` fix (PR #50) was already in this tree, so the rest of
+0.7.2 is what this round adds: LoRA adapters, and one OpenAI error body on the router.
+
+### New
+
+- **LoRA adapters for the dense Ternary-Bonsai GPU engine.** `kindi --lora FOLDER serve` (also
+  `--lora`, `KINDI_LORA`, and `lora=` in `kindi.conf`) loads a PEFT folder (`adapter_config.json` +
+  `adapter_model.safetensors`), an `.npz` with GGUF tensor names, or the hash of an adapter already
+  converted into the pack. Hugging Face Qwen3.5 module names map to GGUF tensors, and an adapter
+  trained in Hugging Face's V-head order is permuted for the 4B/9B. `kindi/lora.py` folds the A rows
+  into the activation rotation once, at conversion (`A R^T`), so no rotation runs per token, and
+  merges `ssm_alpha`/`ssm_beta` adapters into the fp32 weights (zero cost per token). Each adapted
+  projection adds one `k_lora` launch after its GEMV; `k_lora2` splits the reduction across the grid.
+  Converted adapters live in `PACK/lora/<hash>/`; the prompt-cache fingerprint includes them, so a
+  saved opening is never resumed under another adapter.
+  - Range: the plain single-card GPU engine (`KINDI_TP=0`). The plan engine, the tandem engine and
+    the CPU engine refuse an adapter with a message instead of ignoring it.
+  - **Not verified on this host:** there is no CUDA device here, so the LoRA kernels are compiled but
+    never run and no real adapter was applied to a model. The 0.7.2 speed and exactness numbers are
+    the publisher's. What is tested here is device-free: the fold and the V-head permutation against
+    NumPy, the readers (including an `.npz` whose `lora_alpha` scalar upstream's reader mistakes for
+    a tensor - fixed in this port), conversion into a synthetic pack, the cache fingerprint and the
+    config/CLI wiring (`tests/test_lora.py`).
+
+### Fixed
+
+- **One OpenAI error body on the router and the stream.** `kindi route`'s nine hand-written error
+  bodies now go through `kindi/api/errors.error_body`, so they carry `param` and `code` like
+  `kindi serve` does; the server's SSE error events, its non-streaming failure mapping and its
+  cancelled answer use the same builder too. A bad request field is no longer labelled
+  `unsupported_<field>`: only `tool_choice` and `response_format` keep that code, everything else
+  reports `invalid_request_error` (PR #58). The 404/405/422 handlers and the `messages` shape check
+  already here are stricter than upstream's version of this change.
+
 ## 0.7.1-fork (2026-11-24, on official v0.7.1)
 
 This is the fork's release, not official Kindi 0.7.1. After the 2026-11-24 merge below, the fork is

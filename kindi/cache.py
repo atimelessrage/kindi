@@ -241,6 +241,8 @@ def engine_fingerprint(eng, cfg):
         "head": cfg.get("head", "exact"),
         "code": {},
     }
+    if getattr(c0, "lora_hash", None):              # an adapter (kindi.lora); absent = the same key as before
+        d["lora"] = c0.lora_hash
     if getattr(eng, "W", 1) > 1 and getattr(eng, "split_layout", None) is not None:
         d["tp_split"] = eng.split_layout
     if hasattr(eng, "cache_fingerprint"): d["tandem"] = eng.cache_fingerprint()
