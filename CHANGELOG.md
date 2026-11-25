@@ -30,7 +30,7 @@ What changed in the tree: a pack whose manifest names the proxy is refused with 
 `tests/test_engine_gateway.py`), and the decision, the probe and its output table are recorded in
 `docs/BACKENDS.md` ("Serving boundary") and REQ-0019 T4.6.
 
-### The constrained mask's walk: 1.486x per miss, exact (2026-11-25)
+### The constrained mask's walk: an exact character skip, and a memo withdrawn (2026-11-25)
 
 The 2026-11-24 round left the trie walk as the largest remaining part of a constrained mask miss
 without saying what was inside it, so this round profiled it first. A 22-token `json_schema`
@@ -38,26 +38,36 @@ document makes **8,303** automaton steps per mask miss - one per distinct token-
 91% of them rejected - and the trie structure, the id sort and the character sets are rounding
 error. The walk was asking the automaton 8,219 questions to keep a handful of ids.
 
-`TokenClassTable` now keeps a `character -> next state` memo per character class
-(`kindi/jsongrammar.py:_char_class`): a key is returned only when every state of that class answers
-every character identically (the string body, trailing whitespace, the array tail), and a class is
-memoized from its second state, so a first request pays no build. `okey`, `objk`, `otail`,
-`num`/`int` and `kw` are excluded on measurement - their key would carry the key or digit buffer and
-churn one class per accepted character. The memos are an LRU of 16 classes plus a 64-key seen-once
-set, so the REQ-0027 A5 memory bound still holds.
+An interim cut, a per-character-class `character -> next state` memo, measured 1.486x and was
+**withdrawn the same day**: the cached transitions embed the schema stack, so once warm a state of
+one class answered with another state's stack, and document states returned masks that the
+full-vocabulary sweep disagreed with. Its page
+(`docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/`) is kept with a retraction notice.
 
-Measured on the 2B CPU path, in-process A/B against the same table without classes over three runs
-of five passes: the median mask miss fell from **4.02 ms** to **2.70 ms** (**1.486x**), automaton
-steps per miss from **8,303** to **309**, and a warm document's mask work from **109.1 ms** to
-**89.2 ms**. Every mask is identical; the oracle is the same table built without `char_class`, and
-`tests/test_token_classes.py` also tests the class-agreement invariant, the second-state rule and
-the bounds. Served, three interleaved pairs of fresh CPU servers: structured replies **24.42** ->
-**23.50** ms/token (**3.8%**) and the constrained gap **4.57** -> **4.08** ms/token (**10.7%**).
+The shipping cut is exact and shared nothing. `kindi/jsongrammar.py:_accepted_chars(state)` returns
+a **superset** of the characters a state can accept, read off the fields `_step` reads - the schema
+stack for a key, the surviving terminals for a keyword, the target node for a value slot, fixed sets
+for the structural modes - and `None` where acceptance is not analytic (the string bodies, already
+covered by the 2026-11-24 safe-set pruning). `TokenClassTable` takes it as `state_chars` and, at a
+trie node, looks up only those characters in the node's children instead of asking the automaton
+about every distinct first character. Over-reporting costs one step; under-reporting is what the
+tests forbid.
 
-That leaves REQ-0030 A6 open by design: the mask half clears its 1.25x bar, the end-to-end half does
-not clear 5%, so no native variant was started and none is claimed. What a native transition
-function would have to own is the `okey`/`int` grammar state itself - a grammar port, not a mask
-port. Run page: `docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/`.
+Measured on the 2B CPU path, in-process A/B over the document's 23 states with the same table with
+and without the hook: the median mask miss fell from **4.923 ms** to **0.119 ms** (**41.37x**),
+automaton steps per miss from **8,303** to **38**, and the document's first-visit masks from
+**121.1 ms** to **24.9 ms**. Every mask equals the table without the hook *and* the pre-token-class
+sweep over all 248,320 vocabulary entries, on every state. `tests/test_token_classes.py` keeps three
+guards: the sets are supersets of what `_step` accepts, the masks do not change with the hook on or
+off, and a warm table still matches the sweep - that last test fails on the commit that carried the
+memo. Served, three interleaved pairs of fresh CPU servers: structured replies **23.11** ->
+**20.82** ms/token (**9.9%**), the constrained gap **3.83** -> **1.65** ms/token (**56.9%**), the
+unconstrained control flat (**-0.1%**).
+
+REQ-0030 A6's mask and end-to-end bars are now met by the Python path, so no native variant was
+started and none is claimed; what is left of a mask miss is 1.65 ms/token, which a native transition
+function would have to remove almost entirely to clear the same 5% bar. Run page:
+`docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/`, claim `req0030-key-chars-20261125.json`.
 
 ### Bonsai 2.5 27B on the CPU engine, and the prompt now matches the published template (2026-11-25)
 

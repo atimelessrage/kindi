@@ -181,14 +181,19 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   overhead 6.32 to 4.34 ms/token, unconstrained control unchanged; `docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/`).
   **The walk itself, profiled and cut (2026-11-25):** the remaining cost is not trie structure but the
   automaton transition count — 8,303 steps per schema mask miss, 8,219 of them one per distinct
-  token-start character, 91% rejected. A per-character-class edge memo (exact, filled from the
-  second state of a class, 16-class LRU) takes the median miss from 4.02 ms to 2.70 ms (1.486x),
-  steps to 309 and a warm 22-token document's mask work from 109.1 ms to 89.2 ms; served, structured
-  replies 24.42 -> 23.50 ms/token (3.8%) with the constrained gap 4.57 -> 4.08 (10.7%)
-  (`docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/`). A6's mask half passes and its 5%
-  end-to-end half does not, so the A2/A3/A6 selector and gates stay open and no native code was
-  added; what a native transition function would have to own is the `okey`/`int` grammar state
-  itself, which is a grammar port rather than a mask port. `kcpu.c` and
+  token-start character, 91% rejected. A first cut, a per-character-class edge memo, measured 1.486x
+  and was withdrawn the same day: its cached transitions embed the schema stack, so warm tables
+  returned masks the full-vocabulary sweep disagreed with. The exact replacement is a per-state
+  **accepted-character skip** (`JsonGrammar._accepted_chars`: a superset of the characters a state
+  can accept, or `None` for the string bodies the safe-set pruning already covers) that makes the
+  trie walk look up only those characters per node: median miss 4.923 -> 0.119 ms (41.37x), steps
+  8,303 -> 38, a document's 23 first-visit masks 121.1 -> 24.9 ms, every mask equal to the
+  248,320-entry sweep (`docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/`). Served, structured
+  replies 23.11 -> 20.82 ms/token (9.9%) with the constrained gap 3.83 -> 1.65 (56.9%) and the
+  unconstrained control flat. A6's mask and end-to-end bars are now met in Python, so the A2/A3/A6
+  selector stays open only as a native-variant gate and no native code was added: what is left of a
+  mask miss is 1.65 ms/token, which a native transition function would have to remove almost
+  entirely to matter. `kcpu.c` and
   the CUDA kernels are already native and excluded. A swap is adopted only if it is token/mask/byte-identical and
   improves the measured function by at least 1.25x with at least 5% end-to-end p50, with no >1%
   unconstrained-decode regression; otherwise it stays Python. The external sketch's 15-35%

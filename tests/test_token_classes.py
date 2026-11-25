@@ -334,88 +334,90 @@ def _doc_states(grammar, texts, text):
     return out
 
 
-def test_the_edge_memo_never_changes_a_mask():
-    """The class memo only skips questions whose answer cannot differ; every mask must match.
+def test_a_warm_table_still_matches_the_full_sweep_on_every_document_state():
+    """A repeated walk must answer exactly what the pre-token-class sweep answers.
 
-    The oracle here is the same token-class table built without `char_class`, so a walk that shared
-    an edge wrongly shows up as a different id set rather than only in a benchmark.
+    The 2026-11-25 class memo reused one state's `character -> next state` answers for another state
+    of the same class, and those answers embed the schema stack: once warm, a `str` state inherited
+    another container's stack, so a quote plus a closer was judged against the wrong frame.  On the
+    Bonsai 2B vocabulary six of the twenty-two document states returned a wrong mask; here the same
+    shape is nine of forty-eight, with both a dropped and an extra token.  Warm the table first -
+    that is what a second structured request does - and compare every state with the sweep.
     """
-    texts = list(TEXTS)
+    texts = list(TEXTS) + ['"],', '",', ' ["]', 'a"],', '"a"],', '}]', '"]}', 'y"],', '"], ', '"],x']
     grammar = grammar_from_schema({
         "type": "object",
-        "properties": {"name": {"type": "string"}, "tags": {"type": "array", "items": {"type": "string"}},
-                       "n": {"type": "integer"}},
-        "required": ["name", "tags", "n"],
+        "properties": {"s": {"type": "string"},
+                       "tags": {"type": "array", "items": {"type": "string"}},
+                       "o": {"type": "object", "properties": {"s": {"type": "string"}}}},
+        "required": ["s", "tags"],
     })
-    memo_table = grammar._vocab_table(texts)
-    exact_table = token_classes.TokenClassTable(texts, grammar._step, grammar._token_safe_sets)
-    states = _doc_states(grammar, texts, '{"name": "a", "tags": ["x", "y"], "n": 42}')
-    states += _doc_states(grammar, texts, '{"name": "a\u0041", "tags": [], "n": -3}')
-    states.append(grammar.start())
-    seen = set()
-    for state in states:
-        if state in seen:
-            continue
-        seen.add(state)
-        assert memo_table.allowed(state).tolist() == exact_table.allowed(state).tolist(), state
-
-
-def test_a_character_class_only_groups_states_that_agree_on_every_character():
-    """The memo's soundness condition, checked on the states a document reaches.
-
-    Two states of one class must accept exactly the same characters; if a grammar change makes a
-    class key too coarse, this fails before any mask does.
-    """
-    texts = list(TEXTS)
-    alphabet = sorted(set("".join(TEXTS)))
-    grammar = grammar_from_schema({
-        "type": "object",
-        "properties": {"name": {"type": "string"}, "n": {"type": "integer"}, "b": {"type": "boolean"}},
-        "required": ["name", "n", "b"],
-    })
-    states = _doc_states(grammar, texts, '{"name": "a", "n": 42, "b": true}')
-    states += _doc_states(grammar, texts, '{"name": "a')
-    groups = {}
-    for state in states:
-        key = grammar._char_class(state)
-        if key is None:
-            continue
-        vector = tuple(grammar._step(state, ch) is not None for ch in alphabet)
-        groups.setdefault(key, set()).add(vector)
-    assert groups, "the document reached no classed state"
-    for key, vectors in groups.items():
-        assert len(vectors) == 1, (key, vectors)
-
-
-def test_the_edge_memo_starts_at_the_second_state_of_a_class():
-    """A first structured request pays no memo build; the repeat is what creates it."""
-    texts = list(TEXTS)
-    grammar = grammar_from_schema({"type": "string"})
+    states = _doc_states(grammar, texts, '{"s": "a", "tags": ["x", "y"], "o": {"s": "z"}}')
+    assert states
     table = grammar._vocab_table(texts)
-    # A closed string lands in `trail`, which takes the trie walk (its safe set is four characters).
+    warmed = [table.allowed(state).tolist() for state in states]
+    for state, first in zip(states, warmed, strict=True):
+        assert table.allowed(state).tolist() == first, state
+        assert table.allowed(state).tolist() == grammar._vocab_allowed_scan(state, texts).tolist(), state
+
+
+def _document_states(grammar, texts):
+    """States reached while emitting a document, token by token (the served path's states)."""
+    out = [grammar.start()]
     state = grammar.start()
-    for ch in '"abc"':
-        state = grammar._step(state, ch)
-    assert grammar._char_class(state) == "trail"
-    table.allowed(state)
-    assert grammar._char_class(state) in table._index.accept_pending
-    assert grammar._char_class(state) not in table._index.accept_maps
-    table.allowed(state)
-    assert grammar._char_class(state) in table._index.accept_maps
+    for text in texts:
+        state = grammar.advance(state, text)
+        if state is None:
+            break
+        out.append(state)
+    return out
 
 
-def test_the_edge_memos_are_bounded():
+def test_the_accepted_character_sets_are_supersets_of_the_automaton():
+    """The walk may skip a character only if the state cannot accept it.
+
+    ``_accepted_chars`` is read off the same fields ``_step`` reads; a mode that grows a new
+    accepted character without updating it would drop allowed tokens, so every reachable state is
+    checked against the automaton itself over the whole test alphabet.
+    """
+    grammar = grammar_from_schema({
+        "type": "object",
+        "properties": {"name": {"type": "string"}, "n": {"type": "integer"},
+                       "ok": {"type": "boolean"},
+                       "tags": {"type": "array", "items": {"type": "string"}}},
+        "required": ["name", "n"],
+    })
+    alphabet = sorted(set('{}[],:' + '"' + '\\' + ' 0123abtnf.-eE+') | {"\x01", "\t"})
+    states = _reachable(grammar, alphabet)
+    states |= set(_document_states(grammar, ['{"tags": [', ']', ', "a"', ']', '}']))
+    assert states, "no reachable states"
+    checked = 0
+    for state in states:
+        accepted = grammar._accepted_chars(state)
+        if accepted is None:
+            continue
+        checked += 1
+        for ch in alphabet:
+            if grammar._step(state, ch) is not None:
+                assert ch in accepted, (state, ch, accepted)
+    assert checked >= len(states) // 2, "too few states are analytic to prove anything"
+
+
+def test_the_accepted_character_sets_never_change_a_mask():
+    """Turning the skip on and off must produce the same ids: the pruning is not a shortcut."""
     texts = list(TEXTS)
-    grammar = grammar_from_schema({"type": "array", "items": {"type": "string"}})
-    table = grammar._vocab_table(texts)
-    for i in range(token_classes._ACCEPT_MAP_LIMIT + 6):
-        state = grammar.start()
-        for ch in '[-' + str(i) + ',"x':
-            state = grammar._step(state, ch)
-            if state is None:
-                break
-        if state is not None:
-            table.allowed(state)
-            table.allowed(state)               # second sight creates the memo
-    assert len(table._index.accept_maps) <= token_classes._ACCEPT_MAP_LIMIT
-    assert len(table._index.accept_pending) <= token_classes._ACCEPT_PENDING_LIMIT
+    grammar = grammar_from_schema({
+        "type": "object",
+        "properties": {"name": {"type": "string"}, "n": {"type": "integer"},
+                       "tags": {"type": "array", "items": {"type": "string"}}},
+        "required": ["name", "n"],
+    })
+    alphabet = sorted(set('{}[],:' + '"' + '\\' + ' 0123abtnf.-'))
+    states = sorted(_reachable(grammar, alphabet)
+                    | set(_document_states(grammar, ['{"tags": [', ']', ', "a"', ']', '}'])),
+                    key=repr)
+    assert states
+    with_skip = grammar._vocab_table(texts)
+    plain = token_classes.TokenClassTable(texts, grammar._step, grammar._token_safe_sets)
+    for state in states:
+        assert with_skip.allowed(state).tolist() == plain.allowed(state).tolist(), state

@@ -1,4 +1,15 @@
-# The constrained mask's trie walk: what it spends, and an exact Python cut
+# The constrained mask's trie walk: what it spends, and a memo that was withdrawn
+
+> **Retracted (2026-11-25, same day).** The per-class edge memo measured below was not exact: its
+> cached `character -> next state` answers embed the schema stack, so a second state of the same
+> class inherited the first one's stack. On a warm 2B table, several of the 22-token document's
+> states returned masks that the full-vocabulary sweep disagreed with - a `str` state lost closing
+> tokens, an `okey` state gained others. It was removed the same day and replaced by the exact
+> accepted-character skip in `docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md`; the
+> measurements here stay as the record of what the walk spends, not as a change that ships. The
+> oracle used below (the table without `char_class`) could not see the bug because it compared first
+> visits only, before the memo was warm; `tests/test_token_classes.py` now warms the table first and
+> compares against `_vocab_allowed_scan`, and that test fails on the commit that shipped the memo.
 
 Host: i7-8086K, Windows, Python 3.13, no GPU. Pack: `bonsai-2b` (248,320-entry vocabulary).
 Date: 2026-11-25. Grammar: the 22-token `json_schema` document and the ordered-record GBNF from

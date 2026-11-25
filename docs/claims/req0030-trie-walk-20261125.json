@@ -1,10 +1,10 @@
 {
   "gate": "req0030-trie-walk-20261125",
-  "title": "Constrained mask: the trie walk's cost, and the exact per-class edge memo",
+  "title": "Constrained mask: what the trie walk spends, and a class memo that was withdrawn as inexact (superseded by req0030-key-chars-20261125)",
   "measured": "2026-11-25",
   "commit": "unreleased",
   "command": "python docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/profile_walk.py --out walk.json --rounds 5 (three runs); three interleaved served pairs with the modules swapped back to HEAD for the old arm, measure.py --runs 10 --max-tokens 8 --skip-filter",
-  "notes": "In-process A/B alternates a table with the class memo and the same table built without char_class, over the same 23 document states with the per-state mask cache off. Served pairs alternate two fresh CPU servers, old and new modules, same request shape. summary.json aggregates the three profile runs; ab-summary.json the six served runs.",
+  "notes": "In-process A/B alternates a table with the class memo and the same table built without char_class, over the same 23 document states with the per-state mask cache off. Served pairs alternate two fresh CPU servers, old and new modules, same request shape. summary.json aggregates the three profile runs; ab-summary.json the six served runs. RETRACTED 2026-11-25: the memo's cached transitions embed the schema stack, so a warm table returned masks the full-vocabulary sweep disagreed with; the memo was removed and replaced by the exact accepted-character skip in docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/. The numbers below stay as the measurement of the walk and of that superseded change, quoted only by the run page.",
   "evidence": [
     "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/summary.json",
     "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/ab-summary.json",
@@ -18,8 +18,9 @@
     {
       "id": "miss-exact",
       "display": "4.02 ms",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/summary.json",
@@ -30,8 +31,9 @@
     {
       "id": "miss-memo",
       "display": "2.70 ms",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/summary.json",
@@ -43,8 +45,9 @@
       "id": "speedup",
       "display": "1.486x",
       "tolerance": 0.005,
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/summary.json",
@@ -55,8 +58,9 @@
     {
       "id": "steps-exact",
       "display": "8,303",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/summary.json",
@@ -67,8 +71,9 @@
     {
       "id": "steps-memo",
       "display": "309",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/summary.json",
@@ -79,8 +84,9 @@
     {
       "id": "root-fanout",
       "display": "8,219",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "text",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
@@ -90,8 +96,9 @@
     {
       "id": "reject-share",
       "display": "91%",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "text",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
@@ -101,8 +108,9 @@
     {
       "id": "warm-exact",
       "display": "109.1 ms",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/summary.json",
@@ -113,8 +121,9 @@
     {
       "id": "warm-memo",
       "display": "89.2 ms",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/summary.json",
@@ -126,7 +135,9 @@
       "id": "warm-speedup",
       "display": "1.223x",
       "tolerance": 0.005,
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/summary.json",
@@ -137,8 +148,9 @@
     {
       "id": "first-pass-memo",
       "display": "124.8 ms",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/summary.json",
@@ -149,7 +161,9 @@
     {
       "id": "gbnf-exact",
       "display": "4.90 ms",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/summary.json",
@@ -160,7 +174,9 @@
     {
       "id": "gbnf-memo",
       "display": "4.92 ms",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/summary.json",
@@ -172,8 +188,9 @@
       "id": "gbnf-speedup",
       "display": "0.995x",
       "tolerance": 0.005,
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/summary.json",
@@ -184,7 +201,9 @@
     {
       "id": "gbnf-steps",
       "display": "8,424",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/summary.json",
@@ -195,8 +214,9 @@
     {
       "id": "served-old",
       "display": "24.42",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/ab-summary.json",
@@ -207,8 +227,9 @@
     {
       "id": "served-new",
       "display": "23.50",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/ab-summary.json",
@@ -219,8 +240,9 @@
     {
       "id": "gap-old",
       "display": "4.57",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/ab-summary.json",
@@ -231,8 +253,9 @@
     {
       "id": "gap-new",
       "display": "4.08",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/ab-summary.json",
@@ -243,8 +266,9 @@
     {
       "id": "control-old",
       "display": "19.73",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/ab-summary.json",
@@ -255,8 +279,9 @@
     {
       "id": "control-new",
       "display": "19.42",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/ab-summary.json",
@@ -267,7 +292,9 @@
     {
       "id": "control-change",
       "display": "-1.6%",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/ab-summary.json",
@@ -278,8 +305,9 @@
     {
       "id": "structured-gain",
       "display": "3.8%",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/ab-summary.json",
@@ -290,8 +318,9 @@
     {
       "id": "gap-gain",
       "display": "10.7%",
-      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md",
-                    "docs/development/requirements/REQ-0030.md"],
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/README.md"
+      ],
       "check": {
         "kind": "json",
         "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-trie-walk/ab-summary.json",

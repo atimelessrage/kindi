@@ -1,0 +1,60 @@
+{
+  "host": "i7-8086K, Windows, Python 3.13, CPU engine, no GPU",
+  "pack": "bonsai-2b",
+  "shape": "10 runs per shape, 8-token replies, temperature 0, measure.py --skip-filter",
+  "arms": {
+    "old": {
+      "runs": [
+        {
+          "file": "ab-old0.json",
+          "structured": 23.11,
+          "unconstrained": 19.1,
+          "gap": 4.01
+        },
+        {
+          "file": "ab-old1.json",
+          "structured": 23.01,
+          "unconstrained": 19.18,
+          "gap": 3.83
+        },
+        {
+          "file": "ab-old2.json",
+          "structured": 24.04,
+          "unconstrained": 22.43,
+          "gap": 1.61
+        }
+      ],
+      "structured_median": 23.11,
+      "unconstrained_median": 19.18,
+      "gap_median": 3.83
+    },
+    "new": {
+      "runs": [
+        {
+          "file": "ab-new0.json",
+          "structured": 21.07,
+          "unconstrained": 19.5,
+          "gap": 1.57
+        },
+        {
+          "file": "ab-new1.json",
+          "structured": 20.79,
+          "unconstrained": 19.1,
+          "gap": 1.69
+        },
+        {
+          "file": "ab-new2.json",
+          "structured": 20.82,
+          "unconstrained": 19.17,
+          "gap": 1.65
+        }
+      ],
+      "structured_median": 20.82,
+      "unconstrained_median": 19.17,
+      "gap_median": 1.65
+    }
+  },
+  "structured_gain_percent": 9.9,
+  "gap_gain_percent": 56.9,
+  "unconstrained_change_percent": -0.1
+}

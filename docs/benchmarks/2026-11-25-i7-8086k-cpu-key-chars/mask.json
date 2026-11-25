@@ -1,0 +1,90 @@
+{
+  "host": "i7-8086K, Windows, Python 3.13, CPU engine, no GPU",
+  "grammar": "json_schema (tools/grammar_cost.SCHEMA), 22-token document",
+  "vocabulary": 248320,
+  "misses": 23,
+  "rounds": 3,
+  "median_ms": {
+    "skip": 0.119,
+    "exact": 4.923
+  },
+  "total_ms": {
+    "skip": 24.9,
+    "exact": 121.1
+  },
+  "speedup_median_miss": 41.37,
+  "speedup_total": 4.863,
+  "steps_per_miss_median": {
+    "skip": 38,
+    "exact": 8303
+  },
+  "edge_states_per_miss_median": {
+    "skip": 4,
+    "exact": 4
+  },
+  "masks_identical_to_exact": true,
+  "full_scan_identical": true,
+  "full_scan_states": 23,
+  "per_state_ms": {
+    "skip": [
+      0.087,
+      0.056,
+      0.068,
+      1.292,
+      3.286,
+      2.946,
+      0.1,
+      0.045,
+      0.049,
+      0.119,
+      3.316,
+      2.907,
+      1.243,
+      2.972,
+      2.881,
+      0.104,
+      0.016,
+      0.047,
+      0.123,
+      0.107,
+      1.567,
+      1.466,
+      0.068
+    ],
+    "exact": [
+      2.809,
+      6.527,
+      6.77,
+      5.635,
+      3.002,
+      2.994,
+      3.715,
+      6.533,
+      6.775,
+      4.484,
+      3.002,
+      2.903,
+      5.389,
+      2.926,
+      2.868,
+      3.786,
+      6.436,
+      6.722,
+      4.972,
+      4.923,
+      13.185,
+      13.355,
+      1.385
+    ]
+  },
+  "modes": [
+    "aval",
+    "int",
+    "objkb",
+    "okey",
+    "oval",
+    "str",
+    "trail",
+    "val"
+  ]
+}

@@ -174,40 +174,102 @@ class JsonGrammar(object):
             return [safe] if safe else []
         return []
 
-    # Modes whose one-character acceptance reads nothing but the mode: inside a JSON string the same
-    # characters print and the same two end it whatever the buffer holds, trailing whitespace and the
-    # colon slot are fixed, and an array's tail can always take `,` and `]`.
-    _MODE_CLASSES = frozenset(("trail", "str", "akey", "sx", "su", "ocolon", "atail",
-                              "objka", "objkb"))
+    # Characters a generic JSON value may start with.  A schema-typed node narrows this through
+    # `_start_chars`; where the node kind is unknown the generic set is still a superset, because
+    # that is exactly what `_value_start`'s fallback dispatch accepts.
+    _ANY_START_CHARS = frozenset('{"[-0123456789tfn')
 
-    def _char_class(self, state):
-        """A key holding exactly what one-character acceptance reads, or None for exact stepping.
+    def _start_chars(self, node):
+        """A superset of the characters `_value_start(stk, node, ch)` accepts, or None."""
+        kind = node[0] if isinstance(node, tuple) and node else None
+        if kind in ("object", "any_obj"):
+            return frozenset("{")
+        if kind in ("array", "any_arr"):
+            return frozenset("[")
+        if kind == "string":
+            return frozenset('"')
+        if kind in ("number", "int"):
+            return frozenset("-0123456789")
+        if kind == "bool":
+            return frozenset("tf")
+        if kind == "null":
+            return frozenset("n")
+        if kind == "lit":
+            return frozenset(t[0] for t in node[1] if t)
+        if kind == "union":
+            out = set()
+            for sub in node[1]:
+                part = self._start_chars(sub)
+                if part is None:
+                    return None
+                out |= part
+            return frozenset(out)
+        return self._ANY_START_CHARS
 
-        The token-class walk shares a `character -> next state` memo between states of one class, so
-        a key may only group states that agree on every character.  Where the buffer, the schema stack
-        or the remaining property index decides acceptance, that part is in the key; the walk is only
-        skipping questions whose answer cannot differ.
+    def _accepted_chars(self, state):
+        """A superset of the characters this state can accept, or None when it is not analytic.
+
+        The token-class walk stops at every trie node; asking the automaton about all 8,219 first
+        characters of this vocabulary to discover that a JSON key state takes a couple of dozen is
+        most of what the walk still costs (2026-11-25).  Every set below is a superset by
+        construction - it is read off the same fields ``_step`` reads - so a character outside it
+        cannot be legal and its subtree can be skipped without asking.
         """
         mode, stk, buf, aux = state
-        if mode in self._MODE_CLASSES:
-            return mode
-        if mode == "val":
-            return ("val", id(self.root))          # only the root schema decides
-        if mode in ("aval", "oval"):
+        if mode == "trail":
+            return _WS
+        if mode == "okey":
+            # A key character must leave `buf + ch` a prefix of a remaining property, and `"` closes
+            # the key (it is accepted for a name in range even when `buf` is not one, so keep it).
             if not stk:
-                return (mode, None)
+                return None
+            _, node, idx, seen = stk[-1]
+            props = node[1]
+            limit = len(props)
+            for i in range(idx, len(props)):
+                if props[i][2] and not (seen & (1 << i)):
+                    limit = i + 1
+                    break
+            width = len(buf)
+            return frozenset([prop[0][width] for prop in props[idx:limit]
+                              if len(prop[0]) > width and prop[0].startswith(buf)] + ['"'])
+        if mode == "kw":
+            # The terminals still alive, at the buffer's position (aux is the surviving tuple).
+            return frozenset([t[len(buf)] for t in (aux or ()) if len(t) > len(buf)])
+        if mode in ("num", "int"):
+            # Number characters, plus what may follow a complete number (whitespace, a comma,
+            # either closer); the walk decides those with the buffer it has.
+            return frozenset("0123456789.eE+- \t\n\r,]}")
+        if mode == "sx":
+            return frozenset('"\\/bfnrtu')
+        if mode == "su":
+            return frozenset("0123456789abcdefABCDEF")
+        if mode in ("objk", "objkb", "objkf", "objka"):
+            closes = frozenset("}") if mode in ("objk", "objkf") else frozenset()
+            return frozenset(_WS) | closes | frozenset('"')
+        if mode in ("otail", "atail"):
+            return frozenset(_WS) | frozenset(",") | frozenset("}" if mode == "otail" else "]")
+        if mode == "ocolon":
+            return frozenset(_WS) | frozenset(":")
+        if mode == "val":
+            starts = self._start_chars(self.root)
+            return None if starts is None else frozenset(_WS) | starts
+        if mode in ("aval", "oval", "aempty"):
+            if not stk:
+                return None
             top = stk[-1]
             node = top[1]
             if mode == "oval":
                 target = node[1][top[2]][1] if node[0] == "object" else ("any",)
+            elif node[0] == "array":
+                target = node[1]
             else:
-                target = node[1] if node[0] == "array" else ("any",)
-            return (mode, target)
-        # Deliberately absent: `okey`, `otail`, `objk`, `objkf`, `num`/`int` and `kw`.  Their key
-        # would have to include the key buffer, the digit buffer or the schema stack, and a walk then
-        # creates a new one of those per accepted character - a class cache that churns instead of
-        # repeating.  They keep the exact per-edge path (measured on 2026-11-25: memoizing them cost
-        # about 6% of a first-pass document walk and saved nothing on the next pass).
+                target = ("any",)
+            starts = self._start_chars(target)
+            if starts is None:
+                return None
+            extra = frozenset("]") if mode == "aempty" else frozenset()
+            return frozenset(_WS) | extra | starts
         return None
 
     def _vocab_table(self, texts):
@@ -215,7 +277,7 @@ class JsonGrammar(object):
             from .token_classes import TokenClassTable
 
             self._mask_table = TokenClassTable(texts, self._step, self._token_safe_sets,
-                                               char_class=self._char_class)
+                                               state_chars=self._accepted_chars)
             self._mask_texts = texts
             self._vocab_cache.clear()
         table = self._mask_table

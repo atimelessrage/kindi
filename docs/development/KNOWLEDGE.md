@@ -143,12 +143,17 @@ was verified against is the gitignored host-tools sheet under `bench-logs/`.
   mask miss makes ~8,300 `jsongrammar._step` calls, ~8,200 of them one per distinct token-start
   character (91% rejected), with only two distinct states per miss and 761 nodes for the
   end-of-document `trail` state; the id sort and `_chars_under` are rounding error. So the cost
-  model is "one Python transition per distinct first character", and the useful lever is to stop
-  asking transitions whose answer cannot differ — a per-character-class edge memo did exactly that
-  (8,303 -> 309 steps, median miss 4.02 -> 2.70 ms, exact). Memoizing classes whose key carries the
-  key/digit buffer was *slower*: they churn a class per accepted character. What remains is those
-  `okey`/`int` states, i.e. the grammar's own state, which is where a native transition function
-  would have to start (a grammar port, not a mask port).
+  model is "one Python transition per distinct first character", and the useful lever is to skip the
+  characters that state cannot accept: `JsonGrammar._accepted_chars` returns a *superset* of them
+  from the fields `_step` reads (schema stack for a key, surviving terminals for a keyword, target
+  node for a value slot, fixed sets for the structural modes), and the walk then looks up only those
+  characters in a node's children — 8,303 -> 38 steps, median miss 4.923 -> 0.119 ms (41.37x), with
+  every mask equal to the full-vocabulary sweep (2026-11-25). Sharing one `character -> next state`
+  memo across states is what the first attempt did, and it was withdrawn: the cached states embed the
+  schema stack, so a warm table answered with another state's stack and returned wrong masks, and a
+  first-visit-only oracle cannot see it — compare *after* warming. A superset hook is safe because an
+  extra character only costs a step; a shared cache of states is not, because a wrong state changes
+  the answer.
 - **The server's constrained overhead is mask + pick, and they are comparable.** An instrumented
   CPU server (2026-11-24) attributed a 24-token structured reply to `allowed` at 8.8 ms/call and
   `Sampler._logits` at 4.4 ms/call before the refactor; after it, 6.3 and 3.0. `_logits` is only

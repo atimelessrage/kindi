@@ -1,0 +1,253 @@
+{
+  "gate": "req0030-key-chars-20261125",
+  "title": "Constrained mask: an exact accepted-character skip (replaces the withdrawn class memo)",
+  "measured": "2026-11-25",
+  "commit": "unreleased",
+  "command": "python docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/mask_ab.py --out mask.json --rounds 3 --scan-states 23; three interleaved served pairs with the parent commit's modules for the old arm, measure.py --runs 10 --max-tokens 8 --skip-filter; python docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab_summary.py",
+  "notes": "mask_ab alternates the grammar's table and the same table built without state_chars over the 22-token json_schema document's 23 states, with the per-state mask cache off; it also compares both arms with the pre-token-class full-vocabulary sweep. ab_summary aggregates ab-old*.json/ab-new*.json (three fresh CPU servers per arm, ten runs per shape).",
+  "evidence": [
+    "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/mask.json",
+    "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab-summary.json",
+    "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab-old0.json",
+    "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab-old1.json",
+    "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab-old2.json",
+    "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab-new0.json",
+    "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab-new1.json",
+    "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab-new2.json",
+    "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/mask_ab.py",
+    "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab_summary.py",
+    "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md"
+  ],
+  "numbers": [
+    {
+      "id": "miss-exact",
+      "display": "4.923 ms",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/mask.json",
+        "pointer": "/median_ms/exact",
+        "expect": 4.923
+      }
+    },
+    {
+      "id": "miss-skip",
+      "display": "0.119 ms",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/mask.json",
+        "pointer": "/median_ms/skip",
+        "expect": 0.119
+      }
+    },
+    {
+      "id": "speedup",
+      "display": "41.37x",
+      "tolerance": 0.005,
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/mask.json",
+        "pointer": "/speedup_median_miss",
+        "expect": 41.37
+      }
+    },
+    {
+      "id": "steps-exact",
+      "display": "8,303",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/mask.json",
+        "pointer": "/steps_per_miss_median/exact",
+        "expect": 8303
+      }
+    },
+    {
+      "id": "steps-skip",
+      "display": "38",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/mask.json",
+        "pointer": "/steps_per_miss_median/skip",
+        "expect": 38
+      }
+    },
+    {
+      "id": "total-exact",
+      "display": "121.1 ms",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/mask.json",
+        "pointer": "/total_ms/exact",
+        "expect": 121.1
+      }
+    },
+    {
+      "id": "total-skip",
+      "display": "24.9 ms",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/mask.json",
+        "pointer": "/total_ms/skip",
+        "expect": 24.9
+      }
+    },
+    {
+      "id": "total-speedup",
+      "display": "4.863x",
+      "tolerance": 0.005,
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/mask.json",
+        "pointer": "/speedup_total",
+        "expect": 4.863
+      }
+    },
+    {
+      "id": "states",
+      "display": "23 states",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/mask.json",
+        "pointer": "/misses",
+        "expect": 23
+      }
+    },
+    {
+      "id": "vocabulary",
+      "display": "248,320",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/mask.json",
+        "pointer": "/vocabulary",
+        "expect": 248320
+      }
+    },
+    {
+      "id": "served-old",
+      "display": "23.11",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab-summary.json",
+        "pointer": "/arms/old/structured_median",
+        "expect": 23.11
+      }
+    },
+    {
+      "id": "served-new",
+      "display": "20.82",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab-summary.json",
+        "pointer": "/arms/new/structured_median",
+        "expect": 20.82
+      }
+    },
+    {
+      "id": "gap-old",
+      "display": "3.83",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab-summary.json",
+        "pointer": "/arms/old/gap_median",
+        "expect": 3.83
+      }
+    },
+    {
+      "id": "gap-new",
+      "display": "1.65",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab-summary.json",
+        "pointer": "/arms/new/gap_median",
+        "expect": 1.65
+      }
+    },
+    {
+      "id": "control-old",
+      "display": "19.18",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab-summary.json",
+        "pointer": "/arms/old/unconstrained_median",
+        "expect": 19.18
+      }
+    },
+    {
+      "id": "control-new",
+      "display": "19.17",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab-summary.json",
+        "pointer": "/arms/new/unconstrained_median",
+        "expect": 19.17
+      }
+    },
+    {
+      "id": "structured-gain",
+      "display": "9.9%",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab-summary.json",
+        "pointer": "/structured_gain_percent",
+        "expect": 9.9
+      }
+    },
+    {
+      "id": "gap-gain",
+      "display": "56.9%",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab-summary.json",
+        "pointer": "/gap_gain_percent",
+        "expect": 56.9
+      }
+    },
+    {
+      "id": "control-change",
+      "display": "-0.1%",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/README.md",
+                    "docs/development/requirements/REQ-0030.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-cpu-key-chars/ab-summary.json",
+        "pointer": "/unconstrained_change_percent",
+        "expect": -0.1
+      }
+    }
+  ]
+}
