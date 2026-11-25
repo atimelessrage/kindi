@@ -53,10 +53,8 @@ def main():
     ap.add_argument("--threads", type=int, default=None)
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
-    if not a.gguf and not a.drafter_pack:
-        ap.error("give --gguf (the integrated head) or --drafter-pack (an external drafter)")
-    if a.gguf and a.drafter_pack:
-        ap.error("choose one drafter: --gguf (the integrated head) or --drafter-pack (an external pack)")
+    if bool(a.gguf) == bool(a.drafter_pack):
+        ap.error("give exactly one drafter: --gguf (the integrated head) or --drafter-pack (an external pack)")
 
     def log(*m):
         print(*m, flush=True)
@@ -66,12 +64,11 @@ def main():
     load_s = time.time() - t0
     if a.drafter_pack:
         drafter = mtp_cpu.PackDrafter(a.drafter_pack, ctx=a.ctx, threads=a.threads, k=a.k, log=log)
-        kind, desc = "pack", {"kind": "pack", "path": os.path.abspath(a.drafter_pack),
-                              "model": os.path.basename(os.path.normpath(a.drafter_pack))}
+        desc = {"kind": "pack", "path": os.path.abspath(a.drafter_pack),
+                "model": os.path.basename(os.path.normpath(a.drafter_pack))}
     else:
         drafter = mtp_cpu.Head(a.gguf, eng, k=a.k, window=a.window, log=log)
-        kind = "mtp-head"
-        desc = {"kind": kind, "path": os.path.abspath(a.gguf), "block": drafter.dims["block"],
+        desc = {"kind": "mtp-head", "path": os.path.abspath(a.gguf), "block": drafter.dims["block"],
                 "bytes": drafter.bytes, "dims": drafter.dims}
     tk = _load_tok(a.pack)
     runs = []
@@ -101,7 +98,7 @@ def main():
              for i in range(max([len(r["drafts"]["depth"]) for r in runs] or [0]))]
     desc["rows"] = int(drafter.stats.get("rows", 0))
     doc = {"pack": os.path.abspath(a.pack), "drafter": desc, "tokens": a.tokens, "k": a.k,
-           "window": a.window if kind == "mtp-head" else None, "ctx": a.ctx, "threads": eng.threads,
+           "window": a.window if desc["kind"] == "mtp-head" else None, "ctx": a.ctx, "threads": eng.threads,
            "load_s": load_s, "accepted": matched, "offered": offered,
            "rate": (matched / float(offered)) if offered else 0.0, "depth": depth, "runs": runs}
     if a.out:
@@ -109,7 +106,7 @@ def main():
             json.dump(doc, f, indent=1)
         log("wrote %s" % a.out)
     log("drafter %s %s, accepted %d/%d (%.0f%%), depth %s" % (
-        kind, desc.get("model") or ("blk.%s" % desc.get("block")), matched, offered,
+        desc["kind"], desc.get("model") or ("blk.%s" % desc.get("block")), matched, offered,
         100.0 * doc["rate"], depth))
     if not all(r["exact"] for r in runs):
         log("FAIL: the scored run's tokens differ from generate()")

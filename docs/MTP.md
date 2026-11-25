@@ -128,31 +128,15 @@ by a compile. Every attempt below asserted its tokens equal to plain greedy deco
 | `eh-normed-rope1` | 11/108 | 10.2% | RoPE at `p + 1` (the reference's MTP position for row `p`) |
 | `eh-normed-seeded` | 15/108 | 13.9% | window seeded with every **verified** row, not just the head's own |
 
-Three of those are worth keeping:
-
-- **The concat order is `[e_norm(emb), h_norm(hin)]`** - swapping it drops acceptance to zero, so the
-  `eh_proj` side is not where the remaining error lives.
-- **The hidden is the output-normed one.** `kindi/mtp.py` (the GPU head) reads `XN`, which is
-  `rms * output_norm`; the CPU head was handed the raw residual. Passing the normed vector is
-  strictly better (8.3% -> 10.2%, and 3.3% -> 13.3% at `k=1`), and it is what llama.cpp's
-  `graph_mtp` consumes as well (`qwen35.cpp` exposes the post-`output_norm` row as `t_h_nextn`).
-- **Seeding matters.** The reference drafts against a cache that holds the MTP row of every verified
-  position; this head only ever saw its own synthetic rows. Seeding the window with the verified
-  rows lifts 10.2% -> 13.9% overall and 16.7% -> 22.2% on the second prompt, with depth
-  `[2, 3, 4, 3]` - deeper drafts start matching once the window is real.
-
-The remaining gap is not one of those switches. Drafted tokens are *shaped* like the model's output
-(`
-
-`, `<|im_end|>`, repeated words) but off by a token or two where the model continues with a
-run of `<|im_end|>
-<|im_start|>`; a head that is confused about the row it reads looks like this,
-and so does one whose attention context is a handful of positions rather than a filled window. The
-next measurement is the seeded window grown from the whole prompt (not `len(ids) - 1` rows) plus a
-row-by-row dump of `u`/`out` against the head's own recurrence, both of which the probe can run in
-one load. Until that moves the number, the honest summary is the table: **the 2B pack is the better
-drafter (30.6% vs 8.3-13.9%), and neither is a speedup before CP1** (`tools/mtp_cpu_probe.py` and
-both `bench-logs/` runs are untracked measurements, not an evidence page).
+The two switches that matter are in the table's last rows: the hidden is the output-normed one (what
+`kindi/mtp.py`'s `XN` and llama.cpp's `graph_mtp` both read, and what this head now uses), and
+seeding the window with the verified rows - what the reference's MTP cache holds - lifts 10.2% ->
+13.9% overall, 16.7% -> 22.2% on the second prompt, with depth `[2, 3, 4, 3]`. The remaining gap is
+not one of these switches: the drafts are shaped like the model's output but land a token or two off,
+so the next measurement is the seeded window grown from the whole prompt plus a per-row dump of
+`u`/`out` against the head's own recurrence, both in one probe load. Until that moves the number,
+**the 2B pack is the better drafter (30.6% vs 8.3-13.9%), and neither is a speedup before CP1**
+(untracked `bench-logs/` measurements, not an evidence page).
 
 ## The modes
 
