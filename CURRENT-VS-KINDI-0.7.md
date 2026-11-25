@@ -3,12 +3,13 @@
 ## TLDR - too long didnt read
 
 **The comparison:** official Kindi **v0.7.1** (tag `v0.7.1`, commit `1cb59d2`, released 2026-11-23) against this fork at
-**`7cab9d8`** on `merge/upstream-0.7.0` (the 0.7.0 merge `35e4697`, the 2026-11-24 v0.7.1 merge, and the rounds since).
+**`d58dbf0`** on `merge/upstream-0.7.0` (the 0.7.0 merge `35e4697`, the 2026-11-24 v0.7.1 merge, and the rounds since).
 
-**One release is newer than the baseline.** GitHub's latest release is **Kindi 0.7.2** (`22af8d4`, tag object
-`787f63a`, published 2026-11-25T02:05:13Z): **3 commits** and **26 files** on top of `v0.7.1`, so this fork is
-**3 commits behind the newest release** as well as ahead of the one it is compared against. Nothing in 0.7.2 is
-ported here yet, and no figure below includes it.
+**The newest release is ported by content.** GitHub's latest release is **Kindi 0.7.2** (`22af8d4`, tag object
+`787f63a`, published 2026-11-25T02:05:13Z): **3 commits** and **26 files** on top of `v0.7.1`. All of it is in this
+tree now (commit `d58dbf0`): the two `load_json` fixes were already here, and this round adds the LoRA adapter
+path, the router's OpenAI error bodies and the 0.7.2-fork version. Only the commits themselves are absent: **3
+commits past v0.7.1 that this history does not contain**.
 
 **What 0.7.1 adds (now in the tree):** the **Inkling 2 Mini** engine (`inkling2.py`, `inkling2_gpu.cu`,
 `inkling2_cpu.c`, `inkling2_quant.py`, the `kindi inkling` command and the `kindi_inkling2` server backend; the
@@ -24,9 +25,10 @@ reviewed sub-warp masks, 0 unguarded legacy intrinsics. Writing it found two rea
 `k_q8x_T2` bypassed the file's own `KSHFLX` macro and `kindi.cu` `wsum_d`/`wsum_f` used bare `__shfl_xor` on every
 arch.
 
-**Measured 2026-11-25 against `v0.7.1` (`1cb59d2`) at `7cab9d8`:** **0 commits behind, 797 commits ahead, 1,077
-changed files (+154,573/−2,238), 1,209 tracked files against 232 upstream**, no upstream file missing, 31 numbered
-requirements. The 2026-11-24 measurement of the same comparison (778 commits / 1,027 files / 1,159 tracked at
+**Measured 2026-11-25 against `v0.7.1` (`1cb59d2`) at `d58dbf0`:** **0 commits behind, 800 commits ahead, 1,079
+changed files (+155,723/−2,262), 1,211 tracked files against 232 upstream**, no upstream file missing, 31 numbered
+requirements. Before the 0.7.2 port (`7cab9d8`) the same read was 797 commits / 1,077 files / 1,209 tracked.
+ The 2026-11-24 measurement of the same comparison (778 commits / 1,027 files / 1,159 tracked at
 `3288ba1`), the earlier v0.7.1 one (722 commits / 980 files / 1,133 tracked at `e19850e`) and the v0.7.0 one (702
 commits / 931 files against `8298a0f` at `35e4697`) are kept as the record; the numbers below them are 0.6.1-era runs
 and are unchanged.
@@ -76,7 +78,7 @@ leaves 31 rebased, 2 included and no superseded branch. A merge rehearsal on `1c
 foundation (#49, #50, #59, #60, #73, #57, #55, #72, #54, #61, #65, #66, #75, #51; #67 and #68 follow); the rest
 conflict in `kindi/__main__.py`, `kindi/server.py`, `kindi/backends/__init__.py` or the token-class/engine files.
 
-Report date: **2026-11-25**. Baseline: this fork at **`7cab9d8`** against official **Kindi 0.7.1** (tag `v0.7.1`,
+Report date: **2026-11-25**. Baseline: this fork at **`d58dbf0`** against official **Kindi 0.7.1** (tag `v0.7.1`,
 commit `1cb59d2`, released 2026-11-23) on this fork's `merge/upstream-0.7.0` branch. The v0.7.0 comparison that
 produced most of this report used `8298a0f` at the merge commit `35e4697`, and the 0.6.1-era figures below were
 measured at `60a039b`. The earlier comparison, its 0.6.1 measurements and the
@@ -150,11 +152,18 @@ The delta moved with them: **778 → 797 commits**, **1,027 → 1,077 changed fi
 
 ## 1. Baseline
 
+> **At `d58dbf0` (2026-11-25, after the official v0.7.2 port; official `v0.7.1` = `1cb59d2`):** **0 commits
+> behind, 800 commits ahead, 1,079 changed files (+155,723/−2,262), 1,211 tracked files vs 232 upstream**, no
+> upstream file missing, 31 numbered requirements (command block below). `v0.7.1`'s tree is an ancestor of
+> this branch. `v0.7.2` is `22af8d4` (published 2026-11-25T02:05:13Z): its three commits are not ancestors of
+> `HEAD`, but every change they carry is in the tree - `git diff v0.7.1 v0.7.2` is 26 files, and
+> `kindi/apierr.py` is folded into the existing `kindi/api/errors.py` rather than added beside it. The LoRA
+> kernels have not run on this host (no CUDA device).
+>
 > **At `7cab9d8` (2026-11-25, official `v0.7.1` = `1cb59d2`):** **0 commits behind, 797 commits ahead,
 > 1,077 changed files (+154,573/−2,238), 1,209 tracked files vs 232 upstream**, no upstream file missing,
 > 31 numbered requirements (command block below). `v0.7.1`'s tree is an ancestor of this branch, so
-> `v0.7.1..HEAD` is the whole delta. The newest official release is `v0.7.2` (`22af8d4`, published
-> 2026-11-25T02:05:13Z) and this branch does not contain it: it is 3 commits behind that tag.
+> `v0.7.1..HEAD` is the whole delta. It was taken before the 0.7.2 port and does not include it.
 >
 > **At `3288ba1` (2026-11-24):** the same comparison read 778 commits, 1,027 changed files (+147,430/−2,227)
 > and 1,159 tracked files; that block is kept as the record.
@@ -164,16 +173,17 @@ The delta moved with them: **778 → 797 commits**, **1,027 → 1,077 changed fi
 > file missing. The paragraphs below the two blocks are the 0.6.1 baseline they were written at and stay as the
 > measurement record, including their `v0.6.1..HEAD` command block (683 / 897 / +127,213/−1,417 at that time).
 
-The current delta is re-derived, not quoted, by these commands (run at `7cab9d8`):
+The current delta is re-derived, not quoted, by these commands (run at `d58dbf0`):
 
 ```sh
 git rev-list --count HEAD..v0.7.1                     # 0 commits behind
-git rev-list --count HEAD..v0.7.2                     # 3 commits behind the newest release
-git rev-list --count v0.7.1..HEAD                     # 797 commits ahead
-git diff --shortstat v0.7.1 HEAD                      # 1077 files changed, 154573 insertions(+), 2238 deletions(-)
+git rev-list --count HEAD..v0.7.2                     # 3 commits past v0.7.1 that this history does not contain
+git rev-list --count v0.7.1..HEAD                     # 800 commits ahead
+git diff --shortstat v0.7.1 HEAD                      # 1079 files changed, 155723 insertions(+), 2262 deletions(-)
 git diff --diff-filter=D --name-only v0.7.1 HEAD      # (empty: no upstream file missing)
+git diff --name-only v0.7.1 v0.7.2 | wc -l            # 26 files: every 0.7.2 change, ported in d58dbf0
 git ls-tree -r --name-only v0.7.1 | wc -l             # 232 upstream files
-git ls-tree -r --name-only HEAD | wc -l               # 1209 tracked files
+git ls-tree -r --name-only HEAD | wc -l               # 1211 tracked files
 ls docs/development/requirements/REQ-*.md | wc -l     # 31 numbered requirements
 ```
 
@@ -403,31 +413,33 @@ uncovered file is independent work.
 
 ```sh
 curl -s "https://api.github.com/repos/ahtx/kindi/pulls?state=open&per_page=100"    # 34 open, 33 from this fork, 7 drafts
-curl -s "https://api.github.com/repos/ahtx/kindi/pulls?state=closed&per_page=100"  # 9 closed, 0 merged, 0 of them this fork's
+curl -s "https://api.github.com/repos/ahtx/kindi/pulls?state=closed&per_page=100"  # 9 closed, 0 merged (four of them this fork's)
 curl -s "https://api.github.com/repos/atimelessrage/kindi/pulls?state=all"         # the fork itself: 1 PR, closed draft
 curl -s "https://api.github.com/repos/ahtx/kindi/releases/latest"                  # Kindi 0.7.2, published 2026-11-25T02:05:13Z
 ```
 
-So the state is **33 open PRs from this fork (#47-#79), 7 drafts, 0 merged** - upstream has
-never merged one, and every closed upstream PR belongs to someone else. `gh` is not installed on this
+So the state is **33 open PRs from this fork (#47-#79), 7 drafts, 0 merged**: GitHub records no merged PR
+at all. Four closed ones are this fork's, and two of those are why 0.7.2 exists - #50 (`load_json`) and #58
+(the OpenAI error body) were taken into the release as the two commits after `a2eebdd`, with the PRs closed
+rather than merged (`merged_at` is null on all 43). `gh` is not installed on this
 host, which is why the counts above come from the REST API directly. The 2026-11-24 rebase pass pushed
 31 branches onto `v0.7.1` on GitHub, #47 and #48 are in the release by content, and a merge rehearsal on
 `1cb59d2` found a 14-PR conflict-free foundation.
 
-**Ahead with no pull request at all (measured at `7cab9d8`).** The PR branches are snapshots of the
+**Ahead with no pull request at all (measured at `d58dbf0`).** The PR branches are snapshots of the
 pre-0.6/0.7 proposal line, so they carry none of this fork's work since the release:
 
 ```sh
 git rev-list --count v0.7.1..HEAD --not $(git for-each-ref --format='%(refname:short)' 'refs/heads/pr/*')
-# 797 commits since v0.7.1, 0 of them reachable from any pr/* branch
-git diff --name-only v0.7.1..HEAD | sort > mine.txt                       # 1077 changed files
+# 800 commits since v0.7.1, 0 of them reachable from any pr/* branch
+git diff --name-only v0.7.1..HEAD | sort > mine.txt                       # 1079 changed files
 for b in $(git for-each-ref --format='%(refname:short)' 'refs/heads/pr/*'); do
   git diff --name-only "v0.7.1...$b"; done | sort -u > pr.txt             # 113 files, the PRs' whole footprint
-comm -23 mine.txt pr.txt | wc -l                                          # 987 changed files
+comm -23 mine.txt pr.txt | wc -l                                          # 989 changed files
 ```
 
 The gap is roughly nine-tenths documentation and tests, with the rest in `kindi/`, `tools/`, root files, the
-bridge, CI and the container files. In other words **113 of the 1,077 changed files** - about a tenth - are
+bridge, CI and the container files. In other words **113 of the 1,079 changed files** - about a tenth - are
 covered by any PR, and the substance of what is unproposed is the table above plus everything landed since the
 release: the backend registry and its six adapters (REQ-0019 T4.1-T4.4, including the `llamacpp` wildcard), the
 Anthropic `/v1/messages` endpoint (REQ-0028) and the dialect-parity `kindi selftest`, the Arc A770 probes and the
@@ -646,16 +658,23 @@ arbitrary-draft-GGUF harness stays a separate gate.
 - §1's git commands (`git merge-base --is-ancestor`, `rev-list --count`,
   `diff --shortstat`, `diff --diff-filter=D`, `ls-tree`, `ls-files`).
 - Latest release check (2026-11-25): GitHub `/repos/ahtx/kindi/releases/latest` -> [`v0.7.2`](https://github.com/ahtx/kindi/releases/tag/v0.7.2),
-  published 2026-11-25T02:05:13Z, tag object `787f63a` peeled to `22af8d4`; `git rev-list --count 7cab9d8..v0.7.2` -> 3
+  published 2026-11-25T02:05:13Z, tag object `787f63a` peeled to `22af8d4`; `git rev-list --count d58dbf0..v0.7.2` -> 3
   and `git diff --name-only v0.7.1 v0.7.2 | wc -l` -> 26. The 2026-11-22 check of `v0.6.1` (published
   2026-11-16T21:49:20Z, `git ls-remote origin refs/heads/main` -> `7fececb`) stays as the record.
+- The 0.7.2 port itself (`d58dbf0`): all 26 files' changes are in the tree - `kindi/lora.py`, the `dot8h` /
+  `k_lora` / `k_lora2` kernels, the `a`-row fold in `Engine.load_lora`, the chunk/cache fingerprint, the config key
+  and `--lora`, the `/health` field and the engines' refusals, plus one OpenAI error body in `kindi/route.py`,
+  `kindi/server.py` and `kindi/oai.py`. `load_json` was already here (zero `json.load(open(` in `kindi/*.py`), and
+  `kindi/apierr.py` is folded into the existing `kindi/api/errors.py` instead of sitting beside it. The kernels
+  compiled but have not run: this host has no CUDA device.
 - Counts at reported baseline `39f9768`: **683 commits**, **897 files**, `+127,213/−1,417`, **998 tracked files**,
   **28 numbered requirements**, zero file deletions (`git rev-list`, `git diff --shortstat`,
   `git diff --diff-filter=D`, `git ls-tree`). The code baseline `66eebd3` is 678 commits / +127,084;
   the five later commits are docs-only (net 4 files, +180/−51).
 - Upstream PR status (2026-11-25, GitHub API): **34 open** (#37, #47-#79), **33 from this fork**, **7 drafts**
-  (#67-#71, #74, #76) and **0 merged**; **9 closed**, none of them this fork's; the fork's own repository has
-  1 PR, a closed draft. `gh` is absent on this host, so these come from the REST endpoints quoted in §3a.
+  (#67-#71, #74, #76) and **0 merged**; **9 closed**, four of them this fork's - #50 and #58 are the two whose
+  content the maintainer took into 0.7.2 as commits, and both were closed rather than merged (`merged_at` null on
+  all 43 PRs); the fork's own repository has 1 PR, a closed draft. `gh` is absent on this host, so these come from the REST endpoints quoted in §3a.
 - Upstream PR status (2026-11-22, GitHub API, historical): **34 open** (#37, #47-#79): **27 non-draft and
   7 draft** (#67-#71, #74, #76), **33 `mergeable: clean`** and external #37 `dirty`. All target
   `7fececb` except #37 (`JohnUzoka/kindi`, base `dce89df`, not merge-ready). The union is **122 unique
@@ -674,7 +693,10 @@ arbitrary-draft-GGUF harness stays a separate gate.
   `docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-container-smoke/RESULTS.md`.
 - Focused checks at this refresh: `python tools/check_claims.py` (47 gates / 372 numbers),
   `python -m pytest -q tests/test_claims.py` (19 passed).
-- Full suite at `f3a1d23` (2026-11-25, after this refresh): **1,661 passed, 47 skipped, 0 failed**. The tree one
+- Full suite at `d58dbf0` (2026-11-25, after the 0.7.2 port): **1,673 passed, 47 skipped, 0 failed** - the
+  12 device-free `tests/test_lora.py` cases plus the `check_messages` case, and the two generated-file drifts
+  the first run found (`kindi.conf.example`'s `lora` key, the reference's line numbers) fixed.
+- Full suite at `f3a1d23` (2026-11-25, after the previous refresh): **1,661 passed, 47 skipped, 0 failed**. The tree one
   commit earlier read 1,657 passed / 47 skipped / 2 failed, both failures `tests/test_claims.py` refusing the
   then-untracked Arc evidence; the two tests added for the new checker ops account for the difference.
 - Full suite before that: **1,420 passed, 28 skipped, 0 failed** (recorded at

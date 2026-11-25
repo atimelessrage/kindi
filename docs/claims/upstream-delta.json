@@ -2,9 +2,9 @@
   "gate": "upstream-delta",
   "title": "The fork's delta against official Kindi v0.7.1 (and the historical v0.6.1 figures), re-derived from the tags",
   "measured": "2026-11-25",
-  "commit": "7cab9d8",
+  "commit": "d58dbf0",
   "command": "git rev-list --count / git diff --shortstat / diff --name-only against official tag v0.7.1 (1cb59d2) and HEAD 7cab9d8, with v0.7.2 (22af8d4) for the newest-release gap; the no-PR figures use `commits` and `paths` with exclude_glob refs/heads/pr/* (the local pre-rebase PR snapshots); the v0.6.1 numbers stay pinned to v0.6.1 (7fececb), its parent dce89df, v0.6.0 (179710c) and ee2ba46",
-  "notes": "CURRENT-VS-KINDI-0.7.md now reports v0.7.1 at 7cab9d8: 0 behind, 797 commits, 1,077 files, +154,573/-2,238, 1,209 tracked files against 232, 31 requirements, no upstream file missing. All 797 commits and 987 of the 1,077 changed files are touched by no pr/* branch, whose whole footprint is 113 files. The newest official release v0.7.2 (22af8d4, published 2026-11-25) is 3 commits and 26 files past v0.7.1 and is not in this tree. The 2026-11-24 refresh moved 19 commits and 86 files (+7,247/-115) on top of 3288ba1. The v0.6.1 block stays in the same doc as the measurement record and keeps its own pins: the published v0.6.0..v0.6.1 range is 16 files, +336/-43; the 0.6.1 commit itself (dce89df..v0.6.1) is 15 files, +52/-36; v0.6.1..ee2ba46 is 676 commits and 891 files, +125,781/-1,407, zero deletions, 992 tracked files against 172 upstream and 28 requirements.",
+  "notes": "CURRENT-VS-KINDI-0.7.md now reports v0.7.1 at d58dbf0: 0 behind, 800 commits, 1,079 files, +155,723/-2,262, 1,211 tracked files against 232, 31 requirements, no upstream file missing. All 800 commits and 989 of the 1,079 changed files are touched by no pr/* branch, whose whole footprint is 113 files. Official v0.7.2 (22af8d4, published 2026-11-25) is 3 commits and 26 files past v0.7.1; its three commits are not ancestors here, but its content is ported in d58dbf0 (LoRA adapters, the OpenAI error body, the 0.7.2-fork version; kindi/apierr.py is folded into kindi/api/errors.py). The 2026-11-24 refresh moved 19 commits and 86 files (+7,247/-115) on top of 3288ba1; the pre-port baseline was 7cab9d8 (797 commits, 1,077 files, +154,573/-2,238, 1,209 tracked). The v0.6.1 block stays in the same doc as the measurement record and keeps its own pins: the published v0.6.0..v0.6.1 range is 16 files, +336/-43; the 0.6.1 commit itself (dce89df..v0.6.1) is 15 files, +52/-36; v0.6.1..ee2ba46 is 676 commits and 891 files, +125,781/-1,407, zero deletions, 992 tracked files against 172 upstream and 28 requirements.",
   "evidence": [
     "ref:v0.6.0",
     "ref:v0.6.1",
@@ -13,7 +13,8 @@
     "ref:f934a55",
     "ref:v0.7.1",
     "ref:v0.7.2",
-    "ref:7cab9d8"
+    "ref:7cab9d8",
+    "ref:d58dbf0"
   ],
   "numbers": [
     {
@@ -252,7 +253,7 @@
         "kind": "git",
         "op": "commits",
         "revs": [
-          "7cab9d8",
+          "d58dbf0",
           "v0.7.1"
         ],
         "expect": 0
@@ -260,7 +261,7 @@
     },
     {
       "id": "v071-commits",
-      "display": "797 commits ahead",
+      "display": "800 commits ahead",
       "quoted_in": [
         "CURRENT-VS-KINDI-0.7.md"
       ],
@@ -269,14 +270,14 @@
         "op": "commits",
         "revs": [
           "v0.7.1",
-          "7cab9d8"
+          "d58dbf0"
         ],
-        "expect": 797
+        "expect": 800
       }
     },
     {
       "id": "v071-files",
-      "display": "1,077 changed files",
+      "display": "1,079 changed files",
       "quoted_in": [
         "CURRENT-VS-KINDI-0.7.md"
       ],
@@ -285,15 +286,15 @@
         "op": "diffstat",
         "revs": [
           "v0.7.1",
-          "7cab9d8"
+          "d58dbf0"
         ],
         "field": "files",
-        "expect": 1077
+        "expect": 1079
       }
     },
     {
       "id": "v071-insertions",
-      "display": "154,573",
+      "display": "155,723",
       "quoted_in": [
         "CURRENT-VS-KINDI-0.7.md"
       ],
@@ -302,15 +303,15 @@
         "op": "diffstat",
         "revs": [
           "v0.7.1",
-          "7cab9d8"
+          "d58dbf0"
         ],
         "field": "insertions",
-        "expect": 154573
+        "expect": 155723
       }
     },
     {
       "id": "v071-deletions",
-      "display": "2,238",
+      "display": "2,262",
       "quoted_in": [
         "CURRENT-VS-KINDI-0.7.md"
       ],
@@ -319,15 +320,15 @@
         "op": "diffstat",
         "revs": [
           "v0.7.1",
-          "7cab9d8"
+          "d58dbf0"
         ],
         "field": "deletions",
-        "expect": 2238
+        "expect": 2262
       }
     },
     {
       "id": "v071-tracked",
-      "display": "1,209 tracked files",
+      "display": "1,211 tracked files",
       "quoted_in": [
         "CURRENT-VS-KINDI-0.7.md"
       ],
@@ -335,7 +336,7 @@
         "kind": "git",
         "op": "treefiles",
         "rev": "7cab9d8",
-        "expect": 1209
+        "expect": 1211
       }
     },
     {
@@ -377,14 +378,14 @@
         "op": "deleted",
         "revs": [
           "v0.7.1",
-          "7cab9d8"
+          "d58dbf0"
         ],
         "expect": 0
       }
     },
     {
       "id": "v071-no-pr-commits",
-      "display": "797 commits since v0.7.1",
+      "display": "800 commits since v0.7.1",
       "quoted_in": [
         "CURRENT-VS-KINDI-0.7.md"
       ],
@@ -393,15 +394,15 @@
         "op": "commits",
         "revs": [
           "v0.7.1",
-          "7cab9d8"
+          "d58dbf0"
         ],
-        "expect": 797,
+        "expect": 800,
         "exclude_glob": "refs/heads/pr/*"
       }
     },
     {
       "id": "v071-pr-footprint",
-      "display": "113 of the 1,077 changed files",
+      "display": "113 of the 1,079 changed files",
       "quoted_in": [
         "CURRENT-VS-KINDI-0.7.md"
       ],
@@ -410,7 +411,7 @@
         "op": "paths",
         "revs": [
           "v0.7.1",
-          "7cab9d8"
+          "d58dbf0"
         ],
         "field": "union",
         "exclude_glob": "refs/heads/pr/*",
@@ -419,7 +420,7 @@
     },
     {
       "id": "v071-no-pr-files",
-      "display": "987 changed files",
+      "display": "989 changed files",
       "quoted_in": [
         "CURRENT-VS-KINDI-0.7.md"
       ],
@@ -428,15 +429,15 @@
         "op": "paths",
         "revs": [
           "v0.7.1",
-          "7cab9d8"
+          "d58dbf0"
         ],
         "exclude_glob": "refs/heads/pr/*",
-        "expect": 987
+        "expect": 989
       }
     },
     {
       "id": "v072-behind",
-      "display": "3 commits behind the newest release",
+      "display": "3 commits past v0.7.1 that this history does not contain",
       "quoted_in": [
         "CURRENT-VS-KINDI-0.7.md"
       ],
@@ -444,7 +445,7 @@
         "kind": "git",
         "op": "commits",
         "revs": [
-          "7cab9d8",
+          "d58dbf0",
           "v0.7.2"
         ],
         "expect": 3
