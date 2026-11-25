@@ -86,6 +86,21 @@ def test_the_gemma4_and_deepseek_families_route_through_their_adapters(tmp_path,
         assert [mid for mid, _ in seen] == [model_id]
 
 
+def test_a_proxy_pack_says_it_has_no_engine_instead_of_no_adapter(tmp_path, monkeypatch):
+    """The llama.cpp proxy is registered but contract-only: it has no engine object, so a pack naming
+    it must be refused with the serving boundary named - not with "no backend adapter serves that
+    family", which would suggest the family was never ported."""
+    monkeypatch.setattr(engine, "make_engine_legacy",
+                        lambda *a, **k: pytest.fail("the gateway built the dense engine"))
+    pack = _pack(tmp_path, {"backend": "llamacpp", "model_path": "foreign.gguf"})
+    with pytest.raises(SystemExit) as caught:
+        engine.make_engine(pack)
+    message = str(caught.value)
+    assert "llama-server" in message and "no engine object" in message, message
+    assert "Serving boundary" in message, message
+    assert "no backend adapter serves" not in message, message
+
+
 def test_a_contradictory_manifest_is_refused(tmp_path, monkeypatch):
     monkeypatch.setattr(engine, "make_engine_legacy",
                         lambda *a, **k: pytest.fail("the gateway built the dense engine"))

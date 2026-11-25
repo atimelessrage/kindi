@@ -28,6 +28,38 @@ gateway, not automatically servable over HTTP; an HTTP integration must supply t
 chat template, streaming and metrics contract this server uses. `kindi/dsv41_server.py` remains a
 separate stack for that family (audit C2/R4); do not describe an external backend as served.
 
+### The llama.cpp proxy stays engine-gateway only (decided 2026-11-25)
+
+The `llamacpp` wildcard is the concrete case, and it was investigated rather than assumed. Two
+things are already true today: routing is not the obstacle (mounting a proxy-shaped object on the
+existing app answers `/health`, `/v1/models`, `/metrics`, non-streaming chat and `/v1/messages`, and
+the capability gates already return 400 for structured output and tools on that backend), and the
+backend's own shape is what blocks an honest gateway. `server.Kindi` is built on four numbers a
+proxy does not have:
+
+- **context** - the app advertises `eng.ctx` in `/health` and as `context_length`/`max_model_len`
+  in `/v1/models`; the proxy declares `max_context=0` and never asks llama-server. Serving would
+  first add a `/props` probe (`default_generation_settings.n_ctx`) to the backend.
+- **prompt tokens** - `K.check_prompt` is the engine's tokenizer, used by `dry_run`, `/tokenize`,
+  Anthropic's `input_tokens` and the context-overflow check. The proxy's ids are bytes, so those
+  answers would be wrong; upstream `timings.prompt_n`/`predicted_n`/`cache_n` can only report usage
+  after a reply.
+- **streaming** - the backend posts `stream: false` and replays the finished reply as character
+  events (pinned by `tests/backends/test_llamacpp.py`). Through the app's SSE route every frame then
+  waits for the whole reply, so time to first token equals generation time and a cancelled stream
+  does not abort the upstream request. An honest stream needs llama-server's SSE consumed
+  incrementally in the backend.
+- **prompt cache** - cache gauges, session parking and checkpoint reuse live in `Kindi.runner` and
+  the upstream server's prefix reuse is invisible to `/metrics`. A gateway would have to omit those
+  samples and say `cache_kind=none`, or read llama-server's timings.
+
+So the proxy is not selectable from `kindi serve`, and a pack whose manifest names it is refused
+with that reason instead of the older "no backend adapter serves that family" (which suggested the
+family was never ported; `kindi/engine.py` now names the contract-only backend). The step that
+unlocks serving is adding upstream streaming plus the context probe to the backend and verifying
+them against a real `llama-server` - the same live gate T4.4 has open. The probe, its output table
+and the checklist are in [REQ-0019](development/requirements/REQ-0019.md) T4.6.
+
 ## The contract
 
 `kindi/backends/base.py` defines:

@@ -844,6 +844,22 @@ DENSE_BACKENDS = (None, "")
 MOE_BACKENDS = ("kindi_lightning", "kindi_dsv41")
 
 
+def _contract_only_backend(family):
+    """The registered capabilities of `family` when it is a contract-only backend, else None.
+
+    A proxy backend (the llama.cpp wildcard) implements the registry contract but has no
+    `engine` attribute: it forwards generation instead of running weights, so no pack can be
+    turned into it. The gateway must say that rather than call it a family nobody ported.
+    """
+    try:
+        from .backends import get_registration
+
+        factory, caps = get_registration(family)
+    except Exception:  # noqa: BLE001 - not registered (or an unreadable registry): not this case
+        return None
+    return None if hasattr(factory, "engine") else caps
+
+
 def adapter_model_id(man):
     """The registry model id a backend adapter claims for this pack manifest, or None.
 
@@ -929,6 +945,18 @@ def make_engine(pack, ctx=4096, clusters=None, log=print, tandem="off", cpu_laye
             log("kindi: %s -> the %s backend (%s)" % (pack, backend.capabilities.name, model_id))
             return backend.engine
         if family not in DENSE_BACKENDS:
+            proxy = _contract_only_backend(family)
+            if proxy is not None:
+                hint = ""
+                if proxy.name == "llamacpp":
+                    hint = (" It forwards generation to a running `llama-server`: talk to that server "
+                            "directly (it already speaks the OpenAI API), or convert the model into "
+                            "a Kindi pack.")
+                raise SystemExit(
+                    "kindi: %s is a %r pack. That backend (`%s`) implements the backend contract but "
+                    "has no engine object, so `kindi serve` and `kindi verify` cannot build it. Being "
+                    "resolvable by the registry is not HTTP serving; see docs/BACKENDS.md, \"Serving "
+                    "boundary\".%s" % (pack, family, proxy.name, hint))
             raise SystemExit(
                 "kindi: %s is a %r pack and no backend adapter serves that family, so the gateway "
                 "would build the dense Bonsai engine for it (the wrong engine). `kindi serve` and "

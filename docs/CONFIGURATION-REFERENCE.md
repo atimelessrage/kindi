@@ -214,7 +214,7 @@ direct sites.
 | `KINDI_KV` | (empty) or `q8_0` | `kindi/engine.py:80` (+6 more) |
 | `KINDI_KV_CACHE` | (unset) | `kindi/nanbeige.py:274` (+1 more) |
 | `KINDI_KV_EXPERIMENTAL` | `0` | `kindi/kld.py:92` (+5 more) |
-| `KINDI_LEGACY_ENGINE_PATH` | (unset) | `kindi/engine.py:896` |
+| `KINDI_LEGACY_ENGINE_PATH` | (unset) | `kindi/engine.py:912` |
 | `KINDI_LLAMACPP_API_KEY` | (unset) | `kindi/backends/llamacpp.py:120` |
 | `KINDI_LLAMACPP_BASE_URL` | (unset) | `kindi/backends/llamacpp.py:117` |
 | `KINDI_LLVM` | (unset) | `kindi/cpu.py:94` |
@@ -423,7 +423,7 @@ direct sites.
 | `KINDI_TC_DP4A` | `0` | `kindi/tc.py:74` |
 | `KINDI_TC_DUAL` | `1` | `kindi/spec.py:360` |
 | `KINDI_TC_GRAPHS` | `0` | `kindi/spec.py:338` |
-| `KINDI_TC_HP` | `0` | `kindi/engine.py:1004` (+2 more) |
+| `KINDI_TC_HP` | `0` | `kindi/engine.py:1032` (+2 more) |
 | `KINDI_TC_INC` | (empty) | `kindi/spec.py:180` |
 | `KINDI_TC_LANE` | (empty) | `kindi/tc.py:83` |
 | `KINDI_TC_MM` | `2` | `kindi/chunk.py:375` |
@@ -434,7 +434,7 @@ direct sites.
 | `KINDI_TESTED_CC` | (empty) | `kindi/tc.py:39` |
 | `KINDI_THP` | `0` | `kindi/engine.py:93` |
 | `KINDI_THREADS` | (unset) | `kindi/inkling2.py:339` |
-| `KINDI_TP` | (empty) | `kindi/engine.py:986` (+2 more) |
+| `KINDI_TP` | (empty) | `kindi/engine.py:1014` (+2 more) |
 | `KINDI_TP_SPLIT` | `equal` or `auto` | `kindi/tp.py:1046` (+1 more) |
 | `KINDI_VERIFY_ON_START` | (unset) | `kindi/container.py:245` |
 | `KINDI_XC_CAL` | `1` | `kindi/dsv41.py:635` |

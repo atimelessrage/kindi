@@ -1705,3 +1705,21 @@ validation before SSE, forbidden bytes skipped through the HTTP route, json_sche
 the sampler's allowed set, thinking-channel isolation and the Gemma path. Focused run: 180 passed
 (`test_server_grammar` + `test_server` + `test_gbnf` + `test_gbnf_recursion` + `test_sampling` +
 `test_python_quality`); quality ratchet at baseline.
+
+### Serving boundary for the llama.cpp proxy (2026-11-25)
+
+Asked whether the registry's `llamacpp` backend should be wired into `kindi serve`. Investigated
+with a probe that mounts a proxy-shaped object on the real `server.create_app` (canned upstream,
+no llama-server on this host): `/health`, `/v1/models`, `/metrics`, non-streaming chat and SSE all
+answer 200 and structured output is refused 400 by the existing capability gate, so routing is
+cheap. The blockers are the four numbers the app reports - context (`eng.ctx` would be invented and
+is advertised as `context_length`; the backend declares `max_context=0` and never probes
+llama-server), prompt tokens (`K.check_prompt` is the engine tokenizer; the proxy's ids are bytes),
+streaming (the backend posts `stream: false` and replays, pinned by
+`tests/backends/test_llamacpp.py`, so SSE's first frame waits for the whole reply and cancel does
+not abort upstream) and prompt cache (gauges/parking live in `Kindi.runner`). Decision: engine
+gateway only. `kindi/engine.py` now refuses a pack naming a contract-only backend with that reason
+instead of "no backend adapter serves that family" (new test in `tests/test_engine_gateway.py`);
+docs in `docs/BACKENDS.md` ("Serving boundary"), REQ-0019 T4.6, `docs/development/KNOWLEDGE.md`,
+probe in `docs/benchmarks/2026-11-25-llamacpp-proxy-serving/`. No llama-server run, so no serving
+claim either way; live gate unchanged (T4.4 open).

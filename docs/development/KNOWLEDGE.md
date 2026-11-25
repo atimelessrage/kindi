@@ -108,6 +108,20 @@ was verified against is the gitignored host-tools sheet under `bench-logs/`.
   non-streaming request, and cannot do constrained decoding (a `token_filter`
   raises). `tests/backends/test_llamacpp.py` covers it with an injectable
   opener; a live server is the one unrun gate.
+- **A registered backend is not a servable one, and the gap is four numbers.**
+  `kindi serve` builds `server.Kindi`, which is an engine face (ctx, tokenizer,
+  `Runner` prompt cache, sampler), not the Backend contract. A probe
+  (2026-11-25) mounted a proxy-shaped object on `create_app` and got 200 from
+  `/health`, `/v1/models`, `/metrics`, chat and SSE with the existing 400 for
+  structured output - so routing is not what blocks a gateway. What blocks it
+  is that a proxy would have to invent `eng.ctx` (advertised as
+  `context_length`), `check_prompt` (used by `dry_run`, `/tokenize`,
+  Anthropic `input_tokens`, overflow; the proxy's ids are bytes), streaming
+  (the backend posts `stream: false` and replays a finished reply, so SSE's
+  first frame waits for the whole reply and cancel does not abort upstream)
+  and prompt-cache gauges (`Kindi.runner`). Fix the backend first - upstream
+  SSE, a `/props` n_ctx probe, `timings` into usage - then a gateway can be
+  honest; do not fake a `Runner`.
 - **`Backend.capabilities` is declared, not `None`.** The base contract carries
   `capabilities: "BackendCapabilities"` as an annotation only, so a subclass
   assigns its own object without a mypy override error and

@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `88ceb79` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; 2026-11-25: the Bonsai 2.5 27B pack runs on the CPU engine - SHA-256 matched, 7,242 MB in 370 s, packcheck full, 339.9 s load, 3.08-4.02 tok/s greedy, ids identical across two processes - and `kindi verify` now keys its reference by release, so the pack gets "no llama.cpp reference" + exit 2 instead of Bonsai 2's tokens; `chat._tojson` makes the prompt match the published template 26 of 26 (26 cases); GPU cells still `not run`, no exactness claimed; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `f967e66` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; 2026-11-25: the llama.cpp proxy stays engine-gateway only - a probe on the real app showed routing is cheap but context/token counts/streaming/cache gauges would be invented, so serving needs upstream SSE, a `/props` n_ctx probe and timings-based usage first (REQ-0019 T4.6); 2026-11-25: the Bonsai 2.5 27B pack runs on the CPU engine - SHA-256 matched, 7,242 MB in 370 s, packcheck full, 339.9 s load, 3.08-4.02 tok/s greedy, ids identical across two processes - and `kindi verify` now keys its reference by release, so the pack gets "no llama.cpp reference" + exit 2 instead of Bonsai 2's tokens; `chat._tojson` makes the prompt match the published template 26 of 26 (26 cases); GPU cells still `not run`, no exactness claimed; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24:** the llama.cpp proxy backend landed (wildcard; 12 CPU tests, live gate open, no
   arbitrary-GGUF claim) with REQ-0030's native-CPU 2B profile, and `Backend.capabilities` was declared
   instead of `None` (six adapters' mypy `assignment` finding gone, 59 -> 53). Suite: 1,633 / 47 / 0.
@@ -63,7 +63,7 @@ existing debt is tolerated and `--update --reason "..."` lowers the baseline aft
 
 ### Full CPU gate
 
-The 2026-11-25 trie-walk gate is **1,644 passed, 47 skipped, 0 failed** in 247.32 s; the 2026-11-25 Bonsai 2.5 gate is 1,640 / 47 / 0 in 242.39 s (the 2026-11-24
+The 2026-11-25 proxy-boundary gate is **1,658 passed, 47 skipped, 0 failed** in 247.63 s; the trie-walk gate is 1,644 / 47 / 0 in 247.32 s, the Bonsai 2.5 gate 1,640 / 47 / 0 in 242.39 s (the 2026-11-24
 mask/pick gate was 1,635 / 47 / 0 in 238.23 s; 1,633 before that). The 27B-CPU gate at `32075c4` is **1,598 passed, 47 skipped, 0 failed** in 226.48 s (the CPU build checks now compile and load every tier here instead of skipping); the 2026-11-24 grammar-mask gate at `ebf871f` is 1,513 passed, 58 skipped, 0 failed in 180.66 s (plain CPU suite, no coverage rerun); the 2026-11-22 prewarm gate at `4bab483` was 1,423 / 58 / 0 in 138.50 s and the 2026-11-20 integration gate at `82a72bf` 1,412 / 28 / 0 in 250.33 s. The last coverage-measured run remains `539a504`: **1,241 passed, 28 skipped, 0 failed at 46.36%** line+branch (23,504 statements, 8,394 branches; plain 1,241 / 28 / 0 in 227.62 s), and the consolidated 2026-11-19 commits (`f75253b` + `84b6686`) 1,357 / 28 / 0 in 229.53 s. Every skip is inventoried by node ID and reason in `tests/README.md`.
 
 ### Upstream v0.7.0 and comparison
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `88ceb79` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `88ceb79` | this session; 2026-11-25 mask trie walk +1.486x, before that Bonsai 2.5 27B CPU run + template parity, the v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke + Arc GEMM, llama.cpp proxy backend, constrained mask/pick -8.4% structured token, REQ-0030 CPU profile, bench --spec, 27B CPU verify + compiler detection |
+| `T:/kindi` | `main` | `f967e66` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `f967e66` | this session; 2026-11-25 proxy serving boundary decided, mask trie walk +1.486x, before that Bonsai 2.5 27B CPU run + template parity, the v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke + Arc GEMM, llama.cpp proxy backend, constrained mask/pick -8.4% structured token, REQ-0030 CPU profile, bench --spec, 27B CPU verify + compiler detection |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 

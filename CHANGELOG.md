@@ -10,6 +10,26 @@ installer hashes are recorded in `docs/INSTALL.md`; publication is still a relea
 (The pre-merge 0.6.1-era snapshot — 669 commits / 827 files at `60a039b` — is kept in
 `detailed-fork-changelog.md`.)
 
+### The llama.cpp proxy stays out of `kindi serve`, and now says why (2026-11-25)
+
+The `llamacpp` backend is resolvable by the registry but `kindi serve` never builds it, so the
+question was whether to wire it in. A probe (a proxy-shaped object mounted on the real app, canned
+upstream replies) showed routing is not the cost: `/health`, `/v1/models`, `/metrics`, chat and SSE
+all answer, and structured output is already refused with a 400 by the capability gate. What the
+proxy cannot provide is the four numbers the app is built on - `eng.ctx` (it would be invented, and
+is advertised as `context_length`), `check_prompt` (byte ids are not upstream tokens, so `dry_run`,
+`/tokenize`, Anthropic `input_tokens` and the overflow check would be wrong), streaming (the backend
+posts `stream: false` and replays a finished reply, so an SSE first frame waits for the whole reply
+and cancelling does not abort upstream) and the prompt-cache gauges (`Kindi.runner`; llama-server's
+prefix reuse is invisible). So the proxy stays an engine-gateway backend until the backend grows
+incremental upstream SSE, a `/props` context probe and `timings`-based usage - each verifiable only
+against a live `llama-server`, the gate T4.4 already has open.
+
+What changed in the tree: a pack whose manifest names the proxy is refused with that reason
+(`kindi/engine.py` now separates a contract-only backend from a family nobody ported, pinned by
+`tests/test_engine_gateway.py`), and the decision, the probe and its output table are recorded in
+`docs/BACKENDS.md` ("Serving boundary") and REQ-0019 T4.6.
+
 ### The constrained mask's walk: 1.486x per miss, exact (2026-11-25)
 
 The 2026-11-24 round left the trie walk as the largest remaining part of a constrained mask miss
