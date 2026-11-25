@@ -16,6 +16,11 @@ on official Kindi 0.7.2 (`22af8d4`): it carries every 0.7.2 feature (LoRA adapte
 OpenAI error body on every endpoint), every 0.7.1 feature (Inkling 2 Mini, Flash-Next sampled drafting, physical-core
 CPU threads) plus the fork's own plan/tensor-core/tandem/session work, and it is not an official release.
 
+**What works today:** Ternary-Bonsai-2.5 27B converts and runs on the CPU engine (the `-mtp` file's
+draft head is recorded, not used to draft, and no GPU row is measured); on Intel Arc only the device
+probes run - OpenCL kernels and the pack probe, 219-228 GB/s over a real 27B pack - with no engine
+path and no support claim.
+
 ### Measured speed
 
 Kindi and llama.cpp on the same card, with the same model file and the same context. Tokens per second, one stream,

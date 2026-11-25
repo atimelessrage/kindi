@@ -1,7 +1,10 @@
 # Intel Arc A770 support: goal and implementation plan
 
-Status: **planning and architecture audit, 2026-11-10; updated 2026-11-24.** There is no Intel backend
-in Kindi yet, and no Intel support claim. The A770 16 GB is now **installed in the Windows test rig**,
+Status: **M2 probe measured on the Windows test rig; M3 blocked on a SYCL backend** (planning and
+architecture audit 2026-11-10, updated 2026-11-25). There is no Intel backend in Kindi yet, and no
+Intel support claim: M3 - one card serving the 2B through the Kindi engine, `kindi verify` included -
+cannot start until a SYCL backend and engine device selection exist, and that missing SYCL-on-Linux
+half is also what keeps M2 short of its full gate. The A770 16 GB is **installed in the Windows test rig**,
 and M1 hardware qualification has been measured there: the card is visible at 16 GiB, its display
 driver registers a Level Zero driver, and the loader enumerates one driver and one device
 ([run](benchmarks/2026-11-22-i7-8086k-arc-a770/README.md)). Both M2 halves now run on the same host
@@ -13,7 +16,10 @@ shape at layer-sized matrices, [run](benchmarks/2026-11-24-i7-8086k-arc-a770-par
 and now also four rows per work-item with 4-byte vector loads (1.357x that kernel at 4096x8192,
 [run](benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md)),
 and `kindi intel-gemm` runs the engine's q8 arithmetic (`k_q8x_T2` port feeding a `k_mm_g5q`-shaped
-GEMM) bit-exact at 4.2-36.9 GFLOP/s ([run](benchmarks/2026-11-24-i7-8086k-arc-a770-ternary-gemm/README.md)).
+GEMM) bit-exact at 4.2-36.9 GFLOP/s ([run](benchmarks/2026-11-24-i7-8086k-arc-a770-ternary-gemm/README.md)),
+and `kindi intel-pack` streams a converted 27B pack's own ternary bytes through the persistent work
+list at about 1.5x its per-shape path
+([run](benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md)).
 There is still no SYCL backend, Kindi engine path or model run. The plan's first support
 target remains Linux; the Windows run qualifies the hardware, the memory path and the device kernel
 path, not Kindi support (tracked as [REQ-0020](development/requirements/REQ-0020.md)).
@@ -203,7 +209,7 @@ arithmetic path: no `KINDI_TC`, `KINDI_SPEC`, `KINDI_FD`, fast head or `k8v4` in
 |---|---|---|
 | **M0** Architecture audit | this page; 22-kernel inventory; backend boundary and scope | this page names every affected path and the unsupported options |
 | **M1** Hardware qualification | one A770 16 GB on Linux; oneAPI/SYCL/Level Zero; `sycl-ls`; ReBAR and PCIe state | device is visible with 16 GB; ReBAR state recorded; CPU and llama.cpp SYCL baselines run |
-| **M2** Backend smoke test | memory path, runtime-compiled OpenCL vector-add/GEMM and the phase-parallel pack-layout ternary GEMV (partial); still needs `libksycl.so` and Kindi device selection | the smoke binary runs on the A770 with no CPU fallback |
+| **M2** Backend smoke test | memory path, runtime-compiled OpenCL vector-add/GEMM and the phase-parallel pack-layout ternary GEMV: measured on the Windows rig through OpenCL; still needs `libksycl.so` and Kindi device selection | the smoke binary runs on the A770 with no CPU fallback |
 | **M3** Single-card 2B exact | plain engine, exact head, `kindi verify` | 4/4 Bonsai prompts token-exact; no fast/spec/TC |
 | **M4** Server and cache | `kindi serve`, non-stream/stream, prompt cache, health/metrics | same outputs as M3; cache save/restore works |
 | **M5** 4B/9B/27B | model matrix and context fit | exact verify for each advertised model; 8K/24K stability measured |
