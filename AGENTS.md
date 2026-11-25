@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `05be501` on `main` (2026-11-25 (the 2.5 MTP head's acceptance ladder): the head's first row was
+- **HEAD:** `1009bfd` on `main` (2026-11-25 (the 2.5 MTP head's acceptance ladder): the head's first row was
   being handed the raw residual where the GPU head (`kindi/mtp.py`, `XN`) and llama.cpp's Qwen3.5
   `graph_mtp` both read the output-normed row, so `kindi/mtp_cpu.py` now norms it - 8.3% -> 10.2% accepted
   (13.3% vs 3.3% at k=1) - and `Head.seed()` writes the **verified** rows into the head's K/V window, the
@@ -230,8 +230,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `05be501` | main checkout, this session's branch of record (the linked `merge/upstream-0.7.0` worktree sits at `ba465dd`, 5 commits behind); the projector tier, the 2.5 fact pass and the branch audit are committed here |
-| `<worktree>` | `merge/upstream-0.7.0` | `05be501` | the linked worktree, read-only this round; 2026-11-25 the CPU MTP head, before that the vision projector tier (`mmproj.py`, `kindi mmproj`, `mmproj_place`, plan/health policy) and the 2.5 facts re-read from the GGUFs, and before that the branch-of-record check (v0.7.2 comparison, branch audit) and before that the round-4 audit triage (secret-rule width, toolchain flags, backend limits column) and before that the Arc pack probe (real 2.5 27B shapes, no converter needed) and its gate-only roadmap rows; before that the 2.5 publisher sampling sets and low->xhigh, checked on both 2.5 27B packs (settings only: the host was busy, so no rate is quoted); before that the -mtp intake, the official 0.7.2 port (LoRA, one error body) and 0.7.2-fork, before that Arc A770 GEMV rows4 +1.357x (dispatch floor 0.0410 ms), exact accepted-character skip +41.37x median miss (class memo withdrawn), before that proxy serving boundary decided, before that Bonsai 2.5 27B CPU run + template parity, the v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke + Arc GEMM, llama.cpp proxy backend, constrained mask/pick -8.4% structured token, REQ-0030 CPU profile, bench --spec, 27B CPU verify + compiler detection |
+| `T:/kindi` | `main` | `1009bfd` | main checkout, this session's branch of record (the linked `merge/upstream-0.7.0` worktree sits at `ba465dd`, 5 commits behind); the projector tier, the 2.5 fact pass and the branch audit are committed here |
+| `<worktree>` | `merge/upstream-0.7.0` | `1009bfd` | the linked worktree, read-only this round; 2026-11-25 the CPU MTP head, before that the vision projector tier (`mmproj.py`, `kindi mmproj`, `mmproj_place`, plan/health policy) and the 2.5 facts re-read from the GGUFs, and before that the branch-of-record check (v0.7.2 comparison, branch audit) and before that the round-4 audit triage (secret-rule width, toolchain flags, backend limits column) and before that the Arc pack probe (real 2.5 27B shapes, no converter needed) and its gate-only roadmap rows; before that the 2.5 publisher sampling sets and low->xhigh, checked on both 2.5 27B packs (settings only: the host was busy, so no rate is quoted); before that the -mtp intake, the official 0.7.2 port (LoRA, one error body) and 0.7.2-fork, before that Arc A770 GEMV rows4 +1.357x (dispatch floor 0.0410 ms), exact accepted-character skip +41.37x median miss (class memo withdrawn), before that proxy serving boundary decided, before that Bonsai 2.5 27B CPU run + template parity, the v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke + Arc GEMM, llama.cpp proxy backend, constrained mask/pick -8.4% structured token, REQ-0030 CPU profile, bench --spec, 27B CPU verify + compiler detection |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
@@ -327,7 +327,7 @@ is what makes it trip.
 
 | task | worktree | branch | shared files | state |
 |---|---|---|---|---|
-| 2.5 MTP head acceptance (2026-11-25) | `T:/kindi` | `wip/mtp-cpu-acceptance-probe` | `docs/MTP.md`, `docs/ROADMAP.md`, `CHANGELOG.md` | **parked, unproven.** `kindi/mtp_cpu.py` normed hidden + `seed()`, `tools/mtp_cpu_probe.py`, one plumbing test. Acceptance 8.3% -> 13.9% vs the 2B drafter's 30.6%, so no speedup claim and no merge to `main`; next measurement: seed the whole prompt and dump `u`/`out` per row, then re-run the probe. Evidence: untracked `bench-logs/probe*.log`/`probe-out*.jsonl`; `docs/MTP.md` has the ladder. |
+| 2.5 MTP head acceptance (2026-11-25) | `T:/kindi` | `main` (`1009bfd`) | `docs/MTP.md`, `docs/ROADMAP.md`, `CHANGELOG.md` | **merged into `main`, unproven.** `kindi/mtp_cpu.py` normed hidden + `seed()`, `tools/mtp_cpu_probe.py`, one plumbing test; acceptance 8.3% -> 13.9% vs the 2B drafter's 30.6%, so no speedup claim, and CP1 builds against the 2B. Next measurement: seed the whole prompt and dump `u`/`out` per row, then re-run the probe. Evidence: untracked `bench-logs/probe*.log`/`probe-out*.jsonl`; `docs/MTP.md` has the ladder. |
 
 ## Layout
 
