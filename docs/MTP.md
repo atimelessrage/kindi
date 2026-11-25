@@ -22,31 +22,42 @@ on the tensor-core plan engine, and a 27B head has not been converted, wired or 
 
 ### Verified facts about the 2.5 head (2026-11-25)
 
-Read out of the file itself (`Ternary-Bonsai-2.5-27B-PTQ1_0-mtp.gguf`, 6,232,818,944 B), so the next
-agent does not have to re-derive them:
+Read from the two files themselves - `Ternary-Bonsai-2.5-27B-PTQ1_0-mtp.gguf`, 6,232,818,944 B, and
+its base `Ternary-Bonsai-2.5-27B-PTQ1_0.gguf`, 5,993,834,848 B, both GGUF v3 - by parsing their
+headers with `kindi.gguf.GGUF` and pricing every tensor with `kindi.mmproj.tensor_bytes`; no weight was
+run for this. The base file has 851 tensors and the `-mtp` file 866, and the difference is exactly
+`blk.64`; the `-mtp` file also carries `qwen35.nextn_predict_layers = 1`, which the base file does not
+have.
 
-- **`blk.64` is exactly 15 tensors**: `attn_q`, `attn_k`, `attn_v`, `attn_output`, `attn_q_norm`,
-  `attn_k_norm`, `attn_norm`, `post_attention_norm`, `ffn_gate`, `ffn_up`, `ffn_down`, and
-  `nextn.eh_proj`, `nextn.enorm`, `nextn.hnorm`, `nextn.shared_head_norm`. There is no
-  `nextn.shared_head_head.weight`, no second `token_embd` and no second `output.weight`: the head
-  borrows the main model's embedding table and its output projection.
-- **All eight matrices are Q4_0** (ggml type 2, 18 bytes per 32 weights): **238,983,168 B, about
-  239 MB**, together with the seven norms in f32. That is the +0.24 GB over the 5.99 GB base file.
-  It is not q8_0 and not ternary, so a build that reads only PTQ1_0 has to read `blk.64` as Q4_0
-  (the CPU path does, through `kc_q4gemv`).
-- **It is a full gated-attention block, not a GDN block.** `blk.64` has `attn_q/k/v` and the q/k
-  norms, and no `ssm_*` tensor at all. Compare `blk.62`, a GDN layer: 14 tensors, including
-  `ssm_a`, `ssm_alpha`, `ssm_beta`, `ssm_conv1d`, `ssm_dt`, `ssm_norm`, `ssm_out`. The head
-  therefore needs a 64-position K/V ring and **no recurrent state**, so a prompt-cache checkpoint
-  never has to carry GDN state for it.
+- **`blk.64` is exactly 15 tensors**: `attn_q.weight` (5120x12288), `attn_k.weight` and
+  `attn_v.weight` (5120x1024), `attn_output.weight` (6144x5120), `attn_q_norm.weight` and
+  `attn_k_norm.weight` (256), `attn_norm.weight`, `post_attention_norm.weight`, `ffn_gate.weight`
+  and `ffn_up.weight` (5120x17408), `ffn_down.weight` (17408x5120), and `nextn.eh_proj.weight`
+  (10240x5120), `nextn.enorm.weight`, `nextn.hnorm.weight`, `nextn.shared_head_norm.weight` (5120).
+  There is no `nextn.shared_head_head.weight`, and neither file carries a second `token_embd.weight`
+  or `output.weight`: both files' three non-block tensors are `token_embd.weight`, `output.weight`
+  and `output_norm.weight`, so the head borrows the main model's embedding table and its output
+  projection.
+- **Eight Q4_0 matrices and seven f32 vectors, 238,983,168 B in total (239.0 MB)**: 238,878,720 B of
+  Q4_0 (type 2, 18 bytes per 32 weights) plus 104,448 B of f32 (`attn_q_norm` and `attn_k_norm` at
+  1,024 B each, the five 5120-wide norms at 20,480 B each). The `-mtp` file is 238,984,096 B larger
+  than the base - that table plus 928 B of header and alignment - which is why a build that reads
+  only PTQ1_0 has to read `blk.64` as Q4_0 (the CPU path does, through `kc_q4gemv`).
+- **It is a full gated-attention block, not a GDN block.** `blk.64` has `attn_q/k/v`, the q/k norms
+  and no `ssm_*` tensor at all; `blk.62`, a GDN layer, has 14 tensors, including `ssm_a` (no suffix)
+  and `ssm_alpha.weight`, `ssm_beta.weight`, `ssm_conv1d.weight`, `ssm_dt.bias` (a bias, not a
+  weight), `ssm_norm.weight`, `ssm_out.weight`, plus `attn_qkv.weight` and `attn_gate.weight`. The
+  head therefore needs a 64-position K/V ring and **no recurrent state**, so a prompt-cache
+  checkpoint never has to carry GDN state for it.
 - **The output projection is the pack's folded `output.weight`.** Feeding it the head's float32
   vector needs the pack's fold first: on a real residual, `fold(x)` + `gemv_rows` reproduces the
   engine's own head argmax (both 0), while the unfolded input returns 141747. HB is 1024
-  (`prism.hadamard.block_size`), RD 64.
+  (`prism.hadamard.block_size`) and RD 64 (`qwen35.rope.dimension_count`), both in the header.
 - **The embedding lookup is raw.** The language blocks are folded at conversion, so the engine folds
   their activations; `blk.64`'s Q4_0 matrices are stored unfolded, so the head reads the raw PTQ1_0
-  embedding row. Each block of 128 weights is 128 trits (`convert.trits_from_raw`): the first
-  version of `mtp_cpu.trits()` decoded only 80 of them, and that alone produced nonsense.
+  embedding row. The 128-trits-per-block layout in that row is the converter's (`kindi/convert.py`),
+  not something the header states: the first version of `mtp_cpu.trits()` decoded only 80 of the 128
+  trits per block, and that alone produced nonsense.
 
 **A figure that is not ours.** A "1.12-1.17x on CPU with 83-88% drafted-token acceptance" number for
 this head appears in notes written about Kindi. It is **not in this tree and not measured here**. The

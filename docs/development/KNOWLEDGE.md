@@ -5,19 +5,22 @@ guide. Keep commands copy-pasteable and avoid local machine paths and credential
 
 ## Model and card facts worth not re-deriving (2026-11-25)
 
-- **Bonsai 2.5 27B is `qwen35` with `full_attention_interval = 4`**: 64 blocks, 16 full-attention and
-  48 Gated-DeltaNet, width 5120, ffn 17408, 24 Q / 4 KV heads at 256 dims, partial RoPE 64, mRoPE
-  sections `[11,11,10,0]` (text-degenerate), base 1e7, eps 1e-6, vocabulary 248320, context 262144.
-  The per-layer tensor lists are 11 (full) and 14 (GDN); `docs/BONSAI-2-SUPPORT.md` section 1a has
-  the table, the file sizes and the CPU run.
-- **The `-mtp` file's `blk.64` is a full-attention block with 15 tensors, eight of them Q4_0 (about
-  239 MB)**, borrowing `token_embd` and the folded `output.weight`; it needs a K/V ring and no GDN
-  state. `docs/MTP.md` has the details, and the note that a CPU speedup or 83-88% acceptance figure
-  circulating for it is not ours.
+- **Bonsai 2.5 27B is `qwen35` with `full_attention_interval = 4`**: 64 blocks, 16 full-attention
+  (3, 7, ... 63) and 48 Gated-DeltaNet, width 5120, ffn 17408, 24 Q / 4 KV heads at 256 dims, partial
+  RoPE 64, mRoPE sections `[11,11,10,0]` (text-degenerate), base 1e7, eps 1e-6
+  (`qwen35.attention.layer_norm_rms_epsilon`), vocabulary 248320, context 262144. Block tensor counts
+  are 11 (full) and 14 (GDN), counted from the files on 2026-11-25; `docs/BONSAI-2-SUPPORT.md`
+  section 1a has the table, the file sizes and the CPU run.
+- **The `-mtp` file's `blk.64` is a full-attention block with 15 tensors, eight of them Q4_0, priced
+  from the file's own table at 238,983,168 B (239.0 MB)**, borrowing `token_embd` and the folded
+  `output.weight`; it needs a K/V ring and no GDN state. The base file has 851 tensors, the `-mtp`
+  file 866 (the difference is `blk.64`) plus `qwen35.nextn_predict_layers = 1`. `docs/MTP.md` has the
+  details, and the note that a CPU speedup or 83-88% acceptance figure circulating for it is not ours.
 - **A vision projector is a separate `mmproj-*.gguf` of about 600-930 MB**; `kindi mmproj` prices one
   and holds it in host RAM (`mmproj_place = ram`, the default) so it never takes VRAM from the
-  language model. No build implements the encoder yet, so image requests are still refused with a
-  400; `docs/ROADMAP.md` has the V0-V4 ladder.
+  language model, and `kindi plan`/`/health` report that decision once a pack records a size
+  (`kindi mmproj FILE --record PACK`). No build implements the encoder yet, so image requests are
+  still refused with a 400; `docs/ROADMAP.md` has the V0-V4 ladder.
 - **The Arc A770 reads at 385 GB/s in practice (69% of the 560 GB/s spec) and its launches cost
   about 8.8 us**; the shipped per-matrix GEMV pattern loses 48% of a token to ramp and drain between
   401 small matrices, and one persistent launch at `parts=1` is 1.76x. `docs/INTEL-ARC.md` has the
@@ -26,7 +29,7 @@ guide. Keep commands copy-pasteable and avoid local machine paths and credential
 - **`kindi verify` has no reference for 2.5** (it exits 2 rather than compare against Bonsai 2's
   tokens); the 2.5 CPU evidence is load and generate, not token-exactness against a reference.
 - **The pack is 7,242 MB from a 6 GB GGUF** (codes 6.717 GB, scales 0.42 GB, f32 0.105 GB), and the
-  CPU engine loads it in about 340 s here at 4.02 tok/s.
+  CPU engine loads it in about 340 s here at 4.02 tok/s (the 2026-11-25 CPU page, not this header).
 
 ## Verification layers
 
