@@ -1,0 +1,118 @@
+{
+  "pack": "<pack>",
+  "model": "Ternary-Bonsai-2.5-27B",
+  "backend": null,
+  "source_file": "Ternary-Bonsai-2.5-27B-PTQ1_0.gguf",
+  "pack_facts": {
+    "tensors": 851,
+    "dimensions": {
+      "layers": 64,
+      "width": 5120,
+      "ffn": 17408,
+      "heads": 24,
+      "kv_heads": 4,
+      "groups": 16,
+      "head_dim": 256,
+      "rope_dim": 64,
+      "state_size": 128,
+      "gdn_inner": 6144,
+      "rope_base": 10000000.0,
+      "full_attention_interval": 4
+    },
+    "vocab": 248320,
+    "context_length": 262144,
+    "hadamard_block": 1024,
+    "chat_template_chars": 8952,
+    "source_sha256": "929560ec9d37cf3cadd4b00cc87b51c570082a628dd830b4692dc0b2ed18dbbe",
+    "file_sizes": {
+      "bcodes.bin": 6717440000,
+      "dpm.bin": 419840000,
+      "f32.bin": 104953856
+    },
+    "declared": {
+      "bcodes": 6717440000,
+      "dpm": 419840000,
+      "f32": 104953856
+    },
+    "totals_match": [
+      true,
+      true,
+      true
+    ]
+  },
+  "ctx_requested": 2048,
+  "engine": "kindi.cpu.Engine",
+  "device": "cpu",
+  "load_seconds": 339.9,
+  "engine_log": [
+    "kindi-cpu ready: Ternary-Bonsai-2.5-27B, avx2-fma-f16c, 6 threads, ctx 2048 (339.2s)",
+    "kindi: <pack> -> the bonsai backend (bonsai2.5-27b)"
+  ],
+  "host": {
+    "platform": "Windows-10-10.0.19045-SP0",
+    "machine": "AMD64",
+    "cpu_count": 12,
+    "python": "3.13.6",
+    "numpy": "2.5.1"
+  },
+  "requests": [
+    {
+      "prompt": "In one sentence: what is a ternary weight?",
+      "prompt_tokens": 23,
+      "reply_ids": [
+        32,
+        69184,
+        640,
+        4528,
+        369,
+        264,
+        4528,
+        303,
+        264,
+        716,
+        314,
+        13914,
+        1332,
+        1754,
+        4528,
+        369
+      ],
+      "reply_text": "A ternary weight is a weight in a set of weights where each weight is",
+      "first_token_seconds": 6.182,
+      "reply_seconds": 10.182,
+      "decode_tokens_per_second": 3.75,
+      "deterministic": true,
+      "fingerprint": "7845549ba4560914",
+      "warm_fingerprint": "e29c9c180c6279b0"
+    },
+    {
+      "prompt": "2 + 2 = ? Answer with the number only.",
+      "prompt_tokens": 24,
+      "reply_ids": [
+        19,
+        248046,
+        198,
+        248046,
+        198,
+        248045,
+        248046,
+        198,
+        248045,
+        248046,
+        198,
+        248045,
+        248046,
+        198,
+        248046,
+        198
+      ],
+      "reply_text": "4<|im_end|>\n<|im_end|>\n<|im_start|><|im_end|>\n<|im_start|><|im_end|>\n<|im_start|><|im_end|>\n<|im_end|>\n",
+      "first_token_seconds": 6.814,
+      "reply_seconds": 10.541,
+      "decode_tokens_per_second": 4.02,
+      "deterministic": true,
+      "fingerprint": "c7ed05317a13feab",
+      "warm_fingerprint": "9400f1b21cb527d7"
+    }
+  ]
+}

@@ -1,0 +1,218 @@
+{
+ "cases": [
+  {
+   "template": "bonsai25-27b",
+   "case": "user only, thinking off",
+   "match": true,
+   "template_chars": 71,
+   "kindi_chars": 71,
+   "template_sha256": "87b9f5b6243d88239331c78a91695eae31fdc67fcadd1bc07508791d9b1a03be"
+  },
+  {
+   "template": "bonsai25-27b",
+   "case": "user only, thinking on",
+   "match": true,
+   "template_chars": 297,
+   "kindi_chars": 297,
+   "template_sha256": "596929565581b70ced55a351d5ea684eae3f83f0cb37e98d59e44ba77b5b365f"
+  },
+  {
+   "template": "bonsai25-27b",
+   "case": "user only, effort medium",
+   "match": true,
+   "template_chars": 60,
+   "kindi_chars": 60,
+   "template_sha256": "7562ba8388193b82d95953831c2d4d61f85796a9ea065d8d3e3db7b30d9a9447"
+  },
+  {
+   "template": "bonsai25-27b",
+   "case": "user only, effort low",
+   "match": true,
+   "template_chars": 226,
+   "kindi_chars": 226,
+   "template_sha256": "a977b3c6cefccfe971024812bf588ea4485c9279a5f600268198433ac2f24693"
+  },
+  {
+   "template": "bonsai25-27b",
+   "case": "system + user",
+   "match": true,
+   "template_chars": 110,
+   "kindi_chars": 110,
+   "template_sha256": "657fe6d7831e7eb014896102e7e254ae0371599af55a34816dff6763765b370a"
+  },
+  {
+   "template": "bonsai25-27b",
+   "case": "system + user, thinking on",
+   "match": true,
+   "template_chars": 308,
+   "kindi_chars": 308,
+   "template_sha256": "2fb9d80f17896ef1943a492f0735df723b25781ee6fc09281806f2665996b251"
+  },
+  {
+   "template": "bonsai25-27b",
+   "case": "tools only, thinking off",
+   "match": true,
+   "template_chars": 1227,
+   "kindi_chars": 1227,
+   "template_sha256": "241241c52f8a63547624eae9ac9bdbf392daa03e73b31dea2fd371b3c914a78e"
+  },
+  {
+   "template": "bonsai25-27b",
+   "case": "tools only, thinking on",
+   "match": true,
+   "template_chars": 1425,
+   "kindi_chars": 1425,
+   "template_sha256": "48911655bdc1ae433de6739c505e3696ec2bc105fb4e04ccbee0a64dbcb4a2e8"
+  },
+  {
+   "template": "bonsai25-27b",
+   "case": "tools + system + user",
+   "match": true,
+   "template_chars": 1238,
+   "kindi_chars": 1238,
+   "template_sha256": "2d36aa0d09dca6e2710c19f21c96a355e9d93630725e0211c80b1d5585b32ef4"
+  },
+  {
+   "template": "bonsai25-27b",
+   "case": "assistant history keeps reasoning",
+   "match": true,
+   "template_chars": 362,
+   "kindi_chars": 362,
+   "template_sha256": "8e16b2eda07ca28fda5b77e3d5dda679fde2988008bc029232917401462a2bbf"
+  },
+  {
+   "template": "bonsai25-27b",
+   "case": "assistant history drops reasoning",
+   "match": true,
+   "template_chars": 362,
+   "kindi_chars": 362,
+   "template_sha256": "8e16b2eda07ca28fda5b77e3d5dda679fde2988008bc029232917401462a2bbf"
+  },
+  {
+   "template": "bonsai25-27b",
+   "case": "tool call + tool response",
+   "match": true,
+   "template_chars": 1439,
+   "kindi_chars": 1439,
+   "template_sha256": "29fddb0226a1bb7f647c6dfdccb32a6a99e9193fd79ef1f5aa11eddf2f1c4c99"
+  },
+  {
+   "template": "bonsai25-27b",
+   "case": "tool call with dict/list/scalar arguments",
+   "match": true,
+   "template_chars": 1591,
+   "kindi_chars": 1591,
+   "template_sha256": "bc7f339f44555039efab58d366b90cefa8419cb667bf15226d97d9e284bd609d"
+  },
+  {
+   "template": "bonsai2-2b",
+   "case": "user only, thinking off",
+   "match": true,
+   "template_chars": 71,
+   "kindi_chars": 71,
+   "template_sha256": "87b9f5b6243d88239331c78a91695eae31fdc67fcadd1bc07508791d9b1a03be"
+  },
+  {
+   "template": "bonsai2-2b",
+   "case": "user only, thinking on",
+   "match": true,
+   "template_chars": 60,
+   "kindi_chars": 60,
+   "template_sha256": "7562ba8388193b82d95953831c2d4d61f85796a9ea065d8d3e3db7b30d9a9447"
+  },
+  {
+   "template": "bonsai2-2b",
+   "case": "user only, effort medium",
+   "match": true,
+   "template_chars": 60,
+   "kindi_chars": 60,
+   "template_sha256": "7562ba8388193b82d95953831c2d4d61f85796a9ea065d8d3e3db7b30d9a9447"
+  },
+  {
+   "template": "bonsai2-2b",
+   "case": "user only, effort low",
+   "match": true,
+   "template_chars": 60,
+   "kindi_chars": 60,
+   "template_sha256": "7562ba8388193b82d95953831c2d4d61f85796a9ea065d8d3e3db7b30d9a9447"
+  },
+  {
+   "template": "bonsai2-2b",
+   "case": "system + user",
+   "match": true,
+   "template_chars": 110,
+   "kindi_chars": 110,
+   "template_sha256": "657fe6d7831e7eb014896102e7e254ae0371599af55a34816dff6763765b370a"
+  },
+  {
+   "template": "bonsai2-2b",
+   "case": "system + user, thinking on",
+   "match": true,
+   "template_chars": 99,
+   "kindi_chars": 99,
+   "template_sha256": "7af1302f02f3df31b3efd94a7f08d2ac8fd4adaf2568e034b6cdcff0076a296a"
+  },
+  {
+   "template": "bonsai2-2b",
+   "case": "tools only, thinking off",
+   "match": true,
+   "template_chars": 1227,
+   "kindi_chars": 1227,
+   "template_sha256": "241241c52f8a63547624eae9ac9bdbf392daa03e73b31dea2fd371b3c914a78e"
+  },
+  {
+   "template": "bonsai2-2b",
+   "case": "tools only, thinking on",
+   "match": true,
+   "template_chars": 1216,
+   "kindi_chars": 1216,
+   "template_sha256": "7e1088e7dd823f41a7d1c39c173f793c3474a78d959134e429b83a1fe4f23129"
+  },
+  {
+   "template": "bonsai2-2b",
+   "case": "tools + system + user",
+   "match": true,
+   "template_chars": 1238,
+   "kindi_chars": 1238,
+   "template_sha256": "2d36aa0d09dca6e2710c19f21c96a355e9d93630725e0211c80b1d5585b32ef4"
+  },
+  {
+   "template": "bonsai2-2b",
+   "case": "assistant history keeps reasoning",
+   "match": true,
+   "template_chars": 125,
+   "kindi_chars": 125,
+   "template_sha256": "84858405454a622d09b81437cb7bfcf8c7220120568ddb78b8f49fd09b35af91"
+  },
+  {
+   "template": "bonsai2-2b",
+   "case": "assistant history drops reasoning",
+   "match": true,
+   "template_chars": 125,
+   "kindi_chars": 125,
+   "template_sha256": "84858405454a622d09b81437cb7bfcf8c7220120568ddb78b8f49fd09b35af91"
+  },
+  {
+   "template": "bonsai2-2b",
+   "case": "tool call + tool response",
+   "match": true,
+   "template_chars": 1439,
+   "kindi_chars": 1439,
+   "template_sha256": "29fddb0226a1bb7f647c6dfdccb32a6a99e9193fd79ef1f5aa11eddf2f1c4c99"
+  },
+  {
+   "template": "bonsai2-2b",
+   "case": "tool call with dict/list/scalar arguments",
+   "match": true,
+   "template_chars": 1591,
+   "kindi_chars": 1591,
+   "template_sha256": "bc7f339f44555039efab58d366b90cefa8419cb667bf15226d97d9e284bd609d"
+  }
+ ],
+ "match": 26,
+ "total": 26,
+ "templates": [
+  "bonsai2-2b",
+  "bonsai25-27b"
+ ]
+}

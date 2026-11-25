@@ -1,0 +1,84 @@
+{
+  "runs": 2,
+  "prompts": 2,
+  "reply_tokens": 16,
+  "load_seconds": {
+    "run1": 339.9,
+    "run2": 323.8
+  },
+  "decode_tokens_per_second": {
+    "run1": [
+      3.75,
+      4.02
+    ],
+    "run2": [
+      3.08,
+      3.63
+    ],
+    "min": 3.08,
+    "max": 4.02
+  },
+  "in_process_deterministic": true,
+  "cross_process_fingerprints": [
+    {
+      "prompt": "In one sentence: what is a ternary weight?",
+      "run1": "7845549ba4560914",
+      "run2": "7845549ba4560914",
+      "match": true
+    },
+    {
+      "prompt": "2 + 2 = ? Answer with the number only.",
+      "run1": "c7ed05317a13feab",
+      "run2": "c7ed05317a13feab",
+      "match": true
+    }
+  ],
+  "cross_process_match": true,
+  "engine": "kindi.cpu.Engine",
+  "device": "cpu",
+  "threads": "6",
+  "isa": "avx2-fma-f16c",
+  "ctx": 2048,
+  "pack_facts": {
+    "tensors": 851,
+    "dimensions": {
+      "layers": 64,
+      "width": 5120,
+      "ffn": 17408,
+      "heads": 24,
+      "kv_heads": 4,
+      "groups": 16,
+      "head_dim": 256,
+      "rope_dim": 64,
+      "state_size": 128,
+      "gdn_inner": 6144,
+      "rope_base": 10000000.0,
+      "full_attention_interval": 4
+    },
+    "vocab": 248320,
+    "context_length": 262144,
+    "hadamard_block": 1024,
+    "chat_template_chars": 8952,
+    "source_sha256": "929560ec9d37cf3cadd4b00cc87b51c570082a628dd830b4692dc0b2ed18dbbe",
+    "file_sizes": {
+      "bcodes.bin": 6717440000,
+      "dpm.bin": 419840000,
+      "f32.bin": 104953856
+    },
+    "declared": {
+      "bcodes": 6717440000,
+      "dpm": 419840000,
+      "f32": 104953856
+    },
+    "totals_match": [
+      true,
+      true,
+      true
+    ]
+  },
+  "reply_text": {
+    "In one sentence: what is a ternary weight?": "A ternary weight is a weight in a set of weights where each weight is",
+    "2 + 2 = ? Answer with the number only.": "4<|im_end|>\n<|im_end|>\n<|im_start|><|im_end|>\n<|im_start|><|im_end|>\n<|im_start|><|im_end|>\n<|im_end|>\n"
+  },
+  "pack": "<pack>"
+}

@@ -10,6 +10,35 @@ installer hashes are recorded in `docs/INSTALL.md`; publication is still a relea
 (The pre-merge 0.6.1-era snapshot — 669 commits / 827 files at `60a039b` — is kept in
 `detailed-fork-changelog.md`.)
 
+### Bonsai 2.5 27B on the CPU engine, and the prompt now matches the published template (2026-11-25)
+
+The 2.5 27B went from "header-verified" to "runs": the 6 GB `PTQ1_0` file was downloaded (SHA-256
+matched), converted (`7,242 MB in 370 s`), packchecked (10 files) and loaded by the CPU engine on the
+same i7-8086K - **339.9 s** to load, then greedy decoding at **4.02 tok/s** best and **3.08 tok/s** worst
+over **2 prompts** of **16 tokens**. Replies are identical within a process and across two processes, and
+the manifest repeats the header facts (`851 tensors`, 248320 vocabulary, 262144 context, hadamard block
+1024). [docs/BONSAI-2-SUPPORT.md](docs/BONSAI-2-SUPPORT.md) section 1a and the support matrix now say
+`load+generate, no reference` for the CPU cell.
+
+Two correctness fixes came with it:
+
+- **The prompt was not the published one.** Kindi writes the Bonsai prompt by hand instead of running
+  the template, and it serialized tool schemas and non-string tool arguments with plain
+  `json.dumps(...)` - insertion order, no HTML escaping - where the template uses Jinja's `tojson`
+  (sorted keys, `<`, `>`, `&`, `'` escaped). Every tool-calling request therefore carried a different
+  prompt than the model was tuned on. `kindi/chat.py` now writes both through one `_tojson()` helper;
+  a jinja2 comparison of the renderer against the template text in the 2.5 GGUF header and in a
+  converted 2B pack matches on **26 of 26** cases (`26 cases`, 0 mismatches,
+  `docs/benchmarks/2026-11-24-bonsai-chat-template-parity/`), and `tests/test_chat_template.py`'s
+  goldens are rendered by jinja2 rather than typed by hand.
+- **`kindi verify` could not tell the releases apart.** `verify.reference_for` derived only the size from
+  the pack manifest, so a 2.5 27B pack would have been scored against `reference-27b.json`, Bonsai 2's
+  tokens, and reported as a port failure. The reference file name now carries the release
+  (`reference-2.5-27b.json`); when it is absent the command says `no llama.cpp reference for this model
+  in this version of Kindi` and exits 2. No exactness result exists for the 2.5, and none is claimed.
+
+The Arc A770 path is still probe-only and this host has no CUDA device, so the GPU cells stay `not run`.
+
 ### Bonsai 2.5 27B: accepted by the catalog, converter and profiles (2026-11-24)
 
 Prism ML released Ternary Bonsai 2.5 27B the day after v0.7.1, aimed at long agentic work: the same

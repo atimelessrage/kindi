@@ -4,9 +4,9 @@ Where this sits: [CARDS.md](CARDS.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md)
 for what a card can run today; this page is research and projection for the family, and
 [README.md](README.md) is the index.
 
-Status: research and planning, 2026-11-09; updated 2026-11-24 for Bonsai 2.5 27B (section 1a carries
-the file-level facts and the code that now accepts it). This document does not change engine code and
-is not a
+Status: research and planning, 2026-11-09; updated 2026-11-25 for Bonsai 2.5 27B (section 1a carries
+the file-level facts, the code that now accepts it, the template parity check and the CPU-engine run).
+This document does not change engine code and is not a
 support claim for anything marked **No** or **Untested** below.
 
 Scope: PrismML's Ternary Bonsai 2 family (2B, 4B, 9B, 27B) and Bonsai Image 4B. Bonsai Image is a
@@ -110,11 +110,40 @@ What Kindi now does with it:
 - The `bonsai27` template, its `xhigh` default effort and the `medium` fallback apply as-is;
   `enable_thinking` is still off unless the request asks for it.
 
+- The prompt renderer was compared with the published template, not just against a memory of it:
+  jinja2 renders the template string from the 2.5 GGUF header and from a converted 2B pack, and
+  `kindi.chat.render()` renders the same conversations - **26 cases**, **26 of 26** byte-identical, 0
+  mismatches (`docs/benchmarks/2026-11-24-bonsai-chat-template-parity/`). The comparison found a real
+  divergence: tool schemas and non-string tool arguments were serialized in insertion order while the
+  template uses `tojson`, so every tool-calling prompt Kindi built had its keys in another order and
+  left `<`/`&`/`'` unescaped. `kindi/chat.py` now writes both through one `_tojson()` helper, and
+  `tests/test_chat_template.py` pins the result against goldens rendered by jinja2. The comparison is
+  prompt text only: no 2.5 weights were run to show the corrected prompt changes an answer.
+
+What was run (2026-11-25, i7-8086K, CPU engine; evidence in
+`docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/`):
+
+- The 6 GB GGUF was downloaded and its SHA-256 matched the catalog, then converted to a **7,242 MB in 370 s**
+  pack: `packcheck` full passed on 10 files, and the manifest reports `851 tensors`, vocabulary
+  `248320`, context `262144`, hadamard block 1024 and the same 8952-character template the header run saw.
+- `KINDI_DEVICE=cpu` loads that pack in **339.9 s** (avx2-fma-f16c, 6 threads, ctx 2048) and generates
+  greedily at **4.02 tok/s** (best request) and **3.08 tok/s** (worst), over **2 prompts** of
+  **16 tokens**; the first reply is on topic, which is what shows the pack is loaded coherently. The
+  two processes produced the same ids, and a repeated generation in one process is identical too, so
+  CPU decode is reproducible.
+- `kindi verify` on the pack prints `no llama.cpp reference for this model in this version of Kindi`
+  and exits 2. That is the new, deliberate behaviour: `verify.reference_for` keys the reference file by
+  release as well as by size, so a 2.5 pack is no longer scored against Bonsai 2's tokens
+  (`reference-27b.json`) and reported as a port failure.
+
 What is **not** verified and must not be claimed:
 
-- No download, conversion, `kindi verify`, benchmark or GPU run of the 2.5 has happened on this host.
-  The support matrix row `bonsai-2.5-27b` reads `not run` for GPU and CPU verify and `not converted` for
-  PQ2_0/Q2_0, which is the honest state after a header-only check.
+- No exactness result: there is no llama.cpp reference row for this release here, so nothing above is a
+  token-for-token comparison with another engine. The support matrix row `bonsai-2.5-27b` reads
+  `load+generate, no reference` for CPU, `not run` for GPU, and `not converted` for PQ2_0/Q2_0.
+- No GPU run of any kind: the Arc A770 toolchain is still probe-only (`kindi intel-sycl`) and this host
+  has no CUDA device, so the GPU cells stay `not run`. Sampling beyond greedy, tool calling, long
+  context (>2048 tokens) and a 2-vs-2.5 quality comparison are all unmeasured.
 - The `-mtp` files (a draft head in the same GGUF) are neither converted nor wired to Kindi's
   speculation paths. The catalog names the base `PTQ1_0` file only.
 - The `mmproj` vision artifacts are unsupported as before (section 4.1): the 2.5 ships the same separate
@@ -375,9 +404,11 @@ Performance:
    context matrix.
 5. **Only after that:** evaluate PQ2_0/Q2_0 import, Prism MTP/DFlash2, and a separate Bonsai Image
    backend.
-6. **When a card and the bandwidth are available:** download the 2.5 27B `PTQ1_0` file, convert it,
-   run `kindi verify`, and only then move its support-matrix row off `not run`. The header check does
-   not substitute for that run, and the `-mtp` variant is a separate decision.
+6. **The 2.5 27B CPU half is done (2026-11-25):** the file was downloaded, converted, packchecked and
+   run on the CPU engine, and `kindi verify` refuses it for lack of a llama.cpp reference instead of
+   scoring it against Bonsai 2. What is still missing is a **GPU** run on a card (the Arc toolchain is
+   probe-only) and a reference configuration to make `kindi verify` meaningful. The header and CPU
+   checks do not substitute for that, and the `-mtp` variant is a separate decision.
 
 The project should describe the current text path as **text-only PTQ1_0** until the vision milestone
 passes. The family is vision-language; the engine is not there yet.

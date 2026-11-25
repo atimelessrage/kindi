@@ -465,7 +465,8 @@ use the 27B for fast steps and the 33B for harder coding steps.
   the cache (for example, a large file or long command output) at this speed.
 - **The Ternary-Bonsai-2 models** (the PTQ1_0 GGUFs: 2B, 4B, 9B, 27B) and **Ternary-Bonsai-2.5 27B**,
   Nemotron 3.5 Bolt E4B and AH-Nanbeige4.3-33B IQ3_XXS only. The 2.5 27B is accepted by the catalog and
-  converter (`kindi use bonsai-2.5-27b`) but has not been converted or run here yet. The 27B needs 8 GB of card memory (GTX
+  converter (`kindi use bonsai-2.5-27b`); it has been converted and run on the CPU engine only, and
+  `kindi verify` refuses it because no llama.cpp reference exists for that release. The 27B needs 8 GB of card memory (GTX
   1080, RTX 3080) or two 4 GB cards (2x K1200).
 - **At most two GPUs per model.** Two cards run one model in tensor parallel. More cards run more servers.
 - **Small models make mistakes.** The 2B is good at short code, shell and factual questions, tool calls and

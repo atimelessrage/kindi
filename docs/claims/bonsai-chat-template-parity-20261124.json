@@ -1,0 +1,37 @@
+{
+  "gate": "bonsai-chat-template-parity-20261124",
+  "title": "Kindi's Bonsai prompt renderer against the published tokenizer.chat_template",
+  "measured": "2026-11-24",
+  "commit": "unreleased",
+  "command": "python docs/benchmarks/2026-11-24-bonsai-chat-template-parity/compare_template.py > parity.json",
+  "notes": "jinja2 renders the template string shipped in the 2.5 27B GGUF header and in a converted 2B pack; kindi.chat.render renders the same 13 conversations per template. Byte comparison, after the tool-schema/argument tojson fix.",
+  "evidence": [
+    "docs/benchmarks/2026-11-24-bonsai-chat-template-parity/parity.json",
+    "docs/benchmarks/2026-11-24-bonsai-chat-template-parity/compare_template.py",
+    "docs/benchmarks/2026-11-24-bonsai-chat-template-parity/README.md"
+  ],
+  "numbers": [
+    {
+      "id": "cases",
+      "display": "26 cases",
+      "quoted_in": ["docs/BONSAI-2-SUPPORT.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-bonsai-chat-template-parity/parity.json",
+        "pointer": "/total",
+        "expect": 26
+      }
+    },
+    {
+      "id": "match",
+      "display": "26 of 26",
+      "quoted_in": ["docs/BONSAI-2-SUPPORT.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-bonsai-chat-template-parity/parity.json",
+        "pointer": "/match",
+        "expect": 26
+      }
+    }
+  ]
+}

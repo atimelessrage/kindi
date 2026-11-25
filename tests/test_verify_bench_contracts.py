@@ -17,6 +17,9 @@ def test_reference_for_routes_by_model_size(tmp_path):
     assert verify.reference_for(_pack(tmp_path, {"source_file": "Ternary-Bonsai-2-4B-PTQ1_0.gguf"})).endswith("reference-4b.json")
     assert verify.reference_for(_pack(tmp_path, {"source_file": "Ternary-Bonsai-2-9B-PTQ1_0.gguf"})).endswith("reference-9b.json")
     assert verify.reference_for(_pack(tmp_path, {"source_file": "Ternary-Bonsai-2-27B-PTQ1_0.gguf"})).endswith("reference-27b.json")
+    # the release is part of the key: 2.5 must not be verified against Bonsai 2 weights
+    assert verify.reference_for(_pack(tmp_path, {"source_file": "Ternary-Bonsai-2.5-27B-PTQ1_0.gguf"})) is None
+    assert verify.reference_for(_pack(tmp_path, {"model": "Ternary-Bonsai-2.5-27B"})) is None
 
 
 def test_reference_for_defaults_to_2b_and_missing_is_none(tmp_path):

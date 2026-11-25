@@ -36,9 +36,23 @@ def content_of(m):
     return str(c)
 
 
+def _tojson(v):
+    """The value as the templates' `| tojson` renders it: sorted keys, no ASCII escaping, and the
+    HTML-safe escapes Jinja applies (plus U+2028/U+2029).
+
+    This is a byte-level contract, not a style choice: both Bonsai templates dump the tool schemas
+    and non-string tool arguments through `tojson`, and a prompt that differs from the template the
+    model was trained on is a different prompt. `docs/benchmarks/2026-11-24-bonsai25-chat-template/`
+    holds the parity check against the published templates.
+    """
+    s = json.dumps(v, ensure_ascii=False, sort_keys=True)
+    return (s.replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+             .replace("'", "\\u0027").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029"))
+
+
 def _argval(v):
     if isinstance(v, (dict, list)):
-        return json.dumps(v, ensure_ascii=False)
+        return _tojson(v)
     return str(v)
 
 
@@ -79,7 +93,7 @@ def render(messages, tools=None, enable_thinking=False, variant="qwen35", reason
     if tools:
         out += "<|im_start|>system\n# Tools\n\nYou have access to the following functions:\n\n<tools>"
         for t in tools:
-            out += "\n" + json.dumps(t, ensure_ascii=False)
+            out += "\n" + _tojson(t)
         out += "\n</tools>" + TOOL_INSTR
         if messages[0]["role"] == "system":
             c = content_of(messages[0]).strip()
@@ -147,7 +161,7 @@ def render(messages, tools=None, enable_thinking=False, variant="qwen35", reason
 def _argval27(v):
     if isinstance(v, str):
         return v
-    return json.dumps(v, ensure_ascii=False)
+    return _tojson(v)
 
 
 def _render27(messages, tools, enable_thinking, reasoning_effort, preserve_thinking):
@@ -169,7 +183,7 @@ def _render27(messages, tools, enable_thinking, reasoning_effort, preserve_think
             out += instr + "\n\n"
         out += "# Tools\n\nYou have access to the following functions:\n\n<tools>"
         for t in tools:
-            out += "\n" + json.dumps(t, ensure_ascii=False)
+            out += "\n" + _tojson(t)
         out += "\n</tools>" + TOOL_INSTR
         if messages[0]["role"] == "system":
             c = content_of(messages[0]).strip()
