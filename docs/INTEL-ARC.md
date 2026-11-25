@@ -415,6 +415,25 @@ of a decode token. Attention, norms, the GDN state update and the output head's 
 excluded, so a backend will be slower. It is not a model run, engine result or support claim, and
 M2 stays partial (Windows, OpenCL probe, no `libksycl.so`, no device selection in the engine).
 
+### The work list on a real pack (2026-11-25)
+
+`kindi intel-pack` now runs both paths on the same bytes: the per-shape four-row GEMV with its reduce
+launch per matrix, and the persistent kernel from the sweep above - eight rows per work-item, one work
+list over every ternary tensor, `parts=1` so no reduce pass is needed.
+
+Two things the synthetic harness hid. The pack cannot be uploaded in one allocation: the A770 reports
+4095 MiB (`CL_DEVICE_MAX_MEM_ALLOC_SIZE`) and the 27B's codes are 6.7 GB, so the pass takes two chunks
+sized from that limit, and the chunk count matters (the same pack measured 154 GB/s at seven 1 GiB
+chunks against 235 GB/s at two). And the sweep pointed every matrix at buffer offset zero, so
+same-shape matrices re-read the same bytes; a pack cannot.
+
+On the pack's own bytes at their real offsets, six runs across the 2.5 `-mtp` and Bonsai 2 27B packs
+read 219-228 GB/s persistently against 138-149 GB/s for the per-shape path (221.3 GB/s and 1.489x on
+the first `-mtp` run), with the best chunk alone at 238.1 GB/s. So the sweep's 253 GB/s is a
+per-launch figure that this pack does not reach, and the honest pack number is ~1.5x, not 1.76x.
+Both validation paths report 0 mismatches: the work-list kernel reproduces the host model's rows bit
+for bit at `parts=1`. Full table: `docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md`.
+
 ### M2 ternary GEMM in the engine's q8 shape (2026-11-24)
 
 `kindi intel-gemm` runs the arithmetic the engine's prompt path does, at the CUDA kernels' tile,

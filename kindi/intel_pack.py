@@ -8,7 +8,9 @@ at the shapes that model actually has?
 
 It reads `bcodes.bin`, `dpm.bin` and `index.json` exactly as `kindi convert` wrote them - there is no
 Intel-specific pack and no conversion step - uploads the two buffers unchanged, and runs the
-phase-parallel four-row GEMV at every distinct `(rows, cols)` among the pack's ternary tensors. The
+phase-parallel four-row GEMV at every distinct `(rows, cols)` among the pack's ternary tensors, then
+the persistent eight-row kernel over a work list of *all* of them - one launch per upload chunk
+instead of one launch pair per matrix - so the same run reports both paths on the same bytes. The
 pack's scales are fp16; they are widened to float32 on the host (exact) because OpenCL C 1.2 has no
 portable half arithmetic, as in `intel-ternary`.
 
@@ -115,6 +117,99 @@ __kernel void pack_gemv4(__global const uchar *codes,
     if (r0 + 3u < rows) { partial[pb + 3u] = t3; }
 }
 
+/* Eight rows per work-item over a *work list* of matrices: one launch for a whole tensor list.
+
+   Why: one work-item per row leaves the card idle, and the phase split pays a second reduce
+   launch per matrix.  With eight rows per work-item one vload8 covers eight consecutive rows of
+   a slot, and the work list lets one launch cover every matrix, so a decode pass costs one
+   enqueue instead of 400-800 (measured on the 27B shapes: 253 GB/s against 143 GB/s for the
+   per-shape path, docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/).
+
+   parts=1 only, so each row has exactly one partial and no reduce pass is needed: phase ph is
+   simply summed into the row's accumulator in order, which is the same order `pack_gemv4` uses
+   at parts=1, so the values are bit-identical to the per-shape path.
+
+   `pref[mi]` is where matrix mi's work items start, `ce = ceil(rows/8)` items each; `coffs` and
+   `soffs` are the matrix's byte offsets into the two shared pack buffers; `ppref[mi]` is where its
+   rows start in `partial`.  Both pack buffers are 8-byte aligned in a Kindi pack, so the vload8
+   on the row axis is safe. */
+__kernel void pack_gemv_persist(__global const uchar *codes,
+                                __global const float *scales,
+                                __global const float *x,
+                                __global float *partial,
+                                __global const uint *mrows,
+                                __global const uint *mcols,
+                                __global const uint *pref,
+                                __global const ulong *coffs,
+                                __global const ulong *soffs,
+                                __global const uint *ppref,
+                                uint nmats, uint total) {
+    uint stride = get_global_size(0);
+    for (uint w = get_global_id(0); w < total; w += stride) {
+        uint lo = 0, hi = nmats;
+        while (lo + 1 < hi) { uint mid = (lo + hi) >> 1; if (pref[mid] <= w) { lo = mid; } else { hi = mid; } }
+        uint mi = lo;
+        uint rows = mrows[mi], cols = mcols[mi];
+        uint r0 = (w - pref[mi]) << 3;
+        if (r0 >= rows) {
+            continue;
+        }
+        uint phases = cols >> 7;
+        ulong coff = coffs[mi], soff = soffs[mi];
+        uint nrows = rows - r0;                       /* 8, or the tail block */
+        int full = nrows >= 8u;
+        float t0 = 0.0f, t1 = 0.0f, t2 = 0.0f, t3 = 0.0f;
+        float t4 = 0.0f, t5 = 0.0f, t6 = 0.0f, t7 = 0.0f;
+        for (uint ph = 0; ph < phases; ++ph) {
+            int d0 = 0, d1 = 0, d2 = 0, d3 = 0, d4 = 0, d5 = 0, d6 = 0, d7 = 0;
+            ulong base = coff + ((ulong)(ph << 5) * rows) + r0;
+            uint col = ph << 7;
+            for (uint s = 0; s < 32; ++s) {
+                ulong off = base + (ulong)s * rows;
+                uint c = col + (s << 2);
+                if (full) {
+                    uchar8 q = vload8(0, codes + off);
+                    TRI_DOT(d0, q.s0, c);
+                    TRI_DOT(d1, q.s1, c);
+                    TRI_DOT(d2, q.s2, c);
+                    TRI_DOT(d3, q.s3, c);
+                    TRI_DOT(d4, q.s4, c);
+                    TRI_DOT(d5, q.s5, c);
+                    TRI_DOT(d6, q.s6, c);
+                    TRI_DOT(d7, q.s7, c);
+                } else {
+                    TRI_DOT(d0, codes[off], c);
+                    if (1u < nrows) { TRI_DOT(d1, codes[off + 1u], c); }
+                    if (2u < nrows) { TRI_DOT(d2, codes[off + 2u], c); }
+                    if (3u < nrows) { TRI_DOT(d3, codes[off + 3u], c); }
+                    if (4u < nrows) { TRI_DOT(d4, codes[off + 4u], c); }
+                    if (5u < nrows) { TRI_DOT(d5, codes[off + 5u], c); }
+                    if (6u < nrows) { TRI_DOT(d6, codes[off + 6u], c); }
+                    if (7u < nrows) { TRI_DOT(d7, codes[off + 7u], c); }
+                }
+            }
+            ulong sb = soff + (ulong)ph * rows + r0;
+            t0 += (float)d0 * scales[sb];
+            if (1u < nrows) { t1 += (float)d1 * scales[sb + 1u]; }
+            if (2u < nrows) { t2 += (float)d2 * scales[sb + 2u]; }
+            if (3u < nrows) { t3 += (float)d3 * scales[sb + 3u]; }
+            if (4u < nrows) { t4 += (float)d4 * scales[sb + 4u]; }
+            if (5u < nrows) { t5 += (float)d5 * scales[sb + 5u]; }
+            if (6u < nrows) { t6 += (float)d6 * scales[sb + 6u]; }
+            if (7u < nrows) { t7 += (float)d7 * scales[sb + 7u]; }
+        }
+        ulong pb = (ulong)ppref[mi] + r0;
+        partial[pb] = t0;
+        if (1u < nrows) { partial[pb + 1u] = t1; }
+        if (2u < nrows) { partial[pb + 2u] = t2; }
+        if (3u < nrows) { partial[pb + 3u] = t3; }
+        if (4u < nrows) { partial[pb + 4u] = t4; }
+        if (5u < nrows) { partial[pb + 5u] = t5; }
+        if (6u < nrows) { partial[pb + 6u] = t6; }
+        if (7u < nrows) { partial[pb + 7u] = t7; }
+    }
+}
+
 __kernel void pack_gemv_reduce(__global const float *partial,
                                __global float *y,
                                uint rows, uint parts) {
@@ -131,6 +226,11 @@ __kernel void pack_gemv_reduce(__global const float *partial,
 """
 KERNEL = "pack_gemv4"
 REDUCE = "pack_gemv_reduce"
+PERSIST = "pack_gemv_persist"
+ROWS_PER_ITEM = 8                       # rows one work-item of the persistent kernel covers
+PERSIST_MAX_GRID = 1 << 20
+PERSIST_CHUNK_FALLBACK = 1 << 30        # when the device does not report its allocation limit
+PERSIST_CHUNK_SHARE = 0.94              # of CL_DEVICE_MAX_MEM_ALLOC_SIZE, leaving the driver margin
 
 
 def _fail(report, message):
@@ -209,6 +309,13 @@ def _base_report(loader, pack_dir):
                    "exactness": "one real tensor is compared bit for bit at parts=1; the timed runs "
                                 "use the default parts"},
         "shapes": [],
+        "persistent": {"kernel": PERSIST, "parts": 1, "rows_per_item": ROWS_PER_ITEM,
+                       "seconds": None, "mean_ms": None, "weight_bytes": None,
+                       "tokens_per_second": None,
+                       "effective_gbps": None, "speedup": None, "chunks": [], "launches": 0,
+                       "validation": {"tensor": None, "rows": None, "cols": None, "mismatches": None},
+                       "excluded": "attention, norms, GDN state update, output-head f32 work, "
+                                   "tokenizer and sampling"},
         "validation": {"tensor": None, "rows": None, "cols": None, "mismatches": None},
         "projection": {"weight_bytes": None, "seconds": None, "tokens_per_second": None,
                        "effective_gbps": None, "excluded": "attention, norms, GDN state update, "
@@ -221,8 +328,154 @@ def _base_report(loader, pack_dir):
     }
 
 
+def work_lists(chunk):
+    """The persistent kernel's argument arrays for a chunk of tensors, offsets rebased to the chunk.
+
+    `pref[mi]` is where matrix mi's work items start (ceil(rows/8) per matrix), `ppref[mi]` where its
+    rows start in the partial buffer, and coffs/soffs are its byte offsets in the two chunk buffers.
+    """
+    rows = np.array([t["rows"] for t in chunk], dtype=np.uint32)
+    cols = np.array([t["cols"] for t in chunk], dtype=np.uint32)
+    each = (rows.astype(np.uint64) + (ROWS_PER_ITEM - 1)) // ROWS_PER_ITEM
+    codes = np.array([t["codes_bytes"] for t in chunk], dtype=np.uint64)
+    scales = np.array([t["rows"] * t["phases"] * 4 for t in chunk], dtype=np.uint64)
+    return {
+        "mrows": rows, "mcols": cols,
+        "pref": _prefix(each, np.uint32),
+        "ppref": _prefix(rows.astype(np.uint64), np.uint32),
+        "coffs": _prefix(codes, np.uint64),
+        "soffs": _prefix(scales, np.uint64),
+        "work": int(each.sum()),
+        "rows": int(rows.sum()),
+    }
+
+
+def _prefix(sizes, dtype):
+    """Cumulative starts of `sizes`: [0, s0, s0+s1, ...] without the trailing total."""
+    out = np.zeros(len(sizes), dtype=dtype)
+    if len(sizes) > 1:
+        out[1:] = np.cumsum(sizes, dtype=dtype)[:-1]
+    return out
+
+
+def chunk_bytes(device):
+    """The largest upload to attempt: the card's per-allocation limit, less a margin.
+
+    A 27B pack's 6.7 GB of codes is over the Arc A770's 4 GiB limit, so the persistent pass needs
+    chunks; one chunk per allocation means every extra chunk is a launch and a smaller grid, which
+    costs bandwidth (7 chunks measured 154 GB/s, 2 chunks 235 GB/s on the 2.5 27B), so the chunk is
+    as large as the driver will take.
+    """
+    limit = (device or {}).get("max_mem_alloc_mib")
+    if not limit:
+        return PERSIST_CHUNK_FALLBACK
+    return int(limit * (1 << 20) * PERSIST_CHUNK_SHARE)
+
+
+def chunks_of(tensors, cap=None):
+    """Split the tensor list into uploads whose codes and scales each fit in `cap` bytes."""
+    cap = cap or PERSIST_CHUNK_FALLBACK
+    chunk, codes, scales = [], 0, 0
+    for tensor in tensors:
+        code_bytes = tensor["codes_bytes"]
+        scale_bytes = tensor["rows"] * tensor["phases"] * 4
+        if chunk and (codes + code_bytes > cap or scales + scale_bytes > cap):
+            yield chunk
+            chunk, codes, scales = [], 0, 0
+        chunk.append(tensor)
+        codes += code_bytes
+        scales += scale_bytes
+    if chunk:
+        yield chunk
+
+
+def _persist_validate(lib, context, queue, kernel, x_buf, bcodes, dpm16, small, expected, report):
+    """One persistent launch over a single real tensor, compared bit for bit with the host model."""
+    rows = small["rows"]
+    lists = work_lists([small])
+    holds = [lists["mrows"], lists["mcols"], lists["pref"], lists["coffs"], lists["soffs"],
+             lists["ppref"]]
+    codes_buf = _buffer(lib, context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                        bcodes[small["bc_off"]:small["bc_off"] + small["codes_bytes"]],
+                        report, "clCreateBufferPersistValidationCodes")
+    scales_buf = _buffer(lib, context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                         widened(dpm16, small), report, "clCreateBufferPersistValidationScales")
+    part_buf = _buffer(lib, context, CL_MEM_WRITE_ONLY, np.zeros(rows, dtype=np.float32),
+                       report, "clCreateBufferPersistValidation")
+    arrays = [_buffer(lib, context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, a, report,
+                      "clCreateBufferPersistValidationList") for a in holds]
+    _set_persist_args(lib, kernel, codes_buf, scales_buf, x_buf, part_buf, arrays, 1, lists["work"])
+    _launch_1d(lib, queue, kernel, min(lists["work"], PERSIST_MAX_GRID), report,
+               "clEnqueuePersistValidation")
+    _finish(lib, queue, report, "clFinishPersistValidation")
+    raw = _read_back(lib, queue, part_buf, rows, report, "clReadPersistValidation")
+    actual = np.frombuffer(raw, dtype=np.float32)
+    report["persistent"]["validation"].update({
+        "tensor": small["name"], "rows": rows, "cols": small["cols"],
+        "mismatches": int(np.count_nonzero(actual != expected)),
+    })
+    for handle in [codes_buf, scales_buf, part_buf] + arrays:
+        lib.clReleaseMemObject(handle)
+
+
+def _persist_pass(lib, context, queue, kernel, x_buf, bcodes, dpm16, tensors, repeats, report,
+                  cap=None):
+    """Time one persistent launch per upload chunk: a work list over every ternary tensor, parts=1.
+
+    The pack's codes are ~5.8 GB on the 27B, over the driver's per-allocation limit, so the tensors
+    go up in chunks. Each chunk is one launch of its whole work list, and the chunk times are
+    summed - what a decode pass pays once the weights are resident.
+    """
+    section = report["persistent"]
+    seconds = 0.0
+    weight_bytes = 0
+    section["chunk_bytes"] = cap
+    for chunk in chunks_of(tensors, cap):
+        lists = work_lists(chunk)
+        codes = np.concatenate([bcodes[t["bc_off"]:t["bc_off"] + t["codes_bytes"]] for t in chunk])
+        scales = np.concatenate([widened(dpm16, t) for t in chunk])
+        holds = [lists["mrows"], lists["mcols"], lists["pref"], lists["coffs"], lists["soffs"],
+                 lists["ppref"]]
+        codes_buf = _buffer(lib, context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, codes,
+                            report, "clCreateBufferPersistCodes")
+        scales_buf = _buffer(lib, context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, scales,
+                             report, "clCreateBufferPersistScales")
+        part_buf = _buffer(lib, context, CL_MEM_WRITE_ONLY,
+                           np.zeros(lists["rows"], dtype=np.float32),
+                           report, "clCreateBufferPersistPartial")
+        arrays = [_buffer(lib, context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, a, report,
+                          "clCreateBufferPersistList") for a in holds]
+        _set_persist_args(lib, kernel, codes_buf, scales_buf, x_buf, part_buf, arrays,
+                          len(chunk), lists["work"])
+        grid = min(lists["work"], PERSIST_MAX_GRID)
+        _launch_1d(lib, queue, kernel, grid, report, "clEnqueuePersistWarmup")
+        _finish(lib, queue, report, "clFinishPersistWarmup")
+        started = time.perf_counter()
+        for _ in range(repeats):
+            _launch_1d(lib, queue, kernel, grid, report, "clEnqueuePersist")
+        _finish(lib, queue, report, "clFinishPersist")
+        elapsed = (time.perf_counter() - started) / repeats
+        moved = sum(t["codes_bytes"] + t["rows"] * t["phases"] * 2 for t in chunk)
+        seconds += elapsed
+        weight_bytes += moved
+        section["launches"] += 1
+        section["chunks"].append({"tensors": len(chunk), "rows": lists["rows"],
+                                  "work": lists["work"], "grid": grid,
+                                  "mean_ms": round(elapsed * 1000.0, 4),
+                                  "gbps": round(moved / elapsed / 1e9, 3) if elapsed > 0 else None})
+        for handle in [codes_buf, scales_buf, part_buf] + arrays:
+            lib.clReleaseMemObject(handle)
+    section.update({
+        "weight_bytes": int(weight_bytes),
+        "seconds": round(seconds, 6),
+        "mean_ms": round(seconds * 1000.0, 4),
+        "tokens_per_second": round(1.0 / seconds, 3) if seconds > 0 else None,
+        "effective_gbps": round(weight_bytes / seconds / 1e9, 3) if seconds > 0 else None,
+    })
+
+
 def run_pack(pack_dir, repeats=DEFAULT_REPEATS, loader=None, opener=None, device=0,
-             device_name=None, parts=None):
+             device_name=None, parts=None, persist=True):
     """Time every distinct ternary shape of a converted pack on the Intel GPU; never the CPU."""
     loader = loader or DEFAULT_LOADER
     report = _base_report(loader, pack_dir)
@@ -236,6 +489,7 @@ def run_pack(pack_dir, repeats=DEFAULT_REPEATS, loader=None, opener=None, device
     if not tensors:
         return _fail(report, "the pack has no ternary tensors (is it a Kindi pack?)")
     shapes = shapes_of(tensors)
+    report["persistent"]["parts"] = 1
     report["pack"].update({
         "model": manifest.get("model"), "source_file": manifest.get("source_file"),
         "tensors": len(index["tensors"]), "ternary": len(tensors), "shapes": len(shapes),
@@ -402,9 +656,36 @@ def run_pack(pack_dir, repeats=DEFAULT_REPEATS, loader=None, opener=None, device
             for handle in (codes_buf, scales_buf, y_buf, part_buf):
                 lib.clReleaseMemObject(handle)
 
+        if persist:
+            error_code = ctypes.c_int(0)
+            persist_kernel = lib.clCreateKernel(program, PERSIST.encode("ascii"),
+                                                ctypes.byref(error_code))
+            report["returncodes"]["clCreateKernelPersist"] = _hex(error_code.value)
+            if not persist_kernel or error_code.value != CL_SUCCESS:
+                return _fail(report, "clCreateKernel(%s) returned %s"
+                             % (PERSIST, _hex(error_code.value)))
+            try:
+                if validation["mismatches"] is not None:
+                    _persist_validate(lib, context, queue, persist_kernel, x_buf, bcodes, dpm16,
+                                      small, expected, report)
+                    bad = report["persistent"]["validation"]["mismatches"]
+                    if bad:
+                        return _fail(report, "the persistent kernel does not reproduce the "
+                                             "per-shape rows: %d of %d rows of %r differ"
+                                     % (bad, small["rows"], small["name"]))
+                _persist_pass(lib, context, queue, persist_kernel, x_buf, bcodes, dpm16, tensors,
+                              repeats, report, chunk_bytes(report["device"]))
+            finally:
+                report["returncodes"]["clReleaseKernelPersist"] = _hex(
+                    lib.clReleaseKernel(persist_kernel))
+
         report["projection"] = project(tensors, seconds_by_shape)
         report["projection"]["excluded"] = ("attention, norms, GDN state update, output-head f32 "
                                             "work, tokenizer and sampling")
+        persistent = report["persistent"]
+        if persistent["seconds"]:
+            persistent["speedup"] = round(
+                report["projection"]["seconds"] / persistent["seconds"], 3)
         report["result"] = "pass"
         return report
     except (AttributeError, TypeError, ValueError, OSError) as exc:
@@ -446,6 +727,15 @@ def _set_reduce_args(lib, kernel, partial, y, rows, parts):
     _set_arg(lib, kernel, 3, ctypes.c_uint32(parts))
 
 
+def _set_persist_args(lib, kernel, codes, scales, x, partial, arrays, nmats, total):
+    for slot, handle in enumerate((codes, scales, x, partial)):
+        _set_arg(lib, kernel, slot, ctypes.c_void_p(int(handle)))
+    for slot, handle in enumerate(arrays):
+        _set_arg(lib, kernel, 4 + slot, ctypes.c_void_p(int(handle)))
+    _set_arg(lib, kernel, 4 + len(arrays), ctypes.c_uint32(nmats))
+    _set_arg(lib, kernel, 5 + len(arrays), ctypes.c_uint32(total))
+
+
 def _set_args(lib, kernel, codes, scales, x, partial, rows, cols, parts, coff, soff):
     _set_arg(lib, kernel, 0, ctypes.c_void_p(int(codes)))
     _set_arg(lib, kernel, 1, ctypes.c_void_p(int(scales)))
@@ -478,6 +768,19 @@ def render(report):
                      "%s tokens/s ceiling" % (
                          projection["weight_bytes"] / 1e9, projection["seconds"] * 1000.0,
                          projection["effective_gbps"], projection["tokens_per_second"]))
+    persistent = report["persistent"]
+    if persistent["tokens_per_second"] is not None:
+        lines.append("  persistent: %s GB moved -> %.3f ms per pass, %s GB/s effective, "
+                     "%s tokens/s ceiling (%d launch(es) over %d row(s)/item, %sx the per-shape "
+                     "path)" % (
+                         persistent["weight_bytes"] / 1e9, persistent["seconds"] * 1000.0,
+                         persistent["effective_gbps"], persistent["tokens_per_second"],
+                         persistent["launches"], persistent["rows_per_item"],
+                         persistent["speedup"]))
+    if persistent["validation"]["mismatches"] is not None:
+        lines.append("  persistent validation: %s (%d x %d) over one work list, mismatches %s" % (
+            persistent["validation"]["tensor"], persistent["validation"]["rows"],
+            persistent["validation"]["cols"], persistent["validation"]["mismatches"]))
     validation = report["validation"]
     if validation["mismatches"] is not None:
         lines.append("  validation: %s (%d x %d), mismatches %s" % (

@@ -525,7 +525,7 @@ def cmd_intel_pack(cfg, a):
     from . import intel_pack
 
     report = intel_pack.run_pack(a.pack, repeats=a.repeats, loader=a.loader, device=a.device,
-                                 device_name=a.device_name, parts=a.parts)
+                                 device_name=a.device_name, parts=a.parts, persist=not a.no_persist)
     if a.json:
         print(intel_pack.dumps(report))
     else:
@@ -902,6 +902,8 @@ def _build_parser():
     s.add_argument("--device-name", default=None, metavar="SUBSTR",
                    help="pick the GPU whose name contains SUBSTR (e.g. Arc) instead of --device")
     s.add_argument("--loader", default=None, help="OpenCL loader name/path (default: the host loader)")
+    s.add_argument("--no-persist", action="store_true",
+                   help="skip the persistent eight-row kernel (one launch per chunk over every tensor)")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("intel-cl", help="compile and run OpenCL vector-add/GEMM on an Intel GPU (no model, no backend)")
     s.add_argument("--n", type=int, default=1048576, help="vector-add elements (default 1048576, max 16777216)")

@@ -1,5 +1,22 @@
 # Changelog
 
+## The Arc pack probe reads its weights the way a decoder would (2026-11-25)
+
+- **`kindi intel-pack` now runs the persistent work list on a real pack.** The kernel from the
+  synthetic sweep - eight rows per work-item, one work list over every ternary tensor, `parts=1` so
+  no reduce launch is needed - is ported into `kindi/intel_pack.py` alongside the per-shape GEMV, and
+  one run reports both on the same bytes. `--no-persist` skips it.
+- **The upload chunk is sized from the card, not from a guess.** A 27B pack's 6.7 GB of codes does not
+  fit the A770's 4 GiB `CL_DEVICE_MAX_MEM_ALLOC_SIZE`, so the pass uploads in chunks of 94% of that
+  limit (two chunks here, 1 GiB fallback when a device does not report one) and sums their times. The
+  chunk count is a real cost: seven 1 GiB chunks measured 154 GB/s, two chunks 235 GB/s.
+- **Real weights: 1.49-1.66x, not the synthetic 1.76x.** Six twenty-repeat runs on the 2.5 `-mtp` and
+  Bonsai 2 27B packs read 219-228 GB/s through the work list against 138-149 GB/s per shape (31.3-32.5
+  ms per pass against 47.8-51.8 ms). The first chunk alone reaches 238-240 GB/s, so the sweep's 253
+  GB/s is a per-launch figure the pack does not reach - the sweep also gave every matrix buffer offset
+  zero, which a pack cannot. Both paths still validate bit for bit: 0 mismatches. Evidence:
+  `docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/`, claim `arc-a770-pack-persist-20261125`.
+
 ## The 2.5 MTP head's acceptance, measured variant by variant (2026-11-25)
 
 - **A head-only probe that loads the 27B once.** `tools/mtp_cpu_probe.py` takes a JSONL list of

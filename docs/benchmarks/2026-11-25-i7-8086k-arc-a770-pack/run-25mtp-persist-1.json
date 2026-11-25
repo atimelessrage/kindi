@@ -1,0 +1,260 @@
+{
+  "backend": "opencl pack-reading gemv probe; no sycl, model run, engine or backend",
+  "device": {
+    "compute_units": 512,
+    "device_version": "OpenCL 3.0 NEO ",
+    "driver_version": "32.0.101.9175",
+    "global_mem_mib": 15932,
+    "max_clock_mhz": 2400,
+    "max_mem_alloc_mib": 4095,
+    "max_work_group_size": 1024,
+    "name": "Intel(R) Arc(TM) A770 Graphics",
+    "opencl_c_version": "OpenCL C 1.2 ",
+    "vendor": "Intel(R) Corporation"
+  },
+  "device_count": null,
+  "device_index": null,
+  "error": null,
+  "kernel": {
+    "exactness": "one real tensor is compared bit for bit at parts=1; the timed runs use the default parts",
+    "name": "pack_gemv4",
+    "reduce": "pack_gemv_reduce",
+    "split": "phase ph -> part ph % parts"
+  },
+  "loader": {
+    "available": true,
+    "error": null,
+    "name": "OpenCL.dll"
+  },
+  "pack": {
+    "bcodes_bytes": 6717440000,
+    "dir": "bonsai25-27b",
+    "dpm_bytes": 839680000,
+    "model": "Ternary-Bonsai-2.5-27B",
+    "shapes": 8,
+    "source_file": "Ternary-Bonsai-2.5-27B-PTQ1_0-mtp.gguf",
+    "tensors": 851,
+    "ternary": 402
+  },
+  "persistent": {
+    "chunk_bytes": 4036283596,
+    "chunks": [
+      {
+        "gbps": 230.139,
+        "grid": 334080,
+        "mean_ms": 18.6259,
+        "rows": 2672640,
+        "tensors": 226,
+        "work": 334080
+      },
+      {
+        "gbps": 209.164,
+        "grid": 215424,
+        "mean_ms": 13.6292,
+        "rows": 1723392,
+        "tensors": 176,
+        "work": 215424
+      }
+    ],
+    "effective_gbps": 221.276,
+    "excluded": "attention, norms, GDN state update, output-head f32 work, tokenizer and sampling",
+    "kernel": "pack_gemv_persist",
+    "launches": 2,
+    "mean_ms": 32.2551,
+    "parts": 1,
+    "rows_per_item": 8,
+    "seconds": 0.032255,
+    "speedup": 1.489,
+    "tokens_per_second": 31.003,
+    "validation": {
+      "cols": 5120,
+      "mismatches": 0,
+      "rows": 1024,
+      "tensor": "blk.3.attn_k.weight"
+    },
+    "weight_bytes": 7137280000
+  },
+  "platform": "Intel(R) OpenCL Graphics (discrete)",
+  "platforms": [
+    {
+      "gpu_devices": 1,
+      "index": 0,
+      "name": "Intel(R) OpenCL Graphics (discrete)",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.0 "
+    },
+    {
+      "gpu_devices": 1,
+      "index": 1,
+      "name": "Intel(R) OpenCL HD Graphics",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.0 "
+    },
+    {
+      "gpu_devices": 0,
+      "index": 2,
+      "name": "Intel(R) OpenCL",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.1 WINDOWS"
+    }
+  ],
+  "probe": "intel-pack-gemv",
+  "projection": {
+    "effective_gbps": 148.653,
+    "excluded": "attention, norms, GDN state update, output-head f32 work, tokenizer and sampling",
+    "seconds": 0.048013,
+    "tokens_per_second": 20.828,
+    "weight_bytes": 7137280000
+  },
+  "read_only": true,
+  "repeats": 20,
+  "result": "pass",
+  "returncodes": {
+    "clBuildProgram": "0x00000000",
+    "clCreateBufferCodes_10240x5120": "0x00000000",
+    "clCreateBufferCodes_1024x5120": "0x00000000",
+    "clCreateBufferCodes_12288x5120": "0x00000000",
+    "clCreateBufferCodes_17408x5120": "0x00000000",
+    "clCreateBufferCodes_248320x5120": "0x00000000",
+    "clCreateBufferCodes_5120x17408": "0x00000000",
+    "clCreateBufferCodes_5120x6144": "0x00000000",
+    "clCreateBufferCodes_6144x5120": "0x00000000",
+    "clCreateBufferPartial_10240x5120": "0x00000000",
+    "clCreateBufferPartial_1024x5120": "0x00000000",
+    "clCreateBufferPartial_12288x5120": "0x00000000",
+    "clCreateBufferPartial_17408x5120": "0x00000000",
+    "clCreateBufferPartial_248320x5120": "0x00000000",
+    "clCreateBufferPartial_5120x17408": "0x00000000",
+    "clCreateBufferPartial_5120x6144": "0x00000000",
+    "clCreateBufferPartial_6144x5120": "0x00000000",
+    "clCreateBufferPersistCodes": "0x00000000",
+    "clCreateBufferPersistList": "0x00000000",
+    "clCreateBufferPersistPartial": "0x00000000",
+    "clCreateBufferPersistScales": "0x00000000",
+    "clCreateBufferPersistValidation": "0x00000000",
+    "clCreateBufferPersistValidationCodes": "0x00000000",
+    "clCreateBufferPersistValidationList": "0x00000000",
+    "clCreateBufferPersistValidationScales": "0x00000000",
+    "clCreateBufferScales_10240x5120": "0x00000000",
+    "clCreateBufferScales_1024x5120": "0x00000000",
+    "clCreateBufferScales_12288x5120": "0x00000000",
+    "clCreateBufferScales_17408x5120": "0x00000000",
+    "clCreateBufferScales_248320x5120": "0x00000000",
+    "clCreateBufferScales_5120x17408": "0x00000000",
+    "clCreateBufferScales_5120x6144": "0x00000000",
+    "clCreateBufferScales_6144x5120": "0x00000000",
+    "clCreateBufferValidation": "0x00000000",
+    "clCreateBufferValidationCodes": "0x00000000",
+    "clCreateBufferValidationPartial": "0x00000000",
+    "clCreateBufferValidationScales": "0x00000000",
+    "clCreateBufferX": "0x00000000",
+    "clCreateBufferY_10240x5120": "0x00000000",
+    "clCreateBufferY_1024x5120": "0x00000000",
+    "clCreateBufferY_12288x5120": "0x00000000",
+    "clCreateBufferY_17408x5120": "0x00000000",
+    "clCreateBufferY_248320x5120": "0x00000000",
+    "clCreateBufferY_5120x17408": "0x00000000",
+    "clCreateBufferY_5120x6144": "0x00000000",
+    "clCreateBufferY_6144x5120": "0x00000000",
+    "clCreateCommandQueue": "0x00000000",
+    "clCreateContext": "0x00000000",
+    "clCreateKernel": "0x00000000",
+    "clCreateKernelPersist": "0x00000000",
+    "clCreateKernelReduce": "0x00000000",
+    "clCreateProgramWithSource": "0x00000000",
+    "clEnqueueKernel": "0x00000000",
+    "clEnqueuePersist": "0x00000000",
+    "clEnqueuePersistValidation": "0x00000000",
+    "clEnqueuePersistWarmup": "0x00000000",
+    "clEnqueueReduce": "0x00000000",
+    "clEnqueueValidation": "0x00000000",
+    "clEnqueueValidationReduce": "0x00000000",
+    "clEnqueueWarmup": "0x00000000",
+    "clEnqueueWarmupReduce": "0x00000000",
+    "clFinish": "0x00000000",
+    "clFinishPersist": "0x00000000",
+    "clFinishPersistValidation": "0x00000000",
+    "clFinishPersistWarmup": "0x00000000",
+    "clFinishValidation": "0x00000000",
+    "clFinishWarmup": "0x00000000",
+    "clGetPlatformIDs": "0x00000000",
+    "clGetPlatformIDsHandles": "0x00000000",
+    "clReadPersistValidation": "0x00000000",
+    "clReadValidation": "0x00000000",
+    "clReleaseCommandQueue": "0x00000000",
+    "clReleaseContext": "0x00000000",
+    "clReleaseKernel": "0x00000000",
+    "clReleaseKernelPersist": "0x00000000",
+    "clReleaseKernelReduce": "0x00000000",
+    "clReleaseMemObject0": "0x00000000",
+    "clReleaseProgram": "0x00000000"
+  },
+  "schema": 1,
+  "scope": "every ternary matmul of a converted pack at its own shape, from the pack's on-disk 4-trit/byte bytes; a projection of the decode memory floor, not a model run",
+  "shapes": [
+    {
+      "cols": 5120,
+      "gbps": 215.899,
+      "mean_ms": 1.5642,
+      "rows": 248320,
+      "tensors": 2
+    },
+    {
+      "cols": 17408,
+      "gbps": 164.409,
+      "mean_ms": 0.144,
+      "rows": 5120,
+      "tensors": 64
+    },
+    {
+      "cols": 5120,
+      "gbps": 169.956,
+      "mean_ms": 0.1393,
+      "rows": 17408,
+      "tensors": 128
+    },
+    {
+      "cols": 5120,
+      "gbps": 134.225,
+      "mean_ms": 0.1245,
+      "rows": 12288,
+      "tensors": 16
+    },
+    {
+      "cols": 5120,
+      "gbps": 143.972,
+      "mean_ms": 0.0967,
+      "rows": 10240,
+      "tensors": 48
+    },
+    {
+      "cols": 5120,
+      "gbps": 119.583,
+      "mean_ms": 0.0699,
+      "rows": 6144,
+      "tensors": 48
+    },
+    {
+      "cols": 6144,
+      "gbps": 95.408,
+      "mean_ms": 0.0876,
+      "rows": 5120,
+      "tensors": 64
+    },
+    {
+      "cols": 5120,
+      "gbps": 19.859,
+      "mean_ms": 0.0701,
+      "rows": 1024,
+      "tensors": 32
+    }
+  ],
+  "support_claim": false,
+  "validation": {
+    "cols": 5120,
+    "mismatches": 0,
+    "rows": 1024,
+    "tensor": "blk.3.attn_k.weight"
+  },
+  "warnings": []
+}

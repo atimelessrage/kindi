@@ -1,0 +1,370 @@
+{
+  "gate": "arc-a770-pack-persist-20261125",
+  "title": "Bonsai 2.5 27B ternary shapes on the Arc A770: persistent eight-row work list against the per-shape GEMV",
+  "measured": "2026-11-25",
+  "commit": "unreleased",
+  "command": "python -m kindi intel-pack --pack pack --device-name Arc --repeats 20 --json run-{25mtp,bonsai2}-persist-<n>.json",
+  "notes": "The same pack bytes read twice: the per-shape four-row phase-split GEMV with a reduce launch per matrix, and the persistent kernel that gives each work-item eight rows and covers every ternary tensor in one work list at parts=1 (no reduce). Both are weight-streaming projections, not model runs: attention, norms, GDN, the f32 head and the KV cache are excluded. Three spaced runs per pack, twenty timed launches per chunk, host idle. The five-launch runs of the same command measured 168-233 GB/s, so twenty repeats is what this gate quotes.",
+  "evidence": [
+    "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-1.json",
+    "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-2.json",
+    "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-3.json",
+    "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-bonsai2-persist-1.json",
+    "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-bonsai2-persist-2.json",
+    "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-bonsai2-persist-3.json",
+    "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md",
+    "kindi/intel_pack.py"
+  ],
+  "numbers": [
+    {
+      "id": "25mtp-r1-gbps",
+      "display": "221.3 GB/s",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-1.json",
+        "pointer": "/persistent/effective_gbps",
+        "expect": 221.3
+      }
+    },
+    {
+      "id": "25mtp-r1-ms",
+      "display": "32.26 ms",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-1.json",
+        "pointer": "/persistent/mean_ms",
+        "expect": 32.2551
+      }
+    },
+    {
+      "id": "25mtp-r1-per-shape-gbps",
+      "display": "148.7 GB/s",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-1.json",
+        "pointer": "/projection/effective_gbps",
+        "expect": 148.7
+      }
+    },
+    {
+      "id": "25mtp-r1-speedup",
+      "display": "1.489x",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-1.json",
+        "pointer": "/persistent/speedup",
+        "expect": 1.489
+      }
+    },
+    {
+      "id": "25mtp-r2-gbps",
+      "display": "219.4 GB/s",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-2.json",
+        "pointer": "/persistent/effective_gbps",
+        "expect": 219.4
+      }
+    },
+    {
+      "id": "25mtp-r2-ms",
+      "display": "32.53 ms",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-2.json",
+        "pointer": "/persistent/mean_ms",
+        "expect": 32.5283
+      }
+    },
+    {
+      "id": "25mtp-r2-per-shape-gbps",
+      "display": "146.9 GB/s",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-2.json",
+        "pointer": "/projection/effective_gbps",
+        "expect": 146.9
+      }
+    },
+    {
+      "id": "25mtp-r2-speedup",
+      "display": "1.493x",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-2.json",
+        "pointer": "/persistent/speedup",
+        "expect": 1.493
+      }
+    },
+    {
+      "id": "25mtp-r3-gbps",
+      "display": "223.6 GB/s",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-3.json",
+        "pointer": "/persistent/effective_gbps",
+        "expect": 223.6
+      }
+    },
+    {
+      "id": "25mtp-r3-ms",
+      "display": "31.92 ms",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-3.json",
+        "pointer": "/persistent/mean_ms",
+        "expect": 31.9248
+      }
+    },
+    {
+      "id": "25mtp-r3-per-shape-gbps",
+      "display": "149.2 GB/s",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-3.json",
+        "pointer": "/projection/effective_gbps",
+        "expect": 149.2
+      }
+    },
+    {
+      "id": "25mtp-r3-speedup",
+      "display": "1.499x",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-3.json",
+        "pointer": "/persistent/speedup",
+        "expect": 1.499
+      }
+    },
+    {
+      "id": "25mtp-r1-mismatches",
+      "display": "0 mismatches",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-1.json",
+        "pointer": "/persistent/validation/mismatches",
+        "expect": 0
+      }
+    },
+    {
+      "id": "bonsai2-r1-gbps",
+      "display": "227.2 GB/s",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-bonsai2-persist-1.json",
+        "pointer": "/persistent/effective_gbps",
+        "expect": 227.2
+      }
+    },
+    {
+      "id": "bonsai2-r1-ms",
+      "display": "31.42 ms",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-bonsai2-persist-1.json",
+        "pointer": "/persistent/mean_ms",
+        "expect": 31.4193
+      }
+    },
+    {
+      "id": "bonsai2-r1-per-shape-gbps",
+      "display": "146.8 GB/s",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-bonsai2-persist-1.json",
+        "pointer": "/projection/effective_gbps",
+        "expect": 146.8
+      }
+    },
+    {
+      "id": "bonsai2-r1-speedup",
+      "display": "1.548x",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-bonsai2-persist-1.json",
+        "pointer": "/persistent/speedup",
+        "expect": 1.548
+      }
+    },
+    {
+      "id": "bonsai2-r1-chunk0-gbps",
+      "display": "238.1 GB/s",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-bonsai2-persist-1.json",
+        "pointer": "/persistent/chunks/0/gbps",
+        "expect": 238.1
+      }
+    },
+    {
+      "id": "bonsai2-r2-gbps",
+      "display": "225.5 GB/s",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-bonsai2-persist-2.json",
+        "pointer": "/persistent/effective_gbps",
+        "expect": 225.5
+      }
+    },
+    {
+      "id": "bonsai2-r2-ms",
+      "display": "31.65 ms",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-bonsai2-persist-2.json",
+        "pointer": "/persistent/mean_ms",
+        "expect": 31.649
+      }
+    },
+    {
+      "id": "bonsai2-r2-per-shape-gbps",
+      "display": "145.7 GB/s",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-bonsai2-persist-2.json",
+        "pointer": "/projection/effective_gbps",
+        "expect": 145.7
+      }
+    },
+    {
+      "id": "bonsai2-r2-speedup",
+      "display": "1.548x",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-bonsai2-persist-2.json",
+        "pointer": "/persistent/speedup",
+        "expect": 1.548
+      }
+    },
+    {
+      "id": "bonsai2-r3-gbps",
+      "display": "228.3 GB/s",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-bonsai2-persist-3.json",
+        "pointer": "/persistent/effective_gbps",
+        "expect": 228.3
+      }
+    },
+    {
+      "id": "bonsai2-r3-ms",
+      "display": "31.26 ms",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-bonsai2-persist-3.json",
+        "pointer": "/persistent/mean_ms",
+        "expect": 31.2639
+      }
+    },
+    {
+      "id": "bonsai2-r3-per-shape-gbps",
+      "display": "137.7 GB/s",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-bonsai2-persist-3.json",
+        "pointer": "/projection/effective_gbps",
+        "expect": 137.7
+      }
+    },
+    {
+      "id": "bonsai2-r3-speedup",
+      "display": "1.658x",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-bonsai2-persist-3.json",
+        "pointer": "/persistent/speedup",
+        "expect": 1.658
+      }
+    },
+    {
+      "id": "bonsai2-r1-mismatches",
+      "display": "0 mismatches",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-bonsai2-persist-1.json",
+        "pointer": "/persistent/validation/mismatches",
+        "expect": 0
+      }
+    },
+    {
+      "id": "persist-parts",
+      "display": "parts=1",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-1.json",
+        "pointer": "/persistent/parts",
+        "expect": 1
+      }
+    },
+    {
+      "id": "persist-rows-per-item",
+      "display": "eight rows",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-1.json",
+        "pointer": "/persistent/rows_per_item",
+        "expect": 8
+      }
+    },
+    {
+      "id": "persist-weight-bytes",
+      "display": "7,137,280,000 packed weight bytes",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-1.json",
+        "pointer": "/persistent/weight_bytes",
+        "expect": 7137280000
+      }
+    },
+    {
+      "id": "device-max-alloc",
+      "display": "4095 MiB",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md"],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/run-25mtp-persist-1.json",
+        "pointer": "/device/max_mem_alloc_mib",
+        "expect": 4095
+      }
+    }
+  ]
+}

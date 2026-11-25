@@ -75,6 +75,50 @@ packs hold the same 64-layer model and the projections agree within run-to-run n
 On this card there is nothing to benchmark *between* the files yet - a difference would only appear
 once a 27B drafter can consume the head (roadmap row I8), which no platform has.
 
+## Persistent work list: eight rows per item, one launch per chunk
+
+The per-shape numbers above pay two enqueues per matrix - the GEMV and, when `parts > 1`, its reduce -
+and one work-item per four rows. The persistent kernel gives each work-item **eight rows** of one
+matrix and runs a **work list over every ternary tensor of the pack**, with `parts=1` so each row has a
+single partial and the reduce pass disappears: one enqueue covers a whole upload chunk.
+
+A 27B pack's 6.7 GB of codes does not fit the card's 4 GiB per-allocation limit
+(`CL_DEVICE_MAX_MEM_ALLOC_SIZE`, 4095 MiB here), so the pass uploads in chunks sized from that limit -
+two chunks of 3.76 GiB or less - and the chunk times are summed. The chunk count is not cosmetic: the
+same pack measured 154 GB/s at seven 1 GiB chunks against 235 GB/s at two, and 168 GB/s in one
+five-launch run while the card warmed up (untracked diagnostics, `bench-logs/persist_chunk_probe.py`).
+The runs below therefore use twenty timed launches per chunk.
+
+Three spaced runs per pack, host idle between runs:
+
+| pack | run | persistent | per pass | per-shape | speedup |
+|---|---|---:|---:|---:|---:|
+| 2.5 27B `-mtp` | 1 | 221.3 GB/s | 32.26 ms | 148.7 GB/s | 1.489x |
+| 2.5 27B `-mtp` | 2 | 219.4 GB/s | 32.53 ms | 146.9 GB/s | 1.493x |
+| 2.5 27B `-mtp` | 3 | 223.6 GB/s | 31.92 ms | 149.2 GB/s | 1.499x |
+| Bonsai 2 27B | 1 | 227.2 GB/s | 31.42 ms | 146.8 GB/s | 1.548x |
+| Bonsai 2 27B | 2 | 225.5 GB/s | 31.65 ms | 145.7 GB/s | 1.548x |
+| Bonsai 2 27B | 3 | 228.3 GB/s | 31.26 ms | 137.7 GB/s | 1.658x |
+
+Artifacts: `run-25mtp-persist-{1,2,3}.json` (Ternary-Bonsai-2.5-27B-PTQ1_0-mtp.gguf) and
+`run-bonsai2-persist-{1,2,3}.json` (Ternary-Bonsai-2-27B-PTQ1_0.gguf); both hold 402 ternary tensors of
+851, 8 distinct shapes and 7,137,280,000 packed weight bytes, so they are the same work on the same
+byte count. The 2.5 pack is the `-mtp` file: the plain 2.5 file is no longer on this host, and the
+Bonsai 2 27B pack stands in for it (the probe times shapes, not layer identities).
+
+Persistent validation: **0 mismatches** - the smallest ternary tensor's rows from the work-list kernel
+are compared with the host model bit for bit at `parts=1`, so the speed is measured on bytes that were
+decoded correctly, not on bytes that merely moved.
+
+### Why the pack does not reach the synthetic 253 GB/s
+
+The synthetic sweep (`bench-logs/arc_gemv_sweep.py`, untracked) reported 253 GB/s for one launch over
+401 dummy matrices of these shapes. Two differences survive on real weights: the pack needs two
+allocations, and the second chunk is smaller and slower, so the best chunk here (238.1 GB/s on
+Bonsai 2 run 1) is the fair comparison against the sweep, not the pack total. The sweep also put every
+matrix at buffer offset zero, so same-shape matrices re-read the same bytes; the pack cannot, and this
+page quotes the pack total for that reason.
+
 ## What this does not show
 
 - **Not a token rate.** No attention, GDN, norm or head kernel exists on Arc; this is the

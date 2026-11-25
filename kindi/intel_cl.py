@@ -35,6 +35,7 @@ CL_PLATFORM_VENDOR = 0x0903
 CL_DEVICE_MAX_COMPUTE_UNITS = 0x1002
 CL_DEVICE_MAX_WORK_GROUP_SIZE = 0x1004
 CL_DEVICE_MAX_CLOCK_FREQUENCY = 0x100C
+CL_DEVICE_MAX_MEM_ALLOC_SIZE = 0x1010
 CL_DEVICE_GLOBAL_MEM_SIZE = 0x101F
 CL_DEVICE_NAME = 0x102B
 CL_DEVICE_VENDOR = 0x102C
@@ -262,6 +263,7 @@ def _device_report(lib, device):
     version, _ = _query(lib.clGetDeviceInfo, device, CL_DEVICE_VERSION)
     opencl_c, _ = _query(lib.clGetDeviceInfo, device, CL_DEVICE_OPENCL_C_VERSION)
     memory = _scalar(lib, device, CL_DEVICE_GLOBAL_MEM_SIZE, ctypes.c_uint64)
+    max_alloc = _scalar(lib, device, CL_DEVICE_MAX_MEM_ALLOC_SIZE, ctypes.c_uint64)
     return {
         "name": name,
         "vendor": vendor,
@@ -272,6 +274,7 @@ def _device_report(lib, device):
         "max_clock_mhz": _scalar(lib, device, CL_DEVICE_MAX_CLOCK_FREQUENCY,
                                  ctypes.c_uint32),
         "global_mem_mib": None if memory is None else memory // (1024 * 1024),
+        "max_mem_alloc_mib": None if max_alloc is None else max_alloc // (1024 * 1024),
         "max_work_group_size": _scalar(lib, device, CL_DEVICE_MAX_WORK_GROUP_SIZE,
                                        ctypes.c_size_t),
     }

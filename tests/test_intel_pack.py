@@ -72,6 +72,37 @@ def test_projection_sums_every_tensor_once(tmp_path):
     assert projection["tokens_per_second"] == pytest.approx(1 / 0.005, rel=1e-3)
 
 
+def test_work_lists_index_every_row_of_every_tensor(tmp_path):
+    pack = _pack(tmp_path, shapes=((8, 256), (16, 128), (9, 256)))
+    tensors, _manifest, _index = intel_pack.pack_tensors(pack)
+    lists = intel_pack.work_lists(tensors)
+    each = [(t["rows"] + 7) // 8 for t in tensors]
+    assert lists["work"] == sum(each)                       # ceil(rows/8) items per tensor
+    assert list(lists["pref"]) == [0, each[0], each[0] + each[1]]
+    assert list(lists["ppref"]) == [0, 8, 24]               # rows, not work items
+    assert lists["rows"] == 8 + 16 + 9
+    assert list(lists["coffs"])[0] == 0 and list(lists["soffs"])[0] == 0
+    assert list(lists["coffs"])[1] == tensors[0]["codes_bytes"]
+    assert list(lists["soffs"])[1] == tensors[0]["rows"] * tensors[0]["phases"] * 4
+
+
+def test_chunks_stay_under_one_allocation(tmp_path):
+    pack = _pack(tmp_path, shapes=((8, 256), (8, 256), (16, 128)))
+    tensors, _manifest, _index = intel_pack.pack_tensors(pack)
+    cap = 2 * tensors[0]["codes_bytes"] + 1
+    chunks = list(intel_pack.chunks_of(tensors, cap))
+    assert [len(c) for c in chunks] == [2, 1]               # the third tensor would overflow
+    assert sum(len(c) for c in chunks) == len(tensors)       # every tensor exactly once
+    assert [t["name"] for c in chunks for t in c] == [t["name"] for t in tensors]
+    assert all(sum(t["codes_bytes"] for t in c) <= cap for c in chunks)
+
+
+def test_chunk_bytes_follows_the_device_limit():
+    assert intel_pack.chunk_bytes({"max_mem_alloc_mib": 4096}) == int(4096 * (1 << 20) * 0.94)
+    assert intel_pack.chunk_bytes({"max_mem_alloc_mib": None}) == intel_pack.PERSIST_CHUNK_FALLBACK
+    assert intel_pack.chunk_bytes(None) == intel_pack.PERSIST_CHUNK_FALLBACK
+
+
 def test_missing_pack_fails_without_a_gpu(tmp_path):
     report = intel_pack.run_pack(str(tmp_path / "nope"))
     assert report["result"] == "fail" and "cannot read the pack" in report["error"]
