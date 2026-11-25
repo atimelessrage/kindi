@@ -1,0 +1,143 @@
+{
+  "gate": "bonsai25-header-20261124",
+  "title": "Ternary Bonsai 2.5 27B keeps the Bonsai 27B GGUF shape",
+  "measured": "2026-11-24",
+  "commit": "unreleased",
+  "command": "curl -r 0-12582911 https://huggingface.co/prism-ml/Ternary-Bonsai-2.5-27B-GGUF/resolve/main/Ternary-Bonsai-2.5-27B-PTQ1_0.gguf -o head.gguf; python parse_header.py head.gguf > header.json",
+  "notes": "A 12 MB HTTP range request over the published 6 GB GGUF: metadata and tensor table only. No pack was converted, no engine loaded the file and no token was generated, so these are file facts, not runtime results.",
+  "evidence": [
+    "docs/benchmarks/2026-11-24-bonsai25-27b-header/header.json",
+    "docs/benchmarks/2026-11-24-bonsai25-27b-header/parse_header.py",
+    "docs/benchmarks/2026-11-24-bonsai25-27b-header/README.md"
+  ],
+  "numbers": [
+    {
+      "id": "tensor-count",
+      "display": "851",
+      "quoted_in": [
+        "docs/BONSAI-2-SUPPORT.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-bonsai25-27b-header/header.json",
+        "pointer": "/tensors/count",
+        "expect": 851
+      }
+    },
+    {
+      "id": "ternary-tensors",
+      "display": "402",
+      "quoted_in": [
+        "docs/BONSAI-2-SUPPORT.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-bonsai25-27b-header/header.json",
+        "pointer": "/tensors/types/143",
+        "expect": 402
+      }
+    },
+    {
+      "id": "f32-tensors",
+      "display": "449",
+      "quoted_in": [
+        "docs/BONSAI-2-SUPPORT.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-bonsai25-27b-header/header.json",
+        "pointer": "/tensors/types/0",
+        "expect": 449
+      }
+    },
+    {
+      "id": "hadamard-block",
+      "display": "1024",
+      "quoted_in": [
+        "docs/BONSAI-2-SUPPORT.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-bonsai25-27b-header/header.json",
+        "pointer": "/kv/prism.hadamard.block_size",
+        "expect": 1024
+      }
+    },
+    {
+      "id": "vocab",
+      "display": "248320",
+      "quoted_in": [
+        "docs/BONSAI-2-SUPPORT.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-bonsai25-27b-header/header.json",
+        "pointer": "/vocab",
+        "expect": 248320
+      }
+    },
+    {
+      "id": "context",
+      "display": "262144",
+      "quoted_in": [
+        "docs/BONSAI-2-SUPPORT.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-bonsai25-27b-header/header.json",
+        "pointer": "/kv/qwen35.context_length",
+        "expect": 262144
+      }
+    },
+    {
+      "id": "template-chars",
+      "display": "8952",
+      "quoted_in": [
+        "docs/BONSAI-2-SUPPORT.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-bonsai25-27b-header/header.json",
+        "pointer": "/chat_template/chars",
+        "expect": 8952
+      }
+    },
+    {
+      "id": "file-size",
+      "display": "5993834848",
+      "quoted_in": [
+        "docs/BONSAI-2-SUPPORT.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-24-bonsai25-27b-header/header.json",
+        "pointer": "/source/size_bytes",
+        "expect": 5993834848
+      }
+    },
+    {
+      "id": "architecture",
+      "display": "qwen35",
+      "quoted_in": [
+        "docs/BONSAI-2-SUPPORT.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-24-bonsai25-27b-header/header.json",
+        "needle": "\"general.architecture\": \"qwen35\""
+      }
+    },
+    {
+      "id": "profile-match",
+      "display": "convert_profile_match",
+      "quoted_in": [
+        "docs/BONSAI-2-SUPPORT.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-24-bonsai25-27b-header/header.json",
+        "needle": "\"convert_profile_match\": true"
+      }
+    }
+  ]
+}

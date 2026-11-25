@@ -46,6 +46,17 @@ def test_every_bonsai_size_shares_the_profile():
         assert profiles.profile_for(name)["presence_penalty"] == 1.5
 
 
+def test_bonsai25_thinking_profile_drops_the_presence_penalty():
+    """The 2.5 card recommends presence 0.0 in thinking mode, where Bonsai 2 says 1.0.
+
+    The 2.5 id must reach its own entry; the 2 family's entry would otherwise apply.
+    """
+    prof = profiles.profile_for("bonsai2.5-27b", thinking=True)
+    assert prof == {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "presence_penalty": 0.0, "max_tokens": 8192}
+    assert profiles.profile_for("bonsai2.5-27b", thinking=False)["presence_penalty"] == 1.5
+    assert profiles.profile_for("bonsai2-27b", thinking=True)["presence_penalty"] == 1.0
+
+
 def test_backends_without_a_publisher_profile_fall_back():
     for name in ("gemma4", "nanbeige-4.3-33b", ""):
         assert profiles.profile_for(name) == {}

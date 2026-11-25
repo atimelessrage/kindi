@@ -1,4 +1,4 @@
-"""kindi convert: supported Ternary-Bonsai-2 PTQ1_0 / PQ2_0 / Q2_0 GGUF -> Kindi weight pack. Exact (same
+"""kindi convert: supported Ternary-Bonsai-2 / 2.5 PTQ1_0 / PQ2_0 / Q2_0 GGUF -> Kindi weight pack. Exact (same
 information, new layout).
 
 Ternary tensors (GGUF type 143 = PTQ1_0: per 128 weights, qs[24] | qh[2] | fp16 scale d; 5 trits per byte;
@@ -33,7 +33,8 @@ PROFILES = {
     (24, 2048, 6144, 8, 2, 16): "Ternary-Bonsai-2-2B",
     (32, 2560, 9216, 16, 4, 16): "Ternary-Bonsai-2-4B",
     (32, 4096, 12288, 16, 4, 16): "Ternary-Bonsai-2-9B",
-    (64, 5120, 17408, 24, 4, 16): "Ternary-Bonsai-2-27B",
+    # Bonsai 2 and Bonsai 2.5 27B share this geometry (verified from the 2.5 GGUF header, 2026-11-24)
+    (64, 5120, 17408, 24, 4, 16): "Ternary-Bonsai-2-27B / 2.5-27B",
 }
 PACK_FORMAT = 1
 
@@ -163,7 +164,7 @@ def convert(gguf_path, out_dir, log=print):
                g.kv.get("qwen35.feed_forward_length"), g.kv.get("qwen35.attention.head_count"),
                g.kv.get("qwen35.attention.head_count_kv"), g.kv.get("qwen35.ssm.group_count"))
     if profile not in PROFILES:
-        raise SystemExit("kindi convert: unsupported Ternary-Bonsai-2 dimensions %r" % (profile,))
+        raise SystemExit("kindi convert: unsupported Ternary-Bonsai-2/2.5 dimensions %r" % (profile,))
     types = {t[2] for t in g.tensors}
     if not types <= {PTQ1_0, PQ2_0, Q2_0, F32, BF16, FP8_E4M3, FP8_E5M2}:
         raise SystemExit("kindi convert: needs a PTQ1_0, PQ2_0 or Q2_0 GGUF (found tensor types %s)" % sorted(types))

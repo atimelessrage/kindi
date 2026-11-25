@@ -4,7 +4,9 @@ Where this sits: [CARDS.md](CARDS.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md)
 for what a card can run today; this page is research and projection for the family, and
 [README.md](README.md) is the index.
 
-Status: research and planning, 2026-11-09. This document does not change engine code and is not a
+Status: research and planning, 2026-11-09; updated 2026-11-24 for Bonsai 2.5 27B (section 1a carries
+the file-level facts and the code that now accepts it). This document does not change engine code and
+is not a
 support claim for anything marked **No** or **Untested** below.
 
 Scope: PrismML's Ternary Bonsai 2 family (2B, 4B, 9B, 27B) and Bonsai Image 4B. Bonsai Image is a
@@ -13,6 +15,8 @@ separate diffusion model, not another size of the language model.
 Sources:
 
 - [Bonsai 2 family announcement](https://prismml.com/news/bonsai-2-family)
+- [Bonsai 2.5 27B announcement](https://prismml.com/news/bonsai-2-5-27b) (2026-11-24)
+- [Ternary-Bonsai-2.5-27B-GGUF model card](https://huggingface.co/prism-ml/Ternary-Bonsai-2.5-27B-GGUF)
 - [Formats and runtime matrix](https://docs.prismml.com/download/formats)
 - [Bonsai 2 introduction](https://docs.prismml.com/get-started/introduction)
 - [Bonsai 2 Small collection](https://huggingface.co/collections/prism-ml/bonsai-2-small)
@@ -69,6 +73,54 @@ Architecture points that matter to Kindi:
   artifact, not a second language model.
 - Apache 2.0 weights. The repository's AGPL-3.0-only license is a distribution question, not a
   blocker for running the weights locally.
+
+## 1a. Bonsai 2.5 27B (released 2026-11-24)
+
+Prism ML shipped Ternary Bonsai 2.5 27B as an upgrade of the 27B rather than a new family: the same
+Qwen3.8-27B base and ternary hybrid-attention geometry, the same footprint, retrained for agentic
+coding, multi-turn tool use and multi-step task execution, with `-mtp` speculative variants and
+`xhigh`/`medium` reasoning efforts. The card's own benchmarks are the publisher's; nothing below
+repeats them as a Kindi measurement.
+
+The published GGUF header was read on this host without downloading the weights (a 12 MB HTTP range
+request over the 6 GB file; evidence and parser in
+`docs/benchmarks/2026-11-24-bonsai25-27b-header/`), and it says the 27B engine path applies unchanged:
+
+| header field | value | consequence |
+|---|---|---|
+| `general.architecture` | `qwen35` | the existing Bonsai qwen35 branch in `kindi/convert.py` |
+| blocks / width / ffn / heads / kv heads / groups | 64 / 5120 / 17408 / 24 / 4 / 16 | the same tuple as the 27B profile (`convert_profile_match` is true) |
+| `general.file_type` | 143 (`PTQ1_0`) | the primary pack format, no new tensor type |
+| tensors | 851: 402 of type 143 and 449 of type 0 (`f32`), all `blk.N.*` plus `output`, `output_norm`, `token_embd` | no unknown or extra tensors to map |
+| `prism.hadamard.block_size` | 1024 | stored in the pack manifest; the engine already reads it from there |
+| vocabulary / context | 248320 / 262144 | the 27B tokenizer and context, unchanged |
+| chat template | 8952 characters, contains `reasoning_effort` with `xhigh` and `medium` | `chat.template_variant()` selects `bonsai27`, and the `reasoning_effort` plumbing already exists |
+
+What Kindi now does with it:
+
+- `kindi use bonsai-2.5-27b` downloads `Ternary-Bonsai-2.5-27B-PTQ1_0.gguf` (5993834848 bytes, SHA-256
+  pinned in `kindi/catalog.py`) from `prism-ml/Ternary-Bonsai-2.5-27B-GGUF`, builds a pack and selects
+  it. The catalog's fit estimate is the 27B's: one 7600 MiB card, or two at 3800 MiB.
+- The registry id is `bonsai2.5-27b`. A 2.5 pack resolves through the Bonsai adapter's
+  `model_id_for_manifest` (from `general.name`, or from `source_file` for a file that names itself
+  `Hf`), and the release is part of the id so the two releases cannot share a sampling profile.
+- `sampling_profile = publisher` now has a 2.5 entry: thinking temperature 1.0 / top-p 0.95 / top-k 20 /
+  presence 0.0 (Bonsai 2's card says 1.0 there), non-thinking 0.7 / 0.80 / 20 / 1.5. Everything else in
+  the profile is unchanged, and a request's own values still win.
+- The `bonsai27` template, its `xhigh` default effort and the `medium` fallback apply as-is;
+  `enable_thinking` is still off unless the request asks for it.
+
+What is **not** verified and must not be claimed:
+
+- No download, conversion, `kindi verify`, benchmark or GPU run of the 2.5 has happened on this host.
+  The support matrix row `bonsai-2.5-27b` reads `not run` for GPU and CPU verify and `not converted` for
+  PQ2_0/Q2_0, which is the honest state after a header-only check.
+- The `-mtp` files (a draft head in the same GGUF) are neither converted nor wired to Kindi's
+  speculation paths. The catalog names the base `PTQ1_0` file only.
+- The `mmproj` vision artifacts are unsupported as before (section 4.1): the 2.5 ships the same separate
+  BF16/Q8_0 mmproj files, and an image request against a text pack is answered with 400.
+- The 2.5 `PQ2_0` and `Q2_0` files use the same container types the converter handles, but none was
+  downloaded here, so the byte-identical-pack claim stays a 2B result (section 2).
 
 ## 2. Formats: what to support and in what order
 
@@ -181,6 +233,9 @@ presence penalty, and the thinking profile is different. The publisher recommend
 - non-thinking: temperature 0.7, top-p 0.8, top-k 20, presence penalty 1.5
 - up to 8K output tokens for thinking; avoid greedy decoding and do not treat repetition as a
   sampler substitute
+
+Bonsai 2.5 27B changes one value: its card recommends presence 0.0 in thinking mode, where Bonsai 2
+says 1.0, and `kindi/profiles.py` keys that on the 2.5 model id (`bonsai2.5-27b`).
 
 **Implemented (2026-11-10).** `presence_penalty` is a request field (OpenAI semantics, -2..2) and a
 config key; `kindi/profiles.py` carries the publisher profile above, and `sampling_profile = publisher`
@@ -320,6 +375,9 @@ Performance:
    context matrix.
 5. **Only after that:** evaluate PQ2_0/Q2_0 import, Prism MTP/DFlash2, and a separate Bonsai Image
    backend.
+6. **When a card and the bandwidth are available:** download the 2.5 27B `PTQ1_0` file, convert it,
+   run `kindi verify`, and only then move its support-matrix row off `not run`. The header check does
+   not substitute for that run, and the `-mtp` variant is a separate decision.
 
 The project should describe the current text path as **text-only PTQ1_0** until the vision milestone
 passes. The family is vision-language; the engine is not there yet.

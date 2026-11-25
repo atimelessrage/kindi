@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: AGPL-3.0-only
-"""T4.2 Bonsai adapter: the dense Ternary-Bonsai-2 engines behind the backend contract.
+"""T4.2 Bonsai adapter: the dense Ternary-Bonsai-2 / 2.5 engines behind the backend contract.
 
 The adapter wraps the engines today built by ``kindi.engine.make_engine_legacy`` (the
 plain GPU engine, the two-card plan engine and the CPU engine — and, through the same
@@ -22,7 +22,9 @@ import time
 from . import registry
 from .base import Backend, BackendCapabilities, GenerationEvent, StopScanner
 
-MODEL_ID_PREFIX = "Ternary-Bonsai-2-"
+# GGUF name prefix -> registry model id prefix. 2.5 is tested first: its name starts with the
+# 2 family's, and the two releases need different sampling profiles (kindi/profiles.py).
+MODEL_ID_PREFIXES = (("Ternary-Bonsai-2.5-", "bonsai2.5-"), ("Ternary-Bonsai-2-", "bonsai2-"))
 SIZES = ("2b", "4b", "9b", "27b")
 ADD_SPECIAL = "<|endoftext|>"
 
@@ -30,28 +32,31 @@ ADD_SPECIAL = "<|endoftext|>"
 def model_id_for_manifest(man):
     """Registry model id for a Bonsai pack manifest, or None for other packs.
 
-    A pack resolves when its `model` is a ``Ternary-Bonsai-2-<size>`` name —
-    or, like the 27B (whose GGUF ``general.name`` is the placeholder "Hf"),
-    when the `source_file` carries the size (the same fallback
-    `kindi/config.py` uses to name the served model).
+    A pack resolves when its `model` is a ``Ternary-Bonsai-2-<size>`` or
+    ``Ternary-Bonsai-2.5-<size>`` name — or, like the 27B (whose GGUF
+    ``general.name`` is the placeholder "Hf"), when the `source_file` carries
+    the size (the same fallback `kindi/config.py` uses to name the served
+    model). The release is part of the id: 2.5 has its own sampling profile.
     """
     import re as _re
 
     man = man or {}
     name = str(man.get("model") or "")
-    if name.startswith(MODEL_ID_PREFIX):
-        size = name.rsplit("-", 1)[-1].lower()
-        if size in SIZES:
-            return "bonsai2-" + size
-        return None
-    m = _re.search(r"(\d+(?:\.\d+)?)b(?:\b|-|_)", str(man.get("source_file") or "").lower())
-    if m and (m.group(1) + "b") in SIZES and "bonsai" in str(man.get("source_file") or "").lower():
-        return "bonsai2-" + m.group(1) + "b"
+    for prefix, model_prefix in MODEL_ID_PREFIXES:
+        if name.startswith(prefix):
+            size = name.rsplit("-", 1)[-1].lower()
+            if size in SIZES:
+                return model_prefix + size
+            return None
+    src = str(man.get("source_file") or "").lower()
+    m = _re.search(r"(\d+(?:\.\d+)?)b(?:\b|-|_)", src)
+    if m and (m.group(1) + "b") in SIZES and "bonsai" in src:
+        return ("bonsai2.5-" if "bonsai-2.5" in src else "bonsai2-") + m.group(1) + "b"
     return None
 
 
 class BonsaiBackend(Backend):
-    """Ternary-Bonsai-2 dense engine, behind the backend contract."""
+    """The dense Ternary-Bonsai-2 / 2.5 engine, behind the backend contract."""
 
     # The contract tests instantiate every registered backend with no arguments
     # and call the text primitives without a model. For this adapter that is
@@ -60,7 +65,7 @@ class BonsaiBackend(Backend):
 
     capabilities = BackendCapabilities(
         name="bonsai",
-        model_ids=("bonsai2-2b", "bonsai2-4b", "bonsai2-9b", "bonsai2-27b"),
+        model_ids=("bonsai2-2b", "bonsai2-4b", "bonsai2-9b", "bonsai2-27b", "bonsai2.5-27b"),
         architectures=("qwen35",),
         devices=("cuda", "cpu", "rocm"),
         max_context=262144,

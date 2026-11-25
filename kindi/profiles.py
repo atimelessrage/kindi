@@ -12,6 +12,13 @@ sampling profile is recorded for the Gemma 4 or Nanbeige backends; they keep the
 """
 
 PROFILES = {
+    # Bonsai 2.5 27B (2026-11-24) keeps the non-thinking trio and drops the thinking-mode presence
+    # penalty to 0.0, with `xhigh` as its reasoning default. Listed first: the 2.5 model id
+    # (bonsai2.5-27b) must not fall through to the 2 family entry below.
+    "bonsai2.5-": {
+        False: {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "presence_penalty": 1.5},
+        True: {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "presence_penalty": 0.0, "max_tokens": 8192},
+    },
     "bonsai2-": {
         False: {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "presence_penalty": 1.5},
         True: {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "presence_penalty": 1.0, "max_tokens": 8192},
@@ -25,7 +32,8 @@ SAMPLING_KEYS = ("max_tokens", "temperature", "top_p", "top_k", "min_p", "repeat
 
 def profile_for(model_name, thinking=False):
     """The publisher values for a model id, or {} when none are recorded. The Bonsai 2B/4B/9B/27B share the
-    Bonsai guidance; the thinking profile is selected by the request's enable_thinking flag."""
+    Bonsai 2 guidance and the Bonsai 2.5 27B has its own entry; the thinking profile is selected by
+    the request's enable_thinking flag."""
     name = (model_name or "").strip().lower()
     for prefix, modes in PROFILES.items():
         if name.startswith(prefix):

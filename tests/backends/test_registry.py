@@ -157,7 +157,7 @@ def test_fake_backend_is_resolvable():
 def test_bonsai_resolves_by_model_id_unloaded():
     from kindi.backends.bonsai import BonsaiBackend
 
-    for model_id in ("bonsai2-2b", "bonsai2-4b", "bonsai2-9b", "bonsai2-27b"):
+    for model_id in ("bonsai2-2b", "bonsai2-4b", "bonsai2-9b", "bonsai2-27b", "bonsai2.5-27b"):
         backend = registry.resolve(model_id)
         assert isinstance(backend, BonsaiBackend)
         assert backend.loaded is False
@@ -459,6 +459,11 @@ def test_bonsai_model_id_for_manifest():
         "model": "Hf",
         "source_file": "Ternary-Bonsai-2-27B-PTQ1_0.gguf",
     }) == "bonsai2-27b"
+    # Bonsai 2.5 keeps its release in the id: it has its own sampling profile
+    assert model_id_for_manifest({"model": "Ternary-Bonsai-2.5-27B"}) == "bonsai2.5-27b"
+    assert model_id_for_manifest({"model": "Hf",
+                                  "source_file": "Ternary-Bonsai-2.5-27B-PTQ1_0.gguf"}) == "bonsai2.5-27b"
+    assert model_id_for_manifest({"model": "Ternary-Bonsai-2.5-XL"}) is None
     assert model_id_for_manifest({"model": "Ternary-Bonsai-2-XL"}) is None
     assert model_id_for_manifest({"model": "Other-Model"}) is None
     assert model_id_for_manifest({}) is None

@@ -26,6 +26,11 @@ MODELS = {
     "bonsai-27b": dict(file="Ternary-Bonsai-2-27B-PTQ1_0.gguf", repo="prism-ml/Ternary-Bonsai-2-27B-gguf",
                        sha="53107f530aa52eb00912263ab1ee29bd199261c87cd7b4ad4ca1318c1fe33ee3", size=5946648928,
                        one=7600, two=3800, what="Ternary-Bonsai-2 27B (ternary weights)"),
+    # Ternary Bonsai 2.5 27B (released 2026-11-24): the same Qwen3.8-27B geometry and 5.9 GB PTQ1_0 file as the
+    # 27B above, retrained for agentic coding and multi-turn tool use; see docs/BONSAI-2-SUPPORT.md section 1a.
+    "bonsai-2.5-27b": dict(file="Ternary-Bonsai-2.5-27B-PTQ1_0.gguf", repo="prism-ml/Ternary-Bonsai-2.5-27B-GGUF",
+                           sha="929560ec9d37cf3cadd4b00cc87b51c570082a628dd830b4692dc0b2ed18dbbe", size=5993834848,
+                           one=7600, two=3800, what="Ternary-Bonsai-2.5 27B (agentic, ternary weights)"),
     "nemotron-e4b": dict(file="NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q3_K_XL.gguf", repo="unsloth/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF",
                          sha="3f8032b9d2c18536c4ac51b97959a563cc27434de99823640c98147edc62ce9b", size=4219133120,
                          one=3300, two=2400, what="NVIDIA Nemotron 3.5 Bolt E4B (Gemma 4), UD-Q3_K_XL"),

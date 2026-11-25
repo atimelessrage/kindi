@@ -24,6 +24,7 @@ From `kindi/catalog.py`; card memory is the catalog's own fit estimate.
 | `bonsai-4b` | Ternary-Bonsai-2 4B (ternary weights) | `Ternary-Bonsai-2-4B-PTQ1_0.gguf` | 0.9 | 1900 MiB | no split |
 | `bonsai-9b` | Ternary-Bonsai-2 9B (ternary weights) | `Ternary-Bonsai-2-9B-PTQ1_0.gguf` | 2.0 | 3800 MiB | no split |
 | `bonsai-27b` | Ternary-Bonsai-2 27B (ternary weights) | `Ternary-Bonsai-2-27B-PTQ1_0.gguf` | 5.9 | 7600 MiB | 3800 MiB |
+| `bonsai-2.5-27b` | Ternary-Bonsai-2.5 27B (agentic, ternary weights) | `Ternary-Bonsai-2.5-27B-PTQ1_0.gguf` | 6.0 | 7600 MiB | 3800 MiB |
 | `nemotron-e4b` | NVIDIA Nemotron 3.5 Bolt E4B (Gemma 4), UD-Q3_K_XL | `NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q3_K_XL.gguf` | 4.2 | 3300 MiB | 2400 MiB |
 | `nanbeige-33b` | AH-Nanbeige4.3-33B, IQ3_XXS | `AH-Nanbeige4.3-33B-IQ3_XXS.gguf` | 13.1 | 16200 MiB | no split |
 | `lightning-30b` | Nemotron 3.5 Lightning 30B-A3B, ternary (Nota AI), Q2_0 | `Ternary-Nemotron-3.5-Lightning-30B-A3B-GGUF.gguf` | 9.5 | 5800 MiB | no split |
@@ -67,6 +68,7 @@ feature is behind its explicit experimental switch.
 | `bonsai-4b` | 4/4 | 4/4, 16.7 tok/s | not tested | 4/4, gated |
 | `bonsai-9b` | 4/4 | 4/4, 9.1 tok/s | not tested | n/a |
 | `bonsai-27b` | 3 exact + tie, 4060 Ti tc | 4/4, 3.7 tok/s | not converted | n/a |
+| `bonsai-2.5-27b` | not run | not run | not converted | n/a |
 | `nemotron-e4b` | separate backend | n/a | n/a | n/a |
 | `nanbeige-33b` | separate backend | n/a | n/a | n/a |
 | `lightning-30b` | separate backend | n/a | n/a | n/a |
@@ -83,6 +85,7 @@ delta from this, not as the reference itself.
 | `bonsai-4b` | plain engine, exact head, q8_0 K/V (GPU and CPU verify both 4/4) |
 | `bonsai-9b` | plain engine, exact head, q8_0 K/V (GPU verify 4/4; the tensor-core plans need KINDI_TC_HP=1 for the 9B's HB 4096) |
 | `bonsai-27b` | tensor-core plan engine, exact head (3 exact + tie on the 4060 Ti); the CPU engine, exact head (4/4 on the i7-8086K, 2026-11-24); the plain GPU engine has no recorded verify row |
+| `bonsai-2.5-27b` | no `kindi verify` reference configuration recorded: the released PTQ1_0 header matches the 27B geometry (2026-11-24), but no pack was built or run on this host |
 | `nemotron-e4b` | separate backend; no `kindi verify` reference configuration recorded |
 | `nanbeige-33b` | separate backend; no `kindi verify` reference configuration recorded |
 | `lightning-30b` | separate backend; no `kindi verify` reference configuration recorded |

@@ -10,6 +10,30 @@ installer hashes are recorded in `docs/INSTALL.md`; publication is still a relea
 (The pre-merge 0.6.1-era snapshot — 669 commits / 827 files at `60a039b` — is kept in
 `detailed-fork-changelog.md`.)
 
+### Bonsai 2.5 27B: accepted by the catalog, converter and profiles (2026-11-24)
+
+Prism ML released Ternary Bonsai 2.5 27B the day after v0.7.1, aimed at long agentic work: the same
+Qwen3.8-27B base and ternary hybrid-attention geometry as the 27B, the same 5.9 GB footprint, and a
+retrained model with multi-turn tool use as the target. Before touching the code, the released GGUF's
+header was read on this host with one 12 MB HTTP range request over the 6 GB file
+(`docs/benchmarks/2026-11-24-bonsai25-27b-header/`): architecture `qwen35`, the 27B geometry
+(64 / 5120 / 17408 / 24 / 4 / 16), `PTQ1_0` tensor type 143, 851 tensors with no unknown names,
+248320-token vocabulary, 262144 context, and a 8952-character chat template with `reasoning_effort`.
+Nothing in the file needs a new kernel, a new tensor mapping or a new template variant.
+
+So the release is wired in where the file shape allows it, and nowhere else:
+
+- `kindi use bonsai-2.5-27b` downloads the `PTQ1_0` file from `prism-ml/Ternary-Bonsai-2.5-27B-GGUF`
+  with its SHA-256 and size pinned, converts it through the existing 27B path and selects it.
+- The registry id is `bonsai2.5-27b` (`kindi/backends/bonsai.py`), so a 2.5 pack resolves through the
+  Bonsai adapter while staying distinguishable from the 2 release.
+- `kindi/profiles.py` gains the 2.5 publisher profile: the card's thinking-mode presence penalty is 0.0
+  where Bonsai 2's is 1.0; non-thinking is unchanged.
+- `docs/SUPPORT-MATRIX.md` was regenerated; the new row says `not run` / `not converted`, because no
+  pack was built and no token was generated from the 2.5 weights here. The `-mtp`, `PQ2_0`, `Q2_0` and
+  `mmproj` variants remain unsupported or unverified, and `docs/BONSAI-2-SUPPORT.md` section 1a says so
+  explicitly.
+
 ### Structured replies get 8.4% cheaper on the CPU engine (2026-11-24)
 
 The constrained path was doing work it did not need, in three places, and all three are now exact

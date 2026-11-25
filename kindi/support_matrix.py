@@ -74,6 +74,9 @@ STATUS = {
     "bonsai-4b": ["4/4", "4/4, 16.7 tok/s", "not tested", "4/4, gated"],
     "bonsai-9b": ["4/4", "4/4, 9.1 tok/s", "not tested", "n/a"],
     "bonsai-27b": ["3 exact + tie, 4060 Ti tc", "4/4, 3.7 tok/s", "not converted", "n/a"],
+    # Bonsai 2.5 27B: the published GGUF header was read (2026-11-24) and matches the 27B geometry,
+    # but nothing was downloaded, converted or run here yet.
+    "bonsai-2.5-27b": ["not run", "not run", "not converted", "n/a"],
     "nemotron-e4b": ["separate backend", "n/a", "n/a", "n/a"],
     "nanbeige-33b": ["separate backend", "n/a", "n/a", "n/a"],
     "lightning-30b": ["separate backend", "n/a", "n/a", "n/a"],
@@ -92,6 +95,8 @@ REF = {
     "bonsai-27b": "tensor-core plan engine, exact head (3 exact + tie on the 4060 Ti); the CPU"
                   " engine, exact head (4/4 on the i7-8086K, 2026-11-24); the plain GPU engine has"
                   " no recorded verify row",
+    "bonsai-2.5-27b": "no `kindi verify` reference configuration recorded: the released PTQ1_0 header"
+                    " matches the 27B geometry (2026-11-24), but no pack was built or run on this host",
     "nemotron-e4b": "separate backend; no `kindi verify` reference configuration recorded",
     "nanbeige-33b": "separate backend; no `kindi verify` reference configuration recorded",
     "lightning-30b": "separate backend; no `kindi verify` reference configuration recorded",
