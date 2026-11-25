@@ -39,7 +39,7 @@ DEFAULT_DIMS = {"layers": 24, "width": 2048, "ffn": 6144, "heads": 8, "kv_heads"
                 "rope_base": 1e7, "full_attention_interval": 4}
 HERE = os.path.dirname(os.path.abspath(__file__))
 F32 = np.float32
-_LIB: dict[str, Any] = {}                    # built library path -> loaded DLL, one load per path
+_LIB: dict[str, Any] = {}                    # built library path -> loaded DLL; the path carries a source stamp, so a rebuild is a new path and can never return a stale handle
 PF = ctypes.POINTER(ctypes.c_float)
 PU8 = ctypes.POINTER(ctypes.c_uint8)
 PU16 = ctypes.POINTER(ctypes.c_uint16)
@@ -249,12 +249,27 @@ def _cache_key(isa=None):
     return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()[:16]
 
 
+def _src_stamp(src=None):
+    """A stamp of kcpu.c's bytes, so an edited kernel gets a new library name.
+
+    The stamp has to be in the *name*, not just in the cache key: once a DLL is loaded,
+    dlopen/LoadLibrary on the same path returns the already-mapped module, so rebuilding over
+    the same filename and dropping the Python-side entry would still run the old code.
+    """
+    src = src or os.path.join(HERE, "kcpu.c")
+    try:
+        with open(src, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()[:12]
+    except OSError:
+        return "0" * 12
+
+
 def _so_path(cache=None, isa=None):
-    """The cache path for one ISA tier; the key covers the tier, compiler and OS."""
+    """The cache path for one ISA tier; the key covers the tier, compiler, OS and the source."""
     cache = cache or os.environ.get("KINDI_CPU_CACHE") or os.path.join(
         os.path.expanduser("~"), ".cache", "kindi")
     ext = "dll" if os.name == "nt" else "so"
-    return os.path.join(cache, "libkcpu-%s.%s" % (_cache_key(isa), ext))
+    return os.path.join(cache, "libkcpu-%s-%s.%s" % (_cache_key(isa), _src_stamp(), ext))
 
 
 def _lib():
@@ -264,6 +279,9 @@ def _lib():
     isa = select_isa()
     so = _so_path(cache, isa)
     if not os.path.exists(so) or os.path.getmtime(so) < os.path.getmtime(src):
+        # A rebuild lands on the stamped path for the current source, so it never overwrites a
+        # loaded DLL. Any content change already renamed the path, so reaching here with an
+        # existing file means the bytes are unchanged and the cached handle below is correct.
         check_features()
         _build(src, so, isa)
     if _LIB.get(so) is not None:

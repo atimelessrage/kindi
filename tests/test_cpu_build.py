@@ -281,3 +281,73 @@ def test_find_cc_reports_the_install_as_the_cache_key(monkeypatch, tmp_path):
     first = cpu._so_path(str(tmp_path), "avx2-fma-f16c")
     monkeypatch.setenv("KINDI_CC", "clang")
     assert cpu._so_path(str(tmp_path), "avx2-fma-f16c") != first
+
+
+def test_rebuilt_library_is_picked_up(monkeypatch, tmp_path):
+    """Editing kcpu.c must not keep running the previously loaded DLL.
+
+    Before the source stamp, `_lib()` rebuilt the library when the source was newer and then
+    returned the old cached handle for the same path - an edited kernel silently kept running the
+    old code (and dlopen on the same path would return the mapped module anyway). The stamp makes a
+    rebuild a new path, so `_LIB` cannot hand back the old handle.
+    """
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    src = src_dir / "kcpu.c"
+    src.write_text("/* v1 */")
+    cache = tmp_path / "cache"
+    monkeypatch.setenv("KINDI_CPU_CACHE", str(cache))
+    monkeypatch.setattr(cpu, "HERE", str(src_dir))
+    monkeypatch.setattr(cpu, "select_isa", lambda: None)
+    monkeypatch.setattr(cpu, "check_features", lambda: None)
+    built, loads = [], []
+
+    def fake_build(s, so, isa=None):
+        built.append(so)
+        Path(so).write_bytes(b"")
+
+    monkeypatch.setattr(cpu, "_build", fake_build)
+
+    class _Fn(object):
+        restype = None
+        argtypes = None
+
+        def __init__(self, value=0):
+            self.value = value
+
+        def __call__(self, *a):
+            return self.value
+
+    class FakeLib(object):
+        def __init__(self, path):
+            self.path = path
+            loads.append(path)
+            self.kc_isa_name = _Fn(b"native")
+
+        def __getattr__(self, name):
+            return _Fn()
+
+        def kc_init(self):
+            pass
+
+        def kc_sizeof_model(self):
+            return ctypes.sizeof(cpu.Model)
+
+        def kc_sizeof_layer(self):
+            return ctypes.sizeof(cpu.Layer)
+
+    monkeypatch.setattr(ctypes, "CDLL", lambda path, *a, **k: FakeLib(path))
+    saved = dict(cpu._LIB)
+    cpu._LIB.clear()
+    try:
+        first = cpu._lib()
+        assert cpu._lib() is first                       # same source, same handle
+        assert len(loads) == len(built) == 1
+        src.write_text("/* v2: an edited kernel */")
+        second = cpu._lib()
+        assert second is not first                       # the rebuild was picked up
+        assert loads[1] != loads[0] and built[1] != built[0]
+        assert second.path == cpu._so_path(str(cache))
+    finally:
+        cpu._LIB.clear()
+        cpu._LIB.update(saved)
