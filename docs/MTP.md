@@ -118,7 +118,10 @@ and runs several variants in that process: `tools/mtp_cpu_probe.py --pack PACK -
 --commands cmds.jsonl --out out.jsonl`, one JSON attempt per line
 (`{"variant": ..., "k": 4, "tokens": 16, "prompts": [...]}`). It records the acceptance, the depth
 histogram and the actual draft token ids next to the model's own, so a variant is judged by data, not
-by a compile. Every attempt below asserted its tokens equal to plain greedy decode.
+by a compile. A variant ending in `-full` also seeds the prompt's last row, `"window": "prompt"`
+grows the head's K/V ring from the prompt (or an integer sets it), and `--trace out.npz` writes every
+head row's `u` and `out` with its position, prediction, attempt and phase. Every attempt below
+asserted its tokens equal to plain greedy decode.
 
 | variant | accepted | rate | what it changes |
 |---|---|---|---|
@@ -128,16 +131,33 @@ by a compile. Every attempt below asserted its tokens equal to plain greedy deco
 | `eh-normed-folded` | 11/108 | 10.2% | embedding row folded with the pack's signs (BTQ1/PTQ1_0 layout) |
 | `eh-normed-rope1` | 11/108 | 10.2% | RoPE at `p + 1` (the reference's MTP position for row `p`) |
 | `eh-normed-seeded` | 15/108 | 13.9% | window seeded with every **verified** row, not just the head's own |
+| `eh-normed-seeded-full` | 15/108 | 13.9% | also seeds the prompt's last row - the row the first draft recomputes, bit for bit |
 
 The two switches that matter are in the table's last rows: the hidden is the output-normed one (what
 `kindi/mtp.py`'s `XN` and llama.cpp's `graph_mtp` both read, and what this head now uses), and
 seeding the window with the verified rows - what the reference's MTP cache holds - lifts 10.2% ->
 13.9% overall, 16.7% -> 22.2% on the second prompt, with depth `[2, 3, 4, 3]`. The remaining gap is
-not one of these switches: the drafts are shaped like the model's output but land a token or two off,
-so the next measurement is the seeded window grown from the whole prompt plus a per-row dump of
-`u`/`out` against the head's own recurrence, both in one probe load. Until that moves the number,
-**the 2B pack is the better drafter (30.6% vs 8.3-13.9%), and neither is a speedup before CP1**
-(untracked `bench-logs/` measurements, not an evidence page).
+not one of these switches.
+
+#### The whole prompt, and what the rows say (one more load)
+
+The two remaining candidates ran in one load, on the same two prompts and settings: seeding the
+prompt's last row as well (`-full`) changed nothing - 15/108 again (3/54 + 12/54) - and the trace
+shows why it cannot. With that row seeded, its `u` and `out` are bit-for-bit the first draft row's
+(`max|du| = 0`, same prediction): the draft recomputes the same position from the same token and
+hidden immediately after the seed, so the seed is overwritten before anything attends to it. A window
+grown from 64 to the whole prompt changed nothing either - on a 128-token prompt, 4/54 (7.4%) with
+the ring at 64 and 4/54 with it at 132 - so the 64-row horizon is not the limit.
+
+The per-row dump (`--trace`, 748 rows: 388 seed, 360 draft) says where the gap is. Comparing the
+head's own first, self-chained row at a position with the verified row at that position: cos(`u`)
+median 0.12 on the two short prompts and 0.20-0.22 on the long one (minimum 0.04), cos(`out`) median
+0.16 and 0.33, and the chained row predicts the model's token at 0, 1, 1 and 1 of the 17, 17, 15 and
+15 positions that carry both rows. The head's recurrence does not reproduce the model's hidden state
+at all - the rows are nearly orthogonal - so no seeding or window choice can lift the acceptance:
+what `blk.64` computes is not this model's next-token hidden. **The 2B pack is the better drafter
+(30.6% vs 8.3-13.9%), and neither is a speedup before CP1** (untracked `bench-logs/` measurements,
+not an evidence page).
 
 ## The modes
 

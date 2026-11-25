@@ -162,6 +162,8 @@ class Head(object):
         self.emb_mode = "raw"                    # "raw": the GGUF embedding row; "folded": the pack's fold of it (what the engine embeds)
         self.rope_off = 0                        # RoPE position offset vs the row position (probe-switchable)
         self.seed_enabled = False                # seed the window with verified rows (llama.cpp does)
+        self.seed_last = False                   # also seed the prompt's last row (its next token is the first generated one)
+        self.last_u = None                       # the last row's pre-attention vector (u3 - o), for a probe dump
         self.K = np.zeros((self.W, d["NHKV"], d["HD"]), dtype=F32)
         self.V = np.zeros((self.W, d["NHKV"], d["HD"]), dtype=F32)
         self.kp = np.full(self.W, -(1 << 30), dtype=np.int64)
@@ -223,6 +225,7 @@ class Head(object):
                  "he": (self._rms(hin, n["h_norm"]), self._rms(emb, n["e_norm"]))}
         x = np.concatenate(parts[self.order])
         u = self._gemv("fc", x)
+        self.last_u = u
         a = self._rms(u, n["in_norm"])
         qg = self._gemv("q", a).reshape(NH, 2 * HD)
         kk = self._gemv("k", a).reshape(NHKV, HD)
@@ -278,6 +281,19 @@ class Head(object):
             return
         for pos, hin, tok in rows:
             self.row(self._embed(int(tok)), self._hin(hin), int(pos))
+
+    def grow_window(self, n):
+        """Grow the K/V ring to at least ``n`` positions, so a long prompt fits (it never shrinks)."""
+        n = int(n)
+        if n <= self.W:
+            return False
+        d = self.dims
+        self.W = n
+        self.K = np.zeros((n, d["NHKV"], d["HD"]), dtype=F32)
+        self.V = np.zeros((n, d["NHKV"], d["HD"]), dtype=F32)
+        self.kp = np.full(n, -(1 << 30), dtype=np.int64)
+        self.reset()
+        return True
 
     def reset(self):
         self.K[:] = 0
@@ -360,7 +376,11 @@ def score_drafts(eng, ids, n, drafter, k=4):
     hiddens[len(ids) - 1] = eng.get_hidden()
     seed = getattr(drafter, "seed", None)
     if seed is not None:
-        seed([(p, hiddens[p], ids[p + 1]) for p in range(len(ids) - 1)])
+        rows = [(p, hiddens[p], ids[p + 1]) for p in range(len(ids) - 1)]
+        if getattr(drafter, "seed_last", False):
+            # the whole prompt: the last row's next token is the one the model just produced
+            rows.append((len(ids) - 1, hiddens[len(ids) - 1], out[0]))
+        seed(rows)
     scored = []
     while len(out) < n:
         prefix = list(ids) + out

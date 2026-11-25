@@ -132,6 +132,72 @@ def test_score_drafts_keeps_the_model_tokens_and_counts_matches():
     assert len(stats["depth"]) == 2            # every depth is recorded, including the last
 
 
+def test_seed_last_seeds_the_whole_prompt():
+    """A seeded window covers every prompt row; with ``seed_last`` it also covers the last one, whose
+    next token is the first the model generated (the row the first draft reads)."""
+    class Eng(object):
+        head_name, ylog_n, head_off, HB = "output.weight", 4, 0, 512
+
+        def __init__(self):
+            self.pos = -1
+
+        def reset(self):
+            self.pos = -1
+
+        def feed(self, tok, pos):
+            self.pos = int(pos)
+
+        def step(self, tok, pos):
+            self.pos = int(pos)
+            return (int(tok) + 1) % 8
+
+        def get_hidden(self):
+            return [float(self.pos)]
+
+        def gemv_rows(self, name, rows, x):
+            return np.zeros(4, dtype=np.float32)
+
+    class Dr(object):
+        def __init__(self, seed_last):
+            self.seed_last, self.calls = seed_last, []
+
+        def reset(self):
+            self.calls = []
+
+        def seed(self, rows):
+            self.calls.append([(int(p), int(t)) for p, _h, t in rows])
+
+        def draft(self, prefix, hin, k=None):
+            return [0] * int(k or 1)
+
+    ids = [3, 5, 7]
+    plain, _ = mtp_cpu.score_drafts(Eng(), ids, 4, Dr(False), k=1)
+    whole = []
+    for seed_last in (False, True):
+        dr = Dr(seed_last)
+        out, _ = mtp_cpu.score_drafts(Eng(), ids, 4, dr, k=1)
+        assert out == plain
+        whole.append(dr.calls[0])
+        if seed_last:
+            assert dr.calls[0][-1] == (len(ids) - 1, out[0])   # the row the first draft reads
+    assert whole[0] == [(0, 5), (1, 7)]
+    assert whole[1] == [(0, 5), (1, 7), (2, plain[0])]
+
+
+def test_grow_window_only_grows_and_clears():
+    head = object.__new__(mtp_cpu.Head)
+    head.dims = {"NHKV": 2, "HD": 4}
+    head.W = 4
+    head.K = np.zeros((4, 2, 4), np.float32)
+    head.V = np.zeros((4, 2, 4), np.float32)
+    head.kp = np.full(4, -(1 << 30), np.int64)
+    head.K[3, 1, 2] = 7.0
+    assert head.grow_window(4) is False and head.W == 4
+    assert head.grow_window(9) is True and head.W == 9
+    assert head.K.shape == (9, 2, 4) and head.kp.shape == (9,)
+    assert head.K[3, 1, 2] == 0.0 and int(head.kp.max()) == -(1 << 30)
+
+
 def test_score_drafts_hands_the_head_the_row_it_reads():
     """The head's row q reads the residual at q and the token at q + 1 (blk.64 is trained that way).
 
