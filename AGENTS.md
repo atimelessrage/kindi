@@ -12,11 +12,17 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `6852b83` on `merge/upstream-0.7.0` (2026-11-25: `main` re-checked as the branch of record - `CURRENT-VS-KINDI-0.7.md` measures the fork against the newest release, v0.7.2 (`22af8d4`): 3 commits behind by history and 0 by content, 807 ahead, 1,094 files (+158,609/-2,325), 1,224 tracked files against 235; the two upstream paths with no counterpart are named (`kindi/apierr.py`, superseded by `kindi/api/errors.py`, and the root `test_inkling2_engine.py` harness, which needs an Inkling pack this host does not have). A branch-state section records the audit: `main` = `merge/upstream-0.7.0` = this worktree at one clean commit, `myfork/main` fully contained, and every `pr/*`/`wip/*` branch either an open PR's own delta or work already here by content (backend adapters, dense tandem, plan placements) - so nothing on a local branch is missing from `main` except the open PRs' diffs. Before that: the round-4 audit triage - a forward-slash drive root with a space is caught now, the three tandem-cache scripts take `--clang`/`--llvm` or `KINDI_CC`/`KINDI_LLVM`, `kindi backends` prints a `limits=` column, three Intel help strings say "no backend", and the Bonsai 2.5 download advice is explicit; the cold reader's close was already wired (finding stale), Ruff debt 207 -> 189; before that the Arc pack probe (`kindi intel-pack`): 7.14 GB -> 49.9 ms -> 20.0 tok/s at 143 GB/s on the A770, the same for the plain and `-mtp` pack, no Intel converter needed, eight gate-only rows; before that the sampling page as a settings-and-engine check, the 2.5 publisher sampling sets, and the `-mtp` intake (head recorded, not drafted); 0.7.2 port (LoRA adapters, one OpenAI error body); 0.7.0 merge `35e4697`; Arc GEMV rows4 (1.357x); the constrained mask's accepted-character skip (+41.37x); llama.cpp proxy stays engine-gateway only; the 2.5 27B CPU run (4/4 token-exact) and `chat._tojson` parity 26 of 26; GPU cells still `not run`, no exactness claimed; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `bf6ede3` on `merge/upstream-0.7.0` (2026-11-25: `main` re-checked as the branch of record - `CURRENT-VS-KINDI-0.7.md` measures the fork against the newest release, v0.7.2 (`22af8d4`): 3 commits behind by history and 0 by content, 807 ahead, 1,094 files (+158,609/-2,325), 1,224 tracked files against 235; the two upstream paths with no counterpart are named (`kindi/apierr.py`, superseded by `kindi/api/errors.py`, and the root `test_inkling2_engine.py` harness, which needs an Inkling pack this host does not have). A branch-state section records the audit: `main` = `merge/upstream-0.7.0` = this worktree at one clean commit, `myfork/main` fully contained, and every `pr/*`/`wip/*` branch either an open PR's own delta or work already here by content (backend adapters, dense tandem, plan placements) - so nothing on a local branch is missing from `main` except the open PRs' diffs. Before that: the round-4 audit triage - a forward-slash drive root with a space is caught now, the three tandem-cache scripts take `--clang`/`--llvm` or `KINDI_CC`/`KINDI_LLVM`, `kindi backends` prints a `limits=` column, three Intel help strings say "no backend", and the Bonsai 2.5 download advice is explicit; the cold reader's close was already wired (finding stale), Ruff debt 207 -> 189; before that the Arc pack probe (`kindi intel-pack`): 7.14 GB -> 49.9 ms -> 20.0 tok/s at 143 GB/s on the A770, the same for the plain and `-mtp` pack, no Intel converter needed, eight gate-only rows; before that the sampling page as a settings-and-engine check, the 2.5 publisher sampling sets, and the `-mtp` intake (head recorded, not drafted); 0.7.2 port (LoRA adapters, one OpenAI error body); 0.7.0 merge `35e4697`; Arc GEMV rows4 (1.357x); the constrained mask's accepted-character skip (+41.37x); llama.cpp proxy stays engine-gateway only; the 2.5 27B CPU run (4/4 token-exact) and `chat._tojson` parity 26 of 26; GPU cells still `not run`, no exactness claimed; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24:** the llama.cpp proxy backend landed (wildcard; 12 CPU tests, live gate open, no
   arbitrary-GGUF claim) with REQ-0030's native-CPU 2B profile, and `Backend.capabilities` was declared
   instead of `None` (six adapters' mypy `assignment` finding gone, 59 -> 53). Suite: 1,633 / 47 / 0.
-  **2026-11-25 (latest): the constrained mask's walk, cut exactly - and a memo withdrawn.** The walk's
+  **2026-11-25 (round-5 audits, MiniMax round 5 + GLM-5.3-Flash):** `intel-pack` fails cleanly on a
+  pack without `bcodes.bin` and reports `mean_ms` (both findings real); the 2.5 template accepts `high`
+  as the `xhigh` alias and the 400 names `param: reasoning_effort` (DEC-0013 amended); the matrix says
+  `PTQ1_0 only` for the 2.5 rows; the docs record once that no 2.5 7B exists. **Open:** the CPU-MTP work is
+  uncommitted in this worktree (`kindi/mtp_cpu.py`, its test and tool, `kindi/cpu.py`, `kindi/kcpu.c`,
+  `docs/MTP.md`, `docs/ROADMAP.md`); its measured acceptance is low, so CP1/CP2 gate any speedup claim.
+  **2026-11-25: the constrained mask's walk, cut exactly - and a memo withdrawn.** The walk's
   cost is the automaton, not the trie (8,303 `_step` calls per schema miss, 8,219 of them one per
   distinct token-start character, 91% rejected). An interim per-class edge memo measured 1.486x and
   was **withdrawn the same day**: cached transitions embed the schema stack, so warm tables returned
@@ -37,18 +43,12 @@ line of evidence (command + result). A task must be resumable from this file alo
   PATH, then a standard LLVM install (newest first); the cache key names the compiler that will run, and `kindi caps` asks the same
   resolver. That unblocked REQ-0028 A4's live half (`kindi selftest`, 2B CPU: `dialects agree`, exit 0) and the
   `test_cpu_build.py` compile-and-load checks; `kindi plan` names the resolved pack and `kindi models` drops "too large" for
-  the 2B/4B/9B without a card. GPU rows (tc/plain verify, K8/V4, bench, tandem) still need a card; `MANUAL-HELP-NEEDED.md` §3c holds the one open repo gate (4 unbaselined rows on `pr/07-intel-probe`), and that file is the only manual-help tracker (the local scratch copy is folded in and deleted).
-  **2026-11-24:** `POST /v1/messages` answers Anthropic's dialect on the same `run_generate` path (`kindi/api/anthropic.py`;
-  `x-api-key` or bearer; envelope and SSE order; one `_relay` for both streaming routes), and `kindi selftest` drives it in
-  process and with `--url`. REQ-0023's block half landed too (`tests/test_kernel_arity.py`: 28 block/bound pairs, 135 pinned).
-  The package and `install.sh` said `0.7.1-fork`; all three match now, pinned by
-  `tests/test_version_consistency.py`. The `v0.7.1-fork` release is **still unpublished** (only `v0.5.0-installer`),
-  so README's one-liners 404 until the owner runs `docs/RELEASE-CHECKLIST.md`. The mask cache is a bounded 64 MiB
-  LRU (`StateMaskCache`, `KINDI_MASK_CACHE_MB`); A4/A5-rate open. Suite: 1,598 passed / 47 skipped / 0 failed (226 s).
-  The v0.7.1 (`1cb59d2`) and v0.7.0 (`8298a0f`) merge details (Inkling 2 Mini, Flash-Next drafting,
-  one CPU thread per physical core, the fork's own `tools/check_warp_masks.py`, the 2026-11-23 installer
-  slice, and what stayed unrun) moved to
-  [docs/development/AGENTS-HISTORY.md](docs/development/AGENTS-HISTORY.md), "The v0.7.1 and v0.7.0 merges".
+  the 2B/4B/9B without a card. GPU rows still need a card; `MANUAL-HELP-NEEDED.md` is the only manual-help tracker and §3c holds the open repo gate.
+  **2026-11-24:** `POST /v1/messages` answers Anthropic's dialect on the same `run_generate` path, `kindi selftest`
+  drives it in process and with `--url`, and the mask cache is a bounded 64 MiB LRU; the `v0.7.1-fork` release is
+  **still unpublished**, so README's one-liners 404 until the owner runs `docs/RELEASE-CHECKLIST.md`. The rest of that
+  note and the v0.7.1/v0.7.0 merge detail are in
+  [docs/development/AGENTS-HISTORY.md](docs/development/AGENTS-HISTORY.md).
 
 ### Python quality ratchet
 
@@ -235,7 +235,7 @@ Git object database, not the index or the files on disk:
 | worktree | branch | HEAD | role |
 |---|---|---|---|
 | `T:/kindi` | `main` | `6852b83` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `6852b83` | this session; 2026-11-25 the branch-of-record check (v0.7.2 comparison, branch audit) and before that the round-4 audit triage (secret-rule width, toolchain flags, backend limits column) and before that the Arc pack probe (real 2.5 27B shapes, no converter needed) and its gate-only roadmap rows; before that the 2.5 publisher sampling sets and low->xhigh, checked on both 2.5 27B packs (settings only: the host was busy, so no rate is quoted); before that the -mtp intake, the official 0.7.2 port (LoRA, one error body) and 0.7.2-fork, before that Arc A770 GEMV rows4 +1.357x (dispatch floor 0.0410 ms), exact accepted-character skip +41.37x median miss (class memo withdrawn), before that proxy serving boundary decided, before that Bonsai 2.5 27B CPU run + template parity, the v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke + Arc GEMM, llama.cpp proxy backend, constrained mask/pick -8.4% structured token, REQ-0030 CPU profile, bench --spec, 27B CPU verify + compiler detection |
+| `<worktree>` | `merge/upstream-0.7.0` | `bf6ede3` | this session; 2026-11-25 the branch-of-record check (v0.7.2 comparison, branch audit) and before that the round-4 audit triage (secret-rule width, toolchain flags, backend limits column) and before that the Arc pack probe (real 2.5 27B shapes, no converter needed) and its gate-only roadmap rows; before that the 2.5 publisher sampling sets and low->xhigh, checked on both 2.5 27B packs (settings only: the host was busy, so no rate is quoted); before that the -mtp intake, the official 0.7.2 port (LoRA, one error body) and 0.7.2-fork, before that Arc A770 GEMV rows4 +1.357x (dispatch floor 0.0410 ms), exact accepted-character skip +41.37x median miss (class memo withdrawn), before that proxy serving boundary decided, before that Bonsai 2.5 27B CPU run + template parity, the v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke + Arc GEMM, llama.cpp proxy backend, constrained mask/pick -8.4% structured token, REQ-0030 CPU profile, bench --spec, 27B CPU verify + compiler detection |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 

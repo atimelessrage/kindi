@@ -358,7 +358,7 @@ def _validate_messages_and_tools(req, image_error=_IMAGE_UNSUPPORTED):
                 _request_error("tools[%d].function.parameters must be an object" % i)
 
 
-def _validate_request(req, image_error=_IMAGE_UNSUPPORTED):
+def _validate_request(req, image_error=_IMAGE_UNSUPPORTED, variant=None):
     """Check the OpenAI request shape before it reaches the engine or the prompt cache.
 
     The server takes a raw Request, so this is the boundary that turns a typo or a wrong JSON type into a
@@ -445,9 +445,20 @@ def _validate_request(req, image_error=_IMAGE_UNSUPPORTED):
         if kw.get("preserve_thinking") is not None and not isinstance(kw["preserve_thinking"], bool):
             _request_error("chat_template_kwargs.preserve_thinking must be true or false")
         if kw.get("reasoning_effort") is not None and not isinstance(kw["reasoning_effort"], str):
-            _request_error("chat_template_kwargs.reasoning_effort must be a string")
+            _request_error("chat_template_kwargs.reasoning_effort must be a string",
+                           param="chat_template_kwargs.reasoning_effort")
     if req.get("reasoning_effort") is not None and not isinstance(req["reasoning_effort"], str):
-        _request_error("reasoning_effort must be a string")
+        _request_error("reasoning_effort must be a string", param="reasoning_effort")
+    # The 2.5 vocabulary is checked here, not only in chat._render27: an unknown name surfaced as a plain
+    # ValueError from check_prompt(), which is already a 400 but named no field (round-5 audit 5.1).
+    if variant == "bonsai27":
+        effort = req.get("reasoning_effort")
+        if effort is None:
+            effort = (req.get("chat_template_kwargs") or {}).get("reasoning_effort")
+        try:
+            chat.check_effort(effort)
+        except ValueError as exc:
+            _request_error(str(exc), param="reasoning_effort")
 
     for key, lo in (("max_tokens", 1), ("max_completion_tokens", 1), ("top_k", 0),
                     ("top_logprobs", 0), ("repeat_last_n", -1), ("thinking_budget_tokens", 0),
@@ -1405,6 +1416,9 @@ def create_app(cfg, log=print):
         log("[kindi] engine construction failed")
         raise
     log("[kindi] engine ready for %s" % cfg.get("model_name", "model"))
+    if getattr(K, "variant", None) == "bonsai27":
+        log("[kindi] reasoning_effort: low (unsupported by the 2.5 card) and high both render the xhigh "
+            "instruction; this line is the only notice, the response does not echo it (DEC-0013)")
     log("[kindi] " + runtime_view.render(runtime_view.describe(cfg, getattr(K, "eng", None), K)))
     requested_spec = os.environ.get("KINDI_SPEC", "0") or "0"
     if (requested_spec not in ("", "0", "off")
@@ -1619,7 +1633,7 @@ def create_app(cfg, log=print):
             req.pop("max_tokens")                # Ollama's -1 means "until the context is full"
         if body.get("tools") is not None:
             req["tools"] = body["tools"]
-        _validate_request(req, image_error)
+        _validate_request(req, image_error, getattr(K, "variant", None))
         return req, stream
 
     def _ollama_line(info, created, prompt_mode, final=False):
@@ -2124,7 +2138,7 @@ def create_app(cfg, log=print):
         except RequestError as e:
             return _err(400, str(e), param=getattr(e, "param", None))
         try:
-            _validate_request(req, image_error)
+            _validate_request(req, image_error, getattr(K, "variant", None))
         except RequestError as e:
             return _err(400, str(e), param=getattr(e, "param", None))
         if req.get("logprobs") and not getattr(K, "supports_logprobs", False):
@@ -2358,7 +2372,7 @@ def create_app(cfg, log=print):
         except ValueError as e:
             return _anthropic_error(400, str(e))
         try:
-            _validate_request(req, image_error)       # the OpenAI checks; a bad field is a 400 either way
+            _validate_request(req, image_error, getattr(K, "variant", None))   # the OpenAI checks; a bad field is a 400 either way
         except RequestError as e:
             return _anthropic_error(400, str(e))
         if req.get("tools") and not getattr(K, "supports_tools", True):

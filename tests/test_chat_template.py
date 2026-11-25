@@ -115,6 +115,15 @@ def test_27b_reasoning_effort_and_error():
     xhigh, _ = chat.render([{"role": "user", "content": "Hi"}], variant="bonsai27",
                            enable_thinking=True, reasoning_effort="xhigh")
     assert low == xhigh and "Reasoning effort is set to xhigh" in low
+    # round-5 audit 5.8/3a: OpenAI's vocabulary is low|medium|high, so a legal `high` must not be a 400
+    # while the vendor's unsupported `low` is accepted; both are aliases of the one measured instruction.
+    high, _ = chat.render([{"role": "user", "content": "Hi"}], variant="bonsai27",
+                          enable_thinking=True, reasoning_effort="high")
+    assert high == xhigh
+    assert chat.ACCEPTED_EFFORTS == ("xhigh", "high", "medium", "low")
+    chat.check_effort(None)                       # None is the template default
+    with pytest.raises(ValueError, match="low and high render the xhigh"):
+        chat.check_effort("max")
     with pytest.raises(ValueError, match="Unexpected reasoning effort"):
         chat.render([{"role": "user", "content": "Hi"}], variant="bonsai27",
                     enable_thinking=True, reasoning_effort="max")

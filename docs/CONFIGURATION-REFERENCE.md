@@ -70,7 +70,7 @@ Each key can also be set from the environment as `KINDI_<KEY>` (for example `KIN
 | `lookup` | int | `5` | Nanbeige: prompt-lookup drafting, up to this many tokens per check (0: off) |
 | `mtp_head` | string | (empty) | Nanbeige: an MTP head file, a second draft source (empty: none) |
 | `kv_cache` | string | `auto` | Nanbeige: the K/V cache, auto, f16 or q8_0 (auto: f16 when it fits, else q8_0) |
-| `reasoning_effort` | string | (empty) | 27B template: xhigh \| medium \| low (empty: the template default, xhigh) |
+| `reasoning_effort` | string | (empty) | 27B template: xhigh \| high \| medium \| low (empty: the template default, xhigh; low and high render the xhigh instruction) |
 
 ### generation defaults (a request's own values win)
 

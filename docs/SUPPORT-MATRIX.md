@@ -69,8 +69,8 @@ feature is behind its explicit experimental switch.
 | `bonsai-4b` | 4/4 | 4/4, 16.7 tok/s | not tested | 4/4, gated |
 | `bonsai-9b` | 4/4 | 4/4, 9.1 tok/s | not tested | n/a |
 | `bonsai-27b` | 3 exact + tie, 4060 Ti tc | 4/4, 3.7 tok/s | not converted | n/a |
-| `bonsai-2.5-27b` | not run | load+generate, no reference | not converted | n/a |
-| `bonsai-2.5-27b-mtp` | not run | load+generate, no reference | not converted | n/a |
+| `bonsai-2.5-27b` | not run | load+generate, no reference | PTQ1_0 only | n/a |
+| `bonsai-2.5-27b-mtp` | not run | load+generate, no reference | PTQ1_0 only | n/a |
 | `nemotron-e4b` | separate backend | n/a | n/a | n/a |
 | `nanbeige-33b` | separate backend | n/a | n/a | n/a |
 | `lightning-30b` | separate backend | n/a | n/a | n/a |

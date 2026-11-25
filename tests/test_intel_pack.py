@@ -90,6 +90,17 @@ def test_a_pack_without_ternary_tensors_fails(tmp_path):
     assert report["result"] == "fail" and "no ternary tensors" in report["error"]
 
 
+def test_metadata_without_the_byte_files_is_a_fail_report(tmp_path):
+    # round-5 audit F2: the two os.path.getsize calls and the two fromfile() reads ran outside every
+    # guard, so a directory with index.json/kindi_pack.json but no bcodes.bin raised FileNotFoundError
+    # through the CLI instead of answering the probe's {"result": "fail"} contract.
+    pack = _pack(tmp_path)
+    os.remove(pack / "bcodes.bin")
+    report = intel_pack.run_pack(str(pack))
+    assert report["result"] == "fail"
+    assert "cannot read the pack's byte files" in report["error"]
+
+
 def test_unavailable_opencl_loader_fails_the_report(tmp_path):
     pack = _pack(tmp_path)
     report = intel_pack.run_pack(str(pack), loader=str(tmp_path / "no-such-loader.dll"))

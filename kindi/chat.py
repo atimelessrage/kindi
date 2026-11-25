@@ -60,9 +60,24 @@ REASONING_EFFORTS = {
     "xhigh": ("Reasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, "
               "consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer."),
     "medium": "",
+    # The value is never rendered: _render27 remaps low to xhigh before the lookup (DEC-0013). The entry stays
+    # because it is the template's own text (the parity check compares against it) and low is still accepted.
     "low": ("Reasoning effort is set to low. Keep your thinking brief and focused, moving directly to the conclusion "
             "without unnecessary elaboration."),
 }
+
+# What the 2.5 template accepts. `high` is OpenAI's name for the only reasoning instruction Kindi has measured
+# (the xhigh text), and `low` is remapped to that same instruction by the 2.5 card and DEC-0013, so both are
+# aliases rather than new prompts. Accepting `high` stops the asymmetry where a client's legal `high` was a 400
+# while `low` silently got the most expensive behavior.
+ACCEPTED_EFFORTS = ("xhigh", "high", "medium", "low")
+
+
+def check_effort(effort):
+    """Raise ValueError unless effort is a name the 2.5 template accepts; None is the template default, xhigh."""
+    if effort is not None and effort not in ACCEPTED_EFFORTS:
+        raise ValueError("Unexpected reasoning effort %s. Supported types are xhigh (default), high, medium, and "
+                         "low (low and high render the xhigh instruction; DEC-0013)." % effort)
 
 
 def template_variant(src):
@@ -172,11 +187,11 @@ def _render27(messages, tools, enable_thinking, reasoning_effort, preserve_think
     instr = ""
     if enable_thinking:
         eff = "xhigh" if reasoning_effort is None else reasoning_effort
-        if eff not in REASONING_EFFORTS:
-            raise ValueError("Unexpected reasoning effort %s. Supported types are xhigh (default), medium, and low." % eff)
-        if eff == "low":
+        check_effort(eff)
+        if eff in ("low", "high"):
             # the 2.5 card: low is not supported, and the model behaves close to xhigh; the template
-            # text the template ships for low is not what the model was trained on, so use xhigh's
+            # text the template ships for low is not what the model was trained on, so use xhigh's.
+            # `high` is OpenAI's name for that same instruction, the only one this model has measured.
             eff = "xhigh"
         instr = REASONING_EFFORTS[eff]
     keep = preserve_thinking is None or preserve_thinking is True

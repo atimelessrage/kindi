@@ -238,8 +238,6 @@ def run_pack(pack_dir, repeats=DEFAULT_REPEATS, loader=None, opener=None, device
     shapes = shapes_of(tensors)
     report["pack"].update({
         "model": manifest.get("model"), "source_file": manifest.get("source_file"),
-        "bcodes_bytes": os.path.getsize(os.path.join(pack_dir, "bcodes.bin")),
-        "dpm_bytes": os.path.getsize(os.path.join(pack_dir, "dpm.bin")),
         "tensors": len(index["tensors"]), "ternary": len(tensors), "shapes": len(shapes),
     })
     if parts is None:
@@ -249,8 +247,11 @@ def run_pack(pack_dir, repeats=DEFAULT_REPEATS, loader=None, opener=None, device
     if not isinstance(device, int) or device < 0:
         return _fail(report, "--device must be a non-negative integer")
 
-    bcodes = np.fromfile(os.path.join(pack_dir, "bcodes.bin"), dtype=np.uint8)
-    dpm16 = np.fromfile(os.path.join(pack_dir, "dpm.bin"), dtype=np.float16)
+    try:
+        bcodes = np.fromfile(os.path.join(pack_dir, "bcodes.bin"), dtype=np.uint8)
+        dpm16 = np.fromfile(os.path.join(pack_dir, "dpm.bin"), dtype=np.float16)
+    except (OSError, ValueError) as exc:   # metadata without the bytes: a fail report, not a traceback
+        return _fail(report, "cannot read the pack's byte files: %s" % exc)
     report["pack"]["bcodes_bytes"] = int(bcodes.nbytes)
     report["pack"]["dpm_bytes"] = int(dpm16.nbytes * 2)   # widened to float32 for the device
 
@@ -395,7 +396,7 @@ def run_pack(pack_dir, repeats=DEFAULT_REPEATS, loader=None, opener=None, device
             seconds_by_shape[(rows, cols)] = seconds
             report["shapes"].append({
                 "rows": rows, "cols": cols, "tensors": shape["tensors"],
-                "median_ms": round(seconds * 1000.0, 4),
+                "mean_ms": round(seconds * 1000.0, 4),
                 "gbps": round(shape["bytes"] / seconds / 1e9, 3) if seconds > 0 else None,
             })
             for handle in (codes_buf, scales_buf, y_buf, part_buf):
@@ -470,7 +471,7 @@ def render(report):
             device["name"], device["compute_units"], device["global_mem_mib"]))
     for shape in report["shapes"]:
         lines.append("  %5d x %5d x %2d tensor(s): %.4f ms each, %s GB/s" % (
-            shape["rows"], shape["cols"], shape["tensors"], shape["median_ms"], shape["gbps"]))
+            shape["rows"], shape["cols"], shape["tensors"], shape["mean_ms"], shape["gbps"]))
     projection = report["projection"]
     if projection["tokens_per_second"] is not None:
         lines.append("  projection: %s GB moved -> %.3f ms per pass, %s GB/s effective, "

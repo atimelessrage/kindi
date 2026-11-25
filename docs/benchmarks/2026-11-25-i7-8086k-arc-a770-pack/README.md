@@ -10,6 +10,11 @@ python -m kindi convert Ternary-Bonsai-2.5-27B-PTQ1_0-mtp.gguf --out pack
 python -m kindi intel-pack --pack pack --device-name Arc --repeats 5 --json run-mtp.json
 ```
 
+Per-shape timing is `mean_ms` in a new run's JSON: it is the arithmetic mean over the five timed
+launches. The two artifacts on this page were written before that key was named honestly and store the
+same mean as `median_ms` (round-5 audit F3); the claims that quote them point into those files and were
+not re-measured.
+
 `intel-pack` reads `bcodes.bin` and `dpm.bin` exactly as the converter wrote them, uploads each
 shape's slice unchanged, and runs the four-row phase-split GEMV kernel (one warm-up, five timed
 launches per shape). One real tensor of the pack, `blk.3.attn_k.weight` (1,024 x 5,120), is decoded

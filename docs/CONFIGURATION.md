@@ -121,7 +121,7 @@ do not use them yet.
 | `repeat_stop` | `0` | `1` stops a reply caught in a repeating loop. A loop while thinking closes the thinking block early and lets the model answer |
 | `lookup` | `5` | Nanbeige prompt-lookup drafting, up to this many tokens per check; `0` turns it off |
 | `mtp_head` | (empty) | Nanbeige MTP head file, a draft source for `kindi serve` only (the registry gateway and `kindi verify`/`bench` are non-drafting); empty = none |
-| `reasoning_effort` | (empty) | 27B template: `xhigh`, `medium` or `low`; empty = the template default (`xhigh`). The 2.5 card does not support `low` (the model behaves close to `xhigh`), so `low` renders the `xhigh` instruction |
+| `reasoning_effort` | (empty) | 27B template: `xhigh`, `high`, `medium` or `low`; empty = the template default (`xhigh`). The 2.5 card does not support `low` (the model behaves close to `xhigh`), so `low` renders the `xhigh` instruction; `high` is accepted as the same alias, and any other name is a 400 naming `param: reasoning_effort` |
 | `sampling_profile` | `default` | `default` or `publisher`; the publisher profile is described above |
 
 ## Environment variables for the engine

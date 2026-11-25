@@ -1444,3 +1444,21 @@ def test_oversized_body_is_413_and_keeps_the_prompt_cache(app_client):
                        json={"messages": [{"role": "user", "content": "hello"}]})
     assert good.status_code == 200, good.text
     assert good.json()["usage"]["prompt_tokens_details"]["cached_tokens"] == 3
+
+
+def test_unknown_reasoning_effort_is_a_400_naming_the_field():
+    """Round-5 audit 5.1: the 2.5 vocabulary is checked in request validation, so the 400 names the field.
+
+    The old path raised the renderer's plain ValueError out of check_prompt(), which the chat route already
+    turned into a 400 - but a field-less one, and only after the engine had been asked to render.
+    """
+    messages = [{"role": "user", "content": "hi"}]
+    with pytest.raises(server.RequestError) as caught:
+        server._validate_request({"messages": messages, "reasoning_effort": "max"}, variant="bonsai27")
+    assert caught.value.param == "reasoning_effort"
+    assert "Unexpected reasoning effort" in str(caught.value)
+    # the aliases are accepted, and a pack without the 2.5 template has no effort vocabulary to check
+    server._validate_request({"messages": messages, "reasoning_effort": "high"}, variant="bonsai27")
+    server._validate_request({"messages": messages, "chat_template_kwargs": {"reasoning_effort": "low"}},
+                             variant="bonsai27")
+    server._validate_request({"messages": messages, "reasoning_effort": "max"}, variant="qwen35")

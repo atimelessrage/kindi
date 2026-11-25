@@ -77,10 +77,10 @@ STATUS = {
     # Bonsai 2.5 27B: the header was read (2026-11-24) and matches the 27B geometry; the released
     # PTQ1_0 pack was built and loaded on the CPU engine (2026-11-25) but has no llama.cpp reference,
     # so `kindi verify` reports that and exits 2 instead of scoring it against Bonsai 2's tokens.
-    "bonsai-2.5-27b": ["not run", "load+generate, no reference", "not converted", "n/a"],
+    "bonsai-2.5-27b": ["not run", "load+generate, no reference", "PTQ1_0 only", "n/a"],
     # The -mtp file is the same language model plus a 65th head block: the converter drops the block,
     # records it in the manifest and builds the identical pack, so its CPU cell matches the base one.
-    "bonsai-2.5-27b-mtp": ["not run", "load+generate, no reference", "not converted", "n/a"],
+    "bonsai-2.5-27b-mtp": ["not run", "load+generate, no reference", "PTQ1_0 only", "n/a"],
     "nemotron-e4b": ["separate backend", "n/a", "n/a", "n/a"],
     "nanbeige-33b": ["separate backend", "n/a", "n/a", "n/a"],
     "lightning-30b": ["separate backend", "n/a", "n/a", "n/a"],

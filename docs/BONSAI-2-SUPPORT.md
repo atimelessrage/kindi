@@ -4,13 +4,18 @@ Where this sits: [CARDS.md](CARDS.md) and [SUPPORT-MATRIX.md](SUPPORT-MATRIX.md)
 for what a card can run today; this page is research and projection for the family, and
 [README.md](README.md) is the index.
 
-Status: research and planning, 2026-11-09; updated 2026-11-25 for Bonsai 2.5 27B (section 1a carries
-the file-level facts, the code that now accepts it, the template parity check and the CPU-engine run).
-This document does not change engine code and is not a
+Status: research, planning and the shipped Bonsai 2.5 facts, 2026-11-09; updated 2026-11-25 (section 1a
+carries the file-level facts, the code that now accepts it, the template parity check and the CPU-engine
+run; section 4.2 the publisher sampling sets and `reasoning_effort`). Sections 1a and 4.2 describe what
+the tree does today; the rest is projection. This document does not change engine code and is not a
 support claim for anything marked **No** or **Untested** below.
 
 Scope: PrismML's Ternary Bonsai 2 family (2B, 4B, 9B, 27B) and Bonsai Image 4B. Bonsai Image is a
 separate diffusion model, not another size of the language model.
+
+There is no 7B size in this family, in any release: the 2 family is 2B/4B/9B/27B and the 2026-11-24 2.5
+release is a 27B-only upgrade, so a "Bonsai 2.5 7B" plan item is a publisher question, not a Kindi gap
+(two independent 2026-11-25 reviews each spent time on it; recorded here so it is not re-opened).
 
 Sources:
 
@@ -292,8 +297,12 @@ profile and Kindi's template handle all three:
 - **Reasoning effort:** `xhigh` is the default and the most accurate. `medium` is for shorter
   responses and a balance of speed and accuracy. `low` is not supported by the model: when it is
   selected the model behaves close to `xhigh`, so Kindi renders the `xhigh` instruction for it rather
-  than the template's own `low` text (which the model was not trained on). `reasoning_effort` is a
-  config key and a request field; it applies only when thinking is on.
+  than the template's own `low` text (which the model was not trained on). `high` is OpenAI's name for
+  that same behavior and is accepted as a second alias of the one measured instruction, so a client's
+  legal `high` is not a 400 while `low` is; any other name is a 400 that names `param:
+  reasoning_effort`. `reasoning_effort` is a config key and a request field; it applies only when
+  thinking is on, and the response does not echo the effective value (one line at `kindi serve`
+  startup does).
 - **Which request gets which set:** thinking requests (`enable_thinking`) take the first row,
   instruct requests the second. `sampling_profile = publisher` makes the profile active; a request's
   own values, or values the user set in the config, still win.

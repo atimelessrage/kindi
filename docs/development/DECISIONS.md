@@ -255,3 +255,11 @@ Use this shape:
   seed, the same tokens - which is the measured check in the sampling benchmark, not an assumption.
   The alternative (rejecting `low`) was not taken because the vendor accepts it and only its effect
   is unspecified.
+- Amendment (2026-11-25, round-5 audit): `high` is accepted as a second alias of the measured `xhigh`
+  instruction. OpenAI's vocabulary is low|medium|high, so a client's legal `high` used to be a 400 while
+  the vendor's unsupported `low` was accepted: that asymmetry was the bug, not the mapping. No new
+  prompt text and no new measurement are involved; `chat.ACCEPTED_EFFORTS` is the single vocabulary,
+  `_render27` remaps `low` and `high` to `xhigh`, and request validation answers any other name with a
+  400 carrying `param: reasoning_effort` (it used to come out of `check_prompt()` with no field named).
+  The transparency gap stays open by design: the response does not echo the effective effort, only an
+  access-log entry and one startup line do.

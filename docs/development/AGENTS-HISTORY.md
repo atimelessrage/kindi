@@ -1723,3 +1723,19 @@ instead of "no backend adapter serves that family" (new test in `tests/test_engi
 docs in `docs/BACKENDS.md` ("Serving boundary"), REQ-0019 T4.6, `docs/development/KNOWLEDGE.md`,
 probe in `docs/benchmarks/2026-11-25-llamacpp-proxy-serving/`. No llama-server run, so no serving
 claim either way; live gate unchanged (T4.4 open).
+
+## Moved out of the live handoff (2026-11-25, round-5 audits)
+
+The 2026-11-24 note that `AGENTS.md` condensed to three lines, in full:
+
+- `POST /v1/messages` answers Anthropic's dialect on the same `run_generate` path (`kindi/api/anthropic.py`;
+  `x-api-key` or bearer; envelope and SSE order; one `_relay` for both streaming routes), and `kindi selftest`
+  drives it in process and with `--url`.
+- REQ-0023's block half landed too (`tests/test_kernel_arity.py`: 28 block/bound pairs, 135 pinned).
+- The package and `install.sh` said `0.7.1-fork`; all three match now, pinned by
+  `tests/test_version_consistency.py`. The `v0.7.1-fork` release is still unpublished (only `v0.5.0-installer`).
+- The mask cache is a bounded 64 MiB LRU (`StateMaskCache`, `KINDI_MASK_CACHE_MB`); A4/A5-rate open.
+- Suite at that point: 1,598 passed / 47 skipped / 0 failed (226 s).
+- The v0.7.1 (`1cb59d2`) and v0.7.0 (`8298a0f`) merge details (Inkling 2 Mini, Flash-Next drafting, one CPU
+  thread per physical core, the fork's own `tools/check_warp_masks.py`, the 2026-11-23 installer slice, and what
+  stayed unrun) are under "The v0.7.1 and v0.7.0 merges" above.
