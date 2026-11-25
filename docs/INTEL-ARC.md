@@ -357,6 +357,43 @@ roughly 2 MiB of packed weights a GEMV is dispatch-bound, and that - not the dec
 what a backend would have to remove next (a single-launch design has to give up either the coalesced
 row-major reads or the exact float sum order). No backend, model or support claim; M2 stays partial.
 
+### M2 GEMV: where a decode token's time goes (2026-11-25)
+
+The pack probe above left one question: 143 GB/s against a 560 GB/s spec is either a slow kernel or a
+launch-bound one. A sweep over the 27B's own 401 ternary matrices (6.800 GB of codes and scales per
+token) answered it on this card
+([page](benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/README.md); every arm is bit-exact
+against the host reference at a small shape):
+
+| component of the shipped per-matrix pattern | ms/token | share |
+|---|---|---|
+| CPU-side enqueue, 802 launches at 8.78 us | 7.04 | 15% |
+| reading 6.800 GB at the card's measured 384.8 GB/s | 17.67 | 37% |
+| GPU ramp, drain and idle around 401 small launches | 22.67 | 48% |
+
+What the card actually does, so the next round does not measure it again:
+
+- **Practical read bandwidth is 385 GB/s, 69% of the spec**, from a plain `uint4` streaming read over
+  318 MB; the same read reaches only 288 GB/s at 8K threads and 375-385 GB/s at 64K-1M threads, so
+  the grid has to be large before the memory system saturates. No GEMV arm beat the streaming read.
+- **A launch costs 8.78 us** when 802 are enqueued in a batch (9.47 us for a lone one), and a
+  `clFinish` after every matrix costs 65 us each: the token goes from 47.4 ms queued to 99.1 ms with
+  a finish per matrix.
+- **One persistent launch over the work list is 1.76x the per-matrix pattern** (26.87 ms against
+  47.38 ms, 253 GB/s), at `parts=1`, which also removes the reduce kernel and the partial scratch. A
+  larger grid would lose it: the same single launch at 16K threads takes 91.5 ms because the card
+  starves.
+- **Work per thread flattens at eight rows**: with the card full, 1/2/4/8/16 rows per work-item take
+  46.81 / 36.67 / 31.66 / 29.93 / 29.84 ms. More `vload` width past eight buys nothing.
+- **The 401 matrices are small**: 400 of them are at most 23.7 MB, and only the 338 MB output
+  projection streams on its own (263 GB/s). That, not the arithmetic, is why the token total is low.
+- **Zero-filled weights read up to 2.4x faster than random bytes** at the same configuration
+  (memory compression). Every number here uses random weights; a probe on zeros flatters the card.
+- A whole-token `parts>1` work list needs a 664 MB partial scratch (4,147,712 rows x 40 parts),
+  which is the other reason `parts=1` is the shape to build.
+
+No backend, model or support claim; M2 stays partial.
+
 ### M2 pack-reading GEMV probe: a real model's shapes (2026-11-25)
 
 `kindi intel-pack --pack DIR` answers the question before a backend: how fast can the card read a

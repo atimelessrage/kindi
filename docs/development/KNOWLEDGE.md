@@ -3,6 +3,31 @@
 Durable operational facts that do not belong in a single decision, requirement or user
 guide. Keep commands copy-pasteable and avoid local machine paths and credentials.
 
+## Model and card facts worth not re-deriving (2026-11-25)
+
+- **Bonsai 2.5 27B is `qwen35` with `full_attention_interval = 4`**: 64 blocks, 16 full-attention and
+  48 Gated-DeltaNet, width 5120, ffn 17408, 24 Q / 4 KV heads at 256 dims, partial RoPE 64, mRoPE
+  sections `[11,11,10,0]` (text-degenerate), base 1e7, eps 1e-6, vocabulary 248320, context 262144.
+  The per-layer tensor lists are 11 (full) and 14 (GDN); `docs/BONSAI-2-SUPPORT.md` section 1a has
+  the table, the file sizes and the CPU run.
+- **The `-mtp` file's `blk.64` is a full-attention block with 15 tensors, eight of them Q4_0 (about
+  239 MB)**, borrowing `token_embd` and the folded `output.weight`; it needs a K/V ring and no GDN
+  state. `docs/MTP.md` has the details, and the note that a CPU speedup or 83-88% acceptance figure
+  circulating for it is not ours.
+- **A vision projector is a separate `mmproj-*.gguf` of about 600-930 MB**; `kindi mmproj` prices one
+  and holds it in host RAM (`mmproj_place = ram`, the default) so it never takes VRAM from the
+  language model. No build implements the encoder yet, so image requests are still refused with a
+  400; `docs/ROADMAP.md` has the V0-V4 ladder.
+- **The Arc A770 reads at 385 GB/s in practice (69% of the 560 GB/s spec) and its launches cost
+  about 8.8 us**; the shipped per-matrix GEMV pattern loses 48% of a token to ramp and drain between
+  401 small matrices, and one persistent launch at `parts=1` is 1.76x. `docs/INTEL-ARC.md` has the
+  table; zero-filled weights are up to 2.4x faster than random ones (memory compression), so never
+  measure bandwidth on zeros.
+- **`kindi verify` has no reference for 2.5** (it exits 2 rather than compare against Bonsai 2's
+  tokens); the 2.5 CPU evidence is load and generate, not token-exactness against a reference.
+- **The pack is 7,242 MB from a 6 GB GGUF** (codes 6.717 GB, scales 0.42 GB, f32 0.105 GB), and the
+  CPU engine loads it in about 340 s here at 4.02 tok/s.
+
 ## Verification layers
 
 | layer | command | what it proves |

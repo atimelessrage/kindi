@@ -101,6 +101,26 @@ request over the 6 GB file; evidence and parser in
 | vocabulary / context | 248320 / 262144 | the 27B tokenizer and context, unchanged |
 | chat template | 8952 characters, contains `reasoning_effort` with `xhigh` and `medium` | `chat.template_variant()` selects `bonsai27`, and the `reasoning_effort` plumbing already exists |
 
+The same header carries the geometry that decides the per-layer work, and it is recorded here so that
+it is not read again:
+
+| header field | value | consequence |
+|---|---|---|
+| `qwen35.full_attention_interval` | 4 | 16 full-attention layers (`blk.3`, `blk.7`, ... `blk.63`) and 48 Gated-DeltaNet layers, the hybrid the 27B engine already runs |
+| `qwen35.rope.dimension_sections` | `[11, 11, 10, 0]` | mRoPE sections; for text the three streams coincide, so the engine's partial RoPE over the first 64 dims is the same rotation |
+| `qwen35.rope.freq_base` / `rms_norm_eps` | `1e7` / `1e-6` | the engine defaults; no per-model override needed |
+| head dim / rope dim | 256 / 64 | `HD = 256`, `RD = 64`, 24 Q heads and 4 KV heads (16 groups) |
+
+The per-layer tensor list differs by layer type, and that is what a loader keys on: a full-attention
+block has 11 tensors (`attn_q/k/v`, `attn_q_norm`, `attn_k_norm`, `attn_output`, `attn_norm`,
+`post_attention_norm`, `ffn_gate`, `ffn_up`, `ffn_down`) and a Gated-DeltaNet block has 14
+(`attn_qkv`, `attn_gate`, `ssm_a`, `ssm_alpha`, `ssm_beta`, `ssm_conv1d`, `ssm_dt`, `ssm_norm`,
+`ssm_out`, `attn_norm`, `post_attention_norm`, `ffn_gate`, `ffn_up`, `ffn_down`). The `-mtp` file
+adds one more block, `blk.64`, with 15 tensors: a full-attention block plus the four `nextn` tensors.
+It is **not** a second copy of the model: it borrows `token_embd` and `output.weight`, and its eight
+matrices are Q4_0 (about 239 MB), not PTQ1_0. `docs/MTP.md` carries the head's facts; the `-mtp` file
+is 6,232,818,944 B against the base file's 5,993,834,848 B.
+
 What Kindi now does with it:
 
 - `kindi use bonsai-2.5-27b` downloads `Ternary-Bonsai-2.5-27B-PTQ1_0.gguf` (5993834848 bytes, SHA-256
