@@ -54,7 +54,9 @@ def main():
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
     if not a.gguf and not a.drafter_pack:
-        ap.error("give --gguf (the integrated head), --drafter-pack (an external drafter), or both")
+        ap.error("give --gguf (the integrated head) or --drafter-pack (an external drafter)")
+    if a.gguf and a.drafter_pack:
+        ap.error("choose one drafter: --gguf (the integrated head) or --drafter-pack (an external pack)")
 
     def log(*m):
         print(*m, flush=True)

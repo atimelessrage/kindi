@@ -87,6 +87,28 @@ this head appears in notes written about Kindi. It is **not in this tree and not
 drafted, about 5%**, from `tools/mtp_cpu_bench.py` on the real 27B, an untracked `bench-logs/` run.
 Do not repeat a CPU acceptance or speedup figure for this head without a tracked page behind it.
 
+### Which drafter, on the 27B CPU (2026-11-25)
+
+`kindi.mtp_cpu.score_drafts` takes either drafter through one interface (`reset()` and
+`draft(prefix, hin, k)`): `Head` for the `-mtp` file's own `blk.64`, `PackDrafter` for a second,
+smaller converted pack. `tools/mtp_cpu_bench.py` picks between them with `--gguf` or
+`--drafter-pack` (giving both is an error), and the two runs below used the same 27B pack, the same two
+prompts, `k=4`, 16 tokens and 6 threads on this host:
+
+| drafter | accepted | rate | depth [1..4] | plain tok/s | drafted tok/s |
+|---|---|---|---|---|---|
+| integrated `blk.64` head | 7/108 | 6.5% | [3, 1, 2] | 1.69 / 1.51 | 1.11 / 1.02 |
+| 2B pack (`~/.kindi/packs/bonsai-2b`) | 33/108 | 30.6% | [15, 8, 7, 3] | 2.03 / 2.12 | 1.01 / 1.16 |
+
+The external 2B drafter is the better draft source by about five times the acceptance, and **still
+slower than plain decode**: every round replays the known prefix through the 2B engine (O(n) forwards)
+and the 27B verifies one row per pass, so no draft removes work. Neither route is a speedup until
+CP1's batched T-row verify exists; what the measurement settles is which drafter CP1 should be built
+against - the 2B pack, not the head. Per prompt the 2B accepted 23/54 (43%) on the first and 10/54
+(19%) on the second. Both numbers come from untracked `bench-logs/` runs (`mtp-cpu-20261125.json`,
+`mtp-cpu-2b-drafter-20261125.json`), and both asserted their tokens equal to plain greedy decode, so
+acceptance is measured against the real model and nothing else.
+
 ## The modes
 
 | Mode | Setting | Drafts |
