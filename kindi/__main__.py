@@ -477,6 +477,20 @@ def cmd_intel_ternary(cfg, a):
     return 0 if report["result"] == "pass" else 1
 
 
+def cmd_intel_pack(cfg, a):
+    """Time a converted pack's ternary shapes on an Intel GPU; no model run or support claim."""
+    from . import intel_pack
+
+    report = intel_pack.run_pack(a.pack, repeats=a.repeats, loader=a.loader, device=a.device,
+                                 device_name=a.device_name, parts=a.parts)
+    if a.json:
+        print(intel_pack.dumps(report))
+    else:
+        for line in intel_pack.render(report):
+            print(line)
+    return 0 if report["result"] == "pass" else 1
+
+
 def cmd_intel_sycl(cfg, a):
     """SYCL vector-add smoke on an Intel GPU; no backend or support claim."""
     from . import intel_sycl
@@ -820,6 +834,18 @@ def _build_parser():
                         "the driver's device order is not stable")
     s.add_argument("--loader", default=None, help="OpenCL loader name/path (default: the host loader)")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
+
+    s = sub.add_parser("intel-pack", help="time a converted pack's ternary shapes on an Intel GPU "
+                         "(no model run, engine or support claim)")
+    s.add_argument("--pack", required=True, help="a pack directory written by kindi convert")
+    s.add_argument("--repeats", type=int, default=5, help="timed launches per shape (default 5, max 20)")
+    s.add_argument("--parts", type=int, default=None,
+                   help="phase groups run in parallel (default: one per 128-weight phase, capped at 64)")
+    s.add_argument("--device", type=int, default=0, help="Intel OpenCL GPU index (default 0)")
+    s.add_argument("--device-name", default=None, metavar="SUBSTR",
+                   help="pick the GPU whose name contains SUBSTR (e.g. Arc) instead of --device")
+    s.add_argument("--loader", default=None, help="OpenCL loader name/path (default: the host loader)")
+    s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("intel-cl", help="compile and run OpenCL vector-add/GEMM on an Intel GPU (no model)")
     s.add_argument("--n", type=int, default=1048576, help="vector-add elements (default 1048576, max 16777216)")
     s.add_argument("--dim", type=int, default=128, help="square GEMM dimension (default 128, 8-512)")
@@ -917,6 +943,7 @@ _COMMANDS = {
     "intel-gemm": cmd_intel_gemm,
     "intel-sycl": cmd_intel_sycl,
     "intel-ternary": cmd_intel_ternary,
+    "intel-pack": cmd_intel_pack,
     "loop-info": cmd_loop_info,
     "io": cmd_io,
     "autotune": cmd_autotune,

@@ -916,6 +916,31 @@ The nine proposals were checked against the dense `TandemEngine`, the measured 2
 
 The rest are already present, already gated, or not a viable batch-1 pipeline: (3) layer pipelining has a hard dependency, layer n+1 needs layer n, and cross-token overlap is the measured batching NO-GO; (4) sampling, stop strings, tokenization and detokenization are already host-side (`sampling.py` keeps temperature/top-k/top-p on the host); (5) the MoE CPU lane and router/copy plan exist in `moe_tandem.py`, but the CPU lane measured 3.06x slower than the copy lane and the Lightning backend/pack is the open blocker; (6) DeepSeek already runs GPU dense plus CPU experts with dual-Xeon NUMA (`dsv41 numa --rowsplit`); (7) a CPU neural drafter was rejected in the Nanbeige review because the 2B GPU drafter is faster and P0/P1 must first show idle CPU capacity; (8) tokenization is already host-side and does not remove the GPU prompt read, which is the long-prompt cost; (9) checkpoint host copies are pinned, saved-turn disk writes and idle checkpoint copies already use background threads, and a fully async snapshot would need double-buffering, not a quick win. Double-buffered staging is already the next step in [TANDEM-OVERLAP-DESIGN.md](TANDEM-OVERLAP-DESIGN.md) for the measured 3.09 ms/token; no duplicate row was added.
 
+## Intel Arc A770 decode hypotheses (2026-11-25)
+
+`kindi intel-pack` now measures a converted pack's real ternary shapes on the A770 through the
+pack's on-disk 4-trit/byte layout (OpenCL, one work-item per four rows per phase-part). That is the
+baseline every row below has to beat, and every row is **gate only**: none has been measured, and
+none is a support claim. Several premises come from vendor material and must be checked on this
+card before the work starts, because a wrong premise would waste the experiment: mixed `s8 x s2`
+DPAS on DG2, `s2 x s2` at K=64, LSC 2D block loads with VNNI transform on DG2, and whether the
+driver's OpenCL C 1.2 profile exposes any of it at all (it may need ESIMD/SYCL instead).
+
+| # | item | why it might pay | first gate | status |
+|---|---|---|---|---|
+| I1 | `s8 x s2` DPAS decode | XMX runs integer DPAS with 2-bit weights in registers (16 per dword) where the current kernel decodes 4 trits per byte in the vector engine; the memory-bound decode should move the same bytes with less ALU and no unpack | Microbenchmark a single layer shape (17,408 x 5,120): bit-exact against the OpenCL GEMV on all rows, and **>=1.5x** effective GB/s over the measured pack run on the same card; otherwise no-go | proposed; gate only, and the mixed-precision DPAS support itself is unverified |
+| I2 | 2-bit swizzled weight layout (+ converter step) | DPAS wants its `src1` tile layout, not `[slot][row]`; a separate packer could remove per-call swizzle and halve the byte traffic versus 4-trit packing | Build the packed copy offline from one tensor, require the decoded weights to match the pack bit for bit, and measure upload + first-token cost; adopt only if the layout wins **>=1.2x** at 5120-wide shapes | proposed; this is the only row that would need a second converter - correctness does not |
+| I3 | Single-launch decode kernel | The measured floor is two enqueued kernels at ~0.041 ms, which dominates small matrices; a one-kernel design (phases already in a work-item's loop) removes one launch and the partial buffer | Same results as today at 1,024 x 2,048 and at the 27B's shapes, **>=1.1x** per-call at the small shape, no extra VRAM growth | proposed; may need to give up either coalesced reads or the exact float order |
+| I4 | SLM-staged prefill GEMM | The 2026-11-24 q8 GEMM baseline is 36.9 GFLOP/s with byte-wise dots and a 1.02-1.05x (later 0.97x) local-staging win; `dp4a`-shaped packing is the named lever | 512 x 512 x 4096 and 512 tokens x 17,408 rows: bit-exact XQ/XS, **>=2x** GFLOP/s over 36.9, no correctness change with more than one tile per work-group | proposed; staging alone was measured inconsistent, so the gate is on packing, not staging |
+| I5 | fp16/bf16 vector path for norms, RoPE, attention | The current probe only covers ternary matmuls; a real token also pays attention, GDN state and norms, none of which has an Arc kernel | Implement one layer's non-ternary ops in SYCL, compare against the CPU engine's intermediate values on the 2B before any 27B work | proposed; no kernel exists |
+| I6 | Split-K / multi-queue over Xe-cores | One queue may not saturate 560 GB/s at 5,120-wide rows; independent phase ranges on two queues are the cheap experiment | 17,408 x 5,120: two queues versus one, **>=1.1x** GB/s with identical ids | proposed; driver-level queue behaviour on this driver is unmeasured |
+| I7 | Bit-plane popcount versus DP4A versus DPAS | A 1.58-bit format invites popcount tricks, but the Intel vector engine's popcount rate and the extra masking may lose to integer dots | Same shape, three kernels, bit-exact, rank by effective GB/s; keep the best and record the others as no-go | proposed; often slower than expected, which is why it is gated |
+| I8 | 27B MTP head drafting on Arc | The `-mtp` file's head is recorded but unused anywhere; on Arc a 65th-block drafter would need its own kernel and accept/reject loop | Only after a working 27B decode path: token-exact at k=1 and **>=1.15x** tokens/s at 4K context, else no-go | proposed; blocked on I1-I5 and on a 27B backend |
+
+The OpenCL probe's numbers are a projection, not a model run: they exclude attention, norms, the GDN
+state update and the f32 output-head work, so a real backend will be slower than the projection. A
+row above that "wins" only on the projection has not won.
+
 ## Standing rules
 
 - Every experiment gets a numeric gate before implementation, and the gate is written down before

@@ -357,6 +357,27 @@ roughly 2 MiB of packed weights a GEMV is dispatch-bound, and that - not the dec
 what a backend would have to remove next (a single-launch design has to give up either the coalesced
 row-major reads or the exact float sum order). No backend, model or support claim; M2 stays partial.
 
+### M2 pack-reading GEMV probe: a real model's shapes (2026-11-25)
+
+`kindi intel-pack --pack DIR` answers the question before a backend: how fast can the card read a
+**converted model's** packed weights at the shapes that model really has? It reads `bcodes.bin`,
+`dpm.bin` and `index.json` exactly as `kindi convert` wrote them, uploads the two buffers unchanged,
+and runs the four-row phase-split GEMV at every distinct `(rows, cols)` among the pack's ternary
+tensors. One tensor of the real pack (the smallest) is decoded on the host at `parts=1` and compared
+bit for bit, so "the bytes are read correctly" is checked rather than assumed; the timed runs use
+the default phase split.
+
+No Intel-specific converter is needed for this, and none was added: the pack's on-disk 4-trit/byte
+layout is exactly what the kernel consumes, and the engine's load-time 5-trit lane repack is a CUDA
+detail, not a pack format. A second converter would only appear if a DPAS-specific 2-bit swizzled
+layout is adopted as a measured win - that is roadmap row I2, gated like every other idea from this
+round (`docs/ROADMAP.md`, "Intel Arc A770 decode hypotheses (2026-11-25)").
+
+The report is a **projection**: the sum of one pass over every ternary tensor, i.e. the memory floor
+of a decode token. Attention, norms, the GDN state update and the output head's f32 work are
+excluded, so a backend will be slower. It is not a model run, engine result or support claim, and
+M2 stays partial (Windows, OpenCL probe, no `libksycl.so`, no device selection in the engine).
+
 ### M2 ternary GEMM in the engine's q8 shape (2026-11-24)
 
 `kindi intel-gemm` runs the arithmetic the engine's prompt path does, at the CUDA kernels' tile,

@@ -1,5 +1,23 @@
 # Changelog
 
+## Intel Arc A770: a real pack's shapes on the card (2026-11-25)
+
+- **`kindi intel-pack --pack DIR`** reads a converted pack's `bcodes.bin`/`dpm.bin` exactly as the
+  converter wrote them, uploads them unchanged, and runs the four-row phase-split GEMV at every
+  distinct ternary shape in `index.json`. It validates the smallest real tensor against the host
+  model at `parts=1` (bit for bit) and reports per-shape ms/GB/s plus the projection of one pass
+  over the whole pack (the decode memory floor). It is a probe: no model run, no engine path and no
+  Intel support claim.
+- **No Intel-specific converter.** The pack's on-disk 4-trit/byte layout is what the kernel reads;
+  the engine's 5-trit lane repack is a CUDA load-time detail. A second converter would only serve a
+  DPAS-specific swizzled layout, which is roadmap row I2 and is gated.
+- **Roadmap:** eight Arc decode hypotheses (s8 x s2 DPAS, 2-bit swizzle, single-launch kernel,
+  dp4a-shaped prefill, fp16 attention path, split-K queues, popcount comparison, 27B MTP drafting)
+  each with a numeric gate; all are proposals, and the vendor premises they rest on are listed as
+  unverified (`docs/ROADMAP.md`).
+- Tests: `tests/test_intel_pack.py` (7) cover pack parsing, shape grouping, the projection maths and
+  the failure paths without a GPU.
+
 ## Bonsai 2.5 27B publisher sampling (2026-11-25)
 
 - **The card's two sampling sets are the profile, in full.** `sampling_profile = publisher` on
