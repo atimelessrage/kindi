@@ -1739,3 +1739,22 @@ The 2026-11-24 note that `AGENTS.md` condensed to three lines, in full:
 - The v0.7.1 (`1cb59d2`) and v0.7.0 (`8298a0f`) merge details (Inkling 2 Mini, Flash-Next drafting, one CPU
   thread per physical core, the fork's own `tools/check_warp_masks.py`, the 2026-11-23 installer slice, and what
   stayed unrun) are under "The v0.7.1 and v0.7.0 merges" above.
+
+## Handoff bullets moved from AGENTS.md (2026-11-25, projector tier)
+
+Moved verbatim to keep the live handoff under its 450-line cap.
+
+  **2026-11-24:** the 27B verifies on the CPU engine, and the "missing" compiler was installed.**
+  `KINDI_DEVICE=cpu kindi verify` on the 27B pack is **4/4 token-exact** (40/40 per prompt) at 3.7 tok/s after a 340 s load;
+  packcheck full (10 files, 18.4 s) and a structural audit (851 tensors, byte ranges tiling every file, reference ids in range)
+  passed first, and `kindi plan` ran on it (8 GiB assumed: no split, 7,266 MiB at ctx 8192; the default max context plans 2 GDN CPU layers). Because
+  the blocker was detection, not hardware: clang+LLVM 18.1.8 sits under Program Files while `clang` is not on PATH, so `_find_cc` resolves `KINDI_CC`, then
+  PATH, then a standard LLVM install (newest first); the cache key names the compiler that will run, and `kindi caps` asks the same
+  resolver. That unblocked REQ-0028 A4's live half (`kindi selftest`, 2B CPU: `dialects agree`, exit 0) and the
+  `test_cpu_build.py` compile-and-load checks; `kindi plan` names the resolved pack and `kindi models` drops "too large" for
+  the 2B/4B/9B without a card. GPU rows still need a card; `MANUAL-HELP-NEEDED.md` is the only manual-help tracker and §3c holds the open repo gate.
+  **2026-11-24:** `POST /v1/messages` answers Anthropic's dialect on the same `run_generate` path, `kindi selftest`
+  drives it in process and with `--url`, and the mask cache is a bounded 64 MiB LRU; the `v0.7.1-fork` release is
+  **still unpublished**, so README's one-liners 404 until the owner runs `docs/RELEASE-CHECKLIST.md`. The rest of that
+  note and the v0.7.1/v0.7.0 merge detail are in
+  [this file](AGENTS-HISTORY.md).
