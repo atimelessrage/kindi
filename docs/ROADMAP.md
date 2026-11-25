@@ -941,6 +941,36 @@ The OpenCL probe's numbers are a projection, not a model run: they exclude atten
 state update and the f32 output-head work, so a real backend will be slower than the projection. A
 row above that "wins" only on the projection has not won.
 
+## Reasoning-effort text for `low` on the 27B (2026-11-25)
+
+The publisher template carries exactly two effort sentences: `xhigh` ("think carefully through the
+task ...") and `low` ("keep your thinking brief ..."), while `medium` leaves the slot empty.
+`kindi/chat.py` reproduces the xhigh sentence and the empty branch verbatim and renders the xhigh
+sentence for `low` (DEC-0013), because the 2.5 card says `low` is **not supported** and the model
+behaves close to `xhigh` there.
+
+A "do not overthink" sentence written by us would be a third text the model was never trained on,
+and the card's statement is about the effort level, not about a missing prompt. The 2026-11-25
+sampling run does show the slot is not inert - `medium` (empty) and `xhigh` produced different token
+ids on the same seed - so the sentence steers behaviour; it does not show that any sentence shortens
+the thinking, which is what a `low` request is actually asking for.
+
+| # | idea | why it might pay | first gate | status |
+|---|---|---|---|---|
+| E1 | render a Kindi "do not overthink" sentence for `low` | a `low` request renders the xhigh
+sentence today, so it buys the caller nothing; a blunt "answer, do not deliberate" may shorten the
+thinking | fixed prompt set, greedy, thinking on: thinking tokens to the end-of-thinking marker cut
+**>=30%** against the xhigh arm **with the same final answers**, recorded as a benchmark page and a
+DECISIONS entry that replaces DEC-0013 | proposed; unmeasured - a throwaway probe was invalidated by
+its own harness (it fed the engine's greedy token back as logits), and the tracked sampling run does
+not record thinking length |
+| E2 | render the template's own `low` sentence for `low` | faithful to what a caller sees in the
+vendor's own stack | the same gate as E1, and it must beat the card's "behaves close to `xhigh`"
+statement on this pack | proposed; the card argues against it |
+
+The sampling harness gap behind both rows: `tools/bonsai_sampling_bench.py` records ids and
+fingerprints, not thinking length, so the measurement they need does not exist yet.
+
 ## Standing rules
 
 - Every experiment gets a numeric gate before implementation, and the gate is written down before
