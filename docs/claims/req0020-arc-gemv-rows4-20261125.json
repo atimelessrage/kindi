@@ -17,7 +17,8 @@
       "quoted_in": [
         "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md",
         "docs/development/requirements/REQ-0020.md",
-        "docs/ROADMAP.md"
+        "docs/ROADMAP.md",
+        "CURRENT-VS-KINDI-0.7.md"
       ],
       "check": {
         "kind": "json",
@@ -32,7 +33,8 @@
       "quoted_in": [
         "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md",
         "docs/development/requirements/REQ-0020.md",
-        "docs/ROADMAP.md"
+        "docs/ROADMAP.md",
+        "CURRENT-VS-KINDI-0.7.md"
       ],
       "check": {
         "kind": "json",
@@ -48,7 +50,8 @@
       "quoted_in": [
         "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md",
         "docs/development/requirements/REQ-0020.md",
-        "docs/ROADMAP.md"
+        "docs/ROADMAP.md",
+        "CURRENT-VS-KINDI-0.7.md"
       ],
       "check": {
         "kind": "json",
@@ -148,7 +151,8 @@
       "quoted_in": [
         "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md",
         "docs/development/requirements/REQ-0020.md",
-        "docs/ROADMAP.md"
+        "docs/ROADMAP.md",
+        "CURRENT-VS-KINDI-0.7.md"
       ],
       "check": {
         "kind": "json",

@@ -3,7 +3,12 @@
 ## TLDR - too long didnt read
 
 **The comparison:** official Kindi **v0.7.1** (tag `v0.7.1`, commit `1cb59d2`, released 2026-11-23) against this fork at
-**`3288ba1`** on `merge/upstream-0.7.0` (the 0.7.0 merge `35e4697`, the 2026-11-24 v0.7.1 merge, and the rounds since).
+**`7cab9d8`** on `merge/upstream-0.7.0` (the 0.7.0 merge `35e4697`, the 2026-11-24 v0.7.1 merge, and the rounds since).
+
+**One release is newer than the baseline.** GitHub's latest release is **Kindi 0.7.2** (`22af8d4`, tag object
+`787f63a`, published 2026-11-25T02:05:13Z): **3 commits** and **26 files** on top of `v0.7.1`, so this fork is
+**3 commits behind the newest release** as well as ahead of the one it is compared against. Nothing in 0.7.2 is
+ported here yet, and no figure below includes it.
 
 **What 0.7.1 adds (now in the tree):** the **Inkling 2 Mini** engine (`inkling2.py`, `inkling2_gpu.cu`,
 `inkling2_cpu.c`, `inkling2_quant.py`, the `kindi inkling` command and the `kindi_inkling2` server backend; the
@@ -19,11 +24,12 @@ reviewed sub-warp masks, 0 unguarded legacy intrinsics. Writing it found two rea
 `k_q8x_T2` bypassed the file's own `KSHFLX` macro and `kindi.cu` `wsum_d`/`wsum_f` used bare `__shfl_xor` on every
 arch.
 
-**Measured 2026-11-24 against `v0.7.1` (`1cb59d2`, the latest official release) at `3288ba1`:** **0 commits
-behind, 778 commits ahead, 1,027 changed files (+147,430/−2,227), 1,159 tracked files against 232 upstream**, no
-upstream file missing, 31 numbered requirements. The earlier v0.7.1 measurement in this report (722 commits / 980
-files / 1,133 tracked at `e19850e`) and the v0.7.0 one (702 commits / 931 files against `8298a0f` at `35e4697`) are
-kept as the record; the numbers below them are 0.6.1-era runs and are unchanged.
+**Measured 2026-11-25 against `v0.7.1` (`1cb59d2`) at `7cab9d8`:** **0 commits behind, 797 commits ahead, 1,077
+changed files (+154,573/−2,238), 1,209 tracked files against 232 upstream**, no upstream file missing, 31 numbered
+requirements. The 2026-11-24 measurement of the same comparison (778 commits / 1,027 files / 1,159 tracked at
+`3288ba1`), the earlier v0.7.1 one (722 commits / 980 files / 1,133 tracked at `e19850e`) and the v0.7.0 one (702
+commits / 931 files against `8298a0f` at `35e4697`) are kept as the record; the numbers below them are 0.6.1-era runs
+and are unchanged.
 
 **What 0.7.0 brought in (now in the tree):** the Flash-Next engine (`qwen4exp_*`, `qx_cpu.c`, `qx_gpu.cu`), the
 multi-slot serving stack (`slots.py`, the `*_R` row kernels in `spec.cu`, `--slots`, `KINDI_SLOTS_*`), placement and
@@ -60,8 +66,9 @@ untouched: 0.7.0 already carries the equivalent Windows loader (`libcuda_name()`
 would leave only tests against a renamed API. That leaves 33 open PRs, of which 28 are rebased, 4 are in 0.7.0
 by content, and 1 (#47) is superseded.
 
-**Current status (2026-11-24, v0.7.1 merged):** **33 fork PRs (#47-#79) are open and 0 are merged**; 7 are drafts
-(#67-#71, #74, #76), and external #37 is open and dirty. After the official v0.7.1 (`1cb59d2`) merge, **31 of the 33
+**Current status (2026-11-25, re-checked against the GitHub API):** **33 fork PRs (#47-#79) are open and 0 are
+merged**; 7 are drafts (#67-#71, #74, #76), and external #37 is open. Upstream has 9 closed PRs and none of them is
+this fork's, so the fork has still never had a pull request merged. After the official v0.7.1 (`1cb59d2`) merge, **31 of the 33
 branches were rebased onto it** and force-pushed to `myfork` with `--force-with-lease`; #37 was left untouched.
 **#47 (Windows CUDA-driver detection) and #48 (host RAM at the cgroup limit) are now in 0.7.1 by content** - 0.7.1's
 `kindi/hostram.py` carries `_cgroup_dirs`/`_cgroup_limit`/`_cgroup_usage` - so both can be closed as included, which
@@ -69,7 +76,7 @@ leaves 31 rebased, 2 included and no superseded branch. A merge rehearsal on `1c
 foundation (#49, #50, #59, #60, #73, #57, #55, #72, #54, #61, #65, #66, #75, #51; #67 and #68 follow); the rest
 conflict in `kindi/__main__.py`, `kindi/server.py`, `kindi/backends/__init__.py` or the token-class/engine files.
 
-Report date: **2026-11-24**. Baseline: this fork at **`3288ba1`** against official **Kindi 0.7.1** (tag `v0.7.1`,
+Report date: **2026-11-25**. Baseline: this fork at **`7cab9d8`** against official **Kindi 0.7.1** (tag `v0.7.1`,
 commit `1cb59d2`, released 2026-11-23) on this fork's `merge/upstream-0.7.0` branch. The v0.7.0 comparison that
 produced most of this report used `8298a0f` at the merge commit `35e4697`, and the 0.6.1-era figures below were
 measured at `60a039b`. The earlier comparison, its 0.6.1 measurements and the
@@ -126,27 +133,47 @@ The delta moved with them: **722 → 778 commits**, **980 → 1,027 changed file
 path, model pack or upstream comparison number was re-measured: every speed and quality figure in §3 and §4 is still
 the 0.6.1-era run it names, and the 0.7.0/0.7.1 engines remain present-but-unrun.
 
+**2026-11-25 refresh (reported baseline `7cab9d8`).** **19 commits** and **86 files** (+7,247/−115) since `3288ba1`,
+in five rounds plus their history and handoff commits:
+
+| round | what is new | evidence |
+|---|---|---|
+| Ternary Bonsai 2.5 27B intake | a pack whose file shape matches is accepted instead of refused, and the 27B runs on the CPU engine with the template's own prompt | `docs/benchmarks/` Bonsai 2.5 CPU page; REQ-0029 |
+| Constrained mask, trie-walk memo | the mask's trie walk is cut exactly with a per-class edge memo (no language widening) | REQ-0027/REQ-0030 tests |
+| Constrained mask, accepted-character skip | characters a mask state cannot accept are skipped instead of re-scanned (41.37x on the mask, 9.9% end-to-end); an earlier memo was withdrawn as unsound | `docs/benchmarks/2026-11-24-i7-8086k-cpu-mask-fast/` |
+| llama.cpp serving boundary | the proxy backend stays out of `kindi serve` and the decision is recorded with its reason | REQ-0019 note |
+| Arc packed-ternary GEMV | four rows per work-item with `vload4` and a multiply-shift trine decode, `--kernel auto` default, bit-exact | `docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/`, REQ-0020 |
+
+The delta moved with them: **778 → 797 commits**, **1,027 → 1,077 changed files**, **+147,430/−2,227 →
++154,573/−2,238**, **1,159 → 1,209 tracked files** against 232 upstream. No engine speed or quality figure in §3 or
+§4 was re-measured in this refresh; the Arc numbers are probe measurements on the installed card, not engine runs.
+
 ## 1. Baseline
 
-> **At `3288ba1` (2026-11-24, official `v0.7.1` = `1cb59d2`):** **0 commits behind, 778 commits ahead,
-> 1,027 changed files (+147,430/−2,227), 1,159 tracked files vs 232 upstream**, no upstream file missing,
-> 31 numbered requirements (command block below). `v0.7.1` is the latest official release and its tree is
-> an ancestor of this branch, so `v0.7.1..HEAD` is the whole delta.
+> **At `7cab9d8` (2026-11-25, official `v0.7.1` = `1cb59d2`):** **0 commits behind, 797 commits ahead,
+> 1,077 changed files (+154,573/−2,238), 1,209 tracked files vs 232 upstream**, no upstream file missing,
+> 31 numbered requirements (command block below). `v0.7.1`'s tree is an ancestor of this branch, so
+> `v0.7.1..HEAD` is the whole delta. The newest official release is `v0.7.2` (`22af8d4`, published
+> 2026-11-25T02:05:13Z) and this branch does not contain it: it is 3 commits behind that tag.
+>
+> **At `3288ba1` (2026-11-24):** the same comparison read 778 commits, 1,027 changed files (+147,430/−2,227)
+> and 1,159 tracked files; that block is kept as the record.
 >
 > **At the 0.7.0 merge (2026-11-23):** official `v0.7.0` (`8298a0f`) against this fork on `merge/upstream-0.7.0`:
 > **0 commits behind, 702 commits ahead, 931 changed files (+133,113/-1,946), 1,066 tracked files vs 216**, no upstream
 > file missing. The paragraphs below the two blocks are the 0.6.1 baseline they were written at and stay as the
 > measurement record, including their `v0.6.1..HEAD` command block (683 / 897 / +127,213/−1,417 at that time).
 
-The current delta is re-derived, not quoted, by these commands (run at `3288ba1`):
+The current delta is re-derived, not quoted, by these commands (run at `7cab9d8`):
 
 ```sh
 git rev-list --count HEAD..v0.7.1                     # 0 commits behind
-git rev-list --count v0.7.1..HEAD                     # 778 commits ahead
-git diff --shortstat v0.7.1 HEAD                      # 1027 files changed, 147430 insertions(+), 2227 deletions(-)
+git rev-list --count HEAD..v0.7.2                     # 3 commits behind the newest release
+git rev-list --count v0.7.1..HEAD                     # 797 commits ahead
+git diff --shortstat v0.7.1 HEAD                      # 1077 files changed, 154573 insertions(+), 2238 deletions(-)
 git diff --diff-filter=D --name-only v0.7.1 HEAD      # (empty: no upstream file missing)
 git ls-tree -r --name-only v0.7.1 | wc -l             # 232 upstream files
-git ls-tree -r --name-only HEAD | wc -l               # 1159 tracked files
+git ls-tree -r --name-only HEAD | wc -l               # 1209 tracked files
 ls docs/development/requirements/REQ-*.md | wc -l     # 31 numbered requirements
 ```
 
@@ -244,7 +271,7 @@ The preview chips are computed at render time from the committed baseline and it
 | **Tool-call conformance suite** (`tests/test_tool_call_conformance.py`, REQ-0018) | 18 tests over Gemma 4 native, Nanbeige/Lightning XML+JSON and DeepSeek DSML truncated blocks (2026-11-15); all parsers hold the contract, no leak bugs found. 23 tool-call tests total pass |
 | **Backend plugin foundations** (`kindi/backends/`, REQ-0019) | T4.1 contract/registry/FakeBackend + T4.3 `kindi backends [--json]` listing (2026-11-15); CPU-only, importable on Python 3.6. T4.2 adapters for all five families landed 2026-11-16; Bonsai is GPU-gated on all four packs and Lightning for plain verify/bench on the 4060 Ti; Nanbeige, Gemma 4 and DeepSeek V4.1 are CPU-tested with blocked GPU gates — so still no arbitrary-GGUF claim |
 | **OpenAI error envelope + API conformance harness** (`kindi/api/errors.py`, `tests/api/`) | T5.1 2026-11-15: every server error is the OpenAI envelope; harness drives the real app with the official `openai` client, GPU-free |
-| **Intel Arc A770 purchased** (REQ-0020) | one A770 16 GB bought 2026-11-15, in transit (not installed); M0 audit done, M1 arrival checklist ready, `arc-a770` registered as `not measured`. No backend code, no support claim |
+| **Intel Arc A770 installed and probed** (REQ-0020) | the A770 16 GB is in this Windows host; M1 qualification passes (`kindi intel-cl`, `kindi intel-smoke`) and M2 has the read-only Intel probe, the Level Zero SYCL smoke and the packed-ternary GEMV probe. The four-rows-per-work-item GEMV is bit-exact and **1.357x** at 4096x8192 (0.0936 ms to 0.0690 ms, `docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/`); a 128 KB shape still costs 0.0410 ms, so small GEMVs are dispatch-bound. Probe code only: no engine, model run or backend claim, and `arc-a770` stays `not measured` in the support matrix |
 | **Intel iGPU G0 slice** (`kindi/intel.py`, REQ-0021) | 2026-11-15: DRM-sysfs discovery, oneAPI-floor eligibility, shared-memory budget, tandem GPU contract; `KINDI_DEVICE=intel` refuses loudly. G1+ SYCL kernels need an 11th-gen+ iGPU + oneAPI to compile/verify |
 | **Tandem worker-thread verdict** | step-0 re-measured 2026-11-15 (27B/24K, RTX 4060 Ti + 8086K): CPU 74.7 ms/token (6.2 ms/layer) at raw-kernel rate; head 17.6 ms + transfer 3.09 ms come first. **Worker thread not justified, should not be built** |
 | **4B conversion provenance** | fresh `kindi convert` of the downloaded PTQ1_0 GGUF reproduces the 4B pack byte-identically (sha256); converted pack verifies 3+tie like the reference; 9B/27B pack verify re-run 4/4 (2026-11-15) |
@@ -266,7 +293,7 @@ The preview chips are computed at render time from the committed baseline and it
 | **Mode A now defaults to its measured k=1 win** (`kindi/spec.py`, 2026-11-19) | explicit `KINDI_SPEC=mtp` now defaults to `KINDI_SPEC_K=1`; the 2B path is 4/4 token-exact, 160/160 tokens with 65/94 drafts accepted on the live ctx-1024 check. k=4 remains available but no longer silently selected; the other drafters keep k=4 (`docs/MTP.md`) |
 | **Controlled 9B CPU-only vs CPU+GPU tandem pairs** (2026-11-19/20) | three controlled `cpu-first` six-layer pairs at ctx 24,576: three-run median CPU-only **2.4** vs tandem **14.8** tok/s at 24K (**6.2x** over CPU-only), **4.1x** at 100 with runs spanning **3.0x-4.2x**. Run 3 after a passive >7 h cooldown reproduced run 2's tandem row within 8% and its CPU row within 4-10% except CPU-only 24K (1.8 -> 2.4, +33%), so run 2 was not a run-wide outlier; run 1 is the high side. Run 1 verified both placements 4/4, 133/133; runs 2-3 were throughput only. Corrects the old cross-run shallow-context 4.3x; the split stays below the full-GPU 9B row and buys headroom only. `docs/benchmarks/2026-11-19-i7-8086k-rtx4060ti-9b-controlled/` |
 
-## 3a. Upstream pull-request coverage (2026-11-23)
+## 3a. Upstream pull-request coverage (2026-11-25)
 
 > **Status at the 0.7.0 merge:** **33 fork PRs (#47-#79) open, 0 merged, 7 drafts** (#67-#71, #74, #76); external #37
 > open and dirty. Upstream still has no CI check suites and no maintainer review. The union is **122 paths**, of which
@@ -277,10 +304,16 @@ The preview chips are computed at render time from the committed baseline and it
 > **Superseded by the 2026-11-24 state:** all 31 non-#37 branches were rebased onto v0.7.1 (`1cb59d2`), and **#47**
 > joined the included-by-content list (0.7.1 ships the host-RAM cgroup cap and its own Windows loader), so the open
 > set is 33 PRs of which 31 rebased and 2 closeable as included. See the current-status paragraph above.
+>
+> **2026-11-25 re-check:** the GitHub API still reports 34 open PRs upstream, 33 of them this fork's, 7 drafts and
+> 0 merged; 9 PRs are closed and none is this fork's. The GitHub heads are the rebased ones the 2026-11-24 pass
+> force-pushed; the local `pr/*` refs are still the pre-rebase snapshots (`v0.6.1`/`v0.7.0` bases), so the head
+> hashes in the per-PR table are those snapshots, not the live heads.
 
-Thirty-four pull requests are open against `ahtx/kindi`: **#37** and **#47-#79**. **33 target
-`v0.6.1` (`7fececb`)**; #37 is an external fork (`JohnUzoka/kindi`) based on `dce89df`
-(the 0.6.1 parent) and GitHub reports it **`dirty`**. **27 are non-draft and 7 are draft**
+Thirty-four pull requests are open against `ahtx/kindi`: **#37** and **#47-#79**. The per-PR table and the path
+arithmetic in this subsection are the **0.6.1-era measurement** (33 branches opened against `v0.6.1`,
+`7fececb`); #37 is an external fork (`JohnUzoka/kindi`) based on `dce89df` (the 0.6.1 parent) and it was
+reported **`dirty`**. The live 2026-11-25 state is at the end of this section. **27 are non-draft and 7 are draft**
 (#67-#71, #74, #76); the 33 fork PRs are `mergeable: clean`. Every one of the 33 fork PR titles carries the CLA 1.1
 sentence; external #37 does not. The repository has **no CI check suites** and no maintainer
 review has landed.
@@ -362,46 +395,48 @@ uncovered file is independent work.
 | Native family engines and speculators | `kindi/dsv41*`, `gemma4*`, `lightning*`, `nanbeige*`, `mtp.py`, `mtp_heads.py` | family tests, CLI/server validation, Lightning GPU gate | #67-#71 add the adapter boundary only; packs are absent or corrupt, and each engine is a large PR on its own |
 | MoE expert cache and cold tier | `kindi/moe.py`, `moe_compat.py`, `moe_tandem.py`, `expert_cache.py`, `expert_chunk.py`, `cold_experts.py` | `test_expert_cache.py`/`test_cold_experts.py`; prefetch, slots and byte accounting | unit-tested only: no larger-than-RAM pack, GPU run or tok/s claim |
 | Kernels outside the Turing PRs | `kindi/chunk.cu`, `gemma4.cu`, `gemma4_fp8.cu`, `lightning.cu`, `tcf.cu` | multi-ISA dispatch, FP8 `mma.sync` tests, Q2_0 expert-lane gate | #75/#76 cover Turing TC; no AVX-512 host, real FP8 model or Blackwell run, and the Q2 lane is not wired |
-| Speculation and quality harnesses | `tools/verify_matrix.py`, `tools/spec_ab.py`, `tools/mtp_smoke.py`, `tools/check_claims.py`, coverage/perf/secret/quality gates | `verify --spec`/`bench --spec`, a 12/12 byte-identical A/B, the 1,635-test suite, 41 claims gates / 290 numbers | #72 covers only the k=1 default and #73 only stock parity; these harnesses depend on model packs and repo-specific baselines |
+| Speculation and quality harnesses | `tools/verify_matrix.py`, `tools/spec_ab.py`, `tools/mtp_smoke.py`, `tools/check_claims.py`, coverage/perf/secret/quality gates | `verify --spec`/`bench --spec`, a 12/12 byte-identical A/B, the full test suite, the 47-gate claims registry | #72 covers only the k=1 default and #73 only stock parity; these harnesses depend on model packs and repo-specific baselines |
 | Remaining server/API breadth | `kindi/server.py` is touched, but `/metrics`, the JSON access log, route-level 404/422 and the remaining request fields have no PR; session CLI is draft #74 | `test_server*`, session tests; bounded queue/429, rate limit, body caps | #58/#61-#65 split the API surface, and #74 is still a draft; the route-level work is not proposed |
 | Release/docs surface | `kindi/__init__.py`, `container.py`, `convert.py`, both installers, the archive builder, 606 docs and 92 tests | `0.7.0-fork` identity, container smoke, release checklist | depends on the code PRs; docs-only PRs would conflict heavily |
 
-**Live status, re-checked 2026-11-24 against the GitHub API** (not from a saved note):
+**Live status, re-checked 2026-11-25 against the GitHub API** (not from a saved note):
 
 ```sh
-curl -s "https://api.github.com/repos/ahtx/kindi/pulls?state=open&per_page=100"    # 34 open, 33 from this fork
-curl -s "https://api.github.com/repos/ahtx/kindi/pulls?state=closed&per_page=100"  # 9 closed, 0 of them this fork's
+curl -s "https://api.github.com/repos/ahtx/kindi/pulls?state=open&per_page=100"    # 34 open, 33 from this fork, 7 drafts
+curl -s "https://api.github.com/repos/ahtx/kindi/pulls?state=closed&per_page=100"  # 9 closed, 0 merged, 0 of them this fork's
 curl -s "https://api.github.com/repos/atimelessrage/kindi/pulls?state=all"         # the fork itself: 1 PR, closed draft
+curl -s "https://api.github.com/repos/ahtx/kindi/releases/latest"                  # Kindi 0.7.2, published 2026-11-25T02:05:13Z
 ```
 
-So the state is **33 open PRs from this fork (#47-#79), 7 drafts, 0 merged to date** - upstream has
+So the state is **33 open PRs from this fork (#47-#79), 7 drafts, 0 merged** - upstream has
 never merged one, and every closed upstream PR belongs to someone else. `gh` is not installed on this
-host, which is why the counts above come from the REST API directly. The 2026-11-24 rebase pass in
-the TLDR still stands: 31 branches are on `v0.7.1`, #47 and #48 are in the release by content, and a
-merge rehearsal found a 14-PR conflict-free foundation.
+host, which is why the counts above come from the REST API directly. The 2026-11-24 rebase pass pushed
+31 branches onto `v0.7.1` on GitHub, #47 and #48 are in the release by content, and a merge rehearsal on
+`1cb59d2` found a 14-PR conflict-free foundation.
 
-**Ahead with no pull request at all (measured at `3288ba1`).** The PR branches are snapshots of the
+**Ahead with no pull request at all (measured at `7cab9d8`).** The PR branches are snapshots of the
 pre-0.6/0.7 proposal line, so they carry none of this fork's work since the release:
 
 ```sh
 git rev-list --count v0.7.1..HEAD --not $(git for-each-ref --format='%(refname:short)' 'refs/heads/pr/*')
-# 778 commits since v0.7.1, 0 of them reachable from any pr/* branch
-git diff --name-only v0.7.1..HEAD | sort > mine.txt                       # 1027 changed files
+# 797 commits since v0.7.1, 0 of them reachable from any pr/* branch
+git diff --name-only v0.7.1..HEAD | sort > mine.txt                       # 1077 changed files
 for b in $(git for-each-ref --format='%(refname:short)' 'refs/heads/pr/*'); do
-  git diff --name-only "v0.7.1...$b"; done | sort -u > pr.txt             # 89 files, the PRs' whole footprint
-comm -23 mine.txt pr.txt | wc -l                                          # 938 files touched by no PR
+  git diff --name-only "v0.7.1...$b"; done | sort -u > pr.txt             # 113 files, the PRs' whole footprint
+comm -23 mine.txt pr.txt | wc -l                                          # 987 changed files
 ```
 
-The gap by top-level path: **docs 670, tests 112, kindi 77, tools 37, root 22, bridge 5, .github 4,
-docker 3, .agents 2, bench-logs 2**. In other words 89 of the 1,027 changed files - under a tenth -
-are covered by any PR, and the substance of what is unproposed is the table above plus everything
-landed since the release: the backend registry and its six adapters (REQ-0019 T4.1-T4.4, including
-the new `llamacpp` wildcard), the Anthropic `/v1/messages` endpoint (REQ-0028) and the
-dialect-parity `kindi selftest`, the Arc A770 SYCL/oneAPI probes (REQ-0020 M1-M2), the constrained
-mask and pick work (REQ-0027, REQ-0030), `kindi verify --spec` / `bench --spec` (REQ-0025/0026), and
-the claims/quality/secret gates. No PR proposes them today, and three of those areas (the backends,
-Anthropic, the SYCL probes) are ready to be proposed as small PRs with their own tests; the rest
-either depends on unavailable hardware or would conflict heavily with the open branches.
+The gap is roughly nine-tenths documentation and tests, with the rest in `kindi/`, `tools/`, root files, the
+bridge, CI and the container files. In other words **113 of the 1,077 changed files** - about a tenth - are
+covered by any PR, and the substance of what is unproposed is the table above plus everything landed since the
+release: the backend registry and its six adapters (REQ-0019 T4.1-T4.4, including the `llamacpp` wildcard), the
+Anthropic `/v1/messages` endpoint (REQ-0028) and the dialect-parity `kindi selftest`, the Arc A770 probes and the
+four-rows-per-work-item packed GEMV (REQ-0020 M1-M2, **1.357x** at 4096x8192), the Ternary Bonsai 2.5 27B intake
+and its CPU gate, the constrained-mask trie-walk memo and accepted-character skip (REQ-0027, REQ-0030), the
+llama.cpp serving boundary, `kindi verify --spec` / `bench --spec` (REQ-0025/0026), and the claims/quality/secret
+gates. No PR proposes them today; the backends, Anthropic and the Arc probes are the readiest to propose as small
+PRs with their own tests, and the rest either depends on unavailable hardware or would conflict heavily with the
+open branches.
 
 §4.3 lists the work that is not verified at all. This table lists only fork work with recorded
 tests or measurements that no PR proposes; it is an inventory of what could be proposed next,
@@ -575,8 +610,9 @@ limits; it makes no speed claim and does not replace the §4.6 A/B.
 ## 5. Model and hardware status
 
 **Rig.** i7-8086K (6 cores / 12 threads), RTX 4060 Ti 8 GB with the full **BAR1 8192 MiB**
-window, 2026-11-18. This is the only GPU used for the current measurements; the legacy
-cards, Arc and Intel iGPU rows below are not physical runs here.
+window, 2026-11-18. Every engine measurement in §3 and §4 was taken on that card. An Arc A770 16 GB was
+installed on 2026-11-25 and is used for the OpenCL/Level Zero probes only (no engine run, no support claim);
+the legacy cards and the Intel iGPU rows below still have no physical run.
 
 **Small MoEs (2026-11-14, `kindi/moe_compat.py` + `kindi/cascade.py`).**
 Recognition-only, not backends: tool routing for Nemotron Cascade 2 30B-A3B
@@ -591,9 +627,9 @@ reference + token-exact `kindi verify`.
 P4000 (`pascal8`), P106-100 (single 2B/4B/9B, dual 27B), M4000/M5000
 (`maxwell`), and RTX 4000 (`turing`, TC profile). Rig sessions now cover
 M5000 and RTX 4000 Turing (`docs/OLD-CARD-RIG.md`); **no physical run** on
-any of the five cards, so no new performance claim. Intel Arc: M0 audit
-done, A770 16 GB purchased and in transit, M1 (hardware qualification)
-unblocked on arrival (`docs/INTEL-ARC.md`, REQ-0020); Intel iGPU tandem
+any of the five cards, so no new performance claim. Intel Arc: the A770 16 GB
+is installed, M0 audit and M1 qualification are done and M2 has the Level
+Zero/OpenCL probes, still with no engine run (`docs/INTEL-ARC.md`, REQ-0020); Intel iGPU tandem
 investigation complete with G0 implementation (`docs/INTEL-IGPU-TANDEM.md`,
 REQ-0021). Mixed-card pairs: same-vendor layout implemented, GPU-unverified
 (`docs/MIXED-CARD-ROADMAP.md`).
@@ -609,13 +645,18 @@ arbitrary-draft-GGUF harness stays a separate gate.
 
 - §1's git commands (`git merge-base --is-ancestor`, `rev-list --count`,
   `diff --shortstat`, `diff --diff-filter=D`, `ls-tree`, `ls-files`).
-- Latest official release check (2026-11-22): GitHub `/repos/ahtx/kindi/releases/latest` -> [`v0.6.1`](https://github.com/ahtx/kindi/releases/tag/v0.6.1),
-  published 2026-11-16T21:49:20Z; `git ls-remote origin refs/heads/main` -> `7fececb`.
+- Latest release check (2026-11-25): GitHub `/repos/ahtx/kindi/releases/latest` -> [`v0.7.2`](https://github.com/ahtx/kindi/releases/tag/v0.7.2),
+  published 2026-11-25T02:05:13Z, tag object `787f63a` peeled to `22af8d4`; `git rev-list --count 7cab9d8..v0.7.2` -> 3
+  and `git diff --name-only v0.7.1 v0.7.2 | wc -l` -> 26. The 2026-11-22 check of `v0.6.1` (published
+  2026-11-16T21:49:20Z, `git ls-remote origin refs/heads/main` -> `7fececb`) stays as the record.
 - Counts at reported baseline `39f9768`: **683 commits**, **897 files**, `+127,213/−1,417`, **998 tracked files**,
   **28 numbered requirements**, zero file deletions (`git rev-list`, `git diff --shortstat`,
   `git diff --diff-filter=D`, `git ls-tree`). The code baseline `66eebd3` is 678 commits / +127,084;
   the five later commits are docs-only (net 4 files, +180/−51).
-- Upstream PR status (2026-11-22, GitHub API): **34 open** (#37, #47-#79): **27 non-draft and
+- Upstream PR status (2026-11-25, GitHub API): **34 open** (#37, #47-#79), **33 from this fork**, **7 drafts**
+  (#67-#71, #74, #76) and **0 merged**; **9 closed**, none of them this fork's; the fork's own repository has
+  1 PR, a closed draft. `gh` is absent on this host, so these come from the REST endpoints quoted in §3a.
+- Upstream PR status (2026-11-22, GitHub API, historical): **34 open** (#37, #47-#79): **27 non-draft and
   7 draft** (#67-#71, #74, #76), **33 `mergeable: clean`** and external #37 `dirty`. All target
   `7fececb` except #37 (`JohnUzoka/kindi`, base `dce89df`, not merge-ready). The union is **122 unique
   paths**: **94 of the 897 changed paths** (49 of 86 `kindi/` paths), 28 paths outside the delta and 54 shared;
@@ -631,10 +672,13 @@ arbitrary-draft-GGUF harness stays a separate gate.
   passed. The Python 3.6 blocker is fixed; no image has been published and `/health` still reports
   `commit: null` from the `kindi/COMMIT` placeholder. Evidence:
   `docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-container-smoke/RESULTS.md`.
-- Focused checks at this refresh: `python tools/check_claims.py` (37 gates / 265 numbers),
-  `python -m pytest -q tests/test_claims.py tests/test_docs_links.py` (20 passed).
-- Full suite on the current baseline: **1,420 passed, 28 skipped, 0 failed** (recorded at
-  `ee2ba46`; not re-run for this refresh); the earlier **1,391** at `60a039b` and **1,357** at
+- Focused checks at this refresh: `python tools/check_claims.py` (47 gates / 372 numbers),
+  `python -m pytest -q tests/test_claims.py` (19 passed).
+- Full suite at `7cab9d8` (2026-11-25): **1,657 passed, 47 skipped, 2 failed** on the pre-commit tree; both
+  failures were `tests/test_claims.py` refusing the still-untracked Arc evidence, and the file passes (19 passed)
+  once that evidence is committed. The suite was not re-run whole after the commit.
+- Full suite before that: **1,420 passed, 28 skipped, 0 failed** (recorded at
+  `ee2ba46`); the earlier **1,391** at `60a039b` and **1,357** at
   `f75253b` + `84b6686` are historical. On 2026-11-21 `config_reference --check` was stale
   (missing `KINDI_TANDEM_HEAD_SPLIT`); after regeneration, `tests/test_config_reference.py` is
   **8 passed**. Generated-artifact checks (`project_memory --check`, `config_reference --check`,

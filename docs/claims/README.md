@@ -59,7 +59,7 @@ Optional: `notes`, and per number `tolerance` (relative, default `0.002`).
 | `ratio` | `a` / `b` | `a`, `b` (`{file, pointer}`), `expect` |
 | `compare` | the **largest** relative gap in percent between value pairs, which must stay under `expect` | `pairs` (`[[file_a, pointer_a, file_b, pointer_b], ...]`), `expect` |
 | `text` | nothing; the `needle` must appear verbatim in the artifact (whitespace-insensitive) | `file`, `needle` |
-| `git` | a figure from a revision range: `commits` (`rev-list --count a..b`), `diffstat` (`files`/`insertions`/`deletions`), `deleted` (files removed), `treefiles` (tracked files at one revision) | `op`, `revs` or `rev`, optional `field`/`path`/`match`, `expect` |
+| `git` | a figure from a revision range: `commits` (`rev-list --count a..b`), `diffstat` (`files`/`insertions`/`deletions`), `deleted` (files removed), `treefiles` (tracked files at one revision), `paths` (changed files minus every file the refs matching `exclude_glob` propose; `field: union` counts that footprint instead) | `op`, `revs` or `rev`, optional `field`/`path`/`match`/`exclude_glob`, `expect` |
 
 `text` is for runs whose evidence is prose. It is the weakest kind: it proves the page still records
 the figure, not that the figure was recomputed. Prefer a JSON or CSV row when the run wrote one.

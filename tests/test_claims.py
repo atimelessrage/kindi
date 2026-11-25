@@ -267,3 +267,35 @@ def test_ref_evidence_must_resolve_to_a_commit(tmp_path):
     _write(root, "docs/claims/repo.json", json.dumps(claim, indent=1))
     problems = _problems(root)
     assert any("does not resolve to a commit" in p for p in problems), problems
+
+
+def _pr_fixture(tmp_path):
+    """A repository with a pr/* branch, so the exclusion and paths ops are checked against git."""
+    root = _git_fixture(tmp_path)
+
+    def run(*args):
+        subprocess.check_call(
+            ["git", "-C", root, "-c", "user.email=t@example.invalid", "-c", "user.name=test"] + list(args),
+            stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+
+    run("branch", "pr/one")
+    _write(root, "c.txt", "y\n")
+    run("add", "c.txt")
+    run("commit", "-qm", "three")
+    return root
+
+
+def test_commits_can_exclude_the_refs_a_pull_request_already_proposes(tmp_path):
+    root = _pr_fixture(tmp_path)
+    assert check_claims.run_check(root, {"kind": "git", "op": "commits", "revs": ["v1", "HEAD"]}) == 2.0
+    assert check_claims.run_check(root, {"kind": "git", "op": "commits", "revs": ["v1", "HEAD"],
+                                        "exclude_glob": "refs/heads/pr/*"}) == 1.0
+
+
+def test_paths_separates_the_unproposed_gap_from_the_pr_footprint(tmp_path):
+    root = _pr_fixture(tmp_path)
+    spec = {"kind": "git", "op": "paths", "revs": ["v1", "HEAD"], "exclude_glob": "refs/heads/pr/*"}
+    assert check_claims.run_check(root, spec) == 1.0                        # c.txt is the only gap
+    assert check_claims.run_check(root, dict(spec, field="union")) == 2.0   # a.txt and b.txt
+    with pytest.raises(check_claims.ClaimError):
+        check_claims.run_check(root, dict(spec, field="everything"))

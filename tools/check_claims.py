@@ -135,12 +135,37 @@ def _git(root, args):
     return out.decode("utf-8", "replace")
 
 
+def _refs(root, pattern):
+    """Local refs a claim names by pattern rather than by snapshot, so a rebase cannot hide the set."""
+    if not pattern:
+        return []
+    out = _git(root, ["for-each-ref", "--format=%(refname)", pattern])
+    return [line.strip() for line in out.splitlines() if line.strip()]
+
+
+def _paths(root, args):
+    """A path set from one git query."""
+    return set(line.strip() for line in _git(root, args).splitlines() if line.strip())
+
+
+def _proposed_paths(root, base, pattern):
+    """Every path any matching ref changes against its merge base with ``base``: one PR set's footprint."""
+    paths = set()
+    for ref in _refs(root, pattern):
+        paths |= _paths(root, ["diff", "--name-only", "%s...%s" % (base, ref)])
+    return paths
+
+
 def _git_value(root, spec):
     """One repository figure, recomputed from the revision range the claim names."""
     op = spec.get("op")
     if op == "commits":
         first, second = spec["revs"]
-        return float(_git(root, ["rev-list", "--count", "%s..%s" % (first, second)]).strip())
+        args = ["rev-list", "--count", "%s..%s" % (first, second)]
+        excluded = _refs(root, spec.get("exclude_glob"))
+        if excluded:
+            args += ["--not"] + excluded
+        return float(_git(root, args).strip())
     if op == "deleted":
         first, second = spec["revs"]
         names = _git(root, ["diff", "--diff-filter=D", "--name-only", first, second])
@@ -170,6 +195,16 @@ def _git_value(root, spec):
         if spec.get("match"):
             names = [name for name in names if fnmatch.fnmatch(os.path.basename(name), spec["match"])]
         return float(len(names))
+    if op == "paths":
+        first, second = spec["revs"]
+        field = spec.get("field", "gap")
+        if field not in ("gap", "union"):
+            raise ClaimError("unknown paths field %r" % field)
+        proposed = _proposed_paths(root, first, spec.get("exclude_glob"))
+        if field == "union":
+            return float(len(proposed))
+        changed = _paths(root, ["diff", "--name-only", first, second])
+        return float(len(changed - proposed))
     raise ClaimError("unknown git op %r" % op)
 
 
