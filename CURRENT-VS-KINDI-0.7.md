@@ -1,15 +1,29 @@
-# Current fork vs official Kindi 0.7.1
+# Current fork vs official Kindi 0.7.2
 
 ## TLDR - too long didnt read
 
-**The comparison:** official Kindi **v0.7.1** (tag `v0.7.1`, commit `1cb59d2`, released 2026-11-23) against this fork at
-**`d58dbf0`** on `merge/upstream-0.7.0` (the 0.7.0 merge `35e4697`, the 2026-11-24 v0.7.1 merge, and the rounds since).
+**The comparison:** official Kindi **v0.7.2** (commit `22af8d4`, published 2026-11-25) against this fork at
+**`6852b83`** on `merge/upstream-0.7.0` (the 0.7.0 merge `35e4697`, the v0.7.1 and v0.7.2 content ports, and the
+rounds since). Re-derived 2026-11-25: **807 commits ahead of `v0.7.1` (`1cb59d2`) and 0 behind**, and **807
+ahead of `v0.7.2` (`22af8d4`) with 3 commits behind** - the three release commits themselves, whose content is
+in the tree.
 
 **The newest release is ported by content.** GitHub's latest release is **Kindi 0.7.2** (`22af8d4`, tag object
 `787f63a`, published 2026-11-25T02:05:13Z): **3 commits** and **26 files** on top of `v0.7.1`. All of it is in this
-tree now (commit `d58dbf0`): the two `load_json` fixes were already here, and this round adds the LoRA adapter
-path, the router's OpenAI error bodies and the 0.7.2-fork version. Only the commits themselves are absent: **3
-commits past v0.7.1 that this history does not contain**.
+tree now (commit `6852b83`): the two `load_json` fixes were already here, and the 2026-11-24 round added the LoRA
+adapter path, the router's OpenAI error bodies and the 0.7.2-fork version. Only the commits themselves are absent:
+**3 commits past v0.7.1 that this history does not contain**. Two upstream paths have no counterpart here, by
+name only: `kindi/apierr.py` (`kindi/api/errors.py` carries the same body contract, plus `OpenAIError` and
+`response`) and the root-level `test_inkling2_engine.py` harness (it needs an Inkling pack this host does not
+have; `kindi/inkling2*` is present but unrun).
+
+**Branch state (2026-11-25, `main` at `6852b83`):** `main`, `merge/upstream-0.7.0` and this session's worktree
+are the same commit and clean. `origin/main` is the 3-commit v0.7.2 line, ported by content above; `myfork/main`
+is fully contained (no commit of its own). The `pr/*` linked worktrees and the `wip/*` branches hold either the
+open PRs' own deltas or work that is already in `main` by content - the five backend adapters and their contract
+(`kindi/backends/*`), the dense tandem runtime and its placements (`kindi/tandem.py`, the plan engine). Checked
+with `git cherry` per branch and by the modules themselves; nothing on a local branch is missing from `main`
+except the open PRs' diffs, which are review artefacts rather than unreleased work.
 
 **What 0.7.1 adds (now in the tree):** the **Inkling 2 Mini** engine (`inkling2.py`, `inkling2_gpu.cu`,
 `inkling2_cpu.c`, `inkling2_quant.py`, the `kindi inkling` command and the `kindi_inkling2` server backend; the
@@ -25,8 +39,11 @@ reviewed sub-warp masks, 0 unguarded legacy intrinsics. Writing it found two rea
 `k_q8x_T2` bypassed the file's own `KSHFLX` macro and `kindi.cu` `wsum_d`/`wsum_f` used bare `__shfl_xor` on every
 arch.
 
-**Measured 2026-11-25 against `v0.7.1` (`1cb59d2`) at `d58dbf0`:** **0 commits behind, 800 commits ahead, 1,079
-changed files (+155,723/−2,262), 1,211 tracked files against 232 upstream**, no upstream file missing, 31 numbered
+**Measured 2026-11-25 against `v0.7.2` (`22af8d4`) at `6852b83`:** **3 commits behind, 807 ahead, 1,094 files
+changed (+158,609/-2,325), 1,224 tracked files against 235**; against `v0.7.1` (`1cb59d2`) the same tree is 0
+behind, 807 ahead, 1,092 files (+159,203/-2,267). Before the 2026-11-25 audit round (`d58dbf0`) the v0.7.1 read was **0 commits behind, 800 commits ahead, 1,079
+changed files (+155,723/−2,262), 1,211 tracked files against 232 upstream**, no upstream file missing
+against `v0.7.1` (the two 0.7.2 paths named above are the only exception), 31 numbered
 requirements. Before the 0.7.2 port (`7cab9d8`) the same read was 797 commits / 1,077 files / 1,209 tracked.
  The 2026-11-24 measurement of the same comparison (778 commits / 1,027 files / 1,159 tracked at
 `3288ba1`), the earlier v0.7.1 one (722 commits / 980 files / 1,133 tracked at `e19850e`) and the v0.7.0 one (702
