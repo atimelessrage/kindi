@@ -52,7 +52,8 @@ def test_bonsai25_thinking_profile_drops_the_presence_penalty():
     The 2.5 id must reach its own entry; the 2 family's entry would otherwise apply.
     """
     prof = profiles.profile_for("bonsai2.5-27b", thinking=True)
-    assert prof == {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "presence_penalty": 0.0, "max_tokens": 8192}
+    assert prof == {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "min_p": 0.0, "presence_penalty": 0.0,
+                    "repeat_penalty": 1.0, "max_tokens": 8192}
     assert profiles.profile_for("bonsai2.5-27b", thinking=False)["presence_penalty"] == 1.5
     assert profiles.profile_for("bonsai2-27b", thinking=True)["presence_penalty"] == 1.0
 
@@ -62,3 +63,14 @@ def test_backends_without_a_publisher_profile_fall_back():
         assert profiles.profile_for(name) == {}
         sd = profiles.sampling_defaults(cfg(model_name=name), thinking=True)
         assert sd["temperature"] == 0.7 and sd["presence_penalty"] == 0.0
+
+def test_the_2_5_profiles_are_the_publisher_sets_in_full():
+    """Prism's 2.5 card: thinking keeps presence 0.0 and both modes set min_p 0 and repetition 1.0."""
+    think = profiles.profile_for("bonsai2.5-27b", thinking=True)
+    assert (think["temperature"], think["top_p"], think["top_k"], think["min_p"],
+            think["presence_penalty"], think["repeat_penalty"]) == (1.0, 0.95, 20, 0.0, 0.0, 1.0)
+    plain = profiles.profile_for("bonsai2.5-27b", thinking=False)
+    assert (plain["temperature"], plain["top_p"], plain["top_k"], plain["min_p"],
+            plain["presence_penalty"], plain["repeat_penalty"]) == (0.7, 0.80, 20, 0.0, 1.5, 1.0)
+    # and Bonsai 2 keeps its own thinking presence penalty (the card says 1.0 there)
+    assert profiles.profile_for("bonsai2-27b", thinking=True)["presence_penalty"] == 1.0

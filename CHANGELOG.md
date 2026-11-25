@@ -1,5 +1,22 @@
 # Changelog
 
+## Bonsai 2.5 27B publisher sampling (2026-11-25)
+
+- **The card's two sampling sets are the profile, in full.** `sampling_profile = publisher` on
+  `bonsai2.5-27b` now states every value the card gives: thinking temperature 1.0 / top-p 0.95 /
+  top-k 20 / min-p 0.0 / presence 0.0 / repetition 1.0, instruct 0.7 / 0.80 / 20 / 0.0 / 1.5 / 1.0.
+  The off values were already the defaults, so behaviour does not change; they are now part of the
+  profile so a user override cannot silently leave one out and the tests pin the whole set.
+- **`reasoning_effort = low` renders the `xhigh` instruction.** The 2.5 card says `low` is not
+  supported and the model then behaves close to `xhigh`; the template's own `low` text is not what
+  the model was trained on, so Kindi maps `low` to `xhigh` (`kindi/chat.py`, DEC-0013). `xhigh`
+  stays the default and `medium` the shorter-response setting.
+- **A repeatable benchmark covers both packs.** `tools/bonsai_sampling_bench.py` renders the 27B
+  template, asks `kindi.profiles` for the values (so the benchmark cannot drift from the server),
+  samples with `kindi.sampling.Sampler` and records settings, ids, text and timings for instruct and
+  for thinking at `xhigh`, `medium` and `low`. Its 2026-11-25 run on the CPU engine covers both the
+  plain and the `-mtp` Bonsai 2.5 27B packs; no GPU run (the Arc A770 has no backend).
+
 ## Bonsai 2.5 27B `-mtp` files (2026-11-25)
 
 - **The `-mtp` GGUF converts to the base model's pack.** Prism ships the 2.5 27B draft head as a

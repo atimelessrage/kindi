@@ -490,8 +490,10 @@ use the 27B for fast steps and the 33B for harder coding steps.
   and converter: the `-mtp` file is the same 64-layer model with its head in an extra block, so it
   builds the same pack, with the head recorded in `kindi_pack.json` and not used to draft. The 2.5 has
   been converted and run on the CPU engine only, and `kindi verify` refuses it because no llama.cpp
-  reference exists for that release. The 27B needs 8 GB of card memory (GTX 1080, RTX 3080) or two 4 GB
-  cards (2x K1200).
+  reference exists for that release. Its publisher settings are built in: `sampling_profile = publisher`
+  selects the card's thinking or instruct set, and `reasoning_effort = xhigh` (the default), `medium` or
+  `low` controls thinking depth (`low` is unsupported by the model and behaves like `xhigh`). The 27B needs
+  8 GB of card memory (GTX 1080, RTX 3080) or two 4 GB cards (2x K1200).
 - **At most two GPUs per model.** Two cards run one model in tensor parallel. More cards run more servers.
 - **Small models make mistakes.** The 2B is good at short code, shell and factual questions, tool calls and
   summaries. Check what it writes.

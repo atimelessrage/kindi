@@ -16,8 +16,11 @@ PROFILES = {
     # penalty to 0.0, with `xhigh` as its reasoning default. Listed first: the 2.5 model id
     # (bonsai2.5-27b) must not fall through to the 2 family entry below.
     "bonsai2.5-": {
-        False: {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "presence_penalty": 1.5},
-        True: {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "presence_penalty": 0.0, "max_tokens": 8192},
+        # the card's instruct set, complete: min_p 0 and repetition 1.0 are the off values, stated
+        False: {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "min_p": 0.0, "presence_penalty": 1.5,
+                "repeat_penalty": 1.0},
+        True: {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "min_p": 0.0, "presence_penalty": 0.0,
+               "repeat_penalty": 1.0, "max_tokens": 8192},
     },
     "bonsai2-": {
         False: {"temperature": 0.7, "top_p": 0.8, "top_k": 20, "presence_penalty": 1.5},

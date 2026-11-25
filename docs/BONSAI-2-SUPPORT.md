@@ -278,7 +278,27 @@ presence penalty, and the thinking profile is different. The publisher recommend
   sampler substitute
 
 Bonsai 2.5 27B changes one value: its card recommends presence 0.0 in thinking mode, where Bonsai 2
-says 1.0, and `kindi/profiles.py` keys that on the 2.5 model id (`bonsai2.5-27b`).
+says 1.0, and `kindi/profiles.py` keys that on the 2.5 model id (`bonsai2.5-27b`). The 2.5 card also
+states the off values (`min_p` 0.0, `repetition_penalty` 1.0) and its reasoning-effort rules, so the
+profile and Kindi's template handle all three:
+
+| mode | temperature | top_p | top_k | min_p | presence | repetition |
+|---|---:|---:|---:|---:|---:|---:|
+| thinking | 1.0 | 0.95 | 20 | 0.0 | 0.0 | 1.0 |
+| instruct (non-thinking) | 0.7 | 0.80 | 20 | 0.0 | 1.5 | 1.0 |
+
+- **Reasoning effort:** `xhigh` is the default and the most accurate. `medium` is for shorter
+  responses and a balance of speed and accuracy. `low` is not supported by the model: when it is
+  selected the model behaves close to `xhigh`, so Kindi renders the `xhigh` instruction for it rather
+  than the template's own `low` text (which the model was not trained on). `reasoning_effort` is a
+  config key and a request field; it applies only when thinking is on.
+- **Which request gets which set:** thinking requests (`enable_thinking`) take the first row,
+  instruct requests the second. `sampling_profile = publisher` makes the profile active; a request's
+  own values, or values the user set in the config, still win.
+- **Repeatable benchmark:** `tools/bonsai_sampling_bench.py` runs both rows on a pack (and thinking
+  at `xhigh`, `medium` and `low`), on the CPU engine or a card, and writes the ids, text, settings and
+  timings to JSON. The 2026-11-25 CPU run on both 2.5 27B packs is
+  [the sampling benchmark page](benchmarks/2026-11-25-i7-8086k-bonsai25-27b-sampling/README.md).
 
 **Implemented (2026-11-10).** `presence_penalty` is a request field (OpenAI semantics, -2..2) and a
 config key; `kindi/profiles.py` carries the publisher profile above, and `sampling_profile = publisher`

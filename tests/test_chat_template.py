@@ -108,9 +108,13 @@ def test_template_variant():
 
 
 def test_27b_reasoning_effort_and_error():
-    body, _ = chat.render([{"role": "user", "content": "Hi"}], variant="bonsai27",
-                          enable_thinking=True, reasoning_effort="low")
-    assert "Keep your thinking brief" in body
+    # the 2.5 card: low is not supported and the model behaves close to xhigh, so the xhigh
+    # instruction is rendered (the template's own low text is not what the model was trained on)
+    low, _ = chat.render([{"role": "user", "content": "Hi"}], variant="bonsai27",
+                         enable_thinking=True, reasoning_effort="low")
+    xhigh, _ = chat.render([{"role": "user", "content": "Hi"}], variant="bonsai27",
+                           enable_thinking=True, reasoning_effort="xhigh")
+    assert low == xhigh and "Reasoning effort is set to xhigh" in low
     with pytest.raises(ValueError, match="Unexpected reasoning effort"):
         chat.render([{"role": "user", "content": "Hi"}], variant="bonsai27",
                     enable_thinking=True, reasoning_effort="max")

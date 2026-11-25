@@ -105,7 +105,9 @@ Used when a request does not set them: `max_tokens` (`1024`), `temperature` (`0.
 prompt or the reply is lowered by that value once, however often it appears there. The Bonsai backends apply it;
 Gemma 4 and Nanbeige do not. `sampling_profile = publisher` fills the sampling values that the user did not set
 explicitly from the Bonsai publisher's profile: non-thinking 0.7 / 0.8 / 20 with presence 1.5; thinking 1.0 /
-0.95 / 20 with presence 1.0 and an 8192-token default output. The default (`default`) keeps the values above.
+0.95 / 20 with presence 1.0 and an 8192-token default output. For **Bonsai 2.5 27B** (`bonsai2.5-27b`) the
+profile is the 2.5 card's full set: thinking 1.0 / 0.95 / 20 with presence 0.0, instruct 0.7 / 0.80 / 20 with
+presence 1.5, and `min_p` 0 with `repeat_penalty` 1.0 in both. The default (`default`) keeps the values above.
 
 Off by default: `min_p` (`0`) and `repeat_penalty` (`1.0`), with `repeat_last_n` (`64`; `-1` = the full context).
 They work as in llama.cpp. When `repeat_penalty` is not 1.0, the output is not token-exact with the greedy output,
@@ -119,7 +121,7 @@ do not use them yet.
 | `repeat_stop` | `0` | `1` stops a reply caught in a repeating loop. A loop while thinking closes the thinking block early and lets the model answer |
 | `lookup` | `5` | Nanbeige prompt-lookup drafting, up to this many tokens per check; `0` turns it off |
 | `mtp_head` | (empty) | Nanbeige MTP head file, a draft source for `kindi serve` only (the registry gateway and `kindi verify`/`bench` are non-drafting); empty = none |
-| `reasoning_effort` | (empty) | 27B template: `xhigh`, `medium` or `low`; empty = the template default (`xhigh`) |
+| `reasoning_effort` | (empty) | 27B template: `xhigh`, `medium` or `low`; empty = the template default (`xhigh`). The 2.5 card does not support `low` (the model behaves close to `xhigh`), so `low` renders the `xhigh` instruction |
 | `sampling_profile` | `default` | `default` or `publisher`; the publisher profile is described above |
 
 ## Environment variables for the engine

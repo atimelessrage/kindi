@@ -237,3 +237,21 @@ Use this shape:
   `kindi use`/`--pack` choice. Drafting with a 27B head remains open work: it needs a head
   extractor, an engine path that accepts head dimension 128 and a GPU run to verify exactness
   and speed. The catalog entry therefore carries the base fit estimate, not a speculative one.
+
+## DEC-0013: `reasoning_effort = low` renders the `xhigh` instruction on the Bonsai 2.5 27B
+
+- Status: accepted
+- Date: 2026-11-25
+- Requirements: none (Bonsai 2.5 27B publisher sampling; docs/BONSAI-2-SUPPORT.md section 4.2)
+- Context: the 27B template accepts `xhigh`, `medium` and `low`, and the vendor's card says `xhigh` is
+  the default and most accurate, `medium` balances length and accuracy, and `low` is **not
+  supported**: selecting it makes the model behave close to `xhigh`. The template still ships a
+  `low` instruction ("keep your thinking brief") that the model was not trained for, so rendering it
+  would be a setting the model does not honour.
+- Decision: keep accepting the `low` value (it is part of the model's API and rejecting it would
+  break clients), but render the `xhigh` instruction for it, so the prompt matches the documented
+  behaviour. `xhigh` and `medium` render their own instructions; unknown values still raise.
+- Consequences: a `low` request and an `xhigh` request produce the same prompt and, with the same
+  seed, the same tokens - which is the measured check in the sampling benchmark, not an assumption.
+  The alternative (rejecting `low`) was not taken because the vendor accepts it and only its effect
+  is unspecified.

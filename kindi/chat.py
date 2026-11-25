@@ -174,6 +174,10 @@ def _render27(messages, tools, enable_thinking, reasoning_effort, preserve_think
         eff = "xhigh" if reasoning_effort is None else reasoning_effort
         if eff not in REASONING_EFFORTS:
             raise ValueError("Unexpected reasoning effort %s. Supported types are xhigh (default), medium, and low." % eff)
+        if eff == "low":
+            # the 2.5 card: low is not supported, and the model behaves close to xhigh; the template
+            # text the template ships for low is not what the model was trained on, so use xhigh's
+            eff = "xhigh"
         instr = REASONING_EFFORTS[eff]
     keep = preserve_thinking is None or preserve_thinking is True
     out = ""
