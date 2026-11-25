@@ -1,0 +1,1486 @@
+{
+  "aggregate": {
+    "finish_each": {
+      "gbps": 68.63,
+      "launches": 802,
+      "ms": 99.076,
+      "tok_s": 10.093
+    },
+    "persist_p1_g1048576": {
+      "gbps": 253.08,
+      "grid": 1048576,
+      "launches": 1,
+      "max_ms": 30.139,
+      "min_ms": 25.976,
+      "ms": 26.867,
+      "parts": 1,
+      "tok_s": 37.22
+    },
+    "persist_p1_g262144": {
+      "gbps": 244.83,
+      "grid": 262144,
+      "launches": 1,
+      "max_ms": 32.879,
+      "min_ms": 23.805,
+      "ms": 27.772,
+      "parts": 1,
+      "tok_s": 36.007
+    },
+    "persist_p1_g4194304": {
+      "gbps": 233.61,
+      "grid": 4194304,
+      "launches": 1,
+      "max_ms": 39.474,
+      "min_ms": 27.049,
+      "ms": 29.107,
+      "parts": 1,
+      "tok_s": 34.356
+    },
+    "persist_p1_g65536": {
+      "gbps": 248.15,
+      "grid": 65536,
+      "launches": 1,
+      "max_ms": 27.993,
+      "min_ms": 27.174,
+      "ms": 27.401,
+      "parts": 1,
+      "tok_s": 36.495
+    },
+    "persist_p40_g1048576": {
+      "gbps": 230.9,
+      "grid": 1048576,
+      "launches": 2,
+      "max_ms": 30.369,
+      "min_ms": 26.757,
+      "ms": 29.449,
+      "parts": 40,
+      "tok_s": 33.957,
+      "values_equal": true
+    },
+    "persist_p40_g262144": {
+      "gbps": 204.59,
+      "grid": 262144,
+      "launches": 2,
+      "max_ms": 33.55,
+      "min_ms": 32.556,
+      "ms": 33.236,
+      "parts": 40,
+      "tok_s": 30.088
+    },
+    "persist_p40_g4194304": {
+      "gbps": 239.17,
+      "grid": 4194304,
+      "launches": 2,
+      "max_ms": 29.349,
+      "min_ms": 26.507,
+      "ms": 28.43,
+      "parts": 40,
+      "tok_s": 35.174
+    },
+    "persist_p40_g65536": {
+      "gbps": 231.48,
+      "grid": 65536,
+      "launches": 2,
+      "max_ms": 29.5,
+      "min_ms": 28.829,
+      "ms": 29.374,
+      "parts": 40,
+      "tok_s": 34.044
+    },
+    "persist_permat_g1048576": {
+      "gbps": 240.08,
+      "grid": 1048576,
+      "launches": 2,
+      "max_ms": 32.536,
+      "min_ms": 25.216,
+      "ms": 28.322,
+      "parts": 136,
+      "tok_s": 35.308,
+      "values_equal": true
+    },
+    "persist_permat_g262144": {
+      "gbps": 204.24,
+      "grid": 262144,
+      "launches": 2,
+      "max_ms": 34.418,
+      "min_ms": 33.169,
+      "ms": 33.292,
+      "parts": 136,
+      "tok_s": 30.037
+    },
+    "persist_permat_g4194304": {
+      "gbps": 225.96,
+      "grid": 4194304,
+      "launches": 2,
+      "max_ms": 31.1,
+      "min_ms": 27.166,
+      "ms": 30.092,
+      "parts": 136,
+      "tok_s": 33.232
+    },
+    "persist_permat_g65536": {
+      "gbps": 227.13,
+      "grid": 65536,
+      "launches": 2,
+      "max_ms": 30.065,
+      "min_ms": 29.574,
+      "ms": 29.936,
+      "parts": 136,
+      "tok_s": 33.404
+    },
+    "persist_rpt16_p20_g1048576": {
+      "gbps": 234.47,
+      "grid": 1048576,
+      "launches": 2,
+      "max_ms": 29.928,
+      "min_ms": 25.684,
+      "ms": 28.999,
+      "parts": 20,
+      "rpt": 16,
+      "tok_s": 34.484
+    },
+    "persist_rpt16_p40_g1048576": {
+      "gbps": 227.88,
+      "grid": 1048576,
+      "launches": 2,
+      "max_ms": 30.961,
+      "min_ms": 26.378,
+      "ms": 29.839,
+      "parts": 40,
+      "rpt": 16,
+      "tok_s": 33.514
+    },
+    "persist_rpt16_p8_g1048576": {
+      "gbps": 233.21,
+      "grid": 1048576,
+      "launches": 2,
+      "max_ms": 30.365,
+      "min_ms": 24.755,
+      "ms": 29.157,
+      "parts": 8,
+      "rpt": 16,
+      "tok_s": 34.298
+    },
+    "persist_rpt1_p40_g1048576": {
+      "gbps": 145.27,
+      "grid": 1048576,
+      "launches": 2,
+      "max_ms": 48.671,
+      "min_ms": 45.037,
+      "ms": 46.808,
+      "parts": 40,
+      "rpt": 1,
+      "tok_s": 21.364
+    },
+    "persist_rpt2_p40_g1048576": {
+      "gbps": 185.44,
+      "grid": 1048576,
+      "launches": 2,
+      "max_ms": 38.76,
+      "min_ms": 34.594,
+      "ms": 36.666,
+      "parts": 40,
+      "rpt": 2,
+      "tok_s": 27.273
+    },
+    "persist_rpt4_p40_g1048576": {
+      "gbps": 214.79,
+      "grid": 1048576,
+      "launches": 2,
+      "max_ms": 33.416,
+      "min_ms": 29.051,
+      "ms": 31.656,
+      "parts": 40,
+      "rpt": 4,
+      "tok_s": 31.589
+    },
+    "persist_rpt8_p20_g1048576": {
+      "gbps": 239.14,
+      "grid": 1048576,
+      "launches": 2,
+      "max_ms": 30.301,
+      "min_ms": 26.104,
+      "ms": 28.433,
+      "parts": 20,
+      "rpt": 8,
+      "tok_s": 35.17
+    },
+    "persist_rpt8_p40_g1048576": {
+      "gbps": 227.16,
+      "grid": 1048576,
+      "launches": 2,
+      "max_ms": 30.464,
+      "min_ms": 26.844,
+      "ms": 29.933,
+      "parts": 40,
+      "rpt": 8,
+      "tok_s": 33.408
+    },
+    "persist_rpt8_p8_g1048576": {
+      "gbps": 240.84,
+      "grid": 1048576,
+      "launches": 2,
+      "max_ms": 29.487,
+      "min_ms": 24.879,
+      "ms": 28.233,
+      "parts": 8,
+      "rpt": 8,
+      "tok_s": 35.42
+    },
+    "rpt1_p1": {
+      "gbps": 24.08,
+      "launches": 401,
+      "max_ms": 290.261,
+      "min_ms": 274.771,
+      "ms": 282.418,
+      "parts": 1,
+      "tok_s": 3.541
+    },
+    "rpt1_p20": {
+      "gbps": 113.26,
+      "launches": 802,
+      "max_ms": 61.837,
+      "min_ms": 59.502,
+      "ms": 60.034,
+      "parts": 20,
+      "tok_s": 16.657
+    },
+    "rpt1_p4": {
+      "gbps": 72.29,
+      "launches": 802,
+      "max_ms": 101.37,
+      "min_ms": 93.228,
+      "ms": 94.053,
+      "parts": 4,
+      "tok_s": 10.632
+    },
+    "rpt1_p40": {
+      "gbps": 114.34,
+      "launches": 802,
+      "max_ms": 61.711,
+      "min_ms": 59.032,
+      "ms": 59.466,
+      "parts": 40,
+      "tok_s": 16.816
+    },
+    "rpt1_p8": {
+      "gbps": 91.14,
+      "launches": 802,
+      "max_ms": 77.089,
+      "min_ms": 73.024,
+      "ms": 74.608,
+      "parts": 8,
+      "tok_s": 13.403
+    },
+    "rpt1_permat": {
+      "gbps": 105.75,
+      "launches": 802,
+      "max_ms": 71.933,
+      "min_ms": 62.132,
+      "ms": 64.296,
+      "parts": 136,
+      "tok_s": 15.553
+    },
+    "rpt2_p1": {
+      "gbps": 16.74,
+      "launches": 401,
+      "max_ms": 410.783,
+      "min_ms": 400.663,
+      "ms": 406.168,
+      "parts": 1,
+      "tok_s": 2.462
+    },
+    "rpt2_p20": {
+      "gbps": 132.3,
+      "launches": 802,
+      "max_ms": 51.945,
+      "min_ms": 51.248,
+      "ms": 51.396,
+      "parts": 20,
+      "tok_s": 19.457
+    },
+    "rpt2_p4": {
+      "gbps": 59.17,
+      "launches": 802,
+      "max_ms": 122.58,
+      "min_ms": 114.238,
+      "ms": 114.923,
+      "parts": 4,
+      "tok_s": 8.701
+    },
+    "rpt2_p40": {
+      "gbps": 142.31,
+      "launches": 802,
+      "max_ms": 48.37,
+      "min_ms": 47.654,
+      "ms": 47.781,
+      "parts": 40,
+      "tok_s": 20.929
+    },
+    "rpt2_p8": {
+      "gbps": 92.95,
+      "launches": 802,
+      "max_ms": 83.528,
+      "min_ms": 72.718,
+      "ms": 73.154,
+      "parts": 8,
+      "tok_s": 13.67
+    },
+    "rpt2_permat": {
+      "gbps": 138.13,
+      "launches": 802,
+      "max_ms": 60.725,
+      "min_ms": 48.602,
+      "ms": 49.226,
+      "parts": 136,
+      "tok_s": 20.314
+    },
+    "rpt4_p1": {
+      "gbps": 10.78,
+      "launches": 401,
+      "max_ms": 636.681,
+      "min_ms": 627.965,
+      "ms": 630.576,
+      "parts": 1,
+      "tok_s": 1.586
+    },
+    "rpt4_p20": {
+      "gbps": 121.33,
+      "launches": 802,
+      "max_ms": 58.645,
+      "min_ms": 55.759,
+      "ms": 56.04,
+      "parts": 20,
+      "tok_s": 17.844
+    },
+    "rpt4_p4": {
+      "gbps": 39.72,
+      "launches": 802,
+      "max_ms": 173.294,
+      "min_ms": 170.57,
+      "ms": 171.192,
+      "parts": 4,
+      "tok_s": 5.841
+    },
+    "rpt4_p40": {
+      "gbps": 139.72,
+      "launches": 802,
+      "max_ms": 52.243,
+      "min_ms": 48.138,
+      "ms": 48.665,
+      "parts": 40,
+      "tok_s": 20.549
+    },
+    "rpt4_p8": {
+      "gbps": 68.96,
+      "launches": 802,
+      "max_ms": 102.279,
+      "min_ms": 96.65,
+      "ms": 98.607,
+      "parts": 8,
+      "tok_s": 10.141
+    },
+    "rpt4_permat": {
+      "gbps": 139.56,
+      "launches": 802,
+      "max_ms": 51.101,
+      "min_ms": 48.364,
+      "ms": 48.72,
+      "parts": 136,
+      "tok_s": 20.525
+    },
+    "rpt8_p1": {
+      "gbps": 13.68,
+      "launches": 401,
+      "max_ms": 500.733,
+      "min_ms": 493.214,
+      "ms": 497.189,
+      "parts": 1,
+      "tok_s": 2.011
+    },
+    "rpt8_p20": {
+      "gbps": 131.54,
+      "launches": 802,
+      "max_ms": 54.62,
+      "min_ms": 51.416,
+      "ms": 51.692,
+      "parts": 20,
+      "tok_s": 19.346
+    },
+    "rpt8_p4": {
+      "gbps": 46.71,
+      "launches": 802,
+      "max_ms": 148.357,
+      "min_ms": 143.293,
+      "ms": 145.561,
+      "parts": 4,
+      "tok_s": 6.87
+    },
+    "rpt8_p40": {
+      "gbps": 143.51,
+      "launches": 802,
+      "max_ms": 49.942,
+      "min_ms": 46.942,
+      "ms": 47.381,
+      "parts": 40,
+      "tok_s": 21.105
+    },
+    "rpt8_p8": {
+      "gbps": 78.86,
+      "launches": 802,
+      "max_ms": 87.968,
+      "min_ms": 85.963,
+      "ms": 86.228,
+      "parts": 8,
+      "tok_s": 11.597
+    },
+    "rpt8_permat": {
+      "gbps": 138.83,
+      "launches": 802,
+      "max_ms": 57.497,
+      "min_ms": 48.315,
+      "ms": 48.977,
+      "parts": 136,
+      "tok_s": 20.418
+    }
+  },
+  "batch802_launch_us": 8.78,
+  "best_aggregate": "persist_p1_g1048576",
+  "best_overhead_share": 0.0003,
+  "device": {
+    "compute_units": 512,
+    "device_version": "OpenCL 3.0 NEO ",
+    "driver_version": "32.0.101.9175",
+    "global_mem_mib": 15932,
+    "max_clock_mhz": 2400,
+    "max_work_group_size": 1024,
+    "name": "Intel(R) Arc(TM) A770 Graphics",
+    "opencl_c_version": "OpenCL C 1.2 ",
+    "vendor": "Intel(R) Corporation"
+  },
+  "exactness": {
+    "gemv": [
+      {
+        "exact": true,
+        "kernel": "gemv_r1",
+        "parts": 1
+      },
+      {
+        "exact": true,
+        "kernel": "gemv_r1",
+        "parts": 4
+      },
+      {
+        "exact": true,
+        "kernel": "gemv_r1",
+        "parts": 8
+      },
+      {
+        "exact": true,
+        "kernel": "gemv_r2",
+        "parts": 1
+      },
+      {
+        "exact": true,
+        "kernel": "gemv_r2",
+        "parts": 4
+      },
+      {
+        "exact": true,
+        "kernel": "gemv_r2",
+        "parts": 8
+      },
+      {
+        "exact": true,
+        "kernel": "gemv_r4",
+        "parts": 1
+      },
+      {
+        "exact": true,
+        "kernel": "gemv_r4",
+        "parts": 4
+      },
+      {
+        "exact": true,
+        "kernel": "gemv_r4",
+        "parts": 8
+      },
+      {
+        "exact": true,
+        "kernel": "gemv_r8",
+        "parts": 1
+      },
+      {
+        "exact": true,
+        "kernel": "gemv_r8",
+        "parts": 4
+      },
+      {
+        "exact": true,
+        "kernel": "gemv_r8",
+        "parts": 8
+      }
+    ],
+    "persistent": [
+      {
+        "exact": true,
+        "parts": 1
+      },
+      {
+        "exact": true,
+        "parts": 4
+      }
+    ]
+  },
+  "fit": {
+    "bandwidth_gbs": 418.1209877681024,
+    "intercept_us": 125.81608101709635,
+    "points": [
+      {
+        "bytes": 10880,
+        "gbps": 0.09,
+        "ms": 0.1211,
+        "rows": 8
+      },
+      {
+        "bytes": 43520,
+        "gbps": 0.36,
+        "ms": 0.1214,
+        "rows": 32
+      },
+      {
+        "bytes": 174080,
+        "gbps": 1.21,
+        "ms": 0.1437,
+        "rows": 128
+      },
+      {
+        "bytes": 696320,
+        "gbps": 5.92,
+        "ms": 0.1176,
+        "rows": 512
+      },
+      {
+        "bytes": 2785280,
+        "gbps": 20.86,
+        "ms": 0.1335,
+        "rows": 2048
+      },
+      {
+        "bytes": 11141120,
+        "gbps": 72.25,
+        "ms": 0.1542,
+        "rows": 8192
+      },
+      {
+        "bytes": 16711680,
+        "gbps": 101.47,
+        "ms": 0.1647,
+        "rows": 12288
+      }
+    ],
+    "slope_ns_per_byte": 0.002391652247207017
+  },
+  "host": "i7-8086K, Windows, OpenCL via OpenCL.dll",
+  "matrices": 401,
+  "model": "Ternary-Bonsai-2.5-27B PTQ1_0 (GGUF dims, token_embd excluded)",
+  "noop_launch_us": 9.47,
+  "per_token_bytes": 6799564800,
+  "per_token_rows": 4147712,
+  "reps": 9,
+  "shapes": [
+    {
+      "best": "rpt8_p40",
+      "best_gbps": 12.72,
+      "bytes": 1392640,
+      "cols": 5120,
+      "rows": 1024,
+      "variants": {
+        "rpt1_p1": {
+          "gbps": 1.92,
+          "launches": 1,
+          "max_ms": 0.729,
+          "min_ms": 0.7111,
+          "ms": 0.7249
+        },
+        "rpt1_p2": {
+          "gbps": 3.34,
+          "launches": 2,
+          "max_ms": 0.4216,
+          "min_ms": 0.4028,
+          "ms": 0.4165
+        },
+        "rpt1_p20": {
+          "gbps": 10.6,
+          "launches": 2,
+          "max_ms": 0.1537,
+          "min_ms": 0.1219,
+          "ms": 0.1314
+        },
+        "rpt1_p4": {
+          "gbps": 5.36,
+          "launches": 2,
+          "max_ms": 0.3648,
+          "min_ms": 0.2512,
+          "ms": 0.2598
+        },
+        "rpt1_p40": {
+          "gbps": 10.72,
+          "launches": 2,
+          "max_ms": 0.15,
+          "min_ms": 0.1082,
+          "ms": 0.1299
+        },
+        "rpt1_p8": {
+          "gbps": 7.21,
+          "launches": 2,
+          "max_ms": 0.2004,
+          "min_ms": 0.1723,
+          "ms": 0.1932
+        },
+        "rpt2_p1": {
+          "gbps": 1.41,
+          "launches": 1,
+          "max_ms": 0.9927,
+          "min_ms": 0.9559,
+          "ms": 0.9862
+        },
+        "rpt2_p2": {
+          "gbps": 2.53,
+          "launches": 2,
+          "max_ms": 0.5711,
+          "min_ms": 0.5264,
+          "ms": 0.5504
+        },
+        "rpt2_p20": {
+          "gbps": 9.15,
+          "launches": 2,
+          "max_ms": 0.16,
+          "min_ms": 0.1486,
+          "ms": 0.1522
+        },
+        "rpt2_p4": {
+          "gbps": 4.29,
+          "launches": 2,
+          "max_ms": 0.3299,
+          "min_ms": 0.3034,
+          "ms": 0.325
+        },
+        "rpt2_p40": {
+          "gbps": 12.71,
+          "launches": 2,
+          "max_ms": 0.1365,
+          "min_ms": 0.1075,
+          "ms": 0.1096
+        },
+        "rpt2_p8": {
+          "gbps": 6.41,
+          "launches": 2,
+          "max_ms": 0.2274,
+          "min_ms": 0.1935,
+          "ms": 0.2172
+        },
+        "rpt4_p1": {
+          "gbps": 1.03,
+          "launches": 1,
+          "max_ms": 1.3751,
+          "min_ms": 1.3283,
+          "ms": 1.3543
+        },
+        "rpt4_p2": {
+          "gbps": 1.87,
+          "launches": 2,
+          "max_ms": 0.9171,
+          "min_ms": 0.7319,
+          "ms": 0.7447
+        },
+        "rpt4_p20": {
+          "gbps": 9.93,
+          "launches": 2,
+          "max_ms": 0.1488,
+          "min_ms": 0.1383,
+          "ms": 0.1403
+        },
+        "rpt4_p4": {
+          "gbps": 3.29,
+          "launches": 2,
+          "max_ms": 0.4334,
+          "min_ms": 0.4151,
+          "ms": 0.423
+        },
+        "rpt4_p40": {
+          "gbps": 12.18,
+          "launches": 2,
+          "max_ms": 0.116,
+          "min_ms": 0.1132,
+          "ms": 0.1143
+        },
+        "rpt4_p8": {
+          "gbps": 5.89,
+          "launches": 2,
+          "max_ms": 0.248,
+          "min_ms": 0.2334,
+          "ms": 0.2365
+        },
+        "rpt8_p1": {
+          "gbps": 1.35,
+          "launches": 1,
+          "max_ms": 1.0637,
+          "min_ms": 1.0268,
+          "ms": 1.0299
+        },
+        "rpt8_p2": {
+          "gbps": 2.49,
+          "launches": 2,
+          "max_ms": 0.7366,
+          "min_ms": 0.5539,
+          "ms": 0.5597
+        },
+        "rpt8_p20": {
+          "gbps": 9.33,
+          "launches": 2,
+          "max_ms": 0.1664,
+          "min_ms": 0.1319,
+          "ms": 0.1493
+        },
+        "rpt8_p4": {
+          "gbps": 3.89,
+          "launches": 2,
+          "max_ms": 0.3684,
+          "min_ms": 0.3293,
+          "ms": 0.3582
+        },
+        "rpt8_p40": {
+          "gbps": 12.72,
+          "launches": 2,
+          "max_ms": 0.1178,
+          "min_ms": 0.1091,
+          "ms": 0.1095
+        },
+        "rpt8_p8": {
+          "gbps": 6.62,
+          "launches": 2,
+          "max_ms": 0.2358,
+          "min_ms": 0.1999,
+          "ms": 0.2105
+        }
+      }
+    },
+    {
+      "best": "rpt2_p40",
+      "best_gbps": 48.36,
+      "bytes": 5570560,
+      "cols": 5120,
+      "rows": 4096,
+      "variants": {
+        "rpt1_p1": {
+          "gbps": 8.11,
+          "launches": 1,
+          "max_ms": 0.8598,
+          "min_ms": 0.678,
+          "ms": 0.6868
+        },
+        "rpt1_p2": {
+          "gbps": 14.2,
+          "launches": 2,
+          "max_ms": 0.4155,
+          "min_ms": 0.3837,
+          "ms": 0.3923
+        },
+        "rpt1_p20": {
+          "gbps": 42.65,
+          "launches": 2,
+          "max_ms": 0.1429,
+          "min_ms": 0.1274,
+          "ms": 0.1306
+        },
+        "rpt1_p4": {
+          "gbps": 23.48,
+          "launches": 2,
+          "max_ms": 0.2634,
+          "min_ms": 0.235,
+          "ms": 0.2372
+        },
+        "rpt1_p40": {
+          "gbps": 45.62,
+          "launches": 2,
+          "max_ms": 0.1271,
+          "min_ms": 0.1194,
+          "ms": 0.1221
+        },
+        "rpt1_p8": {
+          "gbps": 22.61,
+          "launches": 2,
+          "max_ms": 0.2538,
+          "min_ms": 0.2349,
+          "ms": 0.2464
+        },
+        "rpt2_p1": {
+          "gbps": 5.35,
+          "launches": 1,
+          "max_ms": 1.152,
+          "min_ms": 0.9833,
+          "ms": 1.0419
+        },
+        "rpt2_p2": {
+          "gbps": 9.73,
+          "launches": 2,
+          "max_ms": 0.6026,
+          "min_ms": 0.5543,
+          "ms": 0.5727
+        },
+        "rpt2_p20": {
+          "gbps": 31.98,
+          "launches": 2,
+          "max_ms": 0.1924,
+          "min_ms": 0.1507,
+          "ms": 0.1742
+        },
+        "rpt2_p4": {
+          "gbps": 17.0,
+          "launches": 2,
+          "max_ms": 0.4467,
+          "min_ms": 0.3123,
+          "ms": 0.3277
+        },
+        "rpt2_p40": {
+          "gbps": 48.36,
+          "launches": 2,
+          "max_ms": 0.1215,
+          "min_ms": 0.1141,
+          "ms": 0.1152
+        },
+        "rpt2_p8": {
+          "gbps": 25.77,
+          "launches": 2,
+          "max_ms": 0.2289,
+          "min_ms": 0.2106,
+          "ms": 0.2162
+        },
+        "rpt4_p1": {
+          "gbps": 3.95,
+          "launches": 1,
+          "max_ms": 1.5686,
+          "min_ms": 1.356,
+          "ms": 1.4088
+        },
+        "rpt4_p2": {
+          "gbps": 7.2,
+          "launches": 2,
+          "max_ms": 0.7847,
+          "min_ms": 0.7478,
+          "ms": 0.7737
+        },
+        "rpt4_p20": {
+          "gbps": 30.41,
+          "launches": 2,
+          "max_ms": 0.1921,
+          "min_ms": 0.1793,
+          "ms": 0.1832
+        },
+        "rpt4_p4": {
+          "gbps": 12.99,
+          "launches": 2,
+          "max_ms": 0.6021,
+          "min_ms": 0.4077,
+          "ms": 0.4287
+        },
+        "rpt4_p40": {
+          "gbps": 38.55,
+          "launches": 2,
+          "max_ms": 0.1503,
+          "min_ms": 0.1428,
+          "ms": 0.1445
+        },
+        "rpt4_p8": {
+          "gbps": 22.75,
+          "launches": 2,
+          "max_ms": 0.2504,
+          "min_ms": 0.2372,
+          "ms": 0.2449
+        },
+        "rpt8_p1": {
+          "gbps": 5.09,
+          "launches": 1,
+          "max_ms": 1.2533,
+          "min_ms": 1.0786,
+          "ms": 1.0939
+        },
+        "rpt8_p2": {
+          "gbps": 9.0,
+          "launches": 2,
+          "max_ms": 0.6339,
+          "min_ms": 0.5991,
+          "ms": 0.6188
+        },
+        "rpt8_p20": {
+          "gbps": 32.09,
+          "launches": 2,
+          "max_ms": 0.1788,
+          "min_ms": 0.1715,
+          "ms": 0.1736
+        },
+        "rpt8_p4": {
+          "gbps": 15.31,
+          "launches": 2,
+          "max_ms": 0.3703,
+          "min_ms": 0.3477,
+          "ms": 0.3638
+        },
+        "rpt8_p40": {
+          "gbps": 39.65,
+          "launches": 2,
+          "max_ms": 0.1461,
+          "min_ms": 0.1375,
+          "ms": 0.1405
+        },
+        "rpt8_p8": {
+          "gbps": 24.43,
+          "launches": 2,
+          "max_ms": 0.344,
+          "min_ms": 0.2171,
+          "ms": 0.228
+        }
+      }
+    },
+    {
+      "best": "rpt4_p40",
+      "best_gbps": 103.16,
+      "bytes": 16711680,
+      "cols": 5120,
+      "rows": 12288,
+      "variants": {
+        "rpt1_p1": {
+          "gbps": 22.5,
+          "launches": 1,
+          "max_ms": 0.7523,
+          "min_ms": 0.7328,
+          "ms": 0.7429
+        },
+        "rpt1_p2": {
+          "gbps": 26.88,
+          "launches": 2,
+          "max_ms": 0.7986,
+          "min_ms": 0.6041,
+          "ms": 0.6216
+        },
+        "rpt1_p20": {
+          "gbps": 86.19,
+          "launches": 2,
+          "max_ms": 0.199,
+          "min_ms": 0.191,
+          "ms": 0.1939
+        },
+        "rpt1_p4": {
+          "gbps": 40.49,
+          "launches": 2,
+          "max_ms": 0.4227,
+          "min_ms": 0.3787,
+          "ms": 0.4127
+        },
+        "rpt1_p40": {
+          "gbps": 85.48,
+          "launches": 2,
+          "max_ms": 0.2026,
+          "min_ms": 0.1918,
+          "ms": 0.1955
+        },
+        "rpt1_p8": {
+          "gbps": 76.48,
+          "launches": 2,
+          "max_ms": 0.222,
+          "min_ms": 0.2177,
+          "ms": 0.2185
+        },
+        "rpt2_p1": {
+          "gbps": 16.94,
+          "launches": 1,
+          "max_ms": 1.0086,
+          "min_ms": 0.9696,
+          "ms": 0.9865
+        },
+        "rpt2_p2": {
+          "gbps": 30.51,
+          "launches": 2,
+          "max_ms": 0.5514,
+          "min_ms": 0.5233,
+          "ms": 0.5477
+        },
+        "rpt2_p20": {
+          "gbps": 96.04,
+          "launches": 2,
+          "max_ms": 0.1824,
+          "min_ms": 0.1675,
+          "ms": 0.174
+        },
+        "rpt2_p4": {
+          "gbps": 38.85,
+          "launches": 2,
+          "max_ms": 0.6018,
+          "min_ms": 0.4195,
+          "ms": 0.4302
+        },
+        "rpt2_p40": {
+          "gbps": 97.56,
+          "launches": 2,
+          "max_ms": 0.1795,
+          "min_ms": 0.167,
+          "ms": 0.1713
+        },
+        "rpt2_p8": {
+          "gbps": 55.78,
+          "launches": 2,
+          "max_ms": 0.3199,
+          "min_ms": 0.2924,
+          "ms": 0.2996
+        },
+        "rpt4_p1": {
+          "gbps": 12.04,
+          "launches": 1,
+          "max_ms": 1.5533,
+          "min_ms": 1.3797,
+          "ms": 1.3876
+        },
+        "rpt4_p2": {
+          "gbps": 22.18,
+          "launches": 2,
+          "max_ms": 0.9466,
+          "min_ms": 0.7279,
+          "ms": 0.7535
+        },
+        "rpt4_p20": {
+          "gbps": 70.57,
+          "launches": 2,
+          "max_ms": 0.2567,
+          "min_ms": 0.2312,
+          "ms": 0.2368
+        },
+        "rpt4_p4": {
+          "gbps": 33.84,
+          "launches": 2,
+          "max_ms": 0.4966,
+          "min_ms": 0.4706,
+          "ms": 0.4938
+        },
+        "rpt4_p40": {
+          "gbps": 103.16,
+          "launches": 2,
+          "max_ms": 0.1816,
+          "min_ms": 0.1527,
+          "ms": 0.162
+        },
+        "rpt4_p8": {
+          "gbps": 45.07,
+          "launches": 2,
+          "max_ms": 0.3901,
+          "min_ms": 0.3613,
+          "ms": 0.3708
+        },
+        "rpt8_p1": {
+          "gbps": 15.26,
+          "launches": 1,
+          "max_ms": 1.3811,
+          "min_ms": 1.0841,
+          "ms": 1.095
+        },
+        "rpt8_p2": {
+          "gbps": 28.35,
+          "launches": 2,
+          "max_ms": 2.4614,
+          "min_ms": 0.5805,
+          "ms": 0.5895
+        },
+        "rpt8_p20": {
+          "gbps": 74.91,
+          "launches": 2,
+          "max_ms": 0.227,
+          "min_ms": 0.2204,
+          "ms": 0.2231
+        },
+        "rpt8_p4": {
+          "gbps": 36.88,
+          "launches": 2,
+          "max_ms": 0.468,
+          "min_ms": 0.4389,
+          "ms": 0.4531
+        },
+        "rpt8_p40": {
+          "gbps": 90.09,
+          "launches": 2,
+          "max_ms": 0.2831,
+          "min_ms": 0.1661,
+          "ms": 0.1855
+        },
+        "rpt8_p8": {
+          "gbps": 47.67,
+          "launches": 2,
+          "max_ms": 0.354,
+          "min_ms": 0.3305,
+          "ms": 0.3506
+        }
+      }
+    },
+    {
+      "best": "rpt2_p20",
+      "best_gbps": 124.93,
+      "bytes": 23674880,
+      "cols": 5120,
+      "rows": 17408,
+      "variants": {
+        "rpt1_p1": {
+          "gbps": 23.69,
+          "launches": 1,
+          "max_ms": 1.0147,
+          "min_ms": 0.9773,
+          "ms": 0.9992
+        },
+        "rpt1_p2": {
+          "gbps": 31.44,
+          "launches": 2,
+          "max_ms": 0.9366,
+          "min_ms": 0.7369,
+          "ms": 0.7531
+        },
+        "rpt1_p20": {
+          "gbps": 95.04,
+          "launches": 2,
+          "max_ms": 0.2719,
+          "min_ms": 0.2442,
+          "ms": 0.2491
+        },
+        "rpt1_p4": {
+          "gbps": 59.75,
+          "launches": 2,
+          "max_ms": 0.4074,
+          "min_ms": 0.3877,
+          "ms": 0.3962
+        },
+        "rpt1_p40": {
+          "gbps": 92.92,
+          "launches": 2,
+          "max_ms": 0.5055,
+          "min_ms": 0.2454,
+          "ms": 0.2548
+        },
+        "rpt1_p8": {
+          "gbps": 73.25,
+          "launches": 2,
+          "max_ms": 0.3477,
+          "min_ms": 0.2979,
+          "ms": 0.3232
+        },
+        "rpt2_p1": {
+          "gbps": 23.59,
+          "launches": 1,
+          "max_ms": 1.0116,
+          "min_ms": 0.984,
+          "ms": 1.0037
+        },
+        "rpt2_p2": {
+          "gbps": 33.02,
+          "launches": 2,
+          "max_ms": 0.841,
+          "min_ms": 0.7084,
+          "ms": 0.717
+        },
+        "rpt2_p20": {
+          "gbps": 124.93,
+          "launches": 2,
+          "max_ms": 0.1923,
+          "min_ms": 0.1878,
+          "ms": 0.1895
+        },
+        "rpt2_p4": {
+          "gbps": 48.46,
+          "launches": 2,
+          "max_ms": 0.4993,
+          "min_ms": 0.475,
+          "ms": 0.4885
+        },
+        "rpt2_p40": {
+          "gbps": 124.34,
+          "launches": 2,
+          "max_ms": 0.2177,
+          "min_ms": 0.1836,
+          "ms": 0.1904
+        },
+        "rpt2_p8": {
+          "gbps": 86.59,
+          "launches": 2,
+          "max_ms": 0.3043,
+          "min_ms": 0.2648,
+          "ms": 0.2734
+        },
+        "rpt4_p1": {
+          "gbps": 17.48,
+          "launches": 1,
+          "max_ms": 1.3769,
+          "min_ms": 1.3362,
+          "ms": 1.3541
+        },
+        "rpt4_p2": {
+          "gbps": 31.46,
+          "launches": 2,
+          "max_ms": 0.9551,
+          "min_ms": 0.7423,
+          "ms": 0.7526
+        },
+        "rpt4_p20": {
+          "gbps": 102.36,
+          "launches": 2,
+          "max_ms": 0.2449,
+          "min_ms": 0.2158,
+          "ms": 0.2313
+        },
+        "rpt4_p4": {
+          "gbps": 38.15,
+          "launches": 2,
+          "max_ms": 0.6348,
+          "min_ms": 0.6125,
+          "ms": 0.6205
+        },
+        "rpt4_p40": {
+          "gbps": 123.56,
+          "launches": 2,
+          "max_ms": 0.2002,
+          "min_ms": 0.1829,
+          "ms": 0.1916
+        },
+        "rpt4_p8": {
+          "gbps": 54.69,
+          "launches": 2,
+          "max_ms": 0.635,
+          "min_ms": 0.4247,
+          "ms": 0.4329
+        },
+        "rpt8_p1": {
+          "gbps": 22.06,
+          "launches": 1,
+          "max_ms": 1.2789,
+          "min_ms": 1.0662,
+          "ms": 1.0732
+        },
+        "rpt8_p2": {
+          "gbps": 36.12,
+          "launches": 2,
+          "max_ms": 0.6747,
+          "min_ms": 0.6312,
+          "ms": 0.6554
+        },
+        "rpt8_p20": {
+          "gbps": 111.67,
+          "launches": 2,
+          "max_ms": 0.2155,
+          "min_ms": 0.1997,
+          "ms": 0.212
+        },
+        "rpt8_p4": {
+          "gbps": 39.57,
+          "launches": 2,
+          "max_ms": 0.6028,
+          "min_ms": 0.5703,
+          "ms": 0.5983
+        },
+        "rpt8_p40": {
+          "gbps": 121.41,
+          "launches": 2,
+          "max_ms": 0.2175,
+          "min_ms": 0.1828,
+          "ms": 0.195
+        },
+        "rpt8_p8": {
+          "gbps": 60.74,
+          "launches": 2,
+          "max_ms": 0.4127,
+          "min_ms": 0.3772,
+          "ms": 0.3898
+        }
+      }
+    },
+    {
+      "best": "rpt8_p4",
+      "best_gbps": 263.24,
+      "bytes": 337715200,
+      "cols": 5120,
+      "rows": 248320,
+      "variants": {
+        "rpt1_p1": {
+          "gbps": 131.95,
+          "launches": 1,
+          "max_ms": 3.7141,
+          "min_ms": 2.5201,
+          "ms": 2.5594
+        },
+        "rpt1_p2": {
+          "gbps": 135.84,
+          "launches": 2,
+          "max_ms": 2.7474,
+          "min_ms": 2.4634,
+          "ms": 2.4862
+        },
+        "rpt1_p20": {
+          "gbps": 134.15,
+          "launches": 2,
+          "max_ms": 2.6994,
+          "min_ms": 2.4848,
+          "ms": 2.5175
+        },
+        "rpt1_p4": {
+          "gbps": 136.64,
+          "launches": 2,
+          "max_ms": 2.6106,
+          "min_ms": 2.4464,
+          "ms": 2.4716
+        },
+        "rpt1_p40": {
+          "gbps": 129.79,
+          "launches": 2,
+          "max_ms": 2.7871,
+          "min_ms": 2.572,
+          "ms": 2.6021
+        },
+        "rpt1_p8": {
+          "gbps": 133.48,
+          "launches": 2,
+          "max_ms": 3.0925,
+          "min_ms": 2.4654,
+          "ms": 2.5301
+        },
+        "rpt2_p1": {
+          "gbps": 205.4,
+          "launches": 1,
+          "max_ms": 1.8316,
+          "min_ms": 1.6381,
+          "ms": 1.6442
+        },
+        "rpt2_p2": {
+          "gbps": 215.56,
+          "launches": 2,
+          "max_ms": 1.5767,
+          "min_ms": 1.5576,
+          "ms": 1.5667
+        },
+        "rpt2_p20": {
+          "gbps": 223.99,
+          "launches": 2,
+          "max_ms": 1.5292,
+          "min_ms": 1.5011,
+          "ms": 1.5077
+        },
+        "rpt2_p4": {
+          "gbps": 222.17,
+          "launches": 2,
+          "max_ms": 1.5305,
+          "min_ms": 1.5073,
+          "ms": 1.5201
+        },
+        "rpt2_p40": {
+          "gbps": 214.34,
+          "launches": 2,
+          "max_ms": 1.7588,
+          "min_ms": 1.5702,
+          "ms": 1.5756
+        },
+        "rpt2_p8": {
+          "gbps": 228.16,
+          "launches": 2,
+          "max_ms": 1.5115,
+          "min_ms": 1.4662,
+          "ms": 1.4802
+        },
+        "rpt4_p1": {
+          "gbps": 120.96,
+          "launches": 1,
+          "max_ms": 2.935,
+          "min_ms": 2.5328,
+          "ms": 2.7919
+        },
+        "rpt4_p2": {
+          "gbps": 234.09,
+          "launches": 2,
+          "max_ms": 1.4736,
+          "min_ms": 1.4107,
+          "ms": 1.4427
+        },
+        "rpt4_p20": {
+          "gbps": 256.14,
+          "launches": 2,
+          "max_ms": 1.8513,
+          "min_ms": 1.2801,
+          "ms": 1.3185
+        },
+        "rpt4_p4": {
+          "gbps": 240.23,
+          "launches": 2,
+          "max_ms": 1.6856,
+          "min_ms": 1.342,
+          "ms": 1.4058
+        },
+        "rpt4_p40": {
+          "gbps": 238.3,
+          "launches": 2,
+          "max_ms": 3.434,
+          "min_ms": 1.3648,
+          "ms": 1.4172
+        },
+        "rpt4_p8": {
+          "gbps": 251.84,
+          "launches": 2,
+          "max_ms": 1.5434,
+          "min_ms": 1.3226,
+          "ms": 1.341
+        },
+        "rpt8_p1": {
+          "gbps": 131.82,
+          "launches": 1,
+          "max_ms": 2.8282,
+          "min_ms": 2.3306,
+          "ms": 2.562
+        },
+        "rpt8_p2": {
+          "gbps": 248.87,
+          "launches": 2,
+          "max_ms": 1.5093,
+          "min_ms": 1.3321,
+          "ms": 1.357
+        },
+        "rpt8_p20": {
+          "gbps": 261.57,
+          "launches": 2,
+          "max_ms": 1.3143,
+          "min_ms": 1.2746,
+          "ms": 1.2911
+        },
+        "rpt8_p4": {
+          "gbps": 263.24,
+          "launches": 2,
+          "max_ms": 1.775,
+          "min_ms": 1.2542,
+          "ms": 1.2829
+        },
+        "rpt8_p40": {
+          "gbps": 208.26,
+          "launches": 2,
+          "max_ms": 1.6468,
+          "min_ms": 1.5948,
+          "ms": 1.6216
+        },
+        "rpt8_p8": {
+          "gbps": 261.94,
+          "launches": 2,
+          "max_ms": 1.4554,
+          "min_ms": 1.2635,
+          "ms": 1.2893
+        }
+      }
+    }
+  ],
+  "spec_bandwidth_gbs": 560.0,
+  "stream_read_by_grid": {
+    "8192": 288.09,
+    "65536": 384.76,
+    "262144": 380.75,
+    "1048576": 374.56
+  },
+  "stream_read_gbps": 384.76
+}
