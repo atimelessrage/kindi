@@ -674,9 +674,9 @@ arbitrary-draft-GGUF harness stays a separate gate.
   `docs/benchmarks/2026-11-20-i7-8086k-rtx4060ti-container-smoke/RESULTS.md`.
 - Focused checks at this refresh: `python tools/check_claims.py` (47 gates / 372 numbers),
   `python -m pytest -q tests/test_claims.py` (19 passed).
-- Full suite at `7cab9d8` (2026-11-25): **1,657 passed, 47 skipped, 2 failed** on the pre-commit tree; both
-  failures were `tests/test_claims.py` refusing the still-untracked Arc evidence, and the file passes (19 passed)
-  once that evidence is committed. The suite was not re-run whole after the commit.
+- Full suite at `f3a1d23` (2026-11-25, after this refresh): **1,661 passed, 47 skipped, 0 failed**. The tree one
+  commit earlier read 1,657 passed / 47 skipped / 2 failed, both failures `tests/test_claims.py` refusing the
+  then-untracked Arc evidence; the two tests added for the new checker ops account for the difference.
 - Full suite before that: **1,420 passed, 28 skipped, 0 failed** (recorded at
   `ee2ba46`); the earlier **1,391** at `60a039b` and **1,357** at
   `f75253b` + `84b6686` are historical. On 2026-11-21 `config_reference --check` was stale
