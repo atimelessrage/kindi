@@ -488,6 +488,15 @@ def cmd_mmproj(cfg, a):
         return 2
     report = mmproj.load(a.path, place=place, max_mb=a.max_mb)
     report["place_source"] = source
+    if getattr(a, "record", None):
+        record = mmproj.record(a.record, a.path, place=place)
+        report["record"] = record
+        if not a.json:
+            for line in mmproj.render_record(record):
+                print(line)
+            for line in mmproj.render(report):
+                print(line)
+            return 0 if report["result"] == "pass" and record["result"] == "pass" else 1
     if a.json:
         print(mmproj.dumps(report))
     else:
@@ -862,6 +871,10 @@ def _build_parser():
     s.add_argument("--max-mb", type=int, default=0,
                    help="refuse a projector larger than this many MiB (0: no limit)")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
+    s.add_argument("--record", default=None, metavar="PACK",
+                   help="record this projector's size (bytes, sha256, policy) in PACK's "
+                        "kindi_pack.json, so `kindi plan` and /health report its placement; the "
+                        "weights stay outside the pack")
     s = sub.add_parser("intel-ternary", help="packed ternary GEMV probe on an Intel GPU (no backend)")
     s.add_argument("--rows", type=int, default=64, help="matrix rows (default 64, 1-4096)")
     s.add_argument("--cols", type=int, default=1024, help="matrix columns, a multiple of 128 (default 1024)")

@@ -17,6 +17,7 @@ Placement policy is `KINDI_MMPROJ_PLACE` (config key `mmproj_place`), default `r
 off the decode path, so the default keeps the card to the language model and its cache.
 """
 import ctypes
+import hashlib
 import json
 import os
 import struct
@@ -68,6 +69,123 @@ def resolve_place(requested=None, cfg=None):
             return "ram", source + " (auto: the projector is off the decode path)"
         return value, source
     return DEFAULT_PLACE, "default"
+
+
+def declared(pack):
+    """The pack manifest's projector block, or None when the pack declares none.
+
+    The field is `mmproj` in `kindi_pack.json`, written by `kindi mmproj FILE --record PACK`:
+    `{"bytes": N, "file": name, "sha256": ..., "place": policy}`.  A bare `"vision": true` (or a
+    non-object `mmproj`) counts as a declaration with no size, so the image refusal, `/health` and
+    `kindi plan` read one field and cannot disagree about whether a pack has vision weights.
+    """
+    if not pack:
+        return None
+    try:
+        with open(os.path.join(pack, "kindi_pack.json"), encoding="utf-8") as f:
+            man = json.load(f)
+    except (OSError, ValueError):
+        return None
+    block = man.get("mmproj")
+    if isinstance(block, dict):
+        return block
+    if block or man.get("vision"):
+        return {"bytes": 0, "file": None, "sha256": None, "place": None}
+    return None
+
+
+def policy(pack=None, cfg=None, requested=None):
+    """Where the declared projector's weights live and what that costs the card.
+
+    One function, so `kindi plan` and `/health` report the same decision: `place` is the resolved
+    policy (`--place`, `KINDI_MMPROJ_PLACE`/`mmproj_place`, default `ram`), `host_bytes` and
+    `card_bytes` say where the weights are counted, and `card_saved_bytes` is the card memory the
+    policy keeps for the language model and its K/V cache.
+    """
+    block = declared(pack) or {}
+    n = int(block.get("bytes") or 0)
+    place, source = resolve_place(requested, cfg)
+    out = {"declared": bool(declared(pack)), "bytes": n, "file": block.get("file"),
+           "place": place, "place_source": source, "error": None,
+           "host_bytes": 0, "card_bytes": 0, "card_saved_bytes": 0, "detail": None}
+    if place is None:
+        out["error"] = source
+        out["detail"] = ("the placement policy is refused, so no projector placement is decided: %s"
+                         % source)
+        return out
+    if place == "ram":
+        out["host_bytes"] = n
+        out["card_saved_bytes"] = n
+    else:
+        out["card_bytes"] = n
+    mib = n / 1048576.0
+    if not out["declared"]:
+        out["detail"] = ("no projector declared in this pack's manifest (`kindi mmproj FILE "
+                         "--record PACK` records its size), so mmproj_place decides nothing here")
+    elif place == "ram":
+        out["detail"] = ("%.1f MiB of projector weights stay in host RAM, so %.1f MiB of card "
+                         "memory stays with the language model and its K/V cache" % (mib, mib))
+    else:
+        out["detail"] = ("%.1f MiB of projector weights are counted against the card, out of the "
+                         "room the language model and its K/V cache plan against" % mib)
+    out["detail"] += "; no Kindi build implements the encoder, so image input is refused"
+    return out
+
+
+def record(pack, path, place=None):
+    """Write a projector's size into a pack's manifest: `kindi mmproj FILE --record PACK`.
+
+    The pack keeps no projector bytes (they live in the standalone `mmproj-*.gguf`), so what the
+    manifest needs is the price and the identity: bytes, file name, sha256 and the policy.  Returns
+    a small report; `result` is `fail` with `error` set when either side is unusable.
+    """
+    out = {"result": "fail", "error": None, "pack": pack, "path": os.path.abspath(path),
+           "bytes": None, "file": os.path.basename(path), "sha256": None, "place": None,
+           "manifest": os.path.join(pack or "", "kindi_pack.json")}
+    report = inventory(path)
+    if report["result"] != "pass":
+        out["error"] = report["error"]
+        return out
+    resolved, source = resolve_place(place, None)
+    if resolved is None:
+        out["error"] = source
+        return out
+    try:
+        with open(out["manifest"], encoding="utf-8") as f:
+            man = json.load(f)
+    except (OSError, ValueError) as exc:
+        out["error"] = "no readable manifest at %s: %s" % (out["manifest"], exc)
+        return out
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        while True:
+            chunk = f.read(1 << 20)
+            if not chunk:
+                break
+            digest.update(chunk)
+    man["mmproj"] = {"bytes": int(report["total_bytes"]), "file": out["file"],
+                     "sha256": digest.hexdigest(), "place": resolved,
+                     "tensors": len(report["tensors"]), "clip": report["clip"],
+                     "note": "the projector lives outside the pack; Kindi prices it and keeps it "
+                             "off the card (mmproj_place), and no build implements its encoder"}
+    tmp = out["manifest"] + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(man, f, indent=2)
+    os.replace(tmp, out["manifest"])
+    out.update({"result": "pass", "bytes": int(report["total_bytes"]),
+                "sha256": man["mmproj"]["sha256"], "place": resolved})
+    return out
+
+
+def render_record(out):
+    """Human-readable form of a `--record` result."""
+    if out["result"] != "pass":
+        return ["projector record: fail (%s)" % out["error"]]
+    return ["projector record: pass",
+            "  pack: %s" % out["manifest"],
+            "  projector: %s, %.1f MiB, sha256 %s... (%s)"
+            % (out["file"], out["bytes"] / 1048576.0, out["sha256"][:12], out["place"]),
+            "  plan and /health read this size; the weights stay outside the pack"]
 
 
 def _elements(dims):
@@ -128,9 +246,10 @@ def inventory(path):
     if not report["tensors"]:
         report["error"] = "the file has no tensors"
         return report
-    if report["total_bytes"] > report["file_bytes"]:
+    size = report["file_bytes"]
+    if size is not None and report["total_bytes"] > size:
         report["error"] = ("the tensor table prices %d bytes but the file is %d bytes"
-                           % (report["total_bytes"], report["file_bytes"]))
+                           % (int(report["total_bytes"]), int(size)))
         return report
     report["result"] = "pass"
     return report

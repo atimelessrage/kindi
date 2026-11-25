@@ -29,7 +29,9 @@ ctx = 24576
 # the plan engine needs KINDI_TP=0, and the CPU and tandem engines refuse it.
 lora =
 head = exact
-# vision projector (mmproj-*.gguf): ram keeps it off the card, vram accounts it there
+# vision projector (mmproj-*.gguf): ram keeps it off the card, vram accounts it there;
+# `kindi plan` and /health report the decision once a pack records a size
+# (`kindi mmproj FILE --record PACK`)
 mmproj_place = ram
 fast_clusters = 256
 # CPU+GPU tandem: cap the GPU side at this many MiB (0: no ceiling) and leave this much free for the

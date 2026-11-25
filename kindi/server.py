@@ -285,15 +285,21 @@ def _image_error(pack):
 
 
 def _pack_has_vision(pack):
-    """True only when the selected pack names vision weights in its manifest."""
-    if not pack:
-        return False
-    try:
-        with open(os.path.join(pack, "kindi_pack.json"), encoding="utf-8") as f:
-            man = json.load(f)
-    except (OSError, ValueError):
-        return False
-    return bool(man.get("vision") or man.get("mmproj"))
+    """True only when the selected pack names vision weights in its manifest.
+
+    The manifest reader is `mmproj.declared`, the same one `kindi plan` and `/health` use, so a pack
+    cannot declare vision weights to one of them and not the other.
+    """
+    from . import mmproj
+
+    return bool(mmproj.declared(pack))
+
+
+def _projector_health(pack, cfg):
+    """The projector's placement, from the same policy `kindi plan` reports (`mmproj.policy`)."""
+    from . import mmproj
+
+    return dict(mmproj.policy(pack, cfg))
 
 
 def _is_image_part(part):
@@ -1806,10 +1812,7 @@ def create_app(cfg, log=print):
                      "runtime": rt,
                      "queue": {"waiting": gate.waiting, "max": gate.max_queue, "rejected": gate.rejected,
                                "scheduler": dict(SCHED.counts(), yields=getattr(K, "yields", 0))},
-                     "projector": {"declared": _pack_has_vision(getattr(K, "pack", None)),
-                                   "place": cfg.get("mmproj_place", "ram"),
-                                   "detail": "mmproj weights; no Kindi build implements the encoder, "
-                                             "so image input is refused"},
+                     "projector": _projector_health(getattr(K, "pack", None), cfg),
                      "rate_limit_per_min": limiter.per_minute, "rate_limited": limiter.rejected,
                      "gpu_free_mib": round(free / 1048576.0), "gpu_total_mib": round(total / 1048576.0)})
         return body

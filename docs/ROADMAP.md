@@ -982,11 +982,19 @@ are idle on every text request - llama.cpp's `--no-mmproj-offload` answers the s
 the ggml type table (fails closed on a type it cannot price), resolves a placement from
 `--place`/`KINDI_MMPROJ_PLACE`/the `mmproj_place` key (default `ram`; `auto` resolves to `ram`), and
 for `ram` reads the weights into one host arena and reports resident bytes, load time and the RSS
-delta. `vram` allocates nothing in the probe and only accounts the bytes against the card. `/health`
-reports `projector.declared` and `projector.place`. Eight tests in `tests/test_mmproj.py` pin the
-inventory, the policy precedence, the arena, and the fail-closed cases. **No encoder exists**: the
-server still refuses image parts with a 400, so this is the placement decision and its accounting,
-not vision.
+delta. `vram` allocates nothing in the probe and only accounts the bytes against the card.
+
+The policy decides something outside that command: `kindi mmproj FILE --record PACK` writes the
+projector's size, hash and policy into the pack manifest (`mmproj`), and `kindi plan` and `/health`
+both read one function (`mmproj.policy`) over it. The plan prints a `projector:` line — with `ram`, the
+MiB kept in host RAM and the MiB of card memory that stays with the language model and its K/V cache;
+with `vram`, the same MiB counted against the card and added to the planner's reserve, so the layer
+split sees the smaller card. A pack that records no projector says so instead of inventing a number.
+`/health`'s `projector` block is that same dict (`declared`, `bytes`, `place`, `host_bytes`,
+`card_bytes`, `card_saved_bytes`, `detail`). Thirteen tests across `tests/test_mmproj.py` and
+`tests/test_plan.py` pin the inventory, the policy precedence, the arena, the manifest record, the
+plan-versus-health agreement and the fail-closed cases. **No encoder exists**: the server still
+refuses image parts with a 400, so this is the placement decision and its accounting, not vision.
 
 **Gate ladder for vision itself** (nothing here is started):
 

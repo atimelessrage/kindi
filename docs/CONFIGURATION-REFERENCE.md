@@ -124,7 +124,7 @@ direct sites.
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:592` |
 | `KINDI_CONFIG` | (unset) | `kindi/config.py:129` (+1 more) |
 | `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:254` (+7 more) |
-| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:601` (+1 more) |
+| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:610` (+1 more) |
 | `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:49` |
 | `KINDI_D1` | `1` or `0` | `kindi/spec.py:750` (+1 more) |
 | `KINDI_DATA` | `/data` | `kindi/container.py:243` |
@@ -183,7 +183,7 @@ direct sites.
 | `KINDI_G4_PAD` | `1` | `kindi/gemma4.py:611` |
 | `KINDI_G4_PARK_MAX` | `4` | `kindi/gemma4_cache.py:33` |
 | `KINDI_G4_PLE_HOST` | `auto` | `kindi/gemma4.py:493` |
-| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:773` |
+| `KINDI_G4_PREFILL_BATCH` | `512` | `kindi/server.py:779` |
 | `KINDI_G4_PROMPT_CACHE` | `1` | `kindi/gemma4_cache.py:31` |
 | `KINDI_G4_Q5_DP4A` | `1` | `kindi/gemma4.py:85` |
 | `KINDI_G4_RESERVE_MB` | `1024` | `kindi/gemma4.py:555` |
@@ -241,7 +241,7 @@ direct sites.
 | `KINDI_LT_SELFCHECK` | `1` | `kindi/lightning_gen.py:252` |
 | `KINDI_LT_SM75` | (unset) | `kindi/lightning.py:150` |
 | `KINDI_LT_TC` | `1` | `kindi/lightning.py:145` |
-| `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:608` |
+| `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:635` |
 | `KINDI_MASK_CACHE_MB` | `64` | `kindi/token_classes.py:51` |
 | `KINDI_MAX_BODY_MB` | `16` | `kindi/dsv41_server.py:78` (+1 more) |
 | `KINDI_MEM_RESERVE_MB` | `96` or `256` or `32` | `kindi/engine.py:345` (+4 more) |
@@ -417,7 +417,7 @@ direct sites.
 | `KINDI_SPLIT_GROUPS` | `128` | `kindi/engine.py:227` |
 | `KINDI_STATE_DIR` | `~/.kindi/state` | `kindi/dsv41_xcal.py:107` |
 | `KINDI_TANDEM_DEBUG_TIMING` | `0` | `kindi/tandem.py:733` |
-| `KINDI_TANDEM_GPU` | `auto` | `kindi/plan.py:207` (+2 more) |
+| `KINDI_TANDEM_GPU` | `auto` | `kindi/plan.py:208` (+2 more) |
 | `KINDI_TANDEM_HEAD_SPLIT` | (empty) | `kindi/tandem.py:677` |
 | `KINDI_TANDEM_RATIO` | (unset) | `kindi/tandem.py:355` |
 | `KINDI_TANDEM_RESERVE_MB` | `512` | `kindi/__main__.py:197` (+3 more) |

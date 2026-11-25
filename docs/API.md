@@ -236,7 +236,8 @@ simultaneous tag post and status post cannot overwrite each other.
 ## Observability
 
 - `GET /health`: liveness plus (loopback or authenticated) queue, stats,
-  drafting, GPU memory and a `runtime` block with the effective engine, TC/HP state,
+  drafting, GPU memory, a `projector` block (the `mmproj_place` decision: `declared`, `bytes`,
+  `place`, `host_bytes`, `card_bytes`, `card_saved_bytes`) and a `runtime` block with the effective engine, TC/HP state,
   K/V format, context, speculation mode and head digest, chunk size, threads and VRAM
   budget/reserve. The same resolver (`kindi/runtime.py`) feeds the startup log, `kindi info`
   and `bench --json`; before a model loads it reports requests and `loaded: false` instead of

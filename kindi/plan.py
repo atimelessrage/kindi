@@ -149,7 +149,8 @@ def _moe_free_bytes(assume_vram_gib):
 def describe(pack, ctx, spec, mode="cpu-first", gpu_kind=None,
              assume_vram_gib=None, assume_ram_gib=None, assume_cores=None, reserve_mib=512,
              usage_path=None, moe_cache_mib=None, dcache=None,
-             chunk_tokens=None, chunk_lane="copy", rates=None, vram_budget_mib=None):
+             chunk_tokens=None, chunk_lane="copy", rates=None, vram_budget_mib=None,
+             mmproj_place=None):
     """The placement report as a dict; no weight tensor is read, only indexes and the manifest."""
     man = _manifest(pack)
     if man.get("backend") == "kindi_lightning":
@@ -211,6 +212,32 @@ def describe(pack, ctx, spec, mode="cpu-first", gpu_kind=None,
                   else "%s (whole f32 file uploaded; offloaded layers free weights and K/V only)"
                   % owner))
     out["owner"] = owner
+
+    # The projector policy decides where the declared vision weights are counted.  `ram` (the
+    # default) keeps them out of the card budget; `vram` adds them to the reserve, so the layer
+    # split below sees the card the projector actually leaves. `kindi mmproj` and `/health` report
+    # the same block, so the placement decision has one implementation.
+    from . import mmproj as _mmproj
+    proj = _mmproj.policy(pack, {"mmproj_place": mmproj_place} if mmproj_place else None)
+    out["projector"] = proj
+    if proj["error"]:
+        lines.append(("projector", "policy refused, so no placement is decided: %s" % proj["error"]))
+    elif not proj["declared"]:
+        lines.append(("projector", "none declared in the pack manifest, so mmproj_place (%s) "
+                      "decides nothing here; `kindi mmproj FILE --record PACK` records one"
+                      % (proj["place"] or "?")))
+    elif proj["place"] == "vram":
+        added = proj["card_bytes"] // 2 ** 20
+        reserve_mib = int(reserve_mib) + added
+        out["projector_reserve_mib"] = added
+        lines.append(("projector", "%.1f MiB counted against the card (%s), so the planner adds it "
+                      "to the reserve: the budget below is %d MiB smaller than with place=ram"
+                      % (proj["card_bytes"] / 1048576.0, proj["place_source"], added)))
+    else:
+        lines.append(("projector", "%.1f MiB in host RAM (%s): %d MiB of card memory stays with the "
+                      "language model and its K/V cache, and the budget below does not count it"
+                      % (proj["bytes"] / 1048576.0, proj["place_source"],
+                         proj["card_saved_bytes"] // 2 ** 20)))
 
     if free_gib is None:
         out["cpu_layers"] = None
@@ -825,7 +852,7 @@ def run(cfg, a, log=print):
                    chunk_tokens=getattr(a, "moe_chunk", None),
                    chunk_lane=getattr(a, "moe_lane", None) or "copy",
                    reserve_mib=reserve, vram_budget_mib=budget,
-                   rates=rates)
+                   mmproj_place=cfg.get("mmproj_place"), rates=rates)
     for choice, reason in rep["lines"]:
         log("%-11s %s" % (choice + ":", reason))
     log("follow up: %s" % rep["command"])

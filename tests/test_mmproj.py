@@ -2,6 +2,7 @@
 import io
 import os
 import struct
+from pathlib import Path
 
 from kindi import mmproj
 
@@ -127,3 +128,93 @@ def test_max_mb_refuses_a_projector_that_does_not_fit(tmp_path):
     assert report["result"] == "fail"
     assert "over the --max-mb" in report["error"]
     assert mmproj.load(path, place="ram", max_mb=4)["result"] == "pass"
+
+
+def fake_pack(tmp_path, mmproj_block=None):
+    """A pack directory with the manifest and the two indexes `kindi plan` reads."""
+    import json
+
+    pack = tmp_path / "pack"
+    pack.mkdir(parents=True)
+    man = {"model": "fake", "backend": "kindi", "source_sha256": "x", "f32_bytes": 0,
+           "head": "token_embd.weight",
+           "dimensions": {"layers": 1, "full_attention_interval": 2, "kv_heads": 2,
+                          "head_dim": 16, "state_size": 4, "gdn_inner": 8, "groups": 2}}
+    if mmproj_block is not None:
+        man["mmproj"] = mmproj_block
+    (pack / "kindi_pack.json").write_text(json.dumps(man))
+    (pack / "bcodes_index.json").write_text(json.dumps({"tensors": {"blk.0.w": {"rows": 16,
+                                                                              "ne0": 128}}}))
+    (pack / "index.json").write_text(json.dumps({"tensors": {"token_embd.weight":
+                                                             {"nfloats": 128}}}))
+    return str(pack)
+
+
+def test_record_writes_the_projector_size_into_the_manifest(tmp_path):
+    import json
+
+    path, _tensors = projector(tmp_path)
+    pack = fake_pack(tmp_path)
+    out = mmproj.record(pack, path)
+    assert out["result"] == "pass", out["error"]
+    block = json.loads((Path(pack) / "kindi_pack.json").read_text())["mmproj"]
+    assert block["bytes"] == 96
+    assert block["place"] == "ram"
+    assert len(block["sha256"]) == 64
+    assert block["tensors"] == 2
+    assert mmproj.declared(pack)["bytes"] == 96
+    assert mmproj.record(pack, path, place="vram")["place"] == "vram"
+
+
+def test_record_refuses_a_pack_without_a_manifest(tmp_path):
+    path, _tensors = projector(tmp_path)
+    out = mmproj.record(str(tmp_path / "nope"), path)
+    assert out["result"] == "fail"
+    assert "manifest" in out["error"]
+
+
+def test_policy_counts_the_card_memory_each_place_saves(tmp_path):
+    path, _tensors = projector(tmp_path)
+    pack = fake_pack(tmp_path)
+    mmproj.record(pack, path)
+    ram = mmproj.policy(pack, {"mmproj_place": "ram"})
+    assert (ram["declared"], ram["place"]) == (True, "ram")
+    assert (ram["host_bytes"], ram["card_bytes"], ram["card_saved_bytes"]) == (96, 0, 96)
+    assert "host RAM" in ram["detail"]
+    vram = mmproj.policy(pack, {"mmproj_place": "vram"})
+    assert (vram["host_bytes"], vram["card_bytes"], vram["card_saved_bytes"]) == (0, 96, 0)
+    assert "counted against the card" in vram["detail"]
+    assert mmproj.policy(pack, {"mmproj_place": "gpu"})["error"]
+
+
+def test_health_reads_the_same_policy_as_the_plan(tmp_path):
+    """`/health`'s projector block is `mmproj.policy`, and `kindi plan` embeds the same call."""
+    from kindi import plan, server
+
+    path, _tensors = projector(tmp_path)
+    pack = fake_pack(tmp_path)
+    mmproj.record(pack, path)
+    cfg = {"mmproj_place": "vram"}
+    assert server._projector_health(pack, cfg) == mmproj.policy(pack, cfg)
+    rep = plan.describe(pack, 100, "auto", assume_vram_gib=1, assume_ram_gib=4, assume_cores=2,
+                        mmproj_place="vram")
+    assert rep["projector"] == server._projector_health(pack, cfg)
+    assert rep["projector"]["card_bytes"] == 96
+
+
+def test_a_pack_that_declares_nothing_decides_nothing(tmp_path):
+    import json
+
+    pack = fake_pack(tmp_path)
+    pol = mmproj.policy(pack, {"mmproj_place": "ram"})
+    assert (pol["declared"], pol["bytes"], pol["card_saved_bytes"]) == (False, 0, 0)
+    assert "decides nothing" in pol["detail"]
+    assert mmproj.declared(pack) is None
+    # a bare `vision` flag is still a declaration (the image refusal reads it) with no size
+    from pathlib import Path
+
+    vision = fake_pack(tmp_path / "vision")
+    man = json.loads((Path(vision) / "kindi_pack.json").read_text())
+    man["vision"] = True
+    (Path(vision) / "kindi_pack.json").write_text(json.dumps(man))
+    assert mmproj.declared(vision) == {"bytes": 0, "file": None, "sha256": None, "place": None}

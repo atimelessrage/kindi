@@ -6,9 +6,14 @@
   `--place ram` (the default, also `KINDI_MMPROJ_PLACE=ram` / `mmproj_place = ram`) reads its tensors
   into one host arena and reports the resident bytes, the load time and the RSS delta; `vram` only
   accounts the bytes against the card; `auto` resolves to `ram`, because the projector is off the
-  decode path. `/health` gains a `projector` block naming the policy and whether the selected pack
-  declares vision weights. The encoder is not implemented in any build, so image requests are still
-  refused with a 400: the key decides where the weights would live, not that vision runs.
+  decode path. The policy now decides outside that command: `kindi mmproj FILE --record PACK`
+  writes the projector's size, hash and policy into the pack manifest, and `kindi plan` prints a
+  `projector:` line — with `ram`, the MiB kept in host RAM and the MiB of card memory saved; with
+  `vram`, those bytes added to the planner's reserve, so the split sees the smaller card. `/health`'s
+  `projector` block is the same decision (`declared`, `bytes`, `place`, `host_bytes`, `card_bytes`,
+  `card_saved_bytes`), so the two cannot disagree. The encoder is not implemented in any build, so
+  image requests are still refused with a 400: the key decides where the weights would live, not that
+  vision runs.
 
 ## Round-5 audits: an honest fail report, an honest timing key, and one effort vocabulary (2026-11-25)
 

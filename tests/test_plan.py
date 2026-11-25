@@ -813,3 +813,32 @@ def test_describe_moe_reports_the_slots_cost_on_a_tight_card(tmp_path):
     assert ("it serves 94.2% of the measured picks against 100.0% with the same room and no "
             "slots, so they cost 5.8 points of served share and 9 card experts (119 instead "
             "of 128)") in slots
+
+
+def test_the_projector_policy_decides_the_card_budget(tmp_path):
+    """`mmproj_place` is not cosmetic: `vram` takes the projector's bytes off the card budget."""
+    pack = make_pack(tmp_path)
+    man = json.loads((pack / "kindi_pack.json").read_text())
+    man["mmproj"] = {"bytes": 200 * 2 ** 20, "file": "mmproj.gguf", "place": "ram"}
+    (pack / "kindi_pack.json").write_text(json.dumps(man))
+    ram = _plan.describe(str(pack), 100, "auto", assume_vram_gib=1, assume_ram_gib=4,
+                         assume_cores=2, mmproj_place="ram")
+    vram = _plan.describe(str(pack), 100, "auto", assume_vram_gib=1, assume_ram_gib=4,
+                          assume_cores=2, mmproj_place="vram")
+    assert dict(ram["lines"])["projector"].startswith("200.0 MiB in host RAM")
+    assert ram["budget_mib"] == 512
+    assert ram["projector"]["card_saved_bytes"] == 200 * 2 ** 20
+    assert dict(vram["lines"])["projector"].startswith("200.0 MiB counted against the card")
+    assert vram["budget_mib"] == 512 - 200
+    assert vram["reserve_mib"] == 512 + 200
+    assert vram["projector"]["card_bytes"] == 200 * 2 ** 20
+    assert vram["projector_reserve_mib"] == 200
+
+
+def test_a_pack_without_a_projector_says_the_policy_decides_nothing(tmp_path):
+    pack = make_pack(tmp_path)
+    rep = _plan.describe(str(pack), 100, "auto", assume_vram_gib=1, assume_ram_gib=4,
+                         assume_cores=2, mmproj_place="vram")
+    assert "decides nothing" in dict(rep["lines"])["projector"]
+    assert rep["budget_mib"] == 512
+    assert rep["projector"]["card_bytes"] == 0
