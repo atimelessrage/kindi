@@ -467,7 +467,8 @@ def cmd_intel_ternary(cfg, a):
     from . import intel_ternary
 
     report = intel_ternary.run_probe(a.rows, cols=a.cols, repeats=a.repeats, loader=a.loader,
-                                     device=a.device, parts=a.parts, device_name=a.device_name)
+                                     device=a.device, parts=a.parts, device_name=a.device_name,
+                                     kernel=a.kernel)
     if a.json:
         print(intel_ternary.dumps(report))
     else:
@@ -809,6 +810,9 @@ def _build_parser():
                    help="phase groups run in parallel, one work-item per (row, part) "
                         "(default: one per 128-weight phase, capped at 64)")
     s.add_argument("--repeats", type=int, default=5, help="timed launches (default 5, max 50)")
+    s.add_argument("--kernel", default="auto", choices=["auto", "scalar", "rows4"],
+                   help="GEMV kernel: one work-item per row (scalar), one per four rows with "
+                        "4-byte vector loads (rows4), or auto (rows4 when four rows fit)")
     s.add_argument("--device", type=int, default=0, help="Intel OpenCL GPU index (default 0)")
     s.add_argument("--device-name", default=None, metavar="SUBSTR",
                    help="pick the GPU whose name contains SUBSTR (e.g. Arc) instead of --device; "

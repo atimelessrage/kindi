@@ -1,0 +1,161 @@
+{
+  "gate": "req0020-arc-gemv-rows4-20261125",
+  "title": "Arc A770: four-row vector-load packed ternary GEMV (probe kernel, bit-exact)",
+  "measured": "2026-11-25",
+  "commit": "unreleased",
+  "command": "python docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/bench.py --out bench.json --runs 3 --repeats 20",
+  "notes": "Three runs of 20 launches per arm on the installed Arc A770 through the display driver's OpenCL C runtime, medians over the runs. Each arm re-runs the probe's bit-exact host check; a mismatch aborts the run instead of recording a time. per_call_ms is one GEMV (part kernel + reduce kernel); effective_gb_s counts packed weights, fp16 scales, x and y.",
+  "evidence": [
+    "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/bench.json",
+    "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/bench.py",
+    "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md"
+  ],
+  "numbers": [
+    {
+      "id": "pc-4096x8192-scalar",
+      "display": "0.0936 ms",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md",
+        "docs/development/requirements/REQ-0020.md",
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/bench.json",
+        "pointer": "/shapes/4096x8192/scalar/per_call_ms_median",
+        "expect": 0.0936
+      }
+    },
+    {
+      "id": "pc-4096x8192-rows4",
+      "display": "0.0690 ms",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md",
+        "docs/development/requirements/REQ-0020.md",
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/bench.json",
+        "pointer": "/shapes/4096x8192/rows4/per_call_ms_median",
+        "expect": 0.069
+      }
+    },
+    {
+      "id": "speedup-4096x8192",
+      "display": "1.357x",
+      "tolerance": 0.005,
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md",
+        "docs/development/requirements/REQ-0020.md",
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/bench.json",
+        "pointer": "/speedup/4096x8192",
+        "expect": 1.357
+      }
+    },
+    {
+      "id": "pc-2048x4096-scalar",
+      "display": "0.0571 ms",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md",
+        "docs/development/requirements/REQ-0020.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/bench.json",
+        "pointer": "/shapes/2048x4096/scalar/per_call_ms_median",
+        "expect": 0.0571
+      }
+    },
+    {
+      "id": "pc-2048x4096-rows4",
+      "display": "0.0467 ms",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md",
+        "docs/development/requirements/REQ-0020.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/bench.json",
+        "pointer": "/shapes/2048x4096/rows4/per_call_ms_median",
+        "expect": 0.0467
+      }
+    },
+    {
+      "id": "speedup-2048x4096",
+      "display": "1.223x",
+      "tolerance": 0.005,
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md",
+        "docs/development/requirements/REQ-0020.md",
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/bench.json",
+        "pointer": "/speedup/2048x4096",
+        "expect": 1.223
+      }
+    },
+    {
+      "id": "speedup-1024x2048",
+      "display": "1.065x",
+      "tolerance": 0.005,
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md",
+        "docs/development/requirements/REQ-0020.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/bench.json",
+        "pointer": "/speedup/1024x2048",
+        "expect": 1.065
+      }
+    },
+    {
+      "id": "gb-4096x8192",
+      "display": "129.88",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/bench.json",
+        "pointer": "/shapes/4096x8192/rows4/effective_gb_s_median",
+        "expect": 129.88
+      }
+    },
+    {
+      "id": "gflops-4096x8192",
+      "display": "972.80",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/bench.json",
+        "pointer": "/shapes/4096x8192/rows4/gflops_median",
+        "expect": 972.8
+      }
+    },
+    {
+      "id": "launch-floor",
+      "display": "0.0410 ms",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md",
+        "docs/development/requirements/REQ-0020.md",
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/bench.json",
+        "pointer": "/shapes/4096x128/rows4/per_call_ms_median",
+        "expect": 0.041
+      }
+    }
+  ]
+}

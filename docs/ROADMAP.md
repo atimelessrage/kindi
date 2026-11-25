@@ -240,6 +240,15 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   model run remain open — M2 still needs the Linux target. The card
   is registered in the support matrix as `not measured` and is not offered by the installer. This
   is not a support claim.
+  - **Packed ternary GEMV, vectorized (2026-11-25):** `kindi intel-ternary --kernel rows4` loads four
+    rows of a slot with one 4-byte `vload4` instead of four scalar loads and decodes trits with a
+    multiply-shift, keeping the same per-phase int32 accumulation and the bit-exact host check; it
+    is the `auto` default when four rows fit. On the installed A770, three runs of 20 launches per
+    arm: **1.357x** at 4096x8192 (0.0936 ms -> 0.0690 ms per GEMV) and 1.223x at 2048x4096, 0 mismatches
+    everywhere. A 128 KB shape still costs 0.0410 ms per call, so the probe's two-kernel dispatch
+    floor is ~40 microseconds and a GEMV below ~2 MiB of packed weights is overhead-bound - the next
+    lever for a backend, which would have to give up coalesced reads or exact sum order to remove it.
+    ([run](benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md))
   - **27B pack + K8/V4 on the A770 (2026-11-24, blocked):** the pack already exists as a copy in the
     model store's `packs/bonsai-27b`, and its `kindi_pack.json` source sha256 matches the 27B GGUF
     beside the store (verified the same day; the GGUF was not

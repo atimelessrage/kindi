@@ -108,7 +108,83 @@ __kernel void ternary_gemv_reduce(__global const float *partial,
     }
     y[row] = total;
 }
+
+/* Four rows per work-item.  The layout is [slot][row], so four consecutive bytes of a slot are
+   four rows of the same four columns: one vload4 replaces four scalar byte loads, and the same
+   per-phase int32 accumulation keeps every partial bit-identical to the scalar kernel.  The
+   trailing rows of a shape whose row count is not a multiple of four take the guarded path. */
+#define TRI_DOT(dst, byte, c) do {                                          \
+    int bb = (int)(byte);                                                   \
+    int g1 = (bb * 171) >> 9;                                               \
+    int g2 = (g1 * 171) >> 9;                                               \
+    int g3 = (g2 * 171) >> 9;                                               \
+    (dst) += ((bb - 3 * g1) - 1) * (int)x[(c)]                              \
+           + ((g1 - 3 * g2) - 1) * (int)x[(c) + 1]                          \
+           + ((g2 - 3 * g3) - 1) * (int)x[(c) + 2]                          \
+           + ((g3 - 3 * ((g3 * 171) >> 9)) - 1) * (int)x[(c) + 3];           \
+} while (0)
+
+__kernel void ternary_gemv_part4(__global const uchar *codes,
+                                 __global const float *scales,
+                                 __global const float *x,
+                                 __global float *partial,
+                                 uint rows, uint cols, uint parts) {
+    uint r0 = get_global_id(0) << 2;
+    uint part = get_global_id(1);
+    uint phases = cols >> 7;
+    if (r0 >= rows || part >= parts) {
+        return;
+    }
+    int full = (r0 + 3u) < rows;
+    float t0 = 0.0f, t1 = 0.0f, t2 = 0.0f, t3 = 0.0f;
+    for (uint ph = part; ph < phases; ph += parts) {
+        int d0 = 0, d1 = 0, d2 = 0, d3 = 0;
+        uint base = ((ph << 5) * rows) + r0;
+        uint col = ph << 7;
+        for (uint s = 0; s < 32; ++s) {
+            uint off = base + s * rows;
+            uint c = col + (s << 2);
+            if (full) {
+                uchar4 q = vload4(0, codes + off);
+                TRI_DOT(d0, q.s0, c);
+                TRI_DOT(d1, q.s1, c);
+                TRI_DOT(d2, q.s2, c);
+                TRI_DOT(d3, q.s3, c);
+            } else {
+                TRI_DOT(d0, codes[off], c);
+                if (r0 + 1u < rows) { TRI_DOT(d1, codes[off + 1u], c); }
+                if (r0 + 2u < rows) { TRI_DOT(d2, codes[off + 2u], c); }
+                if (r0 + 3u < rows) { TRI_DOT(d3, codes[off + 3u], c); }
+            }
+        }
+        uint sb = ph * rows + r0;
+        t0 += (float)d0 * scales[sb];
+        if (r0 + 1u < rows) { t1 += (float)d1 * scales[sb + 1u]; }
+        if (r0 + 2u < rows) { t2 += (float)d2 * scales[sb + 2u]; }
+        if (r0 + 3u < rows) { t3 += (float)d3 * scales[sb + 3u]; }
+    }
+    uint pb = part * rows + r0;
+    partial[pb] = t0;
+    if (r0 + 1u < rows) { partial[pb + 1u] = t1; }
+    if (r0 + 2u < rows) { partial[pb + 2u] = t2; }
+    if (r0 + 3u < rows) { partial[pb + 3u] = t3; }
+}
 """
+# "auto" picks the four-row kernel when the shape has at least one full group; both variants pass
+# the same bit-exact host check, so the choice is performance only.
+VARIANTS = ("auto", "scalar", "rows4")
+KERNEL_NAMES = {
+    "scalar": ["ternary_gemv_part", "ternary_gemv_reduce"],
+    "rows4": ["ternary_gemv_part4", "ternary_gemv_reduce"],
+}
+
+def resolve_variant(kernel, rows):
+    """The variant a run uses: `auto` takes rows4 when one full four-row group fits."""
+    if kernel not in VARIANTS:
+        return None
+    if kernel == "auto":
+        return "rows4" if rows >= 4 else "scalar"
+    return kernel
 
 
 def _fail(report, message):
@@ -141,7 +217,7 @@ def _launch_1d(lib, queue, kernel, total, report, key):
         raise ValueError("%s returned %s" % (key, _hex(code)))
 
 
-def _base_report(loader, rows, cols, repeats, seed, parts=None):
+def _base_report(loader, rows, cols, repeats, seed, parts=None, variant=None):
     return {
         "probe": PROBE,
         "schema": 1,
@@ -162,8 +238,11 @@ def _base_report(loader, rows, cols, repeats, seed, parts=None):
             "weight": "trit - 1, scaled by the 128-weight group's scale",
         },
         "kernel": {
-            "names": ["ternary_gemv_part", "ternary_gemv_reduce"],
-            "split": "phase ph -> part ph % parts; one work-item per (row, part), row axis fastest",
+            "variant": variant,
+            "variants": list(VARIANTS),
+            "names": list(KERNEL_NAMES[variant or "scalar"]),
+            "split": "phase ph -> part ph % parts; one work-item per (row, part) for `scalar`, "
+                     "one per four rows for `rows4`; the row axis is fastest in both",
             "reduce": "sums the parts per row; the 1-part shape is the earlier single-kernel GEMV",
             "exactness": "each part and the reduction sum exactly representable values, so the split "
                          "cannot change the result; the host reference is still compared bit for bit",
@@ -255,10 +334,14 @@ def _buffer(lib, context, flags, data, report, key):
 
 
 def run_probe(rows=DEFAULT_ROWS, cols=DEFAULT_COLS, repeats=DEFAULT_REPEATS, loader=None,
-              opener=None, device=0, seed=SEED, parts=None, device_name=None):
+              opener=None, device=0, seed=SEED, parts=None, device_name=None, kernel="auto"):
     """Launch the packed ternary GEMV on the selected Intel GPU; it never runs on the CPU."""
     loader = loader or DEFAULT_LOADER
-    report = _base_report(loader, rows, cols, repeats, seed, parts)
+    report = _base_report(loader, rows, cols, repeats, seed, parts,
+                          variant=resolve_variant(kernel, rows) if isinstance(rows, int) else None)
+    variant = report["kernel"]["variant"]
+    if variant is None:
+        return _fail(report, "--kernel must be one of %s" % ", ".join(VARIANTS))
     if not isinstance(rows, int) or not MIN_ROWS <= rows <= MAX_ROWS:
         return _fail(report, "--rows must be an integer in [%d, %d]" % (MIN_ROWS, MAX_ROWS))
     if not isinstance(cols, int) or not MIN_COLS <= cols <= MAX_COLS or cols % PHASE:
@@ -363,10 +446,11 @@ def run_probe(rows=DEFAULT_ROWS, cols=DEFAULT_COLS, repeats=DEFAULT_REPEATS, loa
         report["build"]["ok"] = True
 
         error_code = ctypes.c_int(0)
-        kernel = lib.clCreateKernel(program, b"ternary_gemv_part", ctypes.byref(error_code))
+        name = KERNEL_NAMES[variant][0]
+        kernel = lib.clCreateKernel(program, name.encode("ascii"), ctypes.byref(error_code))
         report["returncodes"]["clCreateKernel"] = _hex(error_code.value)
         if not kernel or error_code.value != CL_SUCCESS:
-            return _fail(report, "clCreateKernel(ternary_gemv_part) returned %s" % _hex(error_code.value))
+            return _fail(report, "clCreateKernel(%s) returned %s" % (name, _hex(error_code.value)))
         error_code = ctypes.c_int(0)
         reduce_kernel = lib.clCreateKernel(program, b"ternary_gemv_reduce", ctypes.byref(error_code))
         report["returncodes"]["clCreateKernelReduce"] = _hex(error_code.value)
@@ -397,15 +481,16 @@ def run_probe(rows=DEFAULT_ROWS, cols=DEFAULT_COLS, repeats=DEFAULT_REPEATS, loa
         _set_arg(lib, reduce_kernel, 2, ctypes.c_uint32(rows))
         _set_arg(lib, reduce_kernel, 3, ctypes.c_uint32(parts))
 
+        groups = rows if variant == "scalar" else (rows + 3) // 4
         started = time.perf_counter()
-        _launch_2d(lib, queue, kernel, rows, parts, report, "clEnqueueNDRangeKernelWarmup")
+        _launch_2d(lib, queue, kernel, groups, parts, report, "clEnqueueNDRangeKernelWarmup")
         _launch_1d(lib, queue, reduce_kernel, rows, report, "clEnqueueNDRangeReduceWarmup")
         _finish(lib, queue, report, "clFinishWarmup")
         report["gemv"]["warmup_ms"] = round((time.perf_counter() - started) * 1000.0, 3)
 
         started = time.perf_counter()
         for _ in range(repeats):
-            _launch_2d(lib, queue, kernel, rows, parts, report, "clEnqueueNDRangeKernel")
+            _launch_2d(lib, queue, kernel, groups, parts, report, "clEnqueueNDRangeKernel")
             _launch_1d(lib, queue, reduce_kernel, rows, report, "clEnqueueNDRangeReduce")
         _finish(lib, queue, report, "clFinish")
         seconds = time.perf_counter() - started
@@ -467,6 +552,7 @@ def render(report):
     lines.append("  shape: %d rows x %d cols (%d phases in %d part(s), %s packed bytes, %s scale bytes)" % (
         shape["rows"], shape["cols"], shape["phases"], shape["parts"], shape["packed_bytes"],
         shape["scale_bytes"]))
+    lines.append("  kernel: %s" % (report["kernel"]["variant"],))
     if gemv["mismatches"] is not None:
         lines.append("  gemv: mismatches: %s; warmup %.3f ms; %d launches %.3f ms; %s GFLOP/s" % (
             gemv["mismatches"], gemv["warmup_ms"], gemv["repeats"], gemv["elapsed_ms"],

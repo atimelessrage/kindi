@@ -8,8 +8,10 @@ driver registers a Level Zero driver, and the loader enumerates one driver and o
 without oneAPI: `kindi intel-smoke` round-trips 16 MiB through Level Zero device/shared USM, and
 `kindi intel-cl` compiles and runs exact vector-add and GEMM kernels with the driver's OpenCL C
 compiler, and `kindi intel-ternary` runs a packed ternary GEMV over the pack's 4-trit/byte layout
-with a bit-exact host check, now split over the 128-weight phases (5.75x-14.14x the one-work-item
-shape at layer-sized matrices, [run](benchmarks/2026-11-24-i7-8086k-arc-a770-parallel-gemv/README.md)),
+with a bit-exact host check, split over the 128-weight phases (5.75x-14.14x the one-work-item
+shape at layer-sized matrices, [run](benchmarks/2026-11-24-i7-8086k-arc-a770-parallel-gemv/README.md))
+and now also four rows per work-item with 4-byte vector loads (1.357x that kernel at 4096x8192,
+[run](benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md)),
 and `kindi intel-gemm` runs the engine's q8 arithmetic (`k_q8x_T2` port feeding a `k_mm_g5q`-shaped
 GEMM) bit-exact at 4.2-36.9 GFLOP/s ([run](benchmarks/2026-11-24-i7-8086k-arc-a770-ternary-gemm/README.md)).
 There is still no SYCL backend, Kindi engine path or model run. The plan's first support
@@ -329,6 +331,31 @@ repack or its Q8 GEMV, and a launch costs about 1 ms of fixed overhead at these 
 model, engine or support claim is added; M2 stays partial. What it does establish is that the layout
 decodes exactly at a useful rate with the parallelism spread over phases, which is the shape the
 backend's kernel order needs.
+
+### M2 packed ternary GEMV: four rows per work-item (2026-11-25)
+
+The phase split above still left each work-item doing 1,024 single-byte loads with a row-sized
+stride. The layout stores a slot's bytes as consecutive **rows**, so `ternary_gemv_part4` loads four
+rows of a slot with one 4-byte `vload4`, decodes the trits with `(b * 171) >> 9` instead of integer
+division, and keeps the same per-phase int32 accumulation, so its partials are bit-identical to the
+scalar kernel. `--kernel auto` (the default) takes it when four rows fit, `--kernel scalar` keeps the
+2026-11-24 shape, and a row count that is not a multiple of four takes a guarded path.
+
+Three runs of 20 launches per arm, medians, on the same Windows A770
+([page](benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md)):
+
+| rows x cols | scalar per call | rows4 per call | speedup | effective GB/s (rows4) |
+|---|---|---|---|---|
+| 1024 x 2048 | 0.0461 ms | 0.0433 ms | 1.065x | 13.13 |
+| 2048 x 4096 | 0.0571 ms | 0.0467 ms | 1.223x | 48.29 |
+| 4096 x 8192 | 0.0936 ms | 0.0690 ms | 1.357x | 129.88 |
+| 4096 x 128 (floor) | 0.0432 ms | 0.0410 ms | 1.054x | 3.80 |
+
+Every arm reports 0 mismatches against the host reference. The 4096x128 shape moves 128 KB and still
+costs 0.041 ms per call, so two enqueued kernels cost about 40 microseconds on this driver: below
+roughly 2 MiB of packed weights a GEMV is dispatch-bound, and that - not the decode arithmetic - is
+what a backend would have to remove next (a single-launch design has to give up either the coalesced
+row-major reads or the exact float sum order). No backend, model or support claim; M2 stays partial.
 
 ### M2 ternary GEMM in the engine's q8 shape (2026-11-24)
 

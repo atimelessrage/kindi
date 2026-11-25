@@ -74,7 +74,29 @@ def test_the_probe_reports_the_split_it_used():
                                        loader="missing-opencl-loader-probe.dll")
     assert explicit["shape"]["parts"] == 3
     assert explicit["shape"]["parts_source"] == "--parts"
-    assert report["kernel"]["names"] == ["ternary_gemv_part", "ternary_gemv_reduce"]
+    assert report["kernel"]["names"] == ["ternary_gemv_part4", "ternary_gemv_reduce"]
+    scalar = intel_ternary.run_probe(rows=8, cols=1024, kernel="scalar",
+                                     loader="missing-opencl-loader-probe.dll")
+    assert scalar["kernel"]["names"] == ["ternary_gemv_part", "ternary_gemv_reduce"]
+    assert scalar["kernel"]["variant"] == "scalar"
+
+
+def test_the_variant_defaults_to_the_four_row_kernel_when_it_fits():
+    """Both variants are bit-exact; `auto` only picks the faster layout."""
+    assert intel_ternary.resolve_variant("auto", 8) == "rows4"
+    assert intel_ternary.resolve_variant("auto", 4) == "rows4"
+    assert intel_ternary.resolve_variant("auto", 3) == "scalar"
+    assert intel_ternary.resolve_variant("rows4", 2) == "rows4"
+    assert intel_ternary.resolve_variant("scalar", 4096) == "scalar"
+    assert intel_ternary.resolve_variant("nonsense", 8) is None
+    assert set(intel_ternary.VARIANTS) == {"auto", "scalar", "rows4"}
+
+
+def test_an_unknown_kernel_is_refused_before_any_device_work():
+    report = intel_ternary.run_probe(rows=8, cols=1024, kernel="nonsense",
+                                     loader="missing-opencl-loader-probe.dll")
+    assert "--kernel" in report["error"]
+    assert report["result"] == "fail"
 
 
 def test_the_probe_is_flagged_as_a_probe():

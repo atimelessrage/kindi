@@ -30,6 +30,25 @@ What changed in the tree: a pack whose manifest names the proxy is refused with 
 `tests/test_engine_gateway.py`), and the decision, the probe and its output table are recorded in
 `docs/BACKENDS.md` ("Serving boundary") and REQ-0019 T4.6.
 
+### Arc A770: four-row vector loads in the packed ternary GEMV (2026-11-25)
+
+The linked worktree has an Arc A770 16 GB installed, so this round worked the Intel path directly
+rather than from a plan. `kindi intel-ternary` now has a second kernel: the pack layout stores a
+slot's bytes as consecutive **rows**, so `ternary_gemv_part4` loads four rows of a slot with one
+4-byte `vload4`, decodes the trits with `(b * 171) >> 9` instead of integer division, and keeps the
+same per-phase int32 accumulation, so its partials stay bit-identical to the scalar kernel.
+`--kernel auto` (the default) uses it whenever four rows fit, `--kernel scalar` keeps the 2026-11-24
+shape and rows not divisible by four take a guarded path.
+
+Measured on the installed A770 through the display driver's OpenCL C runtime, three runs of 20
+launches per arm, medians: **1.357x** at 4096x8192 (0.0936 -> 0.0690 ms per GEMV, 95.75 -> 129.88
+GB/s effective), **1.223x** at 2048x4096 (0.0571 -> 0.0467 ms) and 1.065x at 1024x2048, with 0
+mismatches in every arm. A 4096x128 shape (128 KB of weights) still costs 0.0410 ms per call, which
+pins the two-launch dispatch floor at about 40 microseconds: below ~2 MiB of packed weights the GEMV
+is overhead-bound, not bandwidth-bound, and that is the next lever for a backend. Probe only - no
+engine path, model run or Intel support claim; M2 stays partial. Evidence:
+`docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/`.
+
 ### The constrained mask's walk: an exact character skip, and a memo withdrawn (2026-11-25)
 
 The 2026-11-24 round left the trie walk as the largest remaining part of a constrained mask miss
