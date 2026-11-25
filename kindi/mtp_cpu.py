@@ -152,6 +152,16 @@ class Head(object):
         self.signs = np.fromfile(path, dtype=F32) if os.path.exists(path) else None
         if self.signs is None or self.signs.size != d["D"]:
             raise ValueError("kindi: the pack has no signs_%d.f32, the folded output head cannot be read" % d["D"])
+        ne, ty, off = by["output_norm.weight"][1], by["output_norm.weight"][2], by["output_norm.weight"][3]
+        with open(gguf_path, "rb") as f:
+            f.seek(self.data0 + off)
+            self.out_w = np.frombuffer(f.read(4 * int(ne[0])), dtype=F32).copy()
+        self._emb_cache = {}                     # token id -> raw PTQ1_0 row (a draft re-reads the same rows a lot)
+        self.order = "eh"                        # eh_proj input order: [emb, hidden] (probe-switchable)
+        self.hidden = "raw"                      # "raw": residual as get_hidden() returns it; "normed": rms * output_norm (what the GPU head's XN is)
+        self.emb_mode = "raw"                    # "raw": the GGUF embedding row; "folded": the pack's fold of it (what the engine embeds)
+        self.rope_off = 0                        # RoPE position offset vs the row position (probe-switchable)
+        self.seed_enabled = False                # seed the window with verified rows (llama.cpp does)
         self.K = np.zeros((self.W, d["NHKV"], d["HD"]), dtype=F32)
         self.V = np.zeros((self.W, d["NHKV"], d["HD"]), dtype=F32)
         self.kp = np.full(self.W, -(1 << 30), dtype=np.int64)
@@ -169,6 +179,14 @@ class Head(object):
         off, cols, rows = self._emb
         if not 0 <= tok < rows:
             raise ValueError("kindi: token %d is outside the embedding (%d rows)" % (tok, rows))
+        row = self._emb_cache.get(tok)
+        if row is None:
+            if len(self._emb_cache) > 8192:
+                self._emb_cache.clear()
+            row = self._emb_cache[tok] = self._embed_read(tok, off, cols)
+        return fold(row, self.signs, self.hb) if self.emb_mode == "folded" else row
+
+    def _embed_read(self, tok, off, cols):
         bpr, bsize = cols // 128, 28
         with open(self.path, "rb") as f:
             f.seek(self.data0 + off + tok * bpr * bsize)
@@ -201,7 +219,9 @@ class Head(object):
         """The head's row at ``pos``: returns (the token it predicts, its output vector)."""
         d, n = self.dims, self.n
         NH, NHKV, HD = d["NH"], d["NHKV"], d["HD"]
-        x = np.concatenate([self._rms(emb, n["e_norm"]), self._rms(hin, n["h_norm"])])
+        parts = {"eh": (self._rms(emb, n["e_norm"]), self._rms(hin, n["h_norm"])),
+                 "he": (self._rms(hin, n["h_norm"]), self._rms(emb, n["e_norm"]))}
+        x = np.concatenate(parts[self.order])
         u = self._gemv("fc", x)
         a = self._rms(u, n["in_norm"])
         qg = self._gemv("q", a).reshape(NH, 2 * HD)
@@ -211,8 +231,8 @@ class Head(object):
             qg[h, :HD] = self._rms(qg[h, :HD], n["q_norm"])
         for h in range(NHKV):
             kk[h] = self._rms(kk[h], n["k_norm"])
-        self._rope(qg[:, :HD], pos)
-        self._rope(kk, pos)
+        self._rope(qg[:, :HD], pos + self.rope_off)
+        self._rope(kk, pos + self.rope_off)
         slot = pos % self.W
         self.K[slot], self.V[slot], self.kp[slot] = kk, vv, pos
         ok = (self.kp <= pos) & (self.kp > pos - self.W)
@@ -239,6 +259,26 @@ class Head(object):
         return x / (1.0 + np.exp(-x))
 
     # ------------------------------------------------------------------ drafting
+    def _hin(self, hin):
+        if self.hidden == "normed":
+            # the GPU head is fed XN = rms(residual) * output_norm, and its chained rows are already
+            # rms(u3) * shared_head_norm; the raw residual is the odd one out. Only rows from the
+            # engine need this; chained rows already arrive normed.
+            return self._rms(np.asarray(hin, dtype=F32), self.out_w)
+        return hin
+
+    def seed(self, rows):
+        """Write verified rows (pos, residual, next token) into the head's K/V window, llama.cpp-style.
+
+        The reference drafts against a cache that holds every verified position's MTP row, not just
+        the head's own draft rows. score_drafts calls this with the rows it has just verified; each
+        row overwrites the draft row at the same position.
+        """
+        if not self.seed_enabled:
+            return
+        for pos, hin, tok in rows:
+            self.row(self._embed(int(tok)), self._hin(hin), int(pos))
+
     def reset(self):
         self.K[:] = 0
         self.V[:] = 0
@@ -255,7 +295,7 @@ class Head(object):
         if k < 1 or len(prefix) < 2:
             return []
         q, tok = len(prefix) - 2, int(prefix[-1])
-        pred, out = self.row(self._embed(tok), hin, q)
+        pred, out = self.row(self._embed(tok), self._hin(hin), q)
         drafts = [pred]
         for i in range(1, k):
             pred, out = self.row(self._embed(drafts[-1]), out, q + i)
@@ -312,16 +352,27 @@ def score_drafts(eng, ids, n, drafter, k=4):
     """
     drafter.reset()
     eng.reset()
+    hiddens = {}
     for i, t in enumerate(ids[:-1]):
         eng.feed(t, i)
+        hiddens[i] = eng.get_hidden()
     out = [eng.step(ids[-1], len(ids) - 1)]        # the model's token at len(ids)
+    hiddens[len(ids) - 1] = eng.get_hidden()
+    seed = getattr(drafter, "seed", None)
+    if seed is not None:
+        seed([(p, hiddens[p], ids[p + 1]) for p in range(len(ids) - 1)])
     scored = []
     while len(out) < n:
         prefix = list(ids) + out
         base = len(prefix)                          # the position of the first drafted token
+        # The head's row q reads the residual at q and embeds the token at q + 1; it drafts rows
+        # len(prefix) - 2 .. and predicts from len(prefix) on, so the residual to pass is the one at
+        # len(prefix) - 2. After the step above (at base - 1) `get_hidden()` is exactly that.
         drafts = drafter.draft(prefix, eng.get_hidden(), k)
         scored += [(base + i, i, d) for i, d in enumerate(drafts)]
         out.append(eng.step(out[-1], base - 1))
+        if seed is not None:
+            seed([(base - 1, eng.get_hidden(), out[-1])])
     at = {len(ids) + i: t for i, t in enumerate(out)}
     stats = {"steps": len(out) - 1, "offered": 0, "matched": 0, "depth": [0] * max(0, int(k))}
     for pos, depth, cand in scored:

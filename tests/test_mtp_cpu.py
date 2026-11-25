@@ -129,3 +129,50 @@ def test_score_drafts_keeps_the_model_tokens_and_counts_matches():
     assert stats["offered"] == offered
     assert stats["matched"] == want
     assert len(stats["depth"]) == 2            # every depth is recorded, including the last
+
+
+def test_score_drafts_hands_the_head_the_row_it_reads():
+    """The head's row q reads the residual at q and the token at q + 1 (blk.64 is trained that way).
+
+    This pins the plumbing without a pack: a stub engine tags every residual with its position.
+    """
+    class Stub(object):
+        def __init__(self):
+            self.pos = -1
+            self.seen = []
+            self.head_name, self.ylog_n, self.head_off, self.HB = "output.weight", 4, 0, 512
+
+        def reset(self):
+            self.pos = -1
+
+        def feed(self, tok, pos):
+            self.pos = int(pos)
+
+        def step(self, tok, pos):
+            self.pos = int(pos)
+            return (int(tok) + 1) % 8
+
+        def get_hidden(self):
+            return [float(self.pos)]                 # the residual at the position just reached
+
+        def gemv_rows(self, name, rows, x):
+            import numpy as np
+            return np.zeros(4, dtype="float32")
+
+    class Drafter(object):
+        def __init__(self):
+            self.rows = []
+
+        def reset(self):
+            pass
+
+        def draft(self, prefix, hin, k=None):
+            self.rows.append((len(prefix), hin[0]))
+            return [0] * int(k or 1)
+
+    eng, dr = Stub(), Drafter()
+    ids = [3, 5, 7]
+    mtp_cpu.score_drafts(eng, ids, 6, dr, k=2)
+    # every round drafts rows from len(prefix) - 2, and receives the residual at that position
+    assert [(p - 2) for p, _pos in dr.rows] == [pos for _, pos in dr.rows]
+    assert [p for p, _ in dr.rows] == [4, 5, 6, 7, 8]      # one row per token after the first

@@ -1,5 +1,34 @@
 # Changelog
 
+## The 2.5 MTP head's acceptance, measured variant by variant (2026-11-25)
+
+- **A head-only probe that loads the 27B once.** `tools/mtp_cpu_probe.py` takes a JSONL list of
+  attempts (`variant`, `k`, `tokens`, `prompts`), loads the pack and the `-mtp` head once, and runs
+  every attempt in that process, appending the acceptance, the depth histogram and the drafted token
+  ids next to the model's own. A head-side change now costs an attempt instead of a six-minute
+  reload; the plain decode of each prompt is cached across variants, and every attempt asserts its
+  tokens equal to plain greedy decode.
+- **The head was handing its first row the wrong hidden.** The GPU head (`kindi/mtp.py`) is fed the
+  output-normed row (`XN` = `rms * output_norm`), which is also what llama.cpp's Qwen3.5 MTP graph
+  consumes; `kindi/mtp_cpu.py` passed the raw residual. The measurement, on the real 27B: 8.3% of
+  drafts accepted with the raw residual, 10.2% with the normed one (13.3% vs 3.3% at `k=1`), so the
+  normed vector is now what the head's engine rows use. The `eh_proj` concat order is confirmed the
+  other way: `[hidden, embedding]` accepted **0 of 108**.
+- **Verified rows seed the head's window.** The reference drafts against a cache that holds the MTP
+  row of every verified position; this head only saw its own synthetic rows. `Head.seed()` (and
+  `score_drafts`, which calls it through a duck-typed hook so `PackDrafter` is untouched) writes the
+  verified rows in: 10.2% -> 13.9%, and 16.7% -> 22.2% on one prompt with depth `[2, 3, 4, 3]`.
+  Folding the embedding row and moving RoPE to `p + 1` changed nothing measurable (11/108 each).
+- **Still not a speedup, and still behind the 2B drafter.** The head accepts 8.3-13.9% of its
+  drafts; the external 2B pack drafter accepts 30.6% on the same two prompts, and neither can beat
+  plain decode until the CPU verifies T rows in one pass (road map CP1). The head's remaining error
+  is not any of these switches - its drafts are shaped like the model's output but off by a token or
+  two - so CP1 is built against the 2B. Numbers are untracked `bench-logs/` runs, documented in
+  `docs/MTP.md`.
+- **Embedding rows are cached per token.** `Head._embed` used to open the 6 GB GGUF on every draft
+  row; it now reads each distinct token once (`_embed_read`), which is what made a four-draft round
+  six file reads instead of four.
+
 ## The vision projector as a host-RAM tier (2026-11-25)
 
 - **`kindi mmproj PATH` prices a projector (`mmproj-*.gguf`) and places it off the card.**

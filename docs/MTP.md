@@ -83,8 +83,9 @@ have.
 **A figure that is not ours.** A "1.12-1.17x on CPU with 83-88% drafted-token acceptance" number for
 this head appears in notes written about Kindi. It is **not in this tree and not measured here**. The
 1.12x in this file is the **2B** `draft2b` result on the 4060 Ti at 512 tokens, with 69% acceptance
-(the tables above); what the 2.5 head measured on this host so far is worse: **4 accepted of 86
-drafted, about 5%**, from `tools/mtp_cpu_bench.py` on the real 27B, an untracked `bench-logs/` run.
+(the tables above); what the 2.5 head measured on this host so far is worse: **9 accepted of 108
+drafted (8.3%), up to 15/108 (13.9%) once the hidden is output-normed and the window seeded**, from
+`tools/mtp_cpu_probe.py` on the real 27B, untracked `bench-logs/` runs.
 Do not repeat a CPU acceptance or speedup figure for this head without a tracked page behind it.
 
 ### Which drafter, on the 27B CPU (2026-11-25)
@@ -92,7 +93,7 @@ Do not repeat a CPU acceptance or speedup figure for this head without a tracked
 `kindi.mtp_cpu.score_drafts` takes either drafter through one interface (`reset()` and
 `draft(prefix, hin, k)`): `Head` for the `-mtp` file's own `blk.64`, `PackDrafter` for a second,
 smaller converted pack. `tools/mtp_cpu_bench.py` picks between them with `--gguf` or
-`--drafter-pack` (giving both is an error), and the two runs below used the same 27B pack, the same two
+`--drafter-pack` (giving both is an error). Both runs below used the same 27B pack, the same two
 prompts, `k=4`, 16 tokens and 6 threads on this host:
 
 | drafter | accepted | rate | depth [1..4] | plain tok/s | drafted tok/s |
@@ -108,6 +109,50 @@ against - the 2B pack, not the head. Per prompt the 2B accepted 23/54 (43%) on t
 (19%) on the second. Both numbers come from untracked `bench-logs/` runs (`mtp-cpu-20261125.json`,
 `mtp-cpu-2b-drafter-20261125.json`), and both asserted their tokens equal to plain greedy decode, so
 acceptance is measured against the real model and nothing else.
+
+#### The head's acceptance ladder (2026-11-25, one load per batch)
+
+Loading the 27B costs six minutes, so the head-side question was turned into a probe that loads once
+and runs several variants in that process: `tools/mtp_cpu_probe.py --pack PACK --gguf <the -mtp file>
+--commands cmds.jsonl --out out.jsonl`, one JSON attempt per line
+(`{"variant": ..., "k": 4, "tokens": 16, "prompts": [...]}`). It records the acceptance, the depth
+histogram and the actual draft token ids next to the model's own, so a variant is judged by data, not
+by a compile. Every attempt below asserted its tokens equal to plain greedy decode.
+
+| variant | accepted | rate | what it changes |
+|---|---|---|---|
+| `eh` (as committed) | 9/108 | 8.3% | raw residual into `eh_proj` |
+| `he` | 0/108 | 0.0% | concat order swapped, `[hidden, emb]` |
+| `eh-normed` | 11/108 | 10.2% | `rms(residual) * output_norm` - what the GPU head is fed |
+| `eh-normed-folded` | 11/108 | 10.2% | embedding row folded with the pack's signs (BTQ1/PTQ1_0 layout) |
+| `eh-normed-rope1` | 11/108 | 10.2% | RoPE at `p + 1` (the reference's MTP position for row `p`) |
+| `eh-normed-seeded` | 15/108 | 13.9% | window seeded with every **verified** row, not just the head's own |
+
+Three of those are worth keeping:
+
+- **The concat order is `[e_norm(emb), h_norm(hin)]`** - swapping it drops acceptance to zero, so the
+  `eh_proj` side is not where the remaining error lives.
+- **The hidden is the output-normed one.** `kindi/mtp.py` (the GPU head) reads `XN`, which is
+  `rms * output_norm`; the CPU head was handed the raw residual. Passing the normed vector is
+  strictly better (8.3% -> 10.2%, and 3.3% -> 13.3% at `k=1`), and it is what llama.cpp's
+  `graph_mtp` consumes as well (`qwen35.cpp` exposes the post-`output_norm` row as `t_h_nextn`).
+- **Seeding matters.** The reference drafts against a cache that holds the MTP row of every verified
+  position; this head only ever saw its own synthetic rows. Seeding the window with the verified
+  rows lifts 10.2% -> 13.9% overall and 16.7% -> 22.2% on the second prompt, with depth
+  `[2, 3, 4, 3]` - deeper drafts start matching once the window is real.
+
+The remaining gap is not one of those switches. Drafted tokens are *shaped* like the model's output
+(`
+
+`, `<|im_end|>`, repeated words) but off by a token or two where the model continues with a
+run of `<|im_end|>
+<|im_start|>`; a head that is confused about the row it reads looks like this,
+and so does one whose attention context is a handful of positions rather than a filled window. The
+next measurement is the seeded window grown from the whole prompt (not `len(ids) - 1` rows) plus a
+row-by-row dump of `u`/`out` against the head's own recurrence, both of which the probe can run in
+one load. Until that moves the number, the honest summary is the table: **the 2B pack is the better
+drafter (30.6% vs 8.3-13.9%), and neither is a speedup before CP1** (`tools/mtp_cpu_probe.py` and
+both `bench-logs/` runs are untracked measurements, not an evidence page).
 
 ## The modes
 
