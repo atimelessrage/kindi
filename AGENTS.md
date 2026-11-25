@@ -12,7 +12,7 @@ line of evidence (command + result). A task must be resumable from this file alo
 
 ### Handoff
 
-- **HEAD:** `6cd23ac` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; 2026-11-25: the Bonsai 2.5 27B pack runs on the CPU engine - SHA-256 matched, 7,242 MB in 370 s, packcheck full, 339.9 s load, 3.08-4.02 tok/s greedy, ids identical across two processes - and `kindi verify` now keys its reference by release, so the pack gets "no llama.cpp reference" + exit 2 instead of Bonsai 2's tokens; `chat._tojson` makes the prompt match the published template 26 of 26 (26 cases); GPU cells still `not run`, no exactness claimed; guarded by `tests/test_agents_handoff.py`).
+- **HEAD:** `2d168c5` on `merge/upstream-0.7.0` (0.7.1 merge; 0.7.0 merge `35e4697`; 2026-11-25: the Bonsai 2.5 27B pack runs on the CPU engine - SHA-256 matched, 7,242 MB in 370 s, packcheck full, 339.9 s load, 3.08-4.02 tok/s greedy, ids identical across two processes - and `kindi verify` now keys its reference by release, so the pack gets "no llama.cpp reference" + exit 2 instead of Bonsai 2's tokens; `chat._tojson` makes the prompt match the published template 26 of 26 (26 cases); GPU cells still `not run`, no exactness claimed; guarded by `tests/test_agents_handoff.py`).
   **2026-11-24:** the llama.cpp proxy backend landed (wildcard; 12 CPU tests, live gate open, no
   arbitrary-GGUF claim) with REQ-0030's native-CPU 2B profile, and `Backend.capabilities` was declared
   instead of `None` (six adapters' mypy `assignment` finding gone, 59 -> 53). Suite: 1,633 / 47 / 0.
@@ -234,8 +234,8 @@ Git object database, not the index or the files on disk:
 
 | worktree | branch | HEAD | role |
 |---|---|---|---|
-| `T:/kindi` | `main` | `6cd23ac` | main checkout; clean; fast-forwarded to this round |
-| `<worktree>` | `merge/upstream-0.7.0` | `6cd23ac` | this session; 2026-11-25 Bonsai 2.5 27B CPU run + template parity, before that the v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke + Arc GEMM, llama.cpp proxy backend, constrained mask/pick -8.4% structured token, REQ-0030 CPU profile, bench --spec, 27B CPU verify + compiler detection |
+| `T:/kindi` | `main` | `2d168c5` | main checkout; clean; fast-forwarded to this round |
+| `<worktree>` | `merge/upstream-0.7.0` | `2d168c5` | this session; 2026-11-25 Bonsai 2.5 27B CPU run + template parity, before that the v0.7.1 merge, grammar-mask edges, Anthropic endpoint + A4 dialects, Arc SYCL smoke + Arc GEMM, llama.cpp proxy backend, constrained mask/pick -8.4% structured token, REQ-0030 CPU profile, bench --spec, 27B CPU verify + compiler detection |
 
 Read its copy only while that worktree has uncommitted changes; otherwise this file is the source of truth.
 
