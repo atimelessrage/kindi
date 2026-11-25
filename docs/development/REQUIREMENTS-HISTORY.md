@@ -39,7 +39,7 @@ the state at that commit.
 | [REQ-0027](requirements/REQ-0027.md) | A constrained-decoding mask that does not sweep the vocabulary per state | active | `62ea1a6828f0` | `3eb4f17b7e62` |
 | [REQ-0028](requirements/REQ-0028.md) | An Anthropic Messages endpoint for agent harnesses | active | `8c4decde1d0f` | `32075c449184` |
 | [REQ-0029](requirements/REQ-0029.md) | Self-hosted n8n can call a local Kindi server | proposed | `7e675235290d` | `7e675235290d` |
-| [REQ-0030](requirements/REQ-0030.md) | Selectable native accelerators for measured hot Python paths | proposed | `7e675235290d` | `bf39d1d54c16` |
+| [REQ-0030](requirements/REQ-0030.md) | Selectable native accelerators for measured hot Python paths | proposed | `7e675235290d` | `44af57b7f9d6` |
 | [REQ-0031](requirements/REQ-0031.md) | Looped-transformer model family (SenseNova-Loop-9B, Inkling 2 Mini) | active | `7e675235290d` | `7ee95c5e86ff` |
 
 `uncommitted` means the requirement file is not in `HEAD` yet. Commit the requirement
