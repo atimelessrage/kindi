@@ -63,8 +63,8 @@ existing debt is tolerated and `--update --reason "..."` lowers the baseline aft
 
 ### Full CPU gate
 
-The 2026-11-24 mask/pick gate is **1,635 passed, 47 skipped, 0 failed** in 238.23 s (config reference
-regenerated after it; 1,633 before this round). The 27B-CPU gate at `32075c4` is **1,598 passed, 47 skipped, 0 failed** in 226.48 s (the CPU build checks now compile and load every tier here instead of skipping); the 2026-11-24 grammar-mask gate at `ebf871f` is 1,513 passed, 58 skipped, 0 failed in 180.66 s (plain CPU suite, no coverage rerun); the 2026-11-22 prewarm gate at `4bab483` was 1,423 / 58 / 0 in 138.50 s and the 2026-11-20 integration gate at `82a72bf` 1,412 / 28 / 0 in 250.33 s. The last coverage-measured run remains `539a504`: **1,241 passed, 28 skipped, 0 failed at 46.36%** line+branch (23,504 statements, 8,394 branches; plain 1,241 / 28 / 0 in 227.62 s), and the consolidated 2026-11-19 commits (`f75253b` + `84b6686`) 1,357 / 28 / 0 in 229.53 s. Every skip is inventoried by node ID and reason in `tests/README.md`.
+The 2026-11-25 Bonsai 2.5 gate is **1,640 passed, 47 skipped, 0 failed** in 242.39 s (the 2026-11-24
+mask/pick gate was 1,635 / 47 / 0 in 238.23 s; 1,633 before that). The 27B-CPU gate at `32075c4` is **1,598 passed, 47 skipped, 0 failed** in 226.48 s (the CPU build checks now compile and load every tier here instead of skipping); the 2026-11-24 grammar-mask gate at `ebf871f` is 1,513 passed, 58 skipped, 0 failed in 180.66 s (plain CPU suite, no coverage rerun); the 2026-11-22 prewarm gate at `4bab483` was 1,423 / 58 / 0 in 138.50 s and the 2026-11-20 integration gate at `82a72bf` 1,412 / 28 / 0 in 250.33 s. The last coverage-measured run remains `539a504`: **1,241 passed, 28 skipped, 0 failed at 46.36%** line+branch (23,504 statements, 8,394 branches; plain 1,241 / 28 / 0 in 227.62 s), and the consolidated 2026-11-19 commits (`f75253b` + `84b6686`) 1,357 / 28 / 0 in 229.53 s. Every skip is inventoried by node ID and reason in `tests/README.md`.
 
 ### Upstream v0.7.0 and comparison
 
