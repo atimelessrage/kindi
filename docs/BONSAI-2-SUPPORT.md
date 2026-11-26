@@ -164,7 +164,9 @@ What was run (2026-11-25, i7-8086K, CPU engine; evidence in
 - The 6 GB GGUF was downloaded and its SHA-256 matched the catalog, then converted to a **7,242 MB in 370 s**
   pack: `packcheck` full passed on 10 files, and the manifest reports `851 tensors`, vocabulary
   `248320`, context `262144`, hadamard block 1024 and the same 8952-character template the header run saw.
-- `KINDI_DEVICE=cpu` loads that pack in **339.9 s** (avx2-fma-f16c, 6 threads, ctx 2048) and generates
+- `KINDI_DEVICE=cpu` loads that pack in **339.9 s** (avx2-fma-f16c, 6 threads, ctx 2048; the pack
+  decoder was 96% of that and got 5.5x faster on 2026-11-26 - measured on the 2B/4B/9B packs, a
+  projection for this one, `docs/benchmarks/2026-11-26-i7-8086k-cpu-pack-load/`) and generates
   greedily at **4.02 tok/s** (best request) and **3.08 tok/s** (worst), over **2 prompts** of
   **16 tokens**; the first reply is on topic, which is what shows the pack is loaded coherently. The
   two processes produced the same ids, and a repeated generation in one process is identical too, so

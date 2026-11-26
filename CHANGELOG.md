@@ -1,5 +1,25 @@
 # Changelog
 
+## Bonsai 2.5's CPU load is 5.5x faster (2026-11-26)
+
+- **The pack decoder was the whole load.** The 2.5 27B's only working path here is the CPU engine, and
+  its first cost was 339.9 s before the first token. `cProfile` put 96% of that in one function:
+  `kindi.cpu.paircodes`, which turned each pack's base-3 weight byte into the uint32 words the C engine
+  reads by deriving four trits with `% 3` / `// 3` and gathering a uint32 code per column pair. It now
+  decodes the whole byte through one 256-entry `uint16` table (`_PAIR_LUT`) and assembles each word
+  from four bytes - a gather, one shift-or and one byte transpose per matrix.
+- **Measured, and the bytes did not move.** Same host, same files, same process, each pack loaded once
+  with the frozen per-trit decoder and once with the shipping one: 21.13 -> 3.84 s (2B, 5.50x),
+  47.15 -> 8.16 s (4B, 5.78x), 109.97 -> 19.91 s (9B, 5.52x), 296-366 MB/s of pack. The 27B's 339.9 s
+  is a projection from those three (its pack is not on this host) and is not claimed as a measurement.
+- **Proof the weights are identical.** `tests/test_cpu_paircodes.py` compares the new decoder with a
+  frozen copy of the old one over the real code range and all 256 byte values, six matrix shapes, both
+  chunk paths and a memmap slice; `KINDI_DEVICE=cpu python -m kindi verify` is still ALL PASS,
+  token-exact with llama.cpp, on both the 2B and the 9B pack.
+- Evidence `docs/benchmarks/2026-11-26-i7-8086k-cpu-pack-load/` (`loads.json` + method), tool
+  `tools/cpu_pack_load_check.py`, and `docs/CPU-SUPPORT.md` / `docs/BONSAI-2-SUPPORT.md` now say which
+  load figures are measured and which is projected.
+
 ## The 2.5 27B's CPU path stops pointing at a card (2026-11-26)
 
 - **`kindi plan` prints follow-ups that run on the host that printed them.** On a machine with no

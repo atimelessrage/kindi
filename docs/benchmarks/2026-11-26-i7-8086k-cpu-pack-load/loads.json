@@ -1,0 +1,34 @@
+{
+  "measured": "2026-11-26",
+  "isa": "avx2-fma-f16c",
+  "ctx": 512,
+  "threads": 4,
+  "runs": 1,
+  "packs": [
+    {
+      "pack": "bonsai-2b",
+      "pack_mb": 1340.5,
+      "before_s": 21.13,
+      "after_s": 3.84,
+      "speedup": 5.5,
+      "mb_per_s_after": 349.0
+    },
+    {
+      "pack": "bonsai-4b",
+      "pack_mb": 2985.0,
+      "before_s": 47.15,
+      "after_s": 8.16,
+      "speedup": 5.78,
+      "mb_per_s_after": 366.0
+    },
+    {
+      "pack": "bonsai-9b",
+      "pack_mb": 5886.6,
+      "before_s": 109.97,
+      "after_s": 19.91,
+      "speedup": 5.52,
+      "mb_per_s_after": 296.0
+    }
+  ],
+  "note": "before = the frozen per-trit decoder in tests/test_cpu_paircodes.py, after = kindi.cpu.paircodes"
+}

@@ -605,22 +605,39 @@ def _configure_threads(threads=None):
 _CODE = np.array([0, 1, 2, 3, 8, 4, 5, 6, 7], dtype=np.uint32)     # t0 + 3 t1 -> pair code (4 = both zero -> 8)
 
 
+def _pair_lut():
+    """One byte (four base-3 trits) -> its two column-pair codes, low byte then high byte.
+
+    Column pairs 2i/2i+1 come from trits 0/1 and 2/3, each mapped through `_CODE`.  This is the same
+    arithmetic the per-trit path did with `% 3` / `// 3` and a uint32 gather - which was 96% of a
+    pack's load time, 340 s on the 2.5 27B - as one 256-entry uint16 lookup per byte.
+    """
+    v = np.arange(256, dtype=np.uint32)
+    t = np.stack([v % 3, v // 3 % 3, v // 9 % 3, v // 27 % 3], axis=1)
+    lo, hi = _CODE[t[:, 0] + 3 * t[:, 1]], _CODE[t[:, 2] + 3 * t[:, 3]]
+    return (lo | (hi << np.uint32(8))).astype(np.uint16)
+
+
+_PAIR_LUT = _pair_lut()
+
+
 def paircodes(codes, R, C, chunk=4096):
     """Pack bytes [C/4][R] (base-3, 4 trits each) -> uint32 [R/8][C/128][64]: word p = the 8 rows' 4-bit codes of
-    columns 2p, 2p+1 (row-block major: one thread's rows are one contiguous stream)."""
+    columns 2p, 2p+1 (row-block major: one thread's rows are one contiguous stream).
+
+    The eight nibbles of a word are assembled as four bytes, so the word is little-endian by
+    construction; that is the only byte order the x86-only C side runs on.
+    """
     G = C // 128
     out = np.empty((R // 8, G, 64), dtype=np.uint32)
     codes = codes.reshape(C // 4, R)
     for r0 in range(0, R, chunk):
         r1 = min(R, r0 + chunk)
-        b = np.asarray(codes[:, r0:r1]).T.astype(np.uint8)                  # [rows][C/4]
-        t = np.stack([b % 3, b // 3 % 3, b // 9 % 3, b // 27 % 3], axis=2).reshape(r1 - r0, G, 64, 2)
-        pc = _CODE[t[..., 0].astype(np.uint32) + 3 * t[..., 1].astype(np.uint32)]      # [rows][G][64]
-        pc = pc.reshape((r1 - r0) // 8, 8, G, 64)
-        word = np.zeros(((r1 - r0) // 8, G, 64), dtype=np.uint32)
-        for l in range(8):
-            word |= pc[:, l] << np.uint32(4 * l)
-        out[r0 // 8:r1 // 8] = word
+        b = np.ascontiguousarray(codes[:, r0:r1].T, dtype=np.uint8)         # [rows][C/4]
+        pairs = _PAIR_LUT[b].view(np.uint8).reshape(r1 - r0, C // 2)        # [rows][C/2] pair codes
+        rows8 = pairs.reshape((r1 - r0) // 8, 8, C // 2)
+        by = rows8[:, 0::2] | (rows8[:, 1::2] << np.uint8(4))               # [rb][4][C/2]: rows 2l, 2l+1
+        out[r0 // 8:r1 // 8] = by.transpose(0, 2, 1).copy().view(np.uint32).reshape(-1, G, 64)
     return out
 
 

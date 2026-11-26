@@ -40,9 +40,19 @@ without a card, `kindi models` lists both 27B releases as `CPU engine (~32 GiB R
 prints CPU follow-up commands rather than the GPU split this engine cannot build (2026-11-26).
 
 **What to expect on a first run:** the 27B pack is 6.75 GB of packed weights, so the load spends
-340-500 s before the first token on the measured host, host RAM has to hold the pack plus the
-per-token scratch (~32 GiB), and a long-context run is slower per token than the ctx-2,048 numbers
-above - no 27B CPU figure on this page is a long-context figure.
+340-500 s before the first token on the measured host (2026-11-25 figures; the pack decoder got
+5.5x faster on 2026-11-26, see below), host RAM has to hold the pack plus the per-token scratch
+(~32 GiB), and a long-context run is slower per token than the ctx-2,048 numbers above - no 27B CPU
+figure on this page is a long-context figure.
+
+**The load no longer dominates the 27B's first run.** `kindi.cpu.paircodes` decoded each weight byte
+with a per-trit `% 3` / `// 3` path and a uint32 gather, and cProfile put it at 96% of a pack's load.
+It now decodes through one 256-entry table and assembles each word from four bytes: measured on the
+packs that fit here, the same load drops 21.13 -> 3.84 s (2B), 47.15 -> 8.16 s (4B) and 109.97 ->
+19.91 s (9B), 5.5-5.8x, with identical bytes (`tests/test_cpu_paircodes.py`) and the CPU `verify`
+matrix still token-exact on both packs it runs. The 27B's 339.9 s predates this and is a projection
+now, not a measurement - evidence and method in
+[benchmarks/2026-11-26-i7-8086k-cpu-pack-load](benchmarks/2026-11-26-i7-8086k-cpu-pack-load/README.md).
 
 Nemotron and Nanbeige are separate backends and are not part of this CPU goal.
 
