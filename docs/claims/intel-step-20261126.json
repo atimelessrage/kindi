@@ -26,7 +26,7 @@
     },
     {
       "id": "max-logit-diff",
-      "display": "2.60e-04",
+      "display": "2.63e-04",
       "quoted_in": [
         "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/README.md"
       ],
@@ -34,12 +34,12 @@
         "kind": "json",
         "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/step8.json",
         "pointer": "/steps/4/max_abs_diff",
-        "expect": 0.00026035308837890625
+        "expect": 0.000263214111328125
       }
     },
     {
       "id": "ms-per-step",
-      "display": "174.89 ms/step",
+      "display": "141.72 ms/step",
       "quoted_in": [
         "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/README.md"
       ],
@@ -47,12 +47,12 @@
         "kind": "json",
         "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/step8.json",
         "pointer": "/ms_per_step",
-        "expect": 174.894
+        "expect": 141.724
       }
     },
     {
       "id": "enqueues-per-step",
-      "display": "563 enqueues/step",
+      "display": "516 enqueues/step",
       "quoted_in": [
         "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/README.md"
       ],
@@ -60,7 +60,7 @@
         "kind": "json",
         "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/step8.json",
         "pointer": "/steps/1/enqueues",
-        "expect": 563
+        "expect": 516
       }
     },
     {

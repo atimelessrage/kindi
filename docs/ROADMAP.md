@@ -262,13 +262,15 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
   - **K3 wired: a full decode step on the A770 (2026-11-26):** `kindi intel-step` runs the whole 2B
     step with norm/fold and every ternary GEMV on the device (host does conv, the GDN delta rule,
     attention and the FFN elementwise math); 8/8 greedy tokens match the CPU engine, max
-    |Δlogit| 2.60e-04, at 174.89 ms/step and 563 enqueues/step - the launch+sync bound, not
+    |Δlogit| 2.63e-04, at 141.72 ms/step and 516 enqueues/step - the launch+sync bound, not
     streaming. Before the wiring, the GEMV kernels were found to truncate the folded input to
     int32 (`(int)x[c]` in `TRI_DOT`); their "bit for bit" validation used integer test vectors
     where int and float agree. The kernels and the host model now accumulate in float32 and the
     validation inputs are fractional, so the check is meaningful; the 2026-11-25 pack pages'
     GB/s stand as streaming rates but nothing there ran a real GEMV.
-    ([step](benchmarks/2026-11-26-i7-8086k-arc-a770-step/README.md), claim `intel-step-20261126`)
+    ([step](benchmarks/2026-11-26-i7-8086k-arc-a770-step/README.md), claim `intel-step-20261126`). Same day the step's launches were cut further: host writes go
+    non-blocking, a `concat3` kernel gives one read per GEMV group, and the FFN's silu×fold runs
+    on the device (K4's first half) — 141.72 ms/step at 516 enqueues, 8/8 tokens still exact.
   - **27B pack + K8/V4 on the A770 (2026-11-24, blocked):** the pack already exists as a copy in the
     model store's `packs/bonsai-27b`, and its `kindi_pack.json` source sha256 matches the 27B GGUF
     beside the store (verified the same day; the GGUF was not

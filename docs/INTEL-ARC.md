@@ -22,7 +22,7 @@ list at about 1.5x its per-shape path
 ([run](benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md)),
 and `kindi intel-step` runs a full 2B decode step with norm/fold and every ternary GEMV on the
 device (host: conv, delta rule, attention, FFN elementwise), matching the CPU engine 8/8 tokens
-at max |Δlogit| 2.60e-04 ([run](benchmarks/2026-11-26-i7-8086k-arc-a770-step/README.md)).
+at max |Δlogit| 2.63e-04 ([run](benchmarks/2026-11-26-i7-8086k-arc-a770-step/README.md)).
 (The pack kernels those pages timed truncated the folded input to int32 before the dot product;
 they and the host model now accumulate in float32 - same page.)
 There is still no SYCL backend, Kindi engine path or model run. The plan's first support

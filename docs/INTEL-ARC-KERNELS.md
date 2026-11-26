@@ -78,7 +78,7 @@ Status: **have** = works and is bit-exact today; **missing** = nothing on device
 | K1 | `norm_fold` | residual add, RMS(n), x w, sign x FWHT(HB) -> `xn` and folded `xp`; rows for per-head modes | 5120 / 17408 / 6144 / 256 / 128 | **193** | **have** (`kindi intel-norm`, 2 kernels) | done |
 | K2 | `embed_row` | decode one token's trits (128-col groups, 8 row scales) | 5120 | 1 | **closed** - host row + K1's fold | 0 |
 | K3 | ternary GEMV | 401 dependent calls on a resident pack, 1-3 matrices per launch | 6.80 GB read | 257 if 4/layer | **have, wired** (`kindi intel-step`; the kernels were fixed first - see below) | done |
-| K4 | `ewise` | silu-mul, residual, sigmoid-gate-mul, group permute - one kernel, mode switch | <=17408 | ~150 | missing | 1 d |
+| K4 | `ewise` | silu-mul (FFN, done 2026-11-26 as `silu_mul`), residual, sigmoid-gate-mul, group permute - one kernel, mode switch | <=17408 | ~150 | half done | 1 d remainder |
 | K5 | `ssm_gates` | alpha/beta f32 matvec `[2 NV x D]`, softplus/sigmoid, x ssm_a | 94 MB/token | 48 | missing | 0.5 d |
 | K6 | `conv1d_silu` | 4-tap depthwise + state rotate | 10240 | 48 | missing | 0.5 d |
 | K7 | `l2norm_heads` | 2 NK rows x HK | 32x128 | 48 | missing | 0.3 d |
@@ -153,8 +153,8 @@ is on the arithmetic side.
    and unit scale, 27.99 us and 0 differing elements against `kcpu.c`'s embed.
 3. ~~**K3 wiring**~~ - **done 2026-11-26** (`kindi intel_step.py`): a layer loop over a resident
    pack, device does norm/fold + every ternary GEMV, host does conv/delta/attention/FFN elementwise
-   in numpy. 8/8 tokens match the CPU engine on the 2B, max |Δlogit| 2.60e-04, 174.89 ms/step at
-   563 enqueues/step - the sync bound is the launches, not the streaming. The 27B pack is not on
+   in numpy. 8/8 tokens match the CPU engine on the 2B, max |Δlogit| 2.63e-04, 141.72 ms/step at
+   516 enqueues/step - the sync bound is the launches, not the streaming. The 27B pack is not on
    this host, so the step is verified at 2B geometry. Before the wiring, the GEMV kernels were
    fixed: `pack_gemv4`/`pack_gemv_persist` multiplied each trit by `(int)x[c]`, truncating the
    folded input to an integer; the kernels and the host model now accumulate in float32 and the

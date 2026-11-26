@@ -30,20 +30,37 @@ are fractional so an int-truncating kernel cannot pass silently again.
 | `intel-pack` (real pack, `blk.3.attn_k.weight`, fractional x) | device vs float host model, bit for bit | **0 mismatches** |
 | `intel-step` (full 2B decode step vs `cpu.Engine`) | 8 greedy tokens after a 4-token prefix | **8/8 matched** |
 
-Logit agreement over the 8 steps: max |Δ| **2.60e-04** (steps 3–10, absolute; the logit range is
+## The step's launch budget
+
+174.89 ms/step was mostly reads: 115 blocking reads at ~0.77 ms each (every one drains the
+queue its phase queued behind). Three changes, none of them a new kernel family:
+
+* **host writes are non-blocking** — the in-order queue orders a write against the kernels
+  launched after it, so a blocking write was buying a sync the reads already pay;
+* **one read per GEMV group** — a 7-line `concat3` kernel copies the group's GEMV outputs into
+  one buffer and the phase reads it once, including the GDN's folded input `[xn | qkv | gate]`;
+* **the FFN's silu(gate)×up runs on the device** (`silu_mul` + the FWHT fold in place, K4's
+  first half), so gate and up never return to the host and the `m` vector is never written.
+
+73 reads, 516 enqueues, **141.72 ms/step** (max |Δlogit| 2.63e-04 — the device's `exp` inside
+silu differs from numpy's by an ulp). The remaining ~73 reads are the architectural floor of
+this wiring: the host needs each phase's GEMV outputs for conv, the delta rule and sampling.
+One read per *step* needs those on the device too (Phase B).
+
+Logit agreement over the 8 steps: max |Δ| **2.63e-04** (steps 3–10, absolute; the logit range is
 about ±30). The GEMV itself agrees with the CPU engine's row GEMV to **1.19e-06** on
 `blk.0.attn_qkv`, i.e. one float32 ulp at that magnitude — AVX2 lane order vs the kernel's slot
 order, both accumulating per phase.
 
-Timing: **174.89 ms/step** at **563 enqueues/step** on the 2B (24 layers × ~23 launches, plus the
+Timing: **141.72 ms/step** at **516 enqueues/step** on the 2B (24 layers × ~23 launches, plus the
 head). The GEMV stream itself is only a few ms of that; the rest is 563 launches with a blocking
 read each (~0.3 ms of sync). The next order of magnitude needs the conv/delta-rule/attention moved
 on-device, which is new kernels, not wiring.
 
 ## Numbers in the claims file
 
-`docs/claims/intel-step-20261126.json` gates on: 8/8 tokens, 2.60e-04 max |Δlogit|, 174.89 ms/step,
-563 enqueues/step, the GEMV's 1.19e-06, and 0 validation mismatches in both `ternary.json` and
+`docs/claims/intel-step-20261126.json` gates on: 8/8 tokens, 2.63e-04 max |Δlogit|, 141.72 ms/step,
+516 enqueues/step, the GEMV's 1.19e-06, and 0 validation mismatches in both `ternary.json` and
 `pack2b.json`. The older pack pages (`2026-11-25-...-pack`) measured the int-truncating kernels;
 their GB/s numbers are weight-streaming rates and stand, but nothing there ran a GEMV on real
 activations.

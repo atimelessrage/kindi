@@ -74,6 +74,28 @@ def _rms_rows(x, w, n):
     return (((x * sc) * w[:n].astype(np.float32))).astype(np.float32)
 
 
+CONCAT_SOURCE = """
+/* One read-back per GEMV group: copy each output into the group buffer, then read once. */
+__kernel void concat3(__global const float *a, __global const float *b,
+                      __global const float *c, __global float *o,
+                      uint na, uint nb, uint nc) {
+    uint i = get_global_id(0);
+    if (i < na) { o[i] = a[i]; }
+    if (i < nb) { o[na + i] = b[i]; }
+    if (i < nc) { o[na + nb + i] = c[i]; }
+}
+
+__kernel void silu_mul(__global const float *g, __global const float *u, __global float *o,
+                       uint n) {
+    uint i = get_global_id(0);
+    if (i < n) {
+        float gv = g[i];
+        o[i] = (gv / (1.0f + exp(-gv))) * u[i];
+    }
+}
+"""
+
+
 class _Device(object):
     """The OpenCL plumbing shared by the kernels: two programs, counted enqueues."""
 
@@ -121,6 +143,9 @@ class _Device(object):
         self.fold = self._kernel(self.rms_program, b"fold_sign")
         gemv_program = self._build(GEMV_SOURCE, "pack_gemv4")
         self.gemv = self._kernel(gemv_program, b"pack_gemv4")
+        concat_program = self._build(CONCAT_SOURCE, "concat3")
+        self.concat = self._kernel(concat_program, b"concat3")
+        self.silu_mul = self._kernel(concat_program, b"silu_mul")
         self.buffers = []
 
     def _build(self, source, kernel_name):
@@ -156,10 +181,14 @@ class _Device(object):
         return buf
 
     def write(self, buf, data, key):
-        """Enqueue a blocking host write; counted like every other enqueue."""
+        """Enqueue a non-blocking host write; counted like every other enqueue.
+
+        The queue is in-order, so a kernel launched after this write reads the new bytes; the
+        host must not free or mutate the source before the queue drains, which the blocking
+        reads do. A blocking write costs its own sync (~0.2 ms here) and buys nothing."""
         array = np.ascontiguousarray(data, dtype=np.float32)
         code = int(self.lib.clEnqueueWriteBuffer(
-            ctypes.c_void_p(int(self.queue)), ctypes.c_void_p(int(buf)), ctypes.c_uint(1),
+            ctypes.c_void_p(int(self.queue)), ctypes.c_void_p(int(buf)), ctypes.c_uint(0),
             ctypes.c_size_t(0),
             ctypes.c_size_t(int(array.nbytes)),
             ctypes.cast(array.ctypes.data, ctypes.c_void_p), ctypes.c_uint(0), None, None))
@@ -247,6 +276,12 @@ class ArcStep(object):
         self.xp = dev.buffer(z, CL_MEM_WRITE_ONLY, "clCreateBufferXp")
         self.ybuf = dev.buffer(np.zeros(self.vocab, dtype=np.float32), CL_MEM_WRITE_ONLY,
                                "clCreateBufferY")
+        self.ybuf2 = dev.buffer(np.zeros(self.vocab, dtype=np.float32), CL_MEM_WRITE_ONLY,
+                                "clCreateBufferY2")
+        self.ybuf3 = dev.buffer(np.zeros(self.vocab, dtype=np.float32), CL_MEM_WRITE_ONLY,
+                                "clCreateBufferY3")
+        self.ygroup = dev.buffer(np.zeros(self.vocab, dtype=np.float32), CL_MEM_WRITE_ONLY,
+                                 "clCreateBufferYGroup")
         self.sig = dev.buffer(np.ones(W, dtype=np.float32), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                               "clCreateBufferSig")
         self.ones = dev.buffer(np.ones(W, dtype=np.float32), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
@@ -268,6 +303,8 @@ class ArcStep(object):
 
     def reset(self):
         self.M = {il: np.zeros((self.NV, self.HK, self.HK), dtype=np.float32) for il in range(self.NL)}
+        self._read_xn_with_group = False
+        self._xn_cache = None
         self.conv = {il: np.zeros(3 * self.CC, dtype=np.float32) for il in range(self.NL)}
         self.Kc = {il: np.zeros((self.ctx, self.NKV, self.HD), dtype=np.float16) for il in self.attn_layers}
         self.Vc = {il: np.zeros((self.ctx, self.NKV, self.HD), dtype=np.float16) for il in self.attn_layers}
@@ -306,6 +343,25 @@ class ArcStep(object):
                 "clEnqueueFoldSign")
         dev.enqueues += 1
 
+    def _fold_in_place(self, width):
+        """fold_sign on the vector currently in h (unit weight/scale): the m -> xp step."""
+        dev = self.dev
+        lib, fold = dev.lib, dev.fold
+        _set_arg(lib, fold, 0, ctypes.c_void_p(int(self.h)))
+        _set_arg(lib, fold, 1, ctypes.c_void_p(int(self.res)))
+        _set_arg(lib, fold, 2, ctypes.c_void_p(int(self.ones)))
+        _set_arg(lib, fold, 3, ctypes.c_void_p(int(self.sign_buf[width])))
+        _set_arg(lib, fold, 4, ctypes.c_void_p(int(self.ones)))
+        _set_arg(lib, fold, 5, ctypes.c_void_p(int(self.xn)))
+        _set_arg(lib, fold, 6, ctypes.c_void_p(int(self.xp)))
+        _set_arg(lib, fold, 7, ctypes.c_uint32(width))
+        _set_arg(lib, fold, 8, ctypes.c_uint32(self.HB))
+        _set_arg(lib, fold, 9, ctypes.c_uint32(0))
+        _local_arg(lib, fold, 10, self.HB * 4)
+        _launch(lib, dev.queue, fold, (width // self.HB) * FOLD_LANES, FOLD_LANES,
+                self.report, "clEnqueueFoldOnly")
+        dev.enqueues += 1
+
     def _fold_only(self, src, width, sign_width):
         """Fold a host vector with unit weight/scale (the FFN/GDN/attn m -> xp step)."""
         dev = self.dev
@@ -328,16 +384,65 @@ class ArcStep(object):
 
     def _gemv(self, name):
         """One ternary GEMV with the folded input in xp; returns the output row."""
+        return self._gemv_multi([name])[0]
+
+    def _gemv_multi(self, names):
+        """Several independent GEMVs launched back to back, concatenated on the device, one read.
+
+        The GEMVs of one phase (qkv+gate, q/k/v, FFN gate+up) share the folded input and do not
+        depend on each other's output, so they queue before the host waits. Each blocking read
+        is a ~0.5 ms queue drain, so a group is copied into one buffer and read once: 151 reads
+        and 90 ms/step before this, ~55 reads after."""
         dev = self.dev
-        entry = self.bc[name]
-        rows, cols = int(entry["rows"]), int(entry["ne0"])
         lib = dev.lib
-        _set_gemv_args(lib, dev.gemv, int(self.codes_buf), int(self.scales[name]),
-                       int(self.xp), int(self.ybuf), rows, cols, 1,
-                       int(entry["bc_off"]), 0)
-        _launch_2d(lib, dev.queue, dev.gemv, (rows + 3) // 4, 1, self.report, "clEnqueueGemv")
+        bufs = (self.ybuf, self.ybuf2, self.ybuf3)
+        rows_list = []
+        for i, name in enumerate(names):
+            entry = self.bc[name]
+            rows, cols = int(entry["rows"]), int(entry["ne0"])
+            rows_list.append(rows)
+            _set_gemv_args(lib, dev.gemv, int(self.codes_buf), int(self.scales[name]),
+                           int(self.xp), int(bufs[i]), rows, cols, 1,
+                           int(entry["bc_off"]), 0)
+            _launch_2d(lib, dev.queue, dev.gemv, (rows + 3) // 4, 1, self.report, "clEnqueueGemv")
+            dev.enqueues += 1
+        if self._read_xn_with_group:
+            counts = (rows_list + [0, 0, 0])[:3]
+            _set_arg(lib, dev.concat, 0, ctypes.c_void_p(int(self.xn)))
+            _set_arg(lib, dev.concat, 1, ctypes.c_void_p(int(bufs[0])))
+            _set_arg(lib, dev.concat, 2, ctypes.c_void_p(int(bufs[1])))
+            _set_arg(lib, dev.concat, 3, ctypes.c_void_p(int(self.ygroup)))
+            _set_arg(lib, dev.concat, 4, ctypes.c_uint32(self.D))
+            _set_arg(lib, dev.concat, 5, ctypes.c_uint32(counts[0]))
+            _set_arg(lib, dev.concat, 6, ctypes.c_uint32(counts[1]))
+            _launch(lib, dev.queue, dev.concat, max(counts + [self.D]), 1, self.report,
+                    "clEnqueueConcat")
+            dev.enqueues += 1
+            total = self.D + counts[0] + counts[1]
+            raw = dev.read(self.ygroup, total, "clEnqueueReadY")
+            self._xn_cache = raw[: self.D].copy()
+            out, off = [], self.D
+            for rows in rows_list:
+                out.append(raw[off:off + rows].copy())
+                off += rows
+            return out
+        counts = (rows_list + [0, 0, 0])[:3]
+        _set_arg(lib, dev.concat, 0, ctypes.c_void_p(int(bufs[0])))
+        _set_arg(lib, dev.concat, 1, ctypes.c_void_p(int(bufs[1])))
+        _set_arg(lib, dev.concat, 2, ctypes.c_void_p(int(bufs[2])))
+        _set_arg(lib, dev.concat, 3, ctypes.c_void_p(int(self.ygroup)))
+        _set_arg(lib, dev.concat, 4, ctypes.c_uint32(counts[0]))
+        _set_arg(lib, dev.concat, 5, ctypes.c_uint32(counts[1]))
+        _set_arg(lib, dev.concat, 6, ctypes.c_uint32(counts[2]))
+        _launch(lib, dev.queue, dev.concat, max(counts), 1, self.report, "clEnqueueConcat")
         dev.enqueues += 1
-        return dev.read(self.ybuf, rows, "clEnqueueReadY")[:rows]
+        total = sum(rows_list)
+        raw = dev.read(self.ygroup, total, "clEnqueueReadY")
+        out, off = [], 0
+        for rows in rows_list:
+            out.append(raw[off:off + rows].copy())
+            off += rows
+        return out
 
     def _xn(self):
         return self.dev.read(self.xn, self.D, "clEnqueueReadXn")[: self.D]
@@ -347,9 +452,12 @@ class ArcStep(object):
         D, NV, NK, HK, CC = self.D, self.NV, self.NK, self.HK, self.CC
         p = "blk.%d." % il
         self._norm_fold(h, p + "attn_norm.weight")
-        qkv = self._gemv(p + "attn_qkv.weight")
-        zv = self._gemv(p + "attn_gate.weight")
-        xn = self._xn()
+        self._read_xn_with_group = True
+        try:
+            qkv, zv = self._gemv_multi([p + "attn_qkv.weight", p + "attn_gate.weight"])
+        finally:
+            self._read_xn_with_group = False
+        xn = self._xn_cache
         beta_w = self._f32(p + "ssm_beta.weight").reshape(NV, D)
         alpha_w = self._f32(p + "ssm_alpha.weight").reshape(NV, D)
         gb = _sigm(beta_w @ xn)
@@ -404,9 +512,8 @@ class ArcStep(object):
         G = NH // NKV
         p = "blk.%d." % il
         self._norm_fold(h, p + "attn_norm.weight")
-        qn = self._gemv(p + "attn_q.weight")
-        kr = self._gemv(p + "attn_k.weight")
-        vv = self._gemv(p + "attn_v.weight")
+        qn, kr, vv = self._gemv_multi([p + "attn_q.weight", p + "attn_k.weight",
+                                      p + "attn_v.weight"])
         cs_, sn_ = self.cos[pos], self.sin[pos]
         qr = np.empty((NH, HD), dtype=np.float32)
         kro = np.empty((NKV, HD), dtype=np.float32)
@@ -443,13 +550,37 @@ class ArcStep(object):
         return h, y
 
     def _ffn(self, il, h):
+        """norm/fold -> gate+up GEMVs -> silu(gate)*up folded -> down GEMV, one read at the end.
+
+        The silu*up and the FWHT fold both run on the device (K4 ewise): gate and up never come
+        back to the host, and the m vector is never written either."""
         p = "blk.%d." % il
+        dev = self.dev
+        lib = dev.lib
         self._norm_fold(h, p + "post_attention_norm.weight")
-        g = self._gemv(p + "ffn_gate.weight")
-        u = self._gemv(p + "ffn_up.weight")
-        m = (_silu(g) * u).astype(np.float32)
-        self._fold_only(m, self.NFF, self.NFF)
-        return self._gemv(p + "ffn_down.weight")
+        for i, name in enumerate((p + "ffn_gate.weight", p + "ffn_up.weight")):
+            entry = self.bc[name]
+            rows, cols = int(entry["rows"]), int(entry["ne0"])
+            _set_gemv_args(lib, dev.gemv, int(self.codes_buf), int(self.scales[name]),
+                           int(self.xp), int((self.ybuf, self.ybuf2)[i]), rows, cols, 1,
+                           int(entry["bc_off"]), 0)
+            _launch_2d(lib, dev.queue, dev.gemv, (rows + 3) // 4, 1, self.report, "clEnqueueGemv")
+            dev.enqueues += 1
+        NFF = self.NFF
+        _set_arg(lib, dev.silu_mul, 0, ctypes.c_void_p(int(self.ybuf)))
+        _set_arg(lib, dev.silu_mul, 1, ctypes.c_void_p(int(self.ybuf2)))
+        _set_arg(lib, dev.silu_mul, 2, ctypes.c_void_p(int(self.h)))
+        _set_arg(lib, dev.silu_mul, 3, ctypes.c_uint32(NFF))
+        _launch(lib, dev.queue, dev.silu_mul, NFF, 1, self.report, "clEnqueueSiluMul")
+        dev.enqueues += 1
+        self._fold_in_place(NFF)
+        entry = self.bc[p + "ffn_down.weight"]
+        rows, cols = int(entry["rows"]), int(entry["ne0"])
+        _set_gemv_args(lib, dev.gemv, int(self.codes_buf), int(self.scales[p + "ffn_down.weight"]),
+                       int(self.xp), int(self.ybuf), rows, cols, 1, int(entry["bc_off"]), 0)
+        _launch_2d(lib, dev.queue, dev.gemv, (rows + 3) // 4, 1, self.report, "clEnqueueGemv")
+        dev.enqueues += 1
+        return dev.read(self.ybuf, rows, "clEnqueueReadY")[:rows]
 
     def _embed(self, tok):
         """kc embed(): h = sD * FWHT_blocks(row), the sign applied after the transform."""
