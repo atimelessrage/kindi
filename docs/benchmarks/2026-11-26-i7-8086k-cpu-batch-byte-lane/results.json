@@ -1,0 +1,82 @@
+{
+  "host": "Intel i7-8086K, Windows, clang 18.1.8, AVX2/FMA/F16C (no AVX-512/VBMI)",
+  "probe": {
+    "harness": "bench-logs/byte_lane_probe.c (untracked), single thread, -O3 -mavx2 -mfma, random codes 0..8, 20 reps, second of two runs quoted",
+    "shapes": [
+      {
+        "R": 12288,
+        "C": 4096,
+        "nt": 5,
+        "current_ms": 12.973,
+        "lane_ms": 14.528,
+        "lane_g_ms": 20.088,
+        "lane_h_ms": 13.217,
+        "lane_hl_ms": 17.184,
+        "differing": 0
+      },
+      {
+        "R": 4096,
+        "C": 12288,
+        "nt": 5,
+        "current_ms": 11.704,
+        "lane_ms": 14.843,
+        "lane_g_ms": 20.545,
+        "lane_h_ms": 10.453,
+        "lane_hl_ms": 15.801,
+        "differing": 0
+      },
+      {
+        "R": 4096,
+        "C": 4096,
+        "nt": 5,
+        "current_ms": 3.404,
+        "lane_ms": 4.781,
+        "lane_g_ms": 6.711,
+        "lane_h_ms": 3.335,
+        "lane_hl_ms": 5.102,
+        "differing": 0
+      }
+    ],
+    "head_shape": {
+      "R": 248320,
+      "C": 5120,
+      "nt": 5,
+      "current_ms": 308.9,
+      "lane_h_ms": 343.8,
+      "differing": 0,
+      "note": "earlier probe run in the same session; group-outer is slower here"
+    }
+  },
+  "engine": {
+    "pack": "bonsai-9b (largest pack on this host; the 27B pack is absent and needs ~32 GiB RAM)",
+    "ctx": 2048,
+    "threads": 6,
+    "plain": {
+      "rows": 16,
+      "s": 1.9366650581359863,
+      "rows_s": 8.26162476200184
+    },
+    "batch": {
+      "rows": 15,
+      "s": 1.8237507343292236,
+      "rows_s": 8.224808203033847,
+      "sizes": [
+        5,
+        5,
+        5
+      ],
+      "tokens_equal": true,
+      "max_logit_delta": 0.0
+    },
+    "rollback": {
+      "keep": 2,
+      "plain_rows": 13,
+      "equal": true,
+      "s": 1.57
+    },
+    "five_row_pass_s": 0.6079169114414078,
+    "plain_row_s": 0.12104156638349806,
+    "five_row_pass_cost_in_plain_rows": 5.022,
+    "gate": 1.5
+  }
+}

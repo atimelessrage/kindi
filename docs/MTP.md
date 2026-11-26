@@ -203,7 +203,10 @@ instead of 2, and only the load and the shift are shared, so a pass scales with 
 rather than with the traffic it saves. Break-even at 1x needs m >= 2.0 and the gate at 1.25x needs
 m >= 2.7 - 60-70% of k=4 drafts - against 28.1%. No speedup is claimed and CP2 stays blocked. What
 would reopen it: a verify kernel at ~0.2 plain rows per row (a byte-lane formulation or AVX-512's
-32-lane permute) or a host where a single row already saturates memory bandwidth. Tracked at the
+32-lane permute) or a host where a single row already saturates memory bandwidth. CP3 (2026-11-26)
+prototyped the byte-lane formulations - shared sign extraction, T-row lanes, group-outer order, both -
+and all four are bit-identical to the shipped kernel but slower or no better on every shape, so the gate
+(<=1.5 plain rows per 5-row pass; the 9B engine pass costs 5.02) is missed and no kernel lands. Evidence [benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane](benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/README.md), claim `cpu-batch-byte-lane-20261126`. Tracked at the
 [batch-verify evidence page](benchmarks/2026-11-26-i7-8086k-27b-cpu-batch-verify/RESULTS.md), claim
 `mtp-cpu-batch-20261126`.
 

@@ -175,8 +175,12 @@ is on the arithmetic side.
 
    *Milestone: 30-33 tok/s, the realizable ceiling.*
 
-Out of scope here: prefill/batching (needs a batched ternary GEMV; the existing q8 GEMM does not apply to pair
-codes) and the MTP draft head (not on the decode path).
+Out of scope here: prefill/batching (needs a batched ternary GEMV; the existing q8 GEMM does not apply to pair codes). Roadmap CP3 (2026-11-26) prototyped the CPU-side batched GEMV's byte-lane
+formulations (shared sign extraction, T-row lanes, group-outer order, both): all bit-identical, all slower
+or no better, and the 9B engine's 5-row pass still costs 5.02 plain rows against the <=1.5 gate, so no
+batched GEMV lands on this host (evidence `benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/`, claim
+`cpu-batch-byte-lane-20261126`). The Arc token loop stays 401 dependent launches, and the MTP draft head
+(not on the decode path) stays out too.
 
 **Why this order and not "attention first":** K1 is called 193 times a token and is a dependency of every
 matvec; attention is called 16 times and is worth about 0.8 GFLOP at ctx 2048 - 3% of the token. GDN comes

@@ -1,0 +1,170 @@
+{
+  "gate": "cpu-batch-byte-lane-20261126",
+  "title": "CP3 byte-lane verify GEMV prototype: bit-identical, slower, gate missed",
+  "measured": "2026-11-26",
+  "commit": "unreleased",
+  "command": "bench-logs/byte_lane_probe.c (untracked) + tools/cpu_batch_check.py --pack <9b> --rows 15 --batch 5",
+  "notes": "Four prototype arms replaying rows8_multi's arithmetic exactly (0 differing floats on every shape) - shared sign extraction, T-row lanes, group-outer loop order, and both - against the shipped kernel, plus the engine's 5-row pass cost on the bonsai-9b pack. The 27B pack is not on this host and needs ~32 GiB RAM, so the engine gate number is the 9B's; the GEMV probe ran on the 27B's matrix shapes. The probe arms' millisecond figures are quoted from the page's table; the engine figures are re-derived from results.json.",
+  "evidence": [
+    "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/results.json",
+    "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/README.md"
+  ],
+  "numbers": [
+    {
+      "id": "probe-12288-current",
+      "display": "12.97 ms",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/results.json",
+        "pointer": "/probe/shapes/0/current_ms",
+        "expect": 12.973
+      }
+    },
+    {
+      "id": "probe-12288-lane",
+      "display": "14.53 ms",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/results.json",
+        "pointer": "/probe/shapes/0/lane_ms",
+        "expect": 14.528
+      }
+    },
+    {
+      "id": "probe-12288-lane-g",
+      "display": "20.09 ms",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/results.json",
+        "pointer": "/probe/shapes/0/lane_g_ms",
+        "expect": 20.088
+      }
+    },
+    {
+      "id": "probe-12288-lane-h",
+      "display": "13.22 ms",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/results.json",
+        "pointer": "/probe/shapes/0/lane_h_ms",
+        "expect": 13.217
+      }
+    },
+    {
+      "id": "probe-12288-lane-hl",
+      "display": "17.18 ms",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/results.json",
+        "pointer": "/probe/shapes/0/lane_hl_ms",
+        "expect": 17.184
+      }
+    },
+    {
+      "id": "probe-4096x12288-current",
+      "display": "11.70 ms",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/results.json",
+        "pointer": "/probe/shapes/1/current_ms",
+        "expect": 11.704
+      }
+    },
+    {
+      "id": "probe-4096x12288-lane-h",
+      "display": "10.45 ms",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/results.json",
+        "pointer": "/probe/shapes/1/lane_h_ms",
+        "expect": 10.453
+      }
+    },
+    {
+      "id": "probe-4096-current",
+      "display": "3.40 ms",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/results.json",
+        "pointer": "/probe/shapes/2/current_ms",
+        "expect": 3.404
+      }
+    },
+    {
+      "id": "probe-4096-lane-h",
+      "display": "3.34 ms",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/results.json",
+        "pointer": "/probe/shapes/2/lane_h_ms",
+        "expect": 3.335
+      }
+    },
+    {
+      "id": "engine-pass-cost",
+      "display": "5.02 plain rows",
+      "quoted_in": [
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/results.json",
+        "pointer": "/engine/five_row_pass_cost_in_plain_rows",
+        "expect": 5.022
+      }
+    },
+    {
+      "id": "engine-plain-rows-s",
+      "display": "8.26 rows/s",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/results.json",
+        "pointer": "/engine/plain/rows_s",
+        "expect": 8.26162476200184
+      }
+    },
+    {
+      "id": "engine-batch-rows-s",
+      "display": "8.22 rows/s",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-cpu-batch-byte-lane/results.json",
+        "pointer": "/engine/batch/rows_s",
+        "expect": 8.224808203033847
+      }
+    }
+  ]
+}
