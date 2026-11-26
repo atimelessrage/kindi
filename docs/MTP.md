@@ -181,6 +181,30 @@ route beats plain decode, because the CPU engine verifies one row per pass. Trac
 [route comparison page](benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md),
 claim `mtp-cpu-routes-20261126`.
 
+#### The batched verify pass, and why it does not pay on this host (2026-11-26)
+
+Roadmap CP1's pass exists: `kindi/kcpu.c`'s `kc_step_batch` runs T rows through **one** weight stream
+(per-row pair tables over the same words, per-row attention under the batch's causal mask, the GDN
+scan in row order, a T-row head), and `kindi.mtp_cpu.speculative_decode` drafts k tokens with a
+smaller pack, confirms them in one pass and rewinds the GDN state with `kc_batch_rollback` - a replay
+from the per-row vectors the pass stored, with no weights read. It is plain decode, row for row:
+tokens equal, every row's logits equal, and the state after a rollback lands where plain decode would
+have it (`tools/cpu_batch_check.py`, `tests/test_cpu_batch.py`).
+
+**It does not reach the CP1 gate.** 27B, 4 prompts, 16 tokens each, k=4, 2B pack drafting:
+**4/4 token-exact**, acceptance **36/128 (28.1%)** - the rate `score_drafts` measured, so the loop
+agrees with the drafter study - and mean **0.51x** (0.41-0.69x) against plain decode. The reason is
+arithmetic, not the drafter: a 5-row pass costs about **3 plain rows** in the loop (1.5-1.9x rows/s;
+4.4 rows and 1.14x in the isolated check), while a round yields 1 + m = 2.3 tokens at 28.1%. The
+pair-code GEMV is *permute-bound*, not bandwidth-bound: T rows need 2T `vpermps` per weight word
+instead of 2, and only the load and the shift are shared, so a pass scales with T on the arithmetic
+rather than with the traffic it saves. Break-even at 1x needs m >= 2.0 and the gate at 1.25x needs
+m >= 2.7 - 60-70% of k=4 drafts - against 28.1%. No speedup is claimed and CP2 stays blocked. What
+would reopen it: a verify kernel at ~0.2 plain rows per row (a byte-lane formulation or AVX-512's
+32-lane permute) or a host where a single row already saturates memory bandwidth. Tracked at the
+[batch-verify evidence page](benchmarks/2026-11-26-i7-8086k-27b-cpu-batch-verify/RESULTS.md), claim
+`mtp-cpu-batch-20261126`.
+
 ## The modes
 
 | Mode | Setting | Drafts |

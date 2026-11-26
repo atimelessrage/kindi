@@ -1,0 +1,145 @@
+{
+ "date": "2026-11-26",
+ "host": {
+  "cpu": "Intel i7-8086K (6 cores, AVX2/FMA/F16C, no AVX-512)",
+  "threads": 6,
+  "ctx": 2048
+ },
+ "engine": "kindi/kcpu.c kc_step_batch (one weight stream, T row tables) + kindi/mtp_cpu.py speculative_decode",
+ "packs": {
+  "verifier": "bonsai25-27b",
+  "drafter": "bonsai-2b",
+  "drafter_incremental": true
+ },
+ "gate": {
+  "prompts": 4,
+  "tokens_per_prompt": 16,
+  "k": 4,
+  "exact": 4,
+  "mean_speedup": 0.5116,
+  "accepted": 36,
+  "offered": 128,
+  "rate": 0.2812,
+  "runs": [
+   {
+    "prompt": "In one sentence: what is a ternary weight?",
+    "exact": true,
+    "plain_tok_s": 1.5662,
+    "spec_tok_s": 0.7983,
+    "speedup": 0.5097,
+    "accepted": 10,
+    "offered": 32,
+    "rounds": 8,
+    "rows": 40,
+    "kept": 18,
+    "batch_ms": 13979.6,
+    "rollback_ms": 255.7,
+    "ms_per_batch_row": 349.5,
+    "plain_ms_per_token": 638.5,
+    "depth": [
+     5,
+     2,
+     2,
+     1
+    ],
+    "batch_row_cost_in_plain_tokens": 0.5474
+   },
+   {
+    "prompt": "2 + 2 = ? Answer with the number only.",
+    "exact": true,
+    "plain_tok_s": 1.5357,
+    "spec_tok_s": 0.6655,
+    "speedup": 0.4333,
+    "accepted": 6,
+    "offered": 40,
+    "rounds": 10,
+    "rows": 50,
+    "kept": 16,
+    "batch_ms": 17303.6,
+    "rollback_ms": 336.7,
+    "ms_per_batch_row": 346.1,
+    "plain_ms_per_token": 651.2,
+    "depth": [
+     6,
+     0,
+     0,
+     0
+    ],
+    "batch_row_cost_in_plain_tokens": 0.5315
+   },
+   {
+    "prompt": "Name three colours and stop.",
+    "exact": true,
+    "plain_tok_s": 1.9666,
+    "spec_tok_s": 0.8094,
+    "speedup": 0.4116,
+    "accepted": 7,
+    "offered": 36,
+    "rounds": 9,
+    "rows": 45,
+    "kept": 16,
+    "batch_ms": 15553.1,
+    "rollback_ms": 316.5,
+    "ms_per_batch_row": 345.6,
+    "plain_ms_per_token": 508.5,
+    "depth": [
+     5,
+     1,
+     1,
+     0
+    ],
+    "batch_row_cost_in_plain_tokens": 0.6796
+   },
+   {
+    "prompt": "Write a four-word sentence about the sea.",
+    "exact": true,
+    "plain_tok_s": 1.7135,
+    "spec_tok_s": 1.1851,
+    "speedup": 0.6917,
+    "accepted": 13,
+    "offered": 20,
+    "rounds": 5,
+    "rows": 25,
+    "kept": 18,
+    "batch_ms": 8794.4,
+    "rollback_ms": 148.3,
+    "ms_per_batch_row": 351.8,
+    "plain_ms_per_token": 583.6,
+    "depth": [
+     4,
+     4,
+     3,
+     2
+    ],
+    "batch_row_cost_in_plain_tokens": 0.6028
+   }
+  ]
+ },
+ "check": {
+  "pack": "bonsai25-27b",
+  "rows": 15,
+  "batch_size": 5,
+  "plain_rows_s": 2.5031,
+  "batch_rows_s": 2.8449,
+  "rows_s_gain": 1.1366,
+  "batch_row_cost_in_plain_rows": 0.8798,
+  "pass_cost_in_plain_rows": 4.4,
+  "tokens_equal": true,
+  "max_logit_delta": 0.0,
+  "batch_sizes": [
+   5,
+   5,
+   5
+  ],
+  "rollback_keep": 2,
+  "rollback_equal": true
+ },
+ "arithmetic": {
+  "round_rows": 5,
+  "loop_batch_row_cost_in_plain_tokens": 0.5903,
+  "loop_batch_rows_s_gain": 1.694,
+  "loop_round_cost_in_plain_tokens": 2.9516,
+  "breakeven_matched_at_1x": 1.95,
+  "breakeven_matched_at_1_25x": 2.69
+ }
+}

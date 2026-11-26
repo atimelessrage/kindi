@@ -312,6 +312,25 @@ def _lib():
     lib.kc_q4gemv.restype = ctypes.c_int
     lib.kc_head.argtypes = [ctypes.POINTER(Model)]
     lib.kc_head.restype = ctypes.c_int
+    # the batched T-row pass (roadmap CP1) and the GDN state block a drafter rewinds with
+    if hasattr(lib, "kc_step_batch"):
+        lib.kc_step_batch.argtypes = [ctypes.POINTER(Model), ctypes.POINTER(ctypes.c_int), ctypes.c_int,
+                                      ctypes.c_int, ctypes.POINTER(ctypes.c_int)]
+        lib.kc_step_batch.restype = ctypes.c_int
+        lib.kc_batch_rollback.argtypes = [ctypes.POINTER(Model), ctypes.c_int]
+        lib.kc_batch_rollback.restype = ctypes.c_int
+        lib.kc_batch_logits.argtypes = [ctypes.POINTER(Model), ctypes.c_int]
+        lib.kc_batch_logits.restype = ctypes.POINTER(ctypes.c_float)
+        lib.kc_batch_hidden.argtypes = [ctypes.POINTER(Model), ctypes.c_int]
+        lib.kc_batch_hidden.restype = PF
+        lib.kc_batch_vocab.argtypes = [ctypes.POINTER(Model)]
+        lib.kc_batch_vocab.restype = ctypes.c_int
+        lib.kc_state_len.argtypes = [ctypes.POINTER(Model)]
+        lib.kc_state_len.restype = ctypes.c_int
+        lib.kc_state_save.argtypes = [ctypes.POINTER(Model), PF]
+        lib.kc_state_save.restype = ctypes.c_int
+        lib.kc_state_load.argtypes = [ctypes.POINTER(Model), PF]
+        lib.kc_state_load.restype = ctypes.c_int
     assert lib.kc_sizeof_model() == ctypes.sizeof(Model) and lib.kc_sizeof_layer() == ctypes.sizeof(Layer)
     _LIB[so] = lib
     return lib
@@ -856,6 +875,73 @@ class Engine(object):
             raise OverflowError("position %d is past the context (%d)" % (pos, self.ctx))
         best = int(self.lib.kc_step(ctypes.byref(self.m), int(tok), int(pos), 1))
         return best + self.head_off if self.head_rows is not None else best
+
+    def step_batch(self, toks, pos):
+        """``len(toks)`` rows at consecutive positions in one pass over the weights (roadmap CP1).
+
+        ``toks[t]`` is the token at position ``pos + t``; the result is the greedy token each row
+        predicts, i.e. the token plain decode would produce at ``pos + t + 1``.  The model's state
+        advances through every row, so a verifier that keeps only the first ``keep`` rows calls
+        :meth:`batch_rollback` afterwards.  The rows are token-exact with plain decode: same
+        arithmetic in the same order, only the weight stream is shared.
+        """
+        toks = [int(t) for t in toks]
+        n = len(toks)
+        if n < 2:
+            return [self.step(toks[0], pos)]
+        if not hasattr(self.lib, "kc_step_batch"):
+            raise RuntimeError("kindi: this CPU library has no batched step; rebuild it (roadmap CP1)")
+        if pos < 0 or pos + n > self.ctx:
+            raise OverflowError("positions %d..%d are outside the context (%d)" % (pos, pos + n - 1, self.ctx))
+        buf = (ctypes.c_int * n)(*toks)
+        out = (ctypes.c_int * n)()
+        rc = int(self.lib.kc_step_batch(ctypes.byref(self.m), buf, n, int(pos), out))
+        if rc != n:
+            raise RuntimeError("kindi: batched step refused %d rows at %d (code %d)" % (n, pos, rc))
+        off = self.head_off if self.head_rows is not None else 0
+        return [int(v) + off for v in out]
+
+    def batch_rollback(self, keep):
+        """Undo the batch rows past ``keep`` (GDN state replayed from the stored vectors)."""
+        rc = int(self.lib.kc_batch_rollback(ctypes.byref(self.m), int(keep)))
+        if rc < 0:
+            raise RuntimeError("kindi: batch rollback to %d rows failed (code %d)" % (keep, rc))
+        return rc
+
+    def batch_logits(self, row=0):
+        """A view of row ``row``'s logits from the last batch (for exactness checks)."""
+        n = int(self.lib.kc_batch_vocab(ctypes.byref(self.m)))
+        if n <= 0:
+            raise RuntimeError("kindi: no batch logits; run step_batch first")
+        return np.ctypeslib.as_array(self.lib.kc_batch_logits(ctypes.byref(self.m), int(row)), shape=(n,))
+
+    def batch_hidden(self, row=0):
+        """A view of row ``row``'s residual from the last batch (what get_hidden() would return)."""
+        return np.ctypeslib.as_array(self.lib.kc_batch_hidden(ctypes.byref(self.m), int(row)), shape=(self.D,))
+
+    def state_len(self):
+        """Floats in the GDN state block (what :meth:`save_state` copies)."""
+        n = int(self.lib.kc_state_len(ctypes.byref(self.m)))
+        if n < 0:
+            raise RuntimeError("kindi: the CPU library cannot report its state size")
+        return n
+
+    def save_state(self):
+        """A copy of the GDN state (conv taps and every SSM matrix), for :meth:`load_state`."""
+        buf = np.zeros(self.state_len(), dtype=F32)
+        if self.lib.kc_state_save(ctypes.byref(self.m), _p(buf)) != buf.size:
+            raise RuntimeError("kindi: the GDN state copy was short")
+        return buf
+
+    def load_state(self, buf):
+        """Restore a :meth:`save_state` copy.  The K/V cache is not part of it: a pass rewrites every
+        position it reads, so stale K/V past the restored prefix is never read."""
+        x = np.ascontiguousarray(buf, dtype=F32)
+        if x.size != self.state_len():
+            raise ValueError("state has %d floats, expected %d" % (x.size, self.state_len()))
+        if self.lib.kc_state_load(ctypes.byref(self.m), _p(x)) != x.size:
+            raise RuntimeError("kindi: the GDN state restore was short")
+        return x.size
 
     def step_layers(self, tok, pos):
         """The per-layer equivalent of step(): embed, every block, then the exact head."""

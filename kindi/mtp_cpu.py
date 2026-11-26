@@ -20,6 +20,7 @@ CPU".  Use it for acceptance measurements and for the head's plumbing; do not ex
 second from it yet.
 """
 import os
+import time
 
 import numpy as np
 
@@ -330,31 +331,113 @@ class PackDrafter(object):
     (``~/.kindi/packs/bonsai-2b``) instead of the ``-mtp`` file's 65th block.
     """
 
-    def __init__(self, pack, ctx=2048, threads=None, k=4, log=print):
+    def __init__(self, pack, ctx=2048, threads=None, k=4, log=print, incremental=False):
         self.eng = _cpu.Engine(pack, ctx=ctx, threads=threads, log=log or (lambda *a: None))
         self.path, self.k = pack, int(k)
+        self.incremental = bool(incremental)
         self.stats = {"drafts": 0}
         self.reset()
 
     def reset(self):
         self.eng.reset()
         self.stats["drafts"] = 0
+        self.consumed = []      # the tokens whose rows this engine has consumed (incremental mode)
+        self.snap = None        # its GDN state at len(consumed)
 
     def draft(self, prefix, hin, k=None):
-        """Up to ``k`` tokens after ``prefix[-1]``, from the drafter's own greedy decode of the prefix."""
+        """Up to ``k`` tokens after ``prefix[-1]``, from the drafter's own greedy decode of the prefix.
+
+        ``incremental=True`` keeps this engine's state across rounds: a round feeds only the tokens
+        the prefix has gained since the last one, from a snapshot of the state at ``prefix[:-1]``, so
+        drafting costs ``k`` rows plus the tokens the verify pass accepted instead of a replay of the
+        whole prefix (the replay is what made the measurement in docs/MTP.md cost more than it saved).
+        """
         k = self.k if k is None else int(k)
         if k < 1 or len(prefix) < 2:
             return []
-        self.eng.reset()
-        for i, t in enumerate(prefix[:-1]):
-            self.eng.feed(int(t), i)
+        if not self.incremental:
+            self.eng.reset()
+            for i, t in enumerate(prefix[:-1]):
+                self.eng.feed(int(t), i)
+        else:
+            want = [int(t) for t in prefix[:-1]]
+            if self.snap is None or want[:len(self.consumed)] != self.consumed:
+                self.eng.reset()
+                self.consumed = []
+                for i, t in enumerate(want):
+                    self.eng.feed(t, i)
+                    self.consumed.append(t)
+            else:
+                self.eng.load_state(self.snap)          # back to the state at prefix[:-1]
+                for t in want[len(self.consumed):]:
+                    self.eng.feed(t, len(self.consumed))
+                    self.consumed.append(t)
+            self.snap = self.eng.save_state()
         tok, pos, drafts = int(prefix[-1]), len(prefix) - 1, []
         for _ in range(k):
             tok = self.eng.step(tok, pos)
             drafts.append(tok)
             pos += 1
         self.stats["drafts"] += 1
+        self.last = list(drafts)
         return drafts
+
+
+def speculative_decode(eng, ids, n, drafter, k=4):
+    """Greedy decode with a batched verify pass: ``drafter`` proposes, one T-row pass confirms.
+
+    The loop keeps one *pending* token (the model's own argmax, not yet consumed) and a round is
+    ``[pending] + drafts[:k]`` at consecutive positions, so the pass that would have cost k + 1
+    weight reads costs one (``kindi/kcpu.c``'s kc_step_batch).  The drafts that match are accepted,
+    the model's next argmax becomes the new pending token, and ``kc_batch_rollback`` puts the GDN
+    state back at the last accepted row.  Returns ``(tokens, stats)`` like
+    ``eng.generate(ids, n)`` - ``n`` tokens after the prompt, and the same ones, because every token
+    is the model's own greedy pick.
+
+    ``stats``: ``rounds``, ``offered`` (k per round), ``matched``, ``rate``, ``rows`` (batch rows
+    fed), ``kept`` (rows the state kept), ``depth[i]`` (rounds where draft i + 1 was accepted) and
+    ``batch_ms`` / ``rollback_ms``.
+    """
+    drafter.reset()
+    eng.reset()
+    for i, t in enumerate(ids[:-1]):
+        eng.feed(t, i)
+    pending = eng.step(ids[-1], len(ids) - 1)      # the model's token at position len(ids)
+    out = list(ids)                                # tokens the model has committed (positions 0..q-1)
+    q = len(ids)                                   # the position `pending` occupies
+    stats = {"rounds": 0, "offered": 0, "matched": 0, "depth": [0] * max(0, int(k)),
+             "rows": 0, "kept": 0, "batch_ms": 0.0, "rollback_ms": 0.0}
+    while len(out) - len(ids) < n:
+        prefix = list(out)                         # tokens at positions 0..q-1
+        h = eng.batch_hidden(0).copy() if hasattr(eng.lib, "kc_batch_hidden") and stats["rounds"] else None
+        # the drafter must see `pending` too: row 0's argmax is the token after it, so draft 0 is
+        # compared with a row that already consumed `pending`
+        drafts = drafter.draft(prefix + [pending], h, k)
+        rows = [pending] + drafts
+        t0 = time.time()
+        preds = eng.step_batch(rows, q)
+        stats["batch_ms"] += (time.time() - t0) * 1000.0
+        matched = 0
+        while matched < len(drafts) and preds[matched] == drafts[matched]:
+            matched += 1
+        accepted = drafts[:matched]
+        stats["rounds"] += 1
+        stats["offered"] += len(drafts)
+        stats["matched"] += matched
+        stats["rows"] += len(rows)
+        for i in range(matched):
+            if i < len(stats["depth"]):
+                stats["depth"][i] += 1
+        keep = matched + 1
+        t0 = time.time()
+        eng.batch_rollback(keep)
+        stats["rollback_ms"] += (time.time() - t0) * 1000.0
+        stats["kept"] += keep
+        out.extend([pending] + accepted)           # the rows this round commits
+        pending = preds[matched]
+        q += keep
+    stats["rate"] = (stats["matched"] / float(stats["offered"])) if stats["offered"] else 0.0
+    return out[len(ids):len(ids) + n], stats
 
 
 def score_drafts(eng, ids, n, drafter, k=4):

@@ -1,5 +1,28 @@
 # Changelog
 
+## The CPU batched verify pass: exact, and a measured no-go (2026-11-26)
+
+- **The pass is plain decode, row for row.** `kindi/kcpu.c`'s `kc_step_batch` runs T rows through one
+  weight stream (per-row pair tables over the same words, per-row attention under the batch's causal
+  mask, the GDN scan in row order, a T-row head) and `kc_batch_rollback` replays the GDN scan from the
+  per-row vectors it stored. Every row's tokens and logits equal one-at-a-time decode, and the state
+  after a rollback lands where plain decode would have it (`tests/test_cpu_batch.py`,
+  `tools/cpu_batch_check.py`; `Engine.step_batch`/`batch_logits`/`batch_rollback`/`save_state`/
+  `load_state` in `kindi/cpu.py`, a generic `kc_state_len/save/load` for the GDN state).
+- **CP1's gate is missed, for a kernel reason.** 27B, 4 prompts, k=4, 2B pack drafting: 4/4
+  token-exact, acceptance 36/128 (28.1%), mean **0.51x** (0.41-0.69x) against plain decode. The
+  pair-code GEMV is permute-bound, not bandwidth-bound - T rows need 2T `vpermps` per weight word
+  instead of 2 - so a 5-row pass costs about 3 plain rows in the loop (4.4 in isolation, 1.14-1.9x
+  rows/s) and break-even needs m >= 2.0 of k=4 drafts. No speedup claimed; CP2 stays blocked.
+- **Two bugs found on the way.** The speculative loop fed the drafter the prefix without the pending
+  row it was about to verify, so every draft was compared one position out (2.6% acceptance); with the
+  pending token included it reproduces the drafter study (28.1% vs 30.6%). The incremental drafter
+  (state snapshot instead of a full prefix replay) is exact against the replaying one and halves its
+  cost.
+- Tracked at `docs/benchmarks/2026-11-26-i7-8086k-27b-cpu-batch-verify/` with claim
+  `mtp-cpu-batch-20261126` (25 numbers), and `docs/MTP.md` plus the CP1/CP2 `docs/ROADMAP.md` rows
+  carry the result.
+
 ## Three CPU drafter routes measured against each other (2026-11-26)
 
 - **The 2B drafter does not need the `-mtp` file.** The same 2.5 27B weights were converted from
