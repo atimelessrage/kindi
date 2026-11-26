@@ -100,6 +100,74 @@ def test_describe_without_a_card_reports_the_model_only(tmp_path, monkeypatch):
     assert rep["command"]                                    # the follow-up command is still printed
 
 
+def test_without_a_card_the_follow_ups_run_the_cpu_engine(tmp_path, monkeypatch):
+    """A printed follow-up has to run on the host that printed it.
+
+    `bench --tandem ...` exits 1 without a CUDA/ROCm device ("tandem needs a CUDA/ROCm GPU"), so on
+    a cardless host - the path a 27B or 2.5 27B CPU user takes - the plan used to hand back two
+    commands that could not run. They now ask for the CPU engine instead (2026-11-26).
+    """
+    pack = make_pack(tmp_path)
+    monkeypatch.setattr(_plan, "_free_vram_gib", lambda: None)
+    monkeypatch.setattr(_plan, "_WINDOWS", False)
+    rep = _plan.describe(str(pack), 100, "auto", assume_ram_gib=4, assume_cores=2)
+    assert rep["cpu_only"] is True
+    prefix = _plan._cpu_env_prefix()
+    assert rep["command"].startswith(prefix) and "--tandem" not in rep["command"]
+    assert any(key == "cpu engine" and "no card here" in reason for key, reason in rep["lines"])
+
+    lines = []
+    monkeypatch.setattr(_plan, "describe", lambda *a, **k: rep)
+    assert _plan.run({"pack": str(pack), "ctx": 100}, _FakeArgs(), log=lines.append) == 0
+    bench = next(line for line in lines if line.startswith("follow up:"))
+    verify = next(line for line in lines if line.startswith("verify:"))
+    assert bench.split("follow up:", 1)[1].strip().startswith(prefix)
+    assert verify.split("verify:", 1)[1].strip().startswith(prefix)
+    assert "--tandem" not in bench + verify
+
+
+def test_the_cpu_follow_up_uses_the_host_shells_own_syntax(tmp_path, monkeypatch):
+    """cmd.exe needs `set "KINDI_DEVICE=cpu" &&`; a POSIX shell needs the bare assignment prefix."""
+    pack = make_pack(tmp_path)
+    monkeypatch.setattr(_plan, "_free_vram_gib", lambda: None)
+    monkeypatch.setattr(_plan, "_WINDOWS", True)
+    win = _plan.describe(str(pack), 100, "auto", assume_ram_gib=4, assume_cores=2)["command"]
+    assert win.startswith('set "KINDI_DEVICE=cpu" && ')
+    py = "C:" + os.sep + "Program Files" + os.sep + "Python 313" + os.sep + "python.exe"
+    pk = "C:" + os.sep + "my packs" + os.sep + "bonsai 2.5 27b"
+    monkeypatch.setattr(_plan.sys, "executable", py)
+    win_verify = _plan._cpu_verify_command(pk)
+    expected_argv = [py, "-m", "kindi", "--pack", pk, "verify"]
+    assert win_verify == 'set "KINDI_DEVICE=cpu" && ' + subprocess.list2cmdline(expected_argv)
+
+
+def test_the_cpu_follow_up_survives_the_real_parser(tmp_path, monkeypatch):
+    """Strip the env prefix and the remaining argv must be accepted by `kindi.__main__`."""
+    from kindi import __main__ as cli
+
+    pack = make_pack(tmp_path)
+    posix_pack = pack.as_posix()
+    monkeypatch.setattr(_plan, "_free_vram_gib", lambda: None)
+    monkeypatch.setattr(_plan, "_WINDOWS", False)
+    monkeypatch.setattr(_plan.sys, "executable", "/usr/bin/python3")
+    conf = tmp_path / "kindi.conf"
+    conf.write_text("[kindi]" + chr(10), encoding="utf-8")
+    monkeypatch.setenv("KINDI_CONFIG", str(conf))
+    rep = _plan.describe(posix_pack, 2048, "auto", assume_ram_gib=4, assume_cores=2)
+    argv = shlex.split(rep["command"])
+    assert argv[0] == "KINDI_DEVICE=cpu"
+    cli_argv = argv[1:]
+    assert cli_argv[:3] == ["/usr/bin/python3", "-m", "kindi"]
+    assert cli_argv[3:] == ["--pack", str(posix_pack), "--ctx", "2048", "bench"]
+
+    seen = []
+    monkeypatch.setattr(cli, "cmd_bench", lambda cfg, a: seen.append((cfg, a)) or 0)
+    assert cli.main(cli_argv[3:]) == 0
+    assert len(seen) == 1
+    cfg, args = seen[0]
+    assert Path(cfg["pack"]) == pack and cfg["ctx"] == 2048
+
+
 def test_describe_reports_the_vram_budget_ceiling(tmp_path):
     pack = make_pack(tmp_path)
     rep = _plan.describe(str(pack), 100, "auto", assume_vram_gib=1, assume_ram_gib=4,
@@ -140,6 +208,17 @@ def test_portfolio_compares_full_gpu_and_both_split_directions(tmp_path):
     assert gpu["command"].endswith("bench --tandem gpu-first --tandem-cpu-layers gdn:1")
     assert rep["best"] == "full GPU"
     assert any(line.startswith("recommendation: full GPU") for line in rep["lines"])
+
+
+def test_portfolio_without_a_card_points_at_the_cpu_engine(tmp_path, monkeypatch):
+    """The rows are hypothetical GPU placements; the line a human runs must still be runnable."""
+    pack = make_pack(tmp_path)
+    monkeypatch.setattr(_plan, "_free_vram_gib", lambda: None)
+    rep = _plan.portfolio(str(pack), 100, "gdn:1", assume_ram_gib=4, assume_cores=2)
+    assert rep["cpu_only"] is True and rep["best"] is None
+    assert rep["command"].startswith(_plan._cpu_env_prefix())
+    assert "--tandem" in rep["rows"][1]["command"]            # the split rows stay as written
+    assert any("no card here" in line for line in rep["lines"])
 
 
 def test_portfolio_carries_the_vram_budget_into_its_rows(tmp_path):

@@ -1,5 +1,23 @@
 # Changelog
 
+## The 2.5 27B's CPU path stops pointing at a card (2026-11-26)
+
+- **`kindi plan` prints follow-ups that run on the host that printed them.** On a machine with no
+  CUDA/ROCm device, `kindi plan` ended with `bench --tandem cpu-first ...` and the same `verify`
+  line, both of which exit 1 there ("tandem needs a CUDA/ROCm GPU") - the exact path a 2.5 27B user
+  without a card takes. The report now says the split needs a device and prints the CPU engine's own
+  `bench`/`verify` commands with `KINDI_DEVICE=cpu` in the host shell's syntax (`set "KINDI_DEVICE=cpu" &&` on
+  cmd.exe, the bare prefix elsewhere); `--portfolio` gets the same recommendation line while its
+  hypothetical placement rows stay as written.
+- **`kindi models` stops calling a CPU-run model `GPU only`.** `bonsai-27b`, `bonsai-2.5-27b` and
+  `bonsai-2.5-27b-mtp` now carry the catalog's `cpu` flag, so a cardless host lists them as `CPU
+  engine` - the engine that ran them (`docs/CPU-SUPPORT.md`, `docs/BONSAI-2-SUPPORT.md` section 1a)
+  - instead of the one it does not have.
+- `docs/CPU-SUPPORT.md` names the 2.5 27B row (load 339.9 s, 4.02 tok/s best of two prompts,
+  `verify` refusing for lack of a reference) and `docs/CONFIGURATION.md`'s `KINDI_DEVICE` row no
+  longer implies the CPU engine stops at the 9B. Tests: `tests/test_plan.py` (three CPU follow-up
+  cases, including the real parser), `tests/test_catalog_scheduling.py`.
+
 ## The CPU batched verify pass: exact, and a measured no-go (2026-11-26)
 
 - **The pass is plain decode, row for row.** `kindi/kcpu.c`'s `kc_step_batch` runs T rows through one

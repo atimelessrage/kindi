@@ -1,93 +1,110 @@
 {
-  "gate": "bonsai25-cpu-20261125",
-  "title": "Bonsai 2.5 27B pack on the CPU engine: load, greedy decode, determinism",
-  "measured": "2026-11-25",
-  "commit": "unreleased",
-  "command": "python -m kindi convert Ternary-Bonsai-2.5-27B-PTQ1_0.gguf --out pack; KINDI_DEVICE=cpu python docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/run_cpu.py --pack pack --out run1.json --tokens 16 (twice)",
-  "notes": "Two processes, two prompts, 16 greedy tokens each, ctx 2048, CPU engine avx2-fma-f16c with 6 threads. summary.json is derived from run1.json and run2.json by the snippet in the run page. No llama.cpp reference exists for this release, so there is no exactness number.",
-  "evidence": [
-    "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/summary.json",
-    "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/run1.json",
-    "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/run2.json",
-    "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/run_cpu.py",
-    "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/README.md"
-  ],
-  "numbers": [
-    {
-      "id": "load",
-      "display": "339.9 s",
-      "quoted_in": ["docs/BONSAI-2-SUPPORT.md"],
-      "check": {
-        "kind": "json",
-        "file": "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/summary.json",
-        "pointer": "/load_seconds/run1",
-        "expect": 339.9
-      }
-    },
-    {
-      "id": "decode-best",
-      "display": "4.02 tok/s",
-      "quoted_in": ["docs/BONSAI-2-SUPPORT.md"],
-      "check": {
-        "kind": "json",
-        "file": "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/summary.json",
-        "pointer": "/decode_tokens_per_second/max",
-        "expect": 4.02
-      }
-    },
-    {
-      "id": "decode-worst",
-      "display": "3.08 tok/s",
-      "quoted_in": ["docs/BONSAI-2-SUPPORT.md"],
-      "check": {
-        "kind": "json",
-        "file": "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/summary.json",
-        "pointer": "/decode_tokens_per_second/min",
-        "expect": 3.08
-      }
-    },
-    {
-      "id": "reply-tokens",
-      "display": "16 tokens",
-      "quoted_in": ["docs/BONSAI-2-SUPPORT.md"],
-      "check": {
-        "kind": "json",
-        "file": "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/summary.json",
-        "pointer": "/reply_tokens",
-        "expect": 16
-      }
-    },
-    {
-      "id": "prompts",
-      "display": "2 prompts",
-      "quoted_in": ["docs/BONSAI-2-SUPPORT.md"],
-      "check": {
-        "kind": "json",
-        "file": "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/summary.json",
-        "pointer": "/prompts",
-        "expect": 2
-      }
-    },
-    {
-      "id": "tensors",
-      "display": "851 tensors",
-      "quoted_in": ["docs/BONSAI-2-SUPPORT.md"],
-      "check": {
-        "kind": "json",
-        "file": "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/summary.json",
-        "pointer": "/pack_facts/tensors",
-        "expect": 851
-      }
-    },
-    {
-      "id": "pack-size",
-      "display": "7,242 MB in 370 s",
-      "quoted_in": ["docs/BONSAI-2-SUPPORT.md"],
-      "check": {
-        "kind": "text",
-        "file": "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/README.md",
-        "needle": "7,242 MB in 370 s"
-      }
-    }
-  ]
+ "gate": "bonsai25-cpu-20261125",
+ "title": "Bonsai 2.5 27B pack on the CPU engine: load, greedy decode, determinism",
+ "measured": "2026-11-25",
+ "commit": "unreleased",
+ "command": "python -m kindi convert Ternary-Bonsai-2.5-27B-PTQ1_0.gguf --out pack; KINDI_DEVICE=cpu python docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/run_cpu.py --pack pack --out run1.json --tokens 16 (twice)",
+ "notes": "Two processes, two prompts, 16 greedy tokens each, ctx 2048, CPU engine avx2-fma-f16c with 6 threads. summary.json is derived from run1.json and run2.json by the snippet in the run page. No llama.cpp reference exists for this release, so there is no exactness number.",
+ "evidence": [
+  "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/summary.json",
+  "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/run1.json",
+  "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/run2.json",
+  "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/run_cpu.py",
+  "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/README.md"
+ ],
+ "numbers": [
+  {
+   "id": "load",
+   "display": "339.9 s",
+   "quoted_in": [
+    "docs/BONSAI-2-SUPPORT.md",
+    "docs/CPU-SUPPORT.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/summary.json",
+    "pointer": "/load_seconds/run1",
+    "expect": 339.9
+   }
+  },
+  {
+   "id": "decode-best",
+   "display": "4.02 tok/s",
+   "quoted_in": [
+    "docs/BONSAI-2-SUPPORT.md",
+    "docs/CPU-SUPPORT.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/summary.json",
+    "pointer": "/decode_tokens_per_second/max",
+    "expect": 4.02
+   }
+  },
+  {
+   "id": "decode-worst",
+   "display": "3.08 tok/s",
+   "quoted_in": [
+    "docs/BONSAI-2-SUPPORT.md",
+    "docs/CPU-SUPPORT.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/summary.json",
+    "pointer": "/decode_tokens_per_second/min",
+    "expect": 3.08
+   }
+  },
+  {
+   "id": "reply-tokens",
+   "display": "16 tokens",
+   "quoted_in": [
+    "docs/BONSAI-2-SUPPORT.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/summary.json",
+    "pointer": "/reply_tokens",
+    "expect": 16
+   }
+  },
+  {
+   "id": "prompts",
+   "display": "2 prompts",
+   "quoted_in": [
+    "docs/BONSAI-2-SUPPORT.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/summary.json",
+    "pointer": "/prompts",
+    "expect": 2
+   }
+  },
+  {
+   "id": "tensors",
+   "display": "851 tensors",
+   "quoted_in": [
+    "docs/BONSAI-2-SUPPORT.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/summary.json",
+    "pointer": "/pack_facts/tensors",
+    "expect": 851
+   }
+  },
+  {
+   "id": "pack-size",
+   "display": "7,242 MB in 370 s",
+   "quoted_in": [
+    "docs/BONSAI-2-SUPPORT.md"
+   ],
+   "check": {
+    "kind": "text",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-bonsai25-27b-cpu/README.md",
+    "needle": "7,242 MB in 370 s"
+   }
+  }
+ ]
 }

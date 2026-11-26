@@ -53,9 +53,12 @@ def test_without_a_card_the_listing_names_the_cpu_engine():
     On a GPU-less host the listing printed "too large" for every model, including the 2B, 4B and 9B
     that the CPU engine runs on that same machine (2026-11-24).
     """
-    for mid in ("bonsai-2b", "bonsai-4b", "bonsai-9b"):
+    # the 27B rows too: the CPU engine ran the 27B (4/4 token-exact) and both 2.5 27B files, so
+    # "GPU only" on a cardless host was the same miscall (2026-11-26)
+    for mid in ("bonsai-2b", "bonsai-4b", "bonsai-9b", "bonsai-27b", "bonsai-2.5-27b",
+                "bonsai-2.5-27b-mtp"):
         assert catalog._no_card_label(catalog.MODELS[mid]) == "CPU engine"
-    for mid in ("bonsai-27b", "nemotron-e4b", "nanbeige-33b", "lightning-30b"):
+    for mid in ("nemotron-e4b", "nanbeige-33b", "lightning-30b"):
         assert catalog._no_card_label(catalog.MODELS[mid]) == "GPU only"
     assert catalog.fits(catalog.MODELS["bonsai-2b"], []) == ""      # unchanged
 

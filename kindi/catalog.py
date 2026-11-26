@@ -25,19 +25,20 @@ MODELS = {
                       one=3800, two=0, what="Ternary-Bonsai-2 9B (ternary weights)", cpu=True),
     "bonsai-27b": dict(file="Ternary-Bonsai-2-27B-PTQ1_0.gguf", repo="prism-ml/Ternary-Bonsai-2-27B-gguf",
                        sha="53107f530aa52eb00912263ab1ee29bd199261c87cd7b4ad4ca1318c1fe33ee3", size=5946648928,
-                       one=7600, two=3800, what="Ternary-Bonsai-2 27B (ternary weights)"),
+                       one=7600, two=3800, what="Ternary-Bonsai-2 27B (ternary weights)", cpu=True),
     # Ternary Bonsai 2.5 27B (released 2026-11-24): the same Qwen3.8-27B geometry and 5.9 GB PTQ1_0 file as the
     # 27B above, retrained for agentic coding and multi-turn tool use; see docs/BONSAI-2-SUPPORT.md section 1a.
     "bonsai-2.5-27b": dict(file="Ternary-Bonsai-2.5-27B-PTQ1_0.gguf", repo="prism-ml/Ternary-Bonsai-2.5-27B-GGUF",
                            sha="929560ec9d37cf3cadd4b00cc87b51c570082a628dd830b4692dc0b2ed18dbbe", size=5993834848,
-                           one=7600, two=3800, what="Ternary-Bonsai-2.5 27B (agentic, ternary weights)"),
+                           one=7600, two=3800, what="Ternary-Bonsai-2.5 27B (agentic, ternary weights)",
+                           cpu=True),
     # The same release with its MTP draft head in the file (a 65th block). The converter builds the
     # same 64-layer pack and records the head in the manifest; Kindi does not draft with it yet.
     "bonsai-2.5-27b-mtp": dict(file="Ternary-Bonsai-2.5-27B-PTQ1_0-mtp.gguf",
                                repo="prism-ml/Ternary-Bonsai-2.5-27B-GGUF",
                                sha="e0fc5f3d47b9c926d52677d303b19df356a2376614b3e1cb9973865fc04ca431",
                                size=6232818944, one=7600, two=3800,
-                               what="Ternary-Bonsai-2.5 27B with MTP draft head (agentic)"),
+                               what="Ternary-Bonsai-2.5 27B with MTP draft head (agentic)", cpu=True),
     "nemotron-e4b": dict(file="NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q3_K_XL.gguf", repo="unsloth/NVIDIA-Nemotron-3.5-Bolt-E4B-GGUF",
                          sha="3f8032b9d2c18536c4ac51b97959a563cc27434de99823640c98147edc62ce9b", size=4219133120,
                          one=3300, two=2400, what="NVIDIA Nemotron 3.5 Bolt E4B (Gemma 4), UD-Q3_K_XL"),
@@ -117,6 +118,11 @@ def _no_card_label(m):
     card-only answer (tests and Kindi Monitor read it), so the CPU lane is a display label naming
     the engine that would run the model, not a fit claim - the pack still has to fit host RAM, which
     this listing does not measure.
+
+    The 27B rows are in that lane too, since 2026-11-26: the CPU engine ran the 27B (4/4
+    token-exact, `docs/CPU-SUPPORT.md`) and both 2.5 27B files (load and generate,
+    `docs/BONSAI-2-SUPPORT.md` section 1a), so on a cardless host "GPU only" was wrong for them as
+    well.
     """
     return "CPU engine" if m.get("cpu") else "GPU only"
 

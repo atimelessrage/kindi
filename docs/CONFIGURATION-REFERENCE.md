@@ -123,7 +123,7 @@ direct sites.
 | `KINDI_CKPT_STREAM` | (empty) | `kindi/cache.py:69` |
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:592` |
 | `KINDI_CONFIG` | (unset) | `kindi/config.py:129` (+1 more) |
-| `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:254` (+7 more) |
+| `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:269` (+7 more) |
 | `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:610` (+1 more) |
 | `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:49` |
 | `KINDI_D1` | `1` or `0` | `kindi/spec.py:750` (+1 more) |
@@ -241,7 +241,7 @@ direct sites.
 | `KINDI_LT_SELFCHECK` | `1` | `kindi/lightning_gen.py:252` |
 | `KINDI_LT_SM75` | (unset) | `kindi/lightning.py:150` |
 | `KINDI_LT_TC` | `1` | `kindi/lightning.py:145` |
-| `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:635` |
+| `KINDI_LT_USAGE` | (unset) | `kindi/plan.py:672` |
 | `KINDI_MASK_CACHE_MB` | `64` | `kindi/token_classes.py:51` |
 | `KINDI_MAX_BODY_MB` | `16` | `kindi/dsv41_server.py:78` (+1 more) |
 | `KINDI_MEM_RESERVE_MB` | `96` or `256` or `32` | `kindi/engine.py:345` (+4 more) |
@@ -304,7 +304,7 @@ direct sites.
 | `KINDI_NVRTC` | (unset) | `kindi/qx_gpu.py:30` (+1 more) |
 | `KINDI_ONEAPI_ROOT` | (unset) | `kindi/intel.py:688` |
 | `KINDI_P100_FP16_PROMPT` | (empty) | `kindi/chunk.py:144` |
-| `KINDI_PACK` | (unset) | `kindi/catalog.py:231` (+1 more) |
+| `KINDI_PACK` | (unset) | `kindi/catalog.py:237` (+1 more) |
 | `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:1102` (+1 more) |
 | `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:1103` |
 | `KINDI_PIPE` | `1` | `kindi/dsv41.py:802` |

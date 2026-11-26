@@ -138,6 +138,10 @@ What Kindi now does with it:
 - The registry id is `bonsai2.5-27b`. A 2.5 pack resolves through the Bonsai adapter's
   `model_id_for_manifest` (from `general.name`, or from `source_file` for a file that names itself
   `Hf`), and the release is part of the id so the two releases cannot share a sampling profile.
+- On a host with no card the CLI now points at the engine that actually runs here: `kindi models`
+  lists `bonsai-2.5-27b` and `bonsai-2.5-27b-mtp` as `CPU engine` instead of `GPU only` (the CPU
+  engine is what loaded both files), and `kindi plan` prints `KINDI_DEVICE=cpu` follow-up commands
+  instead of a `--tandem` split, which exits 1 without a CUDA/ROCm device (2026-11-26).
 - `sampling_profile = publisher` now has a 2.5 entry: thinking temperature 1.0 / top-p 0.95 / top-k 20 /
   presence 0.0 (Bonsai 2's card says 1.0 there), non-thinking 0.7 / 0.80 / 20 / 1.5. Everything else in
   the profile is unchanged, and a request's own values still win.

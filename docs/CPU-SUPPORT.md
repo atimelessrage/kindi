@@ -28,8 +28,18 @@ A CPU is supported when all of these hold:
 The current CPU engine covers the **2B, 4B and 9B**, and since 2026-11-24 it also runs the **27B**:
 `KINDI_DEVICE=cpu` loads the 27B pack and `kindi verify` is **4/4 token-exact** on the i7-8086K
 (3.7 tok/s over the run, 340 s load, 31.9 GiB host RAM). That is an exactness row, not a recommendation: the 27B
-is a GPU model and this path is the fallback of a machine without one. Nemotron and Nanbeige are
-separate backends and are not part of this CPU goal.
+is a GPU model and this path is the fallback of a machine without one.
+
+The **Bonsai 2.5 27B** runs on the same path (2026-11-25) and is the one row here without a llama.cpp
+reference: the released `PTQ1_0` file converts and packchecks, the CPU engine loads it in 339.9 s
+and generates greedily at 4.02 tok/s (best of two prompts, 3.08 tok/s worst) at ctx 2,048. `kindi
+verify` refuses it by name instead of scoring it against Bonsai 2's tokens and says how a reference
+is supplied (`--reference FILE`, `docs/BONSAI-2-SUPPORT.md` section 1a). So the row is load and
+generate, not exactness: nothing here is a token-for-token comparison with another engine. On a host
+without a card, `kindi models` lists both 27B releases as `CPU engine` and `kindi plan` prints CPU
+follow-up commands rather than the GPU split this engine cannot build (2026-11-26).
+
+Nemotron and Nanbeige are separate backends and are not part of this CPU goal.
 
 ## Current backend reality
 

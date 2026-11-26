@@ -150,7 +150,7 @@ def describe(pack, ctx, spec, mode="cpu-first", gpu_kind=None,
              assume_vram_gib=None, assume_ram_gib=None, assume_cores=None, reserve_mib=512,
              usage_path=None, moe_cache_mib=None, dcache=None,
              chunk_tokens=None, chunk_lane="copy", rates=None, vram_budget_mib=None,
-             mmproj_place=None):
+             mmproj_place=None, cpu_follow_up=True):
     """The placement report as a dict; no weight tensor is read, only indexes and the manifest."""
     man = _manifest(pack)
     if man.get("backend") == "kindi_lightning":
@@ -242,11 +242,19 @@ def describe(pack, ctx, spec, mode="cpu-first", gpu_kind=None,
     if free_gib is None:
         out["cpu_layers"] = None
         out["fit"] = None
+        out["cpu_only"] = True
         lines.append(("placement", "not decided without a free-VRAM number; the full model needs "
                       "~%.1f GiB of weights + K/V at %d tokens"
                       % (pack_gib, int(ctx))))
-        out["command"] = _command(pack, mode, spec, vram_budget_mib=vram_budget_mib,
-                                  reserve_mib=reserve_mib)
+        if cpu_follow_up:
+            # `bench --tandem ...` exits 1 without a CUDA/ROCm device, so on the host this report
+            # was made on the only runnable follow-up is the CPU engine.
+            lines.append(("cpu engine", "no card here, so the follow-up asks for the CPU engine "
+                          "(`KINDI_DEVICE=cpu`); the dense split needs a CUDA/ROCm device"))
+            out["command"] = _cpu_bench_command(pack, ctx)
+        else:
+            out["command"] = _command(pack, mode, spec, vram_budget_mib=vram_budget_mib,
+                                      reserve_mib=reserve_mib)
         return out
 
     free_bytes = int(free_gib * 2 ** 30)
@@ -352,10 +360,33 @@ def _command(pack, mode, spec, ctx=None, vram_budget_mib=None, reserve_mib=None)
     return _pasteable(argv)
 
 
-def _plain_command(pack, ctx):
+def _plain_command(pack, ctx, cpu_only=False):
     """The no-split follow-up: the ordinary bench command at the planned context."""
-    return _pasteable([sys.executable, "-m", "kindi", "--pack", pack, "--ctx", int(ctx),
+    argv = _pasteable([sys.executable, "-m", "kindi", "--pack", pack, "--ctx", int(ctx),
                        "bench"])
+    return (_cpu_env_prefix() + argv) if cpu_only else argv
+
+
+def _cpu_env_prefix():
+    """`KINDI_DEVICE=cpu` in the host shell's own syntax, for a command printed for this host.
+
+    On a machine with no CUDA/ROCm device the GPU follow-up cannot run (`bench --tandem` exits 1),
+    while the CPU engine is the one that has run the 27B: the printed line has to say so, in the
+    syntax the host actually parses.
+    """
+    return 'set "KINDI_DEVICE=cpu" && ' if _WINDOWS else "KINDI_DEVICE=cpu "
+
+
+def _cpu_bench_command(pack, ctx):
+    """The no-card follow-up: the CPU engine's bench at the planned context."""
+    return _cpu_env_prefix() + _pasteable([sys.executable, "-m", "kindi", "--pack", pack,
+                                           "--ctx", int(ctx), "bench"])
+
+
+def _cpu_verify_command(pack):
+    """The no-card exactness follow-up: the CPU engine's verify on the same pack."""
+    return _cpu_env_prefix() + _pasteable([sys.executable, "-m", "kindi", "--pack", pack,
+                                           "verify"])
 
 
 def portfolio(pack, ctx, spec="auto", gpu_kind=None,
@@ -387,7 +418,7 @@ def portfolio(pack, ctx, spec="auto", gpu_kind=None,
         rep = describe(pack, ctx, row_spec, mode=row_mode, gpu_kind=gpu_kind,
                        assume_vram_gib=assume_vram_gib, assume_ram_gib=assume_ram_gib,
                        assume_cores=assume_cores, reserve_mib=reserve_mib,
-                       vram_budget_mib=vram_budget_mib)
+                       vram_budget_mib=vram_budget_mib, cpu_follow_up=False)
         if row_spec is None:
             command = _plain_command(pack, ctx)
             estimate = rep.get("estimate_full_mib")
@@ -415,9 +446,13 @@ def portfolio(pack, ctx, spec="auto", gpu_kind=None,
         fit = {True: "yes", False: "no", None: "unknown"}.get(row.get("fit"), "unknown")
         lines.append("  %-10s %-10s %-24s %10s  %s" %
                      (row["placement"], row["mode"], layer_text, est, fit))
+    cpu_only = assume_vram_gib is None and _free_vram_gib() is None
     if best is None and any(row.get("fit") is None for row in rows):
         lines.append("recommendation: cannot decide without a free-VRAM number; pass "
                      "--assume-vram-gib or run this on the target card")
+        if cpu_only:
+            lines.append("no card here: the only runnable follow-up is the CPU engine "
+                         "(`KINDI_DEVICE=cpu`); the full-GPU row and both splits need one")
     elif best is None:
         lines.append("recommendation: none of these placements fit the supplied VRAM; reduce "
                      "--ctx or add free memory")
@@ -425,10 +460,12 @@ def portfolio(pack, ctx, spec="auto", gpu_kind=None,
         lines.append("recommendation: full GPU (it fits; a dense split would only add CPU work)")
     else:
         lines.append("recommendation: %s (capacity-first; full GPU does not fit)" % best["placement"])
-    lines.append("measured follow-up: %s" % (best["command"] if best else _plain_command(pack, ctx)))
+    follow = (best["command"] if best
+              else _plain_command(pack, ctx, cpu_only=cpu_only))
+    lines.append("measured follow-up: %s" % follow)
     return {"pack": pack, "model": man.get("model"), "ctx": int(ctx), "rows": rows,
-            "best": best["placement"] if best else None, "lines": lines,
-            "command": best["command"] if best else _plain_command(pack, ctx)}
+            "best": best["placement"] if best else None, "lines": lines, "cpu_only": cpu_only,
+            "command": follow}
 
 
 def _verify_command(pack, mode=None, spec=None, vram_budget_mib=None, reserve_mib=None):
@@ -856,9 +893,12 @@ def run(cfg, a, log=print):
     for choice, reason in rep["lines"]:
         log("%-11s %s" % (choice + ":", reason))
     log("follow up: %s" % rep["command"])
-    verify = (_verify_command(pack) if rep.get("strategy") == "moe-expert-tiers"
-              else _verify_command(pack, med, spec, vram_budget_mib=budget,
-                                   reserve_mib=reserve))
+    if rep.get("cpu_only"):
+        verify = _cpu_verify_command(pack)
+    elif rep.get("strategy") == "moe-expert-tiers":
+        verify = _verify_command(pack)
+    else:
+        verify = _verify_command(pack, med, spec, vram_budget_mib=budget, reserve_mib=reserve)
     log("verify:    %s" % verify)
     if getattr(a, "json", None):
         from .bench import bench_json
