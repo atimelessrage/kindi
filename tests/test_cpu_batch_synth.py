@@ -15,6 +15,8 @@ seed in a few hundred KiB and ~0.5 s.  What it pins:
 * `batch_rollback(0)` restores the pre-batch state bit for bit (the stored per-layer vectors are
   replayed), and `batch_rollback(n)` changes nothing;
 * `save_state`/`load_state` round-trip the state block a drafter rewinds with.
+* a 5-row pass is not a multiplicative slowdown over the same rows decoded plainly (a loose
+  regression net, not CP3's <=1.5-plain-rows gate, which is missed at ~5 on real packs).
 
 Bit-exactness against plain decode is deliberately *not* asserted here.  On every hand-built pack
 tried (128 to 2048 wide, attention-only and GDN, one to four layers, fresh or fed state) the batch's
@@ -228,3 +230,30 @@ def test_state_block_round_trips_through_save_and_load(pack):
     assert saved.tobytes() == e.save_state().tobytes()
     assert e.step(6, 5) == nxt                          # the same state decodes the same token
     e.close()
+
+
+def test_batch_pass_is_not_a_multiplicative_slowdown(pack):
+    """Regression net for the batch kernel's cost (the 2026-11-26 audit's perf-gate ask).
+
+    This is NOT the CP3 gate (a 5-row pass at <=1.5 plain rows, missed at ~5 plain rows on the 9B);
+    it only guards against a blowup -- a pass that re-reads the weights per row or rebuilds a table
+    per row would land well past 3x the same rows decoded plainly. The bound is 3x with a wide
+    margin on purpose: the pack is ~300 KiB and rows are milliseconds, so a tighter floor would
+    be timing noise, not signal.
+    """
+    import time
+    e = _engine(pack)
+    toks = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    e.reset()
+    t0 = time.perf_counter()
+    for pos, tok in enumerate(toks):
+        e.feed(tok, pos)
+    plain_s = time.perf_counter() - t0
+    e.reset()
+    for pos, tok in enumerate(toks[:5]):
+        e.feed(tok, pos)
+    t0 = time.perf_counter()
+    e.step_batch(toks[5:], 5)
+    batch_s = time.perf_counter() - t0
+    e.close()
+    assert batch_s < 3.0 * plain_s, (batch_s, plain_s)

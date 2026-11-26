@@ -81,6 +81,13 @@ anything it holds is folded in here, and a stray one is now visible to
   unblocks all of them; right now each of those gates is stuck on "no reference".
 - **When done, tell the agent:** the binary path (or that `llama-server` is
   on PATH), and the version.
+- **Also open (2026-11-26 review): a llama.cpp reference file for the 2.5 27B GGUF.** `kindi verify
+  --reference FILE` can verify the 2.5 pack with no bundled reference, but nothing in the tree can
+  produce that file (the bundled references are the old 27B's), so every 2.5 claim stays
+  "load, generate, deterministic" rather than token-exact. Once a pinned `llama-server` exists:
+  one greedy run on the same GGUF (the `verify` prompts, temperature 0) plus a small writer for the
+  JSON `load_reference` accepts. Blocked on the same binary as above and on the 2.5 GGUF being on a
+  host with ~32 GiB RAM; neither is here today.
 
 ## 3b. Put the installed C compiler on `PATH` for the CPU engine (Windows host)
 
