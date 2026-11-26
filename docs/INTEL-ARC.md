@@ -24,6 +24,11 @@ There is still no SYCL backend, Kindi engine path or model run. The plan's first
 target remains Linux; the Windows run qualifies the hardware, the memory path and the device kernel
 path, not Kindi support (tracked as [REQ-0020](development/requirements/REQ-0020.md)).
 
+The kernel inventory - every op one 27B decode step needs, what the Arc code has of it, and the
+cheapest-first build order - is kept separately in [INTEL-ARC-KERNELS.md](INTEL-ARC-KERNELS.md).
+It is a planning review: its estimates are labelled, and the measured figures it quotes come from
+the pages below.
+
 ## Goal
 
 Kindi should support the Intel Arc A770 16 GB as a first-class Kindi platform:
