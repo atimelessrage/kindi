@@ -13,7 +13,7 @@ the state at that commit.
 | [REQ-0001](requirements/REQ-0001.md) | Greedy output matches llama.cpp | active | `f25509f9ba89` | `f25509f9ba89` |
 | [REQ-0002](requirements/REQ-0002.md) | Bonsai packs convert losslessly | active | `f25509f9ba89` | `f25509f9ba89` |
 | [REQ-0003](requirements/REQ-0003.md) | Tensor-core plans are exact or explicitly refused | active | `f25509f9ba89` | `f25509f9ba89` |
-| [REQ-0004](requirements/REQ-0004.md) | CPU inference is exact and ISA-safe | active | `f25509f9ba89` | `32075c449184` |
+| [REQ-0004](requirements/REQ-0004.md) | CPU inference is exact and ISA-safe | active | `f25509f9ba89` | `5f60b0b45b89` |
 | [REQ-0005](requirements/REQ-0005.md) | The serving boundary is predictable and bounded | active | `f25509f9ba89` | `70a6f764c899` |
 | [REQ-0006](requirements/REQ-0006.md) | Prefix caches are exact and invalidate safely | active | `f25509f9ba89` | `70a6f764c899` |
 | [REQ-0007](requirements/REQ-0007.md) | Sampling settings are explicit and reproducible | active | `f25509f9ba89` | `f25509f9ba89` |
@@ -28,19 +28,19 @@ the state at that commit.
 | [REQ-0016](requirements/REQ-0016.md) | Chat session history with triage, tags, and raw-markdown export | experimental | `e9b46936da57` | `1c16d556bad9` |
 | [REQ-0017](requirements/REQ-0017.md) | Uneven tensor splits for unequal-capacity GPUs | experimental | `74ee40d79aa7` | `74ee40d79aa7` |
 | [REQ-0018](requirements/REQ-0018.md) | Agent-grade API: structured output, tool-call conformance, concurrency | proposed | `f9eff6db05f0` | `30d4816add28` |
-| [REQ-0019](requirements/REQ-0019.md) | Backend plugin interface (contract, registry, adapters) | experimental | `a40269e2ce91` | `0b74e7c0da6b` |
-| [REQ-0020](requirements/REQ-0020.md) | Intel Arc A770 (Alchemist/DG2) support via a SYCL/oneAPI backend | proposed | `147e3dc61f78` | `cf9f4633cf41` |
+| [REQ-0019](requirements/REQ-0019.md) | Backend plugin interface (contract, registry, adapters) | experimental | `a40269e2ce91` | `b1ff6aa77c66` |
+| [REQ-0020](requirements/REQ-0020.md) | Intel Arc A770 (Alchemist/DG2) support via a SYCL/oneAPI backend | proposed | `147e3dc61f78` | `09e644586b40` |
 | [REQ-0021](requirements/REQ-0021.md) | CPU + Intel integrated-graphics tandem (SYCL/Level Zero) | proposed | `ac0c767005ba` | `eec5bc790a66` |
 | [REQ-0022](requirements/REQ-0022.md) | Hardware identification and per-machine autotuning | experimental | `9e6405f223c0` | `82a72bff163d` |
-| [REQ-0023](requirements/REQ-0023.md) | A kernel launch contract checked for every call site | proposed | `3ececca68d4a` | `fb25dd8968de` |
+| [REQ-0023](requirements/REQ-0023.md) | A kernel launch contract checked for every call site | proposed | `3ececca68d4a` | `0ef88165f889` |
 | [REQ-0024](requirements/REQ-0024.md) | Speculation state is reported as effective, and the head is verified on load | proposed | `3ececca68d4a` | `b8931576e618` |
 | [REQ-0025](requirements/REQ-0025.md) | `kindi verify` can run under speculation | proposed | `3ececca68d4a` | `0f91b86174ac` |
-| [REQ-0026](requirements/REQ-0026.md) | `kindi bench` can measure a speculation mode | proposed | `3ececca68d4a` | `4e8756fa9761` |
-| [REQ-0027](requirements/REQ-0027.md) | A constrained-decoding mask that does not sweep the vocabulary per state | active | `62ea1a6828f0` | `3eb4f17b7e62` |
-| [REQ-0028](requirements/REQ-0028.md) | An Anthropic Messages endpoint for agent harnesses | active | `8c4decde1d0f` | `32075c449184` |
+| [REQ-0026](requirements/REQ-0026.md) | `kindi bench` can measure a speculation mode | proposed | `3ececca68d4a` | `5b019e712fea` |
+| [REQ-0027](requirements/REQ-0027.md) | A constrained-decoding mask that does not sweep the vocabulary per state | active | `62ea1a6828f0` | `641cfd803a06` |
+| [REQ-0028](requirements/REQ-0028.md) | An Anthropic Messages endpoint for agent harnesses | active | `8c4decde1d0f` | `5f60b0b45b89` |
 | [REQ-0029](requirements/REQ-0029.md) | Self-hosted n8n can call a local Kindi server | proposed | `7e675235290d` | `7e675235290d` |
-| [REQ-0030](requirements/REQ-0030.md) | Selectable native accelerators for measured hot Python paths | proposed | `7e675235290d` | `44af57b7f9d6` |
-| [REQ-0031](requirements/REQ-0031.md) | Looped-transformer model family (SenseNova-Loop-9B, Inkling 2 Mini) | active | `7e675235290d` | `7ee95c5e86ff` |
+| [REQ-0030](requirements/REQ-0030.md) | Selectable native accelerators for measured hot Python paths | proposed | `7e675235290d` | `9e1780526c6b` |
+| [REQ-0031](requirements/REQ-0031.md) | Looped-transformer model family (SenseNova-Loop-9B, Inkling 2 Mini) | active | `7e675235290d` | `26b4b90eac77` |
 
 `uncommitted` means the requirement file is not in `HEAD` yet. Commit the requirement
 and run the generator again to record its real added/last-modified hashes.

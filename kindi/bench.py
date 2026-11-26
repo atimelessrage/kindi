@@ -158,6 +158,9 @@ def _run(cfg, log=print):
             return 2
         from .lightning_cli import bench
         return bench(cfg, man, log=log)
+    if man.get("backend") == "kindi_inkling2":
+        from .inkling2_cli import bench
+        return bench(cfg, man, log=log)
     if man.get("backend") == "kindi_cascade":
         log("kindi bench: the Cascade backend is converter/validator only; GPU K-quant Nemotron-H kernels are pending")
         return 2

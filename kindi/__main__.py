@@ -857,6 +857,7 @@ def _build_parser():
     s.add_argument("gguf", help="local Inkling 2 Mini GGUF")
     s.add_argument("prompt")
     s.add_argument("--max-tokens", type=int, default=128)
+    s.add_argument("--ctx", type=int, default=2048, help="context length (default 2048)")
     s.add_argument("--raw", action="store_true", help="use a raw completion prompt")
     s = sub.add_parser("serve", help="run the OpenAI-compatible server")
     s.add_argument("--host")

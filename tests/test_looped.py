@@ -33,7 +33,11 @@ class FakeGGUF(object):
 
 
 def test_the_two_published_families_are_recognized_from_their_arch_key():
-    assert set(SPECS) == {"sensenova_loop", "inkling2"}
+    # inkling2_loop is the GGUF's declared architecture (kindi/inkling2.py requires it);
+    # inkling2 is the header-inventory name; both map to the one measured Inkling map.
+    assert set(SPECS) == {"sensenova_loop", "inkling2", "inkling2_loop"}
+    a, b = SPECS["inkling2"], SPECS["inkling2_loop"]
+    assert a[1:] == b[1:] and a.name == b.name == "Inkling 2 Mini"
     spec = spec_from_gguf(FakeGGUF({"general.architecture": "sensenova_loop"}))
     assert (spec.name, spec.logical, spec.stored) == ("SenseNova-Loop-9B", 57, 33)
     spec = spec_from_gguf(FakeGGUF({"general.architecture": "inkling2"}))

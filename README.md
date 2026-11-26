@@ -531,13 +531,17 @@ notices are in [NOTICE](NOTICE).
 
 ## Inkling 2 Mini (experimental)
 
-Kindi runs Thinking Machines Lab's Inkling 2 Mini from the IQ2_M GGUF (about 7.5 GiB). `kindi convert` writes a small
-pack, and `kindi serve` then serves the model with its chat template, streaming, thinking levels, tool calls, the
-sampling values of the GGUF and prompt reuse. All 3,072 experts fit in VRAM on an 8 GB card. The server answers one
-request at a time for this model.
+Kindi runs Thinking Machines Lab's Inkling 2 Mini from an `inkling2_loop` GGUF (the weights stay in the GGUF file;
+`kindi convert` writes a small pack pointing at it). `kindi serve` then serves the model with its chat template,
+streaming, thinking levels, tool calls, the sampling values of the GGUF and prompt reuse, and `kindi verify` checks
+it greedy-token-for-token against the bundled llama.cpp reference (`reference-inkling2-mini.json`, UD-Q4_K_M).
+`kindi inkling` runs one prompt from the command line, and `kindi bench` reports reading and writing rates.
+The server answers one request at a time for this model. There is no `kindi use` catalog entry for it yet, so the
+GGUF is supplied by hand; the CPU engine compiles `kindi/inkling2_cpu.c` with `gcc` on first use.
 
 ```
-kindi convert Inkling-2-Mini-IQ2_M.gguf
+kindi convert Inkling-2-Mini-UD-Q4_K_M.gguf
+kindi verify
 kindi serve
 ```
 

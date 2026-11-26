@@ -363,7 +363,7 @@ the status stays proposed with no loader, pack or support claim.
 
 ## Inkling 2 Mini (2026-11-22)
 
-**Status: proposed, no backend, no pack, no catalog entry and no support claim.**
+**Status: experimental backend merged from upstream 0.7.1 (`kindi/inkling2*.py/.c/.cu`, `kindi serve` backend `kindi_inkling2`, `kindi inkling`, and `kindi verify`/`kindi bench` dispatch); no catalog entry and no local verify run on this host, so no support claim beyond what `kindi verify` measures where a pack exists.**
 [Inkling 2 Mini](https://huggingface.co/thinkingmachines/Inkling-2-Mini) is Thinking Machines
 Lab's local model (released 2026-11-20, Apache-2.0): a **looped MoE** with **26.4B total** and
 **3.4B active** parameters (the model card and the HF launch post also give **5.4B weight
@@ -405,7 +405,7 @@ ternary experiment stay out of I4.
 | phase | gate | status |
 |---|---|---|
 | I0 reference | Pin one public GGUF (SHA-256, byte size, Apache-2.0 chain) and a greedy text-only run under a pinned mainline llama.cpp build; record the tokenizer revision, output token ids and the 24->48 map. No vision or DSpark. | **open; header inventoried 2026-11-22.** |
-| I1 loader | Host-RAM expert lane plus the loop remap and the MoE router; CPU tensor/layout tests; `kindi convert` must reject a missing stored block instead of reusing a neighbour. | **proposed; no code.** |
+| I1 loader | Host-RAM expert lane plus the loop remap and the MoE router; CPU tensor/layout tests; `kindi convert` must reject a missing stored block instead of reusing a neighbour. | **landed upstream as the `inkling2` engine (CPU, hetero/hybrid/full-VRAM modes); host-side contract pinned by `tests/test_inkling2.py`.** |
 | I2 exactness | `kindi verify` 4/4 token-exact at 2K text-only against I0, asserting the three loop passes and the top-8 router. | **proposed; needs I0/I1.** |
 | I3 memory | Record requested vs actual context and sampled peak; 8GB is expected to fail on file size, so record it as a no-go, not a reduced-context pass. Repeat on a 24GB card if available. | **hardware-dependent.** |
 | I4 speed | Same host, pack and context: p50 prefill/decode with the loop fused and unfused; DSpark measured separately, not folded into the base claim. | **after I2.** |

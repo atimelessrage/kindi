@@ -38,7 +38,16 @@ _INKLING = LoopSpec(
     stored=24, logical=48, core_start=6, core_end=18, passes=3, post_base=18,
     detail="128-expert MoE (top-8); hybrid local/global attention; 1M context",
 )
-SPECS = dict((spec.arch, spec) for spec in (_SENSENOVA, _INKLING))
+# The GGUF's declared architecture is "inkling2_loop" (kindi/inkling2.py's Spec and
+# inkling2_cli.is_inkling both require exactly that); "inkling2" is the name the
+# 2026-11-22 header inventory recorded. Both keys map to the same measured map so
+# `kindi loop-info` recognizes a real file instead of falling through to the generic error.
+_INKLING_LOOP = LoopSpec(
+    "inkling2_loop", "Inkling 2 Mini",
+    stored=24, logical=48, core_start=6, core_end=18, passes=3, post_base=18,
+    detail="128-expert MoE (top-8); hybrid local/global attention; 1M context",
+)
+SPECS = dict((spec.arch, spec) for spec in (_SENSENOVA, _INKLING, _INKLING_LOOP))
 
 
 def spec_from_gguf(g):

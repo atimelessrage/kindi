@@ -179,6 +179,9 @@ def run(cfg, log=print, reference=None):
     if man.get("backend") == "kindi_cascade":
         from .cascade import verify
         return verify(cfg, man, log=log)
+    if man.get("backend") == "kindi_inkling2":
+        from .inkling2_cli import verify
+        return verify(cfg, man, log=log)
     if man.get("backend") == "kindi_dsv41":
         log("kindi verify: DeepSeek V4.1's release gate is `dsv41.verify` (teacher-forced against the "
             "release gate data), not this llama.cpp reference matrix; run `python -m kindi.dsv41_server` "
