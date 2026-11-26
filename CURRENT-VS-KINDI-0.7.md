@@ -363,9 +363,9 @@ other paths, while the 94 include whole engine modules.
 |---:|---|---|---|---:|---:|---|
 | #37 | open, dirty | RX 6600 Windows HIP + opt-in memory fitting | `e8163a2` | 12 | +541/−32 | external fork; base `dce89df` |
 | #47 | open | load the CUDA driver on native Windows | `a556ef3` | 5 | +48/−7 | base for #67 |
-| #48 | open | cap host RAM at the container cgroup limit | `17d4116` | 2 | +152/−4 | |
-| #49 | open | reject an inconsistent tokenizer pack | `55fb576` | 2 | +29/−1 | |
-| #50 | open | close pack/cache JSON handles before returning | `5c2797c` | 6 | +73/−18 | |
+| #48 | **merged upstream in 0.7.0** | cap host RAM at the container cgroup limit | `17d4116` | 2 | +152/−4 | branch deleted 2026-11-26 |
+| #49 | **merged upstream in 0.7.0** | reject an inconsistent tokenizer pack | `55fb576` | 2 | +29/−1 | branch deleted 2026-11-26 |
+| #50 | **merged upstream in 0.7.2** | close pack/cache JSON handles before returning | `5c2797c` | 6 | +73/−18 | branch deleted 2026-11-26 |
 | #51 | open | sample device-wide VRAM peak in `kindi bench` | `ee2cdc1` | 4 | +241/−1 | |
 | #52 | open | measure host memory tiers with `kindi io` | `a79cd28` | 3 | +579/−1 | |
 | #53 | open | read-only Intel probe (Linux + Windows Level Zero) and loud `KINDI_DEVICE=intel` refusal | `b8d8b70` | 4 | +1,383/−1 | |
@@ -373,7 +373,7 @@ other paths, while the 94 include whole engine modules.
 | #55 | open | opt-in adaptive draft-length policy | `e880da2` | 4 | +194/−0 | tensor-core spec path only |
 | #56 | open | `kindi caps` + CPU feature/tier report | `feb2cf7` | 7 | +1,836/−42 | |
 | #57 | open | generated configuration reference | `feea85e` | 4 | +587/−1 | |
-| #58 | open | OpenAI-style API error envelope | `c1ca43b` | 4 | +105/−4 | |
+| #58 | **merged upstream in 0.7.2** | OpenAI-style API error envelope | `c1ca43b` | 4 | +105/−4 | branch deleted 2026-11-26 |
 | #59 | open | host-side BF16 / FP8 codecs | `ec52897` | 2 | +192/−0 | |
 | #60 | open | link Ollama GGUFs under readable names | `3d83926` | 2 | +376/−0 | |
 | #61 | open | wire `response_format`/GBNF into the server | `3fc8428` | 12 | +2,852/−14 | stacked on #54; includes its 8-file change |
@@ -387,7 +387,7 @@ other paths, while the 94 include whole engine modules.
 | #69 | draft | Nemotron Lightning backend adapter | `f22530c` | 19 | +2,084/−4 | on #66; test conflict with #68 |
 | #70 | draft | Nanbeige backend adapter | `7a837dc` | 19 | +1,999/−4 | on #66 |
 | #71 | draft | DeepSeek V4.1 backend adapter | `c20ef01` | 19 | +1,999/−4 | on #66 |
-| #72 | open | default mode A speculation to k=1 | `535b15d` | 3 | +43/−1 | |
+| #72 | **merged upstream in 0.7.0** | default mode A speculation to k=1 | `535b15d` | 3 | +43/−1 | branch deleted 2026-11-26 |
 | #73 | open | reproducible stock-v0.6.1 greedy parity gate | `4f8a6c8` | 6 | +11,402/−0 | 12/12 exact golden capture |
 | #74 | draft | session CLI and resumable terminal chats | `c2b525b` | 6 | +1,147/−10 | on #65 |
 | #75 | open | Turing (sm_75) tensor-core backend | `40a72fb` | 7 | +1,544/−16 | base for #76 |
@@ -395,6 +395,20 @@ other paths, while the 94 include whole engine modules.
 | #77 | open | dense CPU+GPU tandem runtime | `f4a06b4` | 12 | +1,025/−51 | base for #78 |
 | #78 | open | plan dense tandem placements with `gdn:N` and `auto` | `09c0126` | 12 | +1,356/−52 | on #77; includes its bench fix |
 | #79 | open | plan-engine tandem owner and per-card VRAM budgets | `32acc12` | 19 | +2,977/−89 | on #78; head lacks `09c0126` |
+
+**Merged-by-hand cleanup (2026-11-26):** five fork PRs are in the official tree by the maintainer's own credit,
+not by a GitHub merge - `CHANGELOG.md` thanks atimelessrage for #48, #49 and #72 in 0.7.0 and for #50 and #58 in
+0.7.2, and `kindi/jsonio.py` carries "(PR #50, atimelessrage)" in its docstring. Each fix was re-checked in
+`origin/main` (the strict tokenizer lookup, `jsonio.load_json`, the cgroup walk in `hostram.py`, the error body in
+`kindi/apierr.py`, `KINDI_SPEC_K` = 1 for `mtp`) and in this tree, so `pr/02-hostram-cgroup-limit`,
+`pr/03-tokenizer-corrupt-pack`, `pr/04-json-handles`, `pr/12-api-errors` and `pr/20-mtp-k1` were deleted on the
+fork and locally; their tips stay reachable as the local tags `pr/0N-<slug>-merged` (the branch tips the figures above were taken
+from) and `merged-fork/pr-0N-<slug>` (the fork tips that were deleted), both of which the `upstream-delta` claim
+keeps the PR-footprint arithmetic over. #76 is only **partly** upstream
+(its `tc_hp_for` default is credited, the #75 Turing tensor-core kernels it is stacked on are not), and #47 is
+superseded rather than credited (upstream's own `gpudrv.driver_name()`/`libcuda()` load `nvcuda.dll` under issue
+#4), so those branches stay. `pr/20-mtp-k1`'s local branch also stays until its checkout at
+`.worktrees/pr-20-mtp-k1` is removed.
 
 Paths and lines are GitHub's PR diff against `main`; a stacked PR's count includes its base
 (#61 includes #54's 8-file change; #67 includes #66 and #47; #68-#71 include #66; #74
