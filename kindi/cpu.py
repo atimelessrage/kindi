@@ -337,6 +337,11 @@ def _lib():
         if hasattr(lib, "kc_batch_release"):
             lib.kc_batch_release.argtypes = []
             lib.kc_batch_release.restype = ctypes.c_int
+        if hasattr(lib, "kc_batch_reuse_ok"):      # the arena contract, for tests without a pack
+            lib.kc_batch_reuse_ok.argtypes = [ctypes.POINTER(Model), ctypes.c_int]
+            lib.kc_batch_reuse_ok.restype = ctypes.c_int
+            lib.kc_batch_prepare.argtypes = [ctypes.POINTER(Model), ctypes.c_int]
+            lib.kc_batch_prepare.restype = ctypes.c_int
     assert lib.kc_sizeof_model() == ctypes.sizeof(Model) and lib.kc_sizeof_layer() == ctypes.sizeof(Layer)
     _LIB[so] = lib
     return lib

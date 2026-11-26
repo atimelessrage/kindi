@@ -687,17 +687,33 @@ static void batch_drop(void){
   memset(&B, 0, sizeof B);
 }
 
+/* Would a batch of nt rows on this model reuse the arena as it stands?  One arena per process, so
+   this is the whole safety condition: every field batch_prepare() sizes a buffer from has to be the
+   one the arena was built with, or kc_step_batch() writes at another model's offsets.  The model
+   pointer alone is not enough - a freed Engine hands its Model address back to the allocator, so
+   the next Engine can be a different model at the same address (tests/test_cpu_batch_arena.py
+   pins each field).  `NG` is derived: it is the widest GDN gate matrix, which sizes B.ZV. */
+static int batch_gate_rows(Model* m){
+  int NG = 0;
+  for(int il = 0; il < m->NL; ++il) if(!m->L[il].is_attn && m->L[il].gate.R > NG) NG = m->L[il].gate.R;
+  return NG;
+}
+
+static int batch_fits(Model* m, int nt){
+  return B.owner == m && B.nt >= nt
+      && B.NL == m->NL && B.D == m->D && B.NFF == m->NFF && B.CC == m->CONV_CH
+      && B.NG == batch_gate_rows(m) && B.NH == m->NH && B.NHKV == m->NHKV && B.HD == m->HD
+      && B.NK == m->NK && B.HK == m->HK && B.NV == m->NV && B.HB == m->HB && B.ctx == m->ctx
+      && B.vocab == m->head.R;
+}
+
 /* Allocate for nt rows against this model (releases a smaller set).  Returns 0 on ENOMEM. */
 static int batch_prepare(Model* m, int nt){
-  /* One arena per process, so reuse only for the model it was sized for. Keying on D+ctx alone
-     let a second Model with the same width and context reuse a SNAP/soff table sized for the
-     first one's layer count: out-of-bounds copies with no error. */
-  if(B.owner == m && B.nt >= nt && B.NL == m->NL && B.D == m->D && B.ctx == m->ctx) return 1;
+  if(batch_fits(m, nt)) return 1;
   batch_drop();
   const int D = m->D, NFF = m->NFF, NH = m->NH, NHKV = m->NHKV, HD = m->HD, NK = m->NK, HK = m->HK,
             NV = m->NV, CC = m->CONV_CH, ctx = m->ctx;
-  int NG = 0;
-  for(int il = 0; il < m->NL; ++il) if(!m->L[il].is_attn && m->L[il].gate.R > NG) NG = m->L[il].gate.R;
+  const int NG = batch_gate_rows(m);
   B.owner = m; B.nt = nt; B.NL = m->NL; B.D = D; B.NFF = NFF; B.CC = CC; B.NG = NG; B.NH = NH; B.NHKV = NHKV; B.HD = HD;
   B.NK = NK; B.HK = HK; B.NV = NV; B.HB = m->HB; B.ctx = ctx; B.vocab = m->head.R;
   B.MW = D;
@@ -1265,6 +1281,12 @@ KC_API int kc_batch_vocab(Model* m){ return (m && B.owner == m && B.nt >= 2) ? B
 /* Free the batch arena (SNAP + scratch). Idempotent; the next kc_step_batch re-prepares it, so an
    Engine may call this on teardown even while another Engine in the process still exists. */
 KC_API int kc_batch_release(void){ batch_drop(); return 0; }
+
+/* The arena contract, for tests that must not load a pack (tests/test_cpu_batch_arena.py): size the
+   arena for a model without running a batch, and ask whether a following batch would reuse it.
+   Returns 1 for "prepared"/"would reuse", 0 otherwise, -1 on a bad argument. */
+KC_API int kc_batch_prepare(Model* m, int nt){ if(!m || nt < 2) return -1; return batch_prepare(m, nt); }
+KC_API int kc_batch_reuse_ok(Model* m, int nt){ if(!m || nt < 2) return -1; return batch_fits(m, nt); }
 
 /* ------------------------------------------------------------------------------------- model state */
 /* The GDN state (conv taps and the SSM matrix of every GDN layer) as one flat float block.  A
