@@ -534,6 +534,20 @@ def cmd_intel_pack(cfg, a):
     return 0 if report["result"] == "pass" else 1
 
 
+def cmd_intel_norm(cfg, a):
+    """Time the decode step's norm+fold and the embedding row on an Intel GPU; no model run."""
+    from . import intel_layer
+
+    report = intel_layer.run_norm(a.pack, repeats=a.repeats, loader=a.loader, device=a.device,
+                                  device_name=a.device_name, trials=a.trials)
+    if a.json:
+        print(intel_layer.dumps(report))
+    else:
+        for line in intel_layer.render(report):
+            print(line)
+    return 0 if not report["errors"] else 1
+
+
 def cmd_intel_sycl(cfg, a):
     """SYCL vector-add smoke on an Intel GPU; no backend or support claim."""
     from . import intel_sycl
@@ -832,6 +846,19 @@ def _build_parser():
     sub.add_parser("info", help="show configuration, pack and GPU")
     s = sub.add_parser("caps", help="what each card and this CPU can do, and which Kindi paths that enables")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
+
+
+    s = sub.add_parser("intel-norm", help="time the norm+fold and the embedding row of a decode "
+                         "step on an Intel GPU (no model run or support claim)")
+    s.add_argument("--pack", required=True, help="a pack directory written by kindi convert")
+    s.add_argument("--repeats", type=int, default=9, help="timed calls per width (default 9, max 20)")
+    s.add_argument("--trials", type=int, default=12,
+                   help="random vectors for the sigma comparison (default 12, max 64)")
+    s.add_argument("--device", type=int, default=0, help="Intel OpenCL GPU index (default 0)")
+    s.add_argument("--device-name", default=None, metavar="SUBSTR",
+                   help="pick the GPU whose name contains SUBSTR (e.g. Arc) instead of --device")
+    s.add_argument("--loader", default=None, help="OpenCL loader name/path (default: the host loader)")
+    s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("intel-info", help="read-only Intel M1 probe: CPU, display, NPU, Level Zero and OpenVINO (a probe: no backend)")
     s.add_argument("--json", action="store_true", help="print the whole probe as JSON")
     s = sub.add_parser("intel-smoke", help="Level Zero device-memory round trip on an Intel GPU (no kernel, no backend)")
@@ -1008,6 +1035,7 @@ _COMMANDS = {
     "mmproj": cmd_mmproj,
     "intel-ternary": cmd_intel_ternary,
     "intel-pack": cmd_intel_pack,
+    "intel-norm": cmd_intel_norm,
     "loop-info": cmd_loop_info,
     "io": cmd_io,
     "autotune": cmd_autotune,

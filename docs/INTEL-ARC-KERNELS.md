@@ -75,8 +75,8 @@ Status: **have** = works and is bit-exact today; **missing** = nothing on device
 
 | # | kernel | must do | 27B work | calls/token | status | est. |
 |---|---|---|---|---|---|---|
-| K1 | `norm_fold` | residual add, RMS(n), x w, sign x FWHT(HB) -> `xn` and folded `xp`; rows for per-head modes | 5120 / 17408 / 6144 / 256 / 128 | **193** | missing | 1-1.5 d |
-| K2 | `embed_row` | decode one token's trits (128-col groups, 8 row scales) | 5120 | 1 | missing | 0.5 d |
+| K1 | `norm_fold` | residual add, RMS(n), x w, sign x FWHT(HB) -> `xn` and folded `xp`; rows for per-head modes | 5120 / 17408 / 6144 / 256 / 128 | **193** | **have** (`kindi intel-norm`, 2 kernels) | done |
+| K2 | `embed_row` | decode one token's trits (128-col groups, 8 row scales) | 5120 | 1 | **closed** - host row + K1's fold | 0 |
 | K3 | ternary GEMV | 401 dependent calls on a resident pack, 1-3 matrices per launch | 6.80 GB read | 257 if 4/layer | **have** (needs wiring) | 1.5 d |
 | K4 | `ewise` | silu-mul, residual, sigmoid-gate-mul, group permute - one kernel, mode switch | <=17408 | ~150 | missing | 1 d |
 | K5 | `ssm_gates` | alpha/beta f32 matvec `[2 NV x D]`, softplus/sigmoid, x ssm_a | 94 MB/token | 48 | missing | 0.5 d |
@@ -138,9 +138,19 @@ is on the arithmetic side.
 ## 6. Build order (cheapest first, by dependency depth and reuse)
 
 ### Phase A - first honest 27B token (2-3 d)
-1. **K1 `norm_fold`** - most-reused kernel in the model (193 calls); also the only reduction kernel; no state;
-   testable against `kcpu.c`'s `fold()` on one vector.
-2. **K2 `embed_row`** - trivial, unblocks the loop's first op.
+1. ~~**K1 `norm_fold`**~~ - **done 2026-11-26**: `kindi/intel_layer.py` (`kindi intel-norm`), checked
+   against a numpy transcription of `kcpu.c`'s `rmsfold()`. One call is 43.09 us at 2,048 wide and
+   45.99 / 45.50 / 54.33 us at the 27B's 5,120 / 6,144 / 17,408 as two enqueues; 193 passes would be
+   9.38 ms/token, of which the 10.99 us enqueue floor is ~4.2 ms - so the shipped shape has to fuse
+   the fold into the layer's launch, not call it twice. The driver has no fp64, so the CPU's double
+   sum is a two-float pair: the scale is bit-equal in 8 of 12 (2,048) and 10 of 12 (6,144) random
+   vectors and the folded vector moves by at most 2.86e-06 / 7.15e-07 when it is not, which is inside
+   this file's 1e-5 bar - the Arc gate is `kindi verify`, not bit-equality. Page:
+   [norm+fold](benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md), claim
+   `arc-a770-norm-fold-20261126`.
+2. ~~**K2 `embed_row`**~~ - **closed 2026-11-26**: one row is 544 B (16 phases x 32 bytes + one fp16
+   scale per phase), a host read beside the token id; its fold is K1's second kernel with unit weight
+   and unit scale, 27.99 us and 0 differing elements against `kcpu.c`'s embed.
 3. **K3 wiring** - a layer loop with a resident pack, 1-3 matrices per launch (`pack_gemv_persist` already
    takes `nmats`), host does conv/delta/attention/softmax/silu in numpy.
 

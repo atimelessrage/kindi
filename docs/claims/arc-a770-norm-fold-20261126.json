@@ -1,0 +1,289 @@
+{
+  "gate": "arc-a770-norm-fold-20261126",
+  "title": "Arc A770: K1 norm_fold and K2 embed_row of the kernel plan, against kcpu.c's arithmetic",
+  "measured": "2026-11-26",
+  "commit": "unreleased",
+  "command": "python -m kindi intel-norm --pack ~/.kindi/packs/bonsai-2b --device-name Arc --json docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+  "notes": "One rmsfold call (residual add + RMS + signed FWHT) per width on the A770 from the 2B pack's own sign tables and norm weight, plus the 27B's 5120/17408 widths on synthetic weights (no 27B pack on this host), timed as two enqueues with the arguments bound and one clFinish per loop. A no-op kernel gives the enqueue floor and the idle latency. The reference is kcpu.c's rmsfold/fold transcribed to numpy in the CPU's own order; the driver has no cl_khr_fp64, so the report counts how often the two-float sum still writes the CPU's float. Not a model run: attention, the GDN update, conv, the f32 scalars and the matvecs are excluded, and there is no Intel backend or support claim.",
+  "evidence": [
+    "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+    "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md"
+  ],
+  "numbers": [
+    {
+      "id": "launch-nop",
+      "display": "10.99 us per enqueue",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/launch/nop_us",
+        "expect": 10.99
+      }
+    },
+    {
+      "id": "launch-wake",
+      "display": "317.30 us",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/launch/wake_us",
+        "expect": 317.3
+      }
+    },
+    {
+      "id": "k1-2048",
+      "display": "43.09",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/timings/width_2048/us_per_call",
+        "expect": 43.087
+      }
+    },
+    {
+      "id": "k1-5120",
+      "display": "45.99",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/timings/width_5120/us_per_call",
+        "expect": 45.987
+      }
+    },
+    {
+      "id": "k1-6144",
+      "display": "45.50",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/timings/width_6144/us_per_call",
+        "expect": 45.5
+      }
+    },
+    {
+      "id": "k1-17408",
+      "display": "54.33",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/timings/width_17408/us_per_call",
+        "expect": 54.327
+      }
+    },
+    {
+      "id": "token-ms",
+      "display": "9.38",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/token/ms_per_token",
+        "expect": 9.378
+      }
+    },
+    {
+      "id": "enqueues",
+      "display": "386 enqueues",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/token/enqueues",
+        "expect": 386
+      }
+    },
+    {
+      "id": "sigma-2048",
+      "display": "8 of 12",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/exactness/sigma_trials_2048/equal",
+        "expect": 8
+      }
+    },
+    {
+      "id": "sigma-6144",
+      "display": "10 of 12",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/exactness/sigma_trials_6144/equal",
+        "expect": 10
+      }
+    },
+    {
+      "id": "sigma-2048-rel",
+      "display": "8.51e-08",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/exactness/sigma_trials_2048/worst_relative",
+        "expect": 8.509221784016209e-08
+      }
+    },
+    {
+      "id": "sigma-6144-rel",
+      "display": "8.43e-08",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/exactness/sigma_trials_6144/worst_relative",
+        "expect": 8.433414063595026e-08
+      }
+    },
+    {
+      "id": "xp-2048",
+      "display": "1,555",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/exactness/width_2048/xp/differing",
+        "expect": 1555
+      }
+    },
+    {
+      "id": "xp-2048-max",
+      "display": "2.86e-06",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/exactness/width_2048/xp/max_abs",
+        "expect": 2.86102294921875e-06
+      }
+    },
+    {
+      "id": "xp-6144",
+      "display": "4,763",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/exactness/width_6144/xp/differing",
+        "expect": 4763
+      }
+    },
+    {
+      "id": "xp-6144-max",
+      "display": "7.15e-07",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/exactness/width_6144/xp/max_abs",
+        "expect": 7.152557373046875e-07
+      }
+    },
+    {
+      "id": "embed-bytes",
+      "display": "544 B",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/embed/host_decode_bytes",
+        "expect": 544
+      }
+    },
+    {
+      "id": "embed-decode",
+      "display": "237.10 us",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/embed/host_decode_us_per_row",
+        "expect": 237.1
+      }
+    },
+    {
+      "id": "embed-fold",
+      "display": "27.99 us",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/embed/fold_us",
+        "expect": 27.99
+      }
+    },
+    {
+      "id": "embed-differing",
+      "display": "0 differing",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/norm.json",
+        "pointer": "/embed/exact/differing",
+        "expect": 0
+      }
+    }
+  ]
+}

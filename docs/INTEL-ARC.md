@@ -29,6 +29,36 @@ cheapest-first build order - is kept separately in [INTEL-ARC-KERNELS.md](INTEL-
 It is a planning review: its estimates are labelled, and the measured figures it quotes come from
 the pages below.
 
+## M2 next kernel: norm+fold and the embedding row (2026-11-26)
+
+The kernel plan (`INTEL-ARC-KERNELS.md`) put K1 `norm_fold` first - 193 calls a token, a dependency of
+every matvec - and K2 `embed_row` at half a day. Both are now OpenCL C in `kindi/intel_layer.py`,
+transcribed from `kcpu.c`'s `rmsfold()`/`fold()` and checked against a numpy transcription of it; the
+run is [the norm+fold page](benchmarks/2026-11-26-i7-8086k-arc-a770-norm-fold/README.md) (claim
+`arc-a770-norm-fold-20261126`).
+
+**One call costs 43.09 us at the 2B's width, and 45.99 / 45.50 / 54.33 us at the 27B's 5,120 / 6,144
+/ 17,408**, two enqueues each. Priced at the plan's 193 passes that is **9.38 ms/token in 386
+enqueues**. Most of it is the launch: a no-op kernel costs **10.99 us per enqueue** here and one
+launch from idle costs **317.30 us**, so the floor alone is ~4.2 ms. K1 as two kernels per call is
+not the shipped shape - the fold belongs inside the layer's own launch, beside the matvec that reads
+`xp`.
+
+**There is no fp64 on this driver.** `kcpu.c` sums the squares in double; the same sum carried as a
+two-float pair reproduces the CPU's float in **8 of 12** random vectors at width 2,048 and **10 of
+12** at 6,144, and when its last bit differs the folded vector moves by one ulp - `xp` differs by at
+most **2.86e-06** and **7.15e-07** on those vectors. That is inside the plan's ~1e-5 bar for this
+chain, so the Arc path's gate is `kindi verify`, not bit-equality; say it that way in the report.
+
+**K2 needs no kernel.** One `token_embd.weight` row is **544 B** (16 phases x 32 bytes of base-3
+trits and one fp16 scale per phase), a host read; its fold is K1's second kernel with unit weight and
+unit scale, **27.99 us** and **0 differing** elements against `kcpu.c`'s embed. Half a day of the plan
+is therefore zero, and the row decode stays on the host beside the token id.
+
+A butterfly detail worth keeping: walking each stage in blocks leaves the last stage's pairs on one
+lane, and those dependent local-memory reads dominate the call; walking the stage flat, one pair per
+lane, keeps the CPU's arithmetic and costs less than half. Barriers were never the problem.
+
 ## Goal
 
 Kindi should support the Intel Arc A770 16 GB as a first-class Kindi platform:

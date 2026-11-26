@@ -1,0 +1,266 @@
+{
+  "backend": "opencl norm+fold probe; no sycl, model, engine or backend",
+  "device": {
+    "compute_units": 512,
+    "device_version": "OpenCL 3.0 NEO ",
+    "driver_version": "32.0.101.9175",
+    "global_mem_mib": 15932,
+    "max_clock_mhz": 2400,
+    "max_mem_alloc_mib": 4095,
+    "max_work_group_size": 1024,
+    "name": "Intel(R) Arc(TM) A770 Graphics",
+    "opencl_c_version": "OpenCL C 1.2 ",
+    "vendor": "Intel(R) Corporation"
+  },
+  "embed": {
+    "cols": 2048,
+    "enqueues": 1,
+    "exact": {
+      "differing": 0,
+      "max_abs": 0.0
+    },
+    "fold_us": 27.99,
+    "folded": true,
+    "host_decode_batch_us": 718.15,
+    "host_decode_bytes": 544,
+    "host_decode_us_per_row": 237.1,
+    "note": "the decoder is intel-pack's validated byte layout; the fold is checked against kcpu.c's embed (decode, fwht_block per Hadamard block, * sD)",
+    "rows": 248320,
+    "tensor": "token_embd.weight"
+  },
+  "errors": [],
+  "exactness": {
+    "sigma_trials_2048": {
+      "equal": 8,
+      "trials": 12,
+      "worst_relative": 8.509221784016209e-08
+    },
+    "sigma_trials_6144": {
+      "equal": 10,
+      "trials": 12,
+      "worst_relative": 8.433414063595026e-08
+    },
+    "width_2048": {
+      "sigma": [
+        0.7268518805503845,
+        0.7268518209457397
+      ],
+      "sigma_equal": false,
+      "xn": {
+        "differing": 1728,
+        "max_abs": 1.9073486328125e-06
+      },
+      "xp": {
+        "differing": 1555,
+        "max_abs": 2.86102294921875e-06
+      }
+    },
+    "width_6144": {
+      "sigma": [
+        0.7014883160591125,
+        0.7014882564544678
+      ],
+      "sigma_equal": false,
+      "xn": {
+        "differing": 5701,
+        "max_abs": 4.76837158203125e-07
+      },
+      "xp": {
+        "differing": 4763,
+        "max_abs": 7.152557373046875e-07
+      }
+    }
+  },
+  "fp64": false,
+  "launch": {
+    "enqueues": 200,
+    "nop_us": 10.99,
+    "wake_us": 317.3
+  },
+  "loader": {
+    "available": true,
+    "error": null,
+    "name": "OpenCL.dll"
+  },
+  "pack": {
+    "dir": "bonsai-2b",
+    "ffn": 6144,
+    "hadamard_block": 512,
+    "layers": 24,
+    "model": "Ternary-Bonsai-2-2B",
+    "sign_widths": [
+      2048,
+      6144
+    ],
+    "weight": "output_norm.weight",
+    "width": 2048
+  },
+  "platform": "Intel(R) OpenCL Graphics (discrete)",
+  "platforms": [
+    {
+      "gpu_devices": 1,
+      "index": 0,
+      "name": "Intel(R) OpenCL Graphics (discrete)",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.0 "
+    },
+    {
+      "gpu_devices": 1,
+      "index": 1,
+      "name": "Intel(R) OpenCL HD Graphics",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.0 "
+    },
+    {
+      "gpu_devices": 0,
+      "index": 2,
+      "name": "Intel(R) OpenCL",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.1 WINDOWS"
+    }
+  ],
+  "probe": "intel-norm-fold",
+  "read_only": true,
+  "repeats": 15,
+  "returncodes": {
+    "a17408_h": "0x00000000",
+    "a17408_res": "0x00000000",
+    "a17408_sg": "0x00000000",
+    "a17408_sig": "0x00000000",
+    "a17408_w": "0x00000000",
+    "a17408_xn": "0x00000000",
+    "a17408_xp": "0x00000000",
+    "a5120_h": "0x00000000",
+    "a5120_res": "0x00000000",
+    "a5120_sg": "0x00000000",
+    "a5120_sig": "0x00000000",
+    "a5120_w": "0x00000000",
+    "a5120_xn": "0x00000000",
+    "a5120_xp": "0x00000000",
+    "clBuildProgram": "0x00000000",
+    "clCreateCommandQueue": "0x00000000",
+    "clCreateContext": "0x00000000",
+    "clCreateKernel/fold_sign": "0x00000000",
+    "clCreateKernel/nop": "0x00000000",
+    "clCreateKernel/rms_sum": "0x00000000",
+    "clCreateProgramWithSource": "0x00000000",
+    "clEnqueueNDRangeKernel/embed": "0x00000000",
+    "clEnqueueNDRangeKernel/fold": "0x00000000",
+    "clEnqueueNDRangeKernel/nop": "0x00000000",
+    "clEnqueueNDRangeKernel/rms": "0x00000000",
+    "clFinish/embed": "0x00000000",
+    "clFinish/embed_timed": "0x00000000",
+    "clFinish/nop": "0x00000000",
+    "clFinish/timed": "0x00000000",
+    "clFinish/trial": "0x00000000",
+    "clFinish/warm": "0x00000000",
+    "clGetPlatformIDs": "0x00000000",
+    "clGetPlatformIDsHandles": "0x00000000",
+    "emb_h": "0x00000000",
+    "emb_res": "0x00000000",
+    "emb_sg": "0x00000000",
+    "emb_sig": "0x00000000",
+    "emb_w": "0x00000000",
+    "emb_xn": "0x00000000",
+    "emb_xp": "0x00000000",
+    "nop": "0x00000000",
+    "sig": "0x00000000",
+    "t2048_h": "0x00000000",
+    "t2048_res": "0x00000000",
+    "t2048_sg": "0x00000000",
+    "t2048_sig": "0x00000000",
+    "t2048_w": "0x00000000",
+    "t2048_xn": "0x00000000",
+    "t2048_xp": "0x00000000",
+    "t6144_h": "0x00000000",
+    "t6144_res": "0x00000000",
+    "t6144_sg": "0x00000000",
+    "t6144_sig": "0x00000000",
+    "t6144_w": "0x00000000",
+    "t6144_xn": "0x00000000",
+    "t6144_xp": "0x00000000",
+    "tsig": "0x00000000",
+    "w2048_h": "0x00000000",
+    "w2048_res": "0x00000000",
+    "w2048_sg": "0x00000000",
+    "w2048_sig": "0x00000000",
+    "w2048_w": "0x00000000",
+    "w2048_xn": "0x00000000",
+    "w2048_xp": "0x00000000",
+    "w6144_h": "0x00000000",
+    "w6144_res": "0x00000000",
+    "w6144_sg": "0x00000000",
+    "w6144_sig": "0x00000000",
+    "w6144_w": "0x00000000",
+    "w6144_xn": "0x00000000",
+    "w6144_xp": "0x00000000",
+    "xn": "0x00000000",
+    "xp": "0x00000000"
+  },
+  "schema": 1,
+  "scope": "K1 norm_fold and K2 embed_row of docs/INTEL-ARC-KERNELS.md, against kcpu.c's rmsfold/fold transcribed to numpy",
+  "support_claim": false,
+  "timings": {
+    "width_17408": {
+      "bytes_per_call": 417792,
+      "elements": 17408,
+      "enqueues": 2,
+      "gb_per_s": 7.69,
+      "repeats": 15,
+      "synthetic_signs": true,
+      "synthetic_weight": true,
+      "us_per_call": 54.327
+    },
+    "width_2048": {
+      "bytes_per_call": 49152,
+      "elements": 2048,
+      "enqueues": 2,
+      "gb_per_s": 1.14,
+      "repeats": 15,
+      "synthetic_weight": false,
+      "us_per_call": 43.087
+    },
+    "width_5120": {
+      "bytes_per_call": 122880,
+      "elements": 5120,
+      "enqueues": 2,
+      "gb_per_s": 2.67,
+      "repeats": 15,
+      "synthetic_signs": true,
+      "synthetic_weight": true,
+      "us_per_call": 45.987
+    },
+    "width_6144": {
+      "bytes_per_call": 147456,
+      "elements": 6144,
+      "enqueues": 2,
+      "gb_per_s": 3.24,
+      "repeats": 15,
+      "synthetic_weight": true,
+      "us_per_call": 45.5
+    }
+  },
+  "token": {
+    "calls": 193,
+    "complete": true,
+    "enqueues": 386,
+    "mix": [
+      {
+        "calls": 65,
+        "width": 5120
+      },
+      {
+        "calls": 64,
+        "width": 6144
+      },
+      {
+        "calls": 64,
+        "width": 17408
+      }
+    ],
+    "ms_per_token": 9.378,
+    "note": "two kernels per call, timed with the arguments already bound; it excludes the layer's own launches and the 27B's 5120/17408 weights are synthetic here"
+  },
+  "trials": 12,
+  "warnings": []
+}
