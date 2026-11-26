@@ -9,8 +9,7 @@ consistent with the whole, and `_rms_rows` mirrors kcpu.c's rms_rows (mean squar
 """
 import numpy as np
 
-from kindi import intel_step
-from kindi import intel_ternary
+from kindi import intel_step, intel_ternary
 
 
 def _int_model(bcodes, dpm, x, rows, cols):

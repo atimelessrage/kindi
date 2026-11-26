@@ -124,7 +124,7 @@ direct sites.
 | `KINDI_CKPT_VRAM` | `0` | `kindi/spec.py:592` |
 | `KINDI_CONFIG` | (unset) | `kindi/config.py:129` (+1 more) |
 | `KINDI_CPU_CACHE` | (unset) | `kindi/cpu.py:269` (+7 more) |
-| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:624` (+1 more) |
+| `KINDI_CPU_ISA` | (empty) or `auto` | `kindi/__main__.py:665` (+1 more) |
 | `KINDI_CUDA_ARCH` | `sm_86` | `kindi/dsv41.py:49` |
 | `KINDI_D1` | `1` or `0` | `kindi/spec.py:750` (+1 more) |
 | `KINDI_DATA` | `/data` | `kindi/container.py:243` |

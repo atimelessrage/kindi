@@ -46,13 +46,16 @@ from .intel_cl import (
     _set_arg,
     pick_device,
 )
-from .intel_layer import FOLD_LANES, RMS_LANES, SOURCE as NORM_SOURCE, _launch, _local_arg, _row, _signs
-from .intel_pack import SOURCE as GEMV_SOURCE, _set_args as _set_gemv_args, dpm_view
+from .intel_layer import FOLD_LANES, RMS_LANES, _launch, _local_arg, _row, _signs
+from .intel_layer import SOURCE as NORM_SOURCE
+from .intel_pack import SOURCE as GEMV_SOURCE
+from .intel_pack import _set_args as _set_gemv_args
+from .intel_pack import dpm_view
+from .intel_ternary import _launch_2d
 
 # The Arc driver (32.0.101.9175) refuses a single 6.7 GB allocation, so a 27B pack's codes are
 # grouped into device buffers of at most this many bytes, on tensor boundaries.
 CODES_CHUNK = 2 << 30
-from .intel_ternary import _launch_1d, _launch_2d
 
 DEFAULT_STEPS = 4
 MAX_STEPS = 32
@@ -178,7 +181,6 @@ class _Device(object):
         return kernel
 
     def buffer(self, data, flags, key):
-        wait = self.enqueues
         from .intel_ternary import _buffer
         buf = _buffer(self.lib, self.context, flags, data, self.report, key)
         self.buffers.append(buf)
@@ -555,7 +557,7 @@ class ArcStep(object):
         return h, y
 
     def _attn(self, il, h, pos):
-        D, NH, NKV, HD, rh = self.D, self.NH, self.NKV, self.HD, self.rh
+        NH, NKV, HD, rh = self.NH, self.NKV, self.HD, self.rh
         G = NH // NKV
         p = "blk.%d." % il
         self._norm_fold(h, p + "attn_norm.weight")
@@ -652,7 +654,6 @@ class ArcStep(object):
         """One decode token: returns (greedy token, logits) or just the residual after the stack."""
         h = self._embed(tok)
         for il in range(self.NL):
-            p = "blk.%d." % il
             if il in self.attn_layers:
                 _, y = self._attn(il, h, pos)
             else:
@@ -672,9 +673,9 @@ class ArcStep(object):
 
 def run_step(pack_dir, prefix_ids, nsteps, loader=None, opener=None, device=0, device_name=None,
              ctx=2048):
+    """Verify the Arc decode step against the CPU engine, teacher-forced, and time it."""
     if prefix_ids is None:
         prefix_ids = (128, 2562, 2027, 31823)
-    """Verify the Arc decode step against the CPU engine, teacher-forced, and time it."""
     report = {"returncodes": {}, "warnings": [], "ok": False,
               "pack": {"dir": pack_dir}, "loader": {"available": True}, "steps": [],
               "platforms": [], "prefix": list(prefix_ids), "nsteps": nsteps}
@@ -688,10 +689,9 @@ def run_step(pack_dir, prefix_ids, nsteps, loader=None, opener=None, device=0, d
         # Oracle: the CPU engine, fed the same prefix.
         from . import cpu
         eng = cpu.Engine(pack_dir, ctx=ctx, threads=2, log=None)
-        refs = []
         for pos, tok in enumerate(prefix_ids[:-1]):
             eng.feed(tok, pos)
-        toks = list(prefix_ids)
+        toks: list[int] = list(prefix_ids)
         pos = len(prefix_ids) - 1
         # Warm the Arc state on the prefix (layers only, like the CPU's feed).
         for p0, tok in enumerate(prefix_ids[:-1]):
