@@ -1,0 +1,197 @@
+{
+  "gate": "arc-a770-gemv-overhead-20261125",
+  "title": "Arc A770: where the packed ternary GEMV's token time goes (launch split)",
+  "measured": "2026-11-25",
+  "commit": "unreleased",
+  "command": "bench-logs/arc_gemv_sweep.py (untracked harness named on the page)",
+  "notes": "The 27B's 401 packed ternary matrices (6.800 GB codes+scales per token) swept over rows per work-item, phase parts and enqueue pattern, with a uint4 streaming read and a noop launch as anchors. The split of the 47.38 ms/token per-matrix token into CPU enqueue, reading and GPU ramp/drain idle is the page's arithmetic over the measured anchors; the component milliseconds and shares are quoted from the page's split table, and every arm figure is re-derived from sweep.json. Not a model run and not a runnable decode: the single persistent launch is a work list over known inputs.",
+  "evidence": [
+    "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/sweep.json",
+    "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/README.md"
+  ],
+  "numbers": [
+    {
+      "id": "per-matrix-ms",
+      "display": "47.38 ms/token",
+      "quoted_in": [
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/sweep.json",
+        "pointer": "/aggregate/rpt8_p40/ms",
+        "expect": 47.381
+      }
+    },
+    {
+      "id": "persist-ms",
+      "display": "26.87 ms/token",
+      "quoted_in": [
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/sweep.json",
+        "pointer": "/aggregate/persist_p1_g1048576/ms",
+        "expect": 26.867
+      }
+    },
+    {
+      "id": "persist-gbps",
+      "display": "253.1 GB/s",
+      "quoted_in": [
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/sweep.json",
+        "pointer": "/aggregate/persist_p1_g1048576/gbps",
+        "expect": 253.08
+      }
+    },
+    {
+      "id": "launches",
+      "display": "802 launches",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/README.md",
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/sweep.json",
+        "pointer": "/aggregate/rpt8_p40/launches",
+        "expect": 802
+      }
+    },
+    {
+      "id": "noop-us",
+      "display": "8.78 us",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/README.md",
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/sweep.json",
+        "pointer": "/batch802_launch_us",
+        "expect": 8.78
+      }
+    },
+    {
+      "id": "stream-gbps",
+      "display": "384.8 GB/s",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/README.md",
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/sweep.json",
+        "pointer": "/stream_read_gbps",
+        "expect": 384.76
+      }
+    },
+    {
+      "id": "rpt8-ms",
+      "display": "29.93 ms",
+      "quoted_in": [
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/sweep.json",
+        "pointer": "/aggregate/persist_rpt8_p40_g1048576/ms",
+        "expect": 29.933
+      }
+    },
+    {
+      "id": "rpt16-ms",
+      "display": "29.84 ms",
+      "quoted_in": [
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/sweep.json",
+        "pointer": "/aggregate/persist_rpt16_p40_g1048576/ms",
+        "expect": 29.839
+      }
+    },
+    {
+      "id": "cpu-ms",
+      "display": "7.04 ms",
+      "quoted_in": [
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/README.md",
+        "needle": "7.04"
+      }
+    },
+    {
+      "id": "cpu-share",
+      "display": "15%",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/README.md",
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/README.md",
+        "needle": "15%"
+      }
+    },
+    {
+      "id": "read-ms",
+      "display": "17.67 ms",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/README.md",
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/README.md",
+        "needle": "17.67"
+      }
+    },
+    {
+      "id": "read-share",
+      "display": "37%",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/README.md",
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/README.md",
+        "needle": "37%"
+      }
+    },
+    {
+      "id": "idle-ms",
+      "display": "22.67 ms",
+      "quoted_in": [
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/README.md",
+        "needle": "22.67"
+      }
+    },
+    {
+      "id": "idle-share",
+      "display": "48%",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/README.md",
+        "docs/ROADMAP.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/README.md",
+        "needle": "48%"
+      }
+    }
+  ]
+}

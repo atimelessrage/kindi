@@ -249,6 +249,16 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
     floor is ~40 microseconds and a GEMV below ~2 MiB of packed weights is overhead-bound - the next
     lever for a backend, which would have to give up coalesced reads or exact sum order to remove it.
     ([run](benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-rows4/README.md))
+  - **Single launch before occupancy (2026-11-25, re-checked 2026-11-26):** the overhead split takes
+    the 47.38 ms/token per-matrix token apart: CPU-side enqueue is 7.04 ms (15%, 802 launches at
+    8.78 us each), reading 6.80 GB at the measured 384.8 GB/s is 17.67 ms (37%), and GPU ramp/drain
+    idle around the 401 small launches is 22.67 ms (48%). One persistent launch over the same bytes
+    is 26.87 ms/token at 253.1 GB/s. So the first lever for the Arc work is fewer launches - a
+    persistent work list for the GEMV and fused launches once layers are dependent - not occupancy:
+    with the card already full, eight and sixteen rows per work-item are 29.93 ms and 29.84 ms. The
+    runnable decode still needs dependent launches, so this is the Phase D fusion target, not a claim
+    that one launch can run a layer.
+    ([split](benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead/README.md))
   - **27B pack + K8/V4 on the A770 (2026-11-24, blocked):** the pack already exists as a copy in the
     model store's `packs/bonsai-27b`, and its `kindi_pack.json` source sha256 matches the 27B GGUF
     beside the store (verified the same day; the GGUF was not
