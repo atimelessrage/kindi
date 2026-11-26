@@ -37,3 +37,28 @@ def test_the_benchmark_refuses_a_model_without_the_2_5_profile():
 
     assert model_id_for_manifest({"model": "Ternary-Bonsai-2.5-27B"}) == "bonsai2.5-27b"
     assert model_id_for_manifest({"model": "Ternary-Bonsai-2-27B"}) != "bonsai2.5-27b"
+
+
+class _Tok(object):
+    """A vocabulary with </think> as one token, as the 27B pack's vocab.json has it."""
+
+    def __init__(self):
+        self.sid = {"<think>": 248068, "</think>": 248069}
+
+
+def test_thinking_length_counts_tokens_before_the_close_marker():
+    tok = _Tok()
+    assert bench.thinking_length([10, 11, 12, 248069, 20, 21], tok) == (3, True)
+    assert bench.thinking_length([248069, 20], tok) == (0, True)      # empty thought
+
+
+def test_thinking_length_reports_a_truncation_instead_of_a_finished_thought():
+    tok = _Tok()
+    assert bench.thinking_length([10, 11, 12], tok) == (3, False)     # never closed in --tokens
+    assert bench.thinking_length([], tok) == (0, False)
+
+
+def test_thinking_length_without_the_marker_in_the_vocabulary_is_all_thinking():
+    class _Bare(object):
+        sid = {}
+    assert bench.thinking_length([10, 11], _Bare()) == (2, False)

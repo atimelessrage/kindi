@@ -995,8 +995,10 @@ not record thinking length |
 vendor's own stack | the same gate as E1, and it must beat the card's "behaves close to `xhigh`"
 statement on this pack | proposed; the card argues against it |
 
-The sampling harness gap behind both rows: `tools/bonsai_sampling_bench.py` records ids and
-fingerprints, not thinking length, so the measurement they need does not exist yet.
+The sampling harness gap behind both rows is closed in the tool (`tools/bonsai_sampling_bench.py` now
+records `thinking_tokens` per row - tokens before the `</think>` token, with `thinking_closed` false
+when the marker is not reached in `--tokens`), but the tracked 2026-11-25 run predates that field, so
+E1/E2 still need a fresh run on this pack before either gate can be scored.
 
 ## MTP drafting on the CPU (2026-11-25)
 

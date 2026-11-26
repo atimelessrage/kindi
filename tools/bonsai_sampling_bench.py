@@ -16,6 +16,15 @@ template, and samples with ``kindi.sampling.Sampler`` on the engine that is load
 CPU engine (no CUDA needed) and on a card; it records what each run used, so the JSON is the
 evidence and no number has to be retyped.
 
+Each row also records `thinking_tokens`: how many of the sampled tokens are thinking, i.e. the
+position of the `</think>` token in the reply (the generation prompt for a thinking request ends in an
+open `<think>`, so everything before that marker is reasoning - the same split the server streams as
+"reasoning"). The E1/E2 gates in docs/ROADMAP.md ("Reasoning-effort text for `low`") are stated in
+exactly that number, and the tracked run before this field existed could not answer them. When the
+marker is not reached within `--tokens`, `thinking_tokens` is the whole reply and `thinking_closed`
+is false: the thinking was truncated, not finished. Instruct rows have no thinking (the prompt
+closes the block) and record 0.
+
 The decode rate it prints is a fact of that run, not a performance measurement: a busy host makes it
 unfit for comparison with another run, mode, pack or machine. Use the ids, the settings and the text
 as the check that the profile applies and the engine answers, and take any rate on an idle host.
@@ -45,6 +54,22 @@ EFFORTS = ("xhigh", "medium", "low")
 
 def fingerprint(ids):
     return hashlib.sha256(",".join(str(i) for i in ids).encode()).hexdigest()[:16]
+
+
+THINK_CLOSE = "</think>"
+
+
+def thinking_length(ids, tok):
+    """(thinking tokens, closed): tokens before the `</think>` token, and whether it was reached.
+
+    `</think>` is one token in this vocabulary (tok.sid), so the count is exact, not a text search.
+    Without the marker the whole reply is still thinking, so the count is len(ids) and closed is
+    false - a truncation, which a gate must not read as a finished short thought.
+    """
+    marker = getattr(tok, "sid", {}).get(THINK_CLOSE)
+    if marker is not None and marker in ids:
+        return ids.index(marker), True
+    return len(ids), False
 
 
 def combos(efforts=EFFORTS):
@@ -150,6 +175,7 @@ def main():
             ids = tok.encode(body) + tok.encode(gp)
             row_seed = args.seed + pi          # one seed per prompt: efforts differ only by instruction
             out, seconds = _sample(eng, ids, args.tokens, p, row_seed)
+            think_tokens, think_closed = thinking_length(out, tok) if thinking else (0, False)
             rows.append({
                 "mode": mode,
                 "reasoning_effort": effort if thinking else None,
@@ -157,14 +183,17 @@ def main():
                 "prompt_tokens": len(ids),
                 "sampling": p,
                 "reply_ids": out,
+                "thinking_tokens": think_tokens,
+                "thinking_closed": think_closed,
                 "reply_text": tok.decode(out),
                 "decode_seconds": round(seconds, 3),
                 "decode_tokens_per_second": round(len(out) / seconds, 2) if seconds else 0.0,
                 "fingerprint": fingerprint(out),
                 "seed": row_seed,
             })
-            print("%-8s %-6s %2d tok  %5.2f tok/s  %s" % (
-                mode, effort or "-", len(out), rows[-1]["decode_tokens_per_second"], prompt[:40]))
+            print("%-8s %-6s %2d tok  think=%d%s  %5.2f tok/s  %s" % (
+                mode, effort or "-", len(out), think_tokens, "" if think_closed else " (open)",
+                rows[-1]["decode_tokens_per_second"], prompt[:40]))
 
     out = {
         "model": man.get("model"),
