@@ -271,6 +271,10 @@ q8_0 remains the default and its kernels and arithmetic are untouched.
     ([step](benchmarks/2026-11-26-i7-8086k-arc-a770-step/README.md), claim `intel-step-20261126`). Same day the step's launches were cut further: host writes go
     non-blocking, a `concat3` kernel gives one read per GEMV group, and the FFN's silu×fold runs
     on the device (K4's first half) — 141.72 ms/step at 516 enqueues, 8/8 tokens still exact.
+    Then the **27B itself ran on one card**: `kindi use bonsai-2.5-27b` (7242 MB pack) plus
+    `intel-step` 4/4 tokens exact at 779.14 ms/step, after fixing the driver's 4095 MiB
+    per-allocation cap, the untied `output.weight` head and the 7.1 GB codes read. Correct, and
+    1.3 tokens/s — the P5 floor is 5, so the cell stays open.
   - **27B pack + K8/V4 on the A770 (2026-11-24, blocked):** the pack already exists as a copy in the
     model store's `packs/bonsai-27b`, and its `kindi_pack.json` source sha256 matches the 27B GGUF
     beside the store (verified the same day; the GGUF was not

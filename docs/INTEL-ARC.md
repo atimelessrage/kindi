@@ -786,6 +786,21 @@ A checked cell needs the installer option, the model loaded, `kindi verify` exac
 check and a measured benchmark row. Do not claim two cards from a one-card run, 27B from a 2B run,
 or tandem from two independent servers.
 
+### The 27B cell, 2026-11-26: it runs, exactly, and slowly
+
+The 27B column is no longer "2B only, never run". `kindi intel-step` and the new `kindi intel-run`
+now load the real `bonsai-2.5-27b` pack (6.72 GB of codes, 64 layers, D 5120) on one A770 and
+produce **the CPU engine's tokens** (4/4 teacher-forced, max |Δlogit| 2.18e-04; 779.14 ms/step,
+1366 enqueues/step). Three things blocked it before, all fixed: the driver's **4095 MiB
+per-allocation cap** (codes are now chunked on tensor boundaries), the 27B's **untied
+`output.weight` head** (read from the pack manifest — with the tied name the model decoded to
+non-Latin tokens), and a **7.1 GB codes blob read into RAM** (now memory-mapped).
+
+That is a correctness result, not the cell: the P5 performance gate is **5 tokens/s at 2K** and this
+is **1.3 tokens/s**, because the step still pays one blocking read per GEMV group and runs the delta
+rule, conv, attention and softmax on the host for all 64 layers. The cell stays open.
+`docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/` has the runs.
+
 ## Performance gates
 
 Correctness comes first; a fast wrong result is not support. The following gates are fixed before

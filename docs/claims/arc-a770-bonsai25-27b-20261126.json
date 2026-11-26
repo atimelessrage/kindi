@@ -1,0 +1,105 @@
+{
+  "gate": "arc-a770-bonsai25-27b-20261126",
+  "title": "Arc A770: Bonsai 2.5 27B decodes on the device and matches the CPU engine",
+  "measured": "2026-11-26",
+  "commit": "unreleased",
+  "command": "python -m kindi intel-step --pack ~/.kindi/packs/bonsai-2.5-27b --steps 4 --device-name \"Intel(R) Arc(TM) A770 Graphics\" --json docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/step.json",
+  "notes": "The 27B is the only size the 2.5 release has. Three fixes made it run: the driver's 4095 MiB per-allocation cap (codes chunked on tensor boundaries), the 27B's untied output.weight head (read from the manifest), and a 7.1 GB codes blob forced into RAM (now memory-mapped). intel-step is teacher-forced against cpu.Engine on the same pack; intel-run decodes a prompt with no CPU engine. Host math (conv, delta rule, attention, FFN elementwise) is still numpy; this is a probe, not a backend and not a speed claim.",
+  "evidence": [
+    "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/step.json",
+    "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/run-plain.json",
+    "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/run-chat.json",
+    "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/README.md"
+  ],
+  "numbers": [
+    {
+      "id": "tokens-matching",
+      "display": "4/4",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/README.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/README.md",
+        "needle": "4/4 tokens match"
+      }
+    },
+    {
+      "id": "max-logit-diff",
+      "display": "2.18e-04",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/step.json",
+        "pointer": "/steps/2/max_abs_diff",
+        "expect": 0.00021839141845703125
+      }
+    },
+    {
+      "id": "ms-per-step",
+      "display": "779.14 ms/step",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/step.json",
+        "pointer": "/ms_per_step",
+        "expect": 779.139
+      }
+    },
+    {
+      "id": "enqueues-per-step",
+      "display": "1366 enqueues/step",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/step.json",
+        "pointer": "/steps/0/enqueues",
+        "expect": 1366
+      }
+    },
+    {
+      "id": "max-mem-alloc",
+      "display": "4095 MiB",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/step.json",
+        "pointer": "/device/max_mem_alloc_mib",
+        "expect": 4095
+      }
+    },
+    {
+      "id": "chat-ms-per-step",
+      "display": "816.41 ms/step",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/run-chat.json",
+        "pointer": "/ms_per_step",
+        "expect": 816.411
+      }
+    },
+    {
+      "id": "chat-answer",
+      "display": "the three primary colors",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/README.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/README.md",
+        "needle": "The three primary colors are **red**, **blue**, and **yellow**."
+      }
+    }
+  ]
+}

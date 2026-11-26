@@ -219,6 +219,11 @@ What is **not** verified and must not be claimed:
   BF16/Q8_0 mmproj files, and an image request against a text pack is answered with 400.
 - The 2.5 `PQ2_0` and `Q2_0` files use the same container types the converter handles, but none was
   downloaded here, so the byte-identical-pack claim stays a 2B result (section 2).
+- **The 2.5 27B now runs on an Arc A770** (2026-11-26). `kindi use bonsai-2.5-27b` built the pack
+  (7242 MB, 851 tensors) and `kindi intel-step`/`kindi intel-run` produce the CPU engine's tokens on
+  one card: 4/4 teacher-forced, max |Δlogit| 2.18e-04, 779.14 ms/step. It is a correctness result,
+  not a speed one, and not support: see `docs/INTEL-ARC.md`'s acceptance matrix and
+  `docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/`.
 
 ## 2. Formats: what to support and in what order
 

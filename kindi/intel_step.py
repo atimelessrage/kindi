@@ -48,6 +48,10 @@ from .intel_cl import (
 )
 from .intel_layer import FOLD_LANES, RMS_LANES, SOURCE as NORM_SOURCE, _launch, _local_arg, _row, _signs
 from .intel_pack import SOURCE as GEMV_SOURCE, _set_args as _set_gemv_args, dpm_view
+
+# The Arc driver (32.0.101.9175) refuses a single 6.7 GB allocation, so a 27B pack's codes are
+# grouped into device buffers of at most this many bytes, on tensor boundaries.
+CODES_CHUNK = 2 << 30
 from .intel_ternary import _launch_1d, _launch_2d
 
 DEFAULT_STEPS = 4
@@ -237,10 +241,14 @@ class ArcStep(object):
     def _load_pack(self):
         pack_dir = self.pack_dir
         bc = json.load(open(os.path.join(pack_dir, "bcodes_index.json"), encoding="utf-8"))
+        with open(os.path.join(pack_dir, "kindi_pack.json"), encoding="utf-8") as f:
+            self.manifest = json.load(f)
         idx = json.load(open(os.path.join(pack_dir, "index.json"), encoding="utf-8"))
         self.bc = bc["tensors"]
         self.f32_index = idx["tensors"]
-        self.bcodes = np.fromfile(os.path.join(pack_dir, "bcodes.bin"), dtype=np.uint8)
+        # memory-mapped, not read: the 27B pack is ~7.1 GB of codes and the embedding row is the
+        # only part read back per token, so residency belongs to the page cache, not to this process.
+        self.bcodes = np.memmap(os.path.join(pack_dir, "bcodes.bin"), dtype=np.uint8, mode="r")
         self.dpm16 = np.fromfile(os.path.join(pack_dir, "dpm.bin"), dtype=np.uint8).view("<f2")
         self.f32bin = np.fromfile(os.path.join(pack_dir, "f32.bin"), dtype=np.float32)
         self.signs = {int(k): np.fromfile(os.path.join(pack_dir, "signs_%d.f32" % int(k)),
@@ -248,16 +256,55 @@ class ArcStep(object):
                       for k in _signs(pack_dir, idx)}
         self.attn_layers = sorted({int(n.split(".")[1]) for n in self.bc
                                    if n.endswith(".attn_q.weight")})
+        # The 2B ties its head to the token embedding; the 27B ships a separate `output.weight`, and
+        # the manifest names whichever one the model actually uses.
+        head = self.manifest.get("head") or "token_embd.weight"
+        if head not in self.bc:
+            raise ValueError("pack manifest names head %r, which is not in bcodes_index.json" % head)
+        self.head = head
 
     def _f32(self, name):
         entry = self.f32_index[name]
         off, n = int(entry["f32_off"]) // 4, int(entry["nfloats"])
         return self.f32bin[off:off + n].copy()
 
+    def _codes_buffers(self, dev):
+        """Split the code blob into device buffers the driver accepts, on tensor boundaries.
+
+        The 27B pack is 6.7 GB of codes and this driver refuses one allocation that size
+        (CL_INVALID_BUFFER_SIZE), so the blob is grouped into buffers of at most CODES_CHUNK bytes.
+        A tensor never straddles a buffer: its GEMV byte offset becomes relative to its chunk.  The
+        slices stay views of the mapping, so no chunk is copied into RAM to upload."""
+        length = int(self.bcodes.size)
+        names = sorted(self.bc, key=lambda n: int(self.bc[n]["bc_off"]))
+        groups, start, items = [], None, []
+        for i, n in enumerate(names):
+            off = int(self.bc[n]["bc_off"])
+            end = int(self.bc[names[i + 1]]["bc_off"]) if i + 1 < len(names) else length
+            if start is None:
+                start = off
+            items.append((n, off))
+            if end - start >= CODES_CHUNK:
+                groups.append((start, end, items))
+                start, items = None, []
+        if items:
+            groups.append((start, length, items))
+        self.codes_buf, self.bc_chunk = [], {}
+        for gi, (s0, s1, group) in enumerate(groups):
+            buf = dev.buffer(self.bcodes[s0:s1], CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                             "clCreateBufferCodes%d" % gi)
+            self.codes_buf.append(buf)
+            for n, off in group:
+                self.bc_chunk[n] = (buf, off - s0)
+        return self.codes_buf
+
+    def _codes_args(self, name):
+        """The chunk buffer holding tensor `name`, and its byte offset inside that buffer."""
+        return self.bc_chunk[name]
+
     def _allocate(self):
         dev = self.dev
-        self.codes_buf = dev.buffer(self.bcodes, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                    "clCreateBufferCodes")
+        self._codes_buffers(dev)
         self.scales = {}
         for name, entry in self.bc.items():
             phases = int(entry["ne0"]) // 128
@@ -401,9 +448,9 @@ class ArcStep(object):
             entry = self.bc[name]
             rows, cols = int(entry["rows"]), int(entry["ne0"])
             rows_list.append(rows)
-            _set_gemv_args(lib, dev.gemv, int(self.codes_buf), int(self.scales[name]),
-                           int(self.xp), int(bufs[i]), rows, cols, 1,
-                           int(entry["bc_off"]), 0)
+            codes, coff = self._codes_args(name)
+            _set_gemv_args(lib, dev.gemv, int(codes), int(self.scales[name]),
+                           int(self.xp), int(bufs[i]), rows, cols, 1, coff, 0)
             _launch_2d(lib, dev.queue, dev.gemv, (rows + 3) // 4, 1, self.report, "clEnqueueGemv")
             dev.enqueues += 1
         if self._read_xn_with_group:
@@ -561,9 +608,9 @@ class ArcStep(object):
         for i, name in enumerate((p + "ffn_gate.weight", p + "ffn_up.weight")):
             entry = self.bc[name]
             rows, cols = int(entry["rows"]), int(entry["ne0"])
-            _set_gemv_args(lib, dev.gemv, int(self.codes_buf), int(self.scales[name]),
-                           int(self.xp), int((self.ybuf, self.ybuf2)[i]), rows, cols, 1,
-                           int(entry["bc_off"]), 0)
+            codes, coff = self._codes_args(name)
+            _set_gemv_args(lib, dev.gemv, int(codes), int(self.scales[name]),
+                           int(self.xp), int((self.ybuf, self.ybuf2)[i]), rows, cols, 1, coff, 0)
             _launch_2d(lib, dev.queue, dev.gemv, (rows + 3) // 4, 1, self.report, "clEnqueueGemv")
             dev.enqueues += 1
         NFF = self.NFF
@@ -576,8 +623,9 @@ class ArcStep(object):
         self._fold_in_place(NFF)
         entry = self.bc[p + "ffn_down.weight"]
         rows, cols = int(entry["rows"]), int(entry["ne0"])
-        _set_gemv_args(lib, dev.gemv, int(self.codes_buf), int(self.scales[p + "ffn_down.weight"]),
-                       int(self.xp), int(self.ybuf), rows, cols, 1, int(entry["bc_off"]), 0)
+        codes, coff = self._codes_args(p + "ffn_down.weight")
+        _set_gemv_args(lib, dev.gemv, int(codes), int(self.scales[p + "ffn_down.weight"]),
+                       int(self.xp), int(self.ybuf), rows, cols, 1, coff, 0)
         _launch_2d(lib, dev.queue, dev.gemv, (rows + 3) // 4, 1, self.report, "clEnqueueGemv")
         dev.enqueues += 1
         return dev.read(self.ybuf, rows, "clEnqueueReadY")[:rows]
@@ -615,7 +663,7 @@ class ArcStep(object):
         if not head:
             return h
         self._norm_fold(h, "output_norm.weight")
-        logits = self._gemv("token_embd.weight")
+        logits = self._gemv(self.head)
         return int(np.argmax(logits)), logits
 
     def finish(self):
@@ -681,6 +729,94 @@ def run_step(pack_dir, prefix_ids, nsteps, loader=None, opener=None, device=0, d
             except Exception:
                 pass
     return report
+
+
+def load_tokenizer(pack_dir):
+    """The pack's own vocabulary and merges, so a run decodes text without the CPU engine."""
+    from .tokenizer import Tok
+    with open(os.path.join(pack_dir, "vocab.json"), encoding="utf-8") as f:
+        vocab = json.load(f)
+    return Tok(vocab, os.path.join(pack_dir, "merges.txt"))
+
+
+def _stop_ids(tok):
+    return {i for s, i in tok.sid.items() if s in ("<|im_end|>", "<|endoftext|>")}
+
+
+def run_generate(pack_dir, prompt_ids, ntokens, loader=None, opener=None, device=0,
+                 device_name=None, ctx=2048, tok=None):
+    """Greedy decode on the Arc: prefill the prompt, then emit ntokens tokens.
+
+    No CPU engine is constructed, so this runs packs whose weights do not fit in RAM (the 27B).  The
+    step it repeats in a loop is the one `run_step` verifies teacher-forced against `cpu.Engine`."""
+    report = {"returncodes": {}, "warnings": [], "ok": False, "pack": {"dir": pack_dir},
+              "prefix": list(prompt_ids), "ntokens": int(ntokens), "tokens": [],
+              "steps": [], "platforms": [], "device": None}
+    runner = None
+    try:
+        runner = ArcStep(pack_dir, loader=loader, opener=opener, device=device,
+                         device_name=device_name, ctx=ctx)
+        report.update(runner.report)
+        report["device"] = runner.report["device"]
+        dev = runner.dev
+        stop = _stop_ids(tok) if tok is not None else set()
+        pos = 0
+        for t in prompt_ids[:-1]:
+            runner.step(int(t), pos, head=False)
+            pos += 1
+        dev.enqueues = 0
+        cur = int(prompt_ids[-1])
+        for _ in range(int(ntokens)):
+            t0 = time.perf_counter()
+            got, _logits = runner.step(cur, pos)
+            dt = (time.perf_counter() - t0) * 1e3
+            report["steps"].append({"pos": pos, "tok": cur, "got_tok": got,
+                                    "ms": round(dt, 3), "enqueues": dev.enqueues})
+            report["tokens"].append(got)
+            dev.enqueues = 0
+            pos += 1
+            cur = got
+            if got in stop:
+                report["stopped_on"] = got
+                break
+        report["text"] = tok.decode(report["tokens"]) if tok is not None else None
+        report["ok"] = bool(report["tokens"])
+        if report["steps"]:
+            n = len(report["steps"])
+            report["ms_per_step"] = round(sum(x["ms"] for x in report["steps"]) / n, 3)
+            report["enqueues_per_step"] = round(sum(x["enqueues"] for x in report["steps"]) / n, 1)
+    except Exception as exc:                       # noqa: BLE001 - report the failure with the trace
+        report["error"] = repr(exc)
+        import traceback
+        report["traceback"] = traceback.format_exc()
+    finally:
+        if runner is not None:
+            try:
+                runner.finish()
+            except Exception:
+                pass
+    return report
+
+
+def render_generate(report):
+    lines = ["Arc generation: greedy decode on the device (no CPU engine, so packs larger than RAM "
+             "can run)"]
+    pack = report["pack"]
+    lines.append("  pack: %s" % pack.get("dir"))
+    if report.get("device"):
+        device = report["device"]
+        lines.append("  device: %s; %s CU(s), %s MiB" % (
+            device.get("name"), device.get("compute_units"), device.get("global_mem_mib")))
+    if report.get("error"):
+        lines.append("  error: %s" % report["error"])
+        return "\n".join(lines)
+    lines.append("  prompt tokens: %d -> %s" % (len(report["prefix"]), report["prefix"][:12]))
+    lines.append("  %d tokens at %.2f ms/step, %.1f enqueues/step" % (
+        len(report["tokens"]), report["ms_per_step"], report["enqueues_per_step"]))
+    lines.append("  output tokens: %s" % report["tokens"])
+    text = report.get("text") or ""
+    lines.append("  text: %s" % ascii(text))
+    return "\n".join(lines)
 
 
 def render(report):

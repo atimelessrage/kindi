@@ -63,3 +63,29 @@ def test_rms_rows_uses_mean_square():
     sc = np.float32(1.0) / np.float32(np.sqrt(np.float32(acc / np.float64(37)) + np.float32(1e-6)))
     want = ((x * sc) * w).astype(np.float32)
     assert np.array_equal(got, want)
+
+
+def _tiny_pack(tmp_path):
+    """A pack directory with just what a tokenizer needs: vocab.json and merges.txt."""
+    import json
+    vocab = ["!"] + ["a%d" % i for i in range(250)] + ["<|im_end|>", "<|endoftext|>"]
+    (tmp_path / "vocab.json").write_text(json.dumps(vocab), encoding="utf-8")
+    (tmp_path / "merges.txt").write_text("#version: 0.2\n", encoding="utf-8")
+    return str(tmp_path)
+
+
+def test_load_tokenizer_and_stop_ids_read_the_pack(tmp_path):
+    """`intel-run` decodes text with the pack's own vocab; the stop set is the two end tokens."""
+    tok = intel_step.load_tokenizer(_tiny_pack(tmp_path))
+    assert len(tok.vocab) == 253
+    assert intel_step._stop_ids(tok) == {251, 252}
+
+
+def test_run_generate_reports_the_platform_error_instead_of_raising(tmp_path, monkeypatch):
+    """A run with no usable GPU must come back as a report with `ok: False`, like run_step does."""
+    tok = intel_step.load_tokenizer(_tiny_pack(tmp_path))
+    monkeypatch.setattr(intel_step, "ArcStep", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no device")))
+    report = intel_step.run_generate(str(tmp_path), [1, 2], 4, tok=tok)
+    assert report["ok"] is False
+    assert "no device" in report["error"]
+    assert "error" in intel_step.render_generate(report)

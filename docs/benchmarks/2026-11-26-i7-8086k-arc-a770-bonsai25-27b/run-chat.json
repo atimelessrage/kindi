@@ -1,0 +1,312 @@
+{
+  "chat": true,
+  "device": {
+    "compute_units": 512,
+    "device_version": "OpenCL 3.0 NEO ",
+    "driver_version": "32.0.101.9175",
+    "global_mem_mib": 15932,
+    "max_clock_mhz": 2400,
+    "max_mem_alloc_mib": 4095,
+    "max_work_group_size": 1024,
+    "name": "Intel(R) Arc(TM) A770 Graphics",
+    "opencl_c_version": "OpenCL C 1.2 ",
+    "vendor": "Intel(R) Corporation"
+  },
+  "enqueues_per_step": 1366.0,
+  "fp64": false,
+  "loader": {
+    "available": true
+  },
+  "ms_per_step": 816.411,
+  "ntokens": 24,
+  "ok": true,
+  "pack": {
+    "dir": "~/.kindi/packs/bonsai-2.5-27b"
+  },
+  "platform": "Intel(R) OpenCL Graphics (discrete)",
+  "platforms": [
+    {
+      "gpu_devices": 1,
+      "index": 0,
+      "name": "Intel(R) OpenCL Graphics (discrete)",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.0 "
+    },
+    {
+      "gpu_devices": 1,
+      "index": 1,
+      "name": "Intel(R) OpenCL HD Graphics",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.0 "
+    },
+    {
+      "gpu_devices": 0,
+      "index": 2,
+      "name": "Intel(R) OpenCL",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.1 WINDOWS"
+    }
+  ],
+  "prefix": [
+    248045,
+    846,
+    198,
+    657,
+    279,
+    2250,
+    5839,
+    7736,
+    13,
+    248046,
+    198,
+    248045,
+    74455,
+    198,
+    248068,
+    271,
+    248069,
+    271
+  ],
+  "prompt": "Name the three primary colors.",
+  "returncodes": {
+    "clBuildProgram": "0x00000000",
+    "clCreateBufferCodes0": "0x00000000",
+    "clCreateBufferCodes1": "0x00000000",
+    "clCreateBufferCodes2": "0x00000000",
+    "clCreateBufferCodes3": "0x00000000",
+    "clCreateBufferH": "0x00000000",
+    "clCreateBufferNorm": "0x00000000",
+    "clCreateBufferOnes": "0x00000000",
+    "clCreateBufferRes": "0x00000000",
+    "clCreateBufferScales": "0x00000000",
+    "clCreateBufferSig": "0x00000000",
+    "clCreateBufferSign17408": "0x00000000",
+    "clCreateBufferSign5120": "0x00000000",
+    "clCreateBufferSign6144": "0x00000000",
+    "clCreateBufferXn": "0x00000000",
+    "clCreateBufferXp": "0x00000000",
+    "clCreateBufferY": "0x00000000",
+    "clCreateBufferY2": "0x00000000",
+    "clCreateBufferY3": "0x00000000",
+    "clCreateBufferYGroup": "0x00000000",
+    "clCreateCommandQueue": "0x00000000",
+    "clCreateContext": "0x00000000",
+    "clCreateKernel/concat3": "0x00000000",
+    "clCreateKernel/fold_sign": "0x00000000",
+    "clCreateKernel/pack_gemv4": "0x00000000",
+    "clCreateKernel/rms_sum": "0x00000000",
+    "clCreateKernel/silu_mul": "0x00000000",
+    "clCreateProgramWithSource": "0x00000000",
+    "clEnqueueConcat": "0x00000000",
+    "clEnqueueFoldOnly": "0x00000000",
+    "clEnqueueFoldSign": "0x00000000",
+    "clEnqueueGemv": "0x00000000",
+    "clEnqueueReadY": "0x00000000",
+    "clEnqueueRmsSum": "0x00000000",
+    "clEnqueueSiluMul": "0x00000000",
+    "clEnqueueWriteH": "0x00000000",
+    "clEnqueueWriteSrc": "0x00000000",
+    "clFinish": "0x00000000",
+    "clGetPlatformIDs": "0x00000000",
+    "clGetPlatformIDsHandles": "0x00000000"
+  },
+  "steps": [
+    {
+      "enqueues": 1366,
+      "got_tok": 760,
+      "ms": 811.631,
+      "pos": 17,
+      "tok": 271
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 2250,
+      "ms": 812.647,
+      "pos": 18,
+      "tok": 760
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 5839,
+      "ms": 814.139,
+      "pos": 19,
+      "tok": 2250
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 7736,
+      "ms": 838.143,
+      "pos": 20,
+      "tok": 5839
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 513,
+      "ms": 815.037,
+      "pos": 21,
+      "tok": 7736
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 2972,
+      "ms": 815.089,
+      "pos": 22,
+      "tok": 513
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 1114,
+      "ms": 813.346,
+      "pos": 23,
+      "tok": 2972
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 93868,
+      "ms": 815.229,
+      "pos": 24,
+      "tok": 1114
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 2972,
+      "ms": 812.105,
+      "pos": 25,
+      "tok": 93868
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 11855,
+      "ms": 814.099,
+      "pos": 26,
+      "tok": 2972
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 93868,
+      "ms": 814.227,
+      "pos": 27,
+      "tok": 11855
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 321,
+      "ms": 817.932,
+      "pos": 28,
+      "tok": 93868
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 2972,
+      "ms": 811.538,
+      "pos": 29,
+      "tok": 321
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 26964,
+      "ms": 814.755,
+      "pos": 30,
+      "tok": 2972
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 159034,
+      "ms": 816.978,
+      "pos": 31,
+      "tok": 26964
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 271,
+      "ms": 819.248,
+      "pos": 32,
+      "tok": 159034
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 9205,
+      "ms": 814.48,
+      "pos": 33,
+      "tok": 271
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 513,
+      "ms": 815.736,
+      "pos": 34,
+      "tok": 9205
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 279,
+      "ms": 821.139,
+      "pos": 35,
+      "tok": 513
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 5839,
+      "ms": 818.02,
+      "pos": 36,
+      "tok": 279
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 7736,
+      "ms": 815.737,
+      "pos": 37,
+      "tok": 5839
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 303,
+      "ms": 819.527,
+      "pos": 38,
+      "tok": 7736
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 279,
+      "ms": 817.525,
+      "pos": 39,
+      "tok": 303
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 2972,
+      "ms": 815.558,
+      "pos": 40,
+      "tok": 279
+    }
+  ],
+  "text": "The three primary colors are **red**, **blue**, and **yellow**.\n\nThese are the primary colors in the **",
+  "tokens": [
+    760,
+    2250,
+    5839,
+    7736,
+    513,
+    2972,
+    1114,
+    93868,
+    2972,
+    11855,
+    93868,
+    321,
+    2972,
+    26964,
+    159034,
+    271,
+    9205,
+    513,
+    279,
+    5839,
+    7736,
+    303,
+    279,
+    2972
+  ],
+  "warnings": []
+}
+

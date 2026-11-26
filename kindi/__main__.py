@@ -533,6 +533,34 @@ def cmd_intel_step(cfg, a):
     return 0 if report.get("ok") else 1
 
 
+def cmd_intel_run(cfg, a):
+    """cmd_kindi `intel-run`: greedy decode of a prompt on an Intel GPU (no CPU engine)."""
+    from . import intel_step
+
+    tok = intel_step.load_tokenizer(a.pack)
+    text = a.prompt
+    if a.chat:
+        from . import chat
+        with open(os.path.join(a.pack, "kindi_pack.json"), encoding="utf-8") as f:
+            manifest = json.load(f)
+        variant = chat.template_variant(manifest)
+        body, generation = chat.render([{"role": "user", "content": a.prompt}], variant=variant,
+                                       enable_thinking=False)
+        text = body + generation
+    ids = tok.encode(text)
+    if not ids:
+        raise SystemExit("intel-run: the prompt encodes to no tokens")
+    report = intel_step.run_generate(a.pack, ids, a.tokens, loader=a.loader, device=a.device,
+                                     device_name=a.device_name, ctx=a.ctx, tok=tok)
+    report["prompt"] = a.prompt
+    report["chat"] = bool(a.chat)
+    if a.json:
+        print(intel_step.dumps(report))
+    else:
+        print(intel_step.render_generate(report))
+    return 0 if report.get("ok") else 1
+
+
 def cmd_intel_pack(cfg, a):
     """Time a converted pack's ternary shapes on an Intel GPU; no model run or support claim."""
     from . import intel_pack
@@ -957,6 +985,17 @@ def _build_parser():
                    help="pick the GPU whose name contains SUBSTR (e.g. Arc) instead of --device")
     s.add_argument("--loader", default=None, help="OpenCL loader name/path (default: the host loader)")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
+    s = sub.add_parser("intel-run", help="greedy-decode a prompt on an Intel GPU: the Arc step in a loop, no CPU engine, so packs larger than RAM can run")
+    s.add_argument("--pack", required=True, help="a pack directory written by kindi convert")
+    s.add_argument("--prompt", required=True, help="prompt text (with --chat it is wrapped in the pack's chat template)")
+    s.add_argument("--tokens", type=int, default=16, help="tokens to generate (default 16)")
+    s.add_argument("--chat", action="store_true", help="render the prompt as a user message with the pack's chat template")
+    s.add_argument("--ctx", type=int, default=2048, help="context length (default 2048; the pack's KV cost grows with it)")
+    s.add_argument("--device", type=int, default=0, help="Intel OpenCL GPU index (default 0)")
+    s.add_argument("--device-name", default=None, metavar="SUBSTR",
+                   help="pick the GPU whose name contains SUBSTR (e.g. Arc) instead of --device")
+    s.add_argument("--loader", default=None, help="OpenCL loader name/path (default: the host loader)")
+    s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("intel-cl", help="compile and run OpenCL vector-add/GEMM on an Intel GPU (no model, no backend)")
     s.add_argument("--n", type=int, default=1048576, help="vector-add elements (default 1048576, max 16777216)")
     s.add_argument("--dim", type=int, default=128, help="square GEMM dimension (default 128, 8-512)")
@@ -1057,6 +1096,7 @@ _COMMANDS = {
     "intel-ternary": cmd_intel_ternary,
     "intel-pack": cmd_intel_pack,
     "intel-norm": cmd_intel_norm,
+    "intel-run": cmd_intel_run,
     "intel-step": cmd_intel_step,
     "loop-info": cmd_loop_info,
     "io": cmd_io,
