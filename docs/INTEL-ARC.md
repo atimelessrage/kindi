@@ -801,6 +801,13 @@ is **1.3 tokens/s**, because the step still pays one blocking read per GEMV grou
 rule, conv, attention and softmax on the host for all 64 layers. The cell stays open.
 `docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b/` has the runs.
 
+The **`-mtp` release file runs too**, and means what it means elsewhere: `blk.64` is the draft head
+and stays out of the pack (`mtp_head` in the manifest), so what loads on the card is the 64-layer
+language model. Its teacher-forced step is 4/4 tokens exact at 869.65 ms/step and its greedy tokens
+are the plain file's, with the same CPU reference tokens at the compared positions. The Arc does not
+draft — nothing does with the 27B head yet (`docs/MTP.md`). Evidence:
+`docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/`.
+
 ## Performance gates
 
 Correctness comes first; a fast wrong result is not support. The following gates are fixed before

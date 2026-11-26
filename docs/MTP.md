@@ -91,6 +91,15 @@ drafted (8.3%), up to 15/108 (13.9%) once the hidden is output-normed and the wi
 `tools/mtp_cpu_probe.py` on the real 27B, tracked at the [variant-ladder evidence page](benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/RESULTS.md) (claim `mtp-cpu-variants-20261125`).
 Do not repeat a CPU acceptance or speedup figure for this head without a tracked page behind it.
 
+### The 2.5 `-mtp` file on an Arc A770 (2026-11-26)
+
+The `-mtp` file converts and decodes on the A770 with the head recorded and unused: `kindi convert`
+keeps `blk.64` out of the pack (`mtp_head` in the manifest), the teacher-forced step is 4/4 tokens
+exact against `cpu.Engine` (869.65 ms/step) and the greedy tokens match the plain file's pack, as do
+the reference tokens `[9624, 271, 2, 561]`. That is the base model running on the device — there is
+no drafting on the Arc because there is no 27B drafting anywhere yet.
+`docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/`.
+
 ### Which drafter, on the 27B CPU (2026-11-25)
 
 `kindi.mtp_cpu.score_drafts` takes either drafter through one interface (`reset()` and

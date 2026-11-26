@@ -1,0 +1,105 @@
+{
+  "gate": "arc-a770-bonsai25-27b-mtp-20261126",
+  "title": "Arc A770: the Bonsai 2.5 27B -mtp file decodes on the device, same tokens as the plain file",
+  "measured": "2026-11-26",
+  "commit": "unreleased",
+  "command": "python -m kindi intel-step --pack ~/.kindi/packs/bonsai-2.5-27b-mtp --steps 4 --device-name \"Intel(R) Arc(TM) A770 Graphics\" --json docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/step.json",
+  "notes": "blk.64 of the -mtp file is the draft head and is kept out of the pack (manifest mtp_head); the pack is the 64-layer language model, so this records the -mtp file's base running on the Arc, not speculative decoding -- Kindi does not draft with the 27B head yet, on any backend. The token ids match the plain file's pack, and so do the CPU engine's reference tokens at the compared positions.",
+  "evidence": [
+    "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/step.json",
+    "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/run-plain.json",
+    "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/run-chat.json",
+    "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/README.md"
+  ],
+  "numbers": [
+    {
+      "id": "tokens-matching",
+      "display": "4/4",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/README.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/README.md",
+        "needle": "4/4 tokens match"
+      }
+    },
+    {
+      "id": "max-logit-diff",
+      "display": "2.18e-04",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/step.json",
+        "pointer": "/steps/2/max_abs_diff",
+        "expect": 0.00021839141845703125
+      }
+    },
+    {
+      "id": "ms-per-step",
+      "display": "869.65 ms/step",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/step.json",
+        "pointer": "/ms_per_step",
+        "expect": 869.649
+      }
+    },
+    {
+      "id": "enqueues-per-step",
+      "display": "1366 enqueues/step",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/step.json",
+        "pointer": "/steps/0/enqueues",
+        "expect": 1366
+      }
+    },
+    {
+      "id": "run-ms-per-step",
+      "display": "911.14 ms/step",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/run-plain.json",
+        "pointer": "/ms_per_step",
+        "expect": 911.144
+      }
+    },
+    {
+      "id": "chat-ms-per-step",
+      "display": "890.26 ms/step",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/run-chat.json",
+        "pointer": "/ms_per_step",
+        "expect": 890.263
+      }
+    },
+    {
+      "id": "reference-tokens",
+      "display": "[9624, 271, 2, 561]",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/README.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-bonsai25-27b-mtp/README.md",
+        "needle": "[9624, 271, 2, 561]"
+      }
+    }
+  ]
+}

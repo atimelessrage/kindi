@@ -1,0 +1,144 @@
+{
+  "device": {
+    "compute_units": 512,
+    "device_version": "OpenCL 3.0 NEO ",
+    "driver_version": "32.0.101.9175",
+    "global_mem_mib": 15932,
+    "max_clock_mhz": 2400,
+    "max_mem_alloc_mib": 4095,
+    "max_work_group_size": 1024,
+    "name": "Intel(R) Arc(TM) A770 Graphics",
+    "opencl_c_version": "OpenCL C 1.2 ",
+    "vendor": "Intel(R) Corporation"
+  },
+  "enqueues_per_step": 1366.0,
+  "fp64": false,
+  "loader": {
+    "available": true
+  },
+  "ms_per_step": 869.649,
+  "nsteps": 4,
+  "ok": true,
+  "pack": {
+    "dir": "~/.kindi/packs/bonsai-2.5-27b-mtp"
+  },
+  "platform": "Intel(R) OpenCL Graphics (discrete)",
+  "platforms": [
+    {
+      "gpu_devices": 1,
+      "index": 0,
+      "name": "Intel(R) OpenCL Graphics (discrete)",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.0 "
+    },
+    {
+      "gpu_devices": 1,
+      "index": 1,
+      "name": "Intel(R) OpenCL HD Graphics",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.0 "
+    },
+    {
+      "gpu_devices": 0,
+      "index": 2,
+      "name": "Intel(R) OpenCL",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.1 WINDOWS"
+    }
+  ],
+  "prefix": [
+    128,
+    2562,
+    2027,
+    31823
+  ],
+  "returncodes": {
+    "clBuildProgram": "0x00000000",
+    "clCreateBufferCodes0": "0x00000000",
+    "clCreateBufferCodes1": "0x00000000",
+    "clCreateBufferCodes2": "0x00000000",
+    "clCreateBufferCodes3": "0x00000000",
+    "clCreateBufferH": "0x00000000",
+    "clCreateBufferNorm": "0x00000000",
+    "clCreateBufferOnes": "0x00000000",
+    "clCreateBufferRes": "0x00000000",
+    "clCreateBufferScales": "0x00000000",
+    "clCreateBufferSig": "0x00000000",
+    "clCreateBufferSign17408": "0x00000000",
+    "clCreateBufferSign5120": "0x00000000",
+    "clCreateBufferSign6144": "0x00000000",
+    "clCreateBufferXn": "0x00000000",
+    "clCreateBufferXp": "0x00000000",
+    "clCreateBufferY": "0x00000000",
+    "clCreateBufferY2": "0x00000000",
+    "clCreateBufferY3": "0x00000000",
+    "clCreateBufferYGroup": "0x00000000",
+    "clCreateCommandQueue": "0x00000000",
+    "clCreateContext": "0x00000000",
+    "clCreateKernel/concat3": "0x00000000",
+    "clCreateKernel/fold_sign": "0x00000000",
+    "clCreateKernel/pack_gemv4": "0x00000000",
+    "clCreateKernel/rms_sum": "0x00000000",
+    "clCreateKernel/silu_mul": "0x00000000",
+    "clCreateProgramWithSource": "0x00000000",
+    "clEnqueueConcat": "0x00000000",
+    "clEnqueueFoldOnly": "0x00000000",
+    "clEnqueueFoldSign": "0x00000000",
+    "clEnqueueGemv": "0x00000000",
+    "clEnqueueReadY": "0x00000000",
+    "clEnqueueRmsSum": "0x00000000",
+    "clEnqueueSiluMul": "0x00000000",
+    "clEnqueueWriteH": "0x00000000",
+    "clEnqueueWriteSrc": "0x00000000",
+    "clFinish": "0x00000000",
+    "clGetPlatformIDs": "0x00000000",
+    "clGetPlatformIDsHandles": "0x00000000"
+  },
+  "steps": [
+    {
+      "enqueues": 1366,
+      "got_tok": 9624,
+      "match": true,
+      "max_abs_diff": 0.00013703107833862305,
+      "max_rel_diff": 1.5527476072311401,
+      "ms": 884.189,
+      "pos": 3,
+      "ref_tok": 9624,
+      "tok": 31823
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 271,
+      "match": true,
+      "max_abs_diff": 0.00010728836059570312,
+      "max_rel_diff": 0.28662341833114624,
+      "ms": 889.902,
+      "pos": 4,
+      "ref_tok": 271,
+      "tok": 9624
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 2,
+      "match": true,
+      "max_abs_diff": 0.00021839141845703125,
+      "max_rel_diff": 0.07673630118370056,
+      "ms": 869.088,
+      "pos": 5,
+      "ref_tok": 2,
+      "tok": 271
+    },
+    {
+      "enqueues": 1366,
+      "got_tok": 561,
+      "match": true,
+      "max_abs_diff": 0.0001392364501953125,
+      "max_rel_diff": 4.260975360870361,
+      "ms": 835.415,
+      "pos": 6,
+      "ref_tok": 561,
+      "tok": 2
+    }
+  ],
+  "warnings": []
+}
