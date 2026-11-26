@@ -1,0 +1,121 @@
+{
+ "probe": "arc-layout-ab",
+ "date": "2026-11-26",
+ "device": {
+  "name": "Intel(R) Arc(TM) A770 Graphics",
+  "vendor": "Intel(R) Corporation",
+  "driver_version": "32.0.101.9175",
+  "device_version": "OpenCL 3.0 NEO ",
+  "opencl_c_version": "OpenCL C 1.2 ",
+  "compute_units": 512,
+  "max_clock_mhz": 2400,
+  "global_mem_mib": 15932,
+  "max_mem_alloc_mib": 4095,
+  "max_work_group_size": 1024
+ },
+ "reps": 7,
+ "matrices": 401,
+ "per_token_bytes": 6799564800,
+ "chunks": 2,
+ "chunk_cap_gib": 3.759,
+ "exactness": {
+  "l1_host": true,
+  "l2_host": true,
+  "l1_l2": true
+ },
+ "l1_on_disk_layout": {
+  "median_ms": 27.443,
+  "min_ms": 26.645,
+  "max_ms": 29.335,
+  "gbps": 247.77,
+  "samples_ms": [
+   26.867,
+   27.076,
+   27.216,
+   27.328,
+   28.61,
+   27.584,
+   29.335,
+   26.663,
+   26.645,
+   28.067,
+   27.613,
+   27.346,
+   27.54,
+   28.751
+  ]
+ },
+ "l2_blocked_layout": {
+  "median_ms": 26.306,
+  "min_ms": 25.248,
+  "max_ms": 27.393,
+  "gbps": 258.48,
+  "samples_ms": [
+   25.797,
+   26.21,
+   26.165,
+   26.1,
+   26.328,
+   27.176,
+   26.508,
+   25.248,
+   26.086,
+   26.549,
+   26.284,
+   27.393,
+   26.644,
+   26.539
+  ]
+ },
+ "readonly_blocked": {
+  "median_ms": 18.053,
+  "min_ms": 17.783,
+  "max_ms": 18.545,
+  "gbps": 376.65,
+  "samples_ms": [
+   18.545,
+   18.001,
+   18.023,
+   18.329,
+   17.956,
+   18.082,
+   17.895,
+   18.543,
+   17.931,
+   18.229,
+   17.783,
+   17.949,
+   18.136,
+   18.412
+  ]
+ },
+ "readonly_pack_layout": {
+  "median_ms": 16.789,
+  "min_ms": 16.447,
+  "max_ms": 17.29,
+  "gbps": 405.01,
+  "samples_ms": [
+   17.243,
+   16.618,
+   16.83,
+   16.95,
+   16.894,
+   16.931,
+   16.691,
+   16.818,
+   16.53,
+   16.511,
+   17.29,
+   16.705,
+   16.447,
+   16.759
+  ]
+ },
+ "repack_ms_one_time_both_ways": 301.658,
+ "paired_wins": "13/14",
+ "committed_baseline": {
+  "median_ms": 26.87,
+  "gbps": 253.1,
+  "source": "docs/benchmarks/2026-11-25-i7-8086k-arc-a770-gemv-overhead"
+ }
+}

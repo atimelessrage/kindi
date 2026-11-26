@@ -440,6 +440,29 @@ per-launch figure that this pack does not reach, and the honest pack number is ~
 Both validation paths report 0 mismatches: the work-list kernel reproduces the host model's rows bit
 for bit at `parts=1`. Full table: `docs/benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md`.
 
+### M2 blocked layout: the read pattern was already saturated (2026-11-26)
+
+The overhead sweep's verdict named the access pattern - "how many independent byte streams a
+work-item walks" - as the next lever. A 256-row-blocked layout tests that directly
+([page](benchmarks/2026-11-26-i7-8086k-arc-a770-layout/README.md)): repacking each matrix from
+`[phase][slot][row]` to `[tile][phase][slot][row]` turns a wave's 32 slot loads per phase into one
+contiguous 8 KB run instead of 32 loads a `rows`-byte stride apart.
+
+- It helps, but only 4%: 27.44 ms/token (247.8 GB/s) on the pack's own layout against
+  26.31 ms/token (258.5 GB/s) blocked, faster in 13 of 14 paired samples, for a one-time ~75 ms
+  repack pass.
+- **The pattern was not the limiter.** With the decode deleted and the same addresses, the shipped
+  layout reads at 405.0 GB/s and the blocked one at 376.7 GB/s - both at or near the 384.8 GB/s
+  `uint4` anchor, and the blocked layout is the slower of the two. The 4% comes from cheaper
+  address arithmetic (a shift instead of a `rows` multiply in a 64-bit address chain), not from
+  more bytes per second.
+- So the remaining ~8 ms of the 26 ms token is `TRI_DOT` - four multiply-shifts, four subtracts
+  and four multiply-accumulates per weight, eight rows deep - not the byte pattern. The measured
+  ceiling if the decode were free is 16.8 ms/token, so the next arm cuts the decode, not the
+  layout.
+
+No backend, model or support claim; M2 stays partial.
+
 ### M2 ternary GEMM in the engine's q8 shape (2026-11-24)
 
 `kindi intel-gemm` runs the arithmetic the engine's prompt path does, at the CUDA kernels' tile,

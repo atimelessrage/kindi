@@ -1,0 +1,124 @@
+{
+  "gate": "arc-a770-layout-20261126",
+  "title": "Arc A770: the packed GEMV's read pattern against a 256-row blocked layout, with the decode removed",
+  "measured": "2026-11-26",
+  "commit": "unreleased",
+  "command": "python bench-logs/arc_layout_probe.py --device-name Arc --reps 7",
+  "notes": "The 2.5 27B's 401 ternary matrices, 6,799,564,800 bytes per token, distinct bytes in two 3.76 GiB chunks, one persistent launch per chunk at parts=1 and grid 1 MiB. Two address layouts over the same bytes (the pack's own [phase][slot][row], and a repacked [tile][phase][slot][row] with 256-row tiles) and the same two patterns with the decode removed, 7 samples per arm per cycle over two cycles, medians with ranges. The repack is a device pass timed separately as a load-time cost. Not a model run: attention, norms, GDN, the f32 head work and the KV cache are excluded, and there is no Intel backend or support claim. The harness is bench-logs/arc_layout_probe.py, which is not tracked.",
+  "evidence": [
+    "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/ab.json",
+    "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/README.md"
+  ],
+  "numbers": [
+    {
+      "id": "l1-ms",
+      "display": "27.44 ms/token",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/ab.json",
+        "pointer": "/l1_on_disk_layout/median_ms",
+        "expect": 27.443
+      }
+    },
+    {
+      "id": "l2-ms",
+      "display": "26.31 ms/token",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/ab.json",
+        "pointer": "/l2_blocked_layout/median_ms",
+        "expect": 26.306
+      }
+    },
+    {
+      "id": "l1-gbps",
+      "display": "247.8 GB/s",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/ab.json",
+        "pointer": "/l1_on_disk_layout/gbps",
+        "expect": 247.77
+      }
+    },
+    {
+      "id": "l2-gbps",
+      "display": "258.5 GB/s",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/ab.json",
+        "pointer": "/l2_blocked_layout/gbps",
+        "expect": 258.48
+      }
+    },
+    {
+      "id": "ro-pack-gbps",
+      "display": "405.0 GB/s",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/ab.json",
+        "pointer": "/readonly_pack_layout/gbps",
+        "expect": 405.01
+      }
+    },
+    {
+      "id": "ro-blocked-gbps",
+      "display": "376.7 GB/s",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/ab.json",
+        "pointer": "/readonly_blocked/gbps",
+        "expect": 376.65
+      }
+    },
+    {
+      "id": "ro-pack-ms",
+      "display": "16.79 ms/token",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/ab.json",
+        "pointer": "/readonly_pack_layout/median_ms",
+        "expect": 16.789
+      }
+    },
+    {
+      "id": "paired-wins",
+      "display": "13 of 14",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/README.md",
+        "docs/INTEL-ARC.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-layout/ab.json",
+        "needle": "13/14"
+      }
+    }
+  ]
+}
