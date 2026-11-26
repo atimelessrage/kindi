@@ -101,7 +101,10 @@ than a kernel rewrite, and it lands the token at 66% of the practical read bandw
 occupancy further would not have paid first: work per thread is already flat between 8 and 16 rows
 per work-item, and `parts=1` with enough rows beats every `parts>1` arm once the work list is
 persistent (fewer partials, no reduce). After that, the lever is the access pattern — how many
-independent byte streams a work-item walks — not more threads.
+independent byte streams a work-item walks — not more threads. **Followed up 2026-11-26:** the
+[layout page](../2026-11-26-i7-8086k-arc-a770-layout/README.md) built that arm and measured the
+decode-free variant of both layouts; the read pattern turned out to be already saturated, so the
+remaining cost is the decode and the layout change is a small margin.
 
 Caveats: the host is not quiet (repeats of one config spread 26.2-30.4 ms across runs, see the JSON
 ranges), so differences under ~10% are not conclusions; zero-filled weights read up to 2.4x faster
