@@ -696,6 +696,11 @@ static void batch_drop(void){
 static int batch_gate_rows(Model* m){
   int NG = 0;
   for(int il = 0; il < m->NL; ++il) if(!m->L[il].is_attn && m->L[il].gate.R > NG) NG = m->L[il].gate.R;
+  /* gdn_b() indexes a row's gate by `src` < NV*HK (the gated output is per channel), so a gate
+     matrix narrower than that must not let B.ZV be read past the end of its row.  A real pack's
+     attn_gate has NV*HK or more rows; a short one leaves the tail of the row undefined, as plain
+     decode does with the tail of its calloc'd scratch. */
+  if(NG < m->NV * m->HK) NG = m->NV * m->HK;
   return NG;
 }
 

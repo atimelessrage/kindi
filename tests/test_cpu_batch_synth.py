@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """The batched T-row pass must run, roll back and save/load with no pack download.
 
-`tests/test_cpu_batch.py` is the exactness gate: it decodes a real Bonsai pack a row at a time and
-compares every argmax and every logit with plain decode.  That needs a multi-gigabyte pack, so it is
-opt-in with `KINDI_CPU_PACK` and CI never runs it.
+`tests/test_cpu_batch.py` is the real-pack exactness gate: it decodes a real Bonsai pack a row at a
+time and compares every argmax and every logit with plain decode.  That needs a multi-gigabyte pack,
+so it is opt-in with `KINDI_CPU_PACK` and CI never runs it -- the synthetic pack below covers the same
+comparison without the download.
 
 This file covers the rest of the batch contract -- the part that regressed twice already (arena
 sizing, the reuse key, the rollback replay) -- against a two-layer pack `_write_pack` builds from a
@@ -16,16 +17,17 @@ seed in a few hundred KiB and ~0.5 s.  What it pins:
   replayed), and `batch_rollback(n)` changes nothing;
 * `save_state`/`load_state` round-trip the state block a drafter rewinds with.
 * a 5-row pass is not a multiplicative slowdown over the same rows decoded plainly (a loose
-  regression net, not CP3's <=1.5-plain-rows gate, which is missed at ~5 on real packs).
+  regression net, not CP3's <=1.5-plain-rows gate, which is missed at ~5 on real packs);
+* every row is bit-exact against the same row decoded plainly -- token, residual and logits.
 
-Bit-exactness against plain decode is deliberately *not* asserted here.  On every hand-built pack
-tried (128 to 2048 wide, attention-only and GDN, one to four layers, fresh or fed state) the batch's
-GDN block disagrees with plain decode -- `batch_hidden(0)` can read 1e28 where plain decode is
-finite -- while the real 2B and 27B packs are byte-exact, measured on the 27B over four prompts.  The
-two paths run the same arithmetic in the same order on paper, so the difference is either a buffer
-the batch reads before writing for some pack layouts or weight-magnitude sensitivity, and neither is
-attributed yet; asserting equality here would fail for a reason this file cannot name.  Until that is
-settled `tests/test_cpu_batch.py` stays the only place exactness is claimed.
+The exactness row was open from the 2026-11-26 audit until the pack shape below was fixed: this file
+used to write `attn_gate.weight` with `NV` rows (one gate per v head), while `gdn()`'s gated output
+indexes the gate per *channel* (`src < NV*HK`) -- a real pack's `attn_gate` is `NV*HK` rows wide
+(bonsai-2b: 2048x2048).  Plain decode read the tail of its calloc'd scratch there and stayed finite;
+the batch sized its gate buffer from `gate.R` and read that tail past the end of the arena row, so
+`batch_hidden()` returned whatever the heap held (1e30 and up).  The pack now declares the real
+shape, `batch_gate_rows()` floors the arena's gate width at `NV*HK` so the read can no longer leave
+the row, and the rows compare equal to the last bit.
 """
 import json
 import os
@@ -79,7 +81,9 @@ def _write_pack(path, seed=7):
                      (p + "attn_v.weight", NHKV * HD, D), (p + "attn_output.weight", D, NH * HD)]
             flats += [(p + "attn_q_norm.weight", ones(HD)), (p + "attn_k_norm.weight", ones(HD))]
         else:
-            mats += [(p + "attn_qkv.weight", CONV_CH, D), (p + "attn_gate.weight", NV, D),
+            # the gate is per channel, not per head: gdn() indexes it by `src` < NV*HK, as a real
+            # pack does (its attn_gate rows are NV*HK wide).
+            mats += [(p + "attn_qkv.weight", CONV_CH, D), (p + "attn_gate.weight", NV * HK, D),
                      (p + "ssm_out.weight", D, NV * HK)]
             flats += [(p + "ssm_beta.weight", small(NV * D)), (p + "ssm_alpha.weight", small(NV * D)),
                       (p + "ssm_dt.bias", small(NV)),
@@ -230,6 +234,35 @@ def test_state_block_round_trips_through_save_and_load(pack):
     assert saved.tobytes() == e.save_state().tobytes()
     assert e.step(6, 5) == nxt                          # the same state decodes the same token
     e.close()
+
+
+@pytest.mark.parametrize("rows", [2, 4])
+def test_every_batch_row_is_bit_exact_against_plain_decode(pack, rows):
+    """Same arithmetic in the same order, only the weight stream shared: compare to the last bit.
+
+    Each row is decoded plainly on a fresh engine fed the same prefix, which is what a verifier's
+    rows have to reproduce; the comparison covers the greedy token, the residual a drafter rewinds
+    with and every logit (the head's width, not plain decode's padded vocab).
+    """
+    pre = [1, 2, 3, 4, 5]
+    toks = [6, 7, 8, 9][:rows]
+    e = _engine(pack)
+    e.reset()
+    for pos, tok in enumerate(pre):
+        e.feed(tok, pos)
+    out = e.step_batch(toks, len(pre))
+    hidden = [e.batch_hidden(i).copy() for i in range(len(toks))]
+    logits = [e.batch_logits(i).copy() for i in range(len(toks))]
+    e.close()
+    for j, tok in enumerate(toks):
+        f = _engine(pack)
+        f.reset()
+        for pos, tk in enumerate(pre + toks[:j]):
+            f.feed(tk, pos)
+        assert f.step(tok, len(pre) + j) == out[j], "row %d predicts another token" % j
+        assert np.array_equal(f.hidden, hidden[j]), "row %d residual differs" % j
+        assert np.array_equal(f.logits[:VOCAB], logits[j]), "row %d logits differ" % j
+        f.close()
 
 
 def test_batch_pass_is_not_a_multiplicative_slowdown(pack):

@@ -196,3 +196,24 @@ compute units).
 OpenCL exposes a runtime compiler on this Intel driver. Use the Khronos header's exact constant
 values rather than remembered ones, and treat a successful-looking call as unproven until the return
 code and the result bytes both check out.
+
+## L-0013: A hand-built pack that is the wrong shape makes a real bug look like an unattributed one
+
+**Observation:** `tests/test_cpu_batch_synth.py` wrote `attn_gate.weight` with `NV` rows (one gate per v
+head, 8 on its 128-wide pack) because that reads like "a gate per head". `gdn()`'s gated output indexes
+that vector per *channel* (`src < NV*HK`), and a real pack's `attn_gate` is `NV*HK` rows wide
+(bonsai-2b: 2048x2048). Plain decode survived the mismatch only because its scratch is calloc'd, so the
+tail it read was zero; `kc_step_batch` sized its gate row from `gate.R`, so the same read left the
+arena row and returned heap contents -- `batch_hidden(0)` at 1e30, NaN state blocks, and argmax 0 from
+logits that overflowed to a zero norm scale. The gap had been written up as "unattributed, maybe
+weight-magnitude sensitivity" across two rounds. With the pack's shape corrected the rows are bit-exact
+(3 seeds x 4 row counts x 1/2 threads, 0 differing floats, logits included).
+
+**Evidence:** `kindi/kcpu.c` (`batch_gate_rows` now floors the arena's gate width at `NV*HK`),
+`tests/test_cpu_batch_synth.py::test_every_batch_row_is_bit_exact_against_plain_decode`.
+
+**Practice:** Before calling a synthetic-pack exactness gap "unattributed", diff the pack's declared
+matrix shapes against the widths the block indexes (`gate.R` vs `NV*HK`, `qkv.R` vs `CONV_CH`, `R/8`
+blocks). A pack that only one path tolerates - because that path's buffers happen to be zeroed - looks
+exactly like a numerical divergence, and the batch path's out-of-bounds read is the real finding.
+Also size an arena from what the kernel indexes, not from what the pack declares.
