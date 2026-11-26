@@ -4,7 +4,7 @@
   "measured": "2026-11-25",
   "commit": "67b0a61",
   "command": "python tools/mtp_cpu_bench.py --pack PACK --gguf <the -mtp GGUF> --tokens 16 --k 4; python tools/mtp_cpu_bench.py --pack PACK --drafter-pack <2B pack> --tokens 16 --k 4",
-  "notes": "The CPU engine verifies one row per forward pass, so drafts are scored, never substituted, and the drafted run is slower; this gate measures acceptance only. results.json is the sanitized copy of the two bench-logs runs (machine paths stripped); exact=true on all four rows means the scored tokens equal plain greedy decode.",
+  "notes": "The CPU engine verifies one row per forward pass, so drafts are scored, never substituted, and the drafted run is slower; this gate measures acceptance only. results.json is the sanitized copy of the two bench-logs runs (machine paths stripped); exact=true on all four rows means the scored tokens equal plain greedy decode. Every number both docs quote from these two runs is claimed here, including the plain/drafted tok/s pairs, the depth histograms and the head's per-prompt acceptance; the depth rows are text checks on the page because the artifact stores them as lists.",
   "evidence": [
     "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json",
     "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md"
@@ -75,6 +75,100 @@
         "b": {"file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/1/runs/1/drafts/offered"},
         "expect": 0.1852
       }
+    },
+    {
+      "id": "head-p1-plain_tok_s",
+      "display": "1.69",
+      "quoted_in": ["docs/MTP.md", "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/0/runs/0/plain_tok_s", "expect": 1.690807775862062}
+    },
+    {
+      "id": "head-p2-plain_tok_s",
+      "display": "1.51",
+      "quoted_in": ["docs/MTP.md", "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/0/runs/1/plain_tok_s", "expect": 1.5087411571006302}
+    },
+    {
+      "id": "head-p1-scored_tok_s",
+      "display": "1.11",
+      "quoted_in": ["docs/MTP.md", "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/0/runs/0/scored_tok_s", "expect": 1.1146299644081383}
+    },
+    {
+      "id": "head-p2-scored_tok_s",
+      "display": "1.02",
+      "quoted_in": ["docs/MTP.md", "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/0/runs/1/scored_tok_s", "expect": 1.015031339452947}
+    },
+    {
+      "id": "drafter-p1-plain_tok_s",
+      "display": "2.03",
+      "quoted_in": ["docs/MTP.md", "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/1/runs/0/plain_tok_s", "expect": 2.028906925803574}
+    },
+    {
+      "id": "drafter-p2-plain_tok_s",
+      "display": "2.12",
+      "quoted_in": ["docs/MTP.md", "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/1/runs/1/plain_tok_s", "expect": 2.115191076598162}
+    },
+    {
+      "id": "drafter-p1-scored_tok_s",
+      "display": "1.01",
+      "quoted_in": ["docs/MTP.md", "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/1/runs/0/scored_tok_s", "expect": 1.010642847199118}
+    },
+    {
+      "id": "drafter-p2-scored_tok_s",
+      "display": "1.16",
+      "quoted_in": ["docs/MTP.md", "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/1/runs/1/scored_tok_s", "expect": 1.1557290186855838}
+    },
+    {
+      "id": "head-p1-accepted",
+      "display": "1/54",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md"],
+      "check": {
+        "kind": "ratio",
+        "a": {"file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/0/runs/0/drafts/matched"},
+        "b": {"file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/0/runs/0/drafts/offered"},
+        "expect": 0.018518518518518517
+      }
+    },
+    {
+      "id": "head-p2-accepted",
+      "display": "6/54",
+      "quoted_in": ["docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md"],
+      "check": {
+        "kind": "ratio",
+        "a": {"file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/0/runs/1/drafts/matched"},
+        "b": {"file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/0/runs/1/drafts/offered"},
+        "expect": 0.1111111111111111
+      }
+    },
+    {
+      "id": "head-depth",
+      "display": "[3, 1, 2]",
+      "quoted_in": ["docs/MTP.md", "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md", "needle": "[3, 1, 2]"}
+    },
+    {
+      "id": "drafter-depth",
+      "display": "[15, 8, 7, 3]",
+      "quoted_in": ["docs/MTP.md", "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md"],
+      "check": {"kind": "text", "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md", "needle": "[15, 8, 7, 3]"}
+    },
+    {
+      "id": "drafter-prompt-1-rate",
+      "display": "43%",
+      "quoted_in": ["docs/MTP.md", "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/1/runs/0/drafts/rate", "expect": 0.42592592592592593}
+    },
+    {
+      "id": "drafter-prompt-2-rate",
+      "display": "19%",
+      "quoted_in": ["docs/MTP.md", "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md"],
+      "check": {"kind": "json", "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/results.json", "pointer": "/runs/1/runs/1/drafts/rate", "expect": 0.18518518518518517}
     }
   ]
 }
