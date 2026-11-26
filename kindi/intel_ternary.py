@@ -79,18 +79,18 @@ __kernel void ternary_gemv_part(__global const uchar *codes,
     }
     float total = 0.0f;
     for (uint ph = part; ph < phases; ph += parts) {
-        int dot = 0;
+        float dot = 0.0f;
         uint base = ((ph << 5) * rows) + row;        /* slot (ph*32 + s), stored [slot][row] */
         uint col = ph << 7;
         for (uint s = 0; s < 32; ++s) {
             uint b = (uint)codes[base + s * rows];
             uint c = col + (s << 2);
-            dot += ((int)(b % 3u) - 1) * (int)x[c];
-            dot += ((int)((b / 3u) % 3u) - 1) * (int)x[c + 1];
-            dot += ((int)((b / 9u) % 3u) - 1) * (int)x[c + 2];
-            dot += ((int)((b / 27u) % 3u) - 1) * (int)x[c + 3];
+            dot += ((int)(b % 3u) - 1) * x[c]
+                 + ((int)((b / 3u) % 3u) - 1) * x[c + 1]
+                 + ((int)((b / 9u) % 3u) - 1) * x[c + 2]
+                 + ((int)((b / 27u) % 3u) - 1) * x[c + 3];
         }
-        total += (float)dot * scales[(ph * rows) + row];
+        total += dot * scales[(ph * rows) + row];
     }
     partial[part * rows + row] = total;
 }
@@ -118,10 +118,10 @@ __kernel void ternary_gemv_reduce(__global const float *partial,
     int g1 = (bb * 171) >> 9;                                               \
     int g2 = (g1 * 171) >> 9;                                               \
     int g3 = (g2 * 171) >> 9;                                               \
-    (dst) += ((bb - 3 * g1) - 1) * (int)x[(c)]                              \
-           + ((g1 - 3 * g2) - 1) * (int)x[(c) + 1]                          \
-           + ((g2 - 3 * g3) - 1) * (int)x[(c) + 2]                          \
-           + ((g3 - 3 * ((g3 * 171) >> 9)) - 1) * (int)x[(c) + 3];           \
+    (dst) += ((bb - 3 * g1) - 1) * x[(c)]                              \
+           + ((g1 - 3 * g2) - 1) * x[(c) + 1]                          \
+           + ((g2 - 3 * g3) - 1) * x[(c) + 2]                          \
+           + ((g3 - 3 * ((g3 * 171) >> 9)) - 1) * x[(c) + 3];           \
 } while (0)
 
 __kernel void ternary_gemv_part4(__global const uchar *codes,
@@ -138,7 +138,7 @@ __kernel void ternary_gemv_part4(__global const uchar *codes,
     int full = (r0 + 3u) < rows;
     float t0 = 0.0f, t1 = 0.0f, t2 = 0.0f, t3 = 0.0f;
     for (uint ph = part; ph < phases; ph += parts) {
-        int d0 = 0, d1 = 0, d2 = 0, d3 = 0;
+        float d0 = 0.0f, d1 = 0.0f, d2 = 0.0f, d3 = 0.0f;
         uint base = ((ph << 5) * rows) + r0;
         uint col = ph << 7;
         for (uint s = 0; s < 32; ++s) {
@@ -158,10 +158,10 @@ __kernel void ternary_gemv_part4(__global const uchar *codes,
             }
         }
         uint sb = ph * rows + r0;
-        t0 += (float)d0 * scales[sb];
-        if (r0 + 1u < rows) { t1 += (float)d1 * scales[sb + 1u]; }
-        if (r0 + 2u < rows) { t2 += (float)d2 * scales[sb + 2u]; }
-        if (r0 + 3u < rows) { t3 += (float)d3 * scales[sb + 3u]; }
+        t0 += d0 * scales[sb];
+        if (r0 + 1u < rows) { t1 += d1 * scales[sb + 1u]; }
+        if (r0 + 2u < rows) { t2 += d2 * scales[sb + 2u]; }
+        if (r0 + 3u < rows) { t3 += d3 * scales[sb + 3u]; }
     }
     uint pb = part * rows + r0;
     partial[pb] = t0;
@@ -274,52 +274,62 @@ def matrix(rows, cols, seed=SEED):
     scales = np.empty((rows, phases), dtype=np.float16)
     scales[:] = pattern[np.arange(phases) % pattern.size]
     dpm = np.ascontiguousarray(scales.T)                        # (phases, rows): [phase][row]
-    x = ((np.arange(cols, dtype=np.int64) * 5 + 3) % 7 - 3).astype(np.float32)
+    x = (((np.arange(cols, dtype=np.int64) * 5 + 3) % 7 - 3) * 0.375
+         + 0.125 * ((np.arange(cols, dtype=np.int64) * 3) % 5)).astype(np.float32)
     return trits, bcodes, dpm, x
 
 
 def reference(bcodes, dpm, x, rows, cols):
-    """Host GEMV over the packed bytes, accumulating each 128-weight group in int32 like the kernel."""
+    """Host GEMV over the packed bytes, accumulating in float32 in the kernel's order.
+
+    Each phase's 128 weights are accumulated over the 32 slots of 4 columns, the four trits of a
+    slot summed as one expression (the same left-to-right order TRI_DOT uses), and the phase sum
+    is scaled once, exactly as the kernels do.  A float model matters: with integer test inputs an
+    int32 accumulator and a float32 one agree, so they cannot catch a kernel that truncates x."""
     phases = cols // PHASE
     codes = np.asarray(bcodes, dtype=np.uint8).reshape(phases, 32, rows)
     scales = np.asarray(dpm, dtype=np.float16).astype(np.float32)
     out = np.zeros(rows, dtype=np.float32)
     for ph in range(phases):
-        b = codes[ph].astype(np.int32)                          # (32, rows)
-        xv = np.asarray(x, dtype=np.int32)[ph * PHASE:(ph + 1) * PHASE].reshape(32, 4)
-        dot = ((b % 3 - 1) * xv[:, 0][:, None]
-               + (b // 3 % 3 - 1) * xv[:, 1][:, None]
-               + (b // 9 % 3 - 1) * xv[:, 2][:, None]
-               + (b // 27 % 3 - 1) * xv[:, 3][:, None]).sum(axis=0)
-        out = (out + dot.astype(np.float32) * scales[ph]).astype(np.float32)
+        b = codes[ph].astype(np.float32)                          # (32, rows)
+        xv = np.asarray(x, dtype=np.float32)[ph * PHASE:(ph + 1) * PHASE].reshape(32, 4)
+        t0 = (b % 3 - 1) * xv[:, 0][:, None]
+        t1 = (b // 3 % 3 - 1) * xv[:, 1][:, None]
+        t2 = (b // 9 % 3 - 1) * xv[:, 2][:, None]
+        t3 = (b // 27 % 3 - 1) * xv[:, 3][:, None]
+        dot = np.zeros(rows, dtype=np.float32)
+        for sl in range(32):
+            dot = (dot + (((t0[sl] + t1[sl]) + t2[sl]) + t3[sl])).astype(np.float32)
+        out = (out + (dot * scales[ph]).astype(np.float32)).astype(np.float32)
     return out
-
 
 def partials(bcodes, dpm, x, rows, cols, parts):
     """The host model of what the device computes: one float32 partial per (part, row).
 
     Phase ``ph`` belongs to part ``ph % parts``, exactly as in ``ternary_gemv_part``; each phase is
-    accumulated in int32 and scaled once, which is also what the kernel does.  The probe sums these
-    on the host before it launches anything, so a shape where the split is not exact fails with a
-    reason instead of surfacing as a device mismatch.
+    accumulated in float32 in the kernel's order (per-slot grouped trits, scaled once) so this is
+    bit-identical to the device, not just close.  The probe sums these on the host before it
+    launches anything, so a shape where the split is not exact fails with a reason instead of
+    surfacing as a device mismatch.
     """
     phases = cols // PHASE
     codes = np.asarray(bcodes, dtype=np.uint8).reshape(phases, 32, rows)
     scales = np.asarray(dpm, dtype=np.float16).astype(np.float32)
-    xv = np.asarray(x, dtype=np.int32).reshape(phases, PHASE)
+    xv = np.asarray(x, dtype=np.float32).reshape(phases, PHASE)
     out = np.zeros((parts, rows), dtype=np.float32)
     for ph in range(phases):
-        b = codes[ph].astype(np.int32)                           # (32, rows)
+        b = codes[ph].astype(np.float32)                          # (32, rows)
         digits = xv[ph].reshape(32, 4)
-        dot = ((b % 3 - 1) * digits[:, 0][:, None]
-               + (b // 3 % 3 - 1) * digits[:, 1][:, None]
-               + (b // 9 % 3 - 1) * digits[:, 2][:, None]
-               + (b // 27 % 3 - 1) * digits[:, 3][:, None]).sum(axis=0)
+        t0 = (b % 3 - 1) * digits[:, 0][:, None]
+        t1 = (b // 3 % 3 - 1) * digits[:, 1][:, None]
+        t2 = (b // 9 % 3 - 1) * digits[:, 2][:, None]
+        t3 = (b // 27 % 3 - 1) * digits[:, 3][:, None]
+        dot = np.zeros(rows, dtype=np.float32)
+        for sl in range(32):
+            dot = (dot + (((t0[sl] + t1[sl]) + t2[sl]) + t3[sl])).astype(np.float32)
         part = ph % parts
-        out[part] = (out[part] + dot.astype(np.float32) * scales[ph]).astype(np.float32)
+        out[part] = (out[part] + (dot * scales[ph]).astype(np.float32)).astype(np.float32)
     return out
-
-
 def _buffer(lib, context, flags, data, report, key):
     array = np.ascontiguousarray(data)
     pointer = (ctypes.c_void_p(int(array.ctypes.data))

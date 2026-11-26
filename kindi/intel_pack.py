@@ -65,10 +65,10 @@ SOURCE = """
     int g1 = (bb * 171) >> 9;                                               \\
     int g2 = (g1 * 171) >> 9;                                               \\
     int g3 = (g2 * 171) >> 9;                                               \\
-    (dst) += ((bb - 3 * g1) - 1) * (int)x[(c)]                              \\
-           + ((g1 - 3 * g2) - 1) * (int)x[(c) + 1]                          \\
-           + ((g2 - 3 * g3) - 1) * (int)x[(c) + 2]                          \\
-           + ((g3 - 3 * ((g3 * 171) >> 9)) - 1) * (int)x[(c) + 3];           \\
+    (dst) += ((bb - 3 * g1) - 1) * x[(c)]                              \\
+           + ((g1 - 3 * g2) - 1) * x[(c) + 1]                          \\
+           + ((g2 - 3 * g3) - 1) * x[(c) + 2]                          \\
+           + ((g3 - 3 * ((g3 * 171) >> 9)) - 1) * x[(c) + 3];           \\
 } while (0)
 
 __kernel void pack_gemv4(__global const uchar *codes,
@@ -85,7 +85,7 @@ __kernel void pack_gemv4(__global const uchar *codes,
     int full = (r0 + 3u) < rows;
     float t0 = 0.0f, t1 = 0.0f, t2 = 0.0f, t3 = 0.0f;
     for (uint ph = part; ph < phases; ph += parts) {
-        int d0 = 0, d1 = 0, d2 = 0, d3 = 0;
+        float d0 = 0.0f, d1 = 0.0f, d2 = 0.0f, d3 = 0.0f;
         ulong base = coff + ((ulong)(ph << 5) * rows) + r0;
         uint col = ph << 7;
         for (uint s = 0; s < 32; ++s) {
@@ -105,10 +105,10 @@ __kernel void pack_gemv4(__global const uchar *codes,
             }
         }
         ulong sb = soff + (ulong)ph * rows + r0;
-        t0 += (float)d0 * scales[sb];
-        if (r0 + 1u < rows) { t1 += (float)d1 * scales[sb + 1u]; }
-        if (r0 + 2u < rows) { t2 += (float)d2 * scales[sb + 2u]; }
-        if (r0 + 3u < rows) { t3 += (float)d3 * scales[sb + 3u]; }
+        t0 += d0 * scales[sb];
+        if (r0 + 1u < rows) { t1 += d1 * scales[sb + 1u]; }
+        if (r0 + 2u < rows) { t2 += d2 * scales[sb + 2u]; }
+        if (r0 + 3u < rows) { t3 += d3 * scales[sb + 3u]; }
     }
     ulong pb = (ulong)part * rows + r0;
     partial[pb] = t0;
@@ -161,7 +161,7 @@ __kernel void pack_gemv_persist(__global const uchar *codes,
         float t0 = 0.0f, t1 = 0.0f, t2 = 0.0f, t3 = 0.0f;
         float t4 = 0.0f, t5 = 0.0f, t6 = 0.0f, t7 = 0.0f;
         for (uint ph = 0; ph < phases; ++ph) {
-            int d0 = 0, d1 = 0, d2 = 0, d3 = 0, d4 = 0, d5 = 0, d6 = 0, d7 = 0;
+            float d0 = 0.0f, d1 = 0.0f, d2 = 0.0f, d3 = 0.0f, d4 = 0.0f, d5 = 0.0f, d6 = 0.0f, d7 = 0.0f;
             ulong base = coff + ((ulong)(ph << 5) * rows) + r0;
             uint col = ph << 7;
             for (uint s = 0; s < 32; ++s) {
@@ -189,14 +189,14 @@ __kernel void pack_gemv_persist(__global const uchar *codes,
                 }
             }
             ulong sb = soff + (ulong)ph * rows + r0;
-            t0 += (float)d0 * scales[sb];
-            if (1u < nrows) { t1 += (float)d1 * scales[sb + 1u]; }
-            if (2u < nrows) { t2 += (float)d2 * scales[sb + 2u]; }
-            if (3u < nrows) { t3 += (float)d3 * scales[sb + 3u]; }
-            if (4u < nrows) { t4 += (float)d4 * scales[sb + 4u]; }
-            if (5u < nrows) { t5 += (float)d5 * scales[sb + 5u]; }
-            if (6u < nrows) { t6 += (float)d6 * scales[sb + 6u]; }
-            if (7u < nrows) { t7 += (float)d7 * scales[sb + 7u]; }
+            t0 += d0 * scales[sb];
+            if (1u < nrows) { t1 += d1 * scales[sb + 1u]; }
+            if (2u < nrows) { t2 += d2 * scales[sb + 2u]; }
+            if (3u < nrows) { t3 += d3 * scales[sb + 3u]; }
+            if (4u < nrows) { t4 += d4 * scales[sb + 4u]; }
+            if (5u < nrows) { t5 += d5 * scales[sb + 5u]; }
+            if (6u < nrows) { t6 += d6 * scales[sb + 6u]; }
+            if (7u < nrows) { t7 += d7 * scales[sb + 7u]; }
         }
         ulong pb = (ulong)ppref[mi] + r0;
         partial[pb] = t0;
@@ -578,7 +578,8 @@ def run_pack(pack_dir, repeats=DEFAULT_REPEATS, loader=None, opener=None, device
             return _fail(report, "clCreateKernel(%s) returned %s" % (REDUCE, _hex(error_code.value)))
 
         x_max = max(s["cols"] for s in shapes)
-        x = ((np.arange(x_max, dtype=np.int64) * 5 + 3) % 7 - 3).astype(np.float32)
+        x = (((np.arange(x_max, dtype=np.int64) * 5 + 3) % 7 - 3) * 0.375
+             + 0.125 * ((np.arange(x_max, dtype=np.int64) * 3) % 5)).astype(np.float32)
         x_buf = _buffer(lib, context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, x,
                         report, "clCreateBufferX")
         buffers.append(x_buf)

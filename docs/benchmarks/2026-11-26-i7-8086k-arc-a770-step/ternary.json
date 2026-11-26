@@ -1,0 +1,138 @@
+{
+  "backend": "opencl packed-ternary gemv probe; no sycl, model, engine or backend",
+  "build": {
+    "log": null,
+    "ok": true,
+    "source_bytes": 4656
+  },
+  "device": {
+    "compute_units": 512,
+    "device_version": "OpenCL 3.0 NEO ",
+    "driver_version": "32.0.101.9175",
+    "global_mem_mib": 15932,
+    "max_clock_mhz": 2400,
+    "max_mem_alloc_mib": 4095,
+    "max_work_group_size": 1024,
+    "name": "Intel(R) Arc(TM) A770 Graphics",
+    "opencl_c_version": "OpenCL C 1.2 ",
+    "vendor": "Intel(R) Corporation"
+  },
+  "device_count": 2,
+  "device_index": 0,
+  "error": null,
+  "gemv": {
+    "cols": 512,
+    "elapsed_ms": 0.364,
+    "first_mismatch": null,
+    "gflops": 8.635,
+    "max_abs_error": 0.0,
+    "mismatches": 0,
+    "parts": 4,
+    "repeats": 3,
+    "rows": 1024,
+    "warmup_ms": 3.586
+  },
+  "kernel": {
+    "exactness": "each part and the reduction sum exactly representable values, so the split cannot change the result; the host reference is still compared bit for bit",
+    "names": [
+      "ternary_gemv_part4",
+      "ternary_gemv_reduce"
+    ],
+    "reduce": "sums the parts per row; the 1-part shape is the earlier single-kernel GEMV",
+    "split": "phase ph -> part ph % parts; one work-item per (row, part) for `scalar`, one per four rows for `rows4`; the row axis is fastest in both",
+    "variant": "rows4",
+    "variants": [
+      "auto",
+      "scalar",
+      "rows4"
+    ]
+  },
+  "layout": {
+    "scales": "fp16 per 128 weights, [column/128][row]; widened to float32 on the host",
+    "weight": "trit - 1, scaled by the 128-weight group's scale",
+    "weights": "4 trits per byte, byte = t0 + 3*t1 + 9*t2 + 27*t3; [column/4][row]"
+  },
+  "loader": {
+    "available": true,
+    "error": null,
+    "name": "OpenCL.dll"
+  },
+  "pack": {
+    "bcodes_sha256": "3b1f385c6353ca45e4bb808a8725e8714191c760761c17201c31f0c1b69ebb28",
+    "dpm_sha256": "dca2862d28f8d8a48165257ef4d13f0e69a7c3696b379aa22fe5c7059925cf26",
+    "seed": 7
+  },
+  "platform": "Intel(R) OpenCL Graphics (discrete)",
+  "platforms": [
+    {
+      "gpu_devices": 1,
+      "index": 0,
+      "name": "Intel(R) OpenCL Graphics (discrete)",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.0 "
+    },
+    {
+      "gpu_devices": 1,
+      "index": 1,
+      "name": "Intel(R) OpenCL HD Graphics",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.0 "
+    },
+    {
+      "gpu_devices": 0,
+      "index": 2,
+      "name": "Intel(R) OpenCL",
+      "vendor": "Intel(R) Corporation",
+      "version": "OpenCL 3.1 WINDOWS"
+    }
+  ],
+  "probe": "intel-ternary-gemv",
+  "read_only": false,
+  "result": "pass",
+  "returncodes": {
+    "clBuildProgram": "0x00000000",
+    "clCreateBufferCodes": "0x00000000",
+    "clCreateBufferPartial": "0x00000000",
+    "clCreateBufferScales": "0x00000000",
+    "clCreateBufferX": "0x00000000",
+    "clCreateBufferY": "0x00000000",
+    "clCreateCommandQueue": "0x00000000",
+    "clCreateContext": "0x00000000",
+    "clCreateKernel": "0x00000000",
+    "clCreateKernelReduce": "0x00000000",
+    "clCreateProgramWithSource": "0x00000000",
+    "clEnqueueNDRangeKernel": "0x00000000",
+    "clEnqueueNDRangeKernelWarmup": "0x00000000",
+    "clEnqueueNDRangeReduce": "0x00000000",
+    "clEnqueueNDRangeReduceWarmup": "0x00000000",
+    "clEnqueueReadBuffer": "0x00000000",
+    "clFinish": "0x00000000",
+    "clFinishWarmup": "0x00000000",
+    "clGetPlatformIDs": "0x00000000",
+    "clGetPlatformIDsHandles": "0x00000000",
+    "clReleaseCommandQueue": "0x00000000",
+    "clReleaseContext": "0x00000000",
+    "clReleaseKernel": "0x00000000",
+    "clReleaseKernelReduce": "0x00000000",
+    "clReleaseMemObject0": "0x00000000",
+    "clReleaseMemObject1": "0x00000000",
+    "clReleaseMemObject2": "0x00000000",
+    "clReleaseMemObject3": "0x00000000",
+    "clReleaseMemObject4": "0x00000000",
+    "clReleaseProgram": "0x00000000"
+  },
+  "schema": 1,
+  "scope": "packed ternary GEMV (4 trits/byte, one fp16 scale per 128 weights), checked against an exact host reference",
+  "shape": {
+    "cols": 512,
+    "packed_bytes": 131072,
+    "partial_bytes": 16384,
+    "parts": 4,
+    "parts_source": "phases (cols/128), capped at 64",
+    "phases": 4,
+    "rows": 1024,
+    "scale_bytes": 8192
+  },
+  "support_claim": false,
+  "warnings": []
+}

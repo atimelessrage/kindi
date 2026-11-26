@@ -1,5 +1,13 @@
 # Bonsai 2.5 27B on the Arc A770: every ternary matmul, from the pack's own bytes
 
+> **2026-11-26: the GEMV kernels on this page were wrong.** `pack_gemv4`/`pack_gemv_persist`
+> multiplied each trit by `(int)x[c]`, truncating the folded input to an integer before the dot
+> product; the "bit for bit" validation used integer test inputs, where int and float accumulation
+> agree, so it could not see the bug. The kernels and the host model now accumulate in float32 and the
+> validation inputs are fractional - see the [2026-11-26 step page](../2026-11-26-i7-8086k-arc-a770-step/README.md)
+> for the fix and a full decode step on the device. The GB/s here are weight-streaming rates and
+> stand as measured; nothing on this page ran a GEMV on real activations.
+
 Host: i7-8086K, Windows 10, 12 cores, Python 3.13. Card: Intel(R) Arc(TM) A770 Graphics, 15932 MiB (OpenCL C 1.2 ).
 Date: 2026-11-25. Command:
 

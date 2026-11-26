@@ -19,7 +19,9 @@ def test_the_pack_is_the_converter_layout():
     assert dpm.shape == (512 // 128, 16)           # [phase][row], one scale per 128 weights
     assert dpm.dtype == np.float16
     assert x.shape == (512,)
-    assert np.array_equal(np.unique(x), np.arange(-3, 4))
+    assert x.shape == (512,)
+    # non-integer on purpose: an integer test input cannot tell a float GEMV from an int one
+    assert np.any(x != np.round(x)) and np.abs(x).max() <= 1.9
 
 
 def test_the_packed_bytes_decode_back_to_the_trits():

@@ -19,7 +19,12 @@ and `kindi intel-gemm` runs the engine's q8 arithmetic (`k_q8x_T2` port feeding 
 GEMM) bit-exact at 4.2-36.9 GFLOP/s ([run](benchmarks/2026-11-24-i7-8086k-arc-a770-ternary-gemm/README.md)),
 and `kindi intel-pack` streams a converted 27B pack's own ternary bytes through the persistent work
 list at about 1.5x its per-shape path
-([run](benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md)).
+([run](benchmarks/2026-11-25-i7-8086k-arc-a770-pack/README.md)),
+and `kindi intel-step` runs a full 2B decode step with norm/fold and every ternary GEMV on the
+device (host: conv, delta rule, attention, FFN elementwise), matching the CPU engine 8/8 tokens
+at max |Δlogit| 2.60e-04 ([run](benchmarks/2026-11-26-i7-8086k-arc-a770-step/README.md)).
+(The pack kernels those pages timed truncated the folded input to int32 before the dot product;
+they and the host model now accumulate in float32 - same page.)
 There is still no SYCL backend, Kindi engine path or model run. The plan's first support
 target remains Linux; the Windows run qualifies the hardware, the memory path and the device kernel
 path, not Kindi support (tracked as [REQ-0020](development/requirements/REQ-0020.md)).

@@ -1,0 +1,93 @@
+{
+  "gate": "intel-step-20261126",
+  "title": "Arc A770: float-accumulating ternary GEMV and a full decode step on the device (K3)",
+  "measured": "2026-11-26",
+  "commit": "unreleased",
+  "command": "python -m kindi intel-step --pack ~/.kindi/packs/bonsai-2b --device-name \"Intel(R) Arc(TM) A770 Graphics\" --steps 8 --json docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/step8.json",
+  "notes": "pack_gemv4/pack_gemv_persist truncated the folded input to int32 before the dot product, so they did not compute a GEMV on real activations; the kernels and the host model now accumulate in float32 and the validation inputs are fractional. intel-step runs one full 2B decode step with norm/fold and every ternary GEMV on the A770 (host: conv, delta rule, attention, FFN elementwise, argmax), teacher-forced against cpu.Engine over a 4-token prefix. 2B only: no 27B pack on this host.",
+  "evidence": [
+    "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/step8.json",
+    "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/pack2b.json",
+    "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/ternary.json",
+    "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/README.md"
+  ],
+  "numbers": [
+    {
+      "id": "tokens-matching",
+      "display": "8/8",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/README.md"
+      ],
+      "check": {
+        "kind": "text",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/README.md",
+        "needle": "8/8 matched"
+      }
+    },
+    {
+      "id": "max-logit-diff",
+      "display": "2.60e-04",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/step8.json",
+        "pointer": "/steps/4/max_abs_diff",
+        "expect": 0.00026035308837890625
+      }
+    },
+    {
+      "id": "ms-per-step",
+      "display": "174.89 ms/step",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/step8.json",
+        "pointer": "/ms_per_step",
+        "expect": 174.894
+      }
+    },
+    {
+      "id": "enqueues-per-step",
+      "display": "563 enqueues/step",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/step8.json",
+        "pointer": "/steps/1/enqueues",
+        "expect": 563
+      }
+    },
+    {
+      "id": "ternary-mismatches",
+      "display": "0 mismatches",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/ternary.json",
+        "pointer": "/gemv/mismatches",
+        "expect": 0
+      }
+    },
+    {
+      "id": "pack-validation-mismatches",
+      "display": "0 mismatches",
+      "quoted_in": [
+        "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/README.md"
+      ],
+      "check": {
+        "kind": "json",
+        "file": "docs/benchmarks/2026-11-26-i7-8086k-arc-a770-step/pack2b.json",
+        "pointer": "/validation/mismatches",
+        "expect": 0
+      }
+    }
+  ]
+}

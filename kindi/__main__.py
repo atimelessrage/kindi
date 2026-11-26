@@ -520,6 +520,19 @@ def cmd_intel_ternary(cfg, a):
     return 0 if report["result"] == "pass" else 1
 
 
+def cmd_intel_step(cfg, a):
+    """cmd_kindi `intel-step`: one full decode step of the pack on an Intel GPU, tested against the CPU engine."""
+    from . import intel_step
+
+    report = intel_step.run_step(a.pack, None, a.steps, loader=a.loader, device=a.device,
+                                 device_name=a.device_name)
+    if a.json:
+        print(intel_step.dumps(report))
+    else:
+        print(intel_step.render(report))
+    return 0 if report.get("ok") else 1
+
+
 def cmd_intel_pack(cfg, a):
     """Time a converted pack's ternary shapes on an Intel GPU; no model run or support claim."""
     from . import intel_pack
@@ -936,6 +949,14 @@ def _build_parser():
     s.add_argument("--no-persist", action="store_true",
                    help="skip the persistent eight-row kernel (one launch per chunk over every tensor)")
     s.add_argument("--json", action="store_true", help="print the whole report as JSON")
+    s = sub.add_parser("intel-step", help="one full decode step on an Intel GPU (norm/fold + pack GEMV on the device, host math for the rest); compared against the CPU engine")
+    s.add_argument("--pack", required=True, help="a pack directory written by kindi convert")
+    s.add_argument("--steps", type=int, default=4, help="decode steps per prompt (default 4)")
+    s.add_argument("--device", type=int, default=0, help="Intel OpenCL GPU index (default 0)")
+    s.add_argument("--device-name", default=None, metavar="SUBSTR",
+                   help="pick the GPU whose name contains SUBSTR (e.g. Arc) instead of --device")
+    s.add_argument("--loader", default=None, help="OpenCL loader name/path (default: the host loader)")
+    s.add_argument("--json", action="store_true", help="print the whole report as JSON")
     s = sub.add_parser("intel-cl", help="compile and run OpenCL vector-add/GEMM on an Intel GPU (no model, no backend)")
     s.add_argument("--n", type=int, default=1048576, help="vector-add elements (default 1048576, max 16777216)")
     s.add_argument("--dim", type=int, default=128, help="square GEMM dimension (default 128, 8-512)")
@@ -1036,6 +1057,7 @@ _COMMANDS = {
     "intel-ternary": cmd_intel_ternary,
     "intel-pack": cmd_intel_pack,
     "intel-norm": cmd_intel_norm,
+    "intel-step": cmd_intel_step,
     "loop-info": cmd_loop_info,
     "io": cmd_io,
     "autotune": cmd_autotune,
