@@ -343,6 +343,7 @@ class PackDrafter(object):
         self.stats["drafts"] = 0
         self.consumed = []      # the tokens whose rows this engine has consumed (incremental mode)
         self.snap = None        # its GDN state at len(consumed)
+        self._snap_buf = None   # the reusable buffer snap is copied into (no per-round allocation)
 
     def draft(self, prefix, hin, k=None):
         """Up to ``k`` tokens after ``prefix[-1]``, from the drafter's own greedy decode of the prefix.
@@ -372,7 +373,9 @@ class PackDrafter(object):
                 for t in want[len(self.consumed):]:
                     self.eng.feed(t, len(self.consumed))
                     self.consumed.append(t)
-            self.snap = self.eng.save_state()
+            if self._snap_buf is None or self._snap_buf.size != self.eng.state_len():
+                self._snap_buf = np.empty(self.eng.state_len(), dtype=np.float32)
+            self.snap = self.eng.save_state(into=self._snap_buf)
         tok, pos, drafts = int(prefix[-1]), len(prefix) - 1, []
         for _ in range(k):
             tok = self.eng.step(tok, pos)
@@ -397,6 +400,10 @@ def speculative_decode(eng, ids, n, drafter, k=4):
     ``stats``: ``rounds``, ``offered`` (k per round), ``matched``, ``rate``, ``rows`` (batch rows
     fed), ``kept`` (rows the state kept), ``depth[i]`` (rounds where draft i + 1 was accepted) and
     ``batch_ms`` / ``rollback_ms``.
+
+    Measurement only: this loop is not on a serving path (no `kindi bench --spec` CPU cell, no
+    server wiring), because the CP1 gate it was built for was missed at 0.51x on the 27B
+    (docs/ROADMAP.md CP1). It stays so the reopen (CP3) has an exactness-correct loop to run.
     """
     drafter.reset()
     eng.reset()

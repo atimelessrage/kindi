@@ -122,9 +122,13 @@ def _no_card_label(m):
     The 27B rows are in that lane too, since 2026-11-26: the CPU engine ran the 27B (4/4
     token-exact, `docs/CPU-SUPPORT.md`) and both 2.5 27B files (load and generate,
     `docs/BONSAI-2-SUPPORT.md` section 1a), so on a cardless host "GPU only" was wrong for them as
-    well.
+    well. A 27B label without a RAM figure would read as runnable on a 16 GiB host, so the big
+    packs name the host RAM the measured CPU run needed (~32 GiB); the listing still does not
+    measure this host's RAM, it only stops implying the pack is small.
     """
-    return "CPU engine" if m.get("cpu") else "GPU only"
+    if not m.get("cpu"):
+        return "GPU only"
+    return "CPU engine (~32 GiB RAM)" if m["size"] > 5_000_000_000 else "CPU engine"
 
 
 def list_models(cfg, log=print, as_json=False):

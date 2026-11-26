@@ -104,7 +104,8 @@ def main():
                        "batch": {"rows": len(got), "s": batch_s, "rows_s": len(got) / batch_s,
                                  "sizes": runs, "tokens_equal": same, "max_logit_delta": dmax},
                        "rows_s_gain": gain,
-                       "batch_rows_cost_in_plain_rows": (len(got) / batch_s and 1.0 / gain),
+                       "batch_rows_cost_in_plain_rows": (1.0 / gain if gain else None),
+                       "logit_rows_compared": sum(n for n in runs if n > 1),
                        "rollback": {"keep": keep, "plain_rows": len(tail), "s": after_s,
                                     "equal": tail == want}}, f, indent=1)
 

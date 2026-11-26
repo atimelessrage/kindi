@@ -331,6 +331,12 @@ def _lib():
         lib.kc_state_save.restype = ctypes.c_int
         lib.kc_state_load.argtypes = [ctypes.POINTER(Model), PF]
         lib.kc_state_load.restype = ctypes.c_int
+        if hasattr(lib, "kc_state_load_len"):      # length-checked restore (newer library)
+            lib.kc_state_load_len.argtypes = [ctypes.POINTER(Model), PF, ctypes.c_int]
+            lib.kc_state_load_len.restype = ctypes.c_int
+        if hasattr(lib, "kc_batch_release"):
+            lib.kc_batch_release.argtypes = []
+            lib.kc_batch_release.restype = ctypes.c_int
     assert lib.kc_sizeof_model() == ctypes.sizeof(Model) and lib.kc_sizeof_layer() == ctypes.sizeof(Layer)
     _LIB[so] = lib
     return lib
@@ -803,6 +809,21 @@ class Engine(object):
         for a in self.M + self.conv + self.Kc + self.Vc:
             a.fill(0)
 
+    def close(self):
+        """Free the process-wide batch arena (the ~157 MB SNAP on the 27B); idempotent.
+
+        The arena is shared by every Engine in the process, but freeing it is safe: the next
+        step_batch re-prepares it for whichever model calls it.
+        """
+        if hasattr(self.lib, "kc_batch_release"):
+            self.lib.kc_batch_release()
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            pass
+
     def begin(self, tok):
         """Embed one token into self.hidden; the next layer() call starts layer 0."""
         self.lib.kc_embed(ctypes.byref(self.m), int(tok))
@@ -926,9 +947,21 @@ class Engine(object):
             raise RuntimeError("kindi: the CPU library cannot report its state size")
         return n
 
-    def save_state(self):
-        """A copy of the GDN state (conv taps and every SSM matrix), for :meth:`load_state`."""
-        buf = np.zeros(self.state_len(), dtype=F32)
+    def save_state(self, into=None):
+        """A copy of the GDN state (conv taps and every SSM matrix), for :meth:`load_state`.
+
+        ``into`` reuses a caller-owned float buffer of exactly :meth:`state_len` floats - a drafter
+        that snapshots every round would otherwise allocate and zero 157 MB per round on the 27B.
+        """
+        if into is None:
+            buf = np.zeros(self.state_len(), dtype=F32)
+        else:
+            buf = into
+            if buf.dtype != F32 or buf.size != self.state_len():
+                raise ValueError("state buffer has %d %s floats, expected %d float32"
+                                 % (buf.size, buf.dtype, self.state_len()))
+            if not buf.flags.c_contiguous:
+                raise ValueError("state buffer must be contiguous")
         if self.lib.kc_state_save(ctypes.byref(self.m), _p(buf)) != buf.size:
             raise RuntimeError("kindi: the GDN state copy was short")
         return buf
@@ -939,7 +972,11 @@ class Engine(object):
         x = np.ascontiguousarray(buf, dtype=F32)
         if x.size != self.state_len():
             raise ValueError("state has %d floats, expected %d" % (x.size, self.state_len()))
-        if self.lib.kc_state_load(ctypes.byref(self.m), _p(x)) != x.size:
+        if hasattr(self.lib, "kc_state_load_len"):
+            rc = int(self.lib.kc_state_load_len(ctypes.byref(self.m), _p(x), int(x.size)))
+        else:                                   # an older library: Python already checked the size
+            rc = int(self.lib.kc_state_load(ctypes.byref(self.m), _p(x)))
+        if rc != x.size:
             raise RuntimeError("kindi: the GDN state restore was short")
         return x.size
 

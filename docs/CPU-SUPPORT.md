@@ -36,8 +36,13 @@ and generates greedily at 4.02 tok/s (best of two prompts, 3.08 tok/s worst) at 
 verify` refuses it by name instead of scoring it against Bonsai 2's tokens and says how a reference
 is supplied (`--reference FILE`, `docs/BONSAI-2-SUPPORT.md` section 1a). So the row is load and
 generate, not exactness: nothing here is a token-for-token comparison with another engine. On a host
-without a card, `kindi models` lists both 27B releases as `CPU engine` and `kindi plan` prints CPU
-follow-up commands rather than the GPU split this engine cannot build (2026-11-26).
+without a card, `kindi models` lists both 27B releases as `CPU engine (~32 GiB RAM)` and `kindi plan`
+prints CPU follow-up commands rather than the GPU split this engine cannot build (2026-11-26).
+
+**What to expect on a first run:** the 27B pack is 6.75 GB of packed weights, so the load spends
+340-500 s before the first token on the measured host, host RAM has to hold the pack plus the
+per-token scratch (~32 GiB), and a long-context run is slower per token than the ctx-2,048 numbers
+above - no 27B CPU figure on this page is a long-context figure.
 
 Nemotron and Nanbeige are separate backends and are not part of this CPU goal.
 

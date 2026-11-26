@@ -204,6 +204,33 @@ def test_full_isa_library_builds_and_loads(monkeypatch, tmp_path):
     assert library.kc_sizeof_layer() == ctypes.sizeof(cpu.Layer)
 
 
+def test_batch_and_state_entry_points_exist_and_are_empty_model_safe(monkeypatch, tmp_path):
+    """The 2026-11-26 audit added three exports; a library built from this source must have them, and
+    they must be safe to call before any batch exists (a zeroed Model has no rows and no state)."""
+    cc = cpu._find_cc()
+    if not os.path.isabs(cc) and not shutil.which(cc):
+        pytest.skip("no compiler to build the CPU library")
+    if os.name == "nt":
+        monkeypatch.setenv("KINDI_CC", cc)
+    monkeypatch.setenv("KINDI_CPU_CACHE", str(tmp_path))
+    isa = "avx2-fma-f16c" if cpu.cpu_tier() in ("avx2-fma-f16c", "unknown") else "avx2-f16c-no-fma"
+    monkeypatch.setenv("KINDI_CPU_ISA", isa)
+    so = Path(cpu._so_path(str(tmp_path), isa))
+    cpu._build(str(SRC), str(so), isa=isa)
+    library = cpu._lib()
+
+    m = cpu.Model()                              # zeroed: no layers, no state, no batch
+    for name in ("kc_batch_release", "kc_state_load_len", "kc_batch_rollback", "kc_step_batch"):
+        assert hasattr(library, name), "%s is missing from the built library" % name
+    assert library.kc_state_len(ctypes.byref(m)) == 0
+    buf = (ctypes.c_float * 1)()
+    assert library.kc_state_load_len(ctypes.byref(m), buf, 1) == -1   # a wrong length is refused
+    assert library.kc_state_load_len(ctypes.byref(m), buf, 0) == 0    # an empty state loads
+    assert library.kc_batch_release() == 0
+    assert library.kc_batch_release() == 0                            # idempotent
+    assert library.kc_batch_rollback(ctypes.byref(m), 0) == -1        # nothing to roll back
+
+
 def test_non_avx_build_is_rejected_with_the_required_isa():
     cc = _cc()
     proc = subprocess.run([cc, "-fopenmp", "-mno-avx", "-mno-avx2", "-mno-fma", "-mno-f16c", "-E", str(SRC)],

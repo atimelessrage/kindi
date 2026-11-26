@@ -650,7 +650,8 @@ KC_API int kc_sizeof_layer(void){ return (int)sizeof(Layer); }
 #define KC_MAXB 8
 
 typedef struct {
-  int nt, D, NFF, CC, NG, NH, NHKV, HD, NK, HK, NV, HB, ctx, vocab;
+  Model* owner;                    /* the Model this arena was sized for; reuse only for it */
+  int nt, NL, D, NFF, CC, NG, NH, NHKV, HD, NK, HK, NV, HB, ctx, vocab;
   int MW, QW, KW, AW;              /* MM and XP / QN / KR|KRO|VV / ATT row widths */
   size_t tabp;                     /* pair tables per row (the widest matrix input) */
   size_t snap_len, *soff;          /* SNAP: the GDN state of every layer, one block each */
@@ -672,7 +673,10 @@ static void b_release(void* p){ free(p); }
 
 static float* b_rows(size_t n){
   float* p = (float*)b_alloc((n ? n : 1) * sizeof(float));
-  if(p && B.keep_n < 40) B.keep_p[B.keep_n++] = p;
+  if(p){
+    if(B.keep_n >= 40){ b_release(p); return 0; }   /* an untracked block would leak and go unnoticed */
+    B.keep_p[B.keep_n++] = p;
+  }
   return p;
 }
 
@@ -685,13 +689,16 @@ static void batch_drop(void){
 
 /* Allocate for nt rows against this model (releases a smaller set).  Returns 0 on ENOMEM. */
 static int batch_prepare(Model* m, int nt){
-  if(B.nt >= nt && B.D == m->D && B.ctx == m->ctx) return 1;
+  /* One arena per process, so reuse only for the model it was sized for. Keying on D+ctx alone
+     let a second Model with the same width and context reuse a SNAP/soff table sized for the
+     first one's layer count: out-of-bounds copies with no error. */
+  if(B.owner == m && B.nt >= nt && B.NL == m->NL && B.D == m->D && B.ctx == m->ctx) return 1;
   batch_drop();
   const int D = m->D, NFF = m->NFF, NH = m->NH, NHKV = m->NHKV, HD = m->HD, NK = m->NK, HK = m->HK,
             NV = m->NV, CC = m->CONV_CH, ctx = m->ctx;
   int NG = 0;
   for(int il = 0; il < m->NL; ++il) if(!m->L[il].is_attn && m->L[il].gate.R > NG) NG = m->L[il].gate.R;
-  B.nt = nt; B.D = D; B.NFF = NFF; B.CC = CC; B.NG = NG; B.NH = NH; B.NHKV = NHKV; B.HD = HD;
+  B.owner = m; B.nt = nt; B.NL = m->NL; B.D = D; B.NFF = NFF; B.CC = CC; B.NG = NG; B.NH = NH; B.NHKV = NHKV; B.HD = HD;
   B.NK = NK; B.HK = HK; B.NV = NV; B.HB = m->HB; B.ctx = ctx; B.vocab = m->head.R;
   B.MW = D;
   if(NFF > B.MW) B.MW = NFF;
@@ -1219,7 +1226,7 @@ KC_API int kc_step_batch(Model* m, const int* toks, int nt, int pos0, int* out){
    from the stored vectors (no weights are read).  K/V needs nothing - the next pass rewrites every
    position it reads.  keep == the batch size is a no-op. */
 KC_API int kc_batch_rollback(Model* m, int keep){
-  if(!m || B.nt < 2) return -1;
+  if(!m || B.owner != m || B.nt < 2) return -1;   /* the replay reads B.SNAP, which belongs to B.owner */
   if(keep < 0 || keep > B.nt) return -2;
   if(keep == B.nt) return 0;
   t_last = omp_get_wtime(); t_cur = 0;
@@ -1249,11 +1256,15 @@ KC_API int kc_batch_rollback(Model* m, int keep){
 
 /* The logits of row t from the last batch (for exactness checks against plain decode). */
 KC_API const float* kc_batch_logits(Model* m, int t){
-  if(!m || B.nt < 2 || t < 0 || t >= B.nt) return 0;
+  if(!m || B.owner != m || B.nt < 2 || t < 0 || t >= B.nt) return 0;
   return B.LOG + (size_t)t * B.vocab;
 }
 
-KC_API int kc_batch_vocab(Model* m){ (void)m; return B.nt >= 2 ? B.vocab : 0; }
+KC_API int kc_batch_vocab(Model* m){ return (m && B.owner == m && B.nt >= 2) ? B.vocab : 0; }
+
+/* Free the batch arena (SNAP + scratch). Idempotent; the next kc_step_batch re-prepares it, so an
+   Engine may call this on teardown even while another Engine in the process still exists. */
+KC_API int kc_batch_release(void){ batch_drop(); return 0; }
 
 /* ------------------------------------------------------------------------------------- model state */
 /* The GDN state (conv taps and the SSM matrix of every GDN layer) as one flat float block.  A
@@ -1284,6 +1295,21 @@ KC_API int kc_state_save(Model* m, float* buf){
   return (int)at;
 }
 
+/* Length-checked restore: a caller that passes a short buffer gets an error, not an out-of-bounds
+   read. kc_state_load() below keeps the old signature for external callers and sizes it itself. */
+KC_API int kc_state_load_len(Model* m, const float* buf, int n){
+  if(!m || !buf || n != kc_state_len(m)) return -1;
+  size_t at = 0;
+  const size_t mb = (size_t)m->NV * m->HK * m->HK, cb = (size_t)3 * m->CONV_CH;
+  for(int il = 0; il < m->NL; ++il){
+    Layer* L = m->L + il;
+    if(L->is_attn) continue;
+    memcpy(L->M, buf + at, mb * sizeof(float)); at += mb;
+    memcpy(L->conv, buf + at, cb * sizeof(float)); at += cb;
+  }
+  return (int)at;
+}
+
 KC_API int kc_state_load(Model* m, const float* buf){
   if(!m || !buf) return -1;
   size_t at = 0;
@@ -1299,6 +1325,6 @@ KC_API int kc_state_load(Model* m, const float* buf){
 
 /* The residual of batch row t (the value plain decode keeps in m->h after its head). */
 KC_API const float* kc_batch_hidden(Model* m, int t){
-  if(!m || B.nt < 2 || t < 0 || t >= B.nt) return 0;
+  if(!m || B.owner != m || B.nt < 2 || t < 0 || t >= B.nt) return 0;
   return B.H + (size_t)t * B.D;
 }

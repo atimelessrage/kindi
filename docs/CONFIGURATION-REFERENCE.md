@@ -304,7 +304,7 @@ direct sites.
 | `KINDI_NVRTC` | (unset) | `kindi/qx_gpu.py:30` (+1 more) |
 | `KINDI_ONEAPI_ROOT` | (unset) | `kindi/intel.py:688` |
 | `KINDI_P100_FP16_PROMPT` | (empty) | `kindi/chunk.py:144` |
-| `KINDI_PACK` | (unset) | `kindi/catalog.py:237` (+1 more) |
+| `KINDI_PACK` | (unset) | `kindi/catalog.py:241` (+1 more) |
 | `KINDI_PARK_BRANCH` | `_PARK_DEFAULT` | `kindi/cache.py:1102` (+1 more) |
 | `KINDI_PARK_SHARE` | `1` | `kindi/cache.py:1103` |
 | `KINDI_PIPE` | `1` | `kindi/dsv41.py:802` |

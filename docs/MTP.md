@@ -32,7 +32,9 @@ nothing for a speculative loop to skip. `kindi.mtp_cpu.score_drafts` therefore d
 acceptance measurement, and the tokens are asserted identical to plain greedy decoding. The road map
 carries the missing piece (a batched T-row verify in `kcpu.c`: one weight pass for T rows, per-row
 attention and GDN scan, T-row head) with the gate it has to clear. Until then, use the head for
-acceptance studies; `tools/mtp_cpu_bench.py --pack PACK --gguf <the -mtp file>` is the tool. The
+acceptance studies; `tools/mtp_cpu_bench.py --pack PACK --gguf <the -mtp file>` is the tool. Every
+2.5 27B CPU number on this page is at `--ctx 2048` (and the 27B load alone takes 340-500 s on the
+measured host, `docs/CPU-SUPPORT.md`); a long-context number is not implied by any of them. The
 2026-11-25 run is a tracked evidence page ([docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp](benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp/RESULTS.md),
 claim `mtp-cpu-20261125`): it records the head's cost and its acceptance, and the acceptance is not
 yet good enough to wire the head as a win (road map CP1).

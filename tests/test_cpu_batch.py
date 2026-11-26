@@ -36,6 +36,21 @@ class _FakeLib(object):
         self.calls.append(("batch", [toks[i] for i in range(n)], n, pos))
         return self.rc
 
+    def kc_state_len(self, m):
+        return 4
+
+    def kc_state_save(self, m, buf):
+        self.calls.append(("save",))
+        return int(getattr(buf, "size", 4) or 4)
+
+    def kc_state_load_len(self, m, buf, n):
+        self.calls.append(("load_len", n))
+        return -1 if n != 4 else 4
+
+    def kc_batch_release(self):
+        self.calls.append(("release",))
+        return 0
+
 
 def _fake_engine(rc=-1):
     eng = object.__new__(cpu.Engine)
@@ -64,6 +79,30 @@ def test_a_batch_past_the_context_is_rejected_before_c():
     eng = _fake_engine()
     with pytest.raises(OverflowError):
         eng.step_batch([1, 2, 3], 15)
+
+
+def test_save_state_reuses_a_caller_buffer_instead_of_allocating():
+    """The drafter snapshots every round; a 157 MB allocation per round on the 27B is pure waste."""
+    eng = _fake_engine()
+    buf = np.empty(4, dtype=np.float32)
+    assert eng.save_state(into=buf) is buf
+    assert [c[0] for c in eng.lib.calls] == ["save"]
+    with pytest.raises(ValueError):
+        eng.save_state(into=np.empty(3, dtype=np.float32))
+
+
+def test_load_state_goes_through_the_length_checked_entry_point():
+    eng = _fake_engine()
+    assert eng.load_state(np.zeros(4, dtype=np.float32)) == 4
+    assert ("load_len", 4) in eng.lib.calls
+
+
+def test_close_releases_the_batch_arena_and_is_idempotent():
+    """The arena is process-wide and ~157 MB on the 27B; teardown must free it, and twice is fine."""
+    eng = _fake_engine()
+    eng.close()
+    eng.close()
+    assert [c[0] for c in eng.lib.calls] == ["release", "release"]
 
 
 @pytest.fixture(scope="module")
