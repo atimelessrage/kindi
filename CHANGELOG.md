@@ -1,5 +1,19 @@
 # Changelog
 
+## Three CPU drafter routes measured against each other (2026-11-26)
+
+- **The 2B drafter does not need the `-mtp` file.** The same 2.5 27B weights were converted from
+  both GGUFs (7,242 MB each) and the 2B pack drafted for each: 33/108 accepted (30.6%) on the base
+  pack and 33/108 on the `-mtp` pack, identical because the drafts are scored against the model's
+  tokens and the 2B's drafts do not depend on the target file. The `-mtp` download buys a `draft2b`
+  deployment nothing and costs 239 MB.
+- **The head `Head()` loads is the raw-hidden one.** The integrated head with its library defaults
+  accepts 9/108 (8.3%, depth [1, 1, 4, 3]) at 0.10 tok/s, not the ladder's 11/108 `eh-normed` row:
+  the output-normed hidden, the verified-row seed and the prompt's last row are probe switches, not
+  shipped behaviour.
+- Tracked at `docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/` with claim
+  `mtp-cpu-routes-20261126` (17 numbers), and `docs/MTP.md` carries the table.
+
 ## The MTP variant ladder is now tracked evidence (2026-11-25)
 
 - **The ladder's numbers have a page and a claim.** The `eh`/`he`/`eh-normed`/`eh-normed-seeded`

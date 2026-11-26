@@ -1,0 +1,287 @@
+{
+ "gate": "mtp-cpu-routes-20261126",
+ "title": "27B CPU drafters: the 2B pack on the base and -mtp packs, and the -mtp head as loaded",
+ "measured": "2026-11-26",
+ "commit": "abc9679",
+ "command": "KINDI_DEVICE=cpu python bench-logs/compare_three.py --pack <base or -mtp pack> [--gguf <the -mtp GGUF>] --drafter-pack <2B pack> --tokens 16 --k 4 --out run.json (one process per target pack)",
+ "notes": "Three routes on one host: the same 64-layer 2.5 27B weights converted from the base GGUF (no blk.64) and from the -mtp GGUF, with the 2B pack drafter on both, plus the integrated head with its library defaults (raw hidden, no seed, window 64). results.json is the sanitized copy of the two runs (machine paths stripped). exact=true on all six route/prompt rows: the scored tokens equal plain greedy decode, so acceptance is measured against the real model.",
+ "evidence": [
+  "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+  "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+ ],
+ "numbers": [
+  {
+   "id": "base-accepted",
+   "display": "33/108",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+   ],
+   "check": {
+    "kind": "ratio",
+    "a": {
+     "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+     "pointer": "/runs/0/routes/external/accepted"
+    },
+    "b": {
+     "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+     "pointer": "/runs/0/routes/external/offered"
+    },
+    "expect": 0.3055555555555556
+   }
+  },
+  {
+   "id": "base-rate",
+   "display": "30.6%",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+    "pointer": "/runs/0/routes/external/rate",
+    "expect": 0.3056
+   }
+  },
+  {
+   "id": "mtp2b-accepted",
+   "display": "33/108",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+   ],
+   "check": {
+    "kind": "ratio",
+    "a": {
+     "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+     "pointer": "/runs/1/routes/external/accepted"
+    },
+    "b": {
+     "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+     "pointer": "/runs/1/routes/external/offered"
+    },
+    "expect": 0.3055555555555556
+   }
+  },
+  {
+   "id": "head-accepted",
+   "display": "9/108",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+   ],
+   "check": {
+    "kind": "ratio",
+    "a": {
+     "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+     "pointer": "/runs/1/routes/head/accepted"
+    },
+    "b": {
+     "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+     "pointer": "/runs/1/routes/head/offered"
+    },
+    "expect": 0.08333333333333333
+   }
+  },
+  {
+   "id": "head-rate",
+   "display": "8.3%",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+    "pointer": "/runs/1/routes/head/rate",
+    "expect": 0.0833
+   }
+  },
+  {
+   "id": "head-depth",
+   "display": "[1, 1, 4, 3]",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+   ],
+   "check": {
+    "kind": "text",
+    "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md",
+    "needle": "| [1, 1, 4, 3] |"
+   }
+  },
+  {
+   "id": "base-prompt1",
+   "display": "23/54",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+   ],
+   "check": {
+    "kind": "ratio",
+    "a": {
+     "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+     "pointer": "/runs/0/prompts/0/routes/external/accepted"
+    },
+    "b": {
+     "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+     "pointer": "/runs/0/prompts/0/routes/external/offered"
+    },
+    "expect": 0.42592592592592593
+   }
+  },
+  {
+   "id": "base-prompt2",
+   "display": "10/54",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+   ],
+   "check": {
+    "kind": "ratio",
+    "a": {
+     "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+     "pointer": "/runs/0/prompts/1/routes/external/accepted"
+    },
+    "b": {
+     "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+     "pointer": "/runs/0/prompts/1/routes/external/offered"
+    },
+    "expect": 0.18518518518518517
+   }
+  },
+  {
+   "id": "head-prompt1",
+   "display": "2/54",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+   ],
+   "check": {
+    "kind": "ratio",
+    "a": {
+     "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+     "pointer": "/runs/1/prompts/0/routes/head/accepted"
+    },
+    "b": {
+     "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+     "pointer": "/runs/1/prompts/0/routes/head/offered"
+    },
+    "expect": 0.037037037037037035
+   }
+  },
+  {
+   "id": "head-prompt2",
+   "display": "7/54",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+   ],
+   "check": {
+    "kind": "ratio",
+    "a": {
+     "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+     "pointer": "/runs/1/prompts/1/routes/head/accepted"
+    },
+    "b": {
+     "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+     "pointer": "/runs/1/prompts/1/routes/head/offered"
+    },
+    "expect": 0.12962962962962962
+   }
+  },
+  {
+   "id": "base-tok-s",
+   "display": "1.19 / 1.14",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+   ],
+   "check": {
+    "kind": "text",
+    "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md",
+    "needle": "1.19 / 1.14"
+   }
+  },
+  {
+   "id": "head-tok-s",
+   "display": "0.10 / 0.10",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+   ],
+   "check": {
+    "kind": "text",
+    "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md",
+    "needle": "0.10 / 0.10"
+   }
+  },
+  {
+   "id": "mtp2b-tok-s",
+   "display": "1.21 / 1.12",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+   ],
+   "check": {
+    "kind": "text",
+    "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md",
+    "needle": "1.21 / 1.12"
+   }
+  },
+  {
+   "id": "head-rows",
+   "display": "120 head rows",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/results.json",
+    "pointer": "/runs/1/routes/head/drafter_rows",
+    "expect": 120
+   }
+  },
+  {
+   "id": "head-seconds",
+   "display": "159 s and 156 s",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+   ],
+   "check": {
+    "kind": "text",
+    "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md",
+    "needle": "159 s and 156 s"
+   }
+  },
+  {
+   "id": "pack-size",
+   "display": "7,242 MB",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+   ],
+   "check": {
+    "kind": "text",
+    "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md",
+    "needle": "7,242 MB"
+   }
+  },
+  {
+   "id": "head-bytes",
+   "display": "239 MB",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md"
+   ],
+   "check": {
+    "kind": "text",
+    "file": "docs/benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md",
+    "needle": "costs 239 MB"
+   }
+  }
+ ]
+}

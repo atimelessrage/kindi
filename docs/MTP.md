@@ -160,6 +160,27 @@ at all - the rows are nearly orthogonal - so no seeding or window choice can lif
 what `blk.64` computes is not this model's next-token hidden. **The 2B pack is the better drafter
 (30.6% vs 8.3-13.9%), and neither is a speedup before CP1** (tracked at the [variant-ladder evidence page](benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/RESULTS.md), claim `mtp-cpu-variants-20261125`).
 
+#### Which file drafts best on the CPU (2026-11-26)
+
+Three routes on the same 2.5 27B weights, converted once from the base GGUF (no `blk.64`) and once
+from the `-mtp` GGUF (7,242 MB each), same two prompts and `k=4`:
+
+| route | accepted | rate | depth [1..4] | drafted tok/s | plain tok/s |
+|---|---|---|---|---|---|
+| 2B pack drafter, base pack | 33/108 | 30.6% | [15, 8, 7, 3] | 1.19 / 1.14 | 1.98 / 1.98 |
+| `blk.64` head as loaded, `-mtp` pack | 9/108 | 8.3% | [1, 1, 4, 3] | 0.10 / 0.10 | 2.14 / 2.06 |
+| 2B pack drafter, `-mtp` pack | 33/108 | 30.6% | [15, 8, 7, 3] | 1.21 / 1.12 | 2.14 / 2.06 |
+
+The 2B drafter accepts 23/54 and 10/54 on **both** packs: drafts are scored against the model's own
+tokens and the 2B's drafts come from the 2B engine, so `blk.64`'s presence changes neither. The
+`-mtp` file buys a `draft2b` deployment nothing and costs 239 MB, so the base file is the one to
+ship until CP1. The head measured here is the one `Head()` loads, not the ladder's best row: it still
+defaults to the raw residual, so a deployment gets 9/108 (8.3%) - 2/54 and 7/54 per prompt - depth [1, 1, 4, 3], at 0.10 tok/s
+with its 120 head rows costing 159 s and 156 s against 13-14 s for a 2B-drafted prompt. Neither
+route beats plain decode, because the CPU engine verifies one row per pass. Tracked at the
+[route comparison page](benchmarks/2026-11-26-i7-8086k-bonsai25-27b-cpu-drafter-routes/RESULTS.md),
+claim `mtp-cpu-routes-20261126`.
+
 ## The modes
 
 | Mode | Setting | Drafts |
