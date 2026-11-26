@@ -1,0 +1,399 @@
+{
+ "gate": "mtp-cpu-variants-20261125",
+ "title": "27B CPU MTP head: the variant ladder (eh/he/normed/seeded) and the whole-prompt trace",
+ "measured": "2026-11-25",
+ "commit": "58dadc3",
+ "command": "python tools/mtp_cpu_probe.py --pack PACK --gguf <the -mtp GGUF> --commands cmds.jsonl --out out.jsonl (five loads, 14 attempts; --trace on the seedfull load)",
+ "notes": "The variant ladder behind docs/MTP.md's table and the seedfull follow-up, in one sanitized page. results.json is the sanitized copy of the five bench-logs probe loads (machine paths stripped); trace_summary is derived from the seedfull load's trace by bench-logs/check_seedfull.py's comparison (first self-chained draft row vs verified row per position), since the 25 MB .npz is not tracked. exact=true on all 14 attempts means scored tokens equal plain greedy decode.",
+ "evidence": [
+  "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+  "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/RESULTS.md"
+ ],
+ "numbers": [
+  {
+   "id": "eh-accepted",
+   "display": "9/108",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "ratio",
+    "a": {
+     "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+     "pointer": "/attempts/0/accepted"
+    },
+    "b": {
+     "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+     "pointer": "/attempts/0/offered"
+    },
+    "expect": 0.08333333333333333
+   }
+  },
+  {
+   "id": "eh-rate",
+   "display": "8.3%",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/ROADMAP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/attempts/0/rate",
+    "expect": 0.0833
+   }
+  },
+  {
+   "id": "he-accepted",
+   "display": "0/108",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "ratio",
+    "a": {
+     "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+     "pointer": "/attempts/1/accepted"
+    },
+    "b": {
+     "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+     "pointer": "/attempts/1/offered"
+    },
+    "expect": 0
+   }
+  },
+  {
+   "id": "he-rate",
+   "display": "0.0%",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/attempts/1/rate",
+    "expect": 0.0
+   }
+  },
+  {
+   "id": "normed-accepted",
+   "display": "11/108",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "ratio",
+    "a": {
+     "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+     "pointer": "/attempts/3/accepted"
+    },
+    "b": {
+     "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+     "pointer": "/attempts/3/offered"
+    },
+    "expect": 0.10185185185185185
+   }
+  },
+  {
+   "id": "normed-rate",
+   "display": "10.2%",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/attempts/3/rate",
+    "expect": 0.1019
+   }
+  },
+  {
+   "id": "folded-rate",
+   "display": "10.2%",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/attempts/5/rate",
+    "expect": 0.1019
+   }
+  },
+  {
+   "id": "rope1-rate",
+   "display": "10.2%",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/attempts/6/rate",
+    "expect": 0.1019
+   }
+  },
+  {
+   "id": "seeded-accepted",
+   "display": "15/108",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "ratio",
+    "a": {
+     "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+     "pointer": "/attempts/8/accepted"
+    },
+    "b": {
+     "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+     "pointer": "/attempts/8/offered"
+    },
+    "expect": 0.1388888888888889
+   }
+  },
+  {
+   "id": "seeded-rate",
+   "display": "13.9%",
+   "quoted_in": [
+    "docs/MTP.md",
+    "docs/ROADMAP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/attempts/8/rate",
+    "expect": 0.1389
+   }
+  },
+  {
+   "id": "normed-prompt2-hit",
+   "display": "16.7%",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/attempts/3/prompts/1/rate",
+    "expect": 0.1667
+   }
+  },
+  {
+   "id": "seeded-prompt2-hit",
+   "display": "22.2%",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/attempts/8/prompts/1/rate",
+    "expect": 0.2222
+   }
+  },
+  {
+   "id": "seeded-depth",
+   "display": "[2, 3, 4, 3]",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "text",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/RESULTS.md",
+    "needle": "[2, 3, 4, 3]"
+   }
+  },
+  {
+   "id": "seeded-full-accepted",
+   "display": "15/108",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "ratio",
+    "a": {
+     "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+     "pointer": "/attempts/11/accepted"
+    },
+    "b": {
+     "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+     "pointer": "/attempts/11/offered"
+    },
+    "expect": 0.1388888888888889
+   }
+  },
+  {
+   "id": "seeded-full-rate",
+   "display": "13.9%",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/attempts/11/rate",
+    "expect": 0.1389
+   }
+  },
+  {
+   "id": "long-window64-accepted",
+   "display": "4/54",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "ratio",
+    "a": {
+     "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+     "pointer": "/attempts/12/accepted"
+    },
+    "b": {
+     "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+     "pointer": "/attempts/12/offered"
+    },
+    "expect": 0.07407407407407407
+   }
+  },
+  {
+   "id": "long-rate",
+   "display": "7.4%",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/attempts/12/rate",
+    "expect": 0.0741
+   }
+  },
+  {
+   "id": "long-window132-accepted",
+   "display": "4/54",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "ratio",
+    "a": {
+     "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+     "pointer": "/attempts/13/accepted"
+    },
+    "b": {
+     "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+     "pointer": "/attempts/13/offered"
+    },
+    "expect": 0.07407407407407407
+   }
+  },
+  {
+   "id": "trace-rows",
+   "display": "748 rows",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/trace_summary/rows",
+    "expect": 748
+   }
+  },
+  {
+   "id": "trace-seed-rows",
+   "display": "388 seed",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/trace_summary/seed_rows",
+    "expect": 388
+   }
+  },
+  {
+   "id": "trace-draft-rows",
+   "display": "360 draft",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/trace_summary/draft_rows",
+    "expect": 360
+   }
+  },
+  {
+   "id": "trace-cos-u-short",
+   "display": "0.12",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/trace_summary/attempts/0/cos_u_median",
+    "expect": 0.1163,
+    "tolerance": 0.05
+   }
+  },
+  {
+   "id": "trace-cos-out-short",
+   "display": "0.16",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/trace_summary/attempts/0/cos_out_median",
+    "expect": 0.1583,
+    "tolerance": 0.05
+   }
+  },
+  {
+   "id": "trace-cos-u-long",
+   "display": "0.20",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/trace_summary/attempts/2/cos_u_median",
+    "expect": 0.2044,
+    "tolerance": 0.05
+   }
+  },
+  {
+   "id": "trace-cos-out-long",
+   "display": "0.33",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/trace_summary/attempts/2/cos_out_median",
+    "expect": 0.3359,
+    "tolerance": 0.05
+   }
+  },
+  {
+   "id": "seed-last-max-du",
+   "display": "max|du| = 0",
+   "quoted_in": [
+    "docs/MTP.md"
+   ],
+   "check": {
+    "kind": "json",
+    "file": "docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/results.json",
+    "pointer": "/trace_summary/seed_last_vs_first_draft/max_abs_du",
+    "expect": 0
+   }
+  }
+ ]
+}

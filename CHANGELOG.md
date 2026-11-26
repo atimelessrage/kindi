@@ -1,5 +1,19 @@
 # Changelog
 
+## The MTP variant ladder is now tracked evidence (2026-11-25)
+
+- **The ladder's numbers have a page and a claim.** The `eh`/`he`/`eh-normed`/`eh-normed-seeded`
+  figures `docs/MTP.md` quoted (8.3% -> 10.2% -> 13.9%, `he` at 0.0%) existed only in untracked
+  `bench-logs/probe-out*.jsonl`. They are now sanitized into
+  `docs/benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/` (14 attempts over five one-load
+  probe batches, machine paths stripped, per-prompt draft/model tokens kept) with claim
+  `mtp-cpu-variants-20261125`, the same treatment the head-vs-drafter comparison got.
+- **The whole-prompt and trace numbers ride along.** Seeding the prompt's last row (15/108 again),
+  the long prompt at window 64 vs 132 (4/54 both), and the trace's 748 rows with cos(u) medians
+  0.116 / 0.204-0.220 are in the same `results.json` (`trace_summary`, derived from the seedfull
+  trace by the comparison in `bench-logs/check_seedfull.py`); `docs/MTP.md` and the CP1/CP2
+  `docs/ROADMAP.md` rows now cite the page instead of saying "untracked".
+
 ## `kindi verify` takes a reference you supply (2026-11-25)
 
 - **A release with no bundled reference can be verified now.** `kindi verify --reference FILE` runs the

@@ -36,4 +36,5 @@ The external 2B pack is the better draft source by about five times the acceptan
 is still slower than plain decode. Neither route is a speedup until CP1's batched T-row
 verify exists, and the measurement settles which drafter CP1 builds against: the 2B pack,
 not the head. The head-side follow-ups (output-normed hidden, verified-row seeding, the
-variant ladder) are in `docs/MTP.md`; they are probe runs, not part of this page.
+variant ladder) are in `docs/MTP.md`, tracked at the [variant-ladder page](../2026-11-25-i7-8086k-27b-cpu-mtp-variants/RESULTS.md)
+(claim `mtp-cpu-variants-20261125`).

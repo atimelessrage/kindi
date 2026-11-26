@@ -86,7 +86,7 @@ this head appears in notes written about Kindi. It is **not in this tree and not
 1.12x in this file is the **2B** `draft2b` result on the 4060 Ti at 512 tokens, with 69% acceptance
 (the tables above); what the 2.5 head measured on this host so far is worse: **9 accepted of 108
 drafted (8.3%), up to 15/108 (13.9%) once the hidden is output-normed and the window seeded**, from
-`tools/mtp_cpu_probe.py` on the real 27B (the probe runs themselves stay untracked `bench-logs/` measurements).
+`tools/mtp_cpu_probe.py` on the real 27B, tracked at the [variant-ladder evidence page](benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/RESULTS.md) (claim `mtp-cpu-variants-20261125`).
 Do not repeat a CPU acceptance or speedup figure for this head without a tracked page behind it.
 
 ### Which drafter, on the 27B CPU (2026-11-25)
@@ -121,7 +121,9 @@ histogram and the actual draft token ids next to the model's own, so a variant i
 by a compile. A variant ending in `-full` also seeds the prompt's last row, `"window": "prompt"`
 grows the head's K/V ring from the prompt (or an integer sets it), and `--trace out.npz` writes every
 head row's `u` and `out` with its position, prediction, attempt and phase. Every attempt below
-asserted its tokens equal to plain greedy decode.
+asserted its tokens equal to plain greedy decode. The five loads behind the table and the whole-prompt
+section are tracked at the [variant-ladder evidence page](benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/RESULTS.md)
+(claim `mtp-cpu-variants-20261125`, sanitized from the `bench-logs/` probe JSONL and the seedfull trace).
 
 | variant | accepted | rate | what it changes |
 |---|---|---|---|
@@ -156,8 +158,7 @@ median 0.12 on the two short prompts and 0.20-0.22 on the long one (minimum 0.04
 15 positions that carry both rows. The head's recurrence does not reproduce the model's hidden state
 at all - the rows are nearly orthogonal - so no seeding or window choice can lift the acceptance:
 what `blk.64` computes is not this model's next-token hidden. **The 2B pack is the better drafter
-(30.6% vs 8.3-13.9%), and neither is a speedup before CP1** (untracked `bench-logs/` measurements,
-not an evidence page).
+(30.6% vs 8.3-13.9%), and neither is a speedup before CP1** (tracked at the [variant-ladder evidence page](benchmarks/2026-11-25-i7-8086k-27b-cpu-mtp-variants/RESULTS.md), claim `mtp-cpu-variants-20261125`).
 
 ## The modes
 
