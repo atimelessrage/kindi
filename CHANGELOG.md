@@ -1,5 +1,22 @@
 # Changelog
 
+## `kindi verify` takes a reference you supply (2026-11-25)
+
+- **A release with no bundled reference can be verified now.** `kindi verify --reference FILE` runs the
+  same token-for-token matrix against a reference made with llama.cpp for that exact GGUF. That was the
+  one thing Bonsai 2.5 27B could not do here: the refusal said `no llama.cpp reference for this model in
+  this version of Kindi` and stopped, and it now names the flag on the next line.
+- **The file is checked before the engine loads.** `verify.load_reference` wants a non-empty `prompts`
+  list whose rows carry `ids` and `expected` - the shape the bundled files use - so a wrong file names
+  itself and exits 2 instead of raising a KeyError inside prompt 3. The bundled references go through
+  the same reader, and `--reference` is refused with a message on the backends that resolve their own
+  references (Gemma 4, Nanbeige, Lightning, Cascade, DeepSeek V4.1).
+- **The context is sized from the reference.** It was hard-coded to 1024, which is fine for the bundled
+  45-49-token rows and would fail on a user's long one; the engine now gets the longest row plus the
+  prompt and its expected tokens, minimum 1024.
+- **The verdict names its source.** A user file prints `reference FILE: user-supplied, N prompts`
+  before the pack and speculation lines, so a PASS is never read as the bundled matrix's.
+
 ## The Arc pack probe reads its weights the way a decoder would (2026-11-25)
 
 - **`kindi intel-pack` now runs the persistent work list on a real pack.** The kernel from the

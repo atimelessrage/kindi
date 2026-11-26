@@ -1,6 +1,10 @@
 """kindi verify: greedy output vs llama.cpp's reference for the same model file (4 prompts, the first 40 tokens
 llama.cpp generated from them at temperature 0). Every token must match. reference.json is the 2B; reference-4b.json,
--9b.json and -27b.json the others (the 27B with llama.cpp's q8_0 K/V cache, as Kindi's 27B engine)."""
+-9b.json and -27b.json the others (the 27B with llama.cpp's q8_0 K/V cache, as Kindi's 27B engine).
+
+A release with no bundled reference (Bonsai 2.5 27B today) takes one from the user: ``--reference FILE`` runs the
+same matrix against a file made with llama.cpp for that exact GGUF. The file's shape is checked here, so a
+malformed one names itself instead of failing deep in the comparison."""
 import os
 import re
 import time
@@ -24,6 +28,33 @@ def reference_for(pack):
     key = release + size
     p = os.path.join(here, "reference.json" if key == "2b" else "reference-%s.json" % key)
     return p if os.path.exists(p) else None
+
+
+def load_reference(path, log=print):
+    """Read a reference file and refuse one that is not shaped like it; the dict, or None after saying why.
+
+    The bundled files are written by this project and can be trusted; ``--reference`` takes one from anywhere,
+    so the fields the comparison reads are checked once, up front: every prompt needs ``ids`` and ``expected``,
+    and a missing one would otherwise surface as a KeyError in the middle of prompt 3 rather than as a message
+    naming the file. ``prompt`` is display text and optional.
+    """
+    try:
+        ref = load_json(path)
+    except (OSError, ValueError) as e:
+        log("cannot read reference %s: %s" % (path, e))
+        return None
+    prompts = ref.get("prompts") if isinstance(ref, dict) else None
+    if not isinstance(prompts, list) or not prompts:
+        log("%s is not a reference file: no \"prompts\" list" % path)
+        return None
+    for i, r in enumerate(prompts):
+        if not isinstance(r, dict) or "ids" not in r or "expected" not in r:
+            log("%s: prompt %d needs \"ids\" and \"expected\"" % (path, i + 1))
+            return None
+        if not r["ids"] or not r["expected"]:
+            log("%s: prompt %d has an empty \"ids\" or \"expected\"" % (path, i + 1))
+            return None
+    return ref
 
 
 GEMMA4_MIN_PREFIX = 12      # Gemma 4: every prompt must agree with llama.cpp on at least this many first tokens
@@ -120,7 +151,7 @@ def spec_state(eng, requested=None):
     return mode, "speculation: " + ", ".join(parts), refusal
 
 
-def run(cfg, log=print):
+def run(cfg, log=print, reference=None):
     try:
         import cupy as cp
     except ImportError:
@@ -130,6 +161,10 @@ def run(cfg, log=print):
     from .engine import make_engine
     pack = cfg["pack"]
     man = load_json(os.path.join(pack, "kindi_pack.json"))
+    if reference and man.get("backend"):
+        log("kindi verify: --reference is for the Bonsai reference matrix (a qwen35 pack); %s resolves "
+            "its own references" % man.get("backend"))
+        return 2
     if man.get("backend") == "kindi_gemma4":
         return run_gemma4(cfg, man, log=log)
     if man.get("backend") == "kindi_nanbeige":
@@ -149,11 +184,23 @@ def run(cfg, log=print):
             "release gate data), not this llama.cpp reference matrix; run `python -m kindi.dsv41_server` "
             "with the gate directory to use it")
         return 2
-    rp = reference_for(pack)
-    if rp is None:
-        log("no llama.cpp reference for this model in this version of Kindi")
-        return 2
-    ref = load_json(rp)
+    if reference:
+        if not os.path.isfile(reference):
+            log("no such reference file: %s" % reference)
+            return 2
+        ref = load_reference(reference, log=log)
+        if ref is None:
+            return 2
+        log("reference %s: user-supplied, %d prompts" % (os.path.basename(reference), len(ref["prompts"])))
+    else:
+        rp = reference_for(pack)
+        if rp is None:
+            log("no llama.cpp reference for this model in this version of Kindi")
+            log("one made with llama.cpp for this exact file can be used: kindi verify --reference FILE")
+            return 2
+        ref = load_reference(rp, log=log)
+        if ref is None:
+            return 2
     from .packcheck import PackError, check
     try:                                    # B16: every pack file as kindi convert wrote it (sha256)
         n = check(pack, "full", man)
@@ -164,7 +211,10 @@ def run(cfg, log=print):
                                     "no record (a pack from before 0.7.0; kindi convert --force adds it)"))
     cl = os.path.join(pack, "head_clusters.npz")
     said = []
-    eng = make_engine(pack, ctx=1024, clusters=dict(np.load(cl, allow_pickle=False)) if os.path.exists(cl) else None, log=said.append,
+    # the bundled references are 45-49 tokens end to end; a user-supplied one may be longer, and the
+    # engine needs the prompt and every expected token in one context
+    need = max(len(r["ids"]) + len(r["expected"]) for r in ref["prompts"])
+    eng = make_engine(pack, ctx=max(1024, need + 8), clusters=dict(np.load(cl, allow_pickle=False)) if os.path.exists(cl) else None, log=said.append,
                        tandem=cfg.get("tandem", "off"), cpu_layers=cfg.get("tandem_cpu_layers"),
                        gpu=cfg.get("tandem_gpu"), kv_cache=cfg.get("kv_cache"))
     # the first line names the mode that will generate, so a PASS is never read as the plain engine's
@@ -212,14 +262,16 @@ def run(cfg, log=print):
         if sp and sp.get("drafted"):
             spec_note = ", %d/%d drafts accepted" % (sp.get("accepted", 0), sp.get("drafted", 0))
         log("prompt %d %-60s %s  %d/%d tokens match  (%.1fs%s)" % (
-            i + 1, repr(r["prompt"])[:60], state, n, len(r["expected"]), t, spec_note))
+            i + 1, repr(r.get("prompt") or "")[:60], state, n, len(r["expected"]), t, spec_note))
         if not ok:
             log("   first difference at token %d%s" % (j, " (llama.cpp top-2 gap there %.4f)" % gap if gap is not None else ""))
     where = " with KINDI_SPEC=%s" % spec_mode if spec_mode is not None else " (speculation off)"
+    # a user-supplied file is not llama.cpp's; the verdict names the file it was scored against
+    src = os.path.basename(reference) if reference else "llama.cpp"
     if ok_all and ties:
         log("PASS%s: %d of %d prompts token-exact, %d end at a llama.cpp tie, 0 fail - %.1f tokens/s over the run" % (
             where, len(ref["prompts"]) - ties, len(ref["prompts"]), ties, tok / dt))
     else:
-        log("%s%s - %.1f tokens/s over the run" % ("ALL PASS: token-exact with llama.cpp" if ok_all else "FAIL",
+        log("%s%s - %.1f tokens/s over the run" % (("ALL PASS: token-exact with %s" % src) if ok_all else "FAIL",
                                                     where, tok / dt))
     return 0 if ok_all else 1

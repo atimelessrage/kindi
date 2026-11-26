@@ -5,8 +5,9 @@ for what a card can run today; this page is research and projection for the fami
 [README.md](README.md) is the index.
 
 Status: research, planning and the shipped Bonsai 2.5 facts, 2026-11-09; updated 2026-11-25 (section 1a
-carries the file-level facts, the code that now accepts it, the template parity check and the CPU-engine
-run; section 4.2 the publisher sampling sets and `reasoning_effort`). Sections 1a and 4.2 describe what
+carries the file-level facts, the code that now accepts it, the template parity check, the CPU-engine
+run and the `kindi verify --reference` route; section 4.2 the publisher sampling sets and
+`reasoning_effort`). Sections 1a and 4.2 describe what
 the tree does today; the rest is projection. This document does not change engine code and is not a
 support claim for anything marked **No** or **Untested** below.
 
@@ -165,20 +166,36 @@ What was run (2026-11-25, i7-8086K, CPU engine; evidence in
   two processes produced the same ids, and a repeated generation in one process is identical too, so
   CPU decode is reproducible.
 - `kindi verify` on the pack prints `no llama.cpp reference for this model in this version of Kindi`
-  and exits 2.
+  and exits 2, because references are keyed by release and there is none for 2.5 here. The refusal now
+  names the way in: `kindi verify --reference FILE` runs the same matrix against a reference made with
+  llama.cpp for this exact GGUF. The file is what the bundled ones are - a JSON `{"prompts": [{"ids":
+  [...], "expected": [...]}, ...]}` with optional `source` and `prompt` text - and Kindi checks that
+  shape before it loads the engine, sizes the context from the longest row, and prints `reference FILE:
+  user-supplied` so a PASS cannot be mistaken for the bundled matrix's. It cannot invent the numbers:
+  the expected tokens still have to come from llama.cpp's greedy run on the same file.
 - The `-mtp` file was run the same way, from its own conversion: the pack manifest names the same
   64-layer model with the head's block and tensor names under `mtp_head`, and the CPU engine loaded
   and generated from it with the same kinds of replies as the base file (the first answer on topic,
   the arithmetic prompt answering the number) and identical ids on an in-process repeat. This is a
   load-and-generate check, not a second process run and not a drafting result: nothing drafted.
- That is the new, deliberate behaviour: `verify.reference_for` keys the reference file by
+- `kindi verify --reference` was run on the 2.5 pack with a two-prompt reference the pack itself
+  produced (11 and 1,057 prompt tokens, 8 expected each; `bench-logs/make_self_reference.py`). The file
+  was accepted, the engine came up with `ctx 1073` from the 1,057-token row rather than the hard-coded
+  1024, both prompts matched 8 of 8 and the run passed (pack load 340 s, 3.3 tok/s over the run). The
+  expectations are the pack's own greedy output, so this checks the route and the matrix on the real
+  model, not exactness: only a llama.cpp run on this GGUF can settle that, and `--reference` is how its
+  tokens would be scored.
+
+That is the new, deliberate behaviour: `verify.reference_for` keys the reference file by
   release as well as by size, so a 2.5 pack is no longer scored against Bonsai 2's tokens
   (`reference-27b.json`) and reported as a port failure.
 
 What is **not** verified and must not be claimed:
 
 - No exactness result: there is no llama.cpp reference row for this release here, so nothing above is a
-  token-for-token comparison with another engine. The support matrix row `bonsai-2.5-27b` reads
+  token-for-token comparison with another engine. The route now exists (`--reference`, above) and was
+  exercised on the pack with a reference the pack itself produced; no llama.cpp build for this GGUF is
+  on this host, so the flag is checked and the exactness comparison is not. The support matrix row `bonsai-2.5-27b` reads
   `load+generate, no reference` for CPU, `not run` for GPU, and `not converted` for PQ2_0/Q2_0.
 - No GPU run of any kind: the Arc A770 toolchain is still probe-only (`kindi intel-sycl`) and this host
   has no CUDA device, so the GPU cells stay `not run`. Sampling beyond greedy, tool calling, long

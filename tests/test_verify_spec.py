@@ -164,10 +164,12 @@ def test_the_cli_flag_selects_the_mode(monkeypatch, tmp_path):
     import kindi
     main = importlib.import_module("kindi.__main__")
     seen = {}
-    monkeypatch.setattr(verify, "run", lambda cfg, log=print: seen.update(called=True) or 0)
+    monkeypatch.setattr(verify, "run",
+                        lambda cfg, log=print, reference=None: seen.update(called=True, reference=reference) or 0)
     monkeypatch.delenv("KINDI_SPEC", raising=False)
     assert main.cmd_verify({"state_dir": str(tmp_path)}, types.SimpleNamespace(spec="mtp")) == 0
-    assert seen.get("called") is True and main.os.environ["KINDI_SPEC"] == "mtp"
+    assert seen.get("called") is True and seen.get("reference") is None
+    assert main.os.environ["KINDI_SPEC"] == "mtp"
     assert kindi  # the package imported, not a stub
 
 

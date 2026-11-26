@@ -232,7 +232,7 @@ def cmd_verify(cfg, a):
         os.environ["KINDI_SPEC"] = spec          # the mode's own variables (KINDI_MTP_HEAD, KINDI_SPEC_PACK) stay as set
     _setup_gpu_env(cfg)
     from .verify import run
-    return run(cfg, log=log)
+    return run(cfg, log=log, reference=getattr(a, "reference", None))
 
 
 def cmd_bench(cfg, a):
@@ -742,6 +742,10 @@ def _build_parser():
     s.add_argument("--iters", type=int, default=12)
     s = sub.add_parser("verify", help="check against llama.cpp's reference output")
     _tandem_args(s)
+    s.add_argument("--reference", default=None, metavar="FILE",
+                   help="verify against this reference file instead of the bundled one (the shape the "
+                        "bundled files use: a JSON \"prompts\" list, each row with \"ids\" and \"expected\"); "
+                        "this is the route for a release with no bundled reference, such as Bonsai 2.5 27B")
     s.add_argument("--spec", default=None, choices=("ngram", "mtp", "draft2b", "both", "dspine", "auto", "0"),
                    help="verify under this speculation mode (same as KINDI_SPEC; the mode's own variables, "
                         "KINDI_MTP_HEAD or KINDI_SPEC_PACK, are read as usual); the effective mode is printed "
